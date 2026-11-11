@@ -48,39 +48,19 @@ const TEACHER_AVATAR = require('../../assets/giang-vien-phi-van-thang.png');
 const GOOGLE_MEET_LOGO = require('../../assets/google-meet.webp');
 const MASCOT_STUDY = require('../../assets/mascot/cam-xuc-hoc-bai.gif');
 
-export const FREE_PORTAL_COURSE_NAME = 'Tài khoản miễn phí';
+import {
+  FREE_PORTAL_COURSE_NAME,
+  hasRealCourseEnrollment,
+  isFreePortalLocked,
+  isFreePortalMenu,
+} from '../utils/freePortalHelper';
 
-export function hasRealCourseEnrollment(
-  user?: DemoUser | null,
-  enrollmentsOverride?: DemoEnrollment[] | null,
-): boolean {
-  const list = enrollmentsOverride ?? user?.enrollments;
-  if (!Array.isArray(list)) return false;
-  return list.some((enrollment) => {
-    const label = String(enrollment?.courseName || '').trim().toLocaleLowerCase('vi');
-    if (!label || label === FREE_PORTAL_COURSE_NAME.toLocaleLowerCase('vi')) return false;
-    return enrollment.status === 'Đang học';
-  });
-}
-
-export function isFreePortalMenu(
-  user?: DemoUser | null,
-  enrollmentsOverride?: DemoEnrollment[] | null,
-): boolean {
-  if (!user || user.role !== 'student') return false;
-  if (hasRealCourseEnrollment(user, enrollmentsOverride)) return false;
-  return (
-    user.freePortal === true
-    || String(user.course || '').trim().toLocaleLowerCase('vi') === FREE_PORTAL_COURSE_NAME.toLocaleLowerCase('vi')
-  );
-}
-
-export function isFreePortalLocked(
-  user?: DemoUser | null,
-  enrollmentsOverride?: DemoEnrollment[] | null,
-): boolean {
-  return isFreePortalMenu(user, enrollmentsOverride) && user?.freeUnlocked !== true;
-}
+export {
+  FREE_PORTAL_COURSE_NAME,
+  hasRealCourseEnrollment,
+  isFreePortalLocked,
+  isFreePortalMenu,
+};
 
 const LOCKED_ITEMS = [
   { key: 'support', label: 'Hỗ trợ', Icon: Headphones },
@@ -598,7 +578,7 @@ export function FreeSurveyModal({
                 )}
               </View>
               <Text style={styles.lockTitle}>Cách mở các mục đang khóa</Text>
-              <Text style={styles.lockSubtitle}>Tài khoản miễn phí có sẵn Bài giảng và Luyện tập</Text>
+              <Text style={styles.lockSubtitle}>Tài khoản miễn phí có sẵn Luyện tập</Text>
             </View>
             <View style={styles.lockBody}>
               <View style={styles.lockedGrid}>
@@ -1051,23 +1031,20 @@ const styles = StyleSheet.create({
   planCardNew: {
     width: 130,
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
     borderRadius: 18,
     padding: 10,
     alignItems: 'center',
     position: 'relative',
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   planCardNewSelected: {
     borderColor: '#10B981',
-    borderBottomColor: '#047857',
     backgroundColor: '#ECFDF5',
     shadowColor: '#059669',
     shadowOpacity: 0.15,

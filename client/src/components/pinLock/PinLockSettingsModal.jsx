@@ -137,7 +137,7 @@ export default function PinLockSettingsModal({ userKey }) {
                     type="button"
                     onClick={() => changeTimeout(option.minutes)}
                     aria-pressed={timeout === option.minutes}
-                    className={`rounded-xl border px-3 py-2 text-sm font-bold ${timeout === option.minutes
+                    className={`cms-pin-press rounded-xl border px-3 py-2 text-sm font-bold ${timeout === option.minutes
                       ? 'border-red-600 bg-red-600 text-white'
                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                   >
@@ -148,18 +148,18 @@ export default function PinLockSettingsModal({ userKey }) {
             </div>
             {config ? (
               <div className="grid gap-2 sm:grid-cols-3">
-                <button type="button" onClick={() => goStep('verify-change')} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50">Đổi mã PIN</button>
+                <button type="button" onClick={() => goStep('verify-change')} className="cms-pin-press rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50">Đổi mã PIN</button>
                 <button
                   type="button"
                   onClick={() => { close(); window.dispatchEvent(new CustomEvent(PIN_LOCK_NOW_EVENT)); }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-bold text-white"
+                  className="cms-pin-press inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-bold text-white"
                 >
                   <Lock size={15} aria-hidden="true" /> Khóa ngay
                 </button>
-                <button type="button" onClick={() => goStep('verify-remove')} className="rounded-xl border border-red-200 px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">Tắt khóa</button>
+                <button type="button" onClick={() => goStep('verify-remove')} className="cms-pin-press rounded-xl border border-red-200 bg-white px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">Tắt khóa</button>
               </div>
             ) : (
-              <button type="button" onClick={() => goStep('create')} className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-extrabold text-white">
+              <button type="button" onClick={() => goStep('create')} className="cms-pin-press w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-extrabold text-white">
                 Tạo mã PIN
               </button>
             )}

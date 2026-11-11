@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, Sparkles, Star, StickyNote, Trophy, Volume2, VolumeX } from 'lucide-react-native';
 import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
@@ -33,7 +33,7 @@ import {
 } from '../services/courseVideoApi';
 import { learningService } from '../services/mockService';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 
 type CourseFilter = 'all' | 'registered' | 'video' | 'instructor' | 'guide';
 type CourseSection = { id: string; title: string; courses: LessonPracticeCourse[] };
@@ -652,7 +652,7 @@ export function CourseVideosScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Luyện tập ${topic.name}`}
           >
-            <Gamepad2 size={13} color={colors.brand} />
+            <Gamepad2 size={13} color={theme.brand} />
             <Text numberOfLines={1} style={styles.relatedTopicText}>{topic.name}</Text>
           </Pressable>
         ))}
@@ -727,7 +727,7 @@ export function CourseVideosScreen() {
               accessibilityLabel={option.label}
             >
               <View style={styles.filterIconWrap}>
-                <Icon size={17} color={active ? colors.brandDark : colors.muted} />
+                <Icon size={17} color={active ? theme.brandDark : colors.muted} />
                 {count !== undefined ? <Text style={[styles.filterCount, active && styles.filterCountActive]}>{count}</Text> : null}
               </View>
               <Text numberOfLines={2} style={[styles.filterText, active && styles.filterTextActive]}>{option.displayLabel}</Text>
@@ -739,7 +739,7 @@ export function CourseVideosScreen() {
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {!resource.loading && !resource.error && filter === 'guide' ? (
         <Card>
-          <View style={styles.guideHeader}><CircleHelp size={20} color={colors.brand} /><Text style={styles.cardTitle}>Hướng dẫn học</Text></View>
+          <View style={styles.guideHeader}><CircleHelp size={20} color={theme.brand} /><Text style={styles.cardTitle}>Hướng dẫn học</Text></View>
           <Text style={styles.body}>Chọn khóa học, mở môn học và hoàn thành lần lượt từng buổi để theo dõi tiến độ.</Text>
         </Card>
       ) : null}
@@ -795,7 +795,7 @@ export function CourseVideosScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={selectedSubject ? 'Quay lại danh sách môn học' : 'Quay lại danh sách khóa học'}
               >
-                <ArrowLeft size={19} color={colors.brand} />
+                <ArrowLeft size={19} color={theme.brand} />
               </Pressable>
               <View style={styles.flex}>
                 <Text style={styles.modalTitle}>{selectedSubject?.name || selectedCourse?.name}</Text>
@@ -809,9 +809,9 @@ export function CourseVideosScreen() {
                   accessibilityState={{ expanded: unitNavOpen }}
                   accessibilityLabel={unitNavOpen ? 'Thu gọn danh sách bài học' : 'Mở danh sách bài học'}
                 >
-                  <Menu size={17} color={colors.brand} />
+                  <Menu size={17} color={theme.brand} />
                   <Text style={styles.headerLessonNavText}>Danh sách bài học</Text>
-                  {unitNavOpen ? <ChevronUp size={16} color={colors.brand} /> : <ChevronDown size={16} color={colors.brand} />}
+                  {unitNavOpen ? <ChevronUp size={16} color={theme.brand} /> : <ChevronDown size={16} color={theme.brand} />}
                 </Pressable>
               ) : null}
             </View>
@@ -940,7 +940,7 @@ export function CourseVideosScreen() {
                                     accessibilityLabel={`${section.title}${done ? ', đã hoàn thành, nhấn để học lại' : ''}${locked ? ', đang khóa' : ''}`}
                                     accessibilityState={{ selected: sectionActive, disabled: openingUnit || locked }}
                                   >
-                                    {done ? <CheckCircle2 size={14} color="#059669" /> : <ChevronRight size={14} color={colors.brand} />}
+                                    {done ? <CheckCircle2 size={14} color="#059669" /> : <ChevronRight size={14} color={theme.brand} />}
                                     <Text numberOfLines={2} style={[styles.unitNavSubItemText, sectionActive && styles.unitNavSubItemTextActive, locked && styles.unitNavItemTitleLocked]}>{section.title}</Text>
                                     {done ? <Text style={styles.unitNavReplay}>Học lại</Text> : null}
                                   </Pressable>
@@ -1601,7 +1601,7 @@ function UnitDetails({
                 accessibilityLabel={practiceSoundEnabled ? 'Tắt âm thanh luyện tập' : 'Bật âm thanh luyện tập'}
                 accessibilityState={{ checked: practiceSoundEnabled }}
               >
-                {practiceSoundEnabled ? <Volume2 size={16} color={colors.brand} /> : <VolumeX size={16} color={colors.muted} />}
+                {practiceSoundEnabled ? <Volume2 size={16} color={theme.brand} /> : <VolumeX size={16} color={colors.muted} />}
               </Pressable>
               {practiceTimeLimit > 0 ? (
                 <View style={[styles.practiceClock, practiceRemaining > 0 && practiceRemaining <= 10 && styles.practiceClockWarning]}>
@@ -1858,7 +1858,7 @@ function UnitNavigationBar({
         accessibilityRole="button"
         accessibilityLabel={previousUnit ? `Bài trước: ${previousUnit.title}` : 'Không có bài học trước'}
       >
-        <ArrowLeft size={17} color={previousUnit && !previousUnit.locked ? colors.brand : colors.muted} />
+        <ArrowLeft size={17} color={previousUnit && !previousUnit.locked ? theme.brand : colors.muted} />
         <View style={styles.unitNavigationCopy}>
           <Text style={styles.unitNavigationLabel}>Bài trước</Text>
           <Text numberOfLines={1} style={styles.unitNavigationTitle}>{previousUnit?.title || 'Không có'}</Text>
@@ -1903,7 +1903,7 @@ function SectionNavigationBar({
         accessibilityRole="button"
         accessibilityLabel={previousSection ? `Mục trước: ${previousSection.title}` : 'Không có mục trước'}
       >
-        <ArrowLeft size={15} color={previousSection ? colors.brand : colors.muted} />
+        <ArrowLeft size={15} color={previousSection ? theme.brand : colors.muted} />
         <Text numberOfLines={1} style={styles.sectionNavigationLabel}>{previousSection?.title || 'Mục trước'}</Text>
       </Pressable>
       <Pressable
@@ -1918,7 +1918,7 @@ function SectionNavigationBar({
         accessibilityLabel={nextSection ? `Mục tiếp theo: ${nextSection.title}${!currentDone ? ', hoàn thành mục hiện tại trước' : ''}` : 'Đã đến mục cuối cùng'}
       >
         <Text numberOfLines={1} style={styles.sectionNavigationLabel}>{nextSection?.title || 'Mục tiếp theo'}</Text>
-        <ChevronRight size={15} color={nextSection && currentDone ? colors.brand : colors.muted} />
+        <ChevronRight size={15} color={nextSection && currentDone ? theme.brand : colors.muted} />
       </Pressable>
     </View>
   );
@@ -1987,7 +1987,7 @@ function VideoLessonPane({
     <View style={styles.videoLessonCard}>
       <View style={styles.videoLessonHeading}>
         <View style={styles.videoLessonTitleRow}>
-          <Clapperboard size={17} color={colors.brand} />
+          <Clapperboard size={17} color={theme.brand} />
           <Text style={styles.videoLessonTitle}>{video?.title || 'Video bài giảng'}</Text>
         </View>
         {done ? (
@@ -2040,7 +2040,7 @@ function VideoLessonPane({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
-              <Icon size={15} color={active ? colors.brand : '#64748B'} />
+              <Icon size={15} color={active ? theme.brand : '#64748B'} />
               <Text style={[styles.videoTabText, active && styles.videoTabTextActive]}>{tab.label}</Text>
             </Pressable>
           );
@@ -2294,7 +2294,7 @@ function PracticeQuestion({
               if (optionIndex > 0) [next[optionIndex - 1], next[optionIndex]] = [next[optionIndex], next[optionIndex - 1]];
               return next;
             });
-          }} accessibilityRole="button" accessibilityLabel="Di chuyển lên"><ChevronUp size={18} color={colors.brand} /></Pressable>
+          }} accessibilityRole="button" accessibilityLabel="Di chuyển lên"><ChevronUp size={18} color={theme.brand} /></Pressable>
           <Pressable disabled={answerState === 'correct' || cooldown > 0} onPress={() => {
             setAnswerState('idle'); setFeedback('');
             setSelected((current) => {
@@ -2302,7 +2302,7 @@ function PracticeQuestion({
               if (optionIndex < next.length - 1) [next[optionIndex + 1], next[optionIndex]] = [next[optionIndex], next[optionIndex + 1]];
               return next;
             });
-          }} accessibilityRole="button" accessibilityLabel="Di chuyển xuống"><ChevronDown size={18} color={colors.brand} /></Pressable>
+          }} accessibilityRole="button" accessibilityLabel="Di chuyển xuống"><ChevronDown size={18} color={theme.brand} /></Pressable>
         </View>
       )) : null}
       {item.hint ? (
@@ -2400,7 +2400,7 @@ function PracticeQuestion({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   screenContent: { gap: spacing.md },
   relatedTopics: {
@@ -2705,4 +2705,4 @@ const styles = StyleSheet.create({
   guideHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   cardTitle: { color: colors.ink, fontSize: typography.body, fontWeight: '800' },
   body: { color: colors.muted, fontSize: typography.small, lineHeight: 20 },
-});
+}));

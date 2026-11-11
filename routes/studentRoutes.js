@@ -1261,11 +1261,37 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
                 }
               });
             }
+            if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
+              const nextLink = String(safeBody.linkHoc || '').trim();
+              doc.enrollments[idx].linkHoc = nextLink;
+              if (doc.enrollments[idx].isPrimary || !String(doc.linkHoc || '').trim()) {
+                doc.linkHoc = nextLink;
+                doc.online_meeting_url = nextLink;
+              }
+            }
+            doc.markModified('enrollments');
             await doc.save();
+            if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
+              const nextLink = String(safeBody.linkHoc || '').trim();
+              const scheduleFilter = {
+                studentId: doc._id,
+                status: { $ne: 'cancelled' },
+                ...(req.user?.role === 'teacher' && req.user?.id
+                  ? { teacherId: req.user.id }
+                  : (enrollmentCourse ? { course: enrollmentCourse } : {})),
+              };
+              await Schedule.updateMany(scheduleFilter, { $set: { linkHoc: nextLink } }).catch(() => {});
+            }
             const populated = await Student.findById(doc._id).populate('teacherId', 'name phone specialty');
             const io = req.app.get('io');
             // Use populated (post-save) - never reference later `const student` (TDZ)
-            if (io) studentRealtime(io, populated, 'student:updated', populated._id);
+            if (io) {
+              studentRealtime(io, populated, 'student:updated', populated._id);
+              studentDataRefresh(io, populated, { type: 'student', id: populated._id });
+              if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
+                studentDataRefresh(io, populated, { type: 'schedule', id: populated._id });
+              }
+            }
             if (prevLinkHoc !== null && prevLinkHoc !== String(safeBody.linkHoc || '').trim()) {
               const courseLabel = enrollmentCourse || doc.enrollments[idx]?.courseName || doc.course || 'khóa học';
               const nextLink = String(safeBody.linkHoc || '').trim();
@@ -1548,10 +1574,46 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
+      const nextLink = String(safeBody.linkHoc || '').trim();
+      if (Array.isArray(student.enrollments) && student.enrollments.length) {
+        let touchedEnrollment = false;
+        const actorTeacherId = req.user?.role === 'teacher' && req.user?.id ? String(req.user.id) : '';
+        student.enrollments.forEach((e) => {
+          const eTid = String(e?.teacherId?._id || e?.teacherId || '');
+          if (actorTeacherId ? eTid === actorTeacherId : e?.isPrimary) {
+            e.linkHoc = nextLink;
+            touchedEnrollment = true;
+          }
+        });
+        if (!touchedEnrollment) {
+          const primaryIdx = student.enrollments.findIndex((e) => e?.isPrimary);
+          const targetIdx = primaryIdx >= 0 ? primaryIdx : 0;
+          if (student.enrollments[targetIdx]) {
+            student.enrollments[targetIdx].linkHoc = nextLink;
+            touchedEnrollment = true;
+          }
+        }
+        if (touchedEnrollment) {
+          student.markModified('enrollments');
+          await student.save();
+        }
+      }
+      const scheduleFilter = {
+        studentId: student._id,
+        status: { $ne: 'cancelled' },
+        ...(req.user?.role === 'teacher' && req.user?.id ? { teacherId: req.user.id } : {}),
+      };
+      await Schedule.updateMany(scheduleFilter, { $set: { linkHoc: nextLink } }).catch(() => {});
+    }
+
     const io = req.app.get('io');
     if (io) {
       studentRealtime(io, student, 'student:updated', student._id);
       studentDataRefresh(io, student, { type: 'student', id: student._id });
+      if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
+        studentDataRefresh(io, student, { type: 'schedule', id: student._id });
+      }
 
       // ── Notification: duyệt/thu hồi quyền thi (khi admin/staff cập nhật qua PUT /students/:id)
       // AdminDashboard hiện dùng endpoint này cho approve/revoke exam, nên cần bắn noti ở đây.

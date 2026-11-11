@@ -54,7 +54,7 @@ test('web: HV hết hạn chỉ thấy màn gia hạn; hạn ở sidebar + hồ 
   const sidebar = read('client/src/components/AppSidebar.jsx');
   assert.ok(
     sidebar.includes('subscriptionShortLabel(studentSubscription.subscription)')
-    || sidebar.includes('subscriptionShortLabel(sub)')
+    || sidebar.includes('subscriptionShortLabel(sub')
   );
   assert.ok(sidebar.includes("hash: 'subscription-codes'"));
   assert.ok(

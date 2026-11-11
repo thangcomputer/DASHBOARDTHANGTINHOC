@@ -9,6 +9,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
+import { themeState } from '../../theme/tokens';
 
 export type DuoButtonVariant =
   | 'primary'   // Emerald / Lime green (Học tiếp, Bắt đầu)
@@ -116,7 +117,8 @@ export function DuoButton({
   const contentText = label || text;
 
   const sizeSpec = SIZES[size];
-  const variantSpec = VARIANTS[variant];
+  // Học viên theo khóa: nút chính màu đỏ (đồng bộ web app).
+  const variantSpec = VARIANTS[variant === 'primary' && themeState.brand ? 'danger' : variant];
 
   const isDisabled = disabled || loading;
   const isPressed = pressed && !isDisabled;

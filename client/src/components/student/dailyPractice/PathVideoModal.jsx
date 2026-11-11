@@ -377,7 +377,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
             <Clapperboard size={16} className="shrink-0 text-red-400" aria-hidden="true" />
             <span className="line-clamp-2 break-words">{current?.title || 'Video của chặng'}</span>
           </h2>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="cms-btn cms-btn-primary shrink-0 !py-2 !px-4 text-sm font-black">
+          <button type="button" onClick={onClose} aria-label="Đóng" className="cms-btn cms-btn-primary cms-btn-brand shrink-0 !py-2 !px-4 text-sm font-black">
             Đóng
           </button>
         </div>

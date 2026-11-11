@@ -10,7 +10,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../app/AuthContext';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
-import { colors } from '../theme/tokens';
+import { colors, theme, createThemedStyles } from '../theme/tokens';
 
 type LmsHistoryItem = {
   id: string;
@@ -455,16 +455,19 @@ export function LmsProgressCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   card: {
     borderRadius: 22,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     padding: 16,
     gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   celebrationBanner: {
     flexDirection: 'row',
@@ -515,10 +518,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderRadius: 12,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#FED7AA',
-    borderBottomWidth: 3,
-    borderBottomColor: '#FDBA74',
     backgroundColor: '#FFF7ED',
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -667,20 +668,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   periodBtn: {
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomWidth: 2,
-    borderBottomColor: '#CBD5E1',
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   periodBtnActive: {
     backgroundColor: '#10B981',
-    borderColor: '#059669',
-    borderBottomWidth: 3,
-    borderBottomColor: '#047857',
+    borderColor: '#10B981',
   },
   periodBtnText: {
     fontSize: 11,
@@ -768,5 +765,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-});
+}), { remapGreen: true });
 

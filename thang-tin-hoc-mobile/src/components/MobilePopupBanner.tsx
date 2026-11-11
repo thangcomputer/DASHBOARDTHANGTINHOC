@@ -11,7 +11,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { X } from 'lucide-react-native';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { DuoButton } from './duo/DuoButton';
+import { colors, spacing, typography } from '../theme/tokens';
 
 const STORAGE_PREFIX = 'cms_popup_seen_';
 
@@ -91,9 +92,7 @@ export function MobilePopupBanner({ role = 'student' }: { role?: string }) {
           ) : null}
 
           <View style={styles.actionWrap}>
-            <Pressable onPress={handleClose} style={styles.actionButton}>
-              <Text style={styles.actionButtonText}>Đã hiểu, đóng thông báo ✓</Text>
-            </Pressable>
+            <DuoButton variant="primary" size="lg" fullWidth text="Đã hiểu, đóng thông báo ✓" onPress={handleClose} />
           </View>
         </View>
       </View>
@@ -163,23 +162,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
     paddingTop: spacing.xs,
-  },
-  actionButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: radius.md,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: typography.small,
-    fontWeight: '800',
-    letterSpacing: 0.3,
   },
 });

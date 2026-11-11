@@ -237,14 +237,14 @@ export default function TeacherTeachingLog({
     return (
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl" aria-label="Nhật ký giảng dạy">
         <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 pb-2.5 pt-3 sm:px-5 sm:pt-4">
-          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] bg-red-50 text-red-600">
+          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] bg-emerald-50 text-emerald-600">
             <BookText size={16} />
           </div>
           <h3 className="min-w-0 flex-1 text-sm font-black tracking-tight text-slate-900 sm:text-base">
             {copy.title}
           </h3>
           <div className="flex h-9 min-w-[42px] items-center justify-center gap-1 rounded-xl bg-slate-100 px-2">
-            <span className="text-xs font-black text-red-800">{list.length}</span>
+            <span className="text-xs font-black text-emerald-700">{list.length}</span>
             <span className="text-xs font-bold text-slate-500">ca</span>
           </div>
         </header>
@@ -261,18 +261,18 @@ export default function TeacherTeachingLog({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setTab(selected ? 'all' : id)}
-                  className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition sm:text-xs ${selected
+                  className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition-all cursor-pointer sm:text-xs ${selected
                       ? cancelled
-                        ? 'border-rose-700 bg-rose-700 text-white shadow-sm'
-                        : 'border-red-800 bg-red-800 text-white shadow-sm'
+                        ? 'border-rose-400 bg-rose-600 text-white shadow-sm border-b-4 border-b-rose-800'
+                        : 'border-[#34D399] bg-[#10B981] text-white shadow-sm border-b-4 border-b-[#059669]'
                       : cancelled
-                        ? 'border-rose-200 bg-rose-50 text-rose-700'
-                        : 'border-slate-200 bg-white text-slate-500'
+                        ? 'border-rose-200 bg-rose-50 text-rose-700 border-b-2'
+                        : 'border-slate-200 bg-white text-slate-600 border-b-4 border-b-slate-300 hover:bg-slate-50'
                     }`}
                 >
                   <span>{label}</span>
                   {count !== undefined ? (
-                    <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'}`}>
+                    <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                       {count}
                     </span>
                   ) : null}
@@ -283,7 +283,7 @@ export default function TeacherTeachingLog({
           <div className="grid grid-cols-2 gap-1.5" role="tablist" aria-label="Lọc trạng thái điểm danh">
             {[
               { id: 'pending', label: 'Chưa điểm danh', count: pendingCount, tone: 'orange' },
-              { id: 'confirmation', label: 'Chờ xác nhận', count: confirmationCount, tone: 'red' },
+              { id: 'confirmation', label: 'Chờ xác nhận', count: confirmationCount, tone: 'emerald' },
             ].map(({ id, label, count, tone }) => {
               const selected = tab === id;
               const orange = tone === 'orange';
@@ -294,13 +294,13 @@ export default function TeacherTeachingLog({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setTab(selected ? 'all' : id)}
-                  className={`flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-extrabold transition sm:text-xs ${selected
-                      ? orange ? 'border-orange-700 bg-orange-700 text-white' : 'border-red-700 bg-red-700 text-white'
-                      : orange ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-red-200 bg-red-50 text-red-700'
+                  className={`flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-extrabold transition-all cursor-pointer sm:text-xs ${selected
+                      ? orange ? 'border-orange-400 bg-orange-600 text-white border-b-4 border-b-orange-800' : 'border-[#34D399] bg-[#10B981] text-white border-b-4 border-b-[#059669]'
+                      : orange ? 'border-orange-200 bg-orange-50 text-orange-800 border-b-2' : 'border-emerald-200 bg-emerald-50 text-emerald-700 border-b-2'
                     }`}
                 >
                   <span className="truncate">{label}</span>
-                  <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : orange ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : orange ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>
                     {count}
                   </span>
                 </button>
@@ -387,9 +387,11 @@ export default function TeacherTeachingLog({
                           type="button"
                           onClick={() => openAttendanceFor(sch)}
                           disabled={makeupRequestSent}
-                          className={`inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-extrabold ${makeupRequestSent
-                              ? 'cursor-not-allowed bg-slate-100 text-slate-500'
-                              : `text-white ${kind === 'overdue_attendance' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-700 hover:bg-red-800'}`
+                          className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${makeupRequestSent
+                              ? 'cursor-not-allowed bg-slate-100 text-slate-500 border border-slate-200'
+                              : kind === 'overdue_attendance'
+                                ? 'bg-amber-500 border border-amber-400 border-b-4 border-b-amber-700 text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
+                                : 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
                             }`}
                           title={makeupRequestSent
                             ? 'Yêu cầu đã gửi Admin'
@@ -416,7 +418,7 @@ export default function TeacherTeachingLog({
     <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="px-4 sm:px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
             <BookText size={18} />
           </div>
           <div className="min-w-0">
@@ -434,9 +436,9 @@ export default function TeacherTeachingLog({
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`px-3 h-9 rounded-xl text-xs sm:text-xs font-bold transition ${tab === item.id
-                ? 'bg-red-600 text-white shadow-sm'
-                : 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
+              className={`px-3.5 h-9 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${tab === item.id
+                ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white'
+                : 'bg-white text-slate-600 border border-slate-200 border-b-4 border-b-slate-300 hover:bg-slate-50 active:translate-y-[2px] active:border-b-2'
                 }`}
             >
               {item.label}
@@ -554,15 +556,15 @@ export default function TeacherTeachingLog({
                           }
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-600 text-white text-xs font-black "
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white text-xs font-black transition-all cursor-pointer"
                         >
-                          <Video size={12} /> Vào lớp
+                          <Video size={13} /> Vào lớp
                         </a>
                       ) : null}
                       <button
                         type="button"
                         onClick={() => onOpenSession(sch)}
-                        className="h-8 px-2.5 rounded-lg bg-white border-2 border-red-600 text-red-600 text-xs font-bold hover:bg-red-50"
+                        className="h-8 px-3 rounded-xl bg-white border border-slate-200 border-b-4 border-b-slate-300 text-slate-700 hover:bg-slate-50 active:translate-y-[2px] active:border-b-2 text-xs font-extrabold transition-all cursor-pointer"
                       >
                         Ghi chú / Đổi lịch
                       </button>

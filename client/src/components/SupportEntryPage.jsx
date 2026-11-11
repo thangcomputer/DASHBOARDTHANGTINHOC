@@ -19,6 +19,15 @@ const SUPPORT_CHOICES = [
 export default function SupportEntryPage() {
   const [choiceOpen, setChoiceOpen] = useState(false);
 
+  const isTeacher = (() => {
+    try {
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/teacher') || localStorage.getItem('teacher_token') || localStorage.getItem('teacher_user'))) return true;
+    } catch {
+      /* ignore */
+    }
+    return false;
+  })();
+
   const chooseSupport = (mode) => {
     setChoiceOpen(false);
     window.dispatchEvent(new CustomEvent('cms:open-support-choice', { detail: { mode } }));
@@ -27,7 +36,7 @@ export default function SupportEntryPage() {
   return (
     <section className="mx-auto w-full max-w-5xl pt-4">
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-center shadow-sm sm:px-8 sm:py-10">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+        <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${isTeacher ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
           <Headphones size={27} aria-hidden="true" />
         </div>
         <h2 className="mt-3 text-lg font-extrabold text-slate-900 sm:text-xl">Hỗ trợ Thắng Tin Học</h2>
@@ -37,7 +46,11 @@ export default function SupportEntryPage() {
         <button
           type="button"
           onClick={() => setChoiceOpen(true)}
-          className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+          className={`mt-5 inline-flex min-h-[46px] items-center justify-center rounded-2xl px-6 py-2.5 text-sm sm:text-base font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${
+            isTeacher
+              ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105'
+              : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] hover:brightness-105'
+          }`}
         >
           Trò chuyện với hỗ trợ
         </button>

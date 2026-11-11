@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Loader2, Move, RotateCcw, X } from 'lucide-react';
+import { Camera, Loader2, Move, RotateCcw, UserRound, X } from 'lucide-react';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { authAPI } from '../services/api';
 import { useToast } from '../utils/useToast';
@@ -16,6 +16,7 @@ export default function EditableAvatar({
   imgClassName = '',
   onSuccess,
   editable = true,
+  mobileStyle = false,
 }) {
   const toast = useToast();
   const dataCtx = useData();
@@ -28,6 +29,15 @@ export default function EditableAvatar({
   const [cropImage, setCropImage] = useState(null);
   const dragRef = useRef(null);
   const cropPreviewSize = 240;
+
+  const isFreePortal = role === 'student' && (
+    (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+    || (typeof localStorage !== 'undefined' && (() => {
+      try { return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true; } catch { return false; }
+    })())
+  );
+  const isBrandStudent = role === 'student' && !isFreePortal;
+  const cameraBadgeBg = isBrandStudent ? 'bg-[#EF4444]' : 'bg-[#10B981]';
 
   useEffect(() => {
     setLocalAvatar(avatar);
@@ -172,6 +182,8 @@ export default function EditableAvatar({
     dragRef.current = null;
   };
 
+  const hasCustomAvatar = Boolean(localAvatar || avatar);
+
   return (
     <div
       onClick={handleClick}
@@ -179,7 +191,7 @@ export default function EditableAvatar({
       role={editable ? 'button' : undefined}
       tabIndex={editable ? 0 : undefined}
       aria-label={editable ? 'Đổi ảnh đại diện' : name || 'Avatar'}
-      className={`group relative ${editable ? 'cursor-pointer' : ''} overflow-hidden select-none ${className}`}
+      className={`group relative ${editable ? 'cursor-pointer' : ''} ${mobileStyle ? 'overflow-visible' : 'overflow-hidden'} select-none ${className}`}
       title={editable ? 'Rê vào và bấm để đổi ảnh đại diện' : name || 'Avatar'}
     >
       {editable && (
@@ -257,23 +269,55 @@ export default function EditableAvatar({
           document.body,
         )
       )}
-      <img
-        key={displayAvatar}
-        src={displayAvatar}
-        alt={name || 'Avatar'}
-        className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
-      />
-      {editable && (
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-center text-white z-10 p-0.5 pointer-events-none">
-          {loading ? (
-            <Loader2 size={16} className="animate-spin text-white shrink-0" />
-          ) : (
-            <div className="flex flex-col items-center justify-center w-full h-full text-center leading-none gap-0.5">
-              <Camera size={15} className="drop-shadow text-white shrink-0" />
-              <span className="text-[9px] font-extrabold tracking-tight text-white drop-shadow text-center block w-full whitespace-nowrap leading-none">Đổi ảnh</span>
+      {mobileStyle ? (
+        <>
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-white/[0.22] bg-[#334155]">
+            {hasCustomAvatar ? (
+              <img
+                key={displayAvatar}
+                src={displayAvatar}
+                alt={name || 'Avatar'}
+                className={`h-full w-full object-cover ${imgClassName}`}
+              />
+            ) : (
+              <UserRound size={23} color="#FFFFFF" />
+            )}
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-900/65">
+                <Loader2 size={16} className="animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          {editable && !loading && (
+            <span
+              className={`pointer-events-none absolute -bottom-[1px] -right-[1px] z-20 flex h-[18px] w-[18px] items-center justify-center rounded-full border-[1.5px] border-white ${cameraBadgeBg} shadow-[0_1px_3px_rgba(0,0,0,0.3)]`}
+              aria-hidden="true"
+            >
+              <Camera size={10} color="#FFFFFF" strokeWidth={2.4} />
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          <img
+            key={displayAvatar}
+            src={displayAvatar}
+            alt={name || 'Avatar'}
+            className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
+          />
+          {editable && (
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-center text-white z-10 p-0.5 pointer-events-none">
+              {loading ? (
+                <Loader2 size={16} className="animate-spin text-white shrink-0" />
+              ) : (
+                <div className="flex flex-col items-center justify-center w-full h-full text-center leading-none gap-0.5">
+                  <Camera size={15} className="drop-shadow text-white shrink-0" />
+                  <span className="text-[9px] font-extrabold tracking-tight text-white drop-shadow text-center block w-full whitespace-nowrap leading-none">Đổi ảnh</span>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

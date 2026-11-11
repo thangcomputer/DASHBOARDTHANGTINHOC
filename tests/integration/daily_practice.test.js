@@ -250,15 +250,17 @@ test('popup nhắc luyện tập: một lần mỗi ngày, sau popup mục tiêu
   assert.ok(reminder.includes("navigationRef.navigate('DailyPractice')"));
 });
 
-test('lối vào luyện tập hằng ngày khi HV chưa luyện nằm trong “Việc cần làm hôm nay” (web + mobile)', () => {
+test('lối vào luyện tập hằng ngày từ Tổng quan (web + mobile)', () => {
   const web = read('client/src/components/student/StudentOverviewTab.jsx');
-  assert.ok(web.includes("if (practiceStats && !practiceStats.playedToday && practice.topics?.length) {"));
-  assert.ok(web.includes("onClick: () => navigate('/student/daily-practice')"));
+  assert.ok(web.includes("navigate('/student/daily-practice')"));
+  assert.ok(web.includes('<DuoHeroCard') && web.includes('<DuoDailyQuestsCard'));
+  assert.ok(web.includes('Luyện tập hằng ngày') || web.includes('Làm ngay'));
   assert.ok(!read('client/src/components/student/LearningGoalCard.jsx').includes('DailyStreakCta'), 'không lặp ở thẻ Mục tiêu');
 
   const mobile = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
-  assert.ok(mobile.includes('if (practiceStats && !practiceStats.playedToday && practice?.topics.length) {'));
-  assert.ok(mobile.includes("onPress: () => navigation?.navigate('DailyPractice')"));
+  assert.ok(mobile.includes('<DuoHeroCard'));
+  assert.ok(mobile.includes("tabNavigation.navigate('DailyPractice')"));
+  assert.ok(mobile.includes('<DuoDailyQuestsCard'));
   assert.ok(!read('thang-tin-hoc-mobile/src/components/LearningGoalCard.tsx').includes('DailyStreakCta'));
 });
 

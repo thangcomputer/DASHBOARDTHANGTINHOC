@@ -16,6 +16,7 @@ import { useAuth } from '../app/AuthContext';
 import { uploadAndUpdateAvatar } from '../services/avatarApi';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { colors } from '../theme/tokens';
+import { isFreePortalMenu } from './FreePortalModals';
 
 export type EditableMobileAvatarProps = {
   size?: number;
@@ -35,6 +36,7 @@ export function EditableMobileAvatar({
   onSuccess,
 }: EditableMobileAvatarProps) {
   const { user, updateAvatar } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const [uploading, setUploading] = useState(false);
 
   const effectiveAvatar = avatar ?? user?.avatar;
@@ -138,6 +140,7 @@ export function EditableMobileAvatar({
         <View
           style={[
             styles.cameraBadge,
+            isBrandStudent && { backgroundColor: '#EF4444' },
             {
               width: badgeSize,
               height: badgeSize,

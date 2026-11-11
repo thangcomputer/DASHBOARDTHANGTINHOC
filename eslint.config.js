@@ -16,6 +16,12 @@ module.exports = [
     },
   },
   {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+    },
+  },
+  {
     files: ['**/__tests__/**/*.{js,cjs,mjs}', '**/*.test.{js,cjs,mjs}'],
     languageOptions: {
       globals: {

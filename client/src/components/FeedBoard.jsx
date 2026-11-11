@@ -982,9 +982,17 @@ export default function FeedBoard({ session, role }) {
         {/* Post Composer */}
         <div className="cms-feed-composer bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
           {postLocked ? (
-            <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
-              <Lock size={18} className="shrink-0 text-slate-700" aria-hidden="true" />
-              <p className="text-sm font-semibold text-slate-700">Tài khoản miễn phí chỉ xem bảng tin. Đăng ký gói Meet để được đăng bài.</p>
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3.5 shadow-2xs">
+              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-600">
+                <Send size={18} />
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-white ring-2 ring-white">
+                  <Lock size={9} strokeWidth={2.5} />
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-slate-800">Chức năng đăng bài bị khóa</p>
+                <p className="text-xs font-medium text-slate-500">Tài khoản chưa đăng ký gói hoặc đã hết hạn chỉ xem bảng tin. Mua gói để mở quyền đăng bài.</p>
+              </div>
             </div>
           ) : (
             <>
@@ -1091,7 +1099,11 @@ export default function FeedBoard({ session, role }) {
                   type="button"
                   onClick={handlePost}
                   disabled={posting}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors disabled:opacity-50"
+                  className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-5 py-2 rounded-2xl shadow-xs transition-all disabled:opacity-50 cursor-pointer ${
+                    meRole === 'teacher'
+                      ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
+                      : 'bg-red-600 hover:bg-red-700 text-white border border-red-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2'
+                  }`}
                 >
                   {posting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                   Đăng bài
@@ -1104,7 +1116,11 @@ export default function FeedBoard({ session, role }) {
         {!loading && (
           <div className="cms-feed-list-heading flex items-center justify-between gap-2 px-1 pt-1">
             <h2 className="text-base font-extrabold text-slate-900">Bài viết mới nhất</h2>
-            <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-indigo-50 px-3 text-sm font-extrabold text-red-600">
+            <span className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 text-sm font-extrabold ${
+              meRole === 'teacher'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-indigo-50 text-red-600'
+            }`}>
               <Newspaper size={14} />
               {visiblePosts.length} bài
             </span>
@@ -1362,185 +1378,162 @@ export default function FeedBoard({ session, role }) {
                   {/* Comments Section */}
                   {commentsOpen[post.id] && (
                     <div id={`feed-comments-${post.id}`} data-feed-comments={post.id} className="mt-3 pt-3 border-t border-slate-100 space-y-2 bg-slate-50/70 -mx-4 -mb-4 p-4 rounded-b-2xl">
-                      {(post.comments || []).filter((c) => !c.parentId).map((c) => {
-                        const replies = (post.comments || []).filter((r) => r.parentId === c.id);
-                        return (
-                          <div id={`feed-comment-${c.id}`} key={c.id} className={'pt-2 space-y-1.5 scroll-mt-24 ' + (focusTarget?.commentId === c.id ? 'rounded-xl bg-indigo-50 ring-2 ring-indigo-300' : '')}>
-                            <div className="flex gap-2">
-                              <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border border-slate-200/80 shadow-xs">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <img
-                                    src={resolveFeedAvatar(c)}
-                                    onError={(event) => fallbackFeedAvatar(event, c)}
-                                    alt=""
-                                    className="w-6 h-6 rounded-full object-cover shrink-0 border border-slate-100"
-                                  />
-                                  <span className="font-bold text-xs text-slate-900">{c.authorName}</span>
-                                  <span className={'text-[9px] font-bold px-1.5 py-0.2 rounded-full ' + (ROLE_BADGE[c.authorRole] || '')}>
-                                    {ROLE_LABEL[c.authorRole] || ''}
-                                  </span>
-                                  <span className="text-[11px] text-slate-400">{formatTime(c.createdAt)}</span>
-                                  {canDeleteComment(post, c) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteComment(post.id, c.id)}
-                                      className="ml-auto text-slate-300 hover:text-red-500 p-0.5 transition-colors"
-                                      title="Xóa bình luận"
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  )}
-                                </div>
-                                {c.content && <p className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">{c.content}</p>}
-                                <FeedYouTubePreviews
-                                  text={c.content}
-                                  compact
-                                  onOpen={setYoutubeModal}
+                      {(() => {
+                        const allComments = Array.isArray(post.comments) ? post.comments : [];
+                        const commentIdSet = new Set(allComments.map((item) => String(item.id)));
+                        const rootComments = allComments.filter((c) => !c.parentId || !commentIdSet.has(String(c.parentId)));
+                        const renderCommentNode = (c, depth = 0, parentAuthor = '', isLastSibling = true) => {
+                          const replies = allComments.filter((r) => String(r.parentId || '') === String(c.id));
+                          const isReplyingHere = replyTo[post.id]?.focusId === c.id && !postLocked;
+                          const isReplyNode = depth > 0;
+                          const indentClass = depth === 0
+                            ? 'pt-2 space-y-1.5'
+                            : depth <= 4
+                              ? 'relative space-y-1.5 pl-5 sm:pl-6 mt-2'
+                              : 'relative space-y-1.5 pl-4 mt-2';
+                          return (
+                            <div
+                              id={`feed-comment-${c.id}`}
+                              key={c.id}
+                              className={indentClass + ' scroll-mt-24 ' + (focusTarget?.commentId === c.id ? 'rounded-xl bg-indigo-50 ring-2 ring-indigo-300' : '')}
+                            >
+                              {isReplyNode && !isLastSibling && (
+                                <span
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute left-0 -top-2 -bottom-2 w-[2px] bg-indigo-300/80"
                                 />
-                                {(c.images || []).length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                    {c.images.map((url) => {
-                                      const src = resolveMediaUrl(url) || url;
-                                      return (
-                                        <button
-                                          key={url}
-                                          type="button"
-                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }}
-                                          className="block w-16 h-16 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in"
-                                        >
-                                          <img src={src} alt="" className="w-full h-full object-cover" />
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => setReplyTo((d) => ({ ...d, [post.id]: { id: c.id, name: c.authorName, focusId: c.id } }))}
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 mt-1.5"
+                              )}
+                              {isReplyNode && (
+                                <span
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute left-0 -top-2 h-5 w-4 sm:w-5 rounded-bl-xl border-b-2 border-l-2 border-indigo-400"
                                 >
-                                  <Reply size={11} /> Trả lời
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Reply box to root comment */}
-                            {replyTo[post.id]?.focusId === c.id && !postLocked && (
-                              <>
-                                <div className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                                  <Reply size={11} /> Đang trả lời <span className="font-bold text-slate-800">{replyTo[post.id].name}</span>
-                                  <button type="button" onClick={() => setReplyTo((d) => ({ ...d, [post.id]: null }))} className="text-slate-400 hover:text-slate-600 ml-1">
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                                {(commentPreviews[post.id] || []).length > 0 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {(commentPreviews[post.id] || []).map((src) => (
-                                      <div key={src} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200">
-                                        <img src={src} alt="" className="w-full h-full object-cover" />
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setCommentFiles((d) => ({ ...d, [post.id]: [] }));
-                                            setCommentPreviews((d) => ({ ...d, [post.id]: [] }));
-                                          }}
-                                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white flex items-center justify-center"
-                                        >
-                                          <X size={10} />
-                                        </button>
-                                      </div>
-                                    ))}
+                                  <span className="absolute -right-[3px] -bottom-[4px] h-1.5 w-1.5 rounded-full bg-indigo-600" />
+                                </span>
+                              )}
+                              <div className="flex gap-2">
+                                <div className={'flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border shadow-xs ' + (isReplyNode ? 'border-slate-200 border-l-2 border-l-indigo-300' : 'border-slate-200/80')}>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <img
+                                      src={resolveFeedAvatar(c)}
+                                      onError={(event) => fallbackFeedAvatar(event, c)}
+                                      alt=""
+                                      className={(isReplyNode ? 'w-5 h-5 ' : 'w-6 h-6 ') + 'rounded-full object-cover shrink-0 border border-slate-100'}
+                                    />
+                                    <span className="font-bold text-xs text-slate-900">{c.authorName}</span>
+                                    <span className={'text-[9px] font-bold px-1.5 py-0.2 rounded-full ' + (ROLE_BADGE[c.authorRole] || '')}>
+                                      {ROLE_LABEL[c.authorRole] || ''}
+                                    </span>
+                                    <span className="text-[11px] text-slate-400">{formatTime(c.createdAt)}</span>
+                                    {canDeleteComment(post, c) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteComment(post.id, c.id)}
+                                        className="ml-auto text-slate-300 hover:text-red-500 p-0.5 transition-colors"
+                                        title="Xóa bình luận"
+                                      >
+                                        <Trash2 size={isReplyNode ? 11 : 12} />
+                                      </button>
+                                    )}
                                   </div>
-                                )}
-                                <div className="flex gap-2 items-center bg-white p-1.5 rounded-xl border border-slate-200">
-                                  <input
-                                    value={commentDrafts[post.id] || ''}
-                                    onChange={(e) => setCommentDrafts((d) => ({ ...d, [post.id]: e.target.value }))}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
-                                    placeholder={'Trả lời ' + replyTo[post.id]?.name + '...'}
-                                    className="w-full text-xs text-slate-800 placeholder:text-slate-400 border-0 focus:ring-0 focus:outline-none p-1"
+                                  {isReplyNode && parentAuthor && (
+                                    <p className="text-[10px] font-semibold text-indigo-600/80 mt-0.5">
+                                      ↳ Trả lời {parentAuthor}
+                                    </p>
+                                  )}
+                                  {c.content && <p className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">{c.content}</p>}
+                                  <FeedYouTubePreviews
+                                    text={c.content}
+                                    compact
+                                    onOpen={setYoutubeModal}
                                   />
-                                  <label className="cursor-pointer text-slate-400 hover:text-indigo-600 p-1" title="Thêm ảnh">
-                                    <ImagePlus size={15} />
-                                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => pickCommentFiles(post.id, e)} />
-                                  </label>
+                                  {(c.images || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                      {c.images.map((url) => {
+                                        const src = resolveMediaUrl(url) || url;
+                                        return (
+                                          <button
+                                            key={url}
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }}
+                                            className={(isReplyNode ? 'w-14 h-14 ' : 'w-16 h-16 ') + 'block rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in'}
+                                          >
+                                            <img src={src} alt="" className="w-full h-full object-cover" />
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                   <button
                                     type="button"
-                                    onClick={() => handleComment(post.id)}
-                                    disabled={busyId === ('c-' + post.id)}
-                                    className="text-indigo-600 hover:text-indigo-800 p-1 disabled:opacity-40"
+                                    onClick={() => setReplyTo((d) => ({ ...d, [post.id]: { id: c.id, name: c.authorName, focusId: c.id } }))}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 mt-1.5"
                                   >
-                                    {busyId === ('c-' + post.id) ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                                    <Reply size={11} /> Trả lời
                                   </button>
                                 </div>
-                              </>
-                            )}
+                              </div>
 
-                            {/* Replies */}
-                            {replies.map((r) => (
-                              <div id={`feed-comment-${r.id}`} key={r.id} className={'space-y-1.5 pl-6 scroll-mt-24 ' + (focusTarget?.commentId === r.id ? 'rounded-xl bg-indigo-50 ring-2 ring-indigo-300' : '')}>
-                                <div className="flex gap-2">
-                                  <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border border-slate-200 border-l-2 border-l-indigo-300">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <img
-                                        src={resolveFeedAvatar(r)}
-                                        onError={(event) => fallbackFeedAvatar(event, r)}
-                                        alt=""
-                                        className="w-5 h-5 rounded-full object-cover shrink-0 border border-slate-100"
-                                      />
-                                      <span className="font-bold text-xs text-slate-900">{r.authorName}</span>
-                                      <span className={'text-[9px] font-bold px-1.5 py-0.2 rounded-full ' + (ROLE_BADGE[r.authorRole] || '')}>
-                                        {ROLE_LABEL[r.authorRole] || ''}
-                                      </span>
-                                      <span className="text-[11px] text-slate-400">{formatTime(r.createdAt)}</span>
-                                      {canDeleteComment(post, r) && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteComment(post.id, r.id)}
-                                          className="ml-auto text-slate-300 hover:text-red-500 p-0.5 transition-colors"
-                                          title="Xóa"
-                                        >
-                                          <Trash2 size={11} />
-                                        </button>
-                                      )}
+                              {/* Reply box attached directly under the target comment at any level */}
+                              {isReplyingHere && (
+                                <div className="pl-2 sm:pl-4 space-y-1.5 pt-1">
+                                  <div className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                                    <Reply size={11} /> Đang trả lời <span className="font-bold text-slate-800">{replyTo[post.id].name}</span>
+                                    <button type="button" onClick={() => setReplyTo((d) => ({ ...d, [post.id]: null }))} className="text-slate-400 hover:text-slate-600 ml-1">
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                  {(commentPreviews[post.id] || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {(commentPreviews[post.id] || []).map((src) => (
+                                        <div key={src} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200">
+                                          <img src={src} alt="" className="w-full h-full object-cover" />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setCommentFiles((d) => ({ ...d, [post.id]: [] }));
+                                              setCommentPreviews((d) => ({ ...d, [post.id]: [] }));
+                                            }}
+                                            className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white flex items-center justify-center"
+                                          >
+                                            <X size={10} />
+                                          </button>
+                                        </div>
+                                      ))}
                                     </div>
-                                    {r.content && <p className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">{r.content}</p>}
-                                    <FeedYouTubePreviews
-                                      text={r.content}
-                                      compact
-                                      onOpen={setYoutubeModal}
+                                  )}
+                                  <div className="flex gap-2 items-center bg-white p-1.5 rounded-xl border border-indigo-200 shadow-2xs">
+                                    <input
+                                      autoFocus
+                                      value={commentDrafts[post.id] || ''}
+                                      onChange={(e) => setCommentDrafts((d) => ({ ...d, [post.id]: e.target.value }))}
+                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
+                                      placeholder={'Trả lời ' + replyTo[post.id]?.name + '...'}
+                                      className="w-full text-xs text-slate-800 placeholder:text-slate-400 border-0 focus:ring-0 focus:outline-none p-1"
                                     />
-                                    {(r.images || []).length > 0 && (
-                                      <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                        {r.images.map((url) => {
-                                          const src = resolveMediaUrl(url) || url;
-                                          return (
-                                            <button
-                                              key={url}
-                                              type="button"
-                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }}
-                                              className="block w-14 h-14 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in"
-                                            >
-                                              <img src={src} alt="" className="w-full h-full object-cover" />
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
+                                    <label className="cursor-pointer text-slate-400 hover:text-indigo-600 p-1" title="Thêm ảnh">
+                                      <ImagePlus size={15} />
+                                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => pickCommentFiles(post.id, e)} />
+                                    </label>
                                     <button
                                       type="button"
-                                      onClick={() => setReplyTo((d) => ({ ...d, [post.id]: { id: c.id, name: r.authorName, focusId: r.id } }))}
-                                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 mt-1"
+                                      onClick={() => handleComment(post.id)}
+                                      disabled={busyId === ('c-' + post.id)}
+                                      className="text-indigo-600 hover:text-indigo-800 p-1 disabled:opacity-40"
                                     >
-                                      <Reply size={11} /> Trả lời
+                                      {busyId === ('c-' + post.id) ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                                     </button>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
+                              )}
+
+                              {/* Recursive nested replies */}
+                              {replies.map((r, idx) => renderCommentNode(r, depth + 1, c.authorName, idx === replies.length - 1))}
+                            </div>
+                          );
+                        };
+                        return rootComments.map((c, idx) => renderCommentNode(c, 0, '', idx === rootComments.length - 1));
+                      })()}
 
                       {/* New root comment input */}
                       {!postLocked && !replyTo[post.id] && (
@@ -1580,7 +1573,7 @@ export default function FeedBoard({ session, role }) {
                               type="button"
                               onClick={() => handleComment(post.id)}
                               disabled={busyId === ('c-' + post.id)}
-                              className="text-red-600 hover:text-red-700 p-1 font-bold disabled:opacity-40"
+                              className={`${meRole === 'teacher' ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-600 hover:text-red-700'} p-1 font-bold disabled:opacity-40`}
                               title="Gửi bình luận"
                             >
                               {busyId === ('c-' + post.id) ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}

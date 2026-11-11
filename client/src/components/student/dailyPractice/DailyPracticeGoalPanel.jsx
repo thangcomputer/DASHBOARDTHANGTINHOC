@@ -90,7 +90,7 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
               <button
                 type="button"
                 onClick={openLearningGoal}
-                className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline"
+                className="shrink-0 rounded-[12px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white px-2.5 py-1 text-xs font-extrabold text-[#DC2626] hover:bg-[#FEF2F2] active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none"
               >
                 {goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}
               </button>

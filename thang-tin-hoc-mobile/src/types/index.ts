@@ -2,6 +2,7 @@ export type UserRole = 'student' | 'teacher';
 
 export type DemoUser = {
   id: string;
+  _id?: string;
   previewMode?: boolean;
   name: string;
   role: UserRole;
@@ -34,7 +35,9 @@ export type DemoEnrollment = {
   courseId?: string;
   courseName: string;
   subjectIds?: string[];
+  teacherId?: string;
   teacherName?: string;
+  linkHoc?: string;
   registeredAt?: string;
   progress?: number;
   completedSessions?: number;
@@ -161,7 +164,7 @@ export type Conversation = {
   name: string;
   role: string;
   groupCreatorId?: string;
-  groupParticipants?: Array<{ userId: string; name: string; role: string }>;
+  groupParticipants?: Array<{ userId: string; name: string; role: string; avatar?: string }>;
   participantId?: string;
   participantRole?: string;
   avatar?: string;

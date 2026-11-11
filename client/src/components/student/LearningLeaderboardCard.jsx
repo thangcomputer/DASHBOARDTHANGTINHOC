@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Crown, Target, Trophy } from 'lucide-react';
+import { CheckCircle2, Crown, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
+import { DAILY_PRACTICE_STATS_EVENT } from '../../services/dailyPracticeApi';
 import { resolveMediaUrl } from '../../services/api';
 import { LEARNING_GOAL_CHANGED_EVENT, formatStudyMinutes } from '../../utils/learningGoal';
+import { useFreePortalMenu } from './dailyPractice/FreeFeatureLock';
+import { isFreePortalAccount } from './dailyPractice/FreeMeetPlanModal';
 
 const MEDALS = {
-  1: 'from-amber-300 to-amber-500 text-amber-950 shadow-[0_4px_10px_rgba(245,158,11,0.35),inset_0_1px_2px_rgba(255,255,255,0.6)]',
-  2: 'from-slate-200 to-slate-400 text-slate-800 shadow-[0_4px_10px_rgba(100,116,139,0.3),inset_0_1px_2px_rgba(255,255,255,0.6)]',
-  3: 'from-orange-300 to-orange-600 text-orange-950 shadow-[0_4px_10px_rgba(234,88,12,0.3),inset_0_1px_2px_rgba(255,255,255,0.5)]',
+  1: 'from-amber-300 to-amber-500 text-amber-950',
+  2: 'from-slate-200 to-slate-400 text-slate-800',
+  3: 'from-orange-300 to-orange-600 text-orange-950',
 };
 
 function formatWeekDay(key) {
@@ -18,22 +21,41 @@ function formatWeekDay(key) {
 function RankBadge({ rank }) {
   if (MEDALS[rank]) {
     return (
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-b text-xs font-black ${MEDALS[rank]}`}>
-        {rank === 1 ? <Crown size={14} aria-label="Hạng 1" /> : rank}
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-b text-[11px] font-black shadow-sm ${MEDALS[rank]}`}
+      >
+        {rank === 1 ? <Crown size={13} aria-hidden="true" /> : rank}
       </span>
     );
   }
-  return <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-500">{rank}</span>;
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-slate-500">
+      {rank}
+    </span>
+  );
 }
 
-function Avatar({ name, avatar }) {
+function Avatar({ name, avatar, freePortal = false }) {
   const [failed, setFailed] = useState(false);
   const initial = String(name || '?').trim().split(/\s+/).pop()?.[0]?.toUpperCase() || '?';
   if (avatar && !failed) {
-    return <img src={resolveMediaUrl(avatar)} alt="" onError={() => setFailed(true)} className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-white" />;
+    return (
+      <img
+        src={resolveMediaUrl(avatar)}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-white"
+      />
+    );
   }
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-red-100 to-amber-100 text-sm font-black text-red-700 ring-2 ring-white">
+    <span
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ring-2 ring-white ${
+        freePortal
+          ? 'bg-gradient-to-br from-emerald-50 to-green-50 text-emerald-700'
+          : 'bg-gradient-to-br from-red-50 to-amber-50 text-red-700'
+      }`}
+    >
       {initial}
     </span>
   );
@@ -41,20 +63,21 @@ function Avatar({ name, avatar }) {
 
 function gapMessage(me) {
   if (!me?.rank) return '';
-  if (me.rank === 1) return 'Bạn đang dẫn đầu bảng. Giữ vững phong độ nhé!';
+  if (me.rank === 1) return 'Bạn đang dẫn đầu — giữ phong độ nhé!';
   const ahead = me.ahead;
   if (!ahead) return '';
   if (ahead.goalDays > me.goalDays) {
-    const days = ahead.goalDays - me.goalDays;
-    return `Đạt thêm ${days} ngày mục tiêu để vượt hạng #${ahead.rank}.`;
+    return `Đạt thêm ${ahead.goalDays - me.goalDays} ngày mục tiêu để vượt #${ahead.rank}.`;
   }
-  return `Học thêm ${formatStudyMinutes(ahead.minutes - me.minutes + 1)} để vượt hạng #${ahead.rank}.`;
+  return `Học thêm ${formatStudyMinutes(ahead.minutes - me.minutes + 1)} để vượt #${ahead.rank}.`;
 }
 
 /** Bảng xếp hạng tuần: HV đạt mục tiêu nhiều ngày nhất (bằng nhau so phút học), toàn trung tâm. */
 export default function LearningLeaderboardCard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const freeMenu = useFreePortalMenu();
+  const freePortal = freeMenu || isFreePortalAccount();
 
   const load = useCallback(() => {
     lessonPracticeApi.student.learningLeaderboard()
@@ -66,9 +89,11 @@ export default function LearningLeaderboardCard() {
     load();
     const onVisible = () => { if (document.visibilityState === 'visible') load(); };
     window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, load);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
+      window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, load);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [load]);
@@ -78,76 +103,100 @@ export default function LearningLeaderboardCard() {
   const meInTop = top.some((row) => row.isMe);
 
   return (
-    <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-amber-400 to-amber-600 text-white shadow-[0_6px_14px_rgba(217,119,6,0.3),inset_0_2px_3px_rgba(255,255,255,0.4)]">
-            <Trophy size={22} aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-black text-slate-900">Bảng xếp hạng tuần</p>
-            <p className="text-xs text-slate-500">
-              {data ? `${formatWeekDay(data.weekStart)} – ${formatWeekDay(data.weekEnd)} · ${data.participants} học viên tham gia` : 'Đang tải…'}
-            </p>
-          </div>
+    <section className="duo-card flex min-w-0 flex-col p-3.5">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-amber-400 to-amber-600 text-white shadow-sm">
+          <Trophy size={20} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-black text-slate-900">Bảng xếp hạng tuần</h3>
+          <p className="truncate text-[11px] text-slate-500">
+            {data
+              ? `${formatWeekDay(data.weekStart)} – ${formatWeekDay(data.weekEnd)} · ${data.participants} ${freePortal ? 'học viên tham gia' : 'HV'}`
+              : 'Đang tải…'}
+          </p>
         </div>
       </div>
 
-      {error && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{error}</p>}
+      {error ? (
+        <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800">{error}</p>
+      ) : null}
 
-      <ol className="mt-3 flex-1 space-y-1.5">
-        {data && !top.length && (
-          <li className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">
-            Tuần này chưa có ai trên bảng - hãy là người đầu tiên!
+      <ol className="mt-2.5 space-y-1">
+        {data && !top.length ? (
+          <li className="rounded-xl bg-slate-50 px-3 py-3 text-center text-[11px] text-slate-500">
+            Tuần này chưa có ai — hãy là người đầu tiên!
           </li>
-        )}
+        ) : null}
         {top.map((row) => (
           <li
             key={`${row.rank}-${row.name}`}
-            className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 ${row.isMe ? 'bg-red-50 ring-1 ring-red-100' : row.rank <= 3 ? 'bg-amber-50/40' : ''}`}
+            className={`flex items-center gap-2 rounded-xl px-1.5 py-1.5 ${
+              row.isMe
+                ? (freePortal ? 'bg-emerald-50/90 ring-1 ring-emerald-200' : 'bg-red-50/90 ring-1 ring-red-100')
+                : row.rank <= 3
+                  ? 'bg-amber-50/30'
+                  : ''
+            }`}
           >
             <RankBadge rank={row.rank} />
-            <Avatar name={row.name} avatar={row.avatar} />
+            <Avatar name={row.name} avatar={row.avatar} freePortal={freePortal} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-slate-800">
+              <p className="truncate text-[13px] font-extrabold text-slate-800">
                 {row.name}
-                {row.isMe && <span className="ml-1.5 rounded-full bg-red-600 px-1.5 py-px text-[10px] font-black text-white">Bạn</span>}
+                {row.isMe ? (
+                  <span
+                    className={`ml-1.5 align-middle text-[9px] font-black uppercase tracking-wide ${
+                      freePortal ? 'rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800' : 'text-red-600'
+                    }`}
+                  >
+                    Bạn
+                  </span>
+                ) : null}
               </p>
-              <p className="text-[11px] text-slate-400">Mục tiêu {row.hoursPerDay} giờ/ngày</p>
+              {freePortal && row.hoursPerDay ? (
+                <p className="truncate text-[10px] font-semibold text-slate-500">
+                  Mục tiêu {row.hoursPerDay} giờ / ngày
+                </p>
+              ) : null}
             </div>
-            <div className="shrink-0 text-right">
-              <p className="flex items-center justify-end gap-1 text-xs font-black text-emerald-600">
-                <CheckCircle2 size={12} aria-hidden="true" /> {row.goalDays}/{data.daysSoFar} ngày
+            <div className="shrink-0 text-right leading-tight">
+              <p className="flex items-center justify-end gap-0.5 text-[11px] font-black text-emerald-600">
+                <CheckCircle2 size={11} aria-hidden="true" />
+                {row.goalDays}/{data.daysSoFar}{freePortal ? ' ngày' : ''}
               </p>
-              <p className="text-[11px] font-semibold text-slate-500">
+              <p className="text-[10px] font-semibold text-slate-500">
                 {formatStudyMinutes(row.minutes)}
-                {row.xp > 0 && <span className="ml-1 font-black text-amber-600">· {row.xp} XP</span>}
+                {(freePortal ? row.xp > 0 : row.rank === 1 && row.xp > 0) ? ` · ${row.xp} XP` : null}
               </p>
             </div>
           </li>
         ))}
       </ol>
 
-      {data && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          {!me?.hasGoal ? (
-            <p className="text-xs text-slate-500">Đặt mục tiêu ở thẻ Mục tiêu học để có tên trên bảng xếp hạng.</p>
+      {data && me ? (
+        <footer className="mt-2 border-t border-slate-100 pt-2">
+          {!me.hasGoal ? (
+            <p className="text-[11px] text-slate-500">Đặt mục tiêu ở tab Mục tiêu để lên bảng.</p>
           ) : !me.rank ? (
-            <p className="text-xs text-slate-500">Tuần này bạn chưa học phút nào. Vào bài học ngay để lên bảng!</p>
+            <p className="text-[11px] text-slate-500">Chưa có phút học tuần này — vào bài học để lên bảng.</p>
+          ) : meInTop ? (
+            gapMessage(me) ? (
+              <p className="text-[11px] leading-snug text-slate-500">{gapMessage(me)}</p>
+            ) : null
           ) : (
-            <div className={`flex items-center gap-3 rounded-xl px-3 py-2 ${meInTop ? 'bg-emerald-50' : 'bg-red-50'}`}>
-              <span className={`text-lg font-black tabular-nums ${meInTop ? 'text-emerald-700' : 'text-red-700'}`}>#{me.rank}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-slate-800">
-                  Bạn đang hạng {me.rank}/{data.participants} · {me.goalDays} ngày đạt · {formatStudyMinutes(me.minutes)}
-                  {me.xp > 0 && ` · ${me.xp} XP`}
-                </p>
-                <p className="text-[11px] text-slate-500">{gapMessage(me)}</p>
-              </div>
+            <div className="flex items-start gap-2 rounded-xl bg-slate-50 px-2.5 py-2">
+              <span className={`text-base font-black tabular-nums ${freePortal ? 'text-emerald-600' : 'text-red-600'}`}>#{me.rank}</span>
+              <p className="min-w-0 flex-1 text-[11px] leading-snug text-slate-600">
+                <span className="font-bold text-slate-800">
+                  {me.goalDays} ngày đạt · {formatStudyMinutes(me.minutes)}
+                </span>
+                {gapMessage(me) ? ` — ${gapMessage(me)}` : null}
+              </p>
             </div>
           )}
-        </div>
-      )}
+        </footer>
+      ) : null}
     </section>
   );
 }

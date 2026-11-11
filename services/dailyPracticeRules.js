@@ -12,6 +12,8 @@ const QUESTION_STAKE_XP = 5;
 const SESSION_STAKE_XP = SESSION_SIZE * QUESTION_STAKE_XP;
 /** Kiểm tra vượt chặng: đạt được thêm 40 XP, không đạt hoặc thoát thì mất 40 XP. */
 const TEST_OUT_XP = 40;
+/** Phần thưởng mở rương khi hoàn thành toàn bộ chặng trên lộ trình. */
+const UNIT_CHEST_REWARD_XP = 50;
 /** Mỗi ngày (giờ VN) phần XP của gói đặt về mức này. XP đã mua được giữ và cộng thêm. */
 const DAILY_ALLOWANCE_XP = 200;
 /** Tài khoản miễn phí, khi không có gói Meet: mỗi ngày 60 XP. */
@@ -519,6 +521,7 @@ module.exports = {
   usesPerQuestionStake,
   isPracticeXpDisabled,
   TEST_OUT_XP,
+  UNIT_CHEST_REWARD_XP,
   DAILY_ALLOWANCE_XP,
   MEET_PLAN_DAILY_XP,
   FREE_PORTAL_DAILY_XP,

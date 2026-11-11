@@ -47,6 +47,7 @@ import {
   syncYouTubePlaybackState,
 } from '../utils/youtubeDuration';
 import { useToast } from '../utils/useToast';
+import { lmsBtn } from '../utils/lmsButtonClass';
 
 const MOCK_COURSES = [
   {
@@ -1246,7 +1247,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
   // ── COURSE LIST VIEW ────────────────────────────────────────────────────────
   if (!selectedCourse) {
     return (
-      <div className="w-full animate-in fade-in duration-500 min-h-full">
+      <div className="w-full animate-in fade-in duration-500 min-h-full" data-lms-ui>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-5">
           <div className="min-w-0">
@@ -1487,7 +1488,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                               toast.error(err?.message || 'Không tải được tài liệu');
                             }
                           }}
-                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-all shrink-0"
+                          className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 text-sm' })}
                         >
                           Tải xuống
                         </button>
@@ -1515,7 +1516,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
 
   // ── PLAYER VIEW ─────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col w-screen h-screen bg-[#0d1117] text-white overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex flex-col w-screen h-screen bg-[#0d1117] text-white overflow-hidden" data-lms-ui>
 
       {/* ─── TOPBAR ───────────────────────────────────────────────────────────── */}
       <div className="relative flex-shrink-0 z-50" style={{ background: 'linear-gradient(180deg,#090e18 0%,#0d1117 100%)' }}>

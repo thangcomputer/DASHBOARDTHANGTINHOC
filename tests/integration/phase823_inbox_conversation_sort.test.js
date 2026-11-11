@@ -154,7 +154,7 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
     assert.ok(mobileInbox.includes('styles.inboxFilterRow'));
     assert.ok(mobileInbox.includes('style={styles.filtersWrapper}'));
     assert.ok(mobileInbox.includes('inboxFilterRow: { width: \'100%\''));
-    assert.ok(mobileInbox.includes('<Plus size={25} color={colors.brand} strokeWidth={2.8} />'));
+    assert.ok(mobileInbox.includes('<Plus size={25}') && mobileInbox.includes('strokeWidth={2.8} />'));
     assert.equal(mobileInbox.includes('>Tạo nhóm chat</Text>'), false);
   });
 
@@ -172,7 +172,7 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
 
   it('13 web inbox filters teachers and students by the current role while keeping contact filtering and title-case names', () => {
     const inbox = read('client/src/components/Inbox.jsx');
-    const tabBlock = inbox.match(/\/\* Hàng Tabs \(Pills\) Phân loại danh bạ \*\/[\s\S]*?\]\.map\(tab => \(/)?.[0] || '';
+    const tabBlock = inbox.match(/\/\* Hàng Tabs \(Pills\) Phân loại danh bạ[\s\S]*?\]\.map\(tab =>/)?.[0] || '';
 
     assert.ok(tabBlock.includes("{ id: 'all', label: 'Tất cả' }"));
     assert.ok(tabBlock.includes("{ id: 'teacher', label: 'Giảng viên' }"));

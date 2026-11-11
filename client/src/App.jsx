@@ -443,7 +443,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/feed" element={
           <ErrorBoundary inline>
-            <FreeHiddenRoute session={session}><FeedBoard session={session} role="student" /></FreeHiddenRoute>
+            <FeedBoard session={session} role="student" />
           </ErrorBoundary>
         } />
         <Route path="/student/news" element={
@@ -485,17 +485,23 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/lesson-practice" element={
           <ErrorBoundary inline>
-            <SelfStudyLock><LessonPracticeCatalogPage /></SelfStudyLock>
+            <FreeHiddenRoute session={session}>
+              <SelfStudyLock><LessonPracticeCatalogPage /></SelfStudyLock>
+            </FreeHiddenRoute>
           </ErrorBoundary>
         } />
         <Route path="/student/lesson-practice/subjects/:subjectId" element={
           <ErrorBoundary inline>
-            <SelfStudyLock><LessonPracticeUnitsPage /></SelfStudyLock>
+            <FreeHiddenRoute session={session}>
+              <SelfStudyLock><LessonPracticeUnitsPage /></SelfStudyLock>
+            </FreeHiddenRoute>
           </ErrorBoundary>
         } />
         <Route path="/student/lesson-practice/units/:unitId" element={
           <ErrorBoundary inline>
-            <SelfStudyLock><LessonPracticePlayerPage /></SelfStudyLock>
+            <FreeHiddenRoute session={session}>
+              <SelfStudyLock><LessonPracticePlayerPage /></SelfStudyLock>
+            </FreeHiddenRoute>
           </ErrorBoundary>
         } />
         <Route path="/student/daily-practice" element={

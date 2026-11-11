@@ -6,7 +6,7 @@ import { Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from 'luci
 import { AppHeader, AppScreen, EmptyState, ErrorState, LoadingSkeleton } from '../components/ui';
 import { SOCKET_EVENTS } from '../services/socketService';
 import { getCallHistory, type CallHistoryEntry } from '../services/callHistoryApi';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -106,7 +106,7 @@ export function CallHistoryScreen() {
                 accessibilityLabel={`${getCallStatusLabel(call)} với ${name}, ${details}`}
               >
                 <View style={[styles.callIcon, isMissed && styles.callIconMissed]}>
-                  <Icon size={19} color={isMissed ? colors.red : colors.brand} />
+                  <Icon size={19} color={isMissed ? colors.red : theme.brand} />
                 </View>
                 <View style={styles.copy}>
                   <Text numberOfLines={1} style={styles.name}>{name}</Text>
@@ -124,7 +124,7 @@ export function CallHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   screen: { gap: spacing.md },
   list: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden' },
   row: {
@@ -152,4 +152,4 @@ const styles = StyleSheet.create({
   status: { color: colors.muted, fontSize: typography.caption, fontWeight: '600' },
   statusMissed: { color: colors.red },
   details: { color: colors.muted, fontSize: typography.caption },
-});
+}));

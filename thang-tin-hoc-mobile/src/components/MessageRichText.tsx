@@ -210,9 +210,9 @@ function renderInlineMarks(
             style={[
               styles.inlineBadge,
               {
-                backgroundColor: mine ? 'rgba(255,255,255,0.2)' : fnStyle.bg,
-                color: mine ? '#FFFFFF' : fnStyle.text,
-                borderColor: mine ? 'rgba(255,255,255,0.4)' : fnStyle.border,
+                backgroundColor: fnStyle.bg,
+                color: fnStyle.text,
+                borderColor: fnStyle.border,
               },
             ]}
           >
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   textMine: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   boldMine: {
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#0F172A',
   },
   italicOther: {
     fontStyle: 'italic',
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   },
   italicMine: {
     fontStyle: 'italic',
-    color: '#E2E8F0',
+    color: '#475569',
   },
   linkOther: {
     color: '#2563EB',
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   linkMine: {
-    color: '#BFDBFE',
+    color: '#2563EB',
     textDecorationLine: 'underline',
     fontWeight: '700',
   },
@@ -513,8 +513,8 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   formulaBoxMine: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: '#F0FDF4',
+    borderColor: '#86EFAC',
   },
   formulaText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   formulaTextMine: {
-    color: '#FFFFFF',
+    color: '#166534',
   },
   tableWrapper: {
     marginVertical: 8,
@@ -536,8 +536,8 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   tableWrapperMine: {
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
   },
   tableScrollContent: {
     padding: 0,
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   tableTitleRowMine: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#F8FAFC',
   },
   gutterCell: {
     backgroundColor: '#E9EDF2',
@@ -566,8 +566,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   gutterCellMine: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#E9EDF2',
+    borderColor: '#CBD5E1',
   },
   cornerCell: {
     width: 32,
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   colHeaderTextMine: {
-    color: '#FFFFFF',
+    color: '#475569',
   },
   gutterText: {
     fontSize: 10,
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   gutterTextMine: {
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#64748B',
   },
   dataCell: {
     minWidth: 78,
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   dataTitleCellMine: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#F1F5F9',
   },
   dataCellText: {
     fontSize: 12,

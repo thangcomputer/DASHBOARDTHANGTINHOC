@@ -129,9 +129,9 @@ export async function getStudentQuizzes(user: DemoUser): Promise<StudentQuiz[]> 
       questionsCount: Math.max(0, numberOrNull(raw.questionsCount) ?? 0),
       targetStudentIds: Array.isArray(raw.targetStudentIds)
         ? raw.targetStudentIds.map((target) => {
-            const targetRecord = record(target);
-            return text(targetRecord._id || targetRecord.id || target);
-          }).filter(Boolean)
+          const targetRecord = record(target);
+          return text(targetRecord._id || targetRecord.id || target);
+        }).filter(Boolean)
         : [],
       mySubmission: submission ? {
         submittedAt: text(submission.submittedAt || submission.createdAt || submission.updatedAt),
@@ -264,10 +264,10 @@ export async function getStudentEvaluationActivity(user: DemoUser): Promise<Stud
     return text(teacher._id || teacher.id || enrollment.teacherId);
   }).filter(Boolean))];
   const [privateResponse, teacherResponses] = await Promise.all([
-    mobileApiRequest<{ data?: Raw[] }>('/evaluations/mine'),
+    mobileApiRequest<{ data?: Raw[] }>('/evaluations/mine').catch(() => ({ data: [] })),
     Promise.all(teacherIds.map((teacherId) => mobileApiRequest<{ data?: Raw[] }>(
       `/evaluations/teacher/${encodeURIComponent(teacherId)}`,
-    ))),
+    ).catch(() => ({ data: [] })))),
   ]);
   if (!Array.isArray(privateResponse.data) || teacherResponses.some((response) => !Array.isArray(response.data))) {
     throw new Error('Phản hồi nhật ký đánh giá không hợp lệ.');

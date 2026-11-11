@@ -17,13 +17,13 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  assignmentService, authService, gradeService, learningService, materialService, messageService, notificationService, scheduleService, softwareService, studentProfileService, studentService, teacherProfileService,
+  assignmentService, authService, cleanNotificationMessage, gradeService, learningService, materialService, messageService, notificationService, scheduleService, softwareService, studentProfileService, studentService, teacherProfileService,
 } from '../services/mockService';
 import { getLastSeenUsersSnapshot, getOnlineUsersSnapshot, SOCKET_EVENTS } from '../services/socketService';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { uploadAndUpdateAvatar } from '../services/avatarApi';
 import { PartialAssignmentCreationError, uploadStudentAssignmentFile } from '../services/assignmentApi';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { DemoSoftwareLink } from '../types';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import type { AppNotification, Assignment, Conversation, DemoGradeRecord, DemoStudent, DemoUser, LearningMaterial, ScheduleItem } from '../types';
@@ -34,6 +34,7 @@ import { enableMobilePushNotifications, requestWebNotificationPermission } from 
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
 import { SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
 import { DuoButton } from '../components/duo/DuoButton';
+import { isFreePortalMenu } from '../utils/freePortalHelper';
 import { pinUserKey } from '../services/pinLock';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
@@ -172,6 +173,7 @@ export function ScheduleScreen() {
   const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const isLocalSchedulePreview = Boolean(user?.previewMode || (__DEV__ && process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE));
   const [scheduleNow, setScheduleNow] = useState(() => Date.now());
   const [filter, setFilter] = useState('Tất cả');
@@ -575,7 +577,7 @@ export function ScheduleScreen() {
           studentName: selectedStudent.name,
           status: 'upcoming',
           attendanceStatus: 'pending',
-          color: colors.brand,
+          color: theme.brand,
         }, ...current]);
       }
       setShowCreate(false);
@@ -754,8 +756,8 @@ export function ScheduleScreen() {
   return (
     <AppScreen scrollViewRef={screenScrollRef}>
       <Card style={styles.scheduleHero}>
-        <View style={styles.scheduleHeroIcon}>
-          <CalendarDays size={22} color={colors.brand} />
+        <View style={[styles.scheduleHeroIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
+          <CalendarDays size={22} color={isBrandStudent ? '#DC2626' : theme.brand} />
         </View>
         <View style={styles.rowCopy}>
           <Text style={styles.scheduleHeroTitle}>
@@ -770,12 +772,12 @@ export function ScheduleScreen() {
           {courseProfile.error ? <ErrorState onRetry={courseProfile.reload} /> : null}
           <View style={styles.scheduleStats}>
             {[
-              { label: 'Đã học tháng này', value: studentMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: colors.green },
+              { label: 'Đã học tháng này', value: studentMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: isBrandStudent ? '#DC2626' : colors.green },
               { label: 'Buổi sắp tới', value: studentMonthItems.filter(isUpcomingSchedule).length, icon: Clock3, color: '#D97706' },
               { label: 'Đã hủy', value: studentMonthItems.filter((item) => item.status === 'cancelled').length, icon: Ban, color: colors.red },
             ].map((stat) => (
               <Card key={stat.label} style={styles.scheduleStat}>
-                <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft }]}>
+                <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === '#DC2626' ? '#FEF2F2' : (stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft) }]}>
                   <stat.icon size={17} color={stat.color} />
                 </View>
                 <Text style={styles.scheduleStatLabel}>{stat.label}</Text>
@@ -785,7 +787,7 @@ export function ScheduleScreen() {
           </View>
           <Card style={styles.weeklyGridCard}>
             <View style={styles.weeklyGridHeading}>
-              <View style={styles.scheduleOverviewIcon}><Table2 size={18} color={colors.brand} /></View>
+              <View style={[styles.scheduleOverviewIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}><Table2 size={18} color={isBrandStudent ? '#DC2626' : theme.brand} /></View>
               <View style={styles.weeklyGridHeadingCopy}>
                 <Text style={styles.weeklyGridTitle}>Lịch học theo tuần</Text>
               </View>
@@ -798,20 +800,20 @@ export function ScheduleScreen() {
               accessibilityState={{ expanded: showStudentCoursePicker }}
             >
               <Text style={styles.courseFilterSelectLabel}>Khóa học</Text>
-              <Text numberOfLines={1} style={styles.courseFilterSelectValue}>
+              <Text numberOfLines={1} style={[styles.courseFilterSelectValue, isBrandStudent && { color: '#DC2626' }]}>
                 {activeStudentCourse || 'Chưa có khóa học'}
               </Text>
-              <ChevronDown size={16} color={colors.brand} />
+              <ChevronDown size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
             </Pressable>
-            <View style={styles.teacherWeekRange}>
+            <View style={[styles.teacherWeekRange, isBrandStudent && { backgroundColor: '#FFF5F5', borderColor: '#FEE2E2' }]}>
               <Pressable onPress={() => setWeekOffset((value) => value - 1)} style={styles.teacherWeekRangeArrow} accessibilityRole="button" accessibilityLabel="Tuần trước">
-                <ChevronLeft size={16} color={colors.brand} />
+                <ChevronLeft size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
               </Pressable>
               <Pressable onPress={() => setWeekOffset(0)} accessibilityRole="button" accessibilityLabel="Về tuần hiện tại">
-                <Text style={styles.teacherWeekRangeLabel}>{weekLabel}</Text>
+                <Text style={[styles.teacherWeekRangeLabel, isBrandStudent && { color: '#DC2626' }]}>{weekLabel}</Text>
               </Pressable>
               <Pressable onPress={() => setWeekOffset((value) => value + 1)} style={styles.teacherWeekRangeArrow} accessibilityRole="button" accessibilityLabel="Tuần sau">
-                <ChevronRight size={16} color={colors.brand} />
+                <ChevronRight size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
               </Pressable>
             </View>
             <ScrollView
@@ -823,13 +825,24 @@ export function ScheduleScreen() {
               <View style={[styles.compactWeekGrid, { width: weekDays.length * STUDENT_WEEK_CELL_WIDTH }]}>
                 <View style={styles.compactWeekRow}>
                   {weekDays.map((day, index) => (
-                    <View key={day.dateKey} style={[styles.teacherCompactDayCell, styles.compactWeekHeaderCell, styles.studentCompactWeekHeaderCell, day.dateKey === todayKey && styles.weekGridTodayCell]}>
-                      <Text style={[styles.teacherCompactDayText, day.dateKey === todayKey && styles.weekGridTodayText]}>
+                    <View key={day.dateKey} style={[
+                      styles.teacherCompactDayCell,
+                      styles.compactWeekHeaderCell,
+                      styles.studentCompactWeekHeaderCell,
+                      day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#FEF2F2' } : styles.weekGridTodayCell)
+                    ]}>
+                      <Text style={[
+                        styles.teacherCompactDayText,
+                        day.dateKey === todayKey && (isBrandStudent ? { color: '#DC2626' } : styles.weekGridTodayText)
+                      ]}>
                         {index === 6 ? 'CN' : `T${index + 2}`}
                       </Text>
-                      <Text style={[styles.teacherCompactDateText, day.dateKey === todayKey && styles.weekGridTodayText]}>{day.day}</Text>
+                      <Text style={[
+                        styles.teacherCompactDateText,
+                        day.dateKey === todayKey && (isBrandStudent ? { color: '#DC2626' } : styles.weekGridTodayText)
+                      ]}>{day.day}</Text>
                       <View style={styles.teacherCompactSort}>
-                        <Text style={styles.teacherCompactSortText}>Giờ</Text>
+                        <Text style={[styles.teacherCompactSortText, day.dateKey === todayKey && isBrandStudent && { color: '#DC2626' }]}>Giờ</Text>
                       </View>
                     </View>
                   ))}
@@ -848,21 +861,32 @@ export function ScheduleScreen() {
                       ? styles.weekGridCompletedCell
                       : item?.status === 'cancelled'
                         ? styles.weekGridCancelledCell
-                        : item ? styles.weekGridBookedCell : undefined;
+                        : item
+                          ? (isBrandStudent ? { backgroundColor: '#FFF5F5', borderColor: '#FECACA' } : styles.weekGridBookedCell)
+                          : undefined;
                     const time = item?.time.match(/\d{1,2}:\d{2}/)?.[0];
                     return item ? (
                       <Pressable
                         key={day.dateKey}
                         onPress={() => setSelectedId(item.id)}
-                        style={[styles.teacherCompactDayCell, styles.compactWeekSlotCell, slotStatusStyle, day.dateKey === todayKey && styles.weekGridTodayColumn]}
+                        style={[
+                          styles.teacherCompactDayCell,
+                          styles.compactWeekSlotCell,
+                          slotStatusStyle,
+                          day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#FFF5F5' } : styles.weekGridTodayColumn)
+                        ]}
                         accessibilityRole="button"
                         accessibilityLabel={`${activeStudentCourse}, ${day.weekday} ${day.day}, ${item.time}, ${slotStatus}`}
                       >
-                        <Text numberOfLines={1} style={[styles.teacherCompactTime, styles.weekGridBookedText]}>{time}</Text>
-                        <Text numberOfLines={1} style={styles.teacherCompactStatus}>{slotStatus}</Text>
+                        <Text numberOfLines={1} style={[styles.teacherCompactTime, isBrandStudent ? { color: '#DC2626', fontWeight: '800' } : styles.weekGridBookedText]}>{time}</Text>
+                        <Text numberOfLines={1} style={[styles.teacherCompactStatus, isBrandStudent && { color: '#DC2626' }]}>{slotStatus}</Text>
                       </Pressable>
                     ) : (
-                      <View key={day.dateKey} style={[styles.teacherCompactDayCell, styles.compactWeekSlotCell, day.dateKey === todayKey && styles.weekGridTodayColumn]}>
+                      <View key={day.dateKey} style={[
+                        styles.teacherCompactDayCell,
+                        styles.compactWeekSlotCell,
+                        day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#FFF5F5' } : styles.weekGridTodayColumn)
+                      ]}>
                         <Text style={styles.teacherCompactTime}>-</Text>
                       </View>
                     );
@@ -921,7 +945,7 @@ export function ScheduleScreen() {
                 <Card style={styles.monthCalendarCard}>
                   <View style={styles.monthCalendarHeader}>
                     <View style={styles.weeklyGridHeading}>
-                      <View style={styles.scheduleOverviewIcon}><CalendarDays size={18} color={colors.brand} /></View>
+                      <View style={styles.scheduleOverviewIcon}><CalendarDays size={18} color={theme.brand} /></View>
                       <Text style={styles.weeklyGridTitle}>Lịch theo tháng</Text>
                     </View>
                     <View style={styles.monthCalendarControls}>
@@ -989,7 +1013,7 @@ export function ScheduleScreen() {
                 </Card>
                 <Card style={styles.calendarDayCard}>
                   <View style={styles.calendarDayHeader}>
-                    <View style={styles.diaryHeadingIcon}><CalendarDays size={16} color={colors.brand} /></View>
+                    <View style={styles.diaryHeadingIcon}><CalendarDays size={16} color={theme.brand} /></View>
                     <View style={styles.weeklyGridHeadingCopy}>
                       <Text style={styles.calendarDayTitle}>
                         {new Date(`${selectedCalendarDate}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -1047,10 +1071,11 @@ export function ScheduleScreen() {
                                     }
                                     navigation.navigate('Attendance', { scheduleId: item.id });
                                   }}
-                                  style={[
+                                  style={({ pressed }) => [
                                     styles.calendarAttendanceAction,
                                     makeupOverdue && (makeupRequestSent ? styles.calendarMakeupActionSent : styles.calendarMakeupAction),
                                     !attendanceAvailable && !makeupOverdue && styles.calendarAttendanceActionDisabled,
+                                    pressed && (attendanceAvailable || (makeupOverdue && !makeupRequestSent)) && styles.calendarAttendanceActionPressed,
                                   ]}
                                   accessibilityRole="button"
                                   accessibilityLabel={makeupOverdue
@@ -1069,7 +1094,14 @@ export function ScheduleScreen() {
                                 </Pressable>
                               ) : null}
                               {canEdit && !makeupOverdue ? (
-                                <Pressable onPress={() => openScheduleEditor(item)} style={styles.calendarEditAction} accessibilityRole="button">
+                                <Pressable
+                                  onPress={() => openScheduleEditor(item)}
+                                  style={({ pressed }) => [
+                                    styles.calendarEditAction,
+                                    pressed && styles.calendarEditActionPressed,
+                                  ]}
+                                  accessibilityRole="button"
+                                >
                                   <Text style={styles.calendarEditActionText}>Sửa ca dạy</Text>
                                 </Pressable>
                               ) : null}
@@ -1079,7 +1111,10 @@ export function ScheduleScreen() {
                                     setCancelTarget(item);
                                     setCancelReason('');
                                   }}
-                                  style={styles.calendarCancelAction}
+                                  style={({ pressed }) => [
+                                    styles.calendarCancelAction,
+                                    pressed && styles.calendarCancelActionPressed,
+                                  ]}
                                   accessibilityRole="button"
                                 >
                                   <Text style={styles.calendarCancelActionText}>Hủy ca</Text>
@@ -1110,7 +1145,7 @@ export function ScheduleScreen() {
               teacherScheduleView === 'week' ? (
                 <Card style={styles.weeklyGridCard}>
                   <View style={styles.weeklyGridHeading}>
-                    <View style={styles.scheduleOverviewIcon}><Table2 size={18} color={colors.brand} /></View>
+                    <View style={styles.scheduleOverviewIcon}><Table2 size={18} color={theme.brand} /></View>
                     <View style={styles.weeklyGridHeadingCopy}>
                       <Text style={styles.weeklyGridTitle}>Xếp lịch học viên theo tuần</Text>
                     </View>
@@ -1152,7 +1187,7 @@ export function ScheduleScreen() {
                         accessibilityLabel={showTeacherSearch ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
                         accessibilityState={{ expanded: showTeacherSearch }}
                       >
-                        {showTeacherSearch ? <X size={15} color={colors.brand} /> : <Search size={15} color={colors.brand} />}
+                        {showTeacherSearch ? <X size={15} color={theme.brand} /> : <Search size={15} color={theme.brand} />}
                       </Pressable>
                     </View>
                     <Pressable
@@ -1166,7 +1201,7 @@ export function ScheduleScreen() {
                       <Text numberOfLines={1} style={styles.courseFilterSelectValue}>
                         {teacherCourseFilter === 'Tất cả khóa' ? 'Tất cả khóa học' : teacherCourseFilter}
                       </Text>
-                      <ChevronDown size={16} color={colors.brand} />
+                      <ChevronDown size={16} color={theme.brand} />
                     </Pressable>
                     {showTeacherSearch ? (
                       <View style={styles.compactRosterSearch}>
@@ -1205,7 +1240,7 @@ export function ScheduleScreen() {
                           accessibilityRole="button"
                           accessibilityLabel="Tuần trước"
                         >
-                          <ChevronLeft size={16} color={colors.brand} />
+                          <ChevronLeft size={16} color={theme.brand} />
                         </Pressable>
                         <Pressable onPress={() => setWeekOffset(0)} accessibilityRole="button" accessibilityLabel="Về tuần hiện tại">
                           <Text style={styles.teacherWeekRangeLabel}>{weekLabel}</Text>
@@ -1216,7 +1251,7 @@ export function ScheduleScreen() {
                           accessibilityRole="button"
                           accessibilityLabel="Tuần sau"
                         >
-                          <ChevronRight size={16} color={colors.brand} />
+                          <ChevronRight size={16} color={theme.brand} />
                         </Pressable>
                       </View>
                       <ScrollView
@@ -1320,7 +1355,9 @@ export function ScheduleScreen() {
         !isTeacher && !resource.loading && !resource.error ? (
           <Card style={styles.studentDiaryCard}>
             <View style={styles.studentDiaryHeading}>
-              <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
+              <View style={[styles.diaryHeadingIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
+                <BookText size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
+              </View>
               <View style={styles.weeklyGridHeadingCopy}>
                 <Text style={styles.weeklyGridTitle}>Nhật ký học tập</Text>
               </View>
@@ -1342,12 +1379,22 @@ export function ScheduleScreen() {
                       style={[
                         styles.studentDiaryFilter,
                         dateFilter ? styles.studentDiaryDateFilter : styles.studentDiaryStatusFilter,
-                        selected && styles.studentDiaryFilterActive,
+                        isBrandStudent && { borderColor: '#DC2626' },
+                        selected && (isBrandStudent ? styles.studentDiaryFilterActiveBrand : styles.studentDiaryFilterActive),
                       ]}
                       accessibilityRole="tab"
                       accessibilityState={{ selected }}
                     >
-                      <Text style={[styles.studentDiaryFilterText, selected && styles.studentDiaryFilterTextActive]} numberOfLines={1}>{label}</Text>
+                      <Text
+                        style={[
+                          styles.studentDiaryFilterText,
+                          isBrandStudent && { color: '#DC2626' },
+                          selected && styles.studentDiaryFilterTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {label}
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -1388,7 +1435,11 @@ export function ScheduleScreen() {
                     {item.status === 'upcoming' ? (
                       <View style={styles.studentDiaryActions}>
                         {item.meetingUrl ? (
-                          <Pressable onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }} style={styles.studentDiaryJoinButton} accessibilityRole="button">
+                          <Pressable
+                            onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }}
+                            style={[styles.studentDiaryJoinButton, isBrandStudent && { backgroundColor: '#DC2626' }]}
+                            accessibilityRole="button"
+                          >
                             <Text style={styles.studentDiaryJoinButtonText}>Vào lớp</Text>
                           </Pressable>
                         ) : null}
@@ -1398,10 +1449,10 @@ export function ScheduleScreen() {
                             setStudentNote(item.studentNote || '');
                             setShowStudentNote(true);
                           }}
-                          style={styles.studentDiaryNoteButton}
+                          style={[styles.studentDiaryNoteButton, isBrandStudent && { borderColor: '#DC2626' }]}
                           accessibilityRole="button"
                         >
-                          <Text style={styles.studentDiaryNoteButtonText}>Ghi chú / Đổi lịch</Text>
+                          <Text style={[styles.studentDiaryNoteButtonText, isBrandStudent && { color: '#DC2626' }]}>Ghi chú / Đổi lịch</Text>
                         </Pressable>
                       </View>
                     ) : null}
@@ -1429,7 +1480,7 @@ export function ScheduleScreen() {
         isTeacher && teacherScheduleView === 'week' && !resource.loading && !resource.error ? (
           <Card style={styles.studentDiaryCard}>
             <View style={styles.studentDiaryHeading}>
-              <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
+              <View style={styles.diaryHeadingIcon}><BookText size={16} color={theme.brand} /></View>
               <View style={styles.weeklyGridHeadingCopy}>
                 <Text style={styles.weeklyGridTitle}>Nhật ký giảng dạy</Text>
               </View>
@@ -1535,7 +1586,7 @@ export function ScheduleScreen() {
                           <Text style={[styles.teacherDiaryDateMonth, cancelled && styles.teacherDiaryDateMonthCancelled]}>T{validDate.getMonth() + 1}</Text>
                           <Text style={[styles.teacherDiaryDateDay, cancelled && styles.teacherDiaryDateDayCancelled]}>{validDate.getDate()}</Text>
                         </>
-                      ) : <CalendarDays size={19} color={cancelled ? colors.red : colors.brand} />}
+                      ) : <CalendarDays size={19} color={cancelled ? colors.red : theme.brand} />}
                     </View>
                     <View style={styles.teacherDiarySessionCopy}>
                       <Text style={styles.teacherDiarySessionTitle}>{item.title}</Text>
@@ -1575,10 +1626,11 @@ export function ScheduleScreen() {
                               }
                               navigation.navigate('Attendance', { scheduleId: item.id });
                             }}
-                            style={[
+                            style={({ pressed }) => [
                               styles.teacherDiaryAttendanceButton,
                               makeupOverdue && (makeupRequestSent ? styles.teacherDiaryMakeupButtonSent : styles.teacherDiaryMakeupButton),
                               !attendanceAvailable && !makeupOverdue && styles.teacherDiaryAttendanceButtonDisabled,
+                              pressed && (attendanceAvailable || (makeupOverdue && !makeupRequestSent)) && styles.teacherDiaryAttendanceButtonPressed,
                             ]}
                             accessibilityRole="button"
                             accessibilityLabel={makeupOverdue
@@ -1602,7 +1654,10 @@ export function ScheduleScreen() {
                               setCancelTarget(item);
                               setCancelReason('');
                             }}
-                            style={styles.teacherDiaryCancelButton}
+                            style={({ pressed }) => [
+                              styles.teacherDiaryCancelButton,
+                              pressed && styles.teacherDiaryCancelButtonPressed,
+                            ]}
                             accessibilityRole="button"
                             accessibilityLabel={`Hủy ca ${item.studentName || item.title}`}
                           >
@@ -1852,7 +1907,7 @@ export function ScheduleScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setSortMenu(null)} accessibilityRole="button" accessibilityLabel="Đóng sắp xếp" />
           <View style={[styles.sortMenuCard, styles.centeredPickerCard]}>
             <View style={styles.sortMenuHeading}>
-              <View style={styles.sortMenuIcon}><Table2 size={17} color={colors.brand} /></View>
+              <View style={styles.sortMenuIcon}><Table2 size={17} color={theme.brand} /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>Sắp xếp theo giờ</Text>
                 <Text style={styles.metaText}>
@@ -1892,7 +1947,7 @@ export function ScheduleScreen() {
                   accessibilityState={{ selected: isSelected }}
                 >
                   <Text style={[styles.sortMenuOptionText, isSelected && styles.sortMenuOptionTextSelected]}>{option.label}</Text>
-                  {isSelected ? <Check size={17} color={colors.brand} /> : null}
+                  {isSelected ? <Check size={17} color={theme.brand} /> : null}
                 </Pressable>
               );
             })}
@@ -1904,7 +1959,7 @@ export function ScheduleScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCoursePicker(false)} accessibilityRole="button" accessibilityLabel="Đóng chọn khóa học" />
           <View style={[styles.sortMenuCard, styles.centeredPickerCard]}>
             <View style={styles.sortMenuHeading}>
-              <View style={styles.sortMenuIcon}><BookOpen size={17} color={colors.brand} /></View>
+              <View style={styles.sortMenuIcon}><BookOpen size={17} color={theme.brand} /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>Chọn khóa học</Text>
                 <Text style={styles.metaText}>Lọc học viên theo khóa</Text>
@@ -1930,7 +1985,7 @@ export function ScheduleScreen() {
                     <Text numberOfLines={2} style={[styles.sortMenuOptionText, selected && styles.sortMenuOptionTextSelected]}>
                       {course === 'Tất cả khóa' ? 'Tất cả khóa học' : course}
                     </Text>
-                    {selected ? <Check size={17} color={colors.brand} /> : null}
+                    {selected ? <Check size={17} color={theme.brand} /> : null}
                   </Pressable>
                 );
               })}
@@ -1943,7 +1998,7 @@ export function ScheduleScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowStudentCoursePicker(false)} accessibilityRole="button" accessibilityLabel="Đóng chọn khóa học" />
           <View style={styles.sortMenuCard}>
             <View style={styles.sortMenuHeading}>
-              <View style={styles.sortMenuIcon}><BookOpen size={17} color={colors.brand} /></View>
+              <View style={styles.sortMenuIcon}><BookOpen size={17} color={theme.brand} /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>Chọn khóa học</Text>
                 <Text style={styles.metaText}>Lọc lịch học theo khóa</Text>
@@ -1967,7 +2022,7 @@ export function ScheduleScreen() {
                     accessibilityState={{ selected }}
                   >
                     <Text numberOfLines={2} style={[styles.sortMenuOptionText, selected && styles.sortMenuOptionTextSelected]}>{course}</Text>
-                    {selected ? <Check size={17} color={colors.brand} /> : null}
+                    {selected ? <Check size={17} color={theme.brand} /> : null}
                   </Pressable>
                 );
               })}
@@ -2459,7 +2514,7 @@ export function AssignmentsScreen({
             accessibilityRole="button"
             accessibilityLabel={`Bài tập của khóa ${courseFilter || 'chưa chọn'}${courses.length > 1 ? ', bấm để đổi khóa' : ''}`}
           >
-            <FileText size={18} color={colors.brand} />
+            <FileText size={18} color={theme.brand} />
             <View style={styles.flex}>
               <Text style={styles.assignCourseCaption}>Bài tập của</Text>
               <Text numberOfLines={1} style={styles.assignCourseName}>{courseFilter || 'Chưa có khóa học'}</Text>
@@ -2495,7 +2550,7 @@ export function AssignmentsScreen({
                     accessibilityState={{ selected: active }}
                   >
                     <Text numberOfLines={2} style={[styles.assignSheetOptionText, active && styles.assignSheetOptionTextActive]}>{courseOption}</Text>
-                    {active ? <Check size={18} color={colors.brand} /> : null}
+                    {active ? <Check size={18} color={theme.brand} /> : null}
                   </Pressable>
                 );
               })}
@@ -2533,7 +2588,7 @@ export function AssignmentsScreen({
           <Text style={styles.muted}>{selected.description || 'Không có mô tả.'}</Text>
           {selected.attachedFileName || selected.attachedFileUrl ? (
             <Pressable onPress={() => { void openAssignmentLink(selected.attachedFileUrl, 'Tệp đề bài'); }} style={styles.fileLinkRow} accessibilityRole="button" accessibilityLabel="Mở tệp đề bài">
-              <FileText size={18} color={colors.brand} /><Text style={styles.fileLinkText}>{selected.attachedFileName || 'Tệp đề bài'}</Text><Text style={styles.fileLinkAction}>Mở</Text>
+              <FileText size={18} color={theme.brand} /><Text style={styles.fileLinkText}>{selected.attachedFileName || 'Tệp đề bài'}</Text><Text style={styles.fileLinkAction}>Mở</Text>
             </Pressable>
           ) : null}
           {selected.assignedStudentNames?.length ? <Text style={styles.metaText}>Học viên được giao: {selected.assignedStudentNames.join(', ')}</Text> : null}
@@ -2556,7 +2611,7 @@ export function AssignmentsScreen({
                     <Text style={styles.cardTitle}>{submission.studentName}</Text>
                     <Text style={styles.metaText}>{submission.submittedAt}</Text>
                     <Pressable onPress={() => { void openAssignmentLink(submission.submittedFileUrl, 'Bài nộp'); }} style={styles.fileLinkRow} accessibilityRole="button" accessibilityLabel={`Mở tệp ${submission.submittedFileUrl || 'bài nộp'}`}>
-                      <FileText size={18} color={colors.brand} />
+                      <FileText size={18} color={theme.brand} />
                       <Text style={styles.fileLinkText}>{submission.submittedFileUrl || 'Không có file'}</Text>
                       <Text style={styles.fileLinkAction}>Mở</Text>
                     </Pressable>
@@ -2575,7 +2630,7 @@ export function AssignmentsScreen({
               {selected.grade != null ? <Text style={styles.metaText}>Điểm: {selected.grade}/10 · {selected.teacherFeedback || ''}</Text> : null}
               {selected.submissions?.[0]?.submittedFileUrl ? (
                 <Pressable onPress={() => { void openAssignmentLink(selected.submissions?.[0]?.submittedFileUrl, 'Bài đã nộp'); }} style={styles.fileLinkRow} accessibilityRole="button" accessibilityLabel="Mở bài đã nộp">
-                  <FileText size={18} color={colors.brand} />
+                  <FileText size={18} color={theme.brand} />
                   <Text style={styles.fileLinkText}>Mở bài đã nộp</Text>
                   <Text style={styles.fileLinkAction}>Mở</Text>
                 </Pressable>
@@ -2594,7 +2649,7 @@ export function AssignmentsScreen({
                 accessibilityLabel="Liên kết bài làm"
               />
               <Pressable onPress={() => { void pickSubmissionFile(); }} style={styles.fileLinkRow} accessibilityRole="button">
-                <FileText size={18} color={colors.brand} />
+                <FileText size={18} color={theme.brand} />
                 <Text style={styles.fileLinkText}>{submissionFile?.name || 'Chọn tệp bài làm'}</Text>
                 <Text style={styles.fileLinkAction}>{submissionFile ? 'Đổi tệp' : 'Chọn tệp'}</Text>
               </Pressable>
@@ -2628,7 +2683,7 @@ export function AssignmentsScreen({
               <TextInput value={description} onChangeText={setDescription} placeholder="Mô tả / yêu cầu" multiline style={[styles.formInput, styles.formTextarea]} />
               <Text style={styles.fieldLabel}>Link File đề bài (Google Drive...)</Text>
               <TextInput value={attachedFileUrl} onChangeText={setAttachedFileUrl} placeholder="HTTPS://..." autoCapitalize="none" keyboardType="url" style={styles.formInput} accessibilityLabel="Link File đề bài Google Drive" />
-              {attachedFileUrl.trim() ? <Pressable onPress={() => { void openAssignmentLink(attachedFileUrl.trim(), 'Tệp đề bài'); }} style={styles.fileLinkRow} accessibilityRole="button"><Link2 size={17} color={colors.brand} /><Text numberOfLines={1} style={styles.fileLinkText}>Xem trước liên kết</Text></Pressable> : null}
+              {attachedFileUrl.trim() ? <Pressable onPress={() => { void openAssignmentLink(attachedFileUrl.trim(), 'Tệp đề bài'); }} style={styles.fileLinkRow} accessibilityRole="button"><Link2 size={17} color={theme.brand} /><Text numberOfLines={1} style={styles.fileLinkText}>Xem trước liên kết</Text></Pressable> : null}
               {editingAssignmentId ? <Text style={styles.metaText}>Khóa học: {course}</Text> : null}
               {!editingAssignmentId ? (<>
                 <Text style={styles.fieldLabel}>Khóa học</Text>
@@ -2656,7 +2711,7 @@ export function AssignmentsScreen({
                 accessibilityLabel={deadline ? `Hạn nộp ${deadline}` : 'Chọn ngày hạn nộp'}
                 accessibilityState={{ expanded: showDeadlineCalendar }}
               >
-                <CalendarDays size={18} color={colors.brand} />
+                <CalendarDays size={18} color={theme.brand} />
                 <Text style={deadline ? styles.deadlinePickerValue : styles.deadlinePickerPlaceholder}>
                   {deadline || 'Chọn ngày hạn nộp'}
                 </Text>
@@ -2837,7 +2892,7 @@ export function StudentResourcesScreen() {
           {!softwareResource.loading && !softwareResource.error && !software.length ? <EmptyState title="Chưa có phần mềm" message="Phần mềm của khóa học sẽ hiển thị tại đây." /> : null}
           {!softwareResource.loading && !softwareResource.error && software.map((item: DemoSoftwareLink) => (
             <Card key={item.id} style={styles.materialRow}>
-              <View style={styles.fileIcon}><Download size={20} color={colors.brand} /></View>
+              <View style={styles.fileIcon}><Download size={20} color={theme.brand} /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.metaText}>{item.category}</Text>
@@ -2867,7 +2922,7 @@ function MaterialRow({ item }: { item: LearningMaterial }) {
     WORD: <FileText size={20} color={colors.blue} />,
     EXCEL: <FileSpreadsheet size={20} color={colors.green} />,
     VIDEO: <Film size={20} color={colors.purple} />,
-    LINK: <Link2 size={20} color={colors.brand} />,
+    LINK: <Link2 size={20} color={theme.brand} />,
   };
   return (
     <Card style={styles.materialRow}>
@@ -2935,7 +2990,8 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
   const currentPage = Math.min(page, pageCount);
   const pageItems = resource.data?.page === currentPage ? notifications : [];
   const unreadCount = resource.data?.unread || 0;
-  const refreshControl = <RefreshControl refreshing={resource.loading} onRefresh={resource.reload} tintColor={colors.brand} />;
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
+  const refreshControl = <RefreshControl refreshing={resource.loading} onRefresh={resource.reload} tintColor={isBrandStudent ? '#DC2626' : theme.brand} />;
 
   useEffect(() => {
     setPage(1);
@@ -3121,8 +3177,8 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
         </Pressable>
         {unreadCount > 0 ? (
           <Pressable onPress={() => { void markAll(); }} style={styles.notificationMarkAll} accessibilityRole="button">
-            <Check size={14} color={colors.ink} />
-            <Text style={styles.notificationMarkAllText}>Đánh dấu là đã đọc</Text>
+            <Check size={14} color={isBrandStudent ? '#DC2626' : colors.ink} />
+            <Text style={[styles.notificationMarkAllText, isBrandStudent && { color: '#DC2626' }]}>Đánh dấu là đã đọc</Text>
           </Pressable>
         ) : null}
       </View>
@@ -3182,11 +3238,13 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
 }
 
 function NotificationCard({ item, onPress, onMarkRead, onDismiss, last }: { item: AppNotification; onPress: () => void; onMarkRead: () => void; onDismiss: () => void; last: boolean }) {
+  const { user } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const [hovered, setHovered] = useState(false);
   const [showDeleteAction, setShowDeleteAction] = useState(false);
   const category = notificationCategory(item);
-  const tint = category === 'Lịch dạy' ? '#FFF7ED' : category === 'Hệ thống' ? colors.brandSoft : colors.blueSoft;
-  const iconColor = category === 'Lịch dạy' ? '#EA580C' : category === 'Hệ thống' ? colors.brand : colors.blue;
+  const tint = category === 'Lịch dạy' ? '#FFF7ED' : category === 'Hệ thống' ? (isBrandStudent ? '#FEF2F2' : theme.brandSoft) : colors.blueSoft;
+  const iconColor = category === 'Lịch dạy' ? '#EA580C' : category === 'Hệ thống' ? (isBrandStudent ? '#DC2626' : theme.brand) : colors.blue;
   const Icon = category === 'Lịch dạy' ? CalendarDays : category === 'Hệ thống' ? Bell : GraduationCap;
   return (
     <View
@@ -3197,11 +3255,11 @@ function NotificationCard({ item, onPress, onMarkRead, onDismiss, last }: { item
       <View style={styles.notificationItemMain}>
         <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.unread ? 'chưa đọc' : 'đã đọc'}`} style={[styles.notificationItemIcon, { backgroundColor: tint }]}>
           <Icon size={15} color={iconColor} />
-          {item.unread ? <View style={styles.notificationItemDot} /> : null}
+          {item.unread ? <View style={[styles.notificationItemDot, isBrandStudent && { backgroundColor: '#EF4444' }]} /> : null}
         </Pressable>
         <View style={styles.notificationItemCopy}>
           <View style={styles.notificationItemMeta}>
-            <Text style={styles.notificationItemCategory}>{category}</Text>
+            <Text style={[styles.notificationItemCategory, isBrandStudent && { color: '#DC2626' }]}>{category}</Text>
             <View style={styles.notificationItemTimeActions}>
               <Text style={styles.notificationItemTime}>{item.time}</Text>
               <Pressable
@@ -3217,15 +3275,15 @@ function NotificationCard({ item, onPress, onMarkRead, onDismiss, last }: { item
             </View>
           </View>
           <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.unread ? 'chưa đọc' : 'đã đọc'}`} style={styles.notificationItemContent}>
-            <Text numberOfLines={1} style={styles.notificationItemTitle}>{item.title}</Text>
-            <Text numberOfLines={3} style={styles.notificationItemMessage}>{item.message}</Text>
+            <Text numberOfLines={1} style={styles.notificationItemTitle}>{cleanNotificationMessage(item.title)}</Text>
+            <Text numberOfLines={3} style={styles.notificationItemMessage}>{cleanNotificationMessage(item.message)}</Text>
           </Pressable>
         </View>
       </View>
       <View style={styles.notificationItemActions}>
         {item.unread ? (
           <Pressable onPress={onMarkRead} style={styles.notificationItemAction} accessibilityRole="button" accessibilityLabel={`Đánh dấu đã đọc: ${item.title}`}>
-            <Check size={15} color={colors.green} />
+            <Check size={15} color={isBrandStudent ? '#DC2626' : colors.green} />
           </Pressable>
         ) : null}
         {showDeleteAction ? (
@@ -3431,7 +3489,7 @@ export function StudentsScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Nhắn tin với ${selectedStudent.name}`}
             >
-              <MessageCircle size={18} color={colors.brand} />
+              <MessageCircle size={18} color={theme.brand} />
             </Pressable>
           }
         />
@@ -3469,7 +3527,7 @@ export function StudentsScreen() {
               </Pressable>
               <View style={styles.studentListActions}>
                 <Pressable onPress={() => openStudentConversation(student)} accessibilityRole="button" accessibilityLabel={`Nhắn tin với ${student.name}`} style={styles.studentChatButton}>
-                  <MessageCircle size={18} color={colors.brand} />
+                  <MessageCircle size={18} color={theme.brand} />
                 </Pressable>
                 <ChevronRight size={17} color={colors.muted} />
               </View>
@@ -3520,7 +3578,7 @@ export function StudentsScreen() {
           {detailTab === 'Điểm danh' ? (
             <View style={styles.studentDetailSection}>
               <SectionHeading title="Lịch sử buổi học" />
-              {detailLoading ? <ActivityIndicator color={colors.brand} /> : null}
+              {detailLoading ? <ActivityIndicator color={theme.brand} /> : null}
               {!detailLoading && studentDetail?.attendance.length ? studentDetail.attendance.map((entry) => (
                 <View key={entry.id} style={styles.studentHistoryRow}>
                   <View style={styles.flex}>
@@ -3535,7 +3593,7 @@ export function StudentsScreen() {
           {detailTab === 'Kết quả' ? (
             <View style={styles.studentDetailSection}>
               <SectionHeading title="Kết quả bài thi" />
-              {detailLoading ? <ActivityIndicator color={colors.brand} /> : null}
+              {detailLoading ? <ActivityIndicator color={theme.brand} /> : null}
               {!detailLoading && studentDetail?.examResults.length ? studentDetail.examResults.map((result) => (
                 <View key={result.id} style={styles.studentHistoryRow}>
                   <View style={styles.flex}>
@@ -3588,7 +3646,7 @@ function StudentCard({ student, online, lastSeenLabel }: { student: DemoStudent;
         name={student.name}
         color={student.color}
         size={44}
-        imageSource={student.avatar ? getMobileImageSource(resolveMobilePublicUrl(student.avatar)) : undefined}
+        avatar={student.avatar}
       />
       <View style={styles.rowCopy}>
         <View style={styles.rowBetween}><Text numberOfLines={1} style={styles.cardTitle}>{student.name}</Text><StatusBadge compact label={student.enrollmentStatus === 'completed' ? 'Hoàn thành' : student.enrollmentStatus === 'cancelled' ? 'Thôi học' : 'Đang học'} /></View>
@@ -3861,7 +3919,7 @@ export function AttendanceScreen() {
           ) : null}
           <Card style={styles.attendanceStudentSummary}>
             <View style={styles.attendanceStudentHeading}>
-              <Avatar name={selectedStudent.name} color={selectedStudent.color} size={48} />
+              <Avatar name={selectedStudent.name} color={selectedStudent.color} avatar={selectedStudent.avatar} size={48} />
               <View style={styles.attendanceStudentCopy}>
                 <Text numberOfLines={2} style={styles.attendanceStudentName}>{selectedStudent.name}</Text>
                 <Text numberOfLines={2} style={styles.attendanceStudentMeta}>{selectedSession.courseName || selectedStudent.course}</Text>
@@ -3922,7 +3980,14 @@ export function AttendanceScreen() {
                 <CheckCircle size={16} color="#CBD5E1" />
                 <Text style={styles.attendanceWaitingText}>Đang xác nhận</Text>
               </View>
-              <Pressable onPress={cancelPendingAttendance} style={styles.attendanceUndoButton} accessibilityRole="button">
+              <Pressable
+                onPress={cancelPendingAttendance}
+                style={({ pressed }) => [
+                  styles.attendanceUndoButton,
+                  pressed && styles.attendanceUndoButtonPressed,
+                ]}
+                accessibilityRole="button"
+              >
                 <Text style={styles.attendanceUndoText}>✕  Hủy điểm danh ({confirmRemaining}S)</Text>
               </Pressable>
             </View>
@@ -3934,13 +3999,13 @@ export function AttendanceScreen() {
                   {committingAttendance
                     ? 'Đang ghi nhận'
                     : selectedSession?.attendanceDisputed
-                      ? 'Chờ qu?N tr? Vi?N xử lý'
+                      ? 'Chờ quản trị viên xử lý'
                       : selectedSession?.attendanceRejected
                         ? 'Buổi không được tính'
                         : selectedSession?.attendanceConfirmPending
                           ? 'Chờ học viên xác nhận'
                           : selectedSession?.attendanceConfirmStatus === 'admin_approved'
-                            ? 'Qu?N tr? Vi?N đã điểm danh bù'
+                            ? 'Quản trị viên đã điểm danh bù'
                             : 'Đã điểm danh'}
                 </Text>
               </View>
@@ -4016,10 +4081,24 @@ export function AttendanceScreen() {
                 />
               </View>
               <View style={styles.attendanceModalActions}>
-                <Pressable onPress={closeAttendanceModal} style={styles.attendanceModalCancel} accessibilityRole="button">
+                <Pressable
+                  onPress={closeAttendanceModal}
+                  style={({ pressed }) => [
+                    styles.attendanceModalCancel,
+                    pressed && styles.attendanceModalCancelPressed,
+                  ]}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.attendanceModalCancelText}>Hủy</Text>
                 </Pressable>
-                <Pressable onPress={confirmAttendance} style={styles.attendanceModalConfirm} accessibilityRole="button">
+                <Pressable
+                  onPress={confirmAttendance}
+                  style={({ pressed }) => [
+                    styles.attendanceModalConfirm,
+                    pressed && styles.attendanceModalConfirmPressed,
+                  ]}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.attendanceModalConfirmText}>Xác nhận điểm danh</Text>
                 </Pressable>
               </View>
@@ -4041,12 +4120,12 @@ export function GradesScreen() {
     <AppScreen>
       <AppHeader title="Nhật ký học tập & Điểm số" subtitle="Bài nộp, trắc nghiệm và điểm theo khóa học" />
       <Card style={styles.resultSummary}>
-        <View style={styles.summaryIcon}><WalletCards size={20} color={colors.brand} /></View>
+        <View style={styles.summaryIcon}><WalletCards size={20} color={theme.brand} /></View>
         <View style={styles.rowCopy}>
           <Text style={styles.cardTitle}>Lịch sử kết quả</Text>
           <Text style={styles.metaText}>{courses.length || '-'} khóa học · {records.length || '-'} kết quả</Text>
         </View>
-        <GraduationCap size={22} color={colors.brand} />
+        <GraduationCap size={22} color={theme.brand} />
       </Card>
       {records.some((record) => record.qaFixture) ? <Text style={styles.note}>QA fixture - điểm minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
       {resource.loading ? <LoadingSkeleton /> : null}
@@ -4128,6 +4207,8 @@ export function ProfileScreen() {
     if (['inactive', 'ngừng hoạt động'].includes(status)) return 'Ngừng hoạt động';
     return status || '-';
   })();
+  const isFreePortal = isFreePortalMenu(user);
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortal);
   const enrollments = studentProfile?.enrollments || [];
   const toggleStudentSection = (section: keyof typeof openStudentSections) => {
     setOpenStudentSections((current) => ({ ...current, [section]: !current[section] }));
@@ -4250,7 +4331,7 @@ export function ProfileScreen() {
               color={user?.avatarColor}
             />
             <View style={styles.studentProfileHeroCopy}>
-              <Text style={styles.studentProfileHeroEyebrow}>Hồ sơ cá nhân</Text>
+              <Text style={[styles.studentProfileHeroEyebrow, isBrandStudent && { color: '#DC2626' }]}>Hồ sơ cá nhân</Text>
               <Text style={styles.studentProfileHeroName}>{studentText('name', user?.name || 'Học viên')}</Text>
               <Text style={styles.studentProfileHeroSubtitle}>Chạm vào ảnh để thay đổi ảnh đại diện</Text>
             </View>
@@ -4259,59 +4340,65 @@ export function ProfileScreen() {
           <Card style={styles.studentProfileSection}>
             <View style={styles.studentProfileSectionHeader}>
               <View style={styles.studentProfileSectionTitle}>
-                <UserRound size={16} color={colors.green} />
+                <UserRound size={16} color={isBrandStudent ? '#DC2626' : colors.green} />
                 <Text style={styles.studentProfileSectionText}>Thông tin cá nhân</Text>
               </View>
-              <Pressable onPress={() => setShowStudentProfileForm(true)} style={styles.profileEditButton} accessibilityRole="button">
-                <Settings size={14} color={colors.brand} />
-                <Text style={styles.profileEditButtonText}>Chỉnh sửa</Text>
+              <Pressable
+                onPress={() => setShowStudentProfileForm(true)}
+                style={[styles.profileEditButton, isBrandStudent && { backgroundColor: '#FEF2F2' }]}
+                accessibilityRole="button"
+              >
+                <Settings size={14} color={isBrandStudent ? '#DC2626' : theme.brand} />
+                <Text style={[styles.profileEditButtonText, isBrandStudent && { color: '#DC2626' }]}>Chỉnh sửa</Text>
               </Pressable>
             </View>
           </Card>
-          <Card style={styles.profileDetails}>
-            <Pressable onPress={() => toggleStudentSection('courses')} style={styles.studentProfileSectionHeader} accessibilityRole="button" accessibilityState={{ expanded: openStudentSections.courses }}>
-              <View style={styles.studentProfileSectionTitle}>
-                <BookOpen size={16} color={colors.blue} />
-                <Text style={styles.studentProfileSectionText}>Khóa học đã đăng ký</Text>
-                <Text style={styles.studentProfileCount}>{enrollments.length}</Text>
-              </View>
-              <ChevronDown size={17} color={colors.muted} style={openStudentSections.courses ? styles.studentProfileChevronOpen : undefined} />
-            </Pressable>
-            {openStudentSections.courses ? enrollments.length ? enrollments.map((enrollment) => (
-              <View key={enrollment.id} style={styles.profileCourse}>
-                <View style={styles.rowBetween}><Text style={styles.cardTitle}>{enrollment.courseName}</Text><StatusBadge label={enrollment.status} /></View>
-                <Text style={styles.metaText}>GV: {enrollment.teacherName || 'Chưa phân công'}{enrollment.registeredAt ? ` · ${enrollment.registeredAt}` : ''}</Text>
-                {enrollment.progress != null ? <ProgressBar value={enrollment.progress} /> : null}
-                <View style={styles.studentCourseProgressMeta}>
-                  <Text style={styles.metaText}>{enrollment.completedSessions ?? 0}/{enrollment.totalSessions ?? 0} buổi · Tiến độ {enrollment.progress ?? 0}%</Text>
-                  <Text style={styles.studentCourseGrade}>{enrollment.avgGrade ?? 0} TB</Text>
+          {!isFreePortal && (
+            <Card style={styles.profileDetails}>
+              <Pressable onPress={() => toggleStudentSection('courses')} style={styles.studentProfileSectionHeader} accessibilityRole="button" accessibilityState={{ expanded: openStudentSections.courses }}>
+                <View style={styles.studentProfileSectionTitle}>
+                  <BookOpen size={16} color={colors.blue} />
+                  <Text style={styles.studentProfileSectionText}>Khóa học đã đăng ký</Text>
+                  <Text style={styles.studentProfileCount}>{enrollments.length}</Text>
                 </View>
-              </View>
-            )) : <EmptyState title="Chưa có khóa học" message="Khóa học được phân công sẽ hiển thị tại đây." /> : null}
-          </Card>
+                <ChevronDown size={17} color={colors.muted} style={openStudentSections.courses ? styles.studentProfileChevronOpen : undefined} />
+              </Pressable>
+              {openStudentSections.courses ? enrollments.length ? enrollments.map((enrollment) => (
+                <View key={enrollment.id} style={styles.profileCourse}>
+                  <View style={styles.rowBetween}><Text style={styles.cardTitle}>{enrollment.courseName}</Text><StatusBadge label={enrollment.status} /></View>
+                  <Text style={styles.metaText}>GV: {enrollment.teacherName || 'Chưa phân công'}{enrollment.registeredAt ? ` · ${enrollment.registeredAt}` : ''}</Text>
+                  {enrollment.progress != null ? <ProgressBar value={enrollment.progress} /> : null}
+                  <View style={styles.studentCourseProgressMeta}>
+                    <Text style={styles.metaText}>{enrollment.completedSessions ?? 0}/{enrollment.totalSessions ?? 0} buổi · Tiến độ {enrollment.progress ?? 0}%</Text>
+                    <Text style={styles.studentCourseGrade}>{enrollment.avgGrade ?? 0} TB</Text>
+                  </View>
+                </View>
+              )) : <EmptyState title="Chưa có khóa học" message="Khóa học được phân công sẽ hiển thị tại đây." /> : null}
+            </Card>
+          )}
         </>
       )}
       {isTeacher ? (
         <Card style={styles.menuCard}>
-          <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
-          <MenuRow icon={<KeyRound size={18} color={colors.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
-          <MenuRow icon={<Users size={18} color={colors.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
+          <MenuRow icon={<Settings size={18} color={theme.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
+          <MenuRow icon={<KeyRound size={18} color={theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
+          <MenuRow icon={<Users size={18} color={theme.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
         </Card>
       ) : (
         <Card style={styles.menuCard}>
-          <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
-          <MenuRow icon={<KeyRound size={18} color={colors.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
-          <MenuRow icon={<Target size={18} color={colors.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} borderless />
+          <MenuRow icon={<Settings size={18} color={isBrandStudent ? '#EF4444' : theme.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
+          <MenuRow icon={<KeyRound size={18} color={isBrandStudent ? '#EF4444' : theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
+          <MenuRow icon={<Target size={18} color={isBrandStudent ? '#EF4444' : theme.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} borderless />
         </Card>
       )}
       {showPinSettings && user ? (
-        <PinLockSettingsModal userKey={pinUserKey(user)} onClose={() => setShowPinSettings(false)} />
+        <PinLockSettingsModal userKey={pinUserKey(user)} onClose={() => setShowPinSettings(false)} isBrandStudent={isBrandStudent} />
       ) : null}
       {!user?.previewMode ? (
         <Card style={styles.menuCard}>
           <SectionHeading title="Cài đặt và hỗ trợ" />
           <MenuRow
-            icon={<Bell size={18} color={colors.brand} />}
+            icon={<Bell size={18} color={theme.brand} />}
             title={enablingPush ? 'Đang bật thông báo…' : 'Bật thông báo trên thiết bị'}
             subtitle={Platform.OS === 'web' ? 'Bật quyền thông báo cho trình duyệt này' : 'Chỉ hỏi quyền khi bạn chọn bật'}
             onPress={() => { void enablePush(); }}
@@ -4319,7 +4406,7 @@ export function ProfileScreen() {
           {configuredLinks.map((item, index) => (
             <MenuRow
               key={item.title}
-              icon={<Link2 size={18} color={colors.brand} />}
+              icon={<Link2 size={18} color={theme.brand} />}
               title={item.title}
               onPress={() => openConfiguredUrl(item.url, item.title)}
               borderless={index === configuredLinks.length - 1}
@@ -4349,6 +4436,7 @@ export function ProfileScreen() {
             if (user?.previewMode) setPreviewStudentUpdates((current) => ({ ...current, ...updates }));
             else studentProfileResource.reload();
           }}
+          isBrandStudent={isBrandStudent}
         />
       ) : null}
       {isTeacher && showTeacherProfileForm ? (
@@ -4369,6 +4457,7 @@ export function ProfileScreen() {
             setShowPasswordForm(false);
             Alert.alert('Thành công', 'Mật khẩu đã được thay đổi.');
           }}
+          isBrandStudent={isBrandStudent}
         />
       ) : null}
       <Modal
@@ -4387,6 +4476,7 @@ export function ProfileScreen() {
                 size="md"
                 fullWidth
                 text="Đã hiểu"
+                accessibilityLabel="Đóng thông báo trạng thái quyền"
                 onPress={() => setPushFeedback(null)}
               />
             </View>
@@ -4409,6 +4499,7 @@ function EditableMobileAvatar({
   color?: string;
 }) {
   const { user, updateAvatar } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const [uploading, setUploading] = useState(false);
   const chooseAvatar = async () => {
     if (uploading) return;
@@ -4472,8 +4563,14 @@ function EditableMobileAvatar({
       accessibilityLabel={uploading ? 'Đang tải ảnh đại diện' : 'Đổi ảnh đại diện'}
       accessibilityState={{ disabled: uploading }}
     >
-      <Avatar name={name} color={color} size={size} imageSource={imageSource} />
-      <View style={styles.editableAvatarCamera}>
+      <Avatar
+        name={name}
+        color={color || (isBrandStudent ? '#FEE2E2' : theme.brandSoft)}
+        textColor={isBrandStudent ? '#DC2626' : undefined}
+        size={size}
+        imageSource={imageSource}
+      />
+      <View style={[styles.editableAvatarCamera, isBrandStudent && { backgroundColor: '#DC2626' }]}>
         {uploading ? <Text style={styles.editableAvatarLoading}>…</Text> : <Camera size={14} color="#FFFFFF" />}
       </View>
     </Pressable>
@@ -4485,11 +4582,13 @@ function StudentProfileEditModal({
   profile,
   onClose,
   onSaved,
+  isBrandStudent = false,
 }: {
   user: DemoUser | null;
   profile: RawStudent | null | undefined;
   onClose: () => void;
   onSaved: (updates: StudentProfileUpdate) => void;
+  isBrandStudent?: boolean;
 }) {
   const { width } = useWindowDimensions();
   const name = typeof profile?.name === 'string' ? profile.name : user?.name || '';
@@ -4533,10 +4632,10 @@ function StudentProfileEditModal({
           behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           style={styles.studentProfileModal}
         >
-          <View style={styles.studentProfileModalHeader}>
+          <View style={[styles.studentProfileModalHeader, isBrandStudent && styles.studentProfileModalHeaderBrand]}>
             <View style={styles.studentProfileModalTitle}>
-              <UserRound size={18} color="#0F766E" />
-              <Text style={styles.studentProfileModalTitleText}>Cập nhật Hồ sơ Cá nhân</Text>
+              <UserRound size={18} color={isBrandStudent ? '#DC2626' : '#0F766E'} />
+              <Text style={[styles.studentProfileModalTitleText, isBrandStudent && styles.studentProfileModalTitleTextBrand]}>Cập nhật Hồ sơ Cá nhân</Text>
             </View>
             <Pressable onPress={onClose} style={styles.studentProfileModalClose} accessibilityRole="button" accessibilityLabel="Đóng cập nhật hồ sơ">
               <X size={17} color={colors.muted} />
@@ -4560,11 +4659,17 @@ function StudentProfileEditModal({
                     <Pressable
                       key={option.value}
                       onPress={() => setGender(option.value)}
-                      style={[styles.studentProfileGenderOption, selected && styles.studentProfileGenderOptionSelected]}
+                      style={[
+                        styles.studentProfileGenderOption,
+                        selected && (isBrandStudent ? styles.studentProfileGenderOptionSelectedBrand : styles.studentProfileGenderOptionSelected),
+                      ]}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                     >
-                      <Text style={[styles.studentProfileGenderText, selected && styles.studentProfileGenderTextSelected]}>{option.label}</Text>
+                      <Text style={[
+                        styles.studentProfileGenderText,
+                        selected && (isBrandStudent ? styles.studentProfileGenderTextSelectedBrand : styles.studentProfileGenderTextSelected),
+                      ]}>{option.label}</Text>
                     </Pressable>
                   );
                 })}
@@ -4601,16 +4706,18 @@ function StudentProfileEditModal({
                 <TextInput value={address} onChangeText={setAddress} placeholder="Nhập địa chỉ của bạn" style={styles.studentProfileIconInput} accessibilityLabel="Địa chỉ" />
               </View>
             </View>
-            <Pressable
-              onPress={() => { void save(); }}
-              disabled={saving}
-              style={[styles.studentProfileSaveButton, saving && styles.studentProfileSaveButtonDisabled]}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: saving }}
-            >
-              <Save size={16} color="#FFFFFF" />
-              <Text style={styles.studentProfileSaveButtonText}>{saving ? 'Đang lưu...' : 'Lưu thông tin'}</Text>
-            </Pressable>
+            <View style={{ marginTop: spacing.sm }}>
+              <DuoButton
+                variant={isBrandStudent ? 'danger' : 'primary'}
+                size="lg"
+                fullWidth
+                text={saving ? 'Đang lưu...' : 'Lưu thông tin'}
+                icon={saving ? undefined : <Save size={18} color="#FFFFFF" />}
+                loading={saving}
+                disabled={saving}
+                onPress={() => { void save(); }}
+              />
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
@@ -4621,9 +4728,11 @@ function StudentProfileEditModal({
 function ChangePasswordModal({
   onClose,
   onChanged,
+  isBrandStudent = false,
 }: {
   onClose: () => void;
   onChanged: () => void;
+  isBrandStudent?: boolean;
 }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -4661,9 +4770,9 @@ function ChangePasswordModal({
           behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           style={styles.changePasswordModal}
         >
-          <View style={styles.teacherEditHeader}>
+          <View style={[styles.teacherEditHeader, isBrandStudent && { backgroundColor: '#FEF2F2', borderBottomColor: '#FEE2E2' }]}>
             <View>
-              <Text style={styles.teacherEditTitle}>Thay đổi mật khẩu</Text>
+              <Text style={[styles.teacherEditTitle, isBrandStudent && { color: '#DC2626' }]}>Thay đổi mật khẩu</Text>
               <Text style={styles.teacherEditSubtitle}>Dùng mật khẩu mới cho lần đăng nhập tiếp theo</Text>
             </View>
             <Pressable
@@ -4726,7 +4835,7 @@ function ChangePasswordModal({
               style={{ flex: 1 }}
             />
             <DuoButton
-              variant="primary"
+              variant={isBrandStudent ? 'danger' : 'primary'}
               size="md"
               text={saving ? 'Đang lưu…' : 'Cập nhật mật khẩu'}
               icon={saving ? undefined : <Save size={16} color="#FFFFFF" />}
@@ -4929,7 +5038,7 @@ function TeacherProfileEditModal({
               accessibilityRole="button"
               accessibilityLabel={bankName ? `Ngân hàng ${bankName}, chạm để chọn ngân hàng` : 'Chọn ngân hàng'}
             >
-              <Landmark size={16} color={colors.brand} />
+              <Landmark size={16} color={theme.brand} />
               <Text style={[styles.teacherEditBankText, !bankName && styles.teacherEditBankPlaceholder]} numberOfLines={1}>
                 {bankName || 'Chọn ngân hàng'}
               </Text>
@@ -4951,21 +5060,24 @@ function TeacherProfileEditModal({
             <Text style={styles.teacherEditNote}>Tên, số điện thoại chính, chuyên môn và trạng thái do Trung tâm quản lý.</Text>
           </ScrollView>
           <View style={styles.teacherEditActions}>
-            <Pressable
+            <DuoButton
+              variant="secondary"
+              size="md"
+              text="Hủy"
+              disabled={saving}
               onPress={onClose}
+              style={{ flex: 1 }}
+            />
+            <DuoButton
+              variant="primary"
+              size="md"
+              text={saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+              icon={saving ? undefined : <Save size={16} color="#FFFFFF" />}
+              loading={saving}
               disabled={saving}
-              style={[styles.teacherEditCancel, saving && styles.teacherEditDisabled]}
-            >
-              <Text style={styles.teacherEditCancelText}>Hủy</Text>
-            </Pressable>
-            <Pressable
               onPress={() => { void save(); }}
-              disabled={saving}
-              style={[styles.teacherEditSave, saving && styles.teacherEditDisabled]}
-            >
-              {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
-              <Text style={styles.teacherEditSaveText}>{saving ? 'Đang lưu…' : 'Lưu thay đổi'}</Text>
-            </Pressable>
+              style={{ flex: 1.5 }}
+            />
           </View>
         </View>
       </View>
@@ -5000,7 +5112,7 @@ function TeacherProfileEditModal({
             </View>
             {bankLoading ? (
               <View style={styles.teacherBankState}>
-                <ActivityIndicator size="small" color={colors.brand} />
+                <ActivityIndicator size="small" color={theme.brand} />
                 <Text style={styles.teacherBankStateText}>Đang tải danh sách ngân hàng…</Text>
               </View>
             ) : bankError ? (
@@ -5024,12 +5136,12 @@ function TeacherProfileEditModal({
                     style={styles.teacherBankOption}
                     accessibilityRole="button"
                   >
-                    <View style={styles.teacherBankOptionIcon}><Landmark size={16} color={colors.brand} /></View>
+                    <View style={styles.teacherBankOptionIcon}><Landmark size={16} color={theme.brand} /></View>
                     <View style={styles.teacherBankOptionCopy}>
                       <Text style={styles.teacherBankOptionName}>{item.shortName}</Text>
                       <Text style={styles.teacherBankOptionDetail} numberOfLines={1}>{item.name} · {item.bin}</Text>
                     </View>
-                    {bankCode === item.bin ? <Check size={17} color={colors.brand} /> : null}
+                    {bankCode === item.bin ? <Check size={17} color={theme.brand} /> : null}
                   </Pressable>
                 ))}
                 {!filteredBanks.length ? <Text style={styles.teacherBankStateText}>Không tìm thấy ngân hàng phù hợp.</Text> : null}
@@ -5130,7 +5242,7 @@ function FilterChips({ items, selected, onSelect, compact = false, variant = 'ch
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1 },
   group: { gap: spacing.md },
   scheduleHero: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderColor: '#F1D7D8' },
@@ -5256,20 +5368,113 @@ const styles = StyleSheet.create({
   calendarStudentNote: { color: '#1D4ED8', fontSize: typography.micro, lineHeight: 16 },
   calendarActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   calendarActionsSubmitted: { width: '100%', alignItems: 'center', justifyContent: 'space-between' },
-  calendarAttendanceAction: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.brand },
-  calendarMakeupAction: { backgroundColor: '#D97706' },
-  calendarMakeupActionSent: { backgroundColor: '#E2E8F0' },
+  calendarAttendanceAction: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#059669',
+    borderWidth: 1,
+    borderColor: '#047857',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#064E3B',
+    shadowColor: '#064E3B',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  calendarAttendanceActionPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 1.5,
+  },
+  calendarMakeupAction: {
+    backgroundColor: '#D97706',
+    borderWidth: 1,
+    borderColor: '#B45309',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#92400E',
+    shadowColor: '#92400E',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  calendarMakeupActionSent: {
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderBottomWidth: 2,
+    borderBottomColor: '#94A3B8',
+  },
   calendarMakeupActionText: { color: '#FFFFFF' },
   calendarMakeupActionTextSent: { color: '#64748B' },
-  calendarAttendanceActionDisabled: { backgroundColor: '#E2E8F0' },
-  calendarAttendanceActionSubmitted: { backgroundColor: '#FEE2E2' },
+  calendarAttendanceActionDisabled: {
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderBottomWidth: 2,
+    borderBottomColor: '#94A3B8',
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  calendarAttendanceActionSubmitted: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderBottomWidth: 3,
+    borderBottomColor: '#FCA5A5',
+  },
   calendarAttendanceActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   calendarAttendanceActionTextDisabled: { color: '#64748B' },
   calendarAttendanceActionTextSubmitted: { color: '#B91C1C' },
-  calendarEditAction: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#1D4ED8' },
+  calendarEditAction: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    backgroundColor: '#2563EB',
+    borderWidth: 1,
+    borderColor: '#1D4ED8',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#1E40AF',
+    shadowColor: '#1E40AF',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  calendarEditActionPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 1.5,
+  },
   calendarEditActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
-  calendarCancelAction: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#7F1D1D' },
-  calendarCancelActionText: { color: '#FEE2E2', fontSize: typography.micro, fontWeight: '800' },
+  calendarCancelAction: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#991B1B',
+    shadowColor: '#991B1B',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  calendarCancelActionPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 1.5,
+  },
+  calendarCancelActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   calendarDayEmpty: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   calendarDayEmptyText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
   calendarAddAction: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#2563EB' },
@@ -5354,17 +5559,92 @@ const styles = StyleSheet.create({
   teacherDiarySubject: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: '#F1F5F9', color: '#475569', fontSize: typography.micro, fontWeight: '700' },
   teacherDiarySessionFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.xs, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   teacherDiaryActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: spacing.xs },
-  teacherDiaryAttendanceButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.brand },
-  teacherDiaryMakeupButton: { backgroundColor: '#D97706' },
-  teacherDiaryMakeupButtonSent: { backgroundColor: '#E2E8F0' },
+  teacherDiaryAttendanceButton: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#059669',
+    borderWidth: 1,
+    borderColor: '#047857',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#064E3B',
+    shadowColor: '#064E3B',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  teacherDiaryAttendanceButtonPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 1.5,
+  },
+  teacherDiaryMakeupButton: {
+    backgroundColor: '#D97706',
+    borderWidth: 1,
+    borderColor: '#B45309',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#92400E',
+    shadowColor: '#92400E',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  teacherDiaryMakeupButtonSent: {
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderBottomWidth: 2,
+    borderBottomColor: '#94A3B8',
+  },
   teacherDiaryMakeupButtonText: { color: colors.surface },
   teacherDiaryMakeupButtonTextSent: { color: '#64748B' },
-  teacherDiaryAttendanceButtonDisabled: { backgroundColor: '#E2E8F0' },
-  teacherDiaryAttendanceButtonSubmitted: { backgroundColor: colors.brandSoft },
+  teacherDiaryAttendanceButtonDisabled: {
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderBottomWidth: 2,
+    borderBottomColor: '#94A3B8',
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  teacherDiaryAttendanceButtonSubmitted: {
+    backgroundColor: colors.brandSoft,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#6EE7B7',
+  },
   teacherDiaryAttendanceButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '800' },
   teacherDiaryAttendanceButtonTextDisabled: { color: '#64748B' },
   teacherDiaryAttendanceButtonTextSubmitted: { color: colors.brandDark },
-  teacherDiaryCancelButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#B91C1C' },
+  teacherDiaryCancelButton: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#991B1B',
+    shadowColor: '#991B1B',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  teacherDiaryCancelButtonPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 1.5,
+  },
   teacherDiaryCancelButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '800' },
   studentDiaryFilterContainer: { borderBottomWidth: 1, borderBottomColor: colors.line },
   studentDiaryFilterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
@@ -5372,6 +5652,7 @@ const styles = StyleSheet.create({
   studentDiaryDateFilter: { flexBasis: '22%', flexGrow: 1, minWidth: 0 },
   studentDiaryStatusFilter: { flexBasis: '48%', flexGrow: 0 },
   studentDiaryFilterActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  studentDiaryFilterActiveBrand: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
   studentDiaryFilterText: { color: colors.brand, fontSize: typography.micro, fontWeight: '800' },
   studentDiaryFilterTextActive: { color: colors.surface },
   studentDiaryLogRow: { marginHorizontal: spacing.md, marginBottom: spacing.xs, padding: spacing.md, gap: spacing.xs, borderColor: '#EEF2F7', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
@@ -5638,11 +5919,51 @@ const styles = StyleSheet.create({
   attendancePendingNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#BFDBFE', borderRadius: radius.md, backgroundColor: '#EFF6FF' },
   attendancePendingText: { flex: 1, color: '#1E3A8A', fontSize: typography.caption, lineHeight: 20, fontWeight: '600' },
   attendanceNoticeClose: { width: 30, height: 34, alignItems: 'center', justifyContent: 'center' },
-  attendanceUndoButton: { minHeight: 48, flex: 1.15, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: '#DC2626' },
-  attendanceUndoText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
+  attendanceUndoButton: {
+    minHeight: 48,
+    flex: 1.15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    borderRadius: 16,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#DC2626',
+    borderBottomWidth: 4,
+    borderBottomColor: '#991B1B',
+    shadowColor: '#991B1B',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  attendanceUndoButtonPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+  },
+  attendanceUndoText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900', textAlign: 'center' },
   attendanceSubmittedRow: { flexDirection: 'row', gap: spacing.sm },
-  attendanceWaitingButton: { minHeight: 48, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: '#F1F5F9' },
-  attendanceWaitingText: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
+  attendanceWaitingButton: {
+    minHeight: 48,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 4,
+    borderBottomColor: '#CBD5E1',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  attendanceWaitingText: { color: '#64748B', fontSize: typography.caption, fontWeight: '800', textAlign: 'center' },
   attendanceSessionNote: { color: colors.muted, fontSize: typography.caption, lineHeight: 18 },
   attendanceModalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.md, backgroundColor: 'rgba(15, 23, 42, 0.62)' },
   attendanceModalCard: { width: '100%', maxWidth: 440, maxHeight: '90%', overflow: 'hidden', borderRadius: 30, backgroundColor: '#FFFFFF' },
@@ -5665,9 +5986,51 @@ const styles = StyleSheet.create({
   attendanceGradeMaximum: { color: '#CBD5E1', fontSize: typography.body, fontWeight: '900' },
   attendanceNoteInput: { minHeight: 82, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#E5EDF5', borderRadius: 18, backgroundColor: '#F8FAFC', color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
   attendanceModalActions: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
-  attendanceModalCancel: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
-  attendanceModalCancelText: { color: '#94A3B8', fontSize: typography.caption, fontWeight: '900' },
-  attendanceModalConfirm: { minHeight: 48, flex: 2, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: '#0DA76B' },
+  attendanceModalCancel: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 4,
+    borderBottomColor: '#CBD5E1',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  attendanceModalCancelPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+    backgroundColor: '#F8FAFC',
+  },
+  attendanceModalCancelText: { color: '#64748B', fontSize: typography.caption, fontWeight: '900' },
+  attendanceModalConfirm: {
+    minHeight: 48,
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    borderRadius: 16,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#059669',
+    borderBottomWidth: 4,
+    borderBottomColor: '#047857',
+    shadowColor: '#064E3B',
+    shadowOpacity: 0.22,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  attendanceModalConfirmPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+  },
   attendanceModalConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900', textAlign: 'center' },
   choiceWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   choice: { minHeight: 44, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 7, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
@@ -5688,8 +6051,26 @@ const styles = StyleSheet.create({
   studentProfileSectionTitle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   profileEditButton: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.brandSoft },
   profileEditButtonText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
-  profileSignOutButton: { minHeight: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.xl, borderWidth: 1, borderColor: colors.redSoft, borderRadius: radius.md, backgroundColor: colors.surface },
-  profileSignOutButtonPressed: { backgroundColor: colors.redSoft },
+  profileSignOutButton: {
+    minHeight: 48,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    borderBottomWidth: 4,
+    borderBottomColor: '#F87171',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  profileSignOutButtonPressed: {
+    backgroundColor: '#FEF2F2',
+    transform: [{ translateY: 3 }],
+    borderBottomWidth: 1,
+  },
   profileSignOutText: { color: colors.red, fontSize: typography.small, fontWeight: '800' },
   profilePushFeedbackButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.brand },
   profilePushFeedbackButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
@@ -5851,8 +6232,10 @@ const styles = StyleSheet.create({
   studentProfileModalBackdrop: { justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(15, 23, 42, 0.6)' },
   studentProfileModal: { width: '100%', maxWidth: 440, maxHeight: '94%', alignSelf: 'center', overflow: 'hidden', backgroundColor: colors.surface, borderRadius: 28 },
   studentProfileModalHeader: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, backgroundColor: '#F0FDFA', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  studentProfileModalHeaderBrand: { backgroundColor: '#FEF2F2', borderBottomColor: '#FEE2E2' },
   studentProfileModalTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   studentProfileModalTitleText: { color: '#115E59', fontSize: typography.small, fontWeight: '900' },
+  studentProfileModalTitleTextBrand: { color: '#DC2626' },
   studentProfileModalClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.surface },
   studentProfileModalBody: { padding: spacing.lg, gap: spacing.md },
   studentProfileModalField: { gap: spacing.xs },
@@ -5862,8 +6245,10 @@ const styles = StyleSheet.create({
   studentProfileGenderRow: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
   studentProfileGenderOption: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#F8FAFC' },
   studentProfileGenderOptionSelected: { borderColor: '#2DD4BF', backgroundColor: '#F0FDFA' },
+  studentProfileGenderOptionSelectedBrand: { borderColor: '#F87171', backgroundColor: '#FEF2F2' },
   studentProfileGenderText: { color: '#475569', fontSize: typography.micro, fontWeight: '700', textAlign: 'center' },
   studentProfileGenderTextSelected: { color: '#0F766E' },
+  studentProfileGenderTextSelectedBrand: { color: '#DC2626', fontWeight: '800' },
   studentProfilePhoneRow: { flexDirection: 'row', gap: spacing.sm },
   studentProfilePhoneRowStack: { flexDirection: 'column' },
   studentProfilePhoneField: { flex: 1, minWidth: 0 },
@@ -5887,4 +6272,4 @@ const styles = StyleSheet.create({
   fieldLabel: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
   note: { color: colors.muted, fontSize: typography.caption, lineHeight: 18, fontStyle: 'italic' },
   savedText: { color: colors.green, fontSize: typography.small, fontWeight: '700' },
-});
+}));

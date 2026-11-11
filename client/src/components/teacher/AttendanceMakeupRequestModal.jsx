@@ -163,7 +163,7 @@ export default function AttendanceMakeupRequestModal({
             type="button"
             onClick={() => onClose?.()}
             disabled={sending}
-            className="flex-1 py-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+            className="flex-1 py-3 bg-white border border-slate-200 border-b-4 border-b-slate-300 rounded-2xl font-black text-slate-600 hover:bg-slate-50 active:translate-y-[2px] active:border-b-2 transition-all disabled:opacity-50 cursor-pointer"
           >
             Hủy
           </button>
@@ -171,7 +171,7 @@ export default function AttendanceMakeupRequestModal({
             type="button"
             onClick={handleSend}
             disabled={sending || alreadyPending}
-            className="flex-[1.4] py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-[1.4] py-3 bg-amber-500 border border-amber-400 border-b-4 border-b-amber-700 hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white rounded-2xl font-black shadow-md shadow-amber-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             {alreadyPending ? 'Đã gửi Admin' : 'Gửi'}

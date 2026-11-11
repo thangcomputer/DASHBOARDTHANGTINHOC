@@ -41,8 +41,10 @@ test('mobile feed uses the shared API for images, visibility, reactions and comm
   assert.ok(screen.includes('commentComposerInputRow'));
   assert.ok(screen.includes('selectCommentImages'));
   assert.ok(screen.includes('Thêm ảnh vào bình luận'));
-  assert.ok(screen.includes('renderCommentImages(item.images'));
-  assert.ok(screen.includes('renderCommentImages(reply.images'));
+  assert.ok(screen.includes('renderCommentNode'));
+  assert.ok(screen.includes('renderCommentImages(node.images'));
+  assert.ok(screen.includes('FEED_MAX_INDENT_DEPTH'));
+  assert.ok(screen.includes('commentId: node.id'));
   assert.ok(screen.includes('AI CÓ THỂ XEM BÀI VIẾT?'));
   assert.ok(screen.includes('Chỉ Học viên & Admin'));
   assert.ok(screen.includes('Học viên không xem được'));
@@ -51,9 +53,10 @@ test('mobile feed uses the shared API for images, visibility, reactions and comm
   assert.ok(screen.includes('Chỉnh sửa'));
   assert.ok(screen.includes('Ẩn bài viết'));
   assert.ok(screen.includes('persistHiddenPostIds'));
-  assert.ok(screen.includes('closeOnOutsidePointer'));
-  assert.ok(screen.includes("document.addEventListener('pointerdown', closeOnOutsidePointer, true)"));
-  assert.ok(screen.includes('event.target.closest(\'#feed-post-menu\')'));
+  assert.ok(screen.includes('openPostMenu'));
+  assert.ok(screen.includes('measureInWindow'));
+  assert.ok(screen.includes('closePostMenu'));
+  assert.ok(screen.includes('Đóng menu bài viết'));
   assert.ok(api.includes("'/feed/reports'"));
   assert.ok(api.includes('/reports`'));
   assert.ok(screen.includes('Báo cáo bài viết'));

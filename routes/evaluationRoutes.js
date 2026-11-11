@@ -112,11 +112,14 @@ router.get('/teacher/:teacherId', authMiddleware, ...evaluationsGuard('teacher_r
 // ─── Học viên lấy đánh giá mốc của chính mình (chặn popup khi đã gửi) ─────
 router.get('/mine', authMiddleware, ...evaluationsGuard('student_mine'), async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
+    if (req.user.role !== 'student' && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Không có quyền' });
     }
+    const targetStudentId = req.user.role === 'admin'
+      ? (req.query.studentId || req.user.id)
+      : req.user.id;
     const evals = await Evaluation.find({
-      studentId: req.user.id,
+      studentId: targetStudentId,
       type: 'admin_feedback',
     }).sort({ updatedAt: -1, createdAt: -1 }).lean();
     const data = evals.map((e) => ({

@@ -49,12 +49,12 @@ function evaluateTeacherRatings(subject) {
   return evaluateAuthOnly(subject);
 }
 
-/** GET /mine - học viên đọc đánh giá mốc của chính mình. */
+/** GET /mine - học viên đọc đánh giá mốc của chính mình (hoặc admin kiểm tra). */
 function evaluateStudentMine(subject) {
   const auth = evaluateAuthOnly(subject);
   if (auth.decision === 'DENY') return auth;
   const role = String(subject.role || '').toLowerCase();
-  if (role === 'student') {
+  if (role === 'student' || role === 'admin') {
     return { decision: 'ALLOW', reason: 'student_self', statusHint: 200 };
   }
   return { decision: 'DENY', reason: 'not_student', statusHint: 403 };

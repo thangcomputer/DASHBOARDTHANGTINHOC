@@ -17,6 +17,7 @@ import {
   formatStudyMinutes, getLearningGoal, periodLabel,
   type LearningGoalData,
 } from '../services/learningGoalApi';
+import { DuoButton } from './duo/DuoButton';
 import { colors } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 
@@ -208,9 +209,7 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
                   <Text style={s.goalTitle}>Chưa đặt mục tiêu học</Text>
                   <Text style={s.goalMeta}>Đặt mục tiêu để theo dõi số giờ học.</Text>
                 </View>
-                <Pressable onPress={openGoal} style={s.ctaBtn} accessibilityRole="button">
-                  <Text style={s.ctaTxt}>Đặt ngay</Text>
-                </Pressable>
+                <DuoButton variant="primary" size="sm" text="Đặt ngay" onPress={openGoal} />
               </View>
             ) : (
               <>
@@ -223,9 +222,12 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
                       {goal.expired ? 'Đã kết thúc' : `${periodLabel(goal.period)} · Còn ${pr.daysLeft} ngày`}
                     </Text>
                   </View>
-                  <Pressable onPress={openGoal} style={s.outBtn} accessibilityRole="button">
-                    <Text style={s.outTxt}>{goal.expired ? 'Đặt mới' : 'Đổi'}</Text>
-                  </Pressable>
+                  <DuoButton
+                    variant="secondary"
+                    size="sm"
+                    text={goal.expired ? 'Đặt mới' : 'Đổi'}
+                    onPress={openGoal}
+                  />
                 </View>
 
                 {/* Hôm nay */}
@@ -396,7 +398,18 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
 /* ─── styles ───────────────────────────────────────────── */
 const s = StyleSheet.create({
   f1: { flex: 1 },
-  card: { borderRadius: 22, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#fff', overflow: 'hidden' },
+  card: {
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   section: { padding: 16, gap: 10 },
   tabGoalWrap: { gap: 10, paddingTop: 4 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E2E8F0', marginHorizontal: 16 },
@@ -408,7 +421,7 @@ const s = StyleSheet.create({
   sectionTag: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.6, textTransform: 'uppercase' },
   lvlText: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 1 },
   lvlSub: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  streakPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7ED', borderWidth: 1.5, borderColor: '#FED7AA', borderBottomWidth: 3, borderBottomColor: '#FDBA74', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  streakPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   streakTxt: { fontSize: 12, fontWeight: '900', color: '#C2410C' },
 
   barBg: { height: 10, borderRadius: 999, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden' },
@@ -419,9 +432,9 @@ const s = StyleSheet.create({
 
   tabBar: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 3 },
   tabItem: { flex: 1, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
-  tabItemActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 2 },
+  tabItemActive: { backgroundColor: '#10B981' },
   tabTxt: { fontSize: 11, fontWeight: '700', color: '#64748B' },
-  tabTxtActive: { fontWeight: '900', color: '#0F172A' },
+  tabTxtActive: { fontWeight: '900', color: '#FFFFFF' },
 
   pillRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
   pill: {
@@ -493,28 +506,6 @@ const s = StyleSheet.create({
   icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
   goalTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   goalMeta: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 1 },
-  ctaBtn: {
-    backgroundColor: '#10B981',
-    borderWidth: 1.5,
-    borderColor: '#059669',
-    borderBottomWidth: 3,
-    borderBottomColor: '#047857',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  ctaTxt: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
-  outBtn: {
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderBottomWidth: 3,
-    borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  outTxt: { color: '#0F172A', fontSize: 12, fontWeight: '800' },
 
   metric: { gap: 6 },
   metricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },

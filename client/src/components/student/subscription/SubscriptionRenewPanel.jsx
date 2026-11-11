@@ -23,6 +23,9 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
   const plans = overview?.plans || [];
   const subscription = overview?.subscription;
   const isLifetime = subscription?.state === 'lifetime';
+  const isFreePortal = (() => {
+    try { return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true; } catch { return false; }
+  })();
 
   const redeem = async (event) => {
     event.preventDefault();
@@ -81,7 +84,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
                       type="button"
                       disabled={!sellable || Boolean(checkoutPlan)}
                       onClick={() => buy(plan)}
-                      className="cms-btn cms-btn-primary w-full !py-1 sm:!py-1.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl disabled:opacity-50"
+                      className="cms-btn cms-btn-primary cms-btn-brand w-full !py-1 sm:!py-1.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl disabled:opacity-50"
                     >
                       {checkoutPlan === plan.id ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : 'Gia hạn'}
                     </button>
@@ -124,7 +127,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
               className="w-full rounded-xl border border-slate-200 bg-white py-1.5 sm:py-2 pl-8 pr-2.5 font-mono text-xs sm:text-sm font-bold uppercase tracking-wider outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
             />
           </label>
-          <button type="submit" disabled={code.length < 13 || redeeming} className="cms-btn cms-btn-primary !py-1.5 sm:!py-2 text-xs sm:text-sm disabled:opacity-50">
+          <button type="submit" disabled={code.length < 13 || redeeming} className="cms-btn cms-btn-primary cms-btn-brand !py-1.5 sm:!py-2 text-xs sm:text-sm disabled:opacity-50">
             {redeeming ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : 'Kích hoạt'}
           </button>
         </form>
@@ -137,7 +140,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
           sessionId={payment.sessionId}
           refCode={payment.ref}
           amount={payment.amount}
-          paymentTitle="Gói học Meet"
+          paymentTitle={isFreePortal ? 'Gói học Meet' : 'Gói Khóa học'}
           paidEvent="subscription:renewed"
           getPaymentSession={subscriptionApi.student.session}
           simulatePayment={() => subscriptionApi.student.simulatePaid(payment.sessionId)}

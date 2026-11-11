@@ -408,7 +408,7 @@ export default function TeacherQuizManager({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Award className="text-red-600" size={20} /> Quản lý Trắc nghiệm mỗi buổi học
+                <Award className="text-emerald-600" size={20} /> Quản lý Trắc nghiệm mỗi buổi học
               </h2>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
                 Tạo câu hỏi trắc nghiệm, gán cho học viên và chấm điểm tự động theo chuẩn phòng thi chứng chỉ.
@@ -417,7 +417,7 @@ export default function TeacherQuizManager({
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+              className="px-4 py-2.5 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
             >
               <Plus size={16} /> Tạo bài trắc nghiệm mới
             </button>
@@ -426,7 +426,7 @@ export default function TeacherQuizManager({
           {/* ── DANH SÁCH BÀI TRẮC NGHIỆM ĐÃ TẠO ── */}
           {loading ? (
             <div className="py-12 text-center text-slate-400">
-              <RefreshCw className="animate-spin mx-auto mb-2 text-red-600" size={24} />
+              <RefreshCw className="animate-spin mx-auto mb-2 text-emerald-600" size={24} />
               <p className="text-xs font-bold">Đang tải danh sách bài trắc nghiệm...</p>
             </div>
           ) : quizzes.length === 0 ? (
@@ -485,7 +485,7 @@ export default function TeacherQuizManager({
                       <button
                         type="button"
                         onClick={() => handleDuplicateQuiz(quiz)}
-                        className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                        className="flex-1 py-2 bg-white border border-slate-200 border-b-4 border-b-slate-300 hover:bg-slate-50 active:translate-y-[2px] active:border-b-2 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                         title="Tạo bài mới dựa trên bộ câu hỏi này"
                       >
                         <Copy size={14} /> Tạo lại
@@ -493,7 +493,7 @@ export default function TeacherQuizManager({
                       <button
                         type="button"
                         onClick={() => setSelectedDetailQuiz(quiz)}
-                        className="flex-[1.5] py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                        className="flex-[1.5] py-2 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                       >
                         <Eye size={14} /> Xem kết quả ({subCount})
                       </button>
@@ -510,10 +510,10 @@ export default function TeacherQuizManager({
       {showCreateModal && createPortal(
         <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden">
           <div className="bg-white rounded-[1.75rem] max-w-4xl w-full shadow-2xl border border-slate-200/80 max-h-[92vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-red-50/40 px-5 sm:px-7 pt-4 pb-4 shrink-0">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50/40 px-5 sm:px-7 pt-4 pb-4 shrink-0">
               <div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-700 text-white shadow-md shadow-red-200">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-md shadow-emerald-200">
                     <Plus size={17} strokeWidth={2.5} />
                   </span>
                   Tạo bài thi trắc nghiệm theo buổi học
@@ -523,7 +523,7 @@ export default function TeacherQuizManager({
               <button
                 type="button"
                 onClick={closeCreateModal}
-                className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -538,7 +538,7 @@ export default function TeacherQuizManager({
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Ví dụ: Trắc nghiệm Buổi 1 - MS Word"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 font-bold"
                       required
                     />
                   </div>
@@ -565,8 +565,8 @@ export default function TeacherQuizManager({
                                 }}
                                 aria-pressed={selected}
                                 className={`w-full min-h-9 flex items-center justify-between gap-1 rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold transition ${selected
-                                  ? 'border-red-300 bg-red-50 text-red-700'
-                                  : 'border-slate-200 bg-white text-slate-700 hover:border-red-200'
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-200'
                                   }`}
                               >
                                 <span className="min-w-0 break-words">{course.label}</span>
@@ -584,7 +584,7 @@ export default function TeacherQuizManager({
                             type="button"
                             onClick={() => { setTargetAll(true); setTargetStudentIds([]); }}
                             aria-pressed={targetAll}
-                            className={`w-full min-h-9 flex items-center justify-between gap-1 rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold transition ${targetAll ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-700'}`}
+                            className={`w-full min-h-9 flex items-center justify-between gap-1 rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold transition ${targetAll ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-700'}`}
                           >
                             Tất cả {targetAll && <Check size={14} />}
                           </button>
@@ -592,7 +592,7 @@ export default function TeacherQuizManager({
                             type="button"
                             onClick={() => setTargetAll(false)}
                             aria-pressed={!targetAll}
-                            className={`w-full min-h-9 flex items-center justify-between gap-1 rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold transition ${!targetAll ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-700'}`}
+                            className={`w-full min-h-9 flex items-center justify-between gap-1 rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold transition ${!targetAll ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-700'}`}
                           >
                             Chọn học viên {!targetAll && <Check size={14} />}
                           </button>
@@ -604,11 +604,11 @@ export default function TeacherQuizManager({
                               value={studentSearch}
                               onChange={(e) => setStudentSearch(e.target.value)}
                               placeholder="Tìm học viên"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold outline-none focus:border-red-400"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold outline-none focus:border-emerald-400"
                             />
                             <div className="flex gap-1.5">
-                              <button type="button" onClick={selectAllVisibleStudents} disabled={!pickerStudents.length} className="flex-1 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50">Chọn hiển thị</button>
-                              <button type="button" onClick={clearTargetStudents} disabled={!targetStudentIds.length} className="flex-1 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50">Bỏ chọn</button>
+                              <button type="button" onClick={selectAllVisibleStudents} disabled={!pickerStudents.length} className="flex-1 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-[10px] font-bold text-emerald-700 disabled:opacity-50">Chọn hiển thị</button>
+                              <button type="button" onClick={clearTargetStudents} disabled={!targetStudentIds.length} className="flex-1 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-[10px] font-bold text-emerald-700 disabled:opacity-50">Bỏ chọn</button>
                             </div>
                             <p className="text-[10px] font-bold text-slate-500">
                               {targetStudentIds.length
@@ -619,8 +619,8 @@ export default function TeacherQuizManager({
                               {pickerStudents.map((student) => {
                                 const checked = targetStudentIds.map(String).includes(student.id);
                                 return (
-                                  <label key={student.id} className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] ${checked ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white'}`}>
-                                    <input type="checkbox" checked={checked} onChange={() => toggleTargetStudent(student.id)} className="shrink-0 rounded border-slate-300 text-red-600 focus:ring-red-500" />
+                                  <label key={student.id} className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] ${checked ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                                    <input type="checkbox" checked={checked} onChange={() => toggleTargetStudent(student.id)} className="shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                                     <span className="truncate font-semibold text-slate-700">{student.name}</span>
                                   </label>
                                 );
@@ -643,7 +643,7 @@ export default function TeacherQuizManager({
                       max={180}
                       value={timeLimitMinutes}
                       onChange={e => setTimeLimitMinutes(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 font-bold"
                     />
                   </div>
                   <div className="min-w-0">
@@ -652,7 +652,7 @@ export default function TeacherQuizManager({
                       type="datetime-local"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 font-bold"
                     />
                   </div>
                   <div className="min-w-0">
@@ -661,7 +661,7 @@ export default function TeacherQuizManager({
                       type="datetime-local"
                       value={deadline}
                       onChange={e => setDeadline(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 font-bold"
                     />
                   </div>
                 </div>
@@ -690,7 +690,7 @@ export default function TeacherQuizManager({
                     <button
                       type="button"
                       onClick={() => downloadTeacherQuestionsExcelTemplate('mon-kiem-thu', 'Môn kiểm thử', 'multiple')}
-                      className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition"
+                      className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold hover:bg-emerald-100 transition"
                     >
                       Mẫu
                     </button>
@@ -722,7 +722,7 @@ export default function TeacherQuizManager({
                         <div className="flex flex-wrap gap-x-3 gap-y-1">
                           {[5, 10, 15].map((count) => (
                             <label key={count} className="flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                              <input type="radio" name="teacher-quiz-ai-count" value={count} checked={aiCount === count} onChange={() => setAiCount(count)} className="accent-red-600" />
+                              <input type="radio" name="teacher-quiz-ai-count" value={count} checked={aiCount === count} onChange={() => setAiCount(count)} className="accent-emerald-600" />
                               {count} câu
                             </label>
                           ))}
@@ -733,7 +733,7 @@ export default function TeacherQuizManager({
                         <div className="flex flex-wrap gap-x-3 gap-y-1">
                           {['dễ', 'trung bình', 'khó'].map((difficulty) => (
                             <label key={difficulty} className="flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                              <input type="radio" name="teacher-quiz-ai-difficulty" value={difficulty} checked={aiDifficulty === difficulty} onChange={() => setAiDifficulty(difficulty)} className="accent-red-600" />
+                              <input type="radio" name="teacher-quiz-ai-difficulty" value={difficulty} checked={aiDifficulty === difficulty} onChange={() => setAiDifficulty(difficulty)} className="accent-emerald-600" />
                               {difficulty}
                             </label>
                           ))}
@@ -744,7 +744,7 @@ export default function TeacherQuizManager({
                       type="button"
                       onClick={handleGenerateAi}
                       disabled={aiGenerating}
-                      className="w-full justify-center px-4 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 disabled:opacity-60 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 shadow-md shadow-violet-200 transition-all"
+                      className="w-full justify-center px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 shadow-md shadow-emerald-200 transition-all cursor-pointer"
                     >
                       {aiGenerating ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
                       {aiGenerating ? 'Đang soạn...' : 'Tạo bằng AI (Gemini)'}
@@ -762,7 +762,7 @@ export default function TeacherQuizManager({
                     <button
                       type="button"
                       onClick={addQuestion}
-                      className="px-3.5 py-2 bg-slate-900 hover:bg-red-600 text-white rounded-xl text-xs font-black flex items-center gap-1 transition-colors"
+                      className="px-3.5 py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-black flex items-center gap-1 transition-colors cursor-pointer"
                     >
                       <Plus size={13} /> Thêm câu hỏi
                     </button>
@@ -797,7 +797,7 @@ export default function TeacherQuizManager({
                           setQuestions(prev => prev.map((item, idx) => (idx === qIdx ? { ...item, questionText: val } : item)));
                         }}
                         placeholder="Nhập nội dung câu hỏi..."
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold bg-white"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 font-bold bg-white"
                         required
                       />
 
@@ -827,7 +827,7 @@ export default function TeacherQuizManager({
                                 }));
                               }}
                               placeholder={`Đáp án ${String.fromCharCode(65 + optIdx)}`}
-                              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 outline-none focus:border-red-500 bg-white"
+                              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 outline-none focus:border-emerald-500 bg-white"
                               required
                             />
                           </div>
@@ -841,7 +841,7 @@ export default function TeacherQuizManager({
                           setQuestions(prev => prev.map((item, idx) => (idx === qIdx ? { ...item, explanation: val } : item)));
                         }}
                         placeholder="Lời giải thích (không bắt buộc)..."
-                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 outline-none focus:border-red-500 text-[11px] bg-white/70"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 outline-none focus:border-emerald-500 text-[11px] bg-white/70"
                       />
                     </div>
                   ))}
@@ -852,14 +852,14 @@ export default function TeacherQuizManager({
                 <button
                   type="button"
                   onClick={closeCreateModal}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-black hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-2.5 border border-slate-200 border-b-4 border-b-slate-300 rounded-xl text-slate-600 font-black hover:bg-slate-50 active:translate-y-[2px] active:border-b-2 transition-all cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl font-black transition shadow-md shadow-red-200"
+                  className="flex-1 py-2.5 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white rounded-xl font-black transition-all cursor-pointer shadow-md shadow-emerald-200"
                 >
                   {isSubmitting ? 'Đang tạo...' : 'Tạo bài trắc nghiệm'}
                 </button>

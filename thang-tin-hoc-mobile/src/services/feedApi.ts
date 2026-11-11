@@ -134,8 +134,8 @@ export async function uploadFeedImages(files: Array<{ uri: string; name: string;
   return response.urls.map((url) => url.trim());
 }
 
-export const createFeedPost = (content: string, audience: string, images: string[] = []) => unwrap(
-  mobileApiRequest('/feed', { method: 'POST', headers: json, body: JSON.stringify({ content, images, visibility: AUDIENCE_VALUE[audience] || 'public' }) }),
+export const createFeedPost = (content: string, audience: string, images: string[] = [], authorAvatar?: string) => unwrap(
+  mobileApiRequest('/feed', { method: 'POST', headers: json, body: JSON.stringify({ content, images, visibility: AUDIENCE_VALUE[audience] || 'public', ...(authorAvatar ? { authorAvatar } : {}) }) }),
 );
 export const updateFeedPost = (id: string, content: string, images?: string[], audience?: string) => unwrap(
   mobileApiRequest(`/feed/${encodeURIComponent(id)}`, {

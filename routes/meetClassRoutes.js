@@ -86,7 +86,7 @@ function view(row, { withStudents = false } = {}) {
 router.get('/mine', authMiddleware, async (req, res) => {
   try {
     if (req.user?.role !== 'student') {
-      return res.status(403).json({ success: false, message: 'Chỉ học viên xem lịch của mình' });
+      return res.json({ success: true, data: [], meetAccess: false });
     }
     const student = await Student.findById(req.user.id).select('subscription freePortal').lean();
     if (!student || !hasMeetAccess(student)) {

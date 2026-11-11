@@ -44,17 +44,21 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
-function Avatar({ name, avatar }: { name: string; avatar: string }) {
+function Avatar({ name, avatar, isBrandStudent = false }: { name: string; avatar: string; isBrandStudent?: boolean }) {
   const [failed, setFailed] = useState(false);
   const initial = String(name || '?').trim().split(/\s+/).pop()?.[0]?.toUpperCase() || '?';
   if (avatar && !failed) {
     return <Image source={getMobileImageSource(avatar)} onError={() => setFailed(true)} style={styles.avatar} />;
   }
-  return <View style={[styles.avatar, styles.avatarFallback]}><Text style={styles.avatarText}>{initial}</Text></View>;
+  return (
+    <View style={[styles.avatar, styles.avatarFallback, isBrandStudent && { backgroundColor: '#FEE2E2' }]}>
+      <Text style={[styles.avatarText, isBrandStudent && { color: '#DC2626' }]}>{initial}</Text>
+    </View>
+  );
 }
 
 /** Bảng xếp hạng tuần: HV đạt mục tiêu nhiều ngày nhất (bằng nhau so phút học), toàn trung tâm. */
-export function LearningLeaderboardCard() {
+export function LearningLeaderboardCard({ isBrandStudent = false }: { isBrandStudent?: boolean }) {
   const [data, setData] = useState<LearningLeaderboard | null>(null);
   const [error, setError] = useState('');
 
@@ -94,27 +98,27 @@ export function LearningLeaderboardCard() {
           <Text style={styles.empty}>Tuần này chưa có ai trên bảng - hãy là người đầu tiên!</Text>
         ) : null}
         {top.map((row) => (
-          <View key={`${row.rank}-${row.name} `} style={[styles.row, row.isMe ? styles.rowMe : row.rank <= 3 ? styles.rowPodium : null]}>
+          <View key={`${row.rank}-${row.name} `} style={[styles.row, row.isMe ? (isBrandStudent ? [styles.rowMe, styles.rowMeBrand] : styles.rowMe) : row.rank <= 3 ? styles.rowPodium : null]}>
             <RankBadge rank={row.rank} />
-            <Avatar name={row.name} avatar={row.avatar} />
+            <Avatar name={row.name} avatar={row.avatar} isBrandStudent={isBrandStudent} />
             <View style={styles.flex}>
               <View style={styles.nameRow}>
                 <Text numberOfLines={1} style={styles.name}>{row.name}</Text>
-                {row.isMe ? <View style={styles.meTag}><Text style={styles.meTagText}>Bạn</Text></View> : null}
+                {row.isMe ? <View style={[styles.meTag, isBrandStudent && styles.meTagBrand]}><Text style={styles.meTagText}>Bạn</Text></View> : null}
               </View>
               <Text style={styles.sub}>{`Mục tiêu ${row.hoursPerDay} giờ / ngày`}</Text>
             </View>
             <View style={styles.right}>
               <View style={styles.daysRow}>
-                <CheckCircle2 size={12} color="#059669" />
-                <Text style={styles.days}>{`${row.goalDays} /${data?.daysSoFar || 7} ngày`}</Text >
-              </View >
+                <CheckCircle2 size={12} color={isBrandStudent ? '#DC2626' : '#059669'} />
+                <Text style={[styles.days, isBrandStudent && { color: '#DC2626' }]}>{`${row.goalDays} /${data?.daysSoFar || 7} ngày`}</Text>
+              </View>
               <Text style={styles.minutes}>
                 {formatStudyMinutes(row.minutes)}
                 {row.xp > 0 ? <Text style={styles.xp}>{` · ${row.xp} XP`}</Text> : null}
               </Text>
-            </View >
-          </View >
+            </View>
+          </View>
         ))}
       </View >
 
@@ -156,6 +160,7 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: spacing.md, backgroundColor: '#F8FAFC', borderRadius: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12 },
   rowMe: { backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: colors.line },
+  rowMeBrand: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   rowPodium: { backgroundColor: 'rgba(255, 251, 235, 0.6)' },
   rank: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rankPlain: { backgroundColor: '#F1F5F9' },
@@ -167,6 +172,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flexShrink: 1, color: colors.ink, fontSize: 14, fontWeight: '800' },
   meTag: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  meTagBrand: { backgroundColor: '#EF4444' },
   meTagText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   sub: { color: '#94A3B8', fontSize: 12 },
   right: { alignItems: 'flex-end' },

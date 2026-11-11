@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { ShieldAlert } from 'lucide-react-native';
+import { MobileLmsPlayerChrome } from '../components/dailyPractice/MobileLmsPlayerChrome';
 import { typography } from '../theme/tokens';
 import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
@@ -76,6 +76,7 @@ export function VideoPlayerFrame({
   onProgress,
   onWatched,
   playerApiRef,
+  brandedChrome = true,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -86,6 +87,8 @@ export function VideoPlayerFrame({
   onProgress: (progress: VideoPlayerProgress) => void;
   onWatched: () => Promise<boolean>;
   playerApiRef?: { current: VideoPlayerApi | null };
+  /** Thanh điều khiển Thắng Tin Học, ẩn chrome YouTube (controls:0). */
+  brandedChrome?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -104,6 +107,13 @@ export function VideoPlayerFrame({
   const antiSeekRef = useRef(antiSeekEnabled);
   const [playerError, setPlayerError] = useState('');
   const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
+  const [uiProgress, setUiProgress] = useState<VideoPlayerProgress>({
+    currentTime: 0,
+    duration: 0,
+    watchedSeconds: 0,
+    completed: done,
+    playing: false,
+  });
   const antiSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerAntiSeekNotice = () => {
@@ -215,6 +225,7 @@ export function VideoPlayerFrame({
       if (now - lastProgressSentAt >= 500) {
         lastProgressSentAt = now;
         callbackRef.current(snapshot);
+        setUiProgress(snapshot);
       }
       if (tick.eligible && !doneRef.current && !completionPending && now >= completionRetryAt) {
         thresholdReached = true;
@@ -282,7 +293,14 @@ export function VideoPlayerFrame({
     if (youtubeId && mountRef.current) {
       let disposed = false;
       const mountStyle = document.createElement('style');
-      mountStyle.textContent = '.mobile-youtube-player iframe { width: 100% !important; height: 100% !important; border: 0 !important; }';
+      mountStyle.textContent = [
+        '.mobile-youtube-player { overflow: hidden !important; background: #080D19 !important; }',
+        '.mobile-youtube-player iframe {',
+        '  width: 100% !important; height: 100% !important; border: 0 !important;',
+        '  pointer-events: none !important;',
+        brandedChrome ? '  transform: translate(-50%,-50%) scale(1.14); transform-origin: center center; position:absolute;top:50%;left:50%;width:120%;height:120%;' : '',
+        '}',
+      ].filter(Boolean).join('\n');
       mountRef.current.classList.add('mobile-youtube-player');
       document.head.appendChild(mountStyle);
       void loadYouTubeApi().then((youtube) => {
@@ -292,15 +310,18 @@ export function VideoPlayerFrame({
         playerFrame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
         playerFrame.allowFullscreen = true;
         playerFrame.title = title;
-        playerFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+        playerFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=${brandedChrome ? 0 : 1}&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
         mountRef.current.replaceChildren(playerFrame);
         youtubePlayer = new youtube.Player(playerFrame, {
           videoId: youtubeId,
           playerVars: {
             autoplay: 1,
-            controls: 1,
-            disablekb: 0,
+            controls: brandedChrome ? 0 : 1,
+            disablekb: brandedChrome ? 1 : 0,
             rel: 0,
+            modestbranding: 1,
+            iv_load_policy: 3,
+            fs: brandedChrome ? 0 : 1,
             playsinline: 1,
             enablejsapi: 1,
             origin: window.location.origin,
@@ -315,6 +336,7 @@ export function VideoPlayerFrame({
               iframe.style.width = '100%';
               iframe.style.height = '100%';
               iframe.style.border = '0';
+              if (brandedChrome) iframe.style.pointerEvents = 'none';
               if (!doneRef.current && initialMaxPosition > 0) {
                 youtubePlayer.seekTo(initialMaxPosition, true);
               }
@@ -333,6 +355,11 @@ export function VideoPlayerFrame({
                 ? 'YouTube không nhận được địa chỉ tham chiếu để phát video. Hãy mở video trên YouTube.'
                 : 'Không thể phát video YouTube này.',
             ),
+            onStateChange: () => {
+              if (!youtubePlayer) return;
+              const playing = youtubePlayer.getPlayerState() === 1;
+              setUiProgress((prev) => ({ ...prev, playing }));
+            },
           },
         });
       }).catch((error: unknown) => {
@@ -389,7 +416,17 @@ export function VideoPlayerFrame({
 
     setPlayerError('Không nhận diện được liên kết video.');
     return undefined;
-  }, [embeddedUrl, lessonId, videoUrl, playerApiRef]);
+  }, [brandedChrome, embeddedUrl, lessonId, videoUrl, playerApiRef]);
+
+  const togglePlay = () => {
+    if (uiProgress.playing) playerApiRef?.current?.pause?.();
+    else playerApiRef?.current?.play?.();
+  };
+
+  const seekTo = (position: number) => {
+    playerApiRef?.current?.seekTo?.(position);
+    setUiProgress((prev) => ({ ...prev, currentTime: position }));
+  };
 
   const directVideo = isDirectVideoUrl(videoUrl);
   const vimeoId = vimeoIdFromUrl(videoUrl);
@@ -403,7 +440,7 @@ export function VideoPlayerFrame({
         React.createElement('video', {
           ref: videoRef,
           src: videoUrl,
-          controls: true,
+          controls: !brandedChrome,
           autoPlay: true,
           playsInline: true,
           controlsList: 'nodownload noplaybackrate',
@@ -421,58 +458,24 @@ export function VideoPlayerFrame({
           style: { position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 },
         })
       ) : (
-        <div ref={mountRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+        <div ref={mountRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }} />
       )}
+      {brandedChrome && !playerError ? (
+        <MobileLmsPlayerChrome
+          isPlaying={uiProgress.playing}
+          currentTime={uiProgress.currentTime}
+          duration={uiProgress.duration}
+          onPlay={togglePlay}
+          onPause={togglePlay}
+          onSeek={antiSeekEnabled && !done ? undefined : seekTo}
+          lockSeek={antiSeekEnabled && !done}
+          onBlockedSeek={triggerAntiSeekNotice}
+          showAntiSeekNotice={showAntiSeekNotice}
+        />
+      ) : null}
       {playerError ? (
         <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(8,13,25,0.82)' }}>
           <Text style={{ color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700', textAlign: 'center' }}>{playerError}</Text>
-        </View>
-      ) : null}
-      {showAntiSeekNotice ? (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 40,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.88)',
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              borderRadius: 20,
-              borderWidth: 1.5,
-              borderColor: '#EF4444',
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.5,
-              shadowRadius: 8,
-              elevation: 8,
-            }}
-          >
-            <View
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: '#DC2626',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <ShieldAlert size={14} color="#FFFFFF" strokeWidth={2.5} />
-            </View>
-            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.4 }}>
-              Chống tua video
-            </Text>
-          </View>
         </View>
       ) : null}
     </View>

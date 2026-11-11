@@ -17,7 +17,7 @@ import {
 } from '../services/studentQuizApi';
 import { quizService } from '../services/mockService';
 import { getStudentCertExamScores, type CertExamScore } from '../services/studentApi';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -327,7 +327,7 @@ export function StudentExamScreen() {
                   accessibilityState={{ expanded: showDetailedReview }}
                 >
                   <View style={styles.reviewToggleLeft}>
-                    <HelpCircle size={18} color={colors.brand} />
+                    <HelpCircle size={18} color={theme.brand} />
                     <View style={styles.reviewToggleTitleWrap}>
                       <Text style={styles.sectionTitle}>Xem lại đáp án</Text>
                       <Text style={styles.reviewToggleSub}>
@@ -339,7 +339,7 @@ export function StudentExamScreen() {
                   </View>
                   <View style={styles.reviewToggleBadge}>
                     <Text style={styles.reviewToggleBadgeText}>{showDetailedReview ? 'Thu gọn' : 'Xem lại'}</Text>
-                    {showDetailedReview ? <ChevronUp size={16} color={colors.brandDark} /> : <ChevronDown size={16} color={colors.brandDark} />}
+                    {showDetailedReview ? <ChevronUp size={16} color={theme.brandDark} /> : <ChevronDown size={16} color={theme.brandDark} />}
                   </View>
                 </Pressable>
 
@@ -565,7 +565,7 @@ export function StudentExamScreen() {
       {activeTab !== null ? (activeTab === 'quiz' ? (
         <>
           {loading ? (
-            <View style={styles.centerState}><ActivityIndicator color={colors.brand} size="large" /><Text style={styles.stateText}>Đang tải danh sách bài trắc nghiệm...</Text></View>
+            <View style={styles.centerState}><ActivityIndicator color={theme.brand} size="large" /><Text style={styles.stateText}>Đang tải danh sách bài trắc nghiệm...</Text></View>
           ) : error ? (
             <Card style={styles.stateCard}>
               <AlertCircle size={30} color={colors.red} /><Text style={styles.stateTitle}>Không tải được danh sách</Text><Text style={styles.examMuted}>{error}</Text>
@@ -642,7 +642,7 @@ export function StudentExamScreen() {
             ))}
           </View>
           {scoreTab === 'cert' ? (
-            certScores.loading ? <View style={styles.centerState}><ActivityIndicator color={colors.brand} /></View>
+            certScores.loading ? <View style={styles.centerState}><ActivityIndicator color={theme.brand} /></View>
               : certScores.error ? <EmptyState title="Không tải được điểm thi chứng nhận" message={certScores.error} />
                 : certScores.data.length ? certScores.data.map((score) => {
                   const quizPercent = score.quizScore != null && score.quizTotal ? Math.round((score.quizScore / score.quizTotal) * 100) : null;
@@ -662,7 +662,7 @@ export function StudentExamScreen() {
                     </View>
                   );
                 }) : <EmptyState title="Chưa có điểm thi chứng nhận" message="Kết quả thi chứng nhận trên máy tính sẽ hiển thị tại đây." />
-          ) : loading ? <View style={styles.centerState}><ActivityIndicator color={colors.brand} /></View> : submittedQuizzes.length ? submittedQuizzes.map((quiz) => (
+          ) : loading ? <View style={styles.centerState}><ActivityIndicator color={theme.brand} /></View> : submittedQuizzes.length ? submittedQuizzes.map((quiz) => (
             <Pressable key={quiz.id} onPress={() => void openQuiz(quiz)} style={styles.scoreRow} accessibilityRole="button">
               <View style={styles.flex}><Text style={styles.quizTitle}>{quiz.title}</Text><Text style={styles.metaText}>{quiz.courseName} · {quiz.mySubmission?.submittedAt ? formatDate(quiz.mySubmission.submittedAt) : 'Đã nộp'}</Text></View>
               <Text style={[styles.scoreText, quiz.mySubmission?.passed ? styles.passText : styles.failText]}>{quiz.mySubmission?.forfeit ? 'Rớt' : `${quiz.mySubmission?.score ?? 0}%`}</Text>
@@ -678,7 +678,7 @@ export function StudentExamScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   examScreen: { flex: 1, paddingBottom: spacing.sm },
   examScroll: { flex: 1 },
@@ -902,4 +902,4 @@ const styles = StyleSheet.create({
   reviewAnswerLabel: { color: '#64748B', fontSize: typography.micro, fontWeight: '700' },
   reviewAnswer: { color: '#0F172A', fontSize: typography.caption, fontWeight: '700' },
   reviewCorrect: { color: '#15803D', fontSize: typography.caption, fontWeight: '800' },
-});
+}));

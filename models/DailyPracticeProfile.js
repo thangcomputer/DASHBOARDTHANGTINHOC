@@ -23,6 +23,8 @@ const dailyPracticeProfileSchema = new mongoose.Schema({
     default: [],
   },
   sessionsCount: { type: Number, default: 0 },
+  /** Chủ đề lộ trình học viên chọn gần nhất (đồng bộ web + mobile). */
+  lastPathTopicId: { type: String, default: '' },
 }, { timestamps: true });
 
 module.exports = mongoose.models.DailyPracticeProfile || mongoose.model('DailyPracticeProfile', dailyPracticeProfileSchema);

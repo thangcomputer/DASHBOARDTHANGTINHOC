@@ -1,4 +1,4 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Clock3, Download, FileBox, MessageSquare, Plus, Search, Star, Trash2 } from 'lucide-react-native';
@@ -14,7 +14,7 @@ import {
 } from '../services/courseVideoApi';
 import { SOCKET_EVENTS } from '../services/socketService';
 import { resolveMobilePublicUrl } from '../services/apiClient';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme } from '../theme/tokens';
 
 type VideoLessonTab = 'qa' | 'notes' | 'reviews' | 'resources';
 type VideoLessonNote = {
@@ -344,7 +344,7 @@ export function VideoLessonTabs({
           <Text style={styles.questionCount}>{filteredQuestions.length}</Text>
         </View>
         {questionLoading ? (
-          <ActivityIndicator color={colors.brand} style={styles.loader} />
+          <ActivityIndicator color={theme.brand} style={styles.loader} />
         ) : filteredQuestions.length ? (
           <View style={styles.list}>
             {filteredQuestions.map((question) => {
@@ -543,7 +543,7 @@ export function VideoLessonTabs({
           </Pressable>
         </View>
         {reviewLoading ? (
-          <ActivityIndicator color={colors.brand} style={styles.loader} />
+          <ActivityIndicator color={theme.brand} style={styles.loader} />
         ) : reviews.length ? (
           <View style={styles.list}>
             {reviews.map((review) => <ReviewCard key={review.id} review={review} />)}
@@ -583,7 +583,7 @@ export function VideoLessonTabs({
           >
             <View style={styles.formHeading}>
               <Text style={styles.questionTitle}>{file.title || file.fileOriginalName || 'Tài liệu'}</Text>
-              <Download size={17} color={colors.brand} />
+              <Download size={17} color={theme.brand} />
             </View>
             {file.fileSize ? <Text style={styles.metaText}>{String(file.fileSize)}</Text> : null}
           </Pressable>

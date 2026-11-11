@@ -134,18 +134,12 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
               type="button"
               onClick={() => onChange(name)}
               title={name}
-              className={`snap-start shrink-0 w-[min(calc(100vw-40px),20rem)] sm:w-[17rem] text-left p-4 rounded-[16px] border transition-all duration-200 active:scale-[0.98] min-h-[44px] ${
-                active
-                  ? 'border-blue-500 bg-blue-50/80 shadow-[0_6px_20px_rgba(0,0,0,0.06)] ring-1 ring-blue-100'
-                  : completed
-                    ? 'border-slate-200 bg-white hover:border-blue-300 shadow-[0_6px_20px_rgba(0,0,0,0.06)]'
-                    : 'border-slate-100 bg-white hover:border-slate-200 shadow-[0_6px_20px_rgba(0,0,0,0.06)]'
+              className={`cms-course-card snap-start shrink-0 w-[min(calc(100vw-40px),20rem)] sm:w-[17rem] text-left p-4 rounded-[16px] border min-h-[44px] ${
+                active ? 'cms-course-card--active' : completed ? 'cms-course-card--done' : ''
               }`}
             >
               <p
-                className={`cms-sd-card-title line-clamp-2 ${
-                  active ? 'text-blue-800' : 'text-slate-800'
-                }`}
+                className="cms-sd-card-title cms-course-card__title line-clamp-2 text-slate-800"
               >
                 {name}
               </p>
@@ -161,8 +155,8 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
               <div className="mt-3">
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      active ? 'bg-blue-500' : completed ? 'bg-emerald-500' : 'bg-red-500'
+                    className={`cms-course-card__bar h-full rounded-full transition-all duration-300 ${
+                      active ? 'is-active' : completed ? 'is-done' : ''
                     }`}
                     style={{ width: `${pct}%` }}
                   />
@@ -187,7 +181,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
   );
 };
 
-function CompactCoursePicker({ items, activeCourseName, onChange, error }) {
+export function CompactCoursePicker({ items, activeCourseName, onChange, error, showProgress = true }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const active = items.find((item) => item.name === activeCourseName) || items[0];
@@ -220,7 +214,7 @@ function CompactCoursePicker({ items, activeCourseName, onChange, error }) {
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition hover:border-blue-300"
+        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 text-left shadow-none transition hover:border-slate-300"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
           <BookOpen size={18} aria-hidden="true" />
@@ -229,12 +223,14 @@ function CompactCoursePicker({ items, activeCourseName, onChange, error }) {
           <span className="block text-[11px] font-semibold text-slate-400">Khóa học đang xem · {items.length} khóa</span>
           <span className="block truncate text-sm font-black text-slate-800">{active?.name}</span>
         </span>
-        <span className="hidden shrink-0 text-right sm:block">
-          <span className="block text-[11px] font-bold tabular-nums text-slate-500">{active && progressText(active)}</span>
-          <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-            <span className="block h-full rounded-full bg-blue-500" style={{ width: `${active?.pct || 0}%` }} />
+        {showProgress && (
+          <span className="hidden shrink-0 text-right sm:block">
+            <span className="block text-[11px] font-bold tabular-nums text-slate-500">{active && progressText(active)}</span>
+            <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+              <span className="block h-full rounded-full bg-blue-500" style={{ width: `${active?.pct || 0}%` }} />
+            </span>
           </span>
-        </span>
+        )}
         <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
       {open && (

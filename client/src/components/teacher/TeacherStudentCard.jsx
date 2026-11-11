@@ -709,9 +709,9 @@ export const StudentCard = ({
         ? 'Đã điểm danh - không thể hủy sau khi hết thời gian chờ'
         : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
-    'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-600/25 active:scale-[0.98] cursor-pointer';
+    'bg-red-600 hover:bg-red-700 text-white border border-red-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2 font-extrabold cursor-pointer shadow-xs';
   const cancelButtonClassDisabled =
-    'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60';
+    'bg-slate-100 text-slate-400 border border-slate-200 border-b-2 border-b-slate-300 cursor-not-allowed opacity-60 font-semibold';
 
   const leftAttendanceLocked = alreadyAttendedToday || isPendingConfirm || makeupPending;
   const leftAttendanceDisabled = isDroppedOut || isCompleted || leftAttendanceLocked || waitingAttendanceUnlock || (!isOverdueMakeup && !canCheckIn && !makeupPending);
@@ -1268,21 +1268,21 @@ export const StudentCard = ({
                                       waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
                                         'Bấm để điểm danh buổi học hôm nay'
                     }
-                    className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${isCompleted
-                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                    className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-bold text-[10px] sm:text-sm tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${isCompleted
+                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed border border-slate-200'
                         : makeupPending
-                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none border border-slate-200'
                           : isOverdueMakeup
-                            ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
+                            ? 'bg-amber-500 border border-amber-400 border-b-4 border-b-amber-700 text-white font-extrabold hover:brightness-105 active:translate-y-[2px] active:border-b-2 shadow-xs cursor-pointer'
                             : attendanceDisputed
-                              ? 'bg-amber-100 text-amber-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
+                              ? 'bg-amber-100 text-amber-800 cursor-not-allowed opacity-90 pointer-events-none select-none border border-amber-200'
                               : awaitingStudentConfirm
-                                ? 'bg-blue-100 text-blue-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
+                                ? 'bg-blue-100 text-blue-800 cursor-not-allowed opacity-90 pointer-events-none select-none border border-blue-200'
                                 : leftAttendanceLocked
-                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none border border-slate-200'
                                   : waitingAttendanceUnlock
-                                    ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
+                                    ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60 border border-slate-200'
+                                    : 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white font-extrabold hover:brightness-105 active:translate-y-[2px] active:border-b-2 shadow-xs cursor-pointer'
                       }`}
                   >
                     <CheckCircle size={14} className="shrink-0" aria-hidden="true" />
@@ -1372,7 +1372,7 @@ export const StudentCard = ({
                   <button
                     type="button"
                     onClick={handleLinkSave}
-                    className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs  tracking-widest transition-all shadow-lg whitespace-nowrap ${linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-100'
+                    className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs  tracking-widest transition-all shadow-lg whitespace-nowrap ${linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-100'
                       }`}
                   >
                     {linkSaved ? 'Đã lưu ✓' : 'Cập nhật'}
@@ -1392,8 +1392,8 @@ export const StudentCard = ({
                   type="button"
                   onClick={() => setShowAddAssign(!showAddAssign)}
                   className={`shrink-0 text-xs px-3 min-h-9 rounded-lg font-medium transition-all inline-flex items-center gap-1 whitespace-nowrap ${showAddAssign
-                      ? 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
-                      : 'bg-red-600 hover:bg-red-700 text-white'
+                      ? 'bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                     }`}
                 >
                   {showAddAssign ? <X size={14} /> : <Plus size={14} />}
@@ -1432,7 +1432,7 @@ export const StudentCard = ({
                       </div>
                       <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
                     </div>
-                    <button onClick={handleCreateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Gửi bài tập cho học viên</button>
+                    <button onClick={handleCreateAssign} className="md:col-span-2 bg-emerald-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-emerald-100">Gửi bài tập cho học viên</button>
                   </div>
                 </div>
               )}
@@ -1481,7 +1481,7 @@ export const StudentCard = ({
                             </div>
                             <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
                           </div>
-                          <button onClick={handleUpdateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Cập nhật bài tập</button>
+                          <button onClick={handleUpdateAssign} className="md:col-span-2 bg-emerald-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-emerald-100">Cập nhật bài tập</button>
                         </div>
                       </div>
                     ) : (
@@ -1619,7 +1619,7 @@ export const StudentCard = ({
               <button
                 type="button"
                 onClick={openQuizCreate}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm"
               >
                 <Plus size={14} /> Mở form tạo trắc nghiệm
               </button>
@@ -2084,21 +2084,21 @@ export const StudentCard = ({
                                       waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
                                         'Bấm để điểm danh'
                     }
-                    className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${isCompleted
-                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
+                    className={`py-4 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 transition-all shadow-xs ${isCompleted
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed border border-gray-300'
                         : makeupPending
-                          ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
+                          ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border border-slate-200 opacity-60'
                           : isOverdueMakeup
-                            ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
+                            ? 'bg-amber-500 border border-amber-400 border-b-4 border-b-amber-700 text-white font-extrabold hover:brightness-105 active:translate-y-[2px] active:border-b-2 shadow-xs cursor-pointer'
                             : attendanceDisputed
-                              ? 'bg-amber-100 text-amber-800 cursor-not-allowed pointer-events-none select-none border-2 border-amber-200'
+                              ? 'bg-amber-100 text-amber-800 cursor-not-allowed pointer-events-none select-none border border-amber-200'
                               : awaitingStudentConfirm
-                                ? 'bg-blue-100 text-blue-800 cursor-not-allowed pointer-events-none select-none border-2 border-blue-200'
+                                ? 'bg-blue-100 text-blue-800 cursor-not-allowed pointer-events-none select-none border border-blue-200'
                                 : leftAttendanceLocked
-                                  ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
+                                  ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border border-slate-200 opacity-60'
                                   : waitingAttendanceUnlock
-                                    ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60 border-2 border-slate-200'
-                                    : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
+                                    ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60 border border-slate-200'
+                                    : 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white font-extrabold hover:brightness-105 active:translate-y-[2px] active:border-b-2 shadow-xs cursor-pointer'
                       }`}>
                     <CheckCircle size={18} />
                     <span className="text-xs text-center leading-tight">
@@ -2320,14 +2320,14 @@ export const StudentCard = ({
               <button
                 type="button"
                 onClick={() => setShowAttendanceModal(false)}
-                className="flex-[1] py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition"
+                className="flex-[1] py-4 bg-white border border-slate-200 border-b-4 border-b-slate-300 rounded-2xl font-black text-slate-600 hover:bg-slate-50 active:translate-y-[2px] active:border-b-2 transition-all cursor-pointer"
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
                 onClick={beginAttendanceConfirm}
-                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
+                className="flex-[2] py-4 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white rounded-2xl font-black shadow-md shadow-emerald-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle size={18} />
                 Xác nhận Điểm danh

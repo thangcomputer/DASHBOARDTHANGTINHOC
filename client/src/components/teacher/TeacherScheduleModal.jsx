@@ -163,9 +163,9 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="bg-red-600 px-6 py-4 text-white flex justify-between items-center shrink-0">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 text-white flex justify-between items-center shrink-0">
           <h3 className="font-bold flex items-center gap-2"><Calendar size={18} /> {(schedule?.id || schedule?._id) ? 'Cập nhật lịch học' : 'Xếp lịch học mới'}</h3>
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} className="p-1 rounded-xl hover:bg-white/10 transition-colors"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-4 overflow-y-auto">
           {/* Từ hồ sơ HV: đã biết HV → không hiện chọn / banner khóa. Từ lịch: mới hiện dropdown. */}
@@ -328,7 +328,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
             type="button"
             onClick={handleSubmit}
             disabled={lockedPast || (!gate.canSchedule && !isEdit)}
-            className="w-full bg-red-600 py-4 rounded-2xl text-white font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+            className="w-full py-3.5 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 rounded-2xl text-white font-black shadow-md shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {(schedule?.id || schedule?._id) ? 'Cập nhật lịch' : 'Xếp lịch ngay'}
           </button>

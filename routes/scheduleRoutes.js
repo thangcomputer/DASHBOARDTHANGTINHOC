@@ -474,6 +474,7 @@ router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async
     ]);
 
     await scanAttendanceFollowUps(req.app.get('io'), schedules);
+    await attachFallbackScheduleLinks(schedules);
 
     res.json({
       success: true,
@@ -545,12 +546,63 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
       .sort({ date: 1, startTime: 1 });
 
     await scanAttendanceFollowUps(req.app.get('io'), schedules);
+    await attachFallbackScheduleLinks(schedules);
 
     res.json({ success: true, count: schedules.length, data: schedules });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+async function attachFallbackScheduleLinks(schedules) {
+  if (!Array.isArray(schedules) || schedules.length === 0) return;
+  const missingStudentIds = Array.from(new Set(
+    schedules
+      .filter((sch) => !String(sch?.linkHoc || '').trim())
+      .map((sch) => String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || ''))
+      .filter((id) => /^[a-f\d]{24}$/i.test(id)),
+  ));
+  if (!missingStudentIds.length) return;
+  const students = await Student.find({ _id: { $in: missingStudentIds } })
+    .select('linkHoc online_meeting_url enrollments')
+    .lean();
+  const studentMap = new Map(students.map((s) => [String(s._id), s]));
+  schedules.forEach((sch) => {
+    if (String(sch?.linkHoc || '').trim()) return;
+    const sid = String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || '');
+    const st = studentMap.get(sid);
+    if (!st) return;
+    const tid = String(sch?.teacherId?._id || sch?.teacherId?.id || sch?.teacherId || '');
+    const enrId = String(sch?.enrollmentId?._id || sch?.enrollmentId?.id || sch?.enrollmentId || '');
+    const courseName = String(sch?.course || '').trim().toLowerCase();
+    const enrollments = Array.isArray(st.enrollments) ? st.enrollments : [];
+    const matchedEnrollment = (enrId && enrollments.find((e) => String(e?._id || e?.id || '') === enrId && String(e?.linkHoc || '').trim()))
+      || (tid && courseName && enrollments.find((e) => (
+        String(e?.teacherId?._id || e?.teacherId || '') === tid
+        && String(e?.courseName || '').trim().toLowerCase() === courseName
+        && String(e?.linkHoc || '').trim()
+      )))
+      || (tid && enrollments.find((e) => (
+        String(e?.teacherId?._id || e?.teacherId || '') === tid
+        && String(e?.linkHoc || '').trim()
+      )))
+      || (courseName && enrollments.find((e) => (
+        String(e?.courseName || '').trim().toLowerCase() === courseName
+        && String(e?.linkHoc || '').trim()
+      )))
+      || enrollments.find((e) => e?.isPrimary && String(e?.linkHoc || '').trim())
+      || enrollments.find((e) => String(e?.linkHoc || '').trim());
+    const fallbackLink = String(
+      matchedEnrollment?.linkHoc
+      || st.linkHoc
+      || st.online_meeting_url
+      || '',
+    ).trim();
+    if (fallbackLink) {
+      sch.linkHoc = fallbackLink;
+    }
+  });
+}
 
 async function scanAttendanceFollowUps(io, schedules) {
   if (!io || !Array.isArray(schedules) || schedules.length === 0) return;
@@ -749,6 +801,8 @@ router.get('/student/:studentId', [authMiddleware, ...schedulesGuard('get_studen
       .populate('teacherId', 'name phone avatar specialty')
       .sort({ date: 1, startTime: 1 });
 
+    await attachFallbackScheduleLinks(schedules);
+
     // Thống kê buổi học
     const completed = schedules.filter(s => s.status === 'completed').length;
     const upcoming = schedules.filter(s => s.status === 'scheduled').length;
@@ -943,6 +997,14 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       paymentStatus = 'paid';
     }
 
+    const resolvedScheduleLinkHoc = String(
+      linkHoc
+      || selectedEnrollment?.linkHoc
+      || studentDoc?.linkHoc
+      || studentDoc?.online_meeting_url
+      || '',
+    ).trim();
+
     const schedule = await Schedule.create({
       teacherId, teacherName,
       studentId, studentName,
@@ -951,7 +1013,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       date: new Date(date),
       startTime, endTime: resolvedEndTime,
       course: courseFinal,
-      linkHoc: linkHoc || '',
+      linkHoc: resolvedScheduleLinkHoc,
       note: (() => {
         if (incomingStatus === 'completed') {
           const late = String(req.body?.lateReason || '').trim();

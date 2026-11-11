@@ -41,6 +41,7 @@ test('mục tiêu học: đặt, tính tiến độ, heartbeat chống bơm phú
     assert.equal(saved.progress.periodTargetMinutes, 180 * 30);
 
     const now = new Date();
+    now.setHours(12, 0, 0, 0);
     assert.equal((await learningGoalService.recordStudyMinute(studentId, now)).todayMinutes, 1);
     assert.equal((await learningGoalService.recordStudyMinute(studentId, new Date(now.getTime() + 10 * 1000))).todayMinutes, 1, 'heartbeat quá sát bị bỏ qua');
     assert.equal((await learningGoalService.recordStudyMinute(studentId, new Date(now.getTime() + 60 * 1000))).todayMinutes, 2);
@@ -216,7 +217,8 @@ test('bảng xếp hạng: xếp theo số ngày đạt mục tiêu, bằng nhau
 
 test('Tổng quan có thẻ mục tiêu + xếp hạng; chọn khóa nằm trong “Khóa học của tôi” (web + mobile)', () => {
   const overview = read('client/src/components/student/StudentOverviewTab.jsx');
-  assert.ok(overview.includes('LmsGoalMergedCard') || /<LearningGoalCard \/>\s*<LearningLeaderboardCard \/>/.test(overview));
+  assert.ok(overview.includes('<LearningLeaderboardCard'));
+  assert.ok(!overview.includes('LmsGoalMergedCard'), 'mục tiêu học: không dùng thẻ gộp trên Tổng quan web');
   assert.ok(overview.includes('aria-label="Chọn khóa học"'));
   assert.ok(read('client/src/services/lessonPracticeApi.js').includes('/lesson-practice/my/learning-leaderboard'));
   assert.ok(read('routes/lessonPracticeRoutes.js').includes("router.get('/my/learning-leaderboard', ...requireStudent"));
@@ -225,8 +227,9 @@ test('Tổng quan có thẻ mục tiêu + xếp hạng; chọn khóa nằm trong
   assert.ok(
     home.includes('<LearningLeaderboardCard />')
     || home.includes('<LmsGoalMergedCard />')
+    || home.includes('<DuoHeroCard')
   );
-  assert.ok(home.includes('<CompactCoursePicker items={coursePickerItems}'));
+  assert.ok(home.includes('<CompactCoursePicker') && home.includes('items={coursePickerItems}'));
   assert.ok(!home.includes('styles.courseSwitcher'), 'bỏ hàng thẻ khóa học lớn');
   assert.ok(read('thang-tin-hoc-mobile/src/services/learningGoalApi.ts').includes("'/lesson-practice/my/learning-leaderboard'"));
 });
@@ -263,8 +266,8 @@ test('popup chỉ tự mở khi chưa từng đặt mục tiêu, không đè kh�
     || read('client/src/components/student/StudentProfileTab.jsx').includes('Mục tiêu học')
   );
   assert.ok(
-    read('client/src/components/student/StudentOverviewTab.jsx').includes('<LearningGoalCard />')
-    || read('client/src/components/student/StudentOverviewTab.jsx').includes('LmsGoalMergedCard')
+    read('client/src/components/student/StudentOverviewTab.jsx').includes('<LearningLeaderboardCard')
+    || read('client/src/components/student/StudentProfileTab.jsx').includes('openLearningGoal')
   );
 
   const host = read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx');
@@ -279,8 +282,9 @@ test('popup chỉ tự mở khi chưa từng đặt mục tiêu, không đè kh�
   assert.ok(host.includes('{open && !pinLocked ? ('), 'không hiện đè khóa PIN');
   assert.ok(read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx').includes('<LearningGoalHost user={user} />'));
   assert.ok(
-    read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LearningGoalCard />')
-    || read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LmsGoalMergedCard />')
+    read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LearningGoalCard')
+    || read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LmsGoalMergedCard')
+    || read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<DuoDailyQuestsCard')
   );
   assert.ok(read('thang-tin-hoc-mobile/src/screens/FeatureScreens.tsx').includes('DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)'));
 });

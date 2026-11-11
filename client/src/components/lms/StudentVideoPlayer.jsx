@@ -17,6 +17,7 @@ import {
 } from '../../utils/youtubeDuration';
 import { describeYouTubePlayerError } from '../../utils/youtubePlayerError';
 import { setStudyMediaPlaying } from '../../utils/learningGoal';
+import { buildYtBrandedPlayerVars, YT_IFRAME_CROP } from '../../../../shared/dailyPractice/lmsBrandedVideoPlayer.mjs';
 // ─── Helper: Extract YouTube ID ──────────────────────────────────────────────
 export const extractYouTubeId = (url = '') => {
   if (!url) return '';
@@ -270,18 +271,10 @@ export const StudentVideoPlayer = ({
 
       playerRef.current = new window.YT.Player(elId, {
         videoId: ytId,
-        playerVars: {
-          controls: 0,
-          disablekb: 1,
-          rel: 0,
-          modestbranding: 1,
-          iv_load_policy: 3,
-          fs: 0,
-          start: startAt,
-          playsinline: 1,
-          enablejsapi: 1,
+        playerVars: buildYtBrandedPlayerVars({
           origin: window.location.origin,
-        },
+          start: startAt,
+        }),
         events: {
           onReady: (event) => {
             if (cancelled) return;
@@ -296,6 +289,17 @@ export const StudentVideoPlayer = ({
             }
             preferMaxYouTubeQuality(event.target);
             applyLmsVolumeToPlayer(event.target, volumeRef.current, mutedRef.current);
+            const iframe = event.target.getIframe?.();
+            if (iframe) {
+              iframe.style.position = 'absolute';
+              iframe.style.top = '50%';
+              iframe.style.left = '50%';
+              iframe.style.width = `${YT_IFRAME_CROP.webSizePercent}%`;
+              iframe.style.height = `${YT_IFRAME_CROP.webSizePercent}%`;
+              iframe.style.transform = `translate(-50%, ${YT_IFRAME_CROP.webTranslateYPercent}%)`;
+              iframe.style.border = '0';
+              iframe.style.pointerEvents = 'none';
+            }
             const resumeAt = resolveResumeAt(dur || approxDur);
             if (resumeAt > 0) {
               try {
@@ -575,11 +579,9 @@ export const StudentVideoPlayer = ({
         className={`relative w-full flex-1 min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen || appearance === 'window' ? 'rounded-none' : 'lg:rounded-t-2xl'}`}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <div
-          id={`student-yt-player-${lessonId}`}
-          className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: 'none' }}
-        />
+        <div className="lms-yt-crop absolute inset-0 overflow-hidden" style={{ pointerEvents: 'none' }}>
+          <div id={`student-yt-player-${lessonId}`} className="h-full w-full" />
+        </div>
 
         <LmsBrandedPlayerChrome
           overlayVisible={overlayVisible}

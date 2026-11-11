@@ -379,20 +379,6 @@ export default function LmsBrandedPlayerChrome({
               }
             }}
           >
-            {/* Tooltip chữ chống tua video hiển thị ngay trên nút kéo tua */}
-            {isAntiSeekNoticeActive && (
-              <div
-                className="pointer-events-none absolute -top-8 z-30 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-3 py-0.5 text-[10.5px] sm:text-xs font-black text-white shadow-xl backdrop-blur-md border border-white/30 animate-in fade-in zoom-in-95 duration-150 select-none tracking-wide"
-                style={{
-                  left: `clamp(55px, ${progressPct}%, calc(100% - 55px))`,
-                  transform: 'translateX(-50%)',
-                }}
-              >
-                <ShieldAlert size={12} className="text-white shrink-0 drop-shadow-xs" />
-                <span className="whitespace-nowrap drop-shadow-xs">Chống tua video</span>
-              </div>
-            )}
-
             <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
               {lockSeek && maxPct > 0 && maxPct < 100 && (
                 <div

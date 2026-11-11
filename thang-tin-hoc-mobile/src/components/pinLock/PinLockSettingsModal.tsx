@@ -25,7 +25,15 @@ const STEP_TITLES: Record<Exclude<Step, 'overview'>, string> = {
   'verify-remove': 'Nhập mã PIN hiện tại để tắt khóa',
 };
 
-export function PinLockSettingsModal({ userKey, onClose }: { userKey: string; onClose: () => void }) {
+export function PinLockSettingsModal({
+  userKey,
+  onClose,
+  isBrandStudent = false,
+}: {
+  userKey: string;
+  onClose: () => void;
+  isBrandStudent?: boolean;
+}) {
   const [config, setConfig] = useState<PinConfig | null>(null);
   const [step, setStep] = useState<Step>('overview');
   const [draftPin, setDraftPin] = useState('');
@@ -101,8 +109,8 @@ export function PinLockSettingsModal({ userKey, onClose }: { userKey: string; on
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={styles.headerTitle}>
-              <KeyRound size={20} color={colors.brand} />
-              <Text style={styles.title}>Khóa mã PIN</Text>
+              <KeyRound size={20} color={isBrandStudent ? '#DC2626' : colors.brand} />
+              <Text style={[styles.title, isBrandStudent && { color: '#DC2626' }]}>Khóa mã PIN</Text>
             </View>
             <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Đóng">
               <X size={18} color={colors.muted} />
@@ -128,7 +136,7 @@ export function PinLockSettingsModal({ userKey, onClose }: { userKey: string; on
                       <Pressable
                         key={option.minutes}
                         onPress={() => { void changeTimeout(option.minutes); }}
-                        style={[styles.option, selected && styles.optionActive]}
+                        style={[styles.option, selected && (isBrandStudent ? styles.optionActiveBrand : styles.optionActive)]}
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                       >
@@ -164,7 +172,7 @@ export function PinLockSettingsModal({ userKey, onClose }: { userKey: string; on
                   </View>
                 ) : (
                   <DuoButton
-                    variant="primary"
+                    variant={isBrandStudent ? 'danger' : 'primary'}
                     size="lg"
                     fullWidth
                     text="Tạo mã PIN"
@@ -247,6 +255,10 @@ const styles = StyleSheet.create({
   optionActive: {
     borderColor: '#10B981',
     backgroundColor: '#10B981',
+  },
+  optionActiveBrand: {
+    borderColor: '#DC2626',
+    backgroundColor: '#EF4444',
   },
   optionText: { color: '#334155', fontSize: 13, fontWeight: '700' },
   optionTextActive: { color: '#FFFFFF', fontWeight: '800' },

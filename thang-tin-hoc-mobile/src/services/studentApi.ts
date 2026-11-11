@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   Assignment,
   AssignmentSubmission,
   DemoEnrollment,
@@ -94,7 +94,7 @@ function mapAssignedStudent(raw: RawStudent, index: number): DemoStudent {
     enrollmentStatus = 'active';
   } else if (enrollments.length > 0) {
     const allEnrollmentsCancelled = enrollments.every((enrollment) => (
-    ['cancelled', 'canceled', 'refunded', 'thôi học', 'đã hủy'].includes(text(enrollment.status).toLowerCase())
+      ['cancelled', 'canceled', 'refunded', 'thôi học', 'đã hủy'].includes(text(enrollment.status).toLowerCase())
     ));
     enrollmentStatus = allEnrollmentsCancelled ? 'cancelled' : 'completed';
   } else if (['cancelled', 'canceled', 'refunded', 'thôi học', 'đã hủy'].includes(rootStatus)) {
@@ -108,10 +108,10 @@ function mapAssignedStudent(raw: RawStudent, index: number): DemoStudent {
   const totalSessions = number(raw.totalSessions ?? enrollment.totalSessions);
   const completedSessions = number(
     raw.completedSessions
-      ?? enrollment.completedSessions
-      ?? (totalSessions > 0 && enrollment.remainingSessions != null
-        ? totalSessions - number(enrollment.remainingSessions)
-        : undefined),
+    ?? enrollment.completedSessions
+    ?? (totalSessions > 0 && enrollment.remainingSessions != null
+      ? totalSessions - number(enrollment.remainingSessions)
+      : undefined),
   );
   const explicitProgress = raw.progress == null ? null : Number(raw.progress);
   const progress = explicitProgress != null && Number.isFinite(explicitProgress)
@@ -318,12 +318,17 @@ function mapEnrollment(raw: Record<string, unknown>, index: number): DemoEnrollm
   const teacher = raw.teacherId && typeof raw.teacherId === 'object'
     ? text((raw.teacherId as Record<string, unknown>).name)
     : '';
+  const teacherId = raw.teacherId && typeof raw.teacherId === 'object'
+    ? text((raw.teacherId as Record<string, unknown>)._id || (raw.teacherId as Record<string, unknown>).id)
+    : text(raw.teacherId);
   return {
     id: text(raw._id || raw.id, `${courseName}-${index}`),
     courseId: text(course._id || course.id || raw.courseId),
     courseName,
     subjectIds: Array.isArray(raw.subjectIds) ? raw.subjectIds.map(String) : [],
+    teacherId,
     teacherName: text(raw.teacherName, teacher || 'Chưa phân công'),
+    linkHoc: text(raw.linkHoc),
     registeredAt: toDateLabel(raw.registeredAt),
     progress: totalSessions > 0 ? Math.min(100, Math.round(completedSessions / totalSessions * 100)) : 0,
     completedSessions,
@@ -509,7 +514,12 @@ export async function getStudentChatCard(studentId: string): Promise<StudentChat
     age: Number.isFinite(age) && age > 0 ? age : null,
     remainingSessions: Number.isFinite(remaining) ? remaining : null,
     notes: text(student.notes || student.adminNotes),
-    meetingUrl: text(student.joinClassUrl || student.linkHoc || student.online_meeting_url),
+    meetingUrl: text(
+      student.joinClassUrl
+      || student.linkHoc
+      || student.online_meeting_url
+      || enrollments.find((e) => e.linkHoc)?.linkHoc,
+    ),
   };
 }
 
@@ -574,14 +584,14 @@ function mapAssignment(raw: Record<string, unknown>): Assignment {
   const submission = mapSubmission(rawSubmission);
   const gradeHistory = Array.isArray(rawSubmission?.gradeHistory)
     ? rawSubmission.gradeHistory.map((entry) => {
-        const history = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
-        return {
-          at: text(history.at || history.createdAt),
-          oldGrade: history.oldGrade == null ? undefined : number(history.oldGrade),
-          newGrade: history.newGrade == null ? undefined : number(history.newGrade),
-          note: text(history.note),
-        };
-      })
+      const history = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
+      return {
+        at: text(history.at || history.createdAt),
+        oldGrade: history.oldGrade == null ? undefined : number(history.oldGrade),
+        newGrade: history.newGrade == null ? undefined : number(history.newGrade),
+        note: text(history.note),
+      };
+    })
     : [];
   const deadlineDate = raw.deadline ? new Date(String(raw.deadline)) : null;
   const isOverdue = !!deadlineDate && !Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() < Date.now();

@@ -10,6 +10,8 @@ import { navigationRef } from '../navigation/navigationRef';
 import { isActivelyStudying, isStudyMediaPlaying } from '../services/studyActivity';
 import { DailyPracticeReminder } from './dailyPractice/DailyPracticeReminder';
 import { DuoButton } from './duo/DuoButton';
+import { useAuth } from '../app/AuthContext';
+import { isFreePortalMenu } from '../utils/freePortalHelper';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
   LEARNING_GOAL_HOURS,
@@ -181,6 +183,8 @@ function LearningGoalModal({
   onSaved: (data: LearningGoalData) => void;
   onDone: () => void;
 }) {
+  const { user } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const editing = Boolean(currentGoal && !currentGoal.expired);
   const [period, setPeriod] = useState<LearningGoalPeriod>(editing && currentGoal ? currentGoal.period : 'month');
   const [hours, setHours] = useState(editing && currentGoal ? currentGoal.hoursPerDay : 2);
@@ -298,8 +302,8 @@ function LearningGoalModal({
             <View style={styles.badgeWrap}>
               {!celebrate && motion ? (
                 <>
-                  <Animated.View pointerEvents="none" style={[styles.ring, ringStyle(ring)]} />
-                  <Animated.View pointerEvents="none" style={[styles.ring, ringStyle(ringLate)]} />
+                  <Animated.View pointerEvents="none" style={[styles.ring, ringStyle(ring), isBrandStudent && styles.ringBrand]} />
+                  <Animated.View pointerEvents="none" style={[styles.ring, ringStyle(ringLate), isBrandStudent && styles.ringBrand]} />
                 </>
               ) : null}
               {celebrate ? (
@@ -307,7 +311,7 @@ function LearningGoalModal({
                   <Check size={32} strokeWidth={3} color="#FFFFFF" />
                 </Animated.View>
               ) : (
-                <View style={styles.badge}><Target size={30} color="#FFFFFF" /></View>
+                <View style={[styles.badge, isBrandStudent && styles.badgeBrand]}><Target size={30} color="#FFFFFF" /></View>
               )}
             </View>
             <Text style={styles.title}>{celebrate ? 'Đã đặt mục tiêu!' : editing ? 'Đổi mục tiêu học' : 'Đặt mục tiêu học'}</Text>
@@ -400,15 +404,15 @@ function LearningGoalModal({
                       <Pressable
                         key={option.id}
                         onPress={() => setPeriod(option.id)}
-                        style={[styles.option, active && styles.optionActive]}
+                        style={[styles.option, active && (isBrandStudent ? styles.optionActiveBrand : styles.optionActive)]}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: active }}
                       >
                         {option.popular ? (
-                          <View style={styles.popular}><Text style={styles.popularText}>PHỔ BIẾN</Text></View>
+                          <View style={[styles.popular, isBrandStudent && styles.popularBrand]}><Text style={styles.popularText}>PHỔ BIẾN</Text></View>
                         ) : null}
-                        <Icon size={18} color={active ? colors.brand : '#94A3B8'} />
-                        <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>{option.label}</Text>
+                        <Icon size={18} color={active ? (isBrandStudent ? '#DC2626' : colors.brand) : '#94A3B8'} />
+                        <Text style={[styles.optionTitle, active && (isBrandStudent ? styles.optionTitleActiveBrand : styles.optionTitleActive)]}>{option.label}</Text>
                         <Text style={styles.optionHint}>{`${option.days} ngày`}</Text>
                       </Pressable>
                     );
@@ -457,14 +461,14 @@ function LearningGoalModal({
                   })}
                 </View>
 
-                <View style={styles.summary}>
-                  <Text style={styles.summaryText}>
+                <View style={[styles.summary, isBrandStudent && styles.summaryBrand]}>
+                  <Text style={[styles.summaryText, isBrandStudent && styles.summaryTextBrand]}>
                     Tổng cộng <Text style={styles.strong}>{`${hours * selected.days} giờ`}</Text> trong{' '}
                     <Text style={styles.strong}>{`${selected.days} ngày`}</Text>
                   </Text>
                   <View style={styles.inlineRow}>
-                    <CalendarCheck size={13} color="#047857" />
-                    <Text style={styles.summaryDate}>{`Hoàn thành dự kiến ${endDate} `}</Text>
+                    <CalendarCheck size={13} color={isBrandStudent ? '#DC2626' : '#047857'} />
+                    <Text style={[styles.summaryDate, isBrandStudent && styles.summaryDateBrand]}>{`Hoàn thành dự kiến ${endDate} `}</Text>
                   </View>
                   <View style={styles.inlineRow}>
                     <Sparkles size={12} color="#F59E0B" />
@@ -482,7 +486,7 @@ function LearningGoalModal({
                   style={{ width: 105 }}
                 />
                 <DuoButton
-                  variant="accent"
+                  variant={isBrandStudent ? 'danger' : 'accent'}
                   size="md"
                   loading={saving}
                   icon={<Target size={16} color="#FFFFFF" />}
@@ -534,10 +538,16 @@ const styles = StyleSheet.create({
   },
   badgeWrap: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: 'rgba(16, 185, 129, 0.55)' },
+  ringBrand: { borderColor: 'rgba(239, 68, 68, 0.55)' },
   badge: {
     width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand,
     backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
     boxShadow: '0px 10px 22px rgba(4, 120, 87, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(4, 120, 87, 0.5)',
+  } as never,
+  badgeBrand: {
+    backgroundColor: '#EF4444',
+    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #DC2626 100%)',
+    boxShadow: '0px 10px 22px rgba(185, 28, 28, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(153, 27, 27, 0.5)',
   } as never,
   badgeSuccess: {
     backgroundColor: '#059669',
@@ -553,17 +563,30 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.sm },
   periodRow: { paddingTop: 6 },
   option: {
-    flex: 1, alignItems: 'center', gap: 2, paddingTop: spacing.md, paddingBottom: 10, borderRadius: 16, borderWidth: 2,
-    borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: colors.surface,
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingTop: spacing.md,
+    paddingBottom: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: colors.surface,
   },
   hourOption: { paddingTop: 10, paddingBottom: 8, gap: 0, borderRadius: 14 },
-  optionActive: { borderColor: '#10B981', borderBottomColor: '#047857', backgroundColor: '#ECFDF5' },
+  optionActive: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+  optionActiveBrand: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
   optionTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
   optionTitleActive: { color: '#047857' },
+  optionTitleActiveBrand: { color: '#DC2626' },
   optionHint: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
   popular: {
     position: 'absolute', top: -10, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.brand,
     backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
+  } as never,
+  popularBrand: {
+    backgroundColor: '#DC2626',
+    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #DC2626 100%)',
   } as never,
   popularText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   hoursHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -577,8 +600,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm, padding: spacing.md, gap: 4, borderRadius: 16, borderWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#ECFDF5',
     alignItems: 'center',
   },
+  summaryBrand: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
   summaryText: { color: '#065F46', fontSize: 14, textAlign: 'center' },
+  summaryTextBrand: { color: '#991B1B' },
   summaryDate: { color: '#047857', fontSize: 12, fontWeight: '700' },
+  summaryDateBrand: { color: '#DC2626' },
   motivation: { color: colors.muted, fontSize: 12, fontStyle: 'italic', flexShrink: 1 },
   strong: { fontWeight: '900', color: colors.ink },
   inlineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },

@@ -20,6 +20,7 @@ interface DuoHeroCardProps {
   onContinue?: () => void;
   continueLabel?: string;
   mascotReaction?: 'happy' | 'determined' | 'studying' | string;
+  isBrandStudent?: boolean;
 }
 
 export function DuoHeroCard({
@@ -34,6 +35,7 @@ export function DuoHeroCard({
   onContinue,
   continueLabel,
   mascotReaction,
+  isBrandStudent = false,
 }: DuoHeroCardProps) {
   const finalSubtitle = lessonSubtitle || stageSubtitle;
   const finalProgress = progressPercent ?? progress ?? 40;
@@ -45,13 +47,13 @@ export function DuoHeroCard({
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        <View style={styles.mascotBox}>
+        <View style={[styles.mascotBox, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' }]}>
           <Mascot mood={mascotMood} size={76} />
         </View>
         <View style={styles.infoCol}>
           <View style={styles.badgeRow}>
-            <View style={styles.eyebrowBadge}>
-              <Text style={styles.eyebrowText}>
+            <View style={[styles.eyebrowBadge, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+              <Text style={[styles.eyebrowText, isBrandStudent && { color: '#DC2626' }]}>
                 {playedToday ? 'ĐÃ HOÀN THÀNH HÔM NAY' : 'BÀI HỌC HIỆN TẠI'}
               </Text>
             </View>
@@ -68,14 +70,14 @@ export function DuoHeroCard({
       {/* Progress Track */}
       <View style={styles.progressRow}>
         <View style={styles.track}>
-          <View style={[styles.fill, { width: `${Math.min(100, Math.max(5, finalProgress))}%` }]} />
+          <View style={[styles.fill, isBrandStudent && { backgroundColor: '#EF4444' }, { width: `${Math.min(100, Math.max(5, finalProgress))}%` }]} />
         </View>
-        <Text style={styles.progressText}>{`${Math.round(finalProgress)}%`}</Text>
+        <Text style={[styles.progressText, isBrandStudent && { color: '#DC2626' }]}>{`${Math.round(finalProgress)}%`}</Text>
       </View>
 
       {/* Big Tactile 3D Action Button */}
       <DuoButton
-        variant={playedToday ? 'accent' : 'primary'}
+        variant={playedToday ? 'accent' : (isBrandStudent ? 'danger' : 'primary')}
         size="lg"
         fullWidth
         icon={<Play size={18} color="#FFFFFF" fill="#FFFFFF" />}
@@ -93,9 +95,12 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomWidth: 4,
-    borderBottomColor: '#CBD5E1',
     gap: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   topRow: {
     flexDirection: 'row',

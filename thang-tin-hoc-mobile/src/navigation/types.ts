@@ -49,6 +49,13 @@ export type AppStackParamList = {
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
   DailyPractice: { topicId?: string; watch?: 'stage'; practice?: 'stage' } | undefined;
+  CourseVideos: {
+    resumeKey?: number;
+    resumeSubjectId?: string;
+    resumeCourseId?: string;
+    resumeUnitId?: string;
+    resumeSectionId?: string;
+  } | undefined;
   Support: undefined;
 };
 

@@ -26,7 +26,7 @@ export const SURVEY_FEAR_LABELS = {
 
 const FEAR_NOTES = {
   scam: 'Bạn đang học thử miễn phí, chưa cần đóng tiền.',
-  no_guidance: 'Bài giảng và luyện tập mở sẵn. Giáo viên kèm khi bạn đăng ký khóa.',
+  no_guidance: 'Phần luyện tập mở sẵn. Giáo viên kèm khi bạn đăng ký khóa.',
   not_understand: 'Mỗi video có câu hỏi dừng lại. Làm chưa đúng thì được gợi ý.',
   no_support: 'Phần luyện mở sẵn. Khi cần người ngồi kèm thì đăng ký khóa 1 kèm 1.',
   none: 'Bạn cứ vào học thử. Muốn người kèm thì đăng ký khóa sau.',

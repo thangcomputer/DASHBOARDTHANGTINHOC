@@ -253,6 +253,7 @@ export default function TeacherOverviewTab({
       <header className="flex min-w-0">
         <WelcomeHero
           role="teacher"
+          accent="emerald"
           name={teacherName}
           chips={heroChips}
           joinUrl={ongoingSchedule ? ongoingJoinUrl : ''}
@@ -272,7 +273,7 @@ export default function TeacherOverviewTab({
               key={key}
               type="button"
               onClick={action}
-              className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-red-200 hover:bg-red-50/40"
+              className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-emerald-200 hover:bg-emerald-50/40"
             >
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
                 <Icon size={19} aria-hidden="true" />
@@ -281,7 +282,7 @@ export default function TeacherOverviewTab({
                 <span className="block text-sm font-black text-slate-900">{title}</span>
                 {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
               </span>
-              <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-red-600">
+              <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-emerald-600">
                 {cta} <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </span>
             </button>
@@ -330,7 +331,7 @@ export default function TeacherOverviewTab({
                   type={onClick ? 'button' : undefined}
                   onClick={onClick}
                   title={title}
-                  className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:gap-3 sm:p-3 ${onClick ? 'cursor-pointer hover:border-red-200 hover:bg-red-50/40' : ''}`}
+                  className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:gap-3 sm:p-3 ${onClick ? 'cursor-pointer hover:border-emerald-200 hover:bg-emerald-50/40' : ''}`}
                 >
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tint}`}>
                     <Icon size={24} strokeWidth={2.2} aria-hidden="true" />
@@ -425,7 +426,7 @@ export default function TeacherOverviewTab({
         <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
             <h3 className="text-sm sm:text-base lg:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200 shrink-0">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-200 shrink-0">
                 <Clock size={17} strokeWidth={2.4} aria-hidden="true" />
               </span>
               <span className="truncate">Lịch dạy hôm nay ({nextSessions.length})</span>
@@ -433,7 +434,7 @@ export default function TeacherOverviewTab({
             <button
               type="button"
               onClick={() => navigate('/teacher#schedule')}
-              className="text-[11px] font-bold text-red-600 hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
+              className="text-[11px] font-bold text-emerald-600 hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
             >
               Cả tháng
               <ChevronRight size={12} aria-hidden="true" />
@@ -448,14 +449,14 @@ export default function TeacherOverviewTab({
                 <div
                   key={`${enrollmentKey}-${sch._id || sch.id}`}
                   className={`rounded-xl p-3 border transition ${live
-                      ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-red-400/40 shadow-md shadow-red-500/20 animate-pulse'
-                      : 'bg-slate-50/80 border-slate-100 hover:border-red-200'
+                      ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white border-emerald-400/40 shadow-md shadow-emerald-500/20 animate-pulse'
+                      : 'bg-slate-50/80 border-slate-100 hover:border-emerald-200'
                     }`}
                 >
                   <div className="flex items-start gap-2 min-w-0">
                     <div className="min-w-0 flex-1">
                       {live && (
-                        <p className="text-[11px] font-black  tracking-wider text-red-100 flex items-center gap-1.5 mb-1">
+                        <p className="text-[11px] font-black  tracking-wider text-emerald-100 flex items-center gap-1.5 mb-1">
                           <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
@@ -466,13 +467,13 @@ export default function TeacherOverviewTab({
                       <p className={`text-xs sm:text-sm lg:text-base font-bold truncate ${live ? 'text-white' : 'text-slate-800'}`}>
                         {student.name || sch.studentName || 'Học viên'}
                       </p>
-                      <p className={`text-[11px] sm:text-xs lg:text-sm truncate ${live ? 'text-red-100' : 'text-slate-400'}`}>
+                      <p className={`text-[11px] sm:text-xs lg:text-sm truncate ${live ? 'text-emerald-100' : 'text-slate-400'}`}>
                         {student.course || sch.course || ''}
                       </p>
-                      <p className={`text-xs font-black tabular-nums mt-1 ${live ? 'text-yellow-200' : 'text-red-600'}`}>
+                      <p className={`text-xs font-black tabular-nums mt-1 ${live ? 'text-yellow-200' : 'text-emerald-600'}`}>
                         {timeRange}
                       </p>
-                      <p className={`text-[11px] font-semibold capitalize ${live ? 'text-red-100' : 'text-slate-500'}`}>
+                      <p className={`text-[11px] font-semibold capitalize ${live ? 'text-emerald-100' : 'text-slate-500'}`}>
                         {[weekday, dateLabel].filter(Boolean).join(' · ') || '-'}
                       </p>
                     </div>

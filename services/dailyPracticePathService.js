@@ -5,6 +5,7 @@ const DailyPracticeTopic = require('../models/DailyPracticeTopic');
 const DailyPracticeUnit = require('../models/DailyPracticeUnit');
 const DailyPracticeQuestion = require('../models/DailyPracticeQuestion');
 const DailyPracticePathProgress = require('../models/DailyPracticePathProgress');
+const DailyPracticeProfile = require('../models/DailyPracticeProfile');
 const LessonUnit = require('../models/LessonUnit');
 const Student = require('../models/Student');
 const rules = require('./dailyPracticeRules');
@@ -627,6 +628,8 @@ function computeUnits(units, progressByUnit) {
       state: completed ? 'completed' : unlocked ? 'active' : 'locked',
       testedOut: Boolean(progress?.testedOut),
       canTestOut: !completed,
+      chestClaimed: Boolean(progress?.chestClaimedAt),
+      chestRewardXp: rules.UNIT_CHEST_REWARD_XP,
       pathNodes,
       steps,
       stepVideos: mapStepVideos({ stepVideos: unit.stepVideos || emptyStepVideos() }),
@@ -702,6 +705,25 @@ async function loadTopicsPath(studentId, topics) {
   });
 }
 
+async function readActivePathTopicId(studentId) {
+  const profile = await DailyPracticeProfile.findOne({ studentId }).select('lastPathTopicId').lean();
+  return String(profile?.lastPathTopicId || '').trim();
+}
+
+/** Lưu chủ đề lộ trình đang học (đồng bộ web + mobile). */
+async function setActivePathTopic(studentId, topicId) {
+  const sid = requireId(studentId, 'Học viên');
+  const id = requireId(topicId, 'Chủ đề');
+  const topic = await DailyPracticeTopic.findOne({ _id: id, active: true }).select('_id').lean();
+  if (!topic) throw httpError(404, 'Chủ đề không còn hoạt động');
+  await DailyPracticeProfile.findOneAndUpdate(
+    { studentId: sid },
+    { $set: { lastPathTopicId: String(topic._id) } },
+    { upsert: true, setDefaultsOnInsert: true },
+  );
+  return { topicId: String(topic._id) };
+}
+
 /** Lộ trình của mọi chủ đề đang mở (chỉ chủ đề có chặng đủ câu hỏi). */
 async function getPath(studentId) {
   const sid = requireId(studentId, 'Học viên');
@@ -715,10 +737,15 @@ async function getPath(studentId) {
     }
   }
   const paths = await loadTopicsPath(sid, topics);
+  const topicsOut = paths.filter((path) => path.units.length > 0);
+  const allowed = new Set(topicsOut.map((path) => String(path.topic.id)));
+  const saved = await readActivePathTopicId(sid);
+  const activeTopicId = allowed.has(saved) ? saved : '';
   return {
     canTestOut: hasTestOutAccess(student),
     steps: PATH_STEPS.map((step) => ({ ...step, passPercent: passPercent(step.key) })),
-    topics: paths.filter((path) => path.units.length > 0),
+    topics: topicsOut,
+    activeTopicId,
   };
 }
 
@@ -1117,6 +1144,65 @@ async function rememberPassedCheck(studentId, unit, key) {
 }
 
 /** HV xem đủ video của chặng (≥ 2/3 thời lượng) → đánh dấu đã xem. Chặng còn khóa thì không ghi. */
+/** Nhận thưởng rương chặng (+UNIT_CHEST_REWARD_XP) một lần khi chặng đã hoàn thành. */
+async function claimUnitChest(studentId, unitId) {
+  const sid = requireId(studentId, 'Học viên');
+  const uid = requireId(unitId, 'Chặng');
+  const unit = await DailyPracticeUnit.findOne({ _id: uid, active: true }).lean();
+  if (!unit) throw httpError(404, 'Không tìm thấy chặng');
+  const { path } = await topicPathForUnit(sid, unit);
+  const view = path.units.find((item) => item.id === String(unit._id));
+  if (!view) throw httpError(404, 'Chặng này chưa đủ câu hỏi');
+  if (view.state !== 'completed') {
+    throw httpError(403, 'Hoàn thành toàn bộ chặng trước khi mở rương phần thưởng');
+  }
+  const existing = await DailyPracticePathProgress.findOne({ studentId: sid, unitId: uid }).lean();
+  if (existing?.chestClaimedAt) {
+    const dailyPracticeService = require('./dailyPracticeService');
+    const profile = await dailyPracticeService.getProfile(sid);
+    return {
+      xp: 0,
+      already: true,
+      chestClaimed: true,
+      profileXp: rules.clampXp(profile?.xpTotal),
+    };
+  }
+  const claimed = await DailyPracticePathProgress.findOneAndUpdate(
+    {
+      studentId: sid,
+      unitId: uid,
+      $or: [{ chestClaimedAt: null }, { chestClaimedAt: { $exists: false } }],
+    },
+    {
+      $set: { chestClaimedAt: new Date(), topicId: unit.topicId },
+      $setOnInsert: { completedSteps: [] },
+    },
+    { new: true, upsert: true },
+  ).lean();
+  if (!claimed?.chestClaimedAt) {
+    const row = await DailyPracticePathProgress.findOne({ studentId: sid, unitId: uid }).lean();
+    const dailyPracticeService = require('./dailyPracticeService');
+    const profile = await dailyPracticeService.getProfile(sid);
+    if (row?.chestClaimedAt) {
+      return {
+        xp: 0,
+        already: true,
+        chestClaimed: true,
+        profileXp: rules.clampXp(profile?.xpTotal),
+      };
+    }
+    throw httpError(409, 'Không mở được rương lúc này. Hãy thử lại.');
+  }
+  const dailyPracticeService = require('./dailyPracticeService');
+  const reward = rules.UNIT_CHEST_REWARD_XP;
+  const profile = await dailyPracticeService.adjustProfileXp(sid, reward, { source: 'reward' });
+  return {
+    xp: reward,
+    chestClaimed: true,
+    profileXp: rules.clampXp(profile?.xpTotal),
+  };
+}
+
 async function markVideoWatched(studentId, { unitId, videoId } = {}) {
   const sid = requireId(studentId, 'Học viên');
   const unit = await DailyPracticeUnit.findOne({ _id: requireId(unitId, 'Chặng'), active: true }).lean();
@@ -1259,10 +1345,12 @@ module.exports = {
   computeUnits,
   hasTestOutAccess,
   getPath,
+  setActivePathTopic,
   preparePathSession,
   recordPathResult,
   markVideoWatched,
   answerVideoCheck,
   buyVideoHint,
   unitVideos,
+  claimUnitChest,
 };

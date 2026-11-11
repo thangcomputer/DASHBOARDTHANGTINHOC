@@ -18,6 +18,8 @@ interface DuoHeaderBarProps {
   onPressStreak?: () => void;
   onPressXp?: () => void;
   onPressSubscription?: () => void;
+  /** Logo đã có trên BrandingTopBar — chỉ hiển thị pill streak/XP/gói. */
+  showBrand?: boolean;
 }
 
 export function DuoHeaderBar({
@@ -26,6 +28,7 @@ export function DuoHeaderBar({
   onPressStreak,
   onPressXp,
   onPressSubscription,
+  showBrand = false,
 }: DuoHeaderBarProps) {
   const { user, subscription } = useAuth();
   const subState = subscription?.subscription;
@@ -42,14 +45,14 @@ export function DuoHeaderBar({
   const logoSource = isFreeStudent ? DEWSKILL_LOGO : LMS_LOGO;
 
   return (
-    <View style={styles.container}>
-      {/* Brand Logo bên trái */}
-      <View style={styles.brandCol}>
-        <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
-      </View>
+    <View style={[styles.container, !showBrand && styles.containerPillsOnly]}>
+      {showBrand ? (
+        <View style={styles.brandCol}>
+          <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
+        </View>
+      ) : null}
 
-      {/* Gamification Status Pills bên phải */}
-      <View style={styles.pillsRow}>
+      <View style={[styles.pillsRow, !showBrand && styles.pillsRowEnd]}>
         {/* Streak Flame Pill */}
         <Pressable
           onPress={onPressStreak}
@@ -99,11 +102,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#F1F5F9',
+    paddingTop: 6,
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+  },
+  containerPillsOnly: {
+    justifyContent: 'flex-end',
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  pillsRowEnd: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   brandCol: {
     justifyContent: 'center',

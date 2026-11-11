@@ -19,6 +19,7 @@ import { useSocket } from '../context/SocketContext';
 import { getPresenceUserId } from '../utils/presence';
 import { useData } from '../context/DataContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
+import { useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
 import { getMessagingRole } from '../lib/messagingRoles';
@@ -1521,6 +1522,7 @@ export default function FloatingMessenger({ session, role }) {
     supportOpen, setSupportOpen, tabs, activeTabId,
     openChat, closeChat, minimizeChat,
   } = useFloatingMessenger();
+  const freePortalMenu = useFreePortalMenu(session);
 
   const [aiOpening, setAiOpening] = useState(false);
   const [escalatingId, setEscalatingId] = useState(null);
@@ -2783,7 +2785,7 @@ export default function FloatingMessenger({ session, role }) {
             <button
               type="button"
               onClick={handleSupportFabClick}
-              className={`cms-fm-support-button ${fabExpanded ? 'is-expanded' : ''}`}
+              className={`cms-fm-support-button ${(meRole === 'teacher' || (meRole === 'student' && freePortalMenu)) ? 'cms-fm-support-button--emerald' : ''} ${fabExpanded ? 'is-expanded' : ''}`}
               title={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
               aria-label={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
               aria-expanded={fabExpanded}

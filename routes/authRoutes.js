@@ -1486,7 +1486,7 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
  */
 router.post('/register-teacher', sensitiveFlowLimiter, policyShadowAuth('register_teacher'), async (req, res) => {
   try {
-    const { name, phone, password, password2, specialty } = req.body;
+    const { name, phone, password, password2, specialty, email } = req.body;
 
     if (!name || !phone || !password) {
       return res.status(400).json({
@@ -1874,6 +1874,24 @@ router.post('/avatar', authMiddleware, policyShadowAuth('avatar'), async (req, r
       await Student.findByIdAndUpdate(userId, { avatar });
     } else {
       await Teacher.findByIdAndUpdate(userId, { avatar });
+    }
+
+    const trimmedAvatar = String(avatar).trim();
+    try {
+      const FeedPost = require('../models/FeedPost');
+      await Promise.all([
+        FeedPost.updateMany(
+          { authorId: String(userId) },
+          { $set: { authorAvatar: trimmedAvatar } },
+        ),
+        FeedPost.updateMany(
+          { 'comments.authorId': String(userId) },
+          { $set: { 'comments.$[elem].authorAvatar': trimmedAvatar } },
+          { arrayFilters: [{ 'elem.authorId': String(userId) }] },
+        ),
+      ]);
+    } catch (feedSyncErr) {
+      logger.warn('[AUTH] sync feed post avatar error:', feedSyncErr.message);
     }
 
     res.json({ success: true, message: 'Cập nhật avatar thành công', avatar });

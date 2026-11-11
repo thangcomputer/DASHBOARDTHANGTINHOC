@@ -3,13 +3,14 @@ import { mobileApiRequest } from './apiClient';
 export type SubscriptionPlanId = '1m' | '3m' | '6m' | '12m' | 'lifetime';
 
 export type StudentSubscription = {
-  plan: SubscriptionPlanId;
+  plan: SubscriptionPlanId | 'free';
   planLabel: string;
   expiresAt: string | null;
-  state: 'lifetime' | 'active' | 'expiring' | 'expired';
+  state: 'lifetime' | 'active' | 'expiring' | 'expired' | 'free';
   daysLeft: number | null;
   activated: boolean;
   meetLifetime?: boolean;
+  freeTier?: boolean;
 };
 
 export type SubscriptionPlan = { id: SubscriptionPlanId; label: string; months: number | null; price: number };
@@ -64,6 +65,55 @@ export function subscriptionShortLabel(subscription: StudentSubscription | null 
     return subscription.activated ? `Đã hết hạn ${formatExpiryDate(subscription.expiresAt)}` : 'Chưa kích hoạt';
   }
   return `Hạn: ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày`;
+}
+
+/** Khớp server `hasMeetAccess` và web client. */
+export function hasMeetAccessClient(subscription: StudentSubscription | null | undefined) {
+  if (!subscription) return false;
+  if (subscription.state === 'expired' || subscription.freeTier || subscription.state === 'free') return false;
+  return Boolean(subscription.meetLifetime || subscription.state === 'active' || subscription.state === 'expiring');
+}
+
+/**
+ * Quyền đăng bảng tin trên mobile:
+ * - Đã mua gói và còn hạn (active, expiring, lifetime): MỞ (true)
+ * - Chưa đăng ký gói (free, freeTier) hoặc hết hạn (expired): KHÓA (false)
+ */
+export function hasFeedPostAccess({
+  role,
+  user,
+  subscription,
+}: {
+  role?: string;
+  user?: any;
+  subscription?: StudentSubscription | null;
+}) {
+  if (role !== 'student') return true;
+  const sub = subscription || user?.subscription;
+  if (!sub) {
+    if (user?.freePortal === true) return false;
+    return false;
+  }
+  const state = sub.state;
+  if (state === 'expired' || state === 'free' || sub.freeTier) return false;
+  if (state === 'active' || state === 'expiring') return true;
+  if (state === 'lifetime') {
+    if (user?.freePortal === true) return Boolean(sub.meetLifetime || sub.activated);
+    return true;
+  }
+  return false;
+}
+
+export function isFeedPostLocked({
+  role,
+  user,
+  subscription,
+}: {
+  role?: string;
+  user?: any;
+  subscription?: StudentSubscription | null;
+}) {
+  return !hasFeedPostAccess({ role, user, subscription });
 }
 
 export function formatActivationCodeInput(value: string) {

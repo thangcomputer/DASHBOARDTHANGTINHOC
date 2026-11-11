@@ -8,6 +8,8 @@ import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { clearLastActive, pinUserKey } from '../services/pinLock';
 import { subscriptionApi, type SubscriptionOverview } from '../services/subscriptionApi';
 import type { DemoUser, UserRole } from '../types';
+import { themeState } from '../theme/tokens';
+import { isFreePortalMenu } from '../utils/freePortalHelper';
 
 type AuthContextValue = {
   user: DemoUser | null;
@@ -27,6 +29,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: React.PropsWithChildren) {
   const [user, setUser] = useState<DemoUser | null>(null);
+  // Học viên theo khóa → tone đỏ; đặt cờ trước khi các màn hình con render.
+  themeState.brand = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState('');

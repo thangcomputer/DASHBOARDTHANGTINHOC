@@ -1,4 +1,4 @@
-﻿import {
+import {
   mockAssignments,
   mockEvaluations,
   mockFeedPosts,
@@ -213,6 +213,15 @@ type NotificationPage = {
   unread: number;
 };
 
+export function cleanNotificationMessage(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/(?:⟦|\[+)student_detail:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\]+)/g, '$1')
+    .replace(/(?:⟦|\[+)chat:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\]+)/g, '$1')
+    .replace(/(?:⟦|\[+)go:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\]+)/g, '$1')
+    .trim();
+}
+
 function mapRealNotification(raw: Record<string, any>): AppNotification {
   const createdAt = raw?.time || raw?.createdAt;
   const createdDate = createdAt ? new Date(createdAt) : null;
@@ -245,8 +254,8 @@ function mapRealNotification(raw: Record<string, any>): AppNotification {
   if (!id) throw new Error('Thông báo từ máy chủ thiếu mã định danh.');
   return {
     id,
-    title: String(raw?.title || 'Thông báo'),
-    message: String(raw?.message || raw?.content || ''),
+    title: cleanNotificationMessage(String(raw?.title || 'Thông báo')),
+    message: cleanNotificationMessage(String(raw?.message || raw?.content || '')),
     time,
     category: categoryByType[type] || String(raw?.category || 'Thông báo'),
     type,
@@ -509,7 +518,7 @@ function mapMaterial(value: unknown, index: number, fallbackType = ''): Learning
           ? 'EXCEL'
           : url
             ? 'LINK'
-          : 'LINK';
+            : 'LINK';
   const dateValue = raw.publishedAt || raw.createdAt || raw.updatedAt;
   const date = dateValue ? new Date(String(dateValue)) : null;
   const courseId = rawRecord(raw.courseId);

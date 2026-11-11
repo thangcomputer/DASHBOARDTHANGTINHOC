@@ -42,10 +42,9 @@ function isStudentExamPath(url) {
 function isFreePortalRequestBlocked(req, student) {
   if (!student?.freePortal || hasRealCourseEnrollment(student)) return false;
   const url = String(req.originalUrl || req.url || '').split('?')[0];
+  if (url === '/api/evaluations/mine') return false;
   const hidden = [
     '/api/schedules',
-    '/api/feed',
-    '/api/blog',
     '/api/evaluations',
     '/api/center-info',
   ];
@@ -136,9 +135,9 @@ const authMiddleware = async (req, res, next) => {
     if (decoded.id && decoded.id !== 'admin') {
       let dbUser = null;
       if (decoded.role === 'student') {
-        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked subscription freePortal freeUnlocked enrollments.courseName enrollments.status enrollments.learningAccess enrollments.completedSessions enrollments.totalSessions').lean();
+        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked subscription freePortal freeUnlocked enrollments.courseName enrollments.status enrollments.learningAccess enrollments.completedSessions enrollments.totalSessions avatar gender').lean();
       } else {
-        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId branchCode').lean();
+        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId branchCode avatar gender').lean();
       }
 
       if (dbUser) {
@@ -147,6 +146,8 @@ const authMiddleware = async (req, res, next) => {
         if (dbUser.createdAt) req.user.createdAt = dbUser.createdAt;
         if (dbUser.branchId) req.user.branchId = dbUser.branchId;
         if (dbUser.branchCode) req.user.branchCode = dbUser.branchCode;
+        if (dbUser.avatar !== undefined) req.user.avatar = dbUser.avatar || '';
+        if (dbUser.gender !== undefined) req.user.gender = dbUser.gender || '';
       }
 
       if (!dbUser) {

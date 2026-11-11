@@ -211,6 +211,18 @@ export function hasRealCourseEnrollment(student) {
   });
 }
 
+/** HV đăng ký cổng miễn phí, chưa có khóa 1 kèm 1 thật — giao diện DewSkill xanh như mobile. */
+export function isFreePortalSelfRegistrationStudent(student) {
+  if (!student) return false;
+  if (student.role && student.role !== 'student') return false;
+  const course = String(student.course || '').trim().toLocaleLowerCase('vi');
+  const freePortal = student.freePortal === true
+    || isFreePortalCourseName(course)
+    || course.includes('miễn phí');
+  if (!freePortal) return false;
+  return !hasRealCourseEnrollment(student);
+}
+
 function isEnrollmentPaidFlag(e) {
   return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
 }

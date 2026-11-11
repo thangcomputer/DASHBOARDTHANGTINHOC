@@ -14,7 +14,7 @@ const LOCKED_ITEMS = [
   { icon: FileBox, label: 'Bài tập' },
 ];
 
-export const FREE_HIDDEN_KEYS = new Set(['feed', 'news', 'evaluation', 'center-info', 'schedule']);
+export const FREE_HIDDEN_KEYS = new Set(['news', 'evaluation', 'center-info', 'schedule', 'lesson-practice']);
 
 export function isFreePortalLocked(session) {
   return session?.role === 'student' && session?.freePortal === true && session?.freeUnlocked !== true;
@@ -60,13 +60,14 @@ export function useFreePortalLock(session) {
 export function useFreePortalMenu(session) {
   const { students } = useData();
   const stored = readStudentSession();
-  const source = session?.freePortal === true ? session : stored;
+  const source = session?.freePortal === true ? session : (stored || session);
   const sid = source?.id || source?._id;
   const me = sid && Array.isArray(students)
     ? students.find((student) => String(student?.id || student?._id) === String(sid))
     : null;
+  const target = me || source;
   if (source?.freePortal !== true && me?.freePortal !== true) return false;
-  return !hasRealCourseEnrollment(me);
+  return !hasRealCourseEnrollment(target);
 }
 
 export function FreeHiddenRoute({ session, children }) {

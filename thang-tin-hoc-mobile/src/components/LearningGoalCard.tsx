@@ -14,7 +14,7 @@ import {
   periodLabel,
   type LearningGoalData,
 } from '../services/learningGoalApi';
-import { colors, spacing } from '../theme/tokens';
+import { colors, spacing, theme, createThemedStyles } from '../theme/tokens';
 
 function percent(value?: number, target?: number) {
   if (!target) return 0;
@@ -109,8 +109,22 @@ export function LearningGoalCard() {
             {goal.expired ? 'Đã kết thúc' : `${periodLabel(goal.period)} · Còn ${progress.daysLeft} ngày`}
           </Text>
         </View>
-        <Pressable onPress={openGoal} style={styles.outline} accessibilityRole="button">
-          <Text style={styles.outlineText}>{goal.expired ? 'Đặt mới' : 'Đổi'}</Text>
+        <Pressable
+          onPress={openGoal}
+          style={({ pressed }) => ({
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 10,
+            borderWidth: 1.5,
+            borderColor: '#FECACA',
+            borderBottomWidth: pressed ? 1.5 : 3.5,
+            borderBottomColor: '#F87171',
+            backgroundColor: pressed ? '#FEF2F2' : '#FFFFFF',
+            transform: [{ translateY: pressed ? 2 : 0 }],
+          })}
+          accessibilityRole="button"
+        >
+          <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>{goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}</Text>
         </Pressable>
       </View>
 
@@ -216,7 +230,7 @@ export function LearningGoalCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1 },
   card: {
     borderRadius: 16,
@@ -318,4 +332,4 @@ const styles = StyleSheet.create({
   miniMissionMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   miniMissionMetaDone: { color: '#047857' },
   hint: { color: '#94A3B8', fontSize: 11, lineHeight: 14, fontWeight: '500' },
-});
+}), { remapGreen: true });

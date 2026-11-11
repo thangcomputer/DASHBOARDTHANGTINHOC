@@ -6,7 +6,7 @@ import { Bot, ChevronRight, Headphones, Users, X } from 'lucide-react-native';
 import { AppScreen, Card } from '../components/ui';
 import { DuoButton } from '../components/duo/DuoButton';
 import { useAuth } from '../app/AuthContext';
-import { colors, spacing, typography } from '../theme/tokens';
+import { colors, spacing, typography, theme } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import { openAiSupportConversation } from '../services/aiSupportApi';
 import { messageService } from '../services/mockService';
@@ -86,19 +86,19 @@ export function SupportEntryScreen() {
   return (
     <AppScreen>
       <Card style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl }}>
-        <View style={{ width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 29, backgroundColor: colors.brandSoft }}>
-          <Headphones size={27} color={colors.brand} />
+        <View style={{ width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 29, backgroundColor: theme.brandSoft }}>
+          <Headphones size={27} color={theme.brand} />
         </View>
         <Text style={{ color: colors.ink, fontSize: typography.heading, fontWeight: '800', textAlign: 'center' }}>
           Hỗ trợ Thắng Tin Học
         </Text>
         <Text style={{ color: colors.muted, fontSize: typography.small, lineHeight: 21, textAlign: 'center' }}>
-          Hỏi trợ lý AI về tin học và LMS, hoặc chuyển cuộc trò chuyện cho nhân viên hỗ trợ.
+          Hỏi trợ lý AI về tin học và LMS, hoặc trò chuyện trực tiếp với nhân viên hỗ trợ.
         </Text>
         <DuoButton
           variant="primary"
-          size="lg"
-          fullWidth
+          size="sm"
+          style={{ alignSelf: 'center', paddingHorizontal: 22 }}
           text="Trò chuyện với hỗ trợ"
           onPress={() => {
             setChoiceError('');
@@ -157,13 +157,13 @@ export function SupportEntryScreen() {
                 style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
                 accessibilityRole="button"
               >
-                <View style={styles.choiceIcon}><Bot size={21} color={colors.brand} /></View>
+                <View style={styles.choiceIcon}><Bot size={21} color={theme.brand} /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.choiceRowTitle}>Trợ lý AI Thắng Tin Học</Text>
                   <Text style={styles.choiceRowDescription}>Hỏi về tin học, Office, MOS và LMS.</Text>
                 </View>
                 {opening === 'ai'
-                  ? <ActivityIndicator color={colors.brand} />
+                  ? <ActivityIndicator color={theme.brand} />
                   : <ChevronRight size={18} color={colors.muted} />}
               </Pressable>
               <Pressable
@@ -172,13 +172,13 @@ export function SupportEntryScreen() {
                 style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
                 accessibilityRole="button"
               >
-                <View style={styles.choiceIcon}><Users size={21} color={colors.brand} /></View>
+                <View style={styles.choiceIcon}><Users size={21} color={theme.brand} /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.choiceRowTitle}>Nhân viên hỗ trợ trực tiếp</Text>
                   <Text style={styles.choiceRowDescription}>Trò chuyện trực tiếp với chuyên viên hỗ trợ.</Text>
                 </View>
                 {opening === 'staff'
-                  ? <ActivityIndicator color={colors.brand} />
+                  ? <ActivityIndicator color={theme.brand} />
                   : <ChevronRight size={18} color={colors.muted} />}
               </Pressable>
             </View>

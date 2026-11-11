@@ -1,35 +1,60 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  LayoutDashboard, Home, BookOpen, Calendar, MessageSquare,
+  LayoutDashboard, Home, BookOpen, Calendar, CalendarDays, MessageSquare, MessageCircle, UserRound,
   Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
-  GraduationCap, Users, DollarSign, ClipboardList, Pin, PinOff,
+  GraduationCap, Users, DollarSign, ClipboardList, CheckSquare, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket, Crown,
+  Newspaper, Radio, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket, Crown,
 } from 'lucide-react';
 import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
-import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
+import { hasLearningAccessEnrollment, isFreePortalSelfRegistrationStudent, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
 import { visibleInboxUnread } from '../lib/inboxUnread';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
 import FreeFeatureLock, { useFreePortalLock, useFreePortalMenu, FREE_HIDDEN_KEYS } from './student/dailyPractice/FreeFeatureLock';
-import { subscriptionShortLabel } from '../utils/subscription';
+import { hasFeedPostAccess, subscriptionShortLabel } from '../utils/subscription';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
 const INBOX_FOOTER_HIDE_MS = 1500;
 
-const MOBILE_NAV_ICON_TONES = {
-  schedule: 'border-blue-100/80 from-blue-50 to-white text-blue-600',
-  inbox: 'border-violet-100/80 from-violet-50 to-white text-violet-600',
-  feed: 'border-amber-100/80 from-amber-50 to-white text-amber-600',
-  dashboard: 'border-red-100/80 from-red-50 to-white text-red-600',
-  finance: 'border-emerald-100/80 from-emerald-50 to-white text-emerald-600',
-  'daily-practice': 'border-emerald-100/80 from-emerald-50 to-white text-emerald-600',
-  support: 'border-cyan-100/80 from-cyan-50 to-white text-cyan-600',
-  profile: 'border-indigo-100/80 from-indigo-50 to-white text-indigo-600',
+/** Màu icon ô neumorphic — khớp TAB_ICON_TONES trong thang-tin-hoc-mobile. */
+const MOBILE_NAV_TONE_HEX = {
+  schedule: '#2563EB',
+  inbox: '#7C3AED',
+  feed: '#D97706',
+  dashboard: '#059669',
+  finance: '#059669',
+  'daily-practice': '#059669',
+  'lesson-practice': '#0891B2',
+  support: '#0891B2',
+  profile: '#4F46E5',
+};
+
+function mobileNavTileStyle(tone) {
+  const hex = tone || '#64748B';
+  return {
+    borderColor: `${hex}28`,
+    borderBottomColor: `${hex}45`,
+    backgroundImage: `linear-gradient(135deg, ${hex}14 0%, #FFFFFF 100%)`,
+    boxShadow: `0 3px 8px ${hex}1c, inset 0 1px 1px rgba(255, 255, 255, 0.9)`,
+  };
+}
+
+/** Icon footer khớp TAB_ICONS trong thang-tin-hoc-mobile. */
+const MOBILE_FOOTER_ICONS = {
+  schedule: CalendarDays,
+  inbox: MessageCircle,
+  feed: Newspaper,
+  dashboard: Home,
+  finance: DollarSign,
+  'daily-practice': Gamepad2,
+  support: Headphones,
+  'lesson-practice': BookOpen,
+  profile: UserRound,
 };
 
 // ─── Cấu hình menu theo role ──────────────────────────────────────────────────
@@ -37,21 +62,21 @@ const MENU_CONFIG = {
   student: {
     brand: { label: 'Học viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
-      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
+      { key: 'dashboard', icon: Home, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
       { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', mobileLabel: 'Luyện tập', requiresLearningAccess: true },
-      { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
       { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
-      { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
+      { key: 'inbox', icon: MessageCircle, label: 'Hộp thư', path: '/student/inbox' },
+      { key: 'schedule', icon: CalendarDays, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
-      { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
+      { key: 'exam', icon: GraduationCap, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', sectionLabel: 'THÔNG TIN & HỖ TRỢ', path: '/student/feed' },
-      { key: 'news', icon: FileText, label: 'Tin tức', path: '/student/news' },
-      { key: 'evaluation', icon: Star, label: 'Đánh giá GV', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
+      { key: 'news', icon: Newspaper, label: 'Tin tức', path: '/student/news' },
+      { key: 'evaluation', icon: Star, label: 'Đánh giá giảng viên', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
       { key: 'center-info', icon: Building2, label: 'Liên hệ Trung tâm', path: '/student/center-info' },
       { key: 'support', icon: Headphones, label: 'Hỗ trợ', mobileLabel: 'Hỗ trợ', path: '/student/support' },
     ],
     bottomItems: [
-      { key: 'profile', icon: User, label: 'Hồ sơ', path: '/student', hash: 'profile' },
+      { key: 'profile', icon: UserRound, label: 'Hồ sơ', path: '/student', hash: 'profile' },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
@@ -61,22 +86,22 @@ const MENU_CONFIG = {
     brand: { label: 'Giảng viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', mobileLabel: 'Tổng quan', sectionLabel: 'KHÔNG GIAN LÀM VIỆC', path: '/teacher' },
-      { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', mobileLabel: 'Tin nhắn', path: '/teacher/inbox' },
+      { key: 'inbox', icon: MessageCircle, label: 'Hộp thư', mobileLabel: 'Tin nhắn', path: '/teacher/inbox' },
       { key: 'students', icon: Users, label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
-      { key: 'schedule', icon: Calendar, label: 'Lịch dạy', sidebarLabel: 'Lịch dạy & điểm danh', mobileLabel: 'Lịch', path: '/teacher', hash: 'schedule' },
-      { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', sidebarLabel: 'Bài tập & kiểm tra', sectionLabel: 'QUẢN LÝ ĐÀO TẠO', path: '/teacher', hash: 'assignments', altHashes: ['quizzes', 'test'] },
+      { key: 'schedule', icon: CalendarDays, label: 'Lịch dạy', sidebarLabel: 'Lịch dạy & điểm danh', mobileLabel: 'Lịch', path: '/teacher', hash: 'schedule' },
+      { key: 'assignments', icon: CheckSquare, label: 'Giao bài tập & kiểm tra', sidebarLabel: 'Bài tập & kiểm tra', sectionLabel: 'QUẢN LÝ ĐÀO TẠO', path: '/teacher', hash: 'assignments', altHashes: ['quizzes', 'test'] },
       { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
       { key: 'finance', icon: DollarSign, label: 'Tài chính', mobileLabel: 'Tài chính', path: '/teacher/finance' },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', mobileLabel: 'Bảng tin', sectionLabel: 'THÔNG TIN', path: '/teacher/feed' },
-      { key: 'news', icon: FileText, label: 'Tin tức', path: '/teacher/news' },
+      { key: 'news', icon: Newspaper, label: 'Tin tức', path: '/teacher/news' },
       { key: 'center-info', icon: Building2, label: 'Thông tin Trung tâm', path: '/teacher/center-info' },
       { key: 'support', icon: Headphones, label: 'Hỗ trợ', mobileLabel: 'Hỗ trợ', path: '/teacher/support' },
     ],
     bottomItems: [
-      { key: 'profile', icon: User, label: 'Hồ sơ', mobileLabel: 'Hồ sơ', path: '/teacher', hash: 'profile' },
+      { key: 'profile', icon: UserRound, label: 'Hồ sơ', mobileLabel: 'Hồ sơ', path: '/teacher', hash: 'profile' },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
-    accentColor: 'bg-red-600',
+    accentColor: 'bg-emerald-600',
     activeClass: 'cms-sidebar-glass__nav-active',
   },
   admin: {
@@ -422,11 +447,6 @@ const AppSidebar = ({
   };
 
   const config = MENU_CONFIG[role] || MENU_CONFIG.student;
-  const mobilePrimaryKeys = role === 'teacher'
-    ? ['schedule', 'inbox', 'feed', 'dashboard', 'finance', 'support', 'profile']
-    : role === 'admin' || role === 'staff'
-      ? ['students', 'finance', 'dashboard', 'inbox', 'feed']
-      : ['schedule', 'inbox', 'daily-practice', 'dashboard', 'feed', 'lesson-practice', 'profile'];
 
   const studentHasLearningAccess = (() => {
     if (role !== 'student') return true;
@@ -436,10 +456,57 @@ const AppSidebar = ({
     return hasLearningAccessEnrollment(me);
   })();
 
-  const freeMenu = useFreePortalMenu(session);
+  const freeMenu = useFreePortalMenu(session) || isFreePortalSelfRegistrationStudent(session);
+  const isStudentNav = role === 'student';
+  const isTeacherNav = role === 'teacher';
+  const isCourseStudent = isStudentNav && !freeMenu;
+  const isFreeStudent = isStudentNav && freeMenu;
+  const freePortalStudentNav = isFreeStudent;
+  const sidebarShellProps = isTeacherNav
+    ? { 'data-role-teacher': true }
+    : (isFreeStudent
+      ? { 'data-free-portal-student': true }
+      : (isCourseStudent ? { 'data-course-student': true } : {}));
+  const navIconShellClass = (active) => {
+    if (!active) {
+      return (isStudentNav || isTeacherNav) ? 'bg-white/[0.06] text-[#A8B6CC]' : '';
+    }
+    if (isCourseStudent) {
+      return '!bg-[#EF4444] !text-white !shadow-none';
+    }
+    if (isFreeStudent || isTeacherNav) {
+      return '!bg-[#10B981] !text-white !shadow-none';
+    }
+    return '';
+  };
   const freeLocked = useFreePortalLock(session) && freeMenu;
   const freeLockKeys = new Set(['inbox', 'materials-files', 'exam', 'support']);
   const itemFreeLocked = (item) => freeLocked && freeLockKeys.has(item?.key);
+  const studentSubContext = useStudentSubscription();
+  const feedLocked = role === 'student' && !hasFeedPostAccess({
+    role,
+    session,
+    subscription: studentSubContext?.subscription,
+  });
+
+  const FREE_PORTAL_STUDENT_ITEMS = useMemo(() => [
+    { key: 'dashboard', icon: Home, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
+    { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập', mobileLabel: 'Luyện tập', path: '/student/daily-practice', requiresLearningAccess: true },
+    { key: 'inbox', icon: MessageCircle, label: 'Hộp thư', path: '/student/inbox' },
+    { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
+    { key: 'exam', icon: GraduationCap, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
+    { key: 'feed', icon: Newspaper, label: 'Bảng tin', sectionLabel: 'THÔNG TIN & HỖ TRỢ', path: '/student/feed' },
+    { key: 'support', icon: Headphones, label: 'Hỗ trợ', mobileLabel: 'Hỗ trợ', path: '/student/support' },
+  ], []);
+  const effectiveSourceItems = freePortalStudentNav ? FREE_PORTAL_STUDENT_ITEMS : config.items;
+
+  const mobilePrimaryKeys = role === 'teacher'
+    ? ['schedule', 'inbox', 'feed', 'dashboard', 'finance', 'support', 'profile']
+    : role === 'admin' || role === 'staff'
+      ? ['students', 'finance', 'dashboard', 'inbox', 'feed']
+      : freeMenu
+        ? ['inbox', 'daily-practice', 'dashboard', 'feed', 'profile']
+        : ['schedule', 'inbox', 'feed', 'dashboard', 'daily-practice', 'lesson-practice', 'profile'];
 
   const canSeeItem = (item) => {
     if (role === 'student' && freeMenu && FREE_HIDDEN_KEYS.has(item.key)) return false;
@@ -502,7 +569,7 @@ const AppSidebar = ({
     });
     return out;
   };
-  const flatVisibleItems = flattenLeaves(filterItems(config.items));
+  const flatVisibleItems = flattenLeaves(filterItems(effectiveSourceItems));
   const mobileItems = [
     ...flatVisibleItems,
     ...(config.bottomItems || []).filter((item) => item.key === 'profile'),
@@ -572,6 +639,11 @@ const AppSidebar = ({
   };
 
   const handleClick = (item) => {
+    if (item?.key === 'feed') {
+      navigate(item.path || '/student/feed');
+      setMobileOpen(false);
+      return;
+    }
     if (itemFreeLocked(item)) {
       setFreeLockOpen(true);
       setMobileOpen(false);
@@ -674,7 +746,7 @@ const AppSidebar = ({
           }
         });
       };
-      walk(filterItems(config.items));
+      walk(filterItems(effectiveSourceItems));
       if (!changed) return prev;
       return persistOpenGroups(next);
     });
@@ -694,11 +766,17 @@ const AppSidebar = ({
             role={role}
             adminRole={session?.adminRole}
             gender={effectiveGender}
-            className="w-[46px] h-[46px] rounded-full border-2 border-white/15 bg-slate-700 shadow-sm flex-shrink-0"
+            mobileStyle={isStudentNav}
+            className={isStudentNav
+              ? 'w-[46px] h-[46px] rounded-full border-2 border-white/[0.22] bg-[#334155] flex-shrink-0'
+              : 'w-[46px] h-[46px] rounded-full border-2 border-white/15 bg-slate-700 shadow-sm flex-shrink-0'}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-slate-50 font-extrabold text-sm truncate">{userName || 'Người dùng'}</p>
-            <p className="mt-1 inline-flex rounded-full bg-blue-400/10 px-2 py-0.5 text-blue-300 text-[10px] font-bold tracking-wide">
+            <p className="text-[#F8FAFC] font-extrabold text-[14px] truncate">{userName || 'Người dùng'}</p>
+            <p className={isStudentNav
+              ? 'mt-1 inline-flex rounded-full bg-[#60A5FA]/[0.12] px-[9px] py-[3px] text-[#93C5FD] text-[11px] font-bold tracking-[0.6px]'
+              : 'mt-1 inline-flex rounded-full bg-blue-400/10 px-2 py-0.5 text-blue-300 text-[10px] font-bold tracking-wide'}
+            >
               {(() => {
                 if (role === 'teacher') return 'GIẢNG VIÊN';
                 if (role === 'student') return 'HỌC VIÊN';
@@ -721,26 +799,108 @@ const AppSidebar = ({
           const isLifetime = sub.state === 'lifetime' && (Boolean(sub.meetLifetime) || !freePortalAccount);
           const isFree = !hasActivePaid && !isLifetime;
           const expiring = sub.state === 'expiring';
-          const shortLabel = subscriptionShortLabel(sub);
+          const shortLabel = subscriptionShortLabel(sub, { freePortal: freePortalAccount, isCourseStudent });
           const cycleUnit = sub.resetCycle === 'monthly' ? '/tháng' : sub.resetCycle === 'never' ? '' : '/ngày';
           const freeXpText = `${sub.dailyXpLimit || 60} XP${cycleUnit}`;
+          const daysLeftNum = sub.daysLeft != null ? Number(sub.daysLeft) : null;
+          const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : expiring;
+          const actionLabel = isFree ? 'Nâng cấp' : isNearExpiry ? 'Gia hạn' : 'Đổi gói';
+          const rawPlanLabel = String(sub.planLabel || 'học').trim();
+          const planTitle = isFree
+            ? 'Gói miễn phí'
+            : isCourseStudent
+              ? 'Gói Khóa học'
+              : isLifetime
+                ? 'Gói Vĩnh viễn'
+                : rawPlanLabel.toLowerCase().startsWith('gói')
+                  ? rawPlanLabel
+                  : `Gói ${rawPlanLabel}`;
+          const daysLine = isFree
+            ? freeXpText
+            : isCourseStudent
+              ? 'Khóa chính thức'
+              : isLifetime
+                ? 'Không giới hạn'
+                : `Còn ${sub.daysLeft ?? 0} ngày`;
+
+          if (isStudentNav) {
+            return (
+              <div
+                title={shortLabel}
+                className={`mt-2.5 flex items-center gap-2 rounded-[12px] border px-[10px] py-[7px] ${
+                  isCourseStudent
+                    ? 'border-[#EF4444]/35 bg-[#EF4444]/[0.12]'
+                    : isLifetime
+                      ? 'border-[#F59E0B]/40 bg-[#F59E0B]/[0.14]'
+                      : expiring
+                        ? 'border-[#FB923C]/45 bg-[#FB923C]/[0.16]'
+                        : 'border-white/[0.14] bg-white/[0.08]'
+                }`}
+              >
+                <span
+                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
+                    isCourseStudent
+                      ? 'bg-[#EF4444]/20'
+                      : isLifetime
+                        ? 'bg-[#F59E0B]/20'
+                        : expiring
+                          ? 'bg-[#FB923C]/20'
+                          : 'bg-[#34D399]/20'
+                  }`}
+                >
+                  {isCourseStudent ? (
+                    <CalendarClock size={13} className="text-[#F87171]" />
+                  ) : isLifetime ? (
+                    <Crown size={13} className="text-[#FBBF24]" />
+                  ) : (
+                    <CalendarClock size={13} className={expiring ? 'text-[#FB923C]' : 'text-[#34D399]'} />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate text-[12px] font-extrabold leading-tight ${
+                    isCourseStudent ? 'text-[#FEE2E2]' : isLifetime ? 'text-[#FEF3C7]' : 'text-[#F8FAFC]'
+                  }`}>
+                    {planTitle}
+                  </p>
+                  <p className={`mt-0.5 truncate text-[11px] font-bold leading-tight ${
+                    isCourseStudent ? 'text-[#F87171]' : isLifetime ? 'text-[#FDE68A]' : 'text-[#34D399]'
+                  }`}>
+                    {daysLine}
+                  </p>
+                </div>
+                {isCourseStudent ? null : isLifetime ? (
+                  <span className="shrink-0 rounded-[6px] bg-[#F59E0B]/25 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-[#FDE68A]">
+                    VĨNH VIỄN
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={studentSubscription.openRenew}
+                    className="shrink-0 min-h-[36px] rounded-[12px] border px-[12px] py-[6px] text-[13px] font-extrabold text-white transition hover:brightness-105 active:translate-y-[1px] !shadow-none cursor-pointer bg-[#10B981] border-[#34D399] border-b-[4px] border-b-[#059669]"
+                  >
+                    {actionLabel}
+                  </button>
+                )}
+              </div>
+            );
+          }
 
           if (isFree) {
             return (
               <div title={shortLabel} className="mt-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1.5 transition hover:border-emerald-500/30">
                 <div className="flex items-center justify-between gap-1">
-                  <p className="text-[11px] font-bold text-emerald-100 leading-tight truncate">Gói miễn phí</p>
+                  <p className="text-[11px] font-bold text-emerald-100 leading-tight truncate">{planTitle}</p>
                   <button
                     type="button"
                     onClick={studentSubscription.openRenew}
                     className="shrink-0 rounded-md bg-emerald-600/90 hover:bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white transition cursor-pointer active:scale-95 !shadow-none"
                   >
-                    Nâng cấp
+                    {actionLabel}
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Sparkles size={11} className="shrink-0 text-emerald-400/70" />
-                  <p className="text-[10px] text-emerald-400/80 leading-tight">{freeXpText}</p>
+                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight">{daysLine}</p>
                 </div>
               </div>
             );
@@ -750,14 +910,14 @@ const AppSidebar = ({
             return (
               <div title={shortLabel} className="mt-2.5 rounded-xl border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 transition">
                 <div className="flex items-center justify-between gap-1">
-                  <p className="text-[11px] font-bold text-amber-100 leading-tight truncate">Gói Vĩnh viễn</p>
+                  <p className="text-[11px] font-bold text-amber-100 leading-tight truncate">{planTitle}</p>
                   <span className="shrink-0 rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-amber-200">
                     VĨNH VIỄN
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Crown size={11} className="shrink-0 text-amber-300/70" />
-                  <p className="text-[10px] text-amber-300/80 leading-tight">Không giới hạn</p>
+                  <Crown size={11} className="shrink-0 text-emerald-400/80" />
+                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight">{daysLine}</p>
                 </div>
               </div>
             );
@@ -767,18 +927,18 @@ const AppSidebar = ({
             return (
               <div title={shortLabel} className="mt-2.5 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
                 <div className="flex items-center justify-between gap-1">
-                  <p className="text-[11px] font-bold text-orange-200 leading-tight truncate">Gói {sub.planLabel || 'học'}</p>
+                  <p className="text-[11px] font-bold text-orange-200 leading-tight truncate">{planTitle}</p>
                   <button
                     type="button"
                     onClick={studentSubscription.openRenew}
                     className="shrink-0 rounded-md bg-gradient-to-r from-orange-500 to-red-500 px-2 py-0.5 text-[10px] font-bold text-white transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
                   >
-                    Gia hạn
+                    {actionLabel}
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <CalendarClock size={11} className="shrink-0 text-orange-300/70" />
-                  <p className="text-[10px] font-semibold text-orange-300/90 leading-tight">Còn {sub.daysLeft} ngày</p>
+                  <CalendarClock size={11} className="shrink-0 text-emerald-400/80" />
+                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight">{daysLine}</p>
                 </div>
               </div>
             );
@@ -787,18 +947,18 @@ const AppSidebar = ({
           return (
             <div title={shortLabel} className="mt-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
               <div className="flex items-center justify-between gap-1">
-                <p className="text-[11px] font-bold text-slate-100 leading-tight truncate">Gói {sub.planLabel || 'học'}</p>
+                <p className="text-[11px] font-bold text-slate-100 leading-tight truncate">{planTitle}</p>
                 <button
                   type="button"
                   onClick={studentSubscription.openRenew}
                   className="shrink-0 rounded-md bg-emerald-600/90 hover:bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white transition active:scale-95 !shadow-none cursor-pointer"
                 >
-                  Gia hạn
+                  {actionLabel}
                 </button>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <CalendarClock size={11} className="shrink-0 text-emerald-400/70" />
-                <p className="text-[10px] font-semibold text-emerald-400 leading-tight">Còn {sub.daysLeft} ngày</p>
+                <p className="text-[10px] font-semibold text-emerald-400 leading-tight">{daysLine}</p>
               </div>
             </div>
           );
@@ -806,7 +966,7 @@ const AppSidebar = ({
       </div>
 
       <nav className="flex-1 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
-        {filterItems(config.items)
+        {filterItems(effectiveSourceItems)
           .filter(item => {
             // Ẩn mục 'Bài Test' khi GV đã được kích hoạt giảng dạy
             if (role === 'teacher' && item.key === 'test' && !teacherPending) return false;
@@ -819,7 +979,9 @@ const AppSidebar = ({
               : (item.section && item.section !== visibleItems[index - 1]?.section ? item.section : '');
             const headingEl = sectionHeading ? (
               <div
-                className="px-1 pt-3 pb-1 text-[10px] font-black tracking-[0.12em] text-slate-400"
+                className={isStudentNav
+                  ? 'px-2 pt-3 pb-1 text-[11px] font-black tracking-[1.1px] text-[#94A3B8]'
+                  : 'px-1 pt-3 pb-1 text-[10px] font-black tracking-[0.12em] text-slate-400'}
                 role="heading"
                 aria-level={2}
               >
@@ -830,7 +992,7 @@ const AppSidebar = ({
               const Icon = navItem.icon;
               const active = isActive(navItem);
               const isLocked = teacherPending && navItem.key !== 'test';
-              const showFreeLock = itemFreeLocked(navItem);
+              const showFreeLock = itemFreeLocked(navItem) || (navItem.key === 'feed' && feedLocked);
               return (
                 <div key={navItem.key} className="relative group/nav">
                   <button
@@ -839,8 +1001,8 @@ const AppSidebar = ({
                     disabled={isLocked}
                     aria-current={active ? 'page' : undefined}
                     title={isLocked ? 'Bạn chưa phải là giáo viên chính thức nên chưa được mở' : undefined}
-                    className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all min-h-11 min-w-0
-                    ${nested ? 'px-3 py-1.5 pl-6' : 'px-3 py-1.5'}
+                    className={`cms-sidebar-glass__nav-item w-full flex items-center rounded-[14px] transition-all min-h-11 min-w-0
+                    ${isStudentNav ? 'gap-[10px] px-[10px] py-2' : `${nested ? 'px-3 py-1.5 pl-6' : 'px-3 py-1.5'} gap-3`}
                     ${isLocked
                         ? 'text-white/40 cursor-not-allowed'
                         : active
@@ -849,20 +1011,25 @@ const AppSidebar = ({
                       }
                   `}
                   >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] transition-colors ${active ? 'bg-red-600' : ''}`}>
+                    <span className={`flex shrink-0 items-center justify-center transition-colors ${isStudentNav ? 'h-[34px] w-[34px] rounded-[12px]' : 'h-8 w-8 rounded-[11px]'} ${navIconShellClass(active)}`}>
                       <Icon size={nested ? 16 : 18} className="flex-shrink-0" aria-hidden="true" />
                     </span>
-                    <span className={`font-medium truncate ${nested ? 'text-[13px]' : 'text-sm'}`}>{navItem.sidebarLabel || navItem.label}</span>
+                    <span className={`truncate ${isStudentNav ? `text-[15px] ${active ? 'font-black text-white' : 'font-bold text-[#D5DCE7]'}` : `font-medium ${nested ? 'text-[13px]' : 'text-sm'}`}`}>
+                      {navItem.sidebarLabel || navItem.label}
+                    </span>
                     {isLocked && (
                       <Lock size={13} className="ml-auto text-white/40 flex-shrink-0" aria-hidden="true" />
                     )}
                     {showFreeLock && (
-                      <Lock size={13} className="ml-auto text-amber-200 flex-shrink-0" aria-label="Đang khóa" />
+                      <Lock size={isStudentNav ? 14 : 13} className={`ml-auto flex-shrink-0 ${isStudentNav ? 'text-[#FBBF24]' : 'text-amber-200'}`} aria-label="Đang khóa" />
                     )}
                     {!isLocked && getBadgeCount(navItem.key) > 0 && (
-                      <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none drop-shadow-md shadow-red-500/50" aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
+                      <span className={`ml-auto px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none drop-shadow-md ${isCourseStudent ? 'bg-[#EF4444] shadow-red-500/50' : (isFreeStudent || isTeacherNav) ? 'bg-[#059669] shadow-emerald-500/50' : 'bg-red-500 shadow-red-500/50'}`} aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
                         {getBadgeCount(navItem.key) > 99 ? '99+' : getBadgeCount(navItem.key)}
                       </span>
+                    )}
+                    {isStudentNav && active && !isLocked && !showFreeLock && getBadgeCount(navItem.key) === 0 && (
+                      <span className={`ml-auto h-[7px] w-[7px] shrink-0 rounded-full ${isCourseStudent ? 'bg-[#F87171]' : 'bg-[#34D399]'}`} aria-hidden="true" />
                     )}
                   </button>
                 </div>
@@ -890,12 +1057,12 @@ const AppSidebar = ({
                       ${hubActive ? 'cms-sidebar-glass__nav-active text-white' : 'text-[#D5DCE7]'}
                     `}
                     >
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${hubActive ? 'bg-red-600' : ''}`}>
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${navIconShellClass(hubActive)}`}>
                         <HubIcon size={16} className="flex-shrink-0" aria-hidden="true" />
                       </span>
                       <span className="text-[13px] font-semibold flex-1 text-left truncate">{hub.label}</span>
                       {hubBadge > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
+                        <span className={`px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none ${isTeacherNav ? 'bg-[#059669]' : 'bg-red-500'}`}>
                           {hubBadge > 99 ? '99+' : hubBadge}
                         </span>
                       )}
@@ -929,12 +1096,12 @@ const AppSidebar = ({
                     ${childActive ? 'cms-sidebar-glass__nav-active text-white' : 'text-[#D5DCE7]'}
                   `}
                   >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${childActive ? 'bg-red-600' : ''}`}>
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${navIconShellClass(childActive)}`}>
                       <GroupIcon size={18} className="flex-shrink-0" aria-hidden="true" />
                     </span>
                     <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
                     {groupBadge > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
+                      <span className={`px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none ${isTeacherNav ? 'bg-[#059669]' : 'bg-red-500'}`}>
                         {groupBadge > 99 ? '99+' : groupBadge}
                       </span>
                     )}
@@ -968,26 +1135,37 @@ const AppSidebar = ({
       </nav>
 
       {/* ── Bottom items ── */}
-      <div className="cms-sidebar-glass__footer px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0 border-t border-slate-400/15 pt-2">
+      <div className="cms-sidebar-glass__footer shrink-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0.5 border-t border-slate-400/15 pt-2">
         {config.bottomItems.map(item => {
-          const Icon = item.icon;
+          const Icon = isStudentNav && item.key === 'profile' ? UserRound : item.icon;
           const active = !item.isLogout && !item.isChangePassword && !item.isPinLock && isActive(item);
+          const footerIconClass = isStudentNav
+            ? `flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[12px] ${item.isLogout
+              ? 'bg-white/[0.06] text-[#FCA5A5]'
+              : active
+                ? (isCourseStudent ? '!bg-[#EF4444] !text-white !shadow-none' : '!bg-[#10B981] !text-white !shadow-none')
+                : 'bg-white/[0.06] text-[#A8B6CC]'
+            }`
+            : `flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${navIconShellClass(active)}`;
           return (
             <button
               key={item.key}
               type="button"
               onClick={() => handleClick(item)}
-              className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all min-h-11 box-border
-                px-3 py-1.5
+              className={`cms-sidebar-glass__nav-item w-full flex items-center rounded-[14px] transition-all min-h-11 box-border
+                ${isStudentNav ? 'gap-[10px] px-[10px] py-2' : 'gap-3 px-3 py-1.5'}
                 ${item.isLogout
-                  ? 'text-red-300'
+                  ? (isStudentNav ? 'text-[#F87171]' : 'text-red-300')
                   : active ? config.activeClass : 'text-[#D5DCE7]'}
               `}
             >
-              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${active ? 'bg-red-600' : ''}`}>
+              <span className={footerIconClass}>
                 <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
               </span>
-              <span className="text-sm font-medium truncate">{item.label}</span>
+              <span className={`truncate ${isStudentNav ? `text-[15px] ${active ? 'font-black text-white' : 'font-bold'}` : 'text-sm font-medium'}`}>{item.label}</span>
+              {isStudentNav && active && (
+                <span className={`ml-auto h-[7px] w-[7px] shrink-0 rounded-full ${isCourseStudent ? 'bg-[#F87171]' : 'bg-[#34D399]'}`} aria-hidden="true" />
+              )}
             </button>
           );
         })}
@@ -996,28 +1174,30 @@ const AppSidebar = ({
         <button
           type="button"
           onClick={handleToggleMute}
-          className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all text-[#A8B6CC] min-h-11 box-border
-            px-3 py-1.5
+          className={`cms-sidebar-glass__nav-item w-full flex items-center rounded-[14px] transition-all min-h-11 box-border
+            ${isStudentNav ? 'gap-[10px] px-[10px] py-2 text-[#D5DCE7]' : 'gap-3 px-3 py-1.5 text-[#A8B6CC]'}
           `}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]">
+          <span className={`flex shrink-0 items-center justify-center ${isStudentNav ? 'h-[34px] w-[34px] rounded-[12px] bg-white/[0.06] text-[#A8B6CC]' : 'h-8 w-8 rounded-[11px]'}`}>
             {muted ? <VolumeX size={18} className="flex-shrink-0" aria-hidden="true" /> : <Volume2 size={18} className="flex-shrink-0" aria-hidden="true" />}
           </span>
-          <span className="text-sm font-medium truncate">{muted ? "Bật âm thanh" : "Tắt âm thanh"}</span>
+          <span className={`truncate ${isStudentNav ? 'text-[15px] font-bold text-[#D5DCE7]' : 'text-sm font-medium'}`}>{muted ? "Bật âm thanh" : "Tắt âm thanh"}</span>
         </button>
         <button
           type="button"
           onClick={toggleMenuPin}
           aria-pressed={menuPinned}
           aria-label={menuPinned ? 'Bỏ ghim menu' : 'Ghim menu'}
-          className="cms-sidebar-glass__nav-item hidden lg:flex w-full min-h-11 items-center gap-3 rounded-[14px] px-3 py-1.5 text-[#A8B6CC] transition-all"
+          className={`cms-sidebar-glass__nav-item ${isLaptopOrLarger ? 'flex' : 'hidden'} w-full min-h-11 items-center rounded-[14px] transition-all
+            ${isStudentNav ? 'gap-[10px] px-[10px] py-2 text-[#D5DCE7]' : 'gap-3 px-3 py-1.5 text-[#A8B6CC]'}
+          `}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]">
+          <span className={`flex shrink-0 items-center justify-center ${isStudentNav ? 'h-[34px] w-[34px] rounded-[12px] bg-white/[0.06] text-[#A8B6CC]' : 'h-8 w-8 rounded-[11px]'}`}>
             {menuPinned
               ? <PinOff size={18} className="flex-shrink-0" aria-hidden="true" />
               : <Pin size={18} className="flex-shrink-0" aria-hidden="true" />}
           </span>
-          <span className="text-sm font-medium truncate">{menuPinned ? 'Bỏ ghim menu' : 'Ghim menu'}</span>
+          <span className={`truncate ${isStudentNav ? 'text-[15px] font-bold text-[#D5DCE7]' : 'text-sm font-medium'}`}>{menuPinned ? 'Bỏ ghim menu' : 'Ghim menu'}</span>
         </button>
       </div>
     </div>
@@ -1028,10 +1208,13 @@ const AppSidebar = ({
       {/* ── Responsive navigation drawer ── */}
       {pinnedSidebarVisible ? (
         <>
-          <aside className="cms-sidebar-glass hidden lg:flex fixed left-0 top-0 z-30 h-[100dvh] max-h-[100dvh] w-[264px] overflow-hidden">
+          <aside
+            className="cms-sidebar-glass flex fixed left-0 top-0 z-30 h-[100dvh] max-h-[100dvh] w-[284px] overflow-hidden"
+            {...sidebarShellProps}
+          >
             {renderSidebarContent()}
           </aside>
-          <div className="hidden lg:block w-[264px] shrink-0" aria-hidden="true" />
+          <div className="w-[284px] shrink-0" aria-hidden="true" />
         </>
       ) : (
         <div
@@ -1045,7 +1228,10 @@ const AppSidebar = ({
             className={`cms-mobile-drawer-backdrop absolute inset-0 bg-black/50 ${mobileOpen ? 'is-open' : ''}`}
             onClick={() => setMobileOpen(false)}
           />
-          <div className={`cms-mobile-drawer-panel cms-sidebar-glass absolute left-0 top-0 h-[100dvh] max-h-[100dvh] w-[min(72vw,280px)] max-w-[280px] overflow-hidden rounded-r-[26px] pt-[env(safe-area-inset-top,0px)] ${mobileOpen ? 'is-open' : ''}`}>
+          <div
+            className={`cms-mobile-drawer-panel cms-sidebar-glass absolute left-0 top-0 h-[100dvh] max-h-[100dvh] w-[min(82vw,292px)] max-w-[292px] overflow-hidden rounded-r-[26px] pt-[env(safe-area-inset-top,0px)] ${mobileOpen ? 'is-open' : ''}`}
+            {...sidebarShellProps}
+          >
             <div className="h-full relative overflow-hidden">
               {renderSidebarContent()}
             </div>
@@ -1055,37 +1241,33 @@ const AppSidebar = ({
 
       {mobileNavItems.length > 0 && !pinnedSidebarVisible && (
         <nav
-          className={`${isTabletOrLarger ? '' : 'md:hidden'} fixed bottom-2 left-3 right-3 z-40 rounded-[1.5rem] border border-white/80 bg-white/65 shadow-[0_-8px_32px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl pt-1.5 pointer-events-none`}
+          className={`cms-mobile-bottom-nav cms-mobile-bottom-nav--dock ${isCourseStudent ? 'cms-mobile-bottom-nav--brand' : ''} ${isTabletOrLarger ? '' : 'md:hidden'} ${footerShown ? 'pointer-events-auto' : 'pointer-events-none'}`}
           aria-label="Điều hướng chính"
           aria-hidden={!footerShown}
+          {...((freePortalStudentNav || isTeacherNav) ? { 'data-free-portal-student': true } : {})}
           style={{
-            ...(isTabletOrLarger ? {
-              left: '50%',
-              right: 'auto',
-              bottom: '1rem',
-              width: 'min(48rem, calc(100vw - 2rem))',
-              padding: '0.625rem 0.75rem 0.25rem',
-              border: '1px solid rgba(255, 255, 255, 0.88)',
-              borderRadius: '1.25rem',
-              background: 'linear-gradient(145deg, rgba(255,255,255,0.84), rgba(241,245,249,0.66))',
-              boxShadow: '0 12px 36px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(24px) saturate(1.45)',
-              WebkitBackdropFilter: 'blur(24px) saturate(1.45)',
-              transform: footerShown
-                ? 'translateX(-50%)'
-                : 'translate(-50%, calc(100% + 1rem))',
-            } : {
-              bottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))',
-              padding: '0.625rem 0.25rem 0.375rem',
-              transform: footerShown ? 'translateY(0)' : 'translateY(calc(100% + 0.5rem))',
-            }),
+            ...(isTabletOrLarger
+              ? {
+                left: '50%',
+                right: 'auto',
+                width: 'min(47.5rem, calc(100vw - 2rem))',
+                transform: footerShown
+                  ? 'translateX(-50%)'
+                  : 'translate(-50%, calc(100% + 1rem))',
+              }
+              : {
+                left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
+                right: 'max(0.75rem, env(safe-area-inset-right, 0px))',
+                width: 'auto',
+                transform: footerShown ? 'translateY(0)' : 'translateY(calc(100% + 0.5rem))',
+              }),
             opacity: footerShown ? 1 : 0,
             visibility: footerShown ? 'visible' : 'hidden',
             transition: `transform 450ms cubic-bezier(0.22, 1, 0.36, 1), opacity 350ms ease, visibility 0s linear ${footerShown ? '0s' : '450ms'}`,
           }}
         >
           <div
-            className="pointer-events-auto mx-auto flex h-[5.25rem] w-full max-w-[48rem] items-stretch gap-2 px-1"
+            className="cms-mobile-bottom-nav__track"
             onMouseEnter={isInboxRoute ? keepInboxFooter : undefined}
             onMouseLeave={isInboxRoute ? scheduleInboxFooterHide : undefined}
             onFocus={isInboxRoute ? keepInboxFooter : undefined}
@@ -1093,11 +1275,12 @@ const AppSidebar = ({
             onTouchStart={isInboxRoute ? scheduleInboxFooterHide : undefined}
           >
             {mobileNavItems.map((item) => {
-              const Icon = item.key === 'dashboard' ? Home : item.mobileIcon || item.icon || LayoutDashboard;
+              const Icon = MOBILE_FOOTER_ICONS[item.key] || item.mobileIcon || item.icon || LayoutDashboard;
               const active = isActive(item);
               const isHome = item.key === 'dashboard';
               const badgeCount = getBadgeCount(item.key);
-              const iconTone = MOBILE_NAV_ICON_TONES[item.key] || 'border-slate-200/80 from-slate-50 to-white text-slate-600';
+              const tone = MOBILE_NAV_TONE_HEX[item.key] || '#64748B';
+              const iconColor = isHome ? '#FFFFFF' : (active ? '#FFFFFF' : tone);
               return (
                 <button
                   key={item.key}
@@ -1106,32 +1289,26 @@ const AppSidebar = ({
                   aria-current={active ? 'page' : undefined}
                   aria-label={item.label}
                   tabIndex={footerShown ? 0 : -1}
-                  className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-1 text-[10px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${isHome
-                    ? 'border-transparent bg-transparent text-red-600'
-                    : active
-                      ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
-                      : 'border-white/70 bg-white/45 text-slate-500 hover:border-white/90 hover:bg-white/60 hover:text-slate-800'
-                    }`}
+                  className={`cms-mobile-bottom-nav__item ${isHome ? 'cms-mobile-bottom-nav__item--home' : 'cms-mobile-bottom-nav__item--card'} ${!isHome && active ? 'cms-mobile-bottom-nav__item--active' : ''}`}
                 >
-                  <span className={`relative flex items-center justify-center transition-all duration-200 ${isHome
-                    ? 'h-14 w-14 rounded-full border-[3px] border-white bg-gradient-to-b from-red-400 via-red-600 to-red-800 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32),0_0_0_3px_rgba(254,202,202,0.6),inset_0_3px_5px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(127,29,29,0.5)] group-hover:scale-105 group-active:scale-95'
-                    : `h-10 w-10 rounded-xl border ${active
-                      ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'
-                      : `${iconTone} bg-gradient-to-br shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]`
-                    }`
-                    }`}>
-                    <Icon size={isHome ? 28 : 20} strokeWidth={isHome || active ? 2.5 : 2} aria-hidden="true" />
-                    {badgeCount > 0 && (
-                      <span className="absolute -right-1 -top-1 min-w-[1.05rem] rounded-full bg-red-600 px-1 text-center text-[9px] font-bold leading-[1.05rem] text-white">
-                        {badgeCount > 99 ? '99+' : badgeCount}
+                  <span
+                    className={`cms-mobile-bottom-nav__tile ${isHome ? 'cms-mobile-bottom-nav__tile--home' : ''} ${!isHome && active ? 'cms-mobile-bottom-nav__tile--active' : ''}`}
+                    style={!isHome && !active ? mobileNavTileStyle(tone) : undefined}
+                  >
+                    <Icon size={isHome ? 28 : 20} color={iconColor} strokeWidth={isHome || active ? 2.5 : 2} aria-hidden="true" />
+                    {badgeCount > 0 ? (
+                      <span className="cms-mobile-bottom-nav__badge">{badgeCount > 99 ? '99+' : badgeCount}</span>
+                    ) : null}
+                    {(itemFreeLocked(item) || (item.key === 'feed' && feedLocked)) ? (
+                      <span className="cms-mobile-bottom-nav__lock" aria-hidden="true">
+                        <Lock size={10} strokeWidth={2.5} />
                       </span>
-                    )}
-                    {itemFreeLocked(item) && (
-                      <Lock size={12} className="absolute -left-1 -top-1 rounded-full bg-slate-900 p-0.5 text-amber-200" aria-hidden="true" />
-                    )}
+                    ) : null}
                   </span>
                   {isHome ? null : (
-                    <span className="flex h-6 w-full items-center justify-center text-center leading-3">{item.mobileLabel || item.label}</span>
+                    <span className={`cms-mobile-bottom-nav__label ${active ? 'cms-mobile-bottom-nav__label--active' : ''}`}>
+                      {item.mobileLabel || item.label}
+                    </span>
                   )}
                 </button>
               );

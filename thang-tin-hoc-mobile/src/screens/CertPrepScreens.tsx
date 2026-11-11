@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CertPrepScreens.tsx
  * Màn hình ôn thi MOS/IC3 - tương đương CertPrepCatalogPage, CertPrepLevelPage,
  * CertPrepStudentPlayer, CertPrepResult của web app.
@@ -16,7 +16,7 @@ import {
 import {
   AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton,
 } from '../components/ui';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import certPrepApi, {
   type CertPrepAttempt, type CertPrepCourse, type CertPrepLevel, type CertPrepSession, type CertPrepTest,
@@ -130,7 +130,7 @@ export function CertPrepCatalogScreen() {
               accessibilityRole="button"
             >
               <View style={styles.levelIcon}>
-                <GraduationCap size={20} color={colors.brand} />
+                <GraduationCap size={20} color={theme.brand} />
               </View>
               <View style={styles.levelInfo}>
                 <Text style={styles.levelTitle}>{level.title}</Text>
@@ -284,7 +284,7 @@ export function CertPrepLevelScreen() {
           <Card key={test.id} style={styles.testCard}>
             <View style={styles.testCardHeader}>
               <View style={styles.testCardTitleRow}>
-                <ListChecks size={18} color={colors.brand} />
+                <ListChecks size={18} color={theme.brand} />
                 <Text style={styles.testCardTitle}>{test.title}</Text>
               </View>
               {test.status === 'completed' && test.lastScore !== undefined ? (
@@ -583,7 +583,7 @@ export function CertPrepPlayerScreen() {
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>Nộp bài?</Text>
             <Text style={styles.dialogBody}>
-              Bạn đã trả lời <Text style={{ color: colors.brand, fontWeight: '800' }}>{answeredCount}/{questions.length}</Text> câu.
+              Bạn đã trả lời <Text style={{ color: theme.brand, fontWeight: '800' }}>{answeredCount}/{questions.length}</Text> câu.
               {answeredCount < questions.length ? '\n\nCâu chưa trả lời sẽ bị tính sai.' : ''}
             </Text>
             <View style={styles.dialogActions}>
@@ -797,7 +797,7 @@ export function CertPrepResultScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   // Course catalog
   courseGrid: { gap: spacing.md, padding: spacing.lg },
   courseCard: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.line },
@@ -916,4 +916,4 @@ const styles = StyleSheet.create({
   resultStat: { alignItems: 'center', gap: 4 },
   resultStatValue: { color: colors.ink, fontSize: typography.title, fontWeight: '900' },
   resultStatLabel: { color: colors.muted, fontSize: typography.caption },
-});
+}));

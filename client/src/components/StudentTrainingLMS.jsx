@@ -43,6 +43,7 @@ import {
 } from '../utils/antiSeekPolicy';
 import { parseLmsHashQuery, clearResumePayFromHash, courseKey, courseIdAliases, readOwnedVideoCourseCache, writeOwnedVideoCourseCache } from '../utils/lmsDeepLink';
 import { setLmsPlayerOpen } from '../utils/lmsPlayerOverlay';
+import { lmsBtn } from '../utils/lmsButtonClass';
 
 const MOCK_COURSES = [
   {
@@ -1160,10 +1161,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             </div>
 
             <span
-              className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black  tracking-wide shadow-sm transition-all ${owned
-                  ? 'bg-emerald-600 text-white group-hover:bg-emerald-700 group-hover:shadow-md'
-                  : 'bg-red-600 text-white group-hover:bg-red-700 group-hover:shadow-md'
-                }`}
+              className={`${lmsBtn(owned ? 'primary' : 'danger', { size: 'sm', className: 'shrink-0 min-h-9 text-[11px] tracking-wide group-hover:brightness-105' })}`}
             >
               {owned ? 'Vào học' : 'Xem / Mua'}
               <ChevronRight size={14} className="opacity-90 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
@@ -1186,7 +1184,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   if (!selectedCourse) {
     return (
       <>
-        <div className="w-full animate-in fade-in duration-500 min-h-full">
+        <div className="w-full animate-in fade-in duration-500 min-h-full" data-lms-ui>
           {/* Header */}
           <div className={`flex items-start justify-between gap-3 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) && !isAdmin && !onBack ? 'hidden' : 'mb-5'}`}>
             <div className="flex gap-3 min-w-0">
@@ -1479,7 +1477,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                         return (
                           <button
                             type="button"
-                            className="w-full md:w-auto px-5 py-2.5 bg-red-600 text-white border border-transparent rounded-[10px] text-sm font-bold hover:bg-red-700 hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start"
+                            className={lmsBtn('danger', { className: 'w-full md:w-auto shrink-0 self-center md:self-start text-sm' })}
                             onClick={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -1611,7 +1609,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                           {(() => {
                             if (!submission) {
                               return (
-                                <label className={`flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition-all shadow-sm ${uploadingAssignId === idx ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
+                                <label className={`${lmsBtn('primary', { size: 'sm', className: `text-sm ${uploadingAssignId === idx ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}` })}`}>
                                   {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <UploadCloud size={16} />}
                                   {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp bài tập'}
                                   <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx} />
@@ -1810,7 +1808,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       || lessons.find((l) => l.isPreview && resolveLessonVideoUrl(l))
       || lessons.find((l) => l.isUnlocked && !l.paywallLocked && resolveLessonVideoUrl(l));
     return (
-      <div className="w-full min-h-full bg-slate-50 pb-10">
+      <div className="w-full min-h-full bg-slate-50 pb-10" data-lms-ui>
         <div className="flex items-center gap-2 mb-4">
           <button
             type="button"
@@ -1994,10 +1992,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               <button
                 type="button"
                 onClick={() => (canContinueLearning ? enterCourseLearning() : startVideoCheckout(selectedCourse))}
-                className={`w-full min-h-12 rounded-xl text-white font-bold text-sm ${canContinueLearning
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-red-600 hover:bg-red-700'
-                  }`}
+                className={lmsBtn(canContinueLearning ? 'primary' : 'danger', { size: 'lg', fullWidth: true, className: 'text-sm' })}
               >
                 {canContinueLearning
                   ? 'Tiếp tục học'
@@ -2016,7 +2011,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
   // ── PLAYER VIEW ─────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col w-screen h-screen bg-[#0d1117] text-white overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex flex-col w-screen h-screen bg-[#0d1117] text-white overflow-hidden" data-lms-ui>
 
       {/* ─── TOPBAR ───────────────────────────────────────────────────────────── */}
       <div className="relative flex-shrink-0 z-50" style={{ background: 'linear-gradient(180deg,#090e18 0%,#0d1117 100%)' }}>

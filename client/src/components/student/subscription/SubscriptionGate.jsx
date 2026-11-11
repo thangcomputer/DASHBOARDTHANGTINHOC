@@ -18,12 +18,14 @@ async function logoutToLogin() {
   window.location.replace('/login');
 }
 
-function RenewModal({ overview, onClose, onRenewed }) {
+function RenewModal({ overview, onClose, onRenewed, isCourseStudent }) {
   return createPortal(
     <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-slate-950/55 p-2.5 sm:p-4 backdrop-blur-[2px]" role="presentation">
       <div className="flex max-h-[92dvh] w-full max-w-3xl lg:max-w-4xl flex-col overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white shadow-2xl border border-slate-100" role="dialog" aria-modal="true" aria-label="Gia hạn tài khoản">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 sm:px-5 sm:py-3">
-          <h2 className="text-sm sm:text-base font-black text-slate-900">Gói học Meet</h2>
+          <h2 className="text-sm sm:text-base font-black text-slate-900">
+            {isCourseStudent ? 'Gói Khóa học' : 'Gói học Meet'}
+          </h2>
           <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1 sm:p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><X size={17} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3.5 sm:p-5">
@@ -126,7 +128,7 @@ function ExpiringReminder({ subscription, studentId, onRenew }) {
         </div>
         <div className="flex gap-2 p-4">
           <button type="button" onClick={close} className="cms-btn cms-btn-outline flex-1">Để sau</button>
-          <button type="button" onClick={() => { close(); onRenew(); }} className="cms-btn cms-btn-primary flex-1">Gia hạn ngay</button>
+          <button type="button" onClick={() => { close(); onRenew(); }} className="cms-btn cms-btn-primary cms-btn-brand flex-1">Gia hạn ngay</button>
         </div>
       </div>
     </div>,
@@ -194,7 +196,12 @@ export default function SubscriptionGate({ session, children }) {
     <SubscriptionContext.Provider value={value}>
       {children}
       {renewOpen && overview && (
-        <RenewModal overview={overview} onClose={() => setRenewOpen(false)} onRenewed={onRenewed} />
+        <RenewModal
+          overview={overview}
+          onClose={() => setRenewOpen(false)}
+          onRenewed={onRenewed}
+          isCourseStudent={session?.freePortal !== true}
+        />
       )}
       {subscription && session?.freePortal !== true && (
         <ExpiringReminder subscription={subscription} studentId={studentId} onRenew={() => setRenewOpen(true)} />

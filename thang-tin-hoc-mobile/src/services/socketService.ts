@@ -51,6 +51,7 @@ export const SOCKET_EVENTS = {
   SUBMISSION_CHANGED: 'socket:submission:changed',
   STUDENT_CHANGED: 'socket:student:changed',
   AI_SUPPORT_STATUS: 'socket:ai-support:status',
+  CLASS_REMINDER: 'socket:class:reminder',
 } as const;
 
 let socket: Socket | null = null;
@@ -141,6 +142,7 @@ function bindSocketEvents(instance: Socket, token: string) {
   instance.on('group:deleted', (data) => emitDeviceEvent(SOCKET_EVENTS.GROUP_DELETE, data));
   instance.on('CONTACT_LIST_UPDATED', (data) => emitDeviceEvent(SOCKET_EVENTS.CONTACT_UPDATED, data));
   instance.on('data:refresh', (data) => emitDeviceEvent(SOCKET_EVENTS.DATA_REFRESH, data));
+  instance.on('class:reminder', (data) => emitDeviceEvent(SOCKET_EVENTS.CLASS_REMINDER, data));
   instance.on('schedule:new', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_NEW, data));
   instance.on('schedule:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_UPDATED, data));
   instance.on('schedule:cancelled', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_CANCELLED, data));

@@ -64,7 +64,7 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
         onClick={onClose}
       />
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
-        <div className="relative px-6 pt-6 pb-5 text-white bg-gradient-to-br from-red-700 via-red-600 to-red-500">
+        <div className="relative px-6 pt-6 pb-5 text-white bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-600">
           <button
             type="button"
             onClick={onClose}
@@ -73,14 +73,14 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
           >
             <X size={18} aria-hidden="true" />
           </button>
-          <p className="text-[11px] font-bold  tracking-[0.2em] text-red-100/90">
+          <p className="text-[11px] font-bold  tracking-[0.2em] text-emerald-100/90">
             Ghi chú học viên
           </p>
           <p id="teacher-student-note-title" className="mt-2 text-lg font-black">
             {studentName}
           </p>
           {course ? (
-            <p className="mt-1 text-sm font-medium text-red-50/95">{course}</p>
+            <p className="mt-1 text-sm font-medium text-emerald-50/95">{course}</p>
           ) : null}
         </div>
         <div className="px-6 py-5 space-y-3">
@@ -94,8 +94,8 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
               <p className="text-sm font-bold text-slate-900 mt-0.5">{timeRange}</p>
             </div>
           </div>
-          <div className="rounded-2xl border border-red-100 bg-red-50/70 px-4 py-3">
-            <p className="text-[11px] font-bold  tracking-wide text-red-400">Nội dung ghi chú</p>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+            <p className="text-[11px] font-bold  tracking-wide text-emerald-700">Nội dung ghi chú</p>
             {payload.deleted ? (
               <p className="text-sm text-slate-600 mt-1.5 leading-relaxed font-semibold">
                 Học viên đã xóa ghi chú này. Không còn hoạt động trên lịch.
@@ -109,7 +109,7 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full h-11 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700"
+            className="w-full h-11 rounded-2xl bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white text-sm font-extrabold cursor-pointer transition-all shadow-xs"
           >
             Đóng
           </button>

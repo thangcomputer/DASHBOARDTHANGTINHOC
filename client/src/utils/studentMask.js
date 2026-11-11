@@ -35,9 +35,9 @@ export function formatNotificationStudentMask(text, students = [], isAdmin = fal
   
   let formatted = formatNotificationDatesInText(text);
 
-  // 0. Strip ⟦student_detail:ID:tab|NAME⟧ or [student_detail:ID:tab|NAME] tokens
+  // 0. Strip ⟦student_detail:ID:tab|NAME⟧ or [[student_detail:ID:tab|NAME]] or [student_detail:ID:tab|NAME] tokens
   formatted = formatted.replace(
-    /(?:⟦|\[)student_detail:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\])/g,
+    /(?:⟦|\[+)student_detail:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\]+)/g,
     (match, displayName) => {
       if (!displayName) return isAdmin ? '' : '***';
       if (isAdmin) return displayName.trim();
@@ -45,6 +45,14 @@ export function formatNotificationStudentMask(text, students = [], isAdmin = fal
       // Mask tên: giữ 1 ký tự đầu + ***
       return displayName.trim()[0] + '***';
     }
+  );
+  formatted = formatted.replace(
+    /(?:⟦|\[+)chat:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\]+)/g,
+    '$1'
+  );
+  formatted = formatted.replace(
+    /(?:⟦|\[+)go:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\]+)/g,
+    '$1'
   );
 
   // Bỏ qua masking thủ công nếu là admin (để admin thấy tên thật)

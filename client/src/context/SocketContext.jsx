@@ -382,6 +382,11 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
         read: false,
         priority: 'high',
       }, ...(Array.isArray(prev) ? prev.filter(Boolean) : [])]);
+      try {
+        window.dispatchEvent(new CustomEvent('class:live-reminder', { detail: reminder }));
+      } catch {
+        /* ignore */
+      }
     };
 
     const onSystemReset = (data) => {

@@ -314,4 +314,9 @@ test('giao diện lộ trình: web + mobile có màn lộ trình, luyện tự d
   const mobileApi = read('thang-tin-hoc-mobile/src/services/dailyPracticeApi.ts');
   assert.ok(mobileApi.includes("call<{ topics: DpTopicPath[] }>('/path')"));
   assert.ok(mobileApi.includes('nodeKey'));
+  assert.ok(read('routes/dailyPracticeRoutes.js').includes('/my/path/units/:unitId/chest/claim'));
+  assert.ok(read('services/dailyPracticePathService.js').includes('claimUnitChest'));
+  assert.ok(read('client/src/components/student/dailyPractice/UnitStageChest.jsx').includes('claimUnitChest'));
+  assert.ok(read('client/src/services/dailyPracticeApi.js').includes('claimUnitChest'));
+  assert.ok(mobile.includes('<UnitStageChest'));
 });

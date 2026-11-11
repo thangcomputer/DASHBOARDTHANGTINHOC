@@ -184,7 +184,7 @@ export default function BuyXpModal({ packs = [], onClose, onPaid }) {
                 })}
               </div>
               {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
-              <button type="button" disabled={!selected || busy} onClick={checkout} className="cms-btn cms-btn-primary w-full !py-3">
+              <button type="button" disabled={!selected || busy} onClick={checkout} className="cms-btn cms-btn-primary cms-btn-brand w-full !py-3">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <ShoppingBag size={17} />}
                 Mua {selected?.label || 'XP'}
               </button>

@@ -633,7 +633,7 @@ const TeacherFinanceAndTraining = () => {
                 <FileBox size={14} className="inline mr-2" />  Tài liệu của khóa
               </button>
               <button onClick={() => setCourseTab('notice')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'notice' ? 'text-orange-600 border-orange-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                <AlertCircle size={14} className="inline mr-2" />  Thông báo từ qu?N tr? Vi?N
+                <AlertCircle size={14} className="inline mr-2" />  Thông báo từ quản trị viên
               </button>
             </div>
 

@@ -113,9 +113,9 @@ export default function LearningGoalCard() {
         <button
           type="button"
           onClick={openLearningGoal}
-          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition"
+          className="shrink-0 rounded-[12px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white px-2.5 py-1 text-xs font-extrabold text-[#DC2626] hover:bg-[#FEF2F2] active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none"
         >
-          {goal.expired ? 'Đặt mới' : 'Đổi'}
+          {goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}
         </button>
       </div>
 

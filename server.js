@@ -1450,48 +1450,84 @@ if (!isTest) {
 // ==========================================
 // CRON JOB: Nhắc lịch học tự động
 // ==========================================
-// const Schedule = require('./models/Schedule');
-// const nodemailer = require('nodemailer');
-//
-// Chạy mỗi 10 phút - kiểm tra lịch sắp tới và gửi nhắc nhở
-if (!isTest) cron.schedule('*/10 * * * *', async () => {
-  try {
-    // const now = new Date();
-    // const thirtyMinsLater = new Date(now.getTime() + 30 * 60000);
-    //
-    // const upcoming = await Schedule.find({
-    //   date: { $gte: now, $lte: thirtyMinsLater },
-    //   status: 'scheduled',
-    //   reminderSent: false,
-    // });
-    //
-    // for (const sched of upcoming) {
-    //   // 1. Gửi notification real-time
-    //   app.notifyUser('student', sched.studentId, 'class:reminder', {
-    //     message: `Sắp đến giờ học! ${sched.course} lúc ${sched.startTime}`,
-    //     linkHoc: sched.linkHoc,
-    //     startTime: sched.startTime,
-    //   });
-    //   app.notifyUser('teacher', sched.teacherId, 'class:reminder', {
-    //     message: `Sắp có buổi dạy! ${sched.studentName} - ${sched.course} lúc ${sched.startTime}`,
-    //     linkHoc: sched.linkHoc,
-    //     startTime: sched.startTime,
-    //   });
-    //
-    //   // 2. Gửi Email (cần cấu hình SMTP trong .env)
-    //   // await sendReminderEmail(sched);
-    //
-    //   // 3. Đánh dấu đã gửi
-    //   sched.reminderSent = true;
-    //   sched.reminderSentAt = new Date();
-    //   await sched.save();
-    // }
-    //
-    // if (upcoming.length > 0) {
-    //   console.log(`📧 Đã gửi ${upcoming.length} nhắc lịch học`);
-    // }
+const Schedule = require('./models/Schedule');
 
-    logger.info(`[CRON] Kiểm tra lịch học: ${new Date().toLocaleTimeString('vi-VN')}`);
+// Chạy mỗi 1 phút - kiểm tra lịch học sắp tới và đang diễn ra để gửi nhắc nhở
+if (!isTest) cron.schedule('* * * * *', async () => {
+  try {
+    const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
+    const y = vnNow.getUTCFullYear();
+    const m = vnNow.getUTCMonth();
+    const d = vnNow.getUTCDate();
+    const todayStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const nowMinutes = vnNow.getUTCHours() * 60 + vnNow.getUTCMinutes();
+
+    // Lấy các lịch hôm nay (quét trong khoảng +-1 ngày UTC để bao quát múi giờ)
+    const rangeStart = new Date(Date.UTC(y, m, d - 1, 0, 0, 0));
+    const rangeEnd = new Date(Date.UTC(y, m, d + 1, 23, 59, 59));
+
+    const todaySchedules = await Schedule.find({
+      date: { $gte: rangeStart, $lte: rangeEnd },
+      status: 'scheduled',
+      reminderSent: { $ne: true },
+    }).lean();
+
+    for (const sched of todaySchedules) {
+      const sDateObj = new Date(sched.date);
+      const sVnDate = new Date(sDateObj.getTime() + 7 * 3600 * 1000);
+      const sDayStr = `${sVnDate.getUTCFullYear()}-${String(sVnDate.getUTCMonth() + 1).padStart(2, '0')}-${String(sVnDate.getUTCDate()).padStart(2, '0')}`;
+      if (sDayStr !== todayStr) continue;
+
+      const [sh, sm] = String(sched.startTime || '').split(':').map(Number);
+      if (!Number.isFinite(sh)) continue;
+      const startMinutes = sh * 60 + (Number.isFinite(sm) ? sm : 0);
+
+      const [eh, em] = String(sched.endTime || '').split(':').map(Number);
+      const endMinutes = Number.isFinite(eh) ? eh * 60 + (Number.isFinite(em) ? em : 0) : startMinutes + 60;
+
+      // Cửa sổ nhắc: từ 1 phút trước giờ học cho đến khi kết thúc ca
+      if (nowMinutes >= startMinutes - 1 && nowMinutes < endMinutes) {
+        const isLive = nowMinutes >= startMinutes;
+        const studentMsg = isLive
+          ? `🔴 Đã đến giờ vào học! Môn: ${sched.course} (${sched.startTime} - ${sched.endTime})`
+          : `⏰ Sắp đến giờ vào học (còn 1 phút)! Môn: ${sched.course} lúc ${sched.startTime}`;
+        const teacherMsg = isLive
+          ? `🔴 Đã đến giờ vào lớp dạy! Môn: ${sched.course} (${sched.startTime} - ${sched.endTime})`
+          : `⏰ Sắp đến giờ dạy học (còn 1 phút)! Môn: ${sched.course} lúc ${sched.startTime}`;
+
+        // 1. Gửi notification real-time qua socket và mobile push
+        if (sched.studentId) {
+          app.notifyUser('student', sched.studentId, 'class:reminder', {
+            scheduleId: sched._id,
+            course: sched.course,
+            teacherName: sched.teacherName,
+            studentName: sched.studentName,
+            startTime: sched.startTime,
+            endTime: sched.endTime,
+            linkHoc: sched.linkHoc,
+            message: studentMsg,
+            isLive,
+          });
+        }
+        if (sched.teacherId) {
+          app.notifyUser('teacher', sched.teacherId, 'class:reminder', {
+            scheduleId: sched._id,
+            course: sched.course,
+            teacherName: sched.teacherName,
+            studentName: sched.studentName,
+            startTime: sched.startTime,
+            endTime: sched.endTime,
+            linkHoc: sched.linkHoc,
+            message: teacherMsg,
+            isLive,
+          });
+        }
+
+        // 2. Đánh dấu đã gửi
+        await Schedule.updateOne({ _id: sched._id }, { $set: { reminderSent: true, reminderSentAt: new Date() } });
+        logger.info(`[CRON] Đã gửi nhắc lịch học ca ${sched.startTime} môn ${sched.course} cho HV: ${sched.studentName} & GV: ${sched.teacherName}`);
+      }
+    }
   } catch (err) {
     logger.error({ err: err.message }, '[CRON] schedule check');
   }

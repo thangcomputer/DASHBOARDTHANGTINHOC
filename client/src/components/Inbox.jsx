@@ -21,11 +21,12 @@ import {
 } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
 import {
+  formatLocalDateKey,
   getScheduleDisplayKind,
   isScheduleOngoingNow,
   normalizeScheduleDate,
+  parseTimeToMinutes,
 } from '../utils/scheduleTime';
-import { openClassRoom } from './classRoom/ClassRoom';
 import {
   resolveMessagingDeepLink,
   existingPeerIdsFromConversations,
@@ -87,6 +88,27 @@ function normalizeClassroomUrl(value) {
   const url = String(value || '').trim();
   if (!url) return '';
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function isScheduleInTimeWindowNow(schedule, now = new Date()) {
+  if (!schedule) return false;
+  const status = String(schedule.status || '');
+  if (status === 'cancelled' || status === 'no_show') return false;
+  if (isScheduleOngoingNow(schedule, now)) return true;
+  if (normalizeScheduleDate(schedule.date) !== formatLocalDateKey(now)) return false;
+  const start = parseTimeToMinutes(schedule.startTime);
+  const end = parseTimeToMinutes(schedule.endTime);
+  if (start == null) return false;
+  const current = parseTimeToMinutes(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(now),
+  );
+  if (current == null) return false;
+  return end == null ? current >= start : (current >= start && current <= end);
 }
 
 function toValidActivityDate(date) {
@@ -714,39 +736,62 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     const isTeacher = viewerRole === 'teacher';
     const studentId = isTeacher ? peerId : String(currentUserId || '');
     const teacherId = isTeacher ? String(currentUserId || '') : peerId;
+    const studentProfile = isTeacher
+      ? peerProfile
+      : (students || []).find((student) => entityId(student) === studentId) || currentUser;
+    const enrollments = Array.isArray(studentProfile?.enrollments)
+      ? studentProfile.enrollments
+      : Array.isArray(studentProfile?.courses)
+        ? studentProfile.courses
+        : [];
     const matchingSchedules = (Array.isArray(schedules) ? schedules : [])
       .filter((schedule) => {
-        if (String(schedule?.status || '') !== 'scheduled') return false;
+        const status = String(schedule?.status || '');
+        if (status === 'cancelled' || status === 'no_show') return false;
         if (entityId(schedule.studentId) !== studentId || entityId(schedule.teacherId) !== teacherId) {
           return false;
         }
+        if (isScheduleInTimeWindowNow(schedule, scheduleNow)) return true;
+        if (status !== 'scheduled') return false;
         const kind = getScheduleDisplayKind(schedule, scheduleNow);
-        return kind === 'upcoming' || kind === 'ongoing';
+        return kind === 'upcoming' || kind === 'ongoing' || kind === 'awaiting_confirm';
       })
       .sort((a, b) => {
-        const liveDifference = Number(isScheduleOngoingNow(b, scheduleNow))
-          - Number(isScheduleOngoingNow(a, scheduleNow));
+        const liveDifference = Number(isScheduleInTimeWindowNow(b, scheduleNow))
+          - Number(isScheduleInTimeWindowNow(a, scheduleNow));
         if (liveDifference) return liveDifference;
         const dateDifference = normalizeScheduleDate(a.date).localeCompare(normalizeScheduleDate(b.date));
         return dateDifference || String(a.startTime || '').localeCompare(String(b.startTime || ''));
       });
 
-    if (!matchingSchedules.length) return { url: '', scheduleId: '' };
-    const schedule = matchingSchedules.find((item) => isScheduleOngoingNow(item, scheduleNow))
+    const schedule = matchingSchedules.find((item) => isScheduleInTimeWindowNow(item, scheduleNow))
       || matchingSchedules.find((item) => String(item.linkHoc || '').trim())
-      || matchingSchedules[0];
-    const studentProfile = isTeacher
-      ? peerProfile
-      : (students || []).find((student) => entityId(student) === studentId) || currentUser;
+      || matchingSchedules[0]
+      || null;
+    const scheduleCourse = String(schedule?.course || schedule?.courseName || '').trim().toLowerCase();
+    const matchedEnrollment = (scheduleCourse && enrollments.find((e) => (
+      entityId(e?.teacherId) === teacherId
+      && String(e?.courseName || e?.name || '').trim().toLowerCase() === scheduleCourse
+      && String(e?.linkHoc || '').trim()
+    )))
+      || enrollments.find((e) => entityId(e?.teacherId) === teacherId && String(e?.linkHoc || '').trim())
+      || (scheduleCourse && enrollments.find((e) => (
+        String(e?.courseName || e?.name || '').trim().toLowerCase() === scheduleCourse
+        && String(e?.linkHoc || '').trim()
+      )))
+      || enrollments.find((e) => e?.isPrimary && String(e?.linkHoc || '').trim())
+      || enrollments.find((e) => String(e?.linkHoc || '').trim());
     return {
       url: normalizeClassroomUrl(
-        schedule.linkHoc
+        schedule?.linkHoc
+        || schedule?.meetingUrl
+        || matchedEnrollment?.linkHoc
         || studentProfile?.joinClassUrl
         || studentProfile?.linkHoc
         || studentProfile?.online_meeting_url
         || '',
       ),
-      scheduleId: String(schedule._id || schedule.id || ''),
+      scheduleId: String(schedule?._id || schedule?.id || ''),
     };
   }, [
     canShowClassroomButton,
@@ -760,10 +805,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     currentUser,
   ]);
   const isClassTime = canShowClassroomButton && (Array.isArray(schedules) ? schedules : []).some((schedule) => (
-    String(schedule?.status || '') === 'scheduled'
-    && entityId(schedule.studentId) === (viewerRole === 'teacher' ? entityId(activeConv?.user) : String(currentUserId || ''))
+    entityId(schedule.studentId) === (viewerRole === 'teacher' ? entityId(activeConv?.user) : String(currentUserId || ''))
     && entityId(schedule.teacherId) === (viewerRole === 'teacher' ? String(currentUserId || '') : entityId(activeConv?.user))
-    && isScheduleOngoingNow(schedule, scheduleNow)
+    && isScheduleInTimeWindowNow(schedule, scheduleNow)
   ));
   const pendingAttendanceSchedule = viewerRole === 'student' && peerRole === 'teacher'
     ? (Array.isArray(schedules) ? schedules : [])
@@ -2500,32 +2544,45 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 <button
                   type="button"
                   onClick={() => setShowCreateGroup(true)}
-                  className="w-12 h-12 flex shrink-0 items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors shadow-sm"
+                  className={`w-11 h-11 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center rounded-2xl transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${
+                    currentUserRole === 'teacher'
+                      ? 'bg-white border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-[#10B981] hover:bg-emerald-50/50'
+                      : 'bg-white border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] text-red-600 hover:bg-red-50/50'
+                  }`}
                   title="Tạo nhóm chat"
                   aria-label="Tạo nhóm chat"
                 >
-                  <Plus size={20} />
+                  <Plus size={20} strokeWidth={2.5} />
                 </button>
               )}
             </div>
 
-            {/* Hàng Tabs (Pills) Phân loại danh bạ */}
-            <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">
+            {/* Hàng Tabs (Pills) Phân loại danh bạ - 3D Buttons */}
+            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible py-1">
               {[
                 { id: 'all', label: 'Tất cả' },
                 currentUserRole === 'teacher'
                   ? { id: 'student', label: 'Học viên' }
                   : { id: 'teacher', label: 'Giảng viên' },
                 { id: 'group', label: 'Nhóm' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setContactTab(tab.id)}
-                  className={contactTab === tab.id ? 'cms-chip cms-chip-active' : 'cms-chip'}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              ].map(tab => {
+                const active = contactTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setContactTab(tab.id)}
+                    className={`min-h-[38px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 flex items-center justify-center ${
+                      active
+                        ? (currentUserRole === 'teacher'
+                            ? 'bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
+                            : 'bg-[#DC2626] border-[1.5px] border-[#F87171] border-b-4 border-b-[#B91C1C] text-white hover:brightness-105')
+                        : 'bg-white border-[1.5px] border-slate-200 border-b-4 border-b-slate-300 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
             {!isConnected && (
               <div
@@ -2587,7 +2644,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   className={`cms-chat-conv-row group border border-slate-100 bg-white shadow-sm ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'}`}
                 >
                   <div className="relative shrink-0">
-                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
+                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold relative z-10 overflow-hidden ${isGroup ? 'cms-chat-group-badge bg-red-500' : 'bg-white ring-2 shadow-md ' + (
                       conv.user.role === 'teacher' ? 'ring-amber-400/80'
                         : conv.user.role === 'student' ? 'ring-sky-400/80'
                           : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'ring-blue-400/80'
@@ -2819,7 +2876,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <ChevronLeft size={22} />
                   </button>
                   <div className="relative shrink-0">
-                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white shadow-sm ${activeConv.isGroup ? 'bg-red-500' : 'bg-white'
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white ${activeConv.isGroup ? 'cms-chat-group-badge bg-red-500' : 'bg-white shadow-sm'
                       }`}>
                       {activeConv.isGroup ? (
                         <Users size={16} />
@@ -2867,18 +2924,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   </div>
                 </div>
                 {canShowClassroomButton && (
-                  isClassTime && classroomJoin.scheduleId ? (
-                    <button
-                      type="button"
-                      onClick={() => openClassRoom(classroomJoin.scheduleId)}
+                  isClassTime && classroomJoin.url ? (
+                    <a
+                      href={classroomJoin.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
                       aria-label={isClassTime ? 'Lớp học đang diễn ra, vào lớp ngay' : 'Vào lớp học ngay'}
-                      title="Vào phòng học của buổi này. Tài khoản khác không vào được."
+                      title={isClassTime ? 'Buổi học đang diễn ra. Bấm để vào lớp Meet' : 'Vào lớp học ngay'}
                     >
                       {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
                       <Video size={16} aria-hidden="true" />
                       <span className="hidden sm:inline">{isClassTime ? 'Vào lớp học' : 'Vào lớp học ngay'}</span>
-                    </button>
+                    </a>
                   ) : (
                     <button
                       type="button"

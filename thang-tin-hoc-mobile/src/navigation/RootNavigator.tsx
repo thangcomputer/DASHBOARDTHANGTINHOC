@@ -30,6 +30,7 @@ import { messageService, notificationService, scheduleService, teacherFinanceSer
 import { LoginScreen } from '../screens/LoginScreen';
 import { EditableMobileAvatar } from '../components/EditableMobileAvatar';
 import { SubscriptionExpiredScreen, SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
+import { hasFeedPostAccess } from '../services/subscriptionApi';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CallScreen } from '../screens/CallScreen';
 import { CallHistoryScreen } from '../screens/CallHistoryScreen';
@@ -52,6 +53,7 @@ import {
 import { DailyPracticeScreen } from '../screens/DailyPracticeScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
+import { MeetStartAlert } from '../components/MeetStartAlert';
 import { PinLockGate } from '../components/pinLock/PinLockGate';
 import { TeacherPaymentNoticeModal } from '../components/TeacherPaymentNoticeModal';
 import { LearningGoalHost } from '../components/LearningGoalModal';
@@ -59,7 +61,7 @@ import { FreeFeatureLockModal, FreeSurveyModal, isFreePortalLocked, isFreePortal
 import { MobilePopupBanner } from '../components/MobilePopupBanner';
 import { noteStudyActivity } from '../services/studyActivity';
 import { notePinActivity, pinUserKey } from '../services/pinLock';
-import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, animateChrome } from '../components/ui';
+import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, MOBILE_OPEN_MENU_EVENT, animateChrome } from '../components/ui';
 import type { AppStackParamList, MainTabsParamList } from './types';
 import { navigationRef } from './navigationRef';
 
@@ -437,6 +439,7 @@ export function RootNavigator() {
     <View style={styles.root} onTouchStart={noteUserActivity}>
       <OfflineBanner />
       <MobileSoundEffects incomingCall={Boolean(incomingCall)} />
+      {(user.role === 'student' || user.role === 'teacher') ? <MeetStartAlert user={user} /> : null}
       <PinLockGate
         userKey={pinUserKey(user)}
         userName={user.name}
@@ -484,6 +487,7 @@ export function RootNavigator() {
           <Stack.Screen name="SoftwareLinks" component={SoftwareLinksScreen} />
           {user.role === 'student' ? (
             <>
+              <Stack.Screen name="CourseVideos" component={CourseVideosScreen} />
               <Stack.Screen name="Materials" component={MaterialsScreen} />
               <Stack.Screen name="Grades" component={GradesScreen} />
               <Stack.Screen name="StudentLearning" component={StudentLearningScreen} />
@@ -635,6 +639,7 @@ function NavTabContent({
   isHome,
   badgeCount = 0,
   locked = false,
+  isBrandStudent = false,
 }: {
   name: string;
   label: string;
@@ -643,6 +648,7 @@ function NavTabContent({
   isHome: boolean;
   badgeCount?: number;
   locked?: boolean;
+  isBrandStudent?: boolean;
 }) {
   const tone = TAB_ICON_TONES[name] || colors.muted;
   return (
@@ -650,7 +656,7 @@ function NavTabContent({
       style={[
         styles.navItem,
         isHome ? styles.navItemHome : styles.navItemCard,
-        !isHome && selected && styles.navItemActive,
+        !isHome && selected && (isBrandStudent ? styles.navItemActiveBrand : styles.navItemActive),
       ]}
       accessibilityLabel={isHome ? label : undefined}
     >
@@ -658,9 +664,9 @@ function NavTabContent({
         style={[
           styles.navTile,
           isHome
-            ? styles.navTileHome
+            ? (isBrandStudent ? styles.navTileHomeBrand : styles.navTileHome)
             : selected
-              ? styles.navTileActive
+              ? (isBrandStudent ? styles.navTileActiveBrand : styles.navTileActive)
               : {
                 borderColor: `${tone}26`,
                 backgroundImage: `linear-gradient(135deg, ${tone}14 0%, #FFFFFF 100%)`,
@@ -673,7 +679,9 @@ function NavTabContent({
           strokeWidth={isHome || selected ? 2.5 : 2}
         />
         {badgeCount > 0 ? (
-          <Text style={styles.persistentTabBadge}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+          <Text style={[styles.persistentTabBadge, isBrandStudent && styles.persistentTabBadgeBrand]}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Text>
         ) : locked ? (
           <View style={styles.navLockBadge}>
             <Lock size={10} color="#FBBF24" strokeWidth={2.5} />
@@ -685,7 +693,7 @@ function NavTabContent({
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.8}
-          style={[styles.navLabel, selected && styles.navLabelActive]}
+          style={[styles.navLabel, selected && (isBrandStudent ? styles.navLabelActiveBrand : styles.navLabelActive)]}
         >
           {label}
         </Text>
@@ -712,6 +720,13 @@ function PersistentTabBar({
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isTeacher = role === 'teacher';
+  const { user, subscription } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !freeMenu && !isFreePortalMenu(user));
+  const feedPostLocked = !isTeacher && !hasFeedPostAccess({
+    role,
+    user,
+    subscription: subscription?.subscription,
+  });
   const [visibility, setVisible] = useNavigationBarVisibility();
   const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
   const barWidth = 760;
@@ -735,13 +750,13 @@ function PersistentTabBar({
         { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
         { name: 'DailyPractice' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Gamepad2 },
         { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
-        { name: 'CourseVideos' as const, label: 'Bài giảng', shortLabel: 'Bài giảng', icon: BookOpen },
+        { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Radio },
         { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
       ]
       : [
         { name: 'Schedule' as const, label: 'Lịch học', shortLabel: 'Lịch học', icon: CalendarDays },
         { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
-        { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
+        { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Radio },
         { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
         { name: 'DailyPractice' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Gamepad2 },
         { name: 'CourseVideos' as const, label: 'Bài giảng', shortLabel: 'Bài giảng', icon: BookOpen },
@@ -777,7 +792,7 @@ function PersistentTabBar({
       </BlurView>
       {orderedItems.map(({ name, label, shortLabel, icon: Icon }) => {
         const selected = name === activeTab;
-        const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(name);
+        const locked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(name)) || (name === 'Feed' && feedPostLocked);
         const badgeCount = name === 'Messages'
           ? unreadConversationCount
           : name === 'Schedule' ? todayScheduleCount : 0;
@@ -785,7 +800,7 @@ function PersistentTabBar({
           <Pressable
             key={name}
             onPress={() => {
-              if (locked) {
+              if (locked && name !== 'Feed') {
                 DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
                 return;
               }
@@ -804,6 +819,7 @@ function PersistentTabBar({
               isHome={name === 'Home'}
               badgeCount={badgeCount}
               locked={locked}
+              isBrandStudent={isBrandStudent}
             />
           </Pressable>
         );
@@ -821,28 +837,24 @@ type MenuEntry = { label: string; destination: MenuDestination; icon: LucideIcon
 type MenuSection = { label: string; items: MenuEntry[] };
 
 function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
-  const { user } = useAuth();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { user, subscription } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [menuMounted, setMenuMounted] = useState(false);
   const drawerTranslateX = useRef(new Animated.Value(0)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const [handleHovered, setHandleHovered] = useState(false);
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
+  const isBrandStudent = !isTeacher && !freeMenu;
   const freeLocked = isFreePortalLocked(user);
+  const feedPostLocked = !isTeacher && !hasFeedPostAccess({
+    role: user?.role,
+    user,
+    subscription: subscription?.subscription,
+  });
   const [activeDestination, setActiveDestination] = useState<MenuDestination | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const drawerWidth = Math.min(windowWidth * 0.82, 280);
-  const handleHeight = 48;
-  const headerBottom = insets.top + 58;
-  const bottomNavigationHeight = 96 + insets.bottom;
-  const minMenuTop = headerBottom + 8;
-  const maxMenuTop = Math.max(minMenuTop, windowHeight - bottomNavigationHeight - handleHeight - 8);
-  const [menuTop, setMenuTop] = useState((minMenuTop + maxMenuTop) / 2);
-  useEffect(() => {
-    setMenuTop((currentTop) => Math.max(minMenuTop, Math.min(maxMenuTop, currentTop)));
-  }, [maxMenuTop, minMenuTop]);
   const menuSections: MenuSection[] = isTeacher
     ? [
       {
@@ -878,7 +890,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         items: [
           { label: 'Tổng quan', destination: 'Home', icon: House },
           { label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 },
-          { label: 'Bài giảng', destination: 'CourseVideos', icon: BookOpen },
+          ...(!freeMenu ? [{ label: 'Bài giảng', destination: 'CourseVideos' as const, icon: BookOpen }] : []),
           { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
           ...(!freeMenu ? [{ label: 'Lịch học', destination: 'Schedule' as const, icon: CalendarDays }] : []),
           { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
@@ -888,8 +900,8 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       {
         label: 'THÔNG TIN & HỖ TRỢ',
         items: [
+          { label: 'Bảng tin', destination: 'Feed' as const, icon: Radio },
           ...(!freeMenu ? [
-            { label: 'Bảng tin', destination: 'Feed' as const, icon: Radio },
             { label: 'Tin tức', destination: 'News' as const, icon: Newspaper },
             { label: 'Đánh giá giảng viên', destination: 'Evaluations' as const, icon: Star },
             { label: 'Liên hệ Trung tâm', destination: 'CenterInfo' as const, icon: Building2 },
@@ -920,6 +932,10 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       ]).start();
     });
   };
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(MOBILE_OPEN_MENU_EVENT, openMenu);
+    return () => subscription.remove();
+  }, [openMenu]);
   const closeMenu = () => {
     if (!menuMounted) return;
     drawerTranslateX.stopAnimation();
@@ -966,13 +982,6 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     updateActiveDestination();
     return navigationRef.addListener('state', updateActiveDestination);
   }, [isTeacher]);
-  const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-    onPanResponderMove: (_event, gesture) => {
-      setMenuTop(Math.max(minMenuTop, Math.min(maxMenuTop, gesture.moveY - handleHeight / 2)));
-    },
-  }), [handleHeight, maxMenuTop, minMenuTop]);
-
   const openDestination = (destination: MenuDestination) => {
     closeMenu();
     if (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination)) {
@@ -1020,21 +1029,6 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <>
-      <View {...panResponder.panHandlers} style={[styles.floatingMenuHandle, { top: menuTop }]}>
-        <Pressable
-          onPress={openMenu}
-          onHoverIn={() => setHandleHovered(true)}
-          onHoverOut={() => setHandleHovered(false)}
-          style={({ pressed }) => [
-            styles.floatingMenuButton,
-            { opacity: pressed || handleHovered ? 0.96 : 0.22 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Mở danh mục điều hướng"
-        >
-          <Menu size={21} color="#FFFFFF" />
-        </Pressable>
-      </View>
       <Modal visible={menuMounted} transparent animationType="none" onRequestClose={closeMenu}>
         <View style={styles.drawerOverlay}>
           <Animated.View style={[styles.drawerBackdrop, { opacity: backdropOpacity }]}>
@@ -1077,25 +1071,27 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                   <View style={styles.drawerSectionItems}>
                     {section.items.map(({ label, destination, icon: Icon }) => {
                       const selected = activeDestination === destination;
-                      const itemLocked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination);
+                      const itemLocked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination)) || (destination === 'Feed' && feedPostLocked);
                       return (
                         <Pressable
                           key={destination}
                           onPress={() => openDestination(destination)}
                           style={({ pressed }) => [
                             styles.drawerItem,
-                            selected && styles.drawerItemActive,
+                            selected && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive),
                             pressed && styles.drawerItemPressed,
                           ]}
                           accessibilityRole="button"
                           accessibilityLabel={label}
                           accessibilityState={{ selected }}
                         >
-                          <View style={[styles.drawerItemIcon, selected && styles.drawerItemIconActive]}>
+                          <View style={[styles.drawerItemIcon, selected && (isBrandStudent ? styles.drawerItemIconActiveBrand : styles.drawerItemIconActive)]}>
                             <Icon size={18} color={selected ? '#FFFFFF' : '#A8B6CC'} strokeWidth={2} />
                           </View>
                           <Text style={[styles.drawerItemText, selected && styles.drawerItemTextActive]}>{label}</Text>
-                          {itemLocked ? <Lock size={14} color="#FBBF24" /> : selected ? <View style={styles.drawerItemSelectedMark} /> : null}
+                          {itemLocked ? <Lock size={14} color="#FBBF24" /> : selected ? (
+                            <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
+                          ) : null}
                         </Pressable>
                       );
                     })}
@@ -1106,14 +1102,17 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
             <View style={styles.drawerFooter}>
               <Pressable
                 onPress={() => openDestination('Profile')}
-                style={[styles.drawerItem, activeDestination === 'Profile' && styles.drawerItemActive]}
+                style={[styles.drawerItem, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive)]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: activeDestination === 'Profile' }}
               >
-                <View style={[styles.drawerItemIcon, activeDestination === 'Profile' && styles.drawerItemIconActive]}>
+                <View style={[styles.drawerItemIcon, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemIconActiveBrand : styles.drawerItemIconActive)]}>
                   <UserRound size={18} color={activeDestination === 'Profile' ? '#FFFFFF' : '#A8B6CC'} />
                 </View>
                 <Text style={[styles.drawerItemText, activeDestination === 'Profile' && styles.drawerItemTextActive]}>Hồ sơ</Text>
+                {activeDestination === 'Profile' ? (
+                  <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
+                ) : null}
               </Pressable>
               <Pressable onPress={() => { closeMenu(); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
                 <View style={styles.drawerItemIcon}><LogOut size={18} color="#FCA5A5" /></View>
@@ -1135,6 +1134,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
 
 function FloatingSupportButton() {
   const { user } = useAuth();
+  const freeMenu = isFreePortalMenu(user);
   const freeLocked = isFreePortalLocked(user);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -1181,7 +1181,7 @@ function FloatingSupportButton() {
         accessibilityRole="button"
         accessibilityLabel="Mở hỗ trợ"
       >
-        <View style={styles.floatingSupportIcon}>
+        <View style={[styles.floatingSupportIcon, !freeMenu && styles.floatingSupportIconBrand]}>
           <Headphones size={22} color="#FFFFFF" strokeWidth={2.5} />
         </View>
         <View style={styles.floatingSupportLabel}>
@@ -1193,12 +1193,18 @@ function FloatingSupportButton() {
 }
 
 function MainTabs() {
-  const { user } = useAuth();
+  const { user, subscription } = useAuth();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
+  const isBrandStudent = !isTeacher && !freeMenu;
   const freeLocked = isFreePortalLocked(user);
+  const feedPostLocked = !isTeacher && !hasFeedPostAccess({
+    role: user?.role,
+    user,
+    subscription: subscription?.subscription,
+  });
   const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
   const tabBarWidth = 760;
   const [navigationBarVisibility, setNavigationBarVisible] = useNavigationBarVisibility();
@@ -1413,6 +1419,7 @@ function MainTabs() {
               isHome={route.name === 'Home'}
               badgeCount={badgeCount}
               locked={locked}
+              isBrandStudent={isBrandStudent}
             />
           );
         },
@@ -1474,7 +1481,7 @@ function MainTabs() {
               options={{ title: 'Luyện tập' }}
             />
             <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
+            <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
             <Tab.Screen
               name="Profile"
               component={ProfileScreen}
@@ -1561,22 +1568,26 @@ const styles = StyleSheet.create({
   navItem: { alignSelf: 'stretch', marginHorizontal: 3, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
   navItemCard: { borderColor: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.45)', boxShadow: droplet.button },
   navItemActive: { borderColor: 'rgba(167,243,208,0.8)', backgroundColor: 'rgba(236,253,245,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(236,253,245,0.8) 100%)', boxShadow: droplet.navItemActive },
+  navItemActiveBrand: { borderColor: 'rgba(254,202,202,0.8)', backgroundColor: 'rgba(254,242,242,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(254,242,242,0.8) 100%)', boxShadow: droplet.navItemActive },
   navTile: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderBottomWidth: 3, borderBottomColor: '#CBD5E1', borderRadius: 14, backgroundColor: '#FFFFFF' },
   navTileActive: { borderColor: '#059669', borderBottomColor: '#047857', borderBottomWidth: 3, backgroundColor: '#10B981' },
+  navTileActiveBrand: { borderColor: '#DC2626', borderBottomColor: '#991B1B', borderBottomWidth: 3, backgroundColor: '#EF4444' },
   navItemHome: { gap: 0, paddingVertical: 0 },
   navTileHome: { width: 56, height: 56, borderWidth: 3, borderBottomWidth: 5, borderColor: '#FFFFFF', borderBottomColor: '#047857', borderRadius: 28, backgroundColor: '#10B981', backgroundImage: 'linear-gradient(160deg, #34D399 0%, #059669 55%, #047857 100%)', boxShadow: droplet.navHome },
+  navTileHomeBrand: { width: 56, height: 56, borderWidth: 3, borderBottomWidth: 5, borderColor: '#FFFFFF', borderBottomColor: '#991B1B', borderRadius: 28, backgroundColor: '#EF4444', backgroundImage: 'linear-gradient(160deg, #F87171 0%, #EF4444 55%, #DC2626 100%)', boxShadow: droplet.navHomeBrand },
   navLabel: { maxWidth: '100%', color: colors.muted, fontSize: 10, lineHeight: 13, fontWeight: '700', textAlign: 'center' },
   navLabelActive: { color: '#047857', fontWeight: '900' },
+  navLabelActiveBrand: { color: '#DC2626', fontWeight: '900' },
   persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: colors.brand, color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
+  persistentTabBadgeBrand: { backgroundColor: '#DC2626' },
   navLockBadge: { position: 'absolute', top: -6, right: -6, width: 17, height: 17, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
-  floatingMenuHandle: { position: 'absolute', left: 0, zIndex: 20 },
-  floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 12, borderBottomRightRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 2, height: 2 }, elevation: 6 },
   floatingSupportHandle: { position: 'absolute', right: 0, zIndex: 19 },
   floatingSupportButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3, paddingLeft: 4, paddingRight: 14, borderWidth: 2, borderRightWidth: 0, borderColor: '#F59E0B', borderTopLeftRadius: 999, borderBottomLeftRadius: 999, backgroundColor: '#FFF8EB', backgroundImage: 'linear-gradient(145deg, #FFF8EB 0%, #FFFFFF 100%)', boxShadow: 'inset 2px 2px 5px rgba(120, 53, 15, 0.16), inset -2px -2px 5px rgba(255, 255, 255, 0.98), 0px 2px 5px rgba(15, 23, 42, 0.08)' },
   floatingSupportButtonPressed: { transform: [{ translateY: 1 }], boxShadow: 'inset 3px 3px 8px rgba(120, 53, 15, 0.24), inset -2px -2px 5px rgba(255, 255, 255, 0.88)' },
   floatingSupportLabel: { paddingHorizontal: 2 },
   floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
   floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand, boxShadow: 'inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' },
+  floatingSupportIconBrand: { backgroundColor: '#DC2626', boxShadow: 'inset 2px 2px 4px rgba(185, 28, 28, 0.35), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' } as never,
   drawerOverlay: { flex: 1, flexDirection: 'row' },
   drawerBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
@@ -1619,13 +1630,16 @@ const styles = StyleSheet.create({
   drawerSectionItems: { gap: 4 },
   drawerItem: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: 12, borderWidth: 1, borderColor: 'transparent', borderRadius: 14 },
   drawerItemActive: { borderColor: 'rgba(52, 211, 153, 0.4)', borderBottomWidth: 3, borderBottomColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.16)' },
+  drawerItemActiveBrand: { borderColor: 'rgba(248, 113, 113, 0.4)', borderBottomWidth: 3, borderBottomColor: '#DC2626', backgroundColor: 'rgba(239, 68, 68, 0.16)' },
   drawerItemPressed: { backgroundColor: 'rgba(255,255,255,0.12)' },
   drawerItemIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
   drawerItemIconActive: { backgroundColor: '#10B981' },
+  drawerItemIconActiveBrand: { backgroundColor: '#EF4444' },
   drawerItemText: { flex: 1, color: '#D5DCE7', fontSize: typography.body, fontWeight: '700' },
   drawerLogoutText: { color: '#F87171' },
   drawerItemTextActive: { color: '#FFFFFF', fontWeight: '900' },
   drawerItemSelectedMark: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#34D399' },
+  drawerItemSelectedMarkBrand: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#F87171' },
   drawerFooter: { paddingTop: 10, marginTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.24)', gap: 4 },
   homeArcButton: {
     width: 58,

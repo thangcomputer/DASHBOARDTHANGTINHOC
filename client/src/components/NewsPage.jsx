@@ -39,7 +39,7 @@ function statusClass(s) {
   return 'bg-amber-50 text-amber-700';
 }
 
-const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-red-500';
+const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold shadow-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-red-500';
 const NEWS_VIEW_KEY = 'cms-news-view';
 
 function readNewsView() {
@@ -1008,13 +1008,21 @@ export default function NewsPage({ session, role = 'admin' }) {
                 if (e.key === 'Enter') setQ(qInput.trim());
               }}
               placeholder="Tìm bài viết…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 bg-white transition-all"
+              className={`w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-white transition-all ${
+                role === 'teacher'
+                  ? 'focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                  : 'focus:border-red-500 focus:ring-2 focus:ring-red-100'
+              }`}
             />
           </div>
           <button
             type="button"
             onClick={() => setQ(qInput.trim())}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors"
+            className={
+              role === 'teacher'
+                ? "px-5 py-2.5 rounded-2xl bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white text-xs font-extrabold shrink-0 transition-all cursor-pointer shadow-xs"
+                : "px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors"
+            }
           >
             Tìm
           </button>

@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { X, Save, User, Phone, Mail, MapPin } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useModal } from '../utils/Modal.jsx';
+import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 
 const StudentProfileUpdateModal = ({ student, onClose }) => {
   const { updateStudent } = useData();
   const { showModal } = useModal();
+  const isFreePortal = isFreePortalSelfRegistrationStudent(student ? { ...student, role: 'student' } : null)
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
+  const isBrandStudent = !isFreePortal;
   const [formData, setFormData] = useState({
     name: student.name || '',
     phone: student.phone || '',
@@ -46,8 +50,12 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-teal-50">
-          <h3 className="font-black text-teal-800 flex items-center gap-2">
+        <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-100 ${
+          isBrandStudent ? 'bg-red-50' : 'bg-teal-50'
+        }`}>
+          <h3 className={`font-black flex items-center gap-2 ${
+            isBrandStudent ? 'text-red-700' : 'text-teal-800'
+          }`}>
             <User size={18} /> Cập nhật Hồ sơ Cá nhân
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-red-500 bg-white rounded-full p-1.5 shadow-sm transition">
@@ -61,7 +69,9 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               type="text"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
+              className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none transition ${
+                isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+              }`}
               readOnly
             />
             <p className="text-[9px] text-red-500 mt-1 pl-1 italic">* Tên không thể tự sửa. Vui lòng liên hệ Admin.</p>
@@ -73,8 +83,10 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: 'male' })}
-                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
-                    ? 'bg-teal-50 text-teal-700 border-teal-300 ring-2 ring-teal-400/20 shadow-sm'
+                className={`select-none flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
+                    ? (isBrandStudent
+                        ? 'bg-red-50 text-red-700 border-red-300 ring-2 ring-red-400/20 shadow-sm'
+                        : 'bg-teal-50 text-teal-700 border-teal-300 ring-2 ring-teal-400/20 shadow-sm')
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                   }`}
               >
@@ -83,7 +95,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: 'female' })}
-                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
+                className={`select-none flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
                     ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                   }`}
@@ -100,7 +112,9 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                   type="text"
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
+                  className={`w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
+                    isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                  }`}
                   readOnly
                 />
                 <Phone size={14} className="absolute left-3 top-3.5 text-gray-400" />
@@ -114,7 +128,9 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                   type="text"
                   value={formData.zalo}
                   onChange={e => setFormData({ ...formData, zalo: e.target.value })}
-                  className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
+                  className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
+                    isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                  }`}
                 />
                 <Phone size={14} className="absolute left-3 top-3.5 text-blue-400" />
               </div>
@@ -127,7 +143,9 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 type="email"
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
+                className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
+                  isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                }`}
                 placeholder="Ví dụ: nguyenvan@gmail.com"
               />
               <Mail size={14} className="absolute left-3 top-3.5 text-gray-400" />
@@ -141,7 +159,9 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 type="text"
                 value={formData.address}
                 onChange={e => setFormData({ ...formData, address: e.target.value })}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
+                className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
+                  isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                }`}
                 placeholder="Nhập địa chỉ của bạn"
               />
               <MapPin size={14} className="absolute left-3 top-3.5 text-gray-400" />
@@ -151,9 +171,16 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black text-xs  tracking-widest py-3.5 rounded-xl shadow-lg shadow-teal-200 transition active:scale-95 disabled:opacity-50"
+            className={`duo-btn duo-btn--primary ${isBrandStudent ? 'duo-btn--danger' : 'duo-btn--emerald'} duo-btn--lg duo-btn--full mt-4`}
           >
-            {loading ? 'Đang lưu...' : <><Save size={16} /> Lưu thông tin</>}
+            {loading ? (
+              <span className="duo-btn__label">Đang lưu...</span>
+            ) : (
+              <>
+                <span className="duo-btn__icon"><Save size={18} /></span>
+                <span className="duo-btn__label">Lưu thông tin</span>
+              </>
+            )}
           </button>
         </form>
       </div>

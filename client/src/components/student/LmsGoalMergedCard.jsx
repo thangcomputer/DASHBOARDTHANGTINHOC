@@ -15,6 +15,7 @@ import {
   openLearningGoal,
   periodLabel,
 } from '../../utils/learningGoal';
+import { lmsBtn } from '../../utils/lmsButtonClass';
 
 /* ─── constants ──────────────────────────────────────────── */
 const SEEN_KEY = 'lms-progress-level-seen';
@@ -38,7 +39,7 @@ function shiftMonth(month, delta) {
 function pct(v, t) { return !t ? 0 : Math.min(100, Math.round(((v || 0) / t) * 100)); }
 
 /* ─── main component ─────────────────────────────────────── */
-export default function LmsGoalMergedCard() {
+export default function LmsGoalMergedCard({ hideMissions = false, compact = false } = {}) {
   const navigate = useNavigate();
   const subCtx = useStudentSubscription();
 
@@ -119,67 +120,73 @@ export default function LmsGoalMergedCard() {
     ['history', 'Lịch sử'],
   ];
 
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+  const xpLine = lms?.atMaxLevel
+    ? `${lms?.xpTotal || 0} XP · cấp tối đa`
+    : `${lms?.xpTotal || 0} XP · ${lmsInto}/${lmsNeed} tới ${lms?.nextTitle || 'cấp sau'}`;
 
-      {/* ══ LEVEL UP BANNER ══ */}
+  return (
+    <div className="duo-card overflow-hidden">
+
       {celebrate && lms?.level > 1 && (
         <button
+          type="button"
           onClick={() => { localStorage.setItem(SEEN_KEY, String(lms.level)); setCelebrate(false); }}
-          className="flex w-full items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2.5 text-left text-sm font-black text-amber-800 hover:bg-amber-100 transition"
+          className="flex w-full items-center gap-2 border-b border-amber-100/80 bg-amber-50/90 px-3 py-2 text-left text-xs font-bold text-amber-900 hover:bg-amber-100 transition"
         >
-          <span>🎉</span>
-          <span>Chúc mừng! Bạn lên Cấp {lms.level}: {lms.title}</span>
-          <span className="ml-auto text-xs font-semibold text-amber-600">Nhấn để đóng</span>
+          <span aria-hidden="true">🎉</span>
+          <span className="min-w-0 flex-1 truncate">Lên cấp {lms.level}: {lms.title}</span>
+          <span className="shrink-0 text-[10px] font-semibold text-amber-600">Đóng</span>
         </button>
       )}
 
-      {/* ══ NỘI DUNG THẺ GỘP ══ */}
-      <div className="p-4 space-y-3">
-        {/* Row: label + streak */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Học bài</p>
-            <p className="text-xl font-black text-slate-900 leading-tight">Cấp {lms?.level || 1}</p>
-            <p className="text-xs font-semibold text-slate-500">{lms?.title}</p>
+      <div className={compact ? 'space-y-2.5 p-3.5' : 'space-y-3 p-4'}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Học bài</p>
+            <p className="truncate text-base font-black leading-tight text-slate-900">
+              Cấp {lms?.level || 1}
+              {lms?.title ? <span className="font-semibold text-slate-500"> · {lms.title}</span> : null}
+            </p>
           </div>
-          <div className="flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">
-            <Flame size={13} />
-            {lms?.streak || 0} ngày
+          <div className="flex shrink-0 items-center gap-1 rounded-full border border-orange-100 bg-orange-50 px-2.5 py-1 text-[11px] font-black text-orange-700">
+            <Flame size={12} aria-hidden="true" />
+            {lms?.streak || 0}
           </div>
         </div>
 
-        {/* XP bar */}
         <div className="space-y-1">
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${lmsW}%` }} />
           </div>
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-            <Sparkles size={11} className="text-amber-400" />
-            {lms?.xpTotal || 0} XP học bài
-            {lms?.atMaxLevel ? ' · đạt cấp cao nhất' : ` · ${lmsInto}/${lmsNeed} tới ${lms?.nextTitle}`}
+          <p className="flex items-center gap-1 truncate text-[10px] font-medium text-slate-500" title={xpLine}>
+            <Sparkles size={10} className="shrink-0 text-amber-400" aria-hidden="true" />
+            <span className="truncate">{xpLine}</span>
           </p>
         </div>
 
-        {/* Pill tabs */}
-        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+        <div
+          className={`grid grid-cols-4 gap-0.5 rounded-xl bg-slate-100 p-0.5 ${compact ? '' : 'pt-0.5'}`}
+          role="tablist"
+          aria-label="Mục tiêu học bài"
+        >
           {TABS.map(([id, label]) => (
             <button
               key={id}
               type="button"
+              role="tab"
+              aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`rounded-full px-3 py-1 text-xs font-bold transition ${tab === id
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+              className={`rounded-[10px] px-1.5 py-1.5 text-[11px] font-extrabold transition ${tab === id
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+              }`}
             >
               {label}
             </button>
           ))}
         </div>
 
-        {/* Tab content */}
-        <div className="pt-1">
+        <div className="pt-0.5">
           {tab === 'goal' && (
             <GoalContent
               goal={goal}
@@ -192,6 +199,8 @@ export default function LmsGoalMergedCard() {
               doneMissions={doneMissions}
               navigate={navigate}
               openVideo={openVideo}
+              hideMissions={hideMissions}
+              compact={compact}
             />
           )}
           {tab === 'history' && <HistoryList rows={lms?.history || []} subHistory={subCtx?.overview?.history || []} />}
@@ -214,19 +223,21 @@ function GoalContent({
   doneMissions,
   navigate,
   openVideo,
+  hideMissions,
+  compact,
 }) {
   if (!goal) {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-red-50 p-3">
-        <Target size={20} className="shrink-0 text-red-500" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-slate-900">Chưa đặt mục tiêu học</p>
-          <p className="text-xs text-slate-500">Đặt mục tiêu để theo dõi số giờ học mỗi ngày.</p>
+      <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-red-200 bg-red-50/60 p-2.5">
+        <Target size={18} className="shrink-0 text-red-500" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-black text-slate-900">Chưa đặt mục tiêu học</p>
+          <p className="text-[11px] text-slate-500">Theo dõi giờ học mỗi ngày.</p>
         </div>
         <button
           type="button"
           onClick={openLearningGoal}
-          className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition"
+          className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 !text-[11px]' })}
         >
           Đặt ngay
         </button>
@@ -235,100 +246,95 @@ function GoalContent({
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50">
-          <Target size={18} className="text-red-600" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-slate-900">Mục tiêu: {goal.hoursPerDay} giờ/ngày</p>
-          <p className="text-xs font-semibold text-slate-400">
-            {goal.expired ? 'Đã kết thúc' : `${periodLabel(goal.period)} · Còn ${p.daysLeft} ngày`}
-          </p>
-        </div>
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+        <p className="text-sm font-black text-slate-900">
+          Mục tiêu {goal.hoursPerDay} giờ/ngày
+        </p>
         <button
           type="button"
           onClick={openLearningGoal}
-          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+          className="shrink-0 rounded-[10px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white px-2.5 py-0.5 text-[11px] font-extrabold text-[#DC2626] hover:bg-[#FEF2F2] active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none"
         >
-          {goal.expired ? 'Đặt mới' : 'Đổi'}
+          {goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}
         </button>
+        <p className="w-full text-[11px] font-medium text-slate-400">
+          {goal.expired ? 'Đã kết thúc' : `${periodLabel(goal.period)} · còn ${p.daysLeft} ngày`}
+        </p>
       </div>
 
-      {/* Hôm nay */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="flex items-center gap-1 font-bold text-slate-700">
-            <Flame size={13} className={todayDone ? 'text-emerald-500' : 'text-orange-400'} />
-            Hôm nay
-          </span>
-          <span className="font-black text-slate-900">
-            {formatStudyMinutes(p.todayMinutes)} / {goal.hoursPerDay} giờ
-            <span className={`ml-1 font-semibold ${todayDone ? 'text-emerald-600' : 'text-slate-400'}`}>({todayPct}%)</span>
+      <div
+        className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5"
+        title="Giờ học tính khi làm bài, ôn thi hoặc xem video"
+      >
+        <div className="mb-1.5 flex items-end justify-between gap-2">
+          <div className="flex items-baseline gap-1.5">
+            <span className={`text-2xl font-black tabular-nums leading-none ${todayDone ? 'text-emerald-600' : 'text-slate-900'}`}>
+              {todayPct}%
+            </span>
+            {todayDone ? (
+              <span className="text-[10px] font-bold text-emerald-600">Đạt hôm nay</span>
+            ) : (
+              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-orange-500">
+                <Flame size={11} aria-hidden="true" /> Hôm nay
+              </span>
+            )}
+          </div>
+          <span className="text-right text-[11px] font-bold text-slate-600">
+            {formatStudyMinutes(p.todayMinutes)}
+            <span className="font-semibold text-slate-400"> / {goal.hoursPerDay}h</span>
           </span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-red-500'}`}
+            className={`h-full rounded-full transition-all duration-500 ${todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`}
             style={{ width: `${todayPct}%` }}
           />
         </div>
-        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-          <span>Cả kỳ: {formatStudyMinutes(p.periodMinutes)} ({periodPct}%)</span>
-          {todayDone && <span className="font-bold text-emerald-600">✓ Đã đạt hôm nay</span>}
-        </div>
+        <p className="mt-1.5 text-[10px] font-medium text-slate-400">
+          Cả kỳ {formatStudyMinutes(p.periodMinutes)} · {periodPct}%
+        </p>
       </div>
 
-      {/* Nhiệm vụ hôm nay */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-black text-slate-800">Nhiệm vụ hôm nay</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
-            {doneMissions}/2 xong
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {/* Luyện tập */}
-          <button
-            type="button"
-            onClick={() => navigate('/student/daily-practice')}
-            className={`flex items-center gap-2 rounded-xl border p-2.5 text-left transition active:scale-98 ${qDone ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-              }`}
-          >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${qDone ? 'bg-emerald-500' : 'bg-sky-100'}`}>
-              {qDone ? <Check size={14} className="text-white" strokeWidth={3} /> : <Gamepad2 size={14} className="text-sky-600" />}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-black text-slate-900">Luyện tập</p>
-              <p className={`text-[11px] font-semibold ${qDone ? 'text-emerald-700' : 'text-slate-500'}`}>
+      {hideMissions ? (
+        <p className="text-[10px] text-slate-400">
+          Tiến độ mục tiêu: luyện {Math.min(p.todayQuestions || 0, MISSION_QUESTIONS)}/{MISSION_QUESTIONS} câu
+          {' · '}
+          video {Math.min(p.todayVideos || 0, MISSION_VIDEOS)}/{MISSION_VIDEOS}
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-extrabold text-slate-700">
+            Nhiệm vụ <span className="font-bold text-slate-400">({doneMissions}/2)</span>
+          </p>
+          <div className={`grid gap-1.5 ${compact ? 'grid-cols-2' : 'grid-cols-2'}`}>
+            <button
+              type="button"
+              onClick={() => navigate('/student/daily-practice')}
+              className={`flex items-center gap-2 rounded-xl border px-2 py-2 text-left transition ${qDone ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+            >
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${qDone ? 'bg-emerald-500' : 'bg-sky-50'}`}>
+                {qDone ? <Check size={12} className="text-white" strokeWidth={3} /> : <Gamepad2 size={12} className="text-sky-600" />}
+              </span>
+              <span className="min-w-0 text-[11px] font-bold text-slate-800">
                 {p.todayQuestions || 0}/{MISSION_QUESTIONS} câu
-              </p>
-            </div>
-          </button>
-          {/* Xem video */}
-          <button
-            type="button"
-            onClick={openVideo}
-            className={`flex items-center gap-2 rounded-xl border p-2.5 text-left transition active:scale-98 ${vDone ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-              }`}
-          >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${vDone ? 'bg-emerald-500' : 'bg-purple-100'}`}>
-              {vDone ? <Check size={14} className="text-white" strokeWidth={3} /> : <PlayCircle size={14} className="text-purple-600" />}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-black text-slate-900">Xem video</p>
-              <p className={`text-[11px] font-semibold ${vDone ? 'text-emerald-700' : 'text-slate-500'}`}>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={openVideo}
+              className={`flex items-center gap-2 rounded-xl border px-2 py-2 text-left transition ${vDone ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+            >
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${vDone ? 'bg-emerald-500' : 'bg-violet-50'}`}>
+                {vDone ? <Check size={12} className="text-white" strokeWidth={3} /> : <PlayCircle size={12} className="text-violet-600" />}
+              </span>
+              <span className="min-w-0 text-[11px] font-bold text-slate-800">
                 {p.todayVideos || 0}/{MISSION_VIDEOS} video
-              </p>
-            </div>
-          </button>
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
-
-      <p className="text-[11px] text-slate-400 leading-tight">
-        * Giờ học tính khi bạn làm bài, ôn thi hoặc xem video.
-      </p>
+      )}
     </div>
   );
 }
@@ -425,37 +431,45 @@ function RankList({ board, period, onPeriod }) {
   const top = board?.top || [];
   return (
     <div className="space-y-2">
-      <div className="flex gap-1">
+      <div className="grid grid-cols-3 gap-0.5 rounded-lg bg-slate-100 p-0.5">
         {PERIODS.map(([id, label]) => (
-          <button key={id} onClick={() => onPeriod(id)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-black ${period === id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
+          <button
+            key={id}
+            type="button"
+            onClick={() => onPeriod(id)}
+            className={`rounded-md py-1 text-[10px] font-extrabold ${period === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+          >
             {label}
           </button>
         ))}
       </div>
-      {!top.length
-        ? <p className="py-2 text-xs text-slate-400">Chưa có XP học bài trong kỳ này.</p>
-        : (
-          <ul className="space-y-1">
-            {top.map(row => (
-              <li key={row.rank} className={`flex items-center gap-2 rounded-xl px-2 py-1.5 ${row.isMe ? 'bg-emerald-50 ring-1 ring-emerald-200' : ''}`}>
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${row.rank <= 3 ? 'bg-amber-400 text-amber-950' : 'bg-slate-100 text-slate-500'}`}>
-                  {row.rank === 1 ? <Trophy size={11} /> : row.rank}
+      {!top.length ? (
+        <p className="py-2 text-center text-[11px] text-slate-400">Chưa có XP trong kỳ này.</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {top.map((row) => (
+            <li
+              key={row.rank}
+              className={`flex items-center gap-2 rounded-lg px-1.5 py-1 ${row.isMe ? 'bg-emerald-50 ring-1 ring-emerald-100' : ''}`}
+            >
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${row.rank <= 3 ? 'bg-amber-400 text-amber-950' : 'bg-slate-100 text-slate-500'}`}>
+                {row.rank === 1 ? <Trophy size={10} aria-hidden="true" /> : row.rank}
+              </span>
+              {row.avatar ? (
+                <img src={resolveMediaUrl(row.avatar)} alt="" className="h-7 w-7 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-[10px] font-black text-red-700">
+                  {String(row.name || '?').trim()[0]}
                 </span>
-                {row.avatar
-                  ? <img src={resolveMediaUrl(row.avatar)} alt="" className="h-7 w-7 rounded-full object-cover" />
-                  : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-[11px] font-black text-red-700">{String(row.name || '?').trim()[0]}</span>
-                }
-                <span className="flex-1 min-w-0 truncate text-xs font-bold text-slate-800">{row.name}</span>
-                <span className="text-[10px] text-slate-400">Cấp {row.level}</span>
-                <span className="text-xs font-black text-slate-700">{row.xp}</span>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-      {board?.me && !top.some(r => r.isMe) && (
-        <p className="text-[11px] text-slate-400">Hạng của bạn: {board.me.rank} · {board.me.xp} XP</p>
+              )}
+              <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-800">{row.name}</span>
+              <span className="shrink-0 text-[11px] font-black text-slate-700">{row.xp} XP</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {board?.me && !top.some((r) => r.isMe) && (
+        <p className="text-[10px] text-slate-400">Bạn: hạng {board.me.rank} · {board.me.xp} XP</p>
       )}
     </div>
   );

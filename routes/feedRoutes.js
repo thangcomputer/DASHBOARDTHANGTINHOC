@@ -5,6 +5,8 @@ const multer = require('multer');
 const router = express.Router();
 const FeedPost = require('../models/FeedPost');
 const FeedPostReport = require('../models/FeedPostReport');
+const Student = require('../models/Student');
+const { statusOf } = require('../services/subscriptionService');
 const { REACTION_TYPES } = require('../models/FeedPost');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowFeed } = require('../middleware/policyShadowFeed');
@@ -481,8 +483,29 @@ router.post('/reports/:reportId/resolve', authMiddleware, ...feedGuard('resolve_
   }
 });
 
+async function canStudentPostFeed(user) {
+  if (!user || user.role !== 'student') return true;
+  const dbStudent = await Student.findById(user.id || user._id).lean();
+  if (!dbStudent) return false;
+  const status = statusOf(dbStudent);
+  if (status.state === 'expired' || status.state === 'free' || status.freeTier) return false;
+  if (status.state === 'active' || status.state === 'expiring') return true;
+  if (status.state === 'lifetime') {
+    if (dbStudent.freePortal === true) return Boolean(status.meetLifetime || status.activated);
+    return true;
+  }
+  return false;
+}
+
 router.post('/', authMiddleware, ...feedGuard('create'), async (req, res) => {
   try {
+    if (!await canStudentPostFeed(req.user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'FEED_POST_LOCKED',
+        message: 'Chức năng đăng bài chỉ dành cho tài khoản đã mua gói còn hạn. Vui lòng đăng ký hoặc gia hạn gói.',
+      });
+    }
     const content = String(req.body?.content || '').trim();
     const images = Array.isArray(req.body?.images)
       ? req.body.images.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 6)
@@ -592,28 +615,59 @@ async function applyReaction(req, res, typeIn) {
       userId: l.userId, userName: l.userName || '', role: l.role || '', type: 'heart',
     }));
     post.likes = [];
+    await post.save();
   }
 
   const uid = String(req.user.id);
-  const idx = post.reactions.findIndex((r) => String(r.userId) === uid);
-  const isNewReaction = idx < 0;
-  if (idx >= 0) {
-    if (post.reactions[idx].type === type) post.reactions.splice(idx, 1);
-    else post.reactions[idx].type = type;
-  } else {
-    post.reactions.push({
-      userId: uid,
-      userName: req.user.name || '',
-      role: normalizeRole(req.user.role),
-      gender: req.user.gender || '',
-      type,
-    });
-  }
-  await post.save();
+  const isNewReaction = !post.reactions.some((r) => String(r.userId) === uid);
+  const entry = {
+    userId: uid,
+    userName: req.user.name || '',
+    role: normalizeRole(req.user.role),
+    gender: req.user.gender || '',
+    type,
+  };
+  // Cập nhật nguyên tử trong MongoDB: mỗi user chỉ còn đúng 1 cảm xúc trên bài viết.
+  // - Chọn lại đúng cảm xúc đang có -> bỏ cảm xúc.
+  // - Chọn cảm xúc khác (hoặc dữ liệu cũ bị trùng) -> xóa mọi bản ghi của user rồi ghi 1 bản ghi mới.
+  // Nhờ vậy thao tác nhấn liên tục/đồng thời không thể tạo bản ghi trùng.
+  await FeedPost.updateOne({ _id: post._id }, [{
+    $set: {
+      reactions: {
+        $let: {
+          vars: {
+            current: { $ifNull: ['$reactions', []] },
+          },
+          in: {
+            $let: {
+              vars: {
+                mine: { $filter: { input: '$$current', as: 'r', cond: { $eq: ['$$r.userId', { $literal: uid }] } } },
+                others: { $filter: { input: '$$current', as: 'r', cond: { $ne: ['$$r.userId', { $literal: uid }] } } },
+              },
+              in: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: [{ $size: '$$mine' }, 1] },
+                      { $eq: [{ $arrayElemAt: ['$$mine.type', 0] }, { $literal: type }] },
+                    ],
+                  },
+                  '$$others',
+                  { $concatArrays: ['$$others', [{ $literal: entry }]] },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  }], { updatePipeline: true });
+  const updatedPost = await FeedPost.findById(post._id);
+  if (!updatedPost) return res.status(404).json({ success: false, message: 'Khong tim thay bai viet' });
   if (isNewReaction) {
-    await notifyFeedAuthor(req, post, 'reaction', { reactionType: type });
+    await notifyFeedAuthor(req, updatedPost, 'reaction', { reactionType: type });
   }
-  const data = serializePost(post, req.user.id);
+  const data = serializePost(updatedPost, req.user.id);
   emitFeed(req.app.get('io'), 'feed:like', {
     id: data.id,
     reactions: data.reactions,
@@ -645,6 +699,13 @@ router.post('/:id/react', authMiddleware, ...feedGuard('react'), async (req, res
 
 router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req, res) => {
   try {
+    if (!await canStudentPostFeed(req.user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'FEED_POST_LOCKED',
+        message: 'Chức năng bình luận chỉ dành cho tài khoản đã mua gói còn hạn. Vui lòng đăng ký hoặc gia hạn gói.',
+      });
+    }
     if (!feedRateOk(req.user.id, 'comment', 20, 60 * 1000)) {
       return res.status(429).json({ success: false, message: 'Binh luan qua nhanh, thu lai sau' });
     }
@@ -681,10 +742,7 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
     if (parentId) {
       const parent = post.comments.id(parentId);
       if (!parent) return res.status(404).json({ success: false, message: 'Khong tim thay binh luan goc' });
-      // Flatten: reply to a reply still attaches under the root comment (1 UI thread)
-      if (parent.parentId) {
-        parentId = String(parent.parentId);
-      }
+      parentId = String(parent._id);
     }
     const parentComment = parentId ? post.comments.id(parentId) : null;
 
@@ -734,12 +792,21 @@ router.delete('/:id/comments/:commentId', authMiddleware, ...feedGuard('delete_c
       return res.status(403).json({ success: false, message: 'Ban khong co quyen xoa binh luan nay' });
     }
     const cid = String(comment._id);
-    // xoa ca reply con
-    post.comments = post.comments.filter((c) => {
-      const id = String(c._id);
-      const pid = c.parentId ? String(c.parentId) : null;
-      return id !== cid && pid !== cid;
-    });
+    // Xoa de quy tat ca binh luan con o moi cap bac
+    const toRemove = new Set([cid]);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const c of post.comments) {
+        const id = String(c._id);
+        const pid = c.parentId ? String(c.parentId) : null;
+        if (pid && toRemove.has(pid) && !toRemove.has(id)) {
+          toRemove.add(id);
+          added = true;
+        }
+      }
+    }
+    post.comments = post.comments.filter((c) => !toRemove.has(String(c._id)));
     await post.save();
     const data = serializePost(post, req.user.id);
     emitFeed(req.app.get('io'), 'feed:comment', {

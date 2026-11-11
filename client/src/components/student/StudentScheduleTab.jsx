@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScheduleView } from './StudentScheduleView';
-import { CourseSwitcher } from './StudentShared';
 import {
   filterSchedulesByCourse,
   getActiveOneToOneEnrollment,
@@ -46,16 +45,13 @@ export default function StudentScheduleTab({
 
   return (
     <div className="w-full min-w-0 pt-0 pb-3 sm:pt-0 sm:pb-6 animate-in fade-in duration-500">
-      <div className={enrollments.length > 1 ? 'mb-4' : ''}>
-        <CourseSwitcher
-          courses={enrollments}
-          activeCourseName={scheduleCourseName || activeCourseName || viewStudent?.course}
-          onChange={setScheduleCourseName}
-        />
-      </div>
       <ScheduleView
         schedules={schedulesForSelectedCourse}
+        allSchedules={mySchedules}
         student={scheduleStudent}
+        enrollments={enrollments}
+        activeCourseName={scheduleCourseName || activeCourseName || viewStudent?.course}
+        onSelectCourse={setScheduleCourseName}
         setNoteModalSched={setNoteModalSched}
         displayGrades={displayGrades}
       />

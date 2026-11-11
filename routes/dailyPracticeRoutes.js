@@ -82,6 +82,7 @@ router.delete('/questions/:id', ...requireAdmin, handle((req) => service.deleteQ
 // ── Học viên (web + mobile dùng chung) ────────────────────────────────────────
 router.get('/my/overview', ...requireStudent, handle((req) => service.getOverview(userId(req))));
 router.get('/my/path', ...requireStudent, handle((req) => pathService.getPath(userId(req))));
+router.put('/my/path/active-topic', ...requireStudent, handle((req) => pathService.setActivePathTopic(userId(req), req.body?.topicId)));
 router.get('/my/path/units/:unitId/videos', ...requireStudent, handle((req) => pathService.unitVideos(userId(req), req.params.unitId)));
 router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/answer', ...requireStudent, handle((req) => pathService.answerVideoCheck(userId(req), {
   unitId: req.params.unitId,
@@ -115,6 +116,7 @@ router.post('/my/path/videos/watched', ...requireStudent, handle((req) => pathSe
   unitId: req.body?.unitId,
   videoId: String(req.body?.videoId || ''),
 })));
+router.post('/my/path/units/:unitId/chest/claim', ...requireStudent, handle((req) => pathService.claimUnitChest(userId(req), req.params.unitId)));
 router.post('/my/sessions', ...requireStudent, handle((req) => service.startSession(userId(req), {
   topicId: req.body?.topicId,
   difficulty: String(req.body?.difficulty || ''),

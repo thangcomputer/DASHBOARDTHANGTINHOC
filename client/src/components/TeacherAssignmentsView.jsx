@@ -345,14 +345,14 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
 
   return (
     <div className="space-y-6 w-full">
-      {/* ── TAB SWITCHER DÀNH CHO GIẢNG VIÊN ── */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      {/* ── TAB SWITCHER DÀNH CHO GIẢNG VIÊN (3D Buttons) ── */}
+      <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
         <button
           type="button"
           onClick={() => setActiveTab('quiz')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'quiz'
-              ? 'bg-red-600 text-white shadow-sm'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          className={`px-4 sm:px-5 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${activeTab === 'quiz'
+              ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 border-b-4 border-b-slate-300'
             }`}
         >
           <Clipboard size={16} /> Bài thi Trắc nghiệm
@@ -360,9 +360,9 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         <button
           type="button"
           onClick={() => setActiveTab('file')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'file'
-              ? 'bg-red-600 text-white shadow-sm'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          className={`px-4 sm:px-5 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${activeTab === 'file'
+              ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 border-b-4 border-b-slate-300'
             }`}
         >
           <FileText size={16} /> Bài tập về nhà (Nộp file)
@@ -375,18 +375,18 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         <>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-              <span className="flex items-center gap-2"><Clipboard size={20} className="text-red-600" /> Bài tập của:</span>
+              <span className="flex items-center gap-2"><Clipboard size={20} className="text-emerald-600" /> Bài tập của:</span>
               <CmsSelect
                 value={selectedCourse}
                 onChange={(e) => setSelectedCourse(e.target.value)}
-                className="border-2 border-red-200 focus:border-red-500 rounded-xl px-3 py-1.5 outline-none font-black text-red-700 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer text-sm"
+                className="border-2 border-emerald-200 focus:border-emerald-500 rounded-xl px-3 py-1.5 outline-none font-black text-emerald-800 bg-emerald-50 hover:bg-emerald-100/70 transition-colors cursor-pointer text-sm"
               >
                 {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
               </CmsSelect>
             </h2>
             <button
               onClick={openCreateModal}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-red-200 transition-all flex items-center gap-2 active:scale-95"
+              className="bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 text-white px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-black shadow-xs transition-all flex items-center gap-2 active:translate-y-[2px] active:border-b-2 cursor-pointer"
             >
               <Plus size={16} /> Tạo bài tập mới
             </button>
@@ -403,7 +403,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setGradingFilter(option.id)}
-                  className={`relative flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold transition-colors !shadow-none ${active ? 'text-red-600' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`relative flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold transition-colors !shadow-none ${active ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   {option.label}
                   {option.id !== 'all' && count > 0 && (
@@ -411,7 +411,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                       {count}
                     </span>
                   )}
-                  <span className={`absolute inset-x-0 -bottom-px h-0.5 rounded-full ${active ? 'bg-red-600' : 'bg-transparent'}`} aria-hidden="true" />
+                  <span className={`absolute inset-x-0 -bottom-px h-0.5 rounded-full ${active ? 'bg-emerald-600' : 'bg-transparent'}`} aria-hidden="true" />
                 </button>
               );
             })}
@@ -420,7 +420,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {visibleAssignments.length === 0 ? (
               <div className="col-span-full flex flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white px-6 py-10 text-center shadow-sm">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                   <Inbox size={22} aria-hidden="true" />
                 </span>
                 <p className="mt-1 text-base font-black text-slate-900">
@@ -494,15 +494,15 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                 <form onSubmit={handleCreate} className="p-6 space-y-4 overflow-y-auto overscroll-contain min-h-0 flex-1">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Tên bài tập *</label>
-                    <input required type="text" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="VD: THVP Buổi 1..." />
+                    <input required type="text" className="w-full border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="VD: THVP Buổi 1..." />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả / Yêu cầu</label>
-                    <textarea className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[100px]" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Yêu cầu làm các sheet..."></textarea>
+                    <textarea className="w-full border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[100px]" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Yêu cầu làm các sheet..."></textarea>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Link File đề bài (Google Drive...)</label>
-                    <input type="url" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({ ...formData, attachedFileUrl: e.target.value })} placeholder="HTTPS://..." />
+                    <input type="url" className="w-full border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({ ...formData, attachedFileUrl: e.target.value })} placeholder="HTTPS://..." />
                   </div>
 
                   <div>
@@ -511,9 +511,9 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                       <button
                         type="button"
                         onClick={() => { setAssignScope('all'); setSelectedStudentIds([]); }}
-                        className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${assignScope === 'all'
-                            ? 'bg-red-600 text-white border-red-600'
-                            : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                        className={`h-9 px-3.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${assignScope === 'all'
+                            ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white shadow-xs'
+                            : 'bg-white text-slate-600 border border-slate-200 border-b-4 border-b-slate-300 hover:bg-slate-50'
                           }`}
                       >
                         Cả lớp ({courseStudents.length})
@@ -521,9 +521,9 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                       <button
                         type="button"
                         onClick={() => setAssignScope('selected')}
-                        className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${assignScope === 'selected'
-                            ? 'bg-red-600 text-white border-red-600'
-                            : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                        className={`h-9 px-3.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${assignScope === 'selected'
+                            ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white shadow-xs'
+                            : 'bg-white text-slate-600 border border-slate-200 border-b-4 border-b-slate-300 hover:bg-slate-50'
                           }`}
                       >
                         Chọn học viên
@@ -544,7 +544,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                               >
                                 <input
                                   type="checkbox"
-                                  className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                   checked={checked}
                                   onChange={() => toggleStudentId(sid)}
                                 />
@@ -570,14 +570,14 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                       required
                       type="datetime-local"
                       min={deadlineMin}
-                      className="w-full max-w-full min-w-0 border-2 border-slate-200 focus:border-red-500 rounded-xl px-3 sm:px-4 py-2.5 outline-none font-semibold text-sm sm:text-base"
+                      className="w-full max-w-full min-w-0 border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-3 sm:px-4 py-2.5 outline-none font-semibold text-sm sm:text-base"
                       value={formData.deadline}
                       onChange={e => setFormData({ ...formData, deadline: e.target.value })}
                       onFocus={() => setDeadlineMin(toDatetimeLocalValue(new Date()))}
                     />
                     <p className="text-[11px] text-slate-400 mt-1">Chỉ chọn thời điểm từ hiện tại trở đi.</p>
                   </div>
-                  <button disabled={isSubmitting} type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-red-200 mt-4 disabled:opacity-50 sticky bottom-0">
+                  <button disabled={isSubmitting} type="submit" className="w-full py-3.5 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white font-black rounded-2xl transition-all shadow-md shadow-emerald-200 mt-4 disabled:opacity-50 sticky bottom-0 cursor-pointer">
                     {isSubmitting ? 'Đang tạo...' : 'Tạo Bài Tập'}
                   </button>
                 </form>
@@ -704,7 +704,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                     <label className="block text-sm font-bold text-slate-700 mb-1">Nhận xét / Chữa bài</label>
                     <textarea className="w-full border-2 border-slate-200 focus:border-green-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[80px]" value={gradeData.teacherFeedback} onChange={e => setGradeData({ ...gradeData, teacherFeedback: e.target.value })} placeholder="Tốt, nhưng cần chú ý hàm VLOOKUP..."></textarea>
                   </div>
-                  <button disabled={isSubmitting} type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-200 mt-4 disabled:opacity-50">
+                  <button disabled={isSubmitting} type="submit" className="w-full py-3.5 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105 active:translate-y-[2px] active:border-b-2 text-white font-black rounded-2xl transition-all shadow-md shadow-emerald-200 mt-4 disabled:opacity-50 cursor-pointer">
                     {isSubmitting ? 'Đang lưu...' : 'Hoàn tất Chấm'}
                   </button>
                 </form>

@@ -4,6 +4,17 @@ import {
   Award, BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, Sparkles, Star, Trophy, X,
 } from 'lucide-react';
 import { resolveMediaUrl } from '../../../services/api';
+import {
+  pathTopicNextLinePrefix,
+  pathTopicPrimaryCtaLabel,
+  pickActivePathTopic as pickActivePathTopicShared,
+} from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
+import {
+  persistLastPathTopicId,
+  readStudentUserId,
+  resolveSavedPathTopicId,
+  syncLastPathTopicFromServer,
+} from '../../../utils/lastPathTopic';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import PathLessonModal from './PathLessonModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
@@ -13,6 +24,10 @@ import { QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon
 import Mascot from './Mascot';
 import { DropletMark, PathITBackdrop, PathStageArt } from './PathDecor';
 import FreeMeetPlanModal from './FreeMeetPlanModal';
+import { collectUnitVideos, UnitStageHeader } from './PathUnitStageHeader';
+import { UnitStageChest } from './UnitStageChest';
+
+export { collectUnitVideos, UnitStageHeader };
 
 const STEP_ICONS = { learn: BookOpen, practice: Dumbbell, challenge: Flame };
 const STEP_LABELS = { learn: 'Dễ', practice: 'Vừa', challenge: 'Khó' };
@@ -26,26 +41,6 @@ function buildUnitPathItems(unit) {
     node,
     state: node.state,
   }));
-}
-
-/** Danh sách video của chặng (unit + từng cấp) để hiện cạnh snake. */
-function collectUnitVideos(unit) {
-  const items = [];
-  const seen = new Set();
-  const push = (video) => {
-    if (!video?.id || seen.has(video.id)) return;
-    seen.add(video.id);
-    items.push(video);
-  };
-  for (const video of unit.videos || []) push(video);
-  for (const node of unit.pathNodes || []) {
-    for (const level of node.levels || []) {
-      for (const video of level.videos || []) {
-        push({ ...video, stepLabel: video.stepLabel || level.label || STEP_LABELS[level.key] || '' });
-      }
-    }
-  }
-  return items;
 }
 
 const NODE_ICONS = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
@@ -566,145 +561,110 @@ function CourseTrophyCeremonyModal({ topicName, completedUnits, totalUnits, isCo
   );
 }
 
-/** Đài vinh danh & Cúp Vàng + Linh vật chúc mừng ở cuối lộ trình khóa học. */
-function CourseFinaleMonument({ topicName, completedUnits, totalUnits, lastNodeOffset = 0, onCelebrate }) {
-  const isCompleted = totalUnits > 0 && completedUnits >= totalUnits;
+/** Hình cúp đồ họa. Chưa xong thì xám mờ, hoàn thành thì vàng. */
+function CupArtwork({ dim = false }) {
+  const rawId = useId();
+  const gid = `cup${rawId.replace(/:/g, '')}`;
+  const tone = dim
+    ? {
+      hi: '#F8FAFC', mid: '#CBD5E1', deep: '#64748B', ink: '#0F172A',
+      handle: '#334155', handleEdge: '#1E293B', handleLite: '#94A3B8', handleLiteEdge: '#64748B',
+      stem: '#475569', baseTop: '#334155',
+    }
+    : {
+      hi: '#FFFBEB', mid: '#FDE68A', deep: '#F59E0B', ink: '#B45309',
+      handle: '#D97706', handleEdge: '#92400E', handleLite: '#FBBF24', handleLiteEdge: '#F59E0B',
+      stem: '#D97706', baseTop: '#B45309',
+    };
   return (
-    <div className="relative z-10 mt-6 px-3 pb-8 pt-6 sm:px-6">
-      <PathSnakeConnector
-        previousOffset={lastNodeOffset}
-        offset={0}
-        active={isCompleted}
-        color="#F59E0B"
-      />
-      <div className="relative mx-auto max-w-xl overflow-hidden rounded-[28px] border-2 border-[#FCD34D] bg-gradient-to-b from-[#FFFDF7] via-white to-[#FEF9EE] p-6 text-center shadow-[0_12px_36px_rgba(245,158,11,0.18)] sm:p-8">
-        {isCompleted && <PathConfettiBurst count={32} spread={200} />}
-        <div className="pointer-events-none absolute -top-20 left-1/2 h-44 w-44 -translate-x-1/2 rounded-full bg-amber-300/30 blur-2xl" />
-
-        <div className="relative inline-flex items-center gap-1.5 rounded-full bg-[#D97706] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm">
-          <Sparkles size={14} className="fill-[#FEF08A] text-[#FEF08A]" aria-hidden="true" />
-          <span>{isCompleted ? 'ĐÃ CHINH PHỤC TOÀN BỘ KHÓA HỌC' : `ĐÍCH ĐẾN CUỐI KHÓA · ${completedUnits}/${totalUnits} CHẶNG`}</span>
-        </div>
-
-        <div className="relative mt-5 flex items-end justify-center gap-4 sm:gap-7">
-          <div className="shrink-0">
-            <Mascot mood="graduate" size={82} />
-          </div>
-
-          <div className="relative flex flex-col items-center">
-            {/* Crown badge on top of circle */}
-            <div className="relative -mb-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#EA580C] shadow-sm">
-              <Crown size={16} className="fill-[#FEF08A] text-white" aria-hidden="true" />
-            </div>
-
-            {/* Trophy circle */}
-            <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-[#FEF3C7] bg-[#F59E0B] text-white shadow-[0_10px_24px_rgba(217,119,6,0.32)]">
-              <Trophy size={48} strokeWidth={2} className="drop-shadow-sm text-white" aria-hidden="true" />
-            </div>
-
-            {/* 3 stars badge below circle */}
-            <div className="relative -mt-3 z-10 inline-flex items-center gap-1 rounded-full border border-[#FDE68A] bg-white px-3 py-0.5 shadow-xs">
-              {[1, 2, 3].map((n) => (
-                <Star key={n} size={14} className="fill-[#FBBF24] text-[#F59E0B]" />
-              ))}
-            </div>
-          </div>
-
-          <div className="shrink-0">
-            <Mascot mood="celebrate" size={82} />
-          </div>
-        </div>
-
-        <h4 className="mt-5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-          {isCompleted ? `Chúc mừng hoàn thành khóa học ${topicName}!` : `Cúp Vàng Vinh Danh - ${topicName}`}
-        </h4>
-        <p className="mx-auto mt-2 max-w-md text-xs font-normal leading-relaxed text-[#475569] sm:text-sm">
-          {isCompleted
-            ? `Tuyệt vời! Bạn đã vượt qua trọn vẹn ${totalUnits}/${totalUnits} chặng học và chính thức rước Cúp Vàng Vinh Danh cùng linh vật Thắng Tin Học!`
-            : `Hoàn thành hết ${totalUnits} chặng học (${completedUnits}/${totalUnits} đã xong) để chính thức mở khóa lễ trao Cúp Vàng Vinh Danh cùng linh vật chúc mừng!`}
-        </p>
-
-        <div className="mt-5 flex justify-center">
-          <button
-            type="button"
-            onClick={onCelebrate}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-[#9A3412] bg-gradient-to-b from-[#EA580C] to-[#C2410C] px-6 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(194,65,12,0.35)] transition-all hover:brightness-105 active:scale-98"
-          >
-            <Trophy size={18} className="text-white" aria-hidden="true" />
-            <span>{isCompleted ? 'Nhận Cúp & Xem Vinh Danh' : 'Xem Hiệu Ứng Chúc Mừng Nhận Cúp'}</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <svg
+      width={dim ? 168 : 214}
+      height={dim ? 192 : 244}
+      viewBox="0 0 220 250"
+      className={dim ? 'opacity-30' : 'dp-cup-zoom'}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={`${gid}-body`} x1="28%" y1="0%" x2="78%" y2="100%">
+          <stop offset="0%" stopColor={tone.hi} />
+          <stop offset="30%" stopColor={tone.mid} />
+          <stop offset="64%" stopColor={tone.deep} />
+          <stop offset="100%" stopColor={tone.ink} />
+        </linearGradient>
+        <linearGradient id={`${gid}-rim`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={tone.hi} />
+          <stop offset="100%" stopColor={tone.ink} />
+        </linearGradient>
+        <linearGradient id={`${gid}-base`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={tone.mid} />
+          <stop offset="100%" stopColor={tone.ink} />
+        </linearGradient>
+      </defs>
+      <ellipse cx="110" cy="232" rx="64" ry="9" fill={tone.ink} opacity="0.18" />
+      <path d="M58 78c-28 2-34 48-6 62 6-16 4-40 14-52-2-4-4-8-8-10z" fill={tone.handle} />
+      <path d="M162 78c28 2 34 48 6 62-6-16-4-40-14-52 2-4 4-8 8-10z" fill={tone.handleEdge} />
+      <path d="M66 64c-22 6-24 46 2 58 2-14 6-36 16-46-4-6-10-10-18-12z" fill={tone.handleLite} />
+      <path d="M154 64c22 6 24 46-2 58-2-14-6-36-16-46 4-6 10-10 18-12z" fill={tone.handleLiteEdge} />
+      <path d="M74 58c-2 0-8 78 16 108h40c24-30 18-108 16-108-8 10-20 16-36 16s-28-6-36-16z" fill={`url(#${gid}-body)`} />
+      <ellipse cx="110" cy="58" rx="48" ry="16" fill={`url(#${gid}-rim)`} />
+      <ellipse cx="110" cy="56" rx="34" ry="8" fill={tone.ink} opacity="0.42" />
+      <ellipse cx="90" cy="98" rx="14" ry="28" fill="#FFFFFF" opacity="0.62" />
+      <path d="M110 86l6.2 12.6 13.8 2-10 9.8 2.4 13.6L110 117.4 97.6 124l2.4-13.6-10-9.8 13.8-2z" fill={tone.hi} />
+      <path d="M110 92l3.4 7 7.6 1.1-5.5 5.4 1.3 7.5L110 109.2 103.2 113l1.3-7.5-5.5-5.4 7.6-1.1z" fill={tone.ink} />
+      <path d="M96 166h28l10 24H86z" fill={tone.stem} />
+      <ellipse cx="110" cy="196" rx="46" ry="12" fill={tone.ink} />
+      <ellipse cx="110" cy="190" rx="40" ry="9" fill={`url(#${gid}-base)`} />
+      <ellipse cx="110" cy="214" rx="58" ry="13" fill={tone.ink} />
+      <ellipse cx="110" cy="208" rx="50" ry="10" fill={tone.baseTop} />
+      <ellipse cx="92" cy="204" rx="16" ry="4" fill="#FFFFFF" opacity="0.45" />
+    </svg>
   );
 }
-function UnitStageHeader({ unit, color, onTestOut, onWatch, highlight, hasVideo, testOutButtonRef }) {
-  const locked = unit.state === 'locked';
-  const done = unit.state === 'completed';
-  const doneSteps = unit.steps.filter((step) => step.state === 'completed').length;
-  const totalSteps = unit.steps.length;
-  const progress = totalSteps ? doneSteps / totalSteps : 0;
-  const barBg = locked ? '#94A3B8' : color.to;
-  const barDeep = locked ? '#64748B' : darken(color.to, 0.18);
-  let statusLabel = '';
-  if (done) statusLabel = 'Đã vượt';
-  else if (highlight && !locked) statusLabel = 'Đang học';
-  else if (locked) statusLabel = 'Chưa mở';
 
+const CUP_SPARKS = ['#FACC15', '#F97316', '#EF4444', '#22C55E', '#38BDF8', '#A855F7', '#F472B6', '#FDE68A'];
+
+/** Cúp đồ họa mờ dưới rương chặng cuối. Hoàn thành thì phóng to và bắn pháo. */
+function CourseFinaleCup({ courseDone, onCelebrate }) {
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    if (!courseDone) return undefined;
+    const timer = setInterval(() => setBurst((n) => n + 1), 2600);
+    return () => clearInterval(timer);
+  }, [courseDone]);
   return (
-    <div className="w-full">
-      <div
-        className="relative flex items-stretch overflow-hidden rounded-2xl text-white shadow-sm"
-        style={{ background: `linear-gradient(180deg, ${barBg} 0%, ${barDeep} 100%)` }}
-      >
-        <div className="min-w-0 flex-1 px-4 py-3 sm:px-5 sm:py-3.5">
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-white/85">
-            Chặng {unit.index}
-            {statusLabel ? ` · ${statusLabel}` : ''}
-          </p>
-          <h3 className="mt-0.5 truncate text-lg font-black leading-tight sm:text-xl">{unit.title}</h3>
-          {unit.description ? (
-            <p className="mt-0.5 line-clamp-1 text-xs font-medium text-white/80">{unit.description}</p>
-          ) : null}
-          <div className="mt-2 flex max-w-[220px] items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/20">
-              <div
-                className="h-full rounded-full bg-white transition-all duration-500"
-                style={{ width: `${Math.round(progress * 100)}%` }}
+    <button
+      type="button"
+      onClick={onCelebrate}
+      className="relative mx-auto -mt-1 mb-1 flex h-[250px] w-full max-w-[380px] items-end justify-center overflow-visible border-0 bg-transparent p-0"
+      aria-label="Cúp Vàng Vinh Danh cuối khóa"
+    >
+      {courseDone ? (
+        <span key={burst} className="pointer-events-none absolute inset-0">
+          <PathConfettiBurst count={26} spread={150} />
+          {CUP_SPARKS.map((color, index) => {
+            const angle = (index / CUP_SPARKS.length) * Math.PI * 2;
+            return (
+              <span
+                key={color}
+                className="dp-firework"
+                style={{
+                  color,
+                  background: color,
+                  left: '50%',
+                  top: '42%',
+                  '--dx': `${Math.round(Math.cos(angle) * 118)}px`,
+                  '--dy': `${Math.round(Math.sin(angle) * 78 - 18)}px`,
+                  animationDelay: `${index * 45}ms`,
+                }}
               />
-            </div>
-            <span className="text-[10px] font-black tabular-nums text-white/90">{doneSteps}/{totalSteps}</span>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center border-l border-white/25 px-3 sm:px-4">
-          <button
-            type="button"
-            onClick={hasVideo ? onWatch : undefined}
-            disabled={!hasVideo}
-            title={hasVideo ? 'Xem video của chặng' : 'Chặng chưa có video'}
-            aria-label={hasVideo ? 'Xem video của chặng' : 'Chặng chưa có video'}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25 disabled:cursor-default disabled:opacity-50 !shadow-none"
-          >
-            <BookOpen size={22} strokeWidth={2.4} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-      {locked && unit.canTestOut && (
-        <div className="mt-2 flex justify-center">
-          <button
-            ref={testOutButtonRef}
-            type="button"
-            onClick={onTestOut}
-            className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-1.5 text-[11px] font-black text-white !shadow-none"
-          >
-            <FastForward size={13} aria-hidden="true" /> Kiểm tra vượt
-          </button>
-        </div>
-      )}
-    </div>
+            );
+          })}
+        </span>
+      ) : null}
+      <CupArtwork dim={!courseDone} />
+    </button>
   );
 }
-
 /** Bài đang mở của chặng: bài học thì vào bài, câu hỏi thì vào đúng nấc. */
 export function continuePracticeTarget(topic) {
   const next = topic?.next;
@@ -749,13 +709,10 @@ export function focusCurrentPathLesson() {
   window.dispatchEvent(new CustomEvent('dp-focus-current-lesson'));
 }
 
-/** Chủ đề lộ trình ưu tiên (liên kết URL → đang học dở → đầu tiên). */
-export function pickActivePathTopic(path, initialTopicId = '') {
-  const topics = path?.topics || [];
-  if (!topics.length) return null;
-  const linked = initialTopicId && topics.find((item) => item.topic.id === initialTopicId);
-  const inProgress = topics.find((item) => item.next && item.completedUnits > 0);
-  return linked || inProgress || topics[0];
+/** Chủ đề lộ trình ưu tiên (URL → đã lưu server/máy → đang học dở → còn bước → đầu danh sách). */
+export function pickActivePathTopic(path, initialTopicId = '', savedTopicId = '') {
+  const saved = savedTopicId || resolveSavedPathTopicId(readStudentUserId(), path?.activeTopicId);
+  return pickActivePathTopicShared(path, initialTopicId, saved);
 }
 
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
@@ -769,8 +726,14 @@ export default function PathView({
   onTopicChangeRef.current = onTopicChange;
 
   useEffect(() => {
-    if (topicId) onTopicChangeRef.current?.(topicId);
+    if (!topicId) return;
+    onTopicChangeRef.current?.(topicId);
+    persistLastPathTopicId(topicId);
   }, [topicId]);
+
+  useEffect(() => {
+    syncLastPathTopicFromServer(path?.activeTopicId);
+  }, [path?.activeTopicId]);
   const [popover, setPopover] = useState(null);
   const [videoOpen, setVideoOpen] = useState(null);
   const [lessonOpen, setLessonOpen] = useState(null);
@@ -797,10 +760,13 @@ export default function PathView({
   useEffect(() => {
     if (topicId && topics.some((item) => item.topic.id === topicId)) return;
     if (!topics.length) return;
-    const linked = initialTopicId && topics.find((item) => item.topic.id === initialTopicId);
-    const inProgress = topics.find((item) => item.next && item.completedUnits > 0);
-    setTopicId((linked || inProgress || topics[0]).topic.id);
-  }, [topicId, topics, initialTopicId]);
+    const picked = pickActivePathTopicShared(
+      { topics },
+      initialTopicId,
+      resolveSavedPathTopicId(readStudentUserId(), path?.activeTopicId),
+    );
+    if (picked?.topic?.id) setTopicId(picked.topic.id);
+  }, [topicId, topics, initialTopicId, path?.activeTopicId]);
 
   useEffect(() => {
     if (error) setPopover(null);
@@ -859,12 +825,36 @@ export default function PathView({
   topicsRef.current = topics;
   currentRef.current = current;
 
+  const [startedUnitIds, setStartedUnitIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cms_started_path_units');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const markUnitStarted = useCallback((unitId) => {
+    if (!unitId) return;
+    setStartedUnitIds((prev) => {
+      if (prev.includes(unitId)) return prev;
+      const next = [...prev, unitId];
+      try {
+        localStorage.setItem('cms_started_path_units', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const onFocus = () => {
       const list = topicsRef.current || [];
       const topic = (currentRef.current?.next ? currentRef.current : list.find((item) => item.next)) || currentRef.current;
       const next = topic?.next;
       if (!topic || !next) return;
+      if (next.unitId) markUnitStarted(next.unitId);
       if (topic.topic.id !== currentRef.current?.topic?.id) setTopicId(topic.topic.id);
       setPopover({ unitId: next.unitId, nodeKey: next.nodeKey || 'study', testOut: false });
       window.setTimeout(() => {
@@ -877,7 +867,7 @@ export default function PathView({
     };
     window.addEventListener('dp-focus-current-lesson', onFocus);
     return () => window.removeEventListener('dp-focus-current-lesson', onFocus);
-  }, []);
+  }, [markUnitStarted]);
   const color = topicColor(current?.topic.color);
   const openHub = useMemo(() => {
     if (!popover || popover.testOut || !current) return null;
@@ -914,12 +904,14 @@ export default function PathView({
 
   const toggle = (unit, stepKey, testOut = false) => {
     gameSounds.tap();
+    if (unit?.id) markUnitStarted(unit.id);
     setPopover((prev) => (prev && prev.unitId === unit.id && prev.stepKey === stepKey && prev.testOut === testOut
       ? null
       : { unitId: unit.id, stepKey, testOut }));
   };
   const toggleHub = (unit, nodeKey) => {
     gameSounds.tap();
+    if (unit?.id) markUnitStarted(unit.id);
     setPopover((prev) => (prev && prev.unitId === unit.id && prev.nodeKey === nodeKey && !prev.testOut ? null : { unitId: unit.id, nodeKey, testOut: false }));
   };
   const nextUnit = current?.next ? current.units.find((unit) => unit.id === current.next.unitId) : null;
@@ -931,7 +923,7 @@ export default function PathView({
   return (
     <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       {errorBanner}
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
+      <div className="-mx-1 flex gap-2 overflow-x-auto overflow-y-hidden px-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
         {topics.map((item) => {
           const Icon = topicIcon(item.topic.icon);
           const tone = topicColor(item.topic.color);
@@ -973,7 +965,7 @@ export default function PathView({
               </div>
               <p className="mt-1.5 text-xs text-slate-500">
                 {current.next
-                  ? `Tiếp theo: Chặng ${nextUnit?.index} · ${current.next.nodeLabel || current.next.unitTitle}, ${current.next.stepLabel}`
+                  ? `${pathTopicNextLinePrefix(current)}: Chặng ${nextUnit?.index} · ${current.next.nodeLabel || current.next.unitTitle}, ${current.next.stepLabel}`
                   : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
               </p>
             </div>
@@ -981,10 +973,13 @@ export default function PathView({
               <button
                 type="button"
                 data-path-hub=""
-                onClick={focusCurrentPathLesson}
+                onClick={() => {
+                  if (current.next?.unitId) markUnitStarted(current.next.unitId);
+                  focusCurrentPathLesson();
+                }}
                 className="cms-btn cms-btn-primary shrink-0 !py-2.5"
               >
-                <Play size={16} /> Tiếp tục học
+                <Play size={16} /> {pathTopicPrimaryCtaLabel(current)}
               </button>
             )}
           </section>
@@ -1010,6 +1005,7 @@ export default function PathView({
                 setVideoOpen({ unit, videoId });
               };
               const [buddyLeft, buddyRight] = stageBuddyPair(unitIndex, unit.state !== 'locked');
+              const isLast = unitIndex === current.units.length - 1;
               const leftHigh = unitIndex % 2 === 0;
               const edge = '0.5cm';
               return (
@@ -1033,6 +1029,12 @@ export default function PathView({
                         color={tone}
                         highlight={isNextUnit}
                         hasVideo={hasVideo}
+                        isStarted={startedUnitIds.includes(unit.id)}
+                        onStartUnit={() => {
+                          markUnitStarted(unit.id);
+                          const nextNodeKey = unit.pathNodes?.[0]?.key || 'study';
+                          setPopover({ unitId: unit.id, nodeKey: nextNodeKey, testOut: false });
+                        }}
                         onTestOut={() => toggle(unit, 'challenge', true)}
                         onWatch={() => openUnitVideo('')}
                         testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
@@ -1093,27 +1095,21 @@ export default function PathView({
                             />
                           </div>
                         ) : null}
+                        <div className="relative z-[2] flex w-full flex-col items-center pt-2 pb-3">
+                          <UnitStageChest unit={unit} onClaimed={() => onPathChanged?.()} />
+                          {isLast ? (
+                            <CourseFinaleCup
+                              courseDone={!current.next && current.totalUnits > 0 && current.completedUnits >= current.totalUnits}
+                              onCelebrate={() => setTrophyModalOpen(true)}
+                            />
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </article>
               );
             })}
-            {current.units.length > 0 && (() => {
-              const lastUnit = current.units[current.units.length - 1];
-              const lastItems = buildUnitPathItems(lastUnit);
-              const lastIdx = Math.max(0, lastItems.length - 1);
-              const lastOffset = (NODE_OFFSETS[lastIdx % NODE_OFFSETS.length] / 58) * offsetScale;
-              return (
-                <CourseFinaleMonument
-                  topicName={current.topic.name}
-                  completedUnits={current.completedUnits}
-                  totalUnits={current.totalUnits}
-                  lastNodeOffset={lastOffset}
-                  onCelebrate={() => setTrophyModalOpen(true)}
-                />
-              );
-            })()}
           </div>
         </>
       )}

@@ -141,8 +141,8 @@ export default function TeacherStudentsTab({
                 role="tab"
                 aria-selected={studentStatusFilter === value}
                 className={`min-h-9 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors ${studentStatusFilter === value
-                    ? 'border-red-600 bg-red-600 text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-500 hover:border-red-300 hover:text-red-600'
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:text-emerald-600'
                   }`}
               >
                 {label}

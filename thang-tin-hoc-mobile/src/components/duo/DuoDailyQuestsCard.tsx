@@ -22,6 +22,7 @@ interface DuoDailyQuestsCardProps {
   todayAnswers?: number;
   todayXp?: number;
   onOpenPractice?: () => void;
+  isBrandStudent?: boolean;
 }
 
 export function DuoDailyQuestsCard({
@@ -29,6 +30,7 @@ export function DuoDailyQuestsCard({
   todayAnswers = 0,
   todayXp = 0,
   onOpenPractice,
+  isBrandStudent = false,
 }: DuoDailyQuestsCardProps) {
   const resolvedQuests: QuestItem[] = quests || [
     {
@@ -66,13 +68,13 @@ export function DuoDailyQuestsCard({
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <View style={styles.targetIconBox}>
-            <Target size={18} color="#059669" />
+          <View style={[styles.targetIconBox, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+            <Target size={18} color={isBrandStudent ? '#DC2626' : '#059669'} />
           </View>
           <Text style={styles.cardTitle}>Nhiệm vụ hôm nay</Text>
         </View>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{`${completedCount}/${resolvedQuests.length} xong`}</Text>
+        <View style={[styles.statusBadge, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
+          <Text style={[styles.statusText, isBrandStudent && { color: '#DC2626' }]}>{`${completedCount}/${resolvedQuests.length} xong`}</Text>
         </View>
       </View>
 
@@ -85,10 +87,10 @@ export function DuoDailyQuestsCard({
             <Pressable
               key={quest.id}
               onPress={onOpenPractice}
-              style={[styles.questRow, isDone && styles.questRowDone]}
+              style={[styles.questRow, isDone && (isBrandStudent ? { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' } : styles.questRowDone)]}
               accessibilityRole="button"
             >
-              <View style={[styles.questIconBox, isDone ? styles.iconBoxDone : styles.iconBoxNormal]}>
+              <View style={[styles.questIconBox, isDone ? (isBrandStudent ? { backgroundColor: '#DC2626' } : styles.iconBoxDone) : styles.iconBoxNormal]}>
                 {isDone ? (
                   <Check size={16} color="#FFFFFF" strokeWidth={3} />
                 ) : quest.icon === 'lightning' ? (
@@ -102,7 +104,7 @@ export function DuoDailyQuestsCard({
 
               <View style={styles.questContentCol}>
                 <View style={styles.questTitleRow}>
-                  <Text style={[styles.questTitle, isDone && styles.questTitleDone]} numberOfLines={1}>
+                  <Text style={[styles.questTitle, isDone && (isBrandStudent ? { color: '#991B1B' } : styles.questTitleDone)]} numberOfLines={1}>
                     {quest.title}
                   </Text>
                   <Text style={styles.questCountText}>{`${Math.min(quest.current, quest.target)}/${quest.target}`}</Text>
@@ -110,15 +112,15 @@ export function DuoDailyQuestsCard({
 
                 {/* Progress bar */}
                 <View style={styles.barTrack}>
-                  <View style={[styles.barFill, isDone ? styles.barFillDone : styles.barFillActive, { width: `${pct}%` }]} />
+                  <View style={[styles.barFill, isDone ? (isBrandStudent ? { backgroundColor: '#DC2626' } : styles.barFillDone) : (isBrandStudent ? { backgroundColor: '#EF4444' } : styles.barFillActive), { width: `${pct}%` }]} />
                 </View>
               </View>
 
               {/* Reward pill */}
-              <View style={[styles.rewardPill, isDone && styles.rewardPillDone]}>
-                <Gift size={13} color={isDone ? '#047857' : '#D97706'} />
+              <View style={[styles.rewardPill, isDone && (isBrandStudent ? { backgroundColor: '#FEE2E2' } : styles.rewardPillDone)]}>
+                <Gift size={13} color={isDone ? (isBrandStudent ? '#DC2626' : '#047857') : '#D97706'} />
                 {quest.rewardXp ? (
-                  <Text style={[styles.rewardText, isDone && styles.rewardTextDone]}>
+                  <Text style={[styles.rewardText, isDone && (isBrandStudent ? { color: '#DC2626' } : styles.rewardTextDone)]}>
                     {`+${quest.rewardXp}`}
                   </Text>
                 ) : null}
@@ -138,9 +140,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomWidth: 4,
-    borderBottomColor: '#CBD5E1',
     gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',

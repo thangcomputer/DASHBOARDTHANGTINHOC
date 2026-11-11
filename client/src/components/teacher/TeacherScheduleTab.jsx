@@ -109,7 +109,7 @@ export default function TeacherScheduleTab({
       {/* Top Banner Toolbar & Quick Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex w-11 h-11 sm:w-12 sm:h-12 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600">
+          <div className="flex w-11 h-11 sm:w-12 sm:h-12 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
             <CalendarDays size={22} strokeWidth={2.3} />
           </div>
           <div className="min-w-0">
@@ -175,10 +175,10 @@ export default function TeacherScheduleTab({
               role="tab"
               aria-selected={scheduleView === key}
               onClick={() => setScheduleView(key)}
-              className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-xs font-bold transition-colors sm:text-sm ${
+              className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-xs font-extrabold transition-all cursor-pointer sm:text-sm ${
                 scheduleView === key
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white shadow-xs'
+                  : 'bg-white text-slate-600 border border-slate-200 border-b-4 border-b-slate-300 hover:bg-slate-50'
               }`}
             >
               {React.createElement(Icon, { size: 16, 'aria-hidden': true })}

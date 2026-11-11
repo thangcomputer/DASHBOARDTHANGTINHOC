@@ -432,13 +432,13 @@ export default function TeacherWeeklySlotGrid({
               type="button"
               onClick={() => setRosterFilter(opt.id)}
               className={`flex min-h-[34px] min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 text-xs font-extrabold transition sm:text-xs ${rosterFilter === opt.id
-                  ? 'border-red-600 bg-red-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-500 hover:text-red-700'
+                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-500 hover:text-emerald-700'
                 }`}
               aria-pressed={rosterFilter === opt.id}
             >
               <span className="truncate">{opt.label}</span>
-              <span className={rosterFilter === opt.id ? 'text-rose-100' : 'text-slate-400'}>
+              <span className={rosterFilter === opt.id ? 'text-emerald-100' : 'text-slate-400'}>
                 {rosterCounts[opt.id]}
               </span>
             </button>
@@ -449,8 +449,8 @@ export default function TeacherWeeklySlotGrid({
               if (searchOpen) setNameQuery('');
               setSearchOpen((open) => !open);
             }}
-            className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border ${searchOpen ? 'border-red-200 bg-red-50' : 'border-blue-100 bg-blue-50'
-              } text-red-600`}
+            className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border ${searchOpen ? 'border-emerald-200 bg-emerald-50' : 'border-blue-100 bg-blue-50'
+              } text-emerald-600`}
             aria-label={searchOpen ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
             aria-expanded={searchOpen}
           >
@@ -466,10 +466,10 @@ export default function TeacherWeeklySlotGrid({
           className="flex min-h-[38px] w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-left"
         >
           <span className="shrink-0 text-xs font-bold text-slate-500">Khóa học</span>
-          <span className="min-w-0 flex-1 truncate text-center text-xs font-extrabold text-red-700">
+          <span className="min-w-0 flex-1 truncate text-center text-xs font-extrabold text-emerald-700">
             {courseFilter || 'Tất cả khóa học'}
           </span>
-          <ChevronDown size={16} className="shrink-0 text-red-600" aria-hidden="true" />
+          <ChevronDown size={16} className="shrink-0 text-emerald-600" aria-hidden="true" />
         </button>
         {searchOpen ? (
           <input
@@ -479,16 +479,16 @@ export default function TeacherWeeklySlotGrid({
             placeholder="Lọc tên học viên"
             aria-label="Lọc theo tên học viên"
             autoFocus
-            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none focus:border-red-300"
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none focus:border-emerald-300"
           />
         ) : null}
       </div>
 
-      <div className="mx-3 flex min-h-9 items-center justify-between border border-b-0 border-slate-200 bg-rose-50/70 px-1 sm:mx-4">
+      <div className="mx-3 flex min-h-9 items-center justify-between border border-b-0 border-slate-200 bg-emerald-50/70 px-1 sm:mx-4">
         <button
           type="button"
           onClick={goPrev}
-          className="flex h-8 w-8 items-center justify-center text-red-600"
+          className="flex h-8 w-8 items-center justify-center text-emerald-600"
           aria-label="Tuần trước"
         >
           <ChevronLeft size={16} />
@@ -496,7 +496,7 @@ export default function TeacherWeeklySlotGrid({
         <button
           type="button"
           onClick={goThisWeek}
-          className="px-2 text-xs font-extrabold text-red-700"
+          className="px-2 text-xs font-extrabold text-emerald-700"
           aria-label="Về tuần hiện tại"
         >
           {formatWeekRangeLabel(weekStart)}
@@ -504,7 +504,7 @@ export default function TeacherWeeklySlotGrid({
         <button
           type="button"
           onClick={goNext}
-          className="flex h-8 w-8 items-center justify-center text-red-600"
+          className="flex h-8 w-8 items-center justify-center text-emerald-600"
           aria-label="Tuần sau"
         >
           <ChevronRight size={16} />
@@ -525,7 +525,7 @@ export default function TeacherWeeklySlotGrid({
                   }}
                   aria-label="Sắp xếp theo tên"
                   title="Sắp xếp theo tên A–Z hoặc Z–A"
-                  className={`mt-1 h-7 w-full rounded-md border bg-white px-1 text-xs font-semibold text-slate-600 outline-none ${sort.kind === 'name' ? 'border-red-300 text-red-700' : 'border-slate-200'
+                  className={`mt-1 h-7 w-full rounded-md border bg-white px-1 text-xs font-semibold text-slate-600 outline-none ${sort.kind === 'name' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200'
                     }`}
                 >
                   {sort.kind !== 'name' && <option value="">Tên</option>}
@@ -540,14 +540,14 @@ export default function TeacherWeeklySlotGrid({
                 return (
                   <th
                     key={key}
-                    className={`w-[5rem] min-w-[5rem] border-b border-r border-slate-200 px-0.5 py-1.5 text-center align-bottom ${isToday ? 'bg-red-50/80' : ''
+                    className={`w-[5rem] min-w-[5rem] border-b border-r border-slate-200 px-0.5 py-1.5 text-center align-bottom ${isToday ? 'bg-emerald-50/80' : ''
                       }`}
                   >
                     <div className={`${past ? 'opacity-70' : ''}`}>
-                      <div className={`text-xs font-black ${isToday ? 'text-red-700' : 'text-slate-700'}`}>
+                      <div className={`text-xs font-black ${isToday ? 'text-emerald-700' : 'text-slate-700'}`}>
                         {WEEKDAY_LABELS[i]}
                       </div>
-                      <div className={`text-xs font-semibold ${isToday ? 'text-red-500' : 'text-slate-400'}`}>
+                      <div className={`text-xs font-semibold ${isToday ? 'text-emerald-500' : 'text-slate-400'}`}>
                         {key.slice(8, 10)}/{key.slice(5, 7)}
                       </div>
                     </div>
@@ -556,7 +556,7 @@ export default function TeacherWeeklySlotGrid({
                       onClick={() => setSortMenuDayIndex(i)}
                       aria-label={`Chọn sắp xếp lịch theo giờ ${WEEKDAY_LABELS[i]}`}
                       aria-haspopup="dialog"
-                      className={`mt-0.5 flex h-6 w-full items-center justify-center gap-0.5 rounded-md border px-1 text-xs font-semibold ${dayActive ? 'border-blue-200 bg-blue-50 text-red-700' : 'border-transparent text-slate-500 hover:bg-white'
+                      className={`mt-0.5 flex h-6 w-full items-center justify-center gap-0.5 rounded-md border px-1 text-xs font-semibold ${dayActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-transparent text-slate-500 hover:bg-white'
                         }`}
                     >
                       <span>{dayActive ? (sort.dir === 'asc' ? '↑' : '↓') : 'Giờ'}</span>
@@ -626,7 +626,7 @@ export default function TeacherWeeklySlotGrid({
                   <button
                     type="button"
                     onClick={() => setRosterExpanded((v) => !v)}
-                    className="text-xs font-black text-red-600 hover:text-red-700 hover:underline  tracking-wide"
+                    className="text-xs font-black text-emerald-600 hover:text-emerald-700 hover:underline  tracking-wide"
                   >
                     {rosterExpanded
                       ? 'Thu gọn'
@@ -655,7 +655,7 @@ export default function TeacherWeeklySlotGrid({
             className="flex max-h-[min(80vh,36rem)] w-full max-w-md flex-col gap-1 rounded-2xl bg-white p-3 shadow-2xl sm:p-4"
           >
             <header className="mb-1 flex items-center gap-2.5 border-b border-slate-200 pb-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                 <BookOpen size={17} />
               </span>
               <span className="min-w-0 flex-1">
@@ -683,11 +683,11 @@ export default function TeacherWeeklySlotGrid({
                       setCourseFilter(course);
                       setCoursePickerOpen(false);
                     }}
-                    className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
+                    className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${selected ? 'bg-emerald-50 text-emerald-700' : 'text-slate-900 hover:bg-slate-50'
                       }`}
                   >
                     <span>{course || 'Tất cả khóa học'}</span>
-                    {selected ? <Check size={17} className="shrink-0 text-red-600" /> : null}
+                    {selected ? <Check size={17} className="shrink-0 text-emerald-600" /> : null}
                   </button>
                 );
               })}
@@ -710,7 +710,7 @@ export default function TeacherWeeklySlotGrid({
             className="w-full max-w-md rounded-2xl bg-white p-3 shadow-2xl sm:p-4"
           >
             <header className="mb-1 flex items-center gap-2.5 border-b border-slate-200 pb-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                 <Table2 size={17} />
               </span>
               <span className="min-w-0 flex-1">
@@ -746,11 +746,11 @@ export default function TeacherWeeklySlotGrid({
                     else setSort({ kind: 'day', dir: option.value, dayIndex: sortMenuDayIndex });
                     setSortMenuDayIndex(null);
                   }}
-                  className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
+                  className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${selected ? 'bg-emerald-50 text-emerald-700' : 'text-slate-900 hover:bg-slate-50'
                     }`}
                 >
                   <span>{option.label}</span>
-                  {selected ? <Check size={17} className="shrink-0 text-red-600" /> : null}
+                  {selected ? <Check size={17} className="shrink-0 text-emerald-600" /> : null}
                 </button>
               );
             })}
@@ -788,7 +788,7 @@ function SlotCell({
   const gate = getStudentScheduleGate(student, studentSchedules || schedules, dateKey, existingId || null);
 
   const options = extra ? [extra, ...WEEK_SLOT_OPTIONS] : WEEK_SLOT_OPTIONS;
-  const dayTd = `h-[4.5rem] min-w-0 border-b border-r border-slate-200 px-1 py-1 ${isToday ? 'bg-red-50/50' : ''}`;
+  const dayTd = `h-[4.5rem] min-w-0 border-b border-r border-slate-200 px-1 py-1 ${isToday ? 'bg-emerald-50/50' : ''}`;
 
   if (otherCourse) {
     return (
@@ -834,7 +834,7 @@ function SlotCell({
         data-native-select
         title={!own && !gate.canSchedule ? (gate.reason || 'Không xếp thêm được') : undefined}
         onChange={(e) => onChange(student, dateKey, e.target.value)}
-        className={`min-h-11 w-full min-w-0 max-w-full appearance-none rounded-md border border-transparent bg-none bg-transparent px-0 text-center text-xs font-semibold outline-none hover:bg-white/70 focus:border-red-300 focus:bg-white ${own
+        className={`min-h-11 w-full min-w-0 max-w-full appearance-none rounded-md border border-transparent bg-none bg-transparent px-0 text-center text-xs font-semibold outline-none hover:bg-white/70 focus:border-emerald-300 focus:bg-white ${own
             ? 'text-amber-700'
             : 'text-slate-600'
           } ${busy ? 'opacity-60' : ''} ${disabledAll ? 'cursor-not-allowed' : 'cursor-pointer'}`}

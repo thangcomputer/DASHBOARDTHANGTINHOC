@@ -12,9 +12,9 @@ import { openLearningGoal } from '../../utils/learningGoal';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { readOwnedVideoCourseCache } from '../../utils/lmsDeepLink';
-import { isFreePortalCourseName } from '../../utils/enrollments';
+import { isFreePortalCourseName, isFreePortalSelfRegistrationStudent } from '../../utils/enrollments';
 import { useStudentSubscription } from './subscription/subscriptionContext';
-import { formatExpiryDate, formatVnd } from '../../utils/subscription';
+import { formatVnd } from '../../utils/subscription';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/useToast';
 
@@ -57,7 +57,7 @@ function formatDateDisplay(d) {
 
 export default function StudentProfileTab({
   studentData,
-  progressPct = 0,
+  progressPct: _progressPct = 0,
   setShowUpdateProfileModal,
   setShowTuitionModal,
   sessionGender = '',
@@ -66,22 +66,20 @@ export default function StudentProfileTab({
   const { onLogout } = useData();
   const subCtx = useStudentSubscription();
   const subscription = subCtx?.subscription;
-  const freePortalAccount = (() => {
-    try { return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true; } catch { return false; }
-  })();
+  const isFreePortal = isFreePortalSelfRegistrationStudent(studentData ? { ...studentData, role: 'student' } : null)
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
+  const freePortalAccount = isFreePortal;
+  const isBrandStudent = !isFreePortal;
   const hasActivePaid = (subscription?.state === 'active' || subscription?.state === 'expiring') || Boolean(subscription?.meetLifetime);
   const isLifetime = subscription?.state === 'lifetime' && (Boolean(subscription?.meetLifetime) || !freePortalAccount);
   const freeTier = !hasActivePaid && !isLifetime;
   const history = subCtx?.overview?.history || [];
 
   const [openSections, setOpenSections] = useState({
-    personalInfo: true,
-    summary: true,
-    courses: true,
-    subscription: true,
-    history: false,
+    courses: false,
     videoOrders: false,
   });
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [videoOrders, setVideoOrders] = useState([]);
   const [lessonProgress, setLessonProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
   const studentId = String(
@@ -234,436 +232,307 @@ export default function StudentProfileTab({
     }
   };
 
-  // Tính số buổi còn lại
-  const remainingSessions = (() => {
-    if (studentData?.remainingSessions != null) return studentData.remainingSessions;
-    const total = Number(studentData?.totalSessions) || 12;
-    const done = Number(studentData?.completedSessions) || 0;
-    return Math.max(0, total - done);
-  })();
-
-  // Điểm trung bình
-  const avgGrade = studentData?.avgGrade ?? studentData?.overallScore ?? studentData?.gpa ?? 0;
-
   // Tên gói hiển thị
+  const rawPlanLabel = String(subscription?.planLabel || 'học').trim();
   const planName = freeTier
-    ? 'Tài khoản miễn phí'
+    ? 'Gói miễn phí'
     : subscription
-      ? (isLifetime ? 'Gói Vĩnh viễn' : `Gói ${subscription.planLabel}`)
+      ? (isBrandStudent
+          ? 'Gói Khóa học'
+          : (isLifetime
+              ? 'Gói Vĩnh viễn'
+              : (rawPlanLabel.toLowerCase().startsWith('gói') ? rawPlanLabel : `Gói ${rawPlanLabel}`)))
       : 'Tài khoản học viên';
+  const daysLeftNum = subscription?.daysLeft != null ? Number(subscription.daysLeft) : null;
+  const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : subscription?.state === 'expiring';
+  const subActionLabel = freeTier ? 'Nâng cấp' : (isNearExpiry ? 'Gia hạn' : 'Đổi gói');
+
+  const daysLine = freeTier
+    ? `${subscription?.dailyXpLimit || 60} XP ${subscription?.resetCycle === 'monthly' ? 'mỗi tháng' : subscription?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'}`
+    : isBrandStudent
+      ? 'Khóa chính thức'
+      : isLifetime
+        ? 'Không giới hạn'
+        : subscription
+          ? `Còn ${subscription.daysLeft ?? 0} ngày`
+          : 'Kích hoạt hoặc gia hạn để học tiếp';
 
   return (
     <div className="max-w-2xl mx-auto space-y-3.5 sm:space-y-4 py-3 px-2 sm:px-4 animate-in fade-in duration-300">
-      {/* ── 1. Thẻ Hero hồ sơ cá nhân (Đồng bộ chuẩn Mobile App) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#0c6b5b] via-[#0a584b] to-[#073d34] text-white p-5 sm:p-6 shadow-md relative overflow-hidden">
-        {/* Họa tiết trang trí mờ phía sau */}
-        <div className="absolute -right-10 -bottom-10 w-44 h-44 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute -right-4 -top-8 w-28 h-28 rounded-full bg-emerald-400/10 pointer-events-none" />
-
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="relative shrink-0">
-            <EditableAvatar
-              avatar={studentData?.avatar}
-              name={studentData?.name}
-              role="student"
-              gender={profileGender}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl border-2 border-white/20 bg-white/10 shadow-lg cursor-pointer"
-            />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#0FAF9F] border-2 border-[#0a584b] flex items-center justify-center text-white shadow pointer-events-none">
-              <CheckCircle size={13} className="text-white fill-white/20" />
-            </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wide truncate">
-              {studentData?.name || studentData?.phone || 'HỌC VIÊN'}
-            </h2>
-            <p className="text-xs sm:text-sm font-medium text-emerald-100/90 truncate mt-0.5">
-              {planName}
-            </p>
+      {/* ── 1. Thẻ Hero hồ sơ cá nhân (Đồng bộ 100% Mobile App) ── */}
+      <div className={`rounded-[20px] border-[1.5px] p-4 sm:p-5 flex items-center gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] ${
+        isBrandStudent ? 'border-[#FEE2E2] bg-[#FEF2F2]' : 'border-[#CCFBF1] bg-[#F0FDFA]'
+      }`}>
+        <div className="relative shrink-0">
+          <EditableAvatar
+            avatar={studentData?.avatar}
+            name={studentData?.name}
+            role="student"
+            gender={profileGender}
+            className={`w-[76px] h-[76px] rounded-full border-2 border-white shadow-xs cursor-pointer ${
+              isBrandStudent ? 'bg-[#FEE2E2]' : 'bg-[#CCFBF1]'
+            }`}
+          />
+          <div className={`absolute right-0 bottom-0 w-[25px] h-[25px] rounded-full border-2 border-white flex items-center justify-center text-white shadow-xs pointer-events-none ${
+            isBrandStudent ? 'bg-[#EF4444]' : 'bg-[#0FAF9F]'
+          }`}>
+            <Camera size={14} className="text-white" />
           </div>
         </div>
-
-        {/* 3 Chỉ số KPI chuẩn Mobile */}
-        <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-white/15 text-center relative z-10">
-          <div>
-            <p className="text-lg sm:text-2xl font-black text-white leading-tight">
-              {progressPct || 0}%
-            </p>
-            <p className="text-[11px] sm:text-xs text-emerald-100/75 font-medium mt-0.5">
-              Tiến độ
-            </p>
-          </div>
-          <div className="border-x border-white/10">
-            <p className="text-lg sm:text-2xl font-black text-white leading-tight">
-              {avgGrade}
-            </p>
-            <p className="text-[11px] sm:text-xs text-emerald-100/75 font-medium mt-0.5">
-              Điểm TB
-            </p>
-          </div>
-          <div>
-            <p className="text-lg sm:text-2xl font-black text-white leading-tight">
-              {remainingSessions}
-            </p>
-            <p className="text-[11px] sm:text-xs text-emerald-100/75 font-medium mt-0.5">
-              Buổi còn lại
-            </p>
-          </div>
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <p className={`text-[11px] font-black tracking-[0.8px] uppercase ${
+            isBrandStudent ? 'text-[#DC2626]' : 'text-[#0F766E]'
+          }`}>
+            Hồ sơ cá nhân
+          </p>
+          <h2 className="text-[18px] sm:text-[20px] font-black text-[#0F172A] truncate leading-tight">
+            {studentData?.name || studentData?.phone || 'Học viên'}
+          </h2>
+          <p className="text-[12px] sm:text-[13px] font-medium text-[#64748B]">
+            Chạm vào ảnh để thay đổi ảnh đại diện
+          </p>
         </div>
       </div>
 
-      {/* ── 2. Menu Bảo mật & Tiện ích (Ngay dưới Hero theo đúng Mobile) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
+      {/* ── 2. Gói học Meet & Lịch sử gia hạn (Ngay dưới Hero theo đúng Mobile App) ── */}
+      <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] p-4 sm:p-5">
+        <div className="flex items-center gap-2 pb-3 border-b border-[#F1F5F9]">
+          <Crown size={18} className={isBrandStudent ? 'text-[#EF4444]' : 'text-[#F59E0B]'} />
+          <h3 className="text-[15px] font-extrabold text-[#1E293B]">{isBrandStudent ? 'Gói Khóa học' : 'Gói học Meet'}</h3>
+        </div>
+
+        <div className="mt-3.5 p-3.5 rounded-[16px] bg-[#F8FAFC] border border-[#F1F5F9] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0 text-white ${
+              isBrandStudent ? 'bg-gradient-to-br from-[#EF4444] to-[#DC2626]' : 'bg-gradient-to-br from-[#10B981] to-[#059669]'
+            }`}>
+              <CalendarClock size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-[14px] font-black text-[#0F172A] truncate">
+                {planName}
+              </h4>
+              <p className={`text-[12px] font-bold truncate mt-0.5 ${
+                isBrandStudent ? 'text-[#DC2626]' : 'text-[#059669]'
+              }`}>
+                {daysLine}
+              </p>
+            </div>
+          </div>
+          {(!isLifetime || freeTier) && !isBrandStudent && (
+            <button
+              type="button"
+              onClick={subCtx?.openRenew || (() => setShowTuitionModal(true))}
+              className="shrink-0 min-h-[36px] rounded-[12px] px-3.5 py-1.5 text-[12px] font-extrabold text-white transition hover:brightness-105 active:translate-y-[1px] !shadow-none cursor-pointer bg-[#10B981] border border-[#34D399] border-b-[3px] border-b-[#059669]"
+            >
+              {subActionLabel}
+            </button>
+          )}
+        </div>
+
+        {history.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-[#F1F5F9]">
+            <div className="flex items-center gap-1.5 text-[12px] font-bold text-[#64748B] mb-2">
+              <History size={14} />
+              <span>Lịch sử gia hạn</span>
+            </div>
+            <div className="divide-y divide-[#F1F5F9]">
+              {(showAllHistory ? history : history.slice(0, 3)).map((h, idx) => {
+                const sourceText = h.source === 'code'
+                  ? 'Mã kích hoạt'
+                  : h.source === 'admin'
+                    ? 'Trung tâm cập nhật'
+                    : 'Thanh toán';
+                return (
+                  <div key={h.id || idx} className="py-2 flex items-center justify-between text-[12px]">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <p className="font-semibold text-[#334155] truncate">
+                        {sourceText} · {h.planLabel || h.planId || h.plan || 'Gói học'} {h.amount ? `· ${formatVnd(h.amount)}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-[#94A3B8] font-medium shrink-0">
+                      {h.createdAt ? new Date(h.createdAt).toLocaleDateString('vi-VN') : '-'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {history.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllHistory((prev) => !prev)}
+                className={`mt-2 w-full py-1.5 rounded-[10px] bg-[#F8FAFC] hover:bg-[#F1F5F9] text-[12px] font-bold flex items-center justify-center gap-1 transition cursor-pointer !shadow-none ${
+                  isBrandStudent ? 'text-[#DC2626]' : 'text-[#059669]'
+                }`}
+              >
+                <span>{showAllHistory ? 'Thu gọn' : `Xem thêm (${history.length - 3})`}</span>
+                <ChevronDown size={14} className={`transition-transform duration-200 ${showAllHistory ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. Thông tin cá nhân (Thu gọn 1 dòng chuẩn Mobile App) ── */}
+      <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
+        <div className="min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <User size={16} className={`shrink-0 ${isBrandStudent ? 'text-[#DC2626]' : 'text-[#16A34A]'}`} />
+            <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Thông tin cá nhân</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowUpdateProfileModal(true)}
+            className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 rounded-[10px] text-[12px] font-bold transition cursor-pointer !shadow-none shrink-0 ${
+              isBrandStudent ? 'bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2]' : 'bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
+            }`}
+          >
+            <Settings size={14} />
+            <span>Chỉnh sửa</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── 4. Khóa học đã đăng ký (Chỉ dành cho đăng ký theo khóa, tài khoản tự đăng ký không hiển thị) ── */}
+      {!isFreePortal && (
+        <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('courses')}
+            aria-expanded={openSections.courses}
+            className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-slate-50/60 transition cursor-pointer !shadow-none ${openSections.courses ? 'border-b border-[#E9EEF2]' : ''}`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen size={16} className="text-[#2563EB] shrink-0" />
+              <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Khóa học đã đăng ký</h3>
+              <span className="px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] text-[11px] font-extrabold">
+                {courses.length}
+              </span>
+            </div>
+            <ChevronDown size={17} className={`text-[#64748B] shrink-0 transition-transform duration-200 ${openSections.courses ? 'rotate-180' : ''}`} />
+          </button>
+
+          {openSections.courses && (
+            <div className="divide-y divide-[#E9EEF2]">
+              {courses.length === 0 ? (
+                <div className="py-8 px-4 text-center">
+                  <p className="text-[15px] font-bold text-[#0F172A]">Chưa có khóa học</p>
+                  <p className="text-[13px] text-[#64748B] mt-1">Khóa học được phân công sẽ hiển thị tại đây.</p>
+                </div>
+              ) : (
+                courses.map((c) => {
+                  const title = c.courseName || c.name || 'Khóa học';
+                  const freeCourse = isFreePortalCourseName(title);
+                  const videoProgress = progressForCourse(c);
+                  const isVideoCourse = Boolean(videoProgress);
+                  const total = freeCourse ? 0 : (isVideoCourse ? videoProgress.total : (Number(c.totalSessions) || 12));
+                  const done = freeCourse ? 0 : (isVideoCourse ? videoProgress.completed : (Number(c.completedSessions) || 0));
+                  const isCompleted = !freeCourse && (c.status === 'completed' || (isVideoCourse && total > 0 && done >= total));
+                  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100) || 0) : 0;
+
+                  return (
+                    <div key={c.id || c.enrollmentId || title} className="px-4 py-3.5 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{title}</h4>
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                          isCompleted ? 'bg-[#EFF6FF] text-[#2563EB]' : 'bg-[#ECFDF5] text-[#16A34A]'
+                        }`}>
+                          {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                        </span>
+                      </div>
+                      <p className="text-[12px] text-[#64748B]">
+                        GV: {c.teacherName || teacherValue || 'Chưa phân công'}{c.registeredAt ? ` · ${formatDateDisplay(c.registeredAt)}` : ''}
+                      </p>
+                      <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${isBrandStudent ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="flex items-center justify-between text-[12px]">
+                        <span className="text-[#64748B]">{done}/{total} buổi · Tiến độ {pct}%</span>
+                        <span className="font-extrabold text-[#0F172A]">{c.avgGrade ?? 0} TB</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 5. Menu Bảo mật & Tiện ích (Đồng bộ vị trí & giao diện Mobile App) ── */}
+      <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] px-4 py-1 divide-y divide-[#F1F5F9]">
         <button
           type="button"
           onClick={openChangePassword}
-          className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
         >
-          <span className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center shrink-0">
-            <Shield size={18} />
+          <span className={`w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 ${
+            isBrandStudent ? 'text-[#EF4444]' : 'text-[#10B981]'
+          }`}>
+            <Settings size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Đổi mật khẩu</p>
-            <p className="text-xs text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</p>
+            <p className="text-[14px] font-semibold text-[#0F172A]">Thay đổi mật khẩu</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Cập nhật mật khẩu đăng nhập</p>
           </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+          <ChevronRight size={18} className="text-[#64748B] shrink-0" />
         </button>
 
         <button
           type="button"
           onClick={openPinLockSettings}
-          className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
         >
-          <span className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+          <span className={`w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 ${
+            isBrandStudent ? 'text-[#EF4444]' : 'text-[#10B981]'
+          }`}>
             <KeyRound size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Khóa mã PIN</p>
-            <p className="text-xs text-slate-500 mt-0.5">Tự khóa màn hình khi không thao tác</p>
+            <p className="text-[14px] font-semibold text-[#0F172A]">Khóa mã PIN</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Tự khóa màn hình khi không thao tác</p>
           </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+          <ChevronRight size={18} className="text-[#64748B] shrink-0" />
         </button>
 
         <button
           type="button"
           onClick={openLearningGoal}
-          className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
         >
-          <span className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+          <span className={`w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 ${
+            isBrandStudent ? 'text-[#EF4444]' : 'text-[#10B981]'
+          }`}>
             <Target size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Mục tiêu học</p>
-            <p className="text-xs text-slate-500 mt-0.5">Đặt hoặc đổi số giờ học mỗi ngày</p>
+            <p className="text-[14px] font-semibold text-[#0F172A]">Mục tiêu học</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Đặt hoặc đổi số giờ học mỗi ngày</p>
           </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+          <ChevronRight size={18} className="text-[#64748B] shrink-0" />
         </button>
       </div>
 
-      {/* ── 3. Thông tin cá nhân (Chuẩn Mobile) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <User size={18} className="text-[#0FAF9F]" />
-            <h3 className="text-sm sm:text-base font-bold text-slate-800">Thông tin cá nhân</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowUpdateProfileModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
-            >
-              <Settings size={13} />
-              <span>Cập nhật</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleSection('personalInfo')}
-              className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-              aria-label="Thu gọn thông tin cá nhân"
-            >
-              <ChevronDown size={18} className={`transition-transform duration-200 ${openSections.personalInfo ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        </div>
-        {openSections.personalInfo && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3">
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <Mail size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Email</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                  {studentData?.email || 'Chưa cập nhật'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <Phone size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Số điện thoại</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 font-mono">
-                  {studentData?.phone || 'Chưa cập nhật'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <Phone size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">SĐT Khác</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 font-mono">
-                  {studentData?.otherPhone || studentData?.secondaryPhone || studentData?.parentPhone || studentData?.phone || 'Chưa cập nhật'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <MapPin size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Địa chỉ</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                  {studentData?.address || 'Chưa cập nhật'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── 4. Tóm tắt học tập (Chuẩn Mobile) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
-        <button
-          type="button"
-          onClick={() => toggleSection('summary')}
-          className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <BookOpen size={18} className="text-blue-600" />
-            <h3 className="text-sm sm:text-base font-bold text-slate-800">Tóm tắt học tập</h3>
-          </div>
-          <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${openSections.summary ? 'rotate-180' : ''}`} />
-        </button>
-
-        {openSections.summary && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3.5 mt-2 border-t border-slate-100">
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <GraduationCap size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Giáo viên</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                  {teacherValue}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <Award size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Trạng thái</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                  {studentData?.status || 'Đang học'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <Receipt size={16} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Học phí theo khóa</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                  {freeTier
-                    ? 'Tài khoản miễn phí: 0đ'
-                    : studentData?.tuition
-                      ? `${studentData?.courseName || 'Khóa học'}: ${formatVnd(studentData.tuition)}đ`
-                      : 'Tài khoản miễn phí: 0đ'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-              <CheckCircle size={16} className="text-emerald-500 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400">Thanh toán</p>
-                <p className="text-xs sm:text-sm font-bold text-emerald-600 truncate">
-                  Đã đóng học phí
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── 5. Khóa học (Chuẩn Mobile) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
-        <button
-          type="button"
-          onClick={() => toggleSection('courses')}
-          className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <BookOpen size={18} className="text-blue-600" />
-            <h3 className="text-sm sm:text-base font-bold text-slate-800">Khóa học</h3>
-            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-              {courses.length || (freeTier ? 1 : 0)}
-            </span>
-          </div>
-          <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${openSections.courses ? 'rotate-180' : ''}`} />
-        </button>
-
-        {openSections.courses && (
-          <div className="space-y-2.5 pt-3.5 mt-2 border-t border-slate-100">
-            {courses.length === 0 && freeTier && (
-              <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-bold text-blue-600 truncate">Tài khoản miễn phí</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    GV: {teacherValue} · {new Date().toLocaleDateString('vi-VN')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { window.location.hash = 'lesson-practice'; }}
-                  className="px-3.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 shrink-0 cursor-pointer"
-                >
-                  Học
-                </button>
-              </div>
-            )}
-
-            {courses.length === 0 && !freeTier && (
-              <p className="text-xs text-slate-400 text-center py-4">Chưa có khóa học nào được đăng ký.</p>
-            )}
-
-            {courses.map((c) => {
-              const title = c.courseName || c.name || 'Khóa học';
-              const freeCourse = isFreePortalCourseName(title);
-              const videoProgress = progressForCourse(c);
-              const isVideoCourse = Boolean(videoProgress);
-              const total = isVideoCourse ? videoProgress.total : (Number(c.totalSessions) || 12);
-              const done = isVideoCourse ? videoProgress.completed : (Number(c.completedSessions) || 0);
-              const isCompleted = !freeCourse && (c.status === 'completed' || (isVideoCourse && total > 0 && done >= total));
-              const pct = freeCourse ? 0 : (Math.round((done / total) * 100) || 0);
-
-              return (
-                <div key={c.id || c.enrollmentId || title} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-sm font-bold text-slate-900 truncate">{title}</h4>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700">
-                      {isCompleted ? 'Đã xong' : 'Đang học'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    GV: {c.teacherName || teacherValue} {c.registeredAt ? `· ${formatDateDisplay(c.registeredAt)}` : ''}
-                  </p>
-                  {!freeCourse && (
-                    <>
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-2.5">
-                        <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-500 mt-1.5">
-                        <span>{done}/{total} buổi · Tiến độ {pct}%</span>
-                        <span className="font-bold text-slate-700">{c.avgGrade ?? 0} TB</span>
-                      </div>
-                    </>
-                  )}
-                  {freeCourse && (
-                    <div className="flex justify-end mt-2">
-                      <button
-                        type="button"
-                        onClick={() => { window.location.hash = 'lesson-practice'; }}
-                        className="px-3.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 cursor-pointer"
-                      >
-                        Học
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── 6. Gói học Meet / Gói tự học (Chuẩn Mobile) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-          <Crown size={18} className="text-amber-500" />
-          <h3 className="text-sm sm:text-base font-bold text-slate-800">Gói học Meet</h3>
-        </div>
-
-        {/* Thẻ hiển thị gói hiện tại */}
-        <div className="mt-3.5 p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-xs text-white ${
-              isLifetime ? 'bg-gradient-to-br from-rose-500 to-rose-600' : 'bg-emerald-600'
-            }`}>
-              <CalendarClock size={22} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="text-sm font-bold text-slate-900 truncate">
-                {planName}
-              </h4>
-              <p className="text-xs text-slate-500 truncate mt-0.5">
-                {freeTier
-                  ? `Gói miễn phí (${subscription?.dailyXpLimit || 60} XP ${subscription?.resetCycle === 'monthly' ? 'mỗi tháng' : subscription?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'})`
-                  : isLifetime
-                    ? 'Không giới hạn thời gian'
-                    : subscription
-                      ? `Hạn: ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày${subscription?.dailyXpLimit ? ` · ${subscription.dailyXpLimit} XP ${subscription?.resetCycle === 'monthly' ? '/tháng' : subscription?.resetCycle === 'never' ? '' : '/ngày'}` : ''}`
-                      : 'Kích hoạt hoặc gia hạn để học tiếp'}
-              </p>
-            </div>
-          </div>
-          {(!isLifetime || freeTier) && (
-            <button
-              type="button"
-              onClick={subCtx?.openRenew || (() => setShowTuitionModal(true))}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-xs whitespace-nowrap transition-colors cursor-pointer shrink-0"
-            >
-              {freeTier ? 'Nâng cấp gói' : 'Gia hạn'}
-            </button>
-          )}
-        </div>
-
-        {/* Lịch sử gia hạn */}
-        {history.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2">
-              <History size={14} />
-              <span>Lịch sử gia hạn</span>
-            </div>
-            <div className="space-y-1.5 divide-y divide-slate-100">
-              {history.map((h, idx) => (
-                <div key={idx} className="pt-2 flex items-center justify-between text-xs">
-                  <div className="min-w-0 flex-1 pr-2">
-                    <p className="font-semibold text-slate-700 truncate">
-                      Thanh toán · {h.planLabel || h.planId || 'Gói học'} {h.amount ? `· ${formatVnd(h.amount)}` : ''}
-                    </p>
-                  </div>
-                  <span className="text-slate-400 font-mono shrink-0">
-                    {h.createdAt ? new Date(h.createdAt).toLocaleDateString('vi-VN') : '-'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── 7. Đơn mua khóa video (nếu có) ── */}
+      {/* ── 6. Đơn mua khóa video (chỉ hiển thị khi có đơn, mặc định thu gọn) ── */}
       {videoOrders.length > 0 && (
-        <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
+        <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
           <button
             type="button"
             onClick={() => toggleSection('videoOrders')}
-            className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
+            aria-expanded={openSections.videoOrders}
+            className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-slate-50/60 transition cursor-pointer !shadow-none ${openSections.videoOrders ? 'border-b border-[#E9EEF2]' : ''}`}
           >
-            <div className="flex items-center gap-2">
-              <Receipt size={18} className="text-violet-600" />
-              <h3 className="text-sm sm:text-base font-bold text-slate-800">Đơn mua khóa video</h3>
-              <span className="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+            <div className="flex items-center gap-2 min-w-0">
+              <Receipt size={16} className="text-violet-600 shrink-0" />
+              <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Đơn mua khóa video</h3>
+              <span className="text-[11px] font-extrabold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
                 {videoOrders.length}
               </span>
             </div>
-            <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${openSections.videoOrders ? 'rotate-180' : ''}`} />
+            <ChevronDown size={17} className={`text-[#64748B] shrink-0 transition-transform duration-200 ${openSections.videoOrders ? 'rotate-180' : ''}`} />
           </button>
           {openSections.videoOrders && (
-            <div className="space-y-2 pt-3.5 mt-2 border-t border-slate-100">
+            <div className="p-4 space-y-2">
               {videoOrders.map((order) => {
                 const paid = isOrderPaid(order);
                 return (
@@ -676,7 +545,7 @@ export default function StudentProfileTab({
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        paid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        paid ? 'cms-profile-soft' : 'bg-amber-100 text-amber-800'
                       }`}>
                         {paid ? 'Đã thanh toán' : 'Chờ TT'}
                       </span>
@@ -684,7 +553,7 @@ export default function StudentProfileTab({
                         <button
                           type="button"
                           onClick={() => handleContinueVideoLearning(order)}
-                          className="px-2.5 py-1 rounded bg-blue-600 text-white font-bold text-[11px] hover:bg-blue-700 cursor-pointer"
+                          className="cms-btn cms-btn-primary cms-btn-sm !min-h-7 !px-2.5 !text-[11px]"
                         >
                           Vào học
                         </button>
@@ -692,7 +561,7 @@ export default function StudentProfileTab({
                         <button
                           type="button"
                           onClick={() => handleResumeVideoPay(order)}
-                          className="px-2.5 py-1 rounded bg-amber-500 text-white font-bold text-[11px] hover:bg-amber-600 cursor-pointer"
+                          className="cms-btn cms-btn-warning cms-btn-sm !min-h-7 !px-2.5 !text-[11px]"
                         >
                           Thanh toán
                         </button>
@@ -706,36 +575,36 @@ export default function StudentProfileTab({
         </div>
       )}
 
-      {/* ── 8. Cài đặt và hỗ trợ (Chuẩn Mobile) ── */}
-      <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
-        <h4 className="text-sm sm:text-base font-bold text-slate-800 mb-3">Cài đặt và hỗ trợ</h4>
+      {/* ── 7. Cài đặt và hỗ trợ (Chuẩn Mobile App) ── */}
+      <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] p-4 sm:p-5">
+        <h4 className="text-[16px] font-bold text-[#0F172A] mb-2">Cài đặt và hỗ trợ</h4>
         <button
           type="button"
           onClick={handleEnableNotification}
-          className="w-full flex items-center gap-3.5 text-left hover:bg-slate-50 p-2.5 rounded-xl transition-colors cursor-pointer"
+          className="w-full min-h-[60px] flex items-center gap-3.5 text-left hover:bg-slate-50/70 py-2 border-b border-[#F1F5F9] transition-colors cursor-pointer !shadow-none"
         >
-          <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+          <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] text-[#10B981] flex items-center justify-center shrink-0">
             <Bell size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Bật thông báo trên thiết bị</p>
-            <p className="text-xs text-slate-500 mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+            <p className="text-[14px] font-semibold text-[#0F172A]">Bật thông báo trên thiết bị</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
           </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+          <ChevronRight size={18} className="text-[#64748B] shrink-0" />
         </button>
-        <p className="text-xs text-slate-400 italic mt-3 pt-3 border-t border-slate-100">
+        <p className="text-[12px] text-[#64748B] italic mt-3">
           Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
         </p>
       </div>
 
-      {/* ── 9. Nút Đăng xuất (Chuẩn Mobile) ── */}
+      {/* ── 8. Nút Đăng xuất (Chuẩn 3D) ── */}
       <div className="pt-2 pb-6 flex justify-center">
         <button
           type="button"
           onClick={handleLogout}
-          className="min-w-[180px] py-2.5 px-6 rounded-full border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+          className="cms-profile-logout min-h-[48px] px-7 rounded-[14px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white text-[#DC2626] font-extrabold text-[14px] flex items-center justify-center gap-2 hover:bg-[#FEF2F2] active:translate-y-[3px] active:border-b transition-all cursor-pointer !shadow-none"
         >
-          <LogOut size={16} />
+          <LogOut size={18} />
           <span>Đăng xuất</span>
         </button>
       </div>

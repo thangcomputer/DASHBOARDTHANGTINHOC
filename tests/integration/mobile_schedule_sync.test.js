@@ -133,8 +133,8 @@ test('teacher attendance and cancellation controls wait for the eligible attenda
   assert.ok(ui.includes("'Đã điểm danh': { backgroundColor: colors.greenSoft, color: colors.green }"));
   assert.ok(ui.includes("'Đã xác nhận': { backgroundColor: colors.greenSoft, color: colors.green }"));
   assert.ok(
-    scheduleScreen.includes("teacherDiaryAttendanceButtonSubmitted: { backgroundColor: '#FEE2E2' }")
-    || scheduleScreen.includes("teacherDiaryAttendanceButtonSubmitted: { backgroundColor: colors.brandSoft }")
+    scheduleScreen.includes('teacherDiaryAttendanceButtonSubmitted:')
+    && (scheduleScreen.includes("backgroundColor: '#FEE2E2'") || scheduleScreen.includes('backgroundColor: colors.brandSoft'))
   );
   assert.ok(scheduleScreen.includes('setInterval(() => setScheduleNow(Date.now()), 15_000)'));
 });
@@ -156,7 +156,7 @@ test('student weekly schedule matches teacher course and week controls without a
 
   assert.ok(studentWeeklySchedule.includes('style={styles.courseFilterSelect}'));
   assert.ok(studentWeeklySchedule.includes('setShowStudentCoursePicker(true)'));
-  assert.ok(studentWeeklySchedule.includes('style={styles.teacherWeekRange}'));
+  assert.ok(studentWeeklySchedule.includes('styles.teacherWeekRange'));
   assert.ok(studentWeeklySchedule.includes('weekDays.map((day, index)'));
   assert.ok(studentWeeklySchedule.includes("{index === 6 ? 'CN' : `T${index + 2}`}"));
   assert.ok(studentWeeklySchedule.includes('weekDays.map((day) =>'));

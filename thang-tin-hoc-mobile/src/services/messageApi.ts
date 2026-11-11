@@ -274,10 +274,10 @@ function mapMessage(raw: RawMessage, user: DemoUser, index: number): ChatMessage
     ...(raw.recipientRejected ? { recipientRejected: true } : {}),
     ...(messageType === 'image' || messageType === 'file'
       ? {
-          attachmentType: messageType,
-          attachmentName: fileName,
-          attachmentUrl: raw.fileUrl ? resolveMobilePublicUrl(raw.fileUrl) : undefined,
-        }
+        attachmentType: messageType,
+        attachmentName: fileName,
+        attachmentUrl: raw.fileUrl ? resolveMobilePublicUrl(raw.fileUrl) : undefined,
+      }
       : {}),
   };
 }
@@ -362,6 +362,7 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
             userId: String(participant.userId),
             name: String(participant.name),
             role: String(participant.role),
+            avatar: (participant as { avatar?: string }).avatar ? String((participant as { avatar?: string }).avatar) : undefined,
           })),
         lastMessage: text(group.lastMessage?.content, 'Bắt đầu cuộc trò chuyện nhóm'),
         time: formatMessageTime(lastActivity),

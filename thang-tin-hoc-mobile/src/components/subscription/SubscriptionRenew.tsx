@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { CalendarClock, CalendarX2, Crown, KeyRound, LogOut, Ticket, X } from 'lucide-react-native';
+import { CalendarClock, CalendarX2, ChevronDown, Crown, History, KeyRound, LogOut, Ticket, X } from 'lucide-react-native';
 import { useAuth } from '../../app/AuthContext';
 import { CoursePaymentModal, type CoursePaymentCheckout } from '../CoursePaymentModal';
 import {
@@ -11,6 +11,8 @@ import {
   type SubscriptionOverview,
   type SubscriptionPlan,
 } from '../../services/subscriptionApi';
+import { DuoButton } from '../duo/DuoButton';
+import { isFreePortalMenu } from '../../utils/freePortalHelper';
 import { colors, radius, spacing } from '../../theme/tokens';
 
 const PLAN_TONES: Record<string, [string, string]> = {
@@ -76,15 +78,16 @@ export function SubscriptionRenewPanel({ overview, onRenewed }: { overview: Subs
                   </View>
                   <View style={styles.planBody}>
                     <Text style={[styles.planPrice, !sellable && styles.planPriceMuted]}>{sellable ? formatVnd(plan.price) : 'Kích hoạt bằng mã'}</Text>
-                    <Pressable
-                      onPress={() => { void buy(plan); }}
+                    <DuoButton
+                      variant="primary"
+                      size="md"
+                      fullWidth
+                      text="Gia hạn"
+                      loading={busyPlan === plan.id}
                       disabled={!sellable || Boolean(busyPlan)}
-                      style={[styles.primary, (!sellable || Boolean(busyPlan)) && styles.disabled]}
-                      accessibilityRole="button"
+                      onPress={() => { void buy(plan); }}
                       accessibilityLabel={`Gia hạn gói ${plan.label}`}
-                    >
-                      {busyPlan === plan.id ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Gia hạn</Text>}
-                    </Pressable>
+                    />
                   </View>
                 </View>
               );
@@ -110,9 +113,15 @@ export function SubscriptionRenewPanel({ overview, onRenewed }: { overview: Subs
               accessibilityLabel="Mã kích hoạt"
             />
           </View>
-          <Pressable onPress={() => { void redeem(); }} disabled={code.length < 13 || redeeming} style={[styles.primary, styles.codeButton, (code.length < 13 || redeeming) && styles.disabled]} accessibilityRole="button">
-            {redeeming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Kích hoạt</Text>}
-          </Pressable>
+          <DuoButton
+            variant="primary"
+            size="md"
+            text="Kích hoạt"
+            loading={redeeming}
+            disabled={code.length < 13 || redeeming}
+            onPress={() => { void redeem(); }}
+            style={styles.codeButton}
+          />
         </View>
         <Text style={styles.muted}>Mã do trung tâm cấp khi bạn đăng ký gói (1, 3, 6, 12 tháng hoặc vĩnh viễn).</Text>
       </View>
@@ -148,9 +157,13 @@ export function SubscriptionExpiredScreen() {
             ? 'Nhập mã kích hoạt trung tâm cấp hoặc chọn gói để bắt đầu học.'
             : `Gói tài khoản của ${user?.name || 'bạn'} đã hết hạn ngày ${formatExpiryDate(subscription.subscription.expiresAt)}. Gia hạn để tiếp tục học - tiến độ học vẫn được giữ nguyên.`}
         </Text>
-        <Pressable onPress={() => { void signOut(); }} style={styles.outline} accessibilityRole="button">
-          <LogOut size={15} color={colors.ink} /><Text style={styles.outlineText}>Đăng xuất</Text>
-        </Pressable>
+        <DuoButton
+          variant="secondary"
+          size="md"
+          text="Đăng xuất"
+          icon={<LogOut size={15} color={colors.ink} />}
+          onPress={() => { void signOut(); }}
+        />
       </View>
       <View style={styles.card}>
         <SubscriptionRenewPanel overview={subscription} onRenewed={() => { void refreshSubscription(); }} />
@@ -167,15 +180,37 @@ export function SubscriptionStatusCard({
   compact?: boolean;
   variant?: 'default' | 'drawer';
 }) {
-  const { subscription, refreshSubscription } = useAuth();
+  const { user, subscription, refreshSubscription } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const [open, setOpen] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   if (!subscription) return null;
   const sub = subscription.subscription;
   const expiring = sub.state === 'expiring';
-  const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || Boolean(sub.meetLifetime);
-  const isLifetime = sub.state === 'lifetime' && Boolean(sub.meetLifetime);
-  const isFree = !hasActivePaid && !isLifetime;
+  const isLifetime = sub.state === 'lifetime' && (!sub.freeTier || Boolean(sub.meetLifetime) || isBrandStudent);
+  const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || isLifetime || isBrandStudent;
+  const isFree = !isBrandStudent && (sub.freeTier === true || (!hasActivePaid && !isLifetime));
   const isDrawer = variant === 'drawer';
+  const daysLeftNum = sub.daysLeft != null ? Number(sub.daysLeft) : null;
+  const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : expiring;
+  const actionLabel = isFree ? 'Nâng cấp' : isNearExpiry ? 'Gia hạn' : 'Đổi gói';
+  const rawPlanLabel = String(sub.planLabel || 'học').trim();
+  const planTitle = isFree
+    ? 'Gói miễn phí'
+    : isBrandStudent
+      ? 'Gói Khóa học'
+      : isLifetime
+        ? 'Gói Vĩnh viễn'
+        : rawPlanLabel.toLowerCase().startsWith('gói')
+          ? rawPlanLabel
+          : `Gói ${rawPlanLabel}`;
+  const daysLine = isFree
+    ? 'Miễn phí hằng ngày'
+    : isBrandStudent
+      ? 'Khóa chính thức'
+      : isLifetime
+        ? 'Không giới hạn'
+        : `Còn ${sub.daysLeft ?? 0} ngày`;
 
   if (isDrawer) {
     return (
@@ -184,26 +219,30 @@ export function SubscriptionStatusCard({
           style={[
             styles.drawerSubCard,
             isLifetime
-              ? styles.drawerSubCardLifetime
+              ? (isBrandStudent ? styles.drawerSubCardBrand : styles.drawerSubCardLifetime)
               : expiring
                 ? styles.drawerSubCardExpiring
-                : styles.drawerSubCardActive,
+                : isBrandStudent
+                  ? styles.drawerSubCardBrand
+                  : styles.drawerSubCardActive,
           ]}
         >
           <View
             style={[
               styles.drawerSubIconBox,
               isLifetime
-                ? styles.drawerSubIconLifetime
+                ? (isBrandStudent ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' } : styles.drawerSubIconLifetime)
                 : expiring
                   ? styles.drawerSubIconExpiring
-                  : styles.drawerSubIconActive,
+                  : isBrandStudent
+                    ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' }
+                    : styles.drawerSubIconActive,
             ]}
           >
-            {isLifetime ? (
+            {isLifetime && !isBrandStudent ? (
               <Crown size={13} color="#FBBF24" />
             ) : (
-              <CalendarClock size={13} color={expiring ? '#FB923C' : '#34D399'} />
+              <CalendarClock size={13} color={isBrandStudent ? '#EF4444' : (expiring ? '#FB923C' : '#34D399')} />
             )}
           </View>
 
@@ -211,31 +250,36 @@ export function SubscriptionStatusCard({
             <Text
               numberOfLines={1}
               style={[
-                styles.drawerSubText,
-                isLifetime
-                  ? styles.drawerSubTextLifetime
-                  : expiring
-                    ? styles.drawerSubTextExpiring
-                    : styles.drawerSubTextActive,
+                styles.drawerSubTitle,
+                isLifetime && !isBrandStudent && styles.drawerSubTextLifetime,
+                isBrandStudent && { color: '#FEE2E2' },
               ]}
             >
-              {subscriptionShortLabel(sub)}
+              {planTitle}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.drawerSubDays,
+                isBrandStudent && { color: '#F87171' },
+              ]}
+            >
+              {daysLine}
             </Text>
           </View>
 
-          {isLifetime ? (
+          {isLifetime && !isBrandStudent ? (
             <View style={styles.drawerSubTag}>
               <Text style={styles.drawerSubTagText}>VĨNH VIỄN</Text>
             </View>
-          ) : (
-            <Pressable
+          ) : isBrandStudent ? null : (
+            <DuoButton
+              variant="primary"
+              size="sm"
+              text={actionLabel}
               onPress={() => setOpen(true)}
-              style={styles.drawerRenewBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Gia hạn tài khoản"
-            >
-              <Text style={styles.drawerRenewBtnText}>{isFree ? 'Nâng cấp' : 'Gia hạn'}</Text>
-            </Pressable>
+              accessibilityLabel={actionLabel}
+            />
           )}
         </View>
 
@@ -243,7 +287,7 @@ export function SubscriptionStatusCard({
           <View style={styles.sheetBackdrop}>
             <View style={styles.sheet}>
               <View style={styles.sheetHead}>
-                <Text style={styles.sheetTitle}>Gia hạn tài khoản</Text>
+                <Text style={styles.sheetTitle}>{actionLabel} tài khoản</Text>
                 <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng">
                   <X size={20} color={colors.muted} />
                 </Pressable>
@@ -264,27 +308,91 @@ export function SubscriptionStatusCard({
     );
   }
 
+  const history = subscription.history || [];
+
   return (
     <>
-      <View style={[styles.statusCard, compact && styles.statusCardCompact, expiring && styles.statusCardExpiring]}>
-        <View style={[styles.statusIcon, isLifetime ? gradient('#EF4444', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#34D399', '#0D9488')]}>
-          <CalendarClock size={compact ? 16 : 20} color="#FFFFFF" />
+      {compact ? (
+        <View style={[styles.statusCard, styles.statusCardCompact, expiring && styles.statusCardExpiring]}>
+          <View style={[styles.statusIcon, isBrandStudent ? gradient('#EF4444', '#DC2626') : isLifetime ? gradient('#EF4444', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
+            <CalendarClock size={16} color="#FFFFFF" />
+          </View>
+          <View style={styles.flex}>
+            <Text numberOfLines={1} style={styles.statusTitle}>{planTitle}</Text>
+            <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#DC2626' }]}>{daysLine}</Text>
+          </View>
+          {!isLifetime && !isBrandStudent ? (
+            <DuoButton variant="primary" size="sm" text={actionLabel} onPress={() => setOpen(true)} accessibilityLabel={actionLabel} />
+          ) : null}
         </View>
-        <View style={styles.flex}>
-          {!compact ? <Text style={styles.statusTitle}>{`Gói ${sub.planLabel}`}</Text> : null}
-          <Text numberOfLines={1} style={[styles.statusText, expiring && styles.statusTextExpiring]}>{subscriptionShortLabel(sub)}</Text>
+      ) : (
+        <View style={styles.profileSubCard}>
+          <View style={styles.profileSubHeader}>
+            <Crown size={18} color={isBrandStudent ? '#EF4444' : (isFree ? '#10B981' : '#F59E0B')} />
+            <Text style={[styles.profileSubHeaderTitle, isBrandStudent && { color: '#0F172A' }]}>
+              {isFree ? 'Gói miễn phí' : (isBrandStudent ? 'Gói Khóa học' : 'Gói học Meet')}
+            </Text>
+          </View>
+
+          <View style={[styles.profileSubInnerBox, expiring && styles.statusCardExpiring]}>
+            <View style={[styles.profileSubIcon, isBrandStudent ? gradient('#EF4444', '#DC2626') : isLifetime ? gradient('#EF4444', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
+              <CalendarClock size={22} color="#FFFFFF" />
+            </View>
+            <View style={styles.flex}>
+              <Text numberOfLines={1} style={styles.statusTitle}>{planTitle}</Text>
+              <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#DC2626' }]}>{daysLine}</Text>
+            </View>
+            {(!isLifetime || isFree) && !isBrandStudent ? (
+              <DuoButton variant="primary" size="sm" text={actionLabel} onPress={() => setOpen(true)} accessibilityLabel={actionLabel} />
+            ) : null}
+          </View>
+
+          {history.length > 0 ? (
+            <View style={styles.historySection}>
+              <View style={styles.historyHeader}>
+                <History size={14} color="#64748B" />
+                <Text style={styles.historyHeaderText}>Lịch sử gia hạn</Text>
+              </View>
+              <View style={styles.historyList}>
+                {(showAllHistory ? history : history.slice(0, 3)).map((h, idx) => {
+                  const sourceText = h.source === 'code'
+                    ? 'Mã kích hoạt'
+                    : h.source === 'admin'
+                      ? 'Trung tâm cập nhật'
+                      : 'Thanh toán';
+                  const rowLabel = `${sourceText} · ${h.planLabel || h.plan || 'Gói học'}${h.amount ? ` · ${formatVnd(h.amount)}` : ''}`;
+                  return (
+                    <View key={h.id || String(idx)} style={[styles.historyRow, idx > 0 && styles.historyRowDivider]}>
+                      <Text numberOfLines={1} style={styles.historyRowLeft}>{rowLabel}</Text>
+                      <Text style={styles.historyRowDate}>{h.createdAt ? formatExpiryDate(h.createdAt) : '-'}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {history.length > 3 ? (
+                <Pressable
+                  onPress={() => setShowAllHistory((prev) => !prev)}
+                  style={styles.historyToggleBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={showAllHistory ? 'Thu gọn lịch sử gia hạn' : 'Xem thêm lịch sử gia hạn'}
+                >
+                  <Text style={styles.historyToggleText}>
+                    {showAllHistory ? 'Thu gọn' : `Xem thêm (${history.length - 3})`}
+                  </Text>
+                  <View style={showAllHistory ? styles.chevronRotated : undefined}>
+                    <ChevronDown size={14} color="#059669" />
+                  </View>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
-        {!isLifetime ? (
-          <Pressable onPress={() => setOpen(true)} style={styles.renewChip} accessibilityRole="button" accessibilityLabel="Gia hạn tài khoản">
-            <Text style={styles.renewChipText}>Gia hạn</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      )}
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={styles.sheetBackdrop}>
           <View style={styles.sheet}>
             <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>Gia hạn tài khoản</Text>
+              <Text style={styles.sheetTitle}>{actionLabel} tài khoản</Text>
               <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng"><X size={20} color={colors.muted} /></Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.sheetBody}>
@@ -319,14 +427,25 @@ const styles = StyleSheet.create({
   planBody: { padding: spacing.sm, gap: spacing.xs, alignItems: 'stretch' },
   planPrice: { color: colors.ink, fontSize: 15, fontWeight: '900', textAlign: 'center' },
   planPriceMuted: { color: '#94A3B8', fontSize: 12 },
-  primary: { minHeight: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, paddingHorizontal: spacing.md },
+  primary: {
+    minHeight: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderWidth: 1,
+    borderColor: '#34D399',
+    borderBottomWidth: 3,
+    borderBottomColor: '#059669',
+    paddingHorizontal: spacing.md,
+  },
   primaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   disabled: { opacity: 0.5 },
   codeBox: { gap: spacing.sm, padding: spacing.md, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
   codeRow: { flexDirection: 'row', gap: spacing.sm },
-  codeInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
+  codeInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
   codeInput: { flex: 1, minHeight: 40, color: colors.ink, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  codeButton: { minWidth: 96 },
+  codeButton: { minWidth: 108 },
   screen: { flex: 1, backgroundColor: '#FEF2F2' },
   screenContent: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
   hero: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#FECACA' },
@@ -340,11 +459,124 @@ const styles = StyleSheet.create({
   statusCardCompact: { padding: spacing.sm, borderRadius: 12 },
   statusCardExpiring: { borderColor: '#FDE68A', backgroundColor: '#FFFBEB' },
   statusIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  profileSubCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  profileSubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  profileSubHeaderTitle: {
+    color: '#1E293B',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  profileSubInnerBox: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  profileSubIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historySection: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  historyHeaderText: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  historyList: {
+    gap: 2,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  historyRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  historyRowLeft: {
+    flex: 1,
+    paddingRight: 8,
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  historyRowDate: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  historyToggleBtn: {
+    marginTop: 6,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  historyToggleText: {
+    color: '#059669',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chevronRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
   statusTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   statusText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  statusDaysGreen: { color: '#059669', fontSize: 12, fontWeight: '700', marginTop: 2 },
   statusTextExpiring: { color: '#EA580C' },
-  renewChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.brand },
-  renewChipText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  renewChip: {
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    borderWidth: 1,
+    borderColor: '#34D399',
+    borderBottomWidth: 3,
+    borderBottomColor: '#059669',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  renewChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 0.3 },
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2, 6, 23, 0.5)' },
   sheet: { maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.sm },
@@ -370,6 +602,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(249, 115, 22, 0.14)',
     borderColor: 'rgba(249, 115, 22, 0.35)',
   },
+  drawerSubCardBrand: {
+    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+  },
   drawerSubCardActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderColor: 'rgba(255, 255, 255, 0.14)',
@@ -393,6 +629,19 @@ const styles = StyleSheet.create({
   drawerSubText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  drawerSubTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    lineHeight: 15,
+  },
+  drawerSubDays: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#34D399',
+    lineHeight: 14,
+    marginTop: 1,
   },
   drawerSubTextLifetime: {
     color: '#FEF3C7',

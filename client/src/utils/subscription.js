@@ -21,6 +21,7 @@ export function formatExpiryDate(iso) {
 /** Dòng ngắn cho sidebar / hồ sơ. */
 export function subscriptionShortLabel(subscription, options = {}) {
   if (!subscription) return '';
+  if (options.isCourseStudent === true) return 'Gói Khóa học · Khóa chính thức';
   const freePortal = options.freePortal === true;
   const hasActivePaid = subscription.state === 'active' || subscription.state === 'expiring' || Boolean(subscription.meetLifetime);
   if (!hasActivePaid && (subscription.freeTier || subscription.state === 'free' || (freePortal && !subscription.meetLifetime))) {
@@ -61,9 +62,28 @@ export function hasMeetAccessClient(subscription) {
   return Boolean(subscription.meetLifetime || subscription.state === 'active' || subscription.state === 'expiring');
 }
 
-/** HV cổng miễn phí chưa có gói Meet: chỉ xem bảng tin, không đăng / bình luận. */
+/**
+ * Quyền đăng bảng tin:
+ * - Đã mua gói và còn hạn (active, expiring, lifetime): MỞ (true)
+ * - Chưa đăng ký gói (free, freeTier) hoặc hết hạn (expired): KHÓA (false)
+ */
+export function hasFeedPostAccess({ role, session, subscription }) {
+  if (role !== 'student') return true;
+  const sub = subscription || session?.subscription;
+  if (!sub) {
+    if (session?.freePortal === true) return false;
+    return false;
+  }
+  const state = sub.state;
+  if (state === 'expired' || state === 'free' || sub.freeTier) return false;
+  if (state === 'active' || state === 'expiring') return true;
+  if (state === 'lifetime') {
+    if (session?.freePortal === true) return Boolean(sub.meetLifetime || sub.activated);
+    return true;
+  }
+  return false;
+}
+
 export function isFeedPostLocked({ role, session, subscription }) {
-  if (role !== 'student') return false;
-  if (session?.freePortal !== true) return false;
-  return !hasMeetAccessClient(subscription);
+  return !hasFeedPostAccess({ role, session, subscription });
 }

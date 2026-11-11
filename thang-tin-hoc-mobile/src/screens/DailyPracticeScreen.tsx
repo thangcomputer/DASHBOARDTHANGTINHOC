@@ -10,7 +10,7 @@ import {
   ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, X, XCircle, Zap,
   type LucideIcon,
 } from 'lucide-react-native';
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
+import Svg, { Circle as SvgCircle, Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList } from '../navigation/types';
@@ -22,10 +22,12 @@ import { Celebration } from '../components/dailyPractice/Celebration';
 import { MobileComboLightningOverlay } from '../components/dailyPractice/MobileComboLightningOverlay';
 import { MobilePerfectStreakOverlay } from '../components/dailyPractice/MobilePerfectStreakOverlay';
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
+import { UnitStageChest } from '../components/dailyPractice/UnitStageChest';
 import { VideoPlayerFrame, type VideoPlayerApi } from './VideoPlayerFrame';
 import { resolveMobilePublicUrl } from '../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/videoSource';
 import { useAuth } from '../app/AuthContext';
+import { isFreePortalMenu } from '../utils/freePortalHelper';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from '../components/dailyPractice/Questions';
 import { useGameSounds, type GameSound } from '../components/dailyPractice/useGameSounds';
 import { DuoButton } from '../components/duo/DuoButton';
@@ -38,7 +40,14 @@ import {
   type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpPlanType, type DpStepKey,
   type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath, type DpXpCheckout, type DpXpPack,
 } from '../services/dailyPracticeApi';
-import { colors, radius, spacing } from '../theme/tokens';
+import { colors, radius, spacing, theme, createThemedStyles } from '../theme/tokens';
+import {
+  persistLastPathTopicId,
+  pickActivePathTopic,
+  resolveSavedPathTopicId,
+  syncLastPathTopicFromServer,
+} from '../utils/lastPathTopic';
+import { pathTopicNextLinePrefix, pathTopicPrimaryCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
@@ -181,8 +190,8 @@ function DailyPracticeGoalPanel({
       <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: colors.brandSoft }]}>
-              <Target size={17} color={colors.brand} />
+            <View style={[styles.goalIconBox, { backgroundColor: theme.brandSoft }]}>
+              <Target size={17} color={theme.brand} />
             </View>
             <View>
               <Text style={styles.goalCardTitle}>Mục tiêu hôm nay</Text>
@@ -205,8 +214,19 @@ function DailyPracticeGoalPanel({
               onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)}
               hitSlop={8}
               accessibilityRole="button"
+              style={({ pressed }) => ({
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: '#FECACA',
+                borderBottomWidth: pressed ? 1.5 : 3.5,
+                borderBottomColor: '#F87171',
+                backgroundColor: pressed ? '#FEF2F2' : '#FFFFFF',
+                transform: [{ translateY: pressed ? 2 : 0 }],
+              })}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981' }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>
                 {goalData?.goal?.expired ? 'Đặt lại mục tiêu' : goalData?.goal ? 'Đổi mục tiêu' : 'Đặt mục tiêu'}
               </Text>
             </Pressable>
@@ -372,7 +392,7 @@ function DailyPracticeGoalPanel({
 function HomeView({
   topics, stats, loading, error, starting, onStart, play, initialTopicId = '',
   mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onQuickStart, onPathChanged, onBuyXp,
-  initialWatchStage = false,
+  initialWatchStage = false, pathActiveTopicId = '',
 }: {
   topics: DpTopic[];
   stats: DpStats | null;
@@ -393,6 +413,7 @@ function HomeView({
   /** Điều hướng đến màn mua gói XP. */
   onBuyXp: () => void;
   initialWatchStage?: boolean;
+  pathActiveTopicId?: string;
 }) {
   const { user } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
@@ -414,11 +435,14 @@ function HomeView({
     setTopicId(linked ? linked.id : topics[0].id);
   }, [topicId, topics, initialTopicId]);
 
-  const activePathTopic = (selectedPathTopicId ? pathTopics.find((t) => t.topic.id === selectedPathTopicId) : null)
-    || (initialTopicId ? pathTopics.find((t) => t.topic.id === initialTopicId) : null)
-    || pathTopics.find((t) => t.next && t.completedUnits > 0)
-    || pathTopics[0]
-    || null;
+  const activePathTopic = useMemo(
+    () => pickActivePathTopic(
+      { topics: pathTopics, activeTopicId: pathActiveTopicId },
+      initialTopicId,
+      selectedPathTopicId || pathActiveTopicId,
+    ),
+    [pathTopics, initialTopicId, selectedPathTopicId, pathActiveTopicId],
+  );
   const activeTopicTitle = mode === 'path'
     ? activePathTopic?.topic.name || topics[0]?.name || 'Lộ trình'
     : selected?.name || topics[0]?.name || 'Chủ đề';
@@ -433,24 +457,12 @@ function HomeView({
         ? 'determined'
         : 'idle';
 
-  const heroHeadline = stats?.playedToday
-    ? 'Hôm nay bạn đã hoàn thành bài luyện tập!'
-    : stats?.streakState === 'lost'
-      ? `Cùng bắt đầu lại nào!${stats.lostStreak ? ` Bạn vừa lỡ chuỗi ${stats.lostStreak} ngày` : ''}`
-      : stats?.streakState === 'at_risk'
-        ? `Duy trì chuỗi học ${stats.streak} ngày - hôm nay bạn chưa luyện tập!`
-        : 'Chào bạn! Cùng luyện tập vài phút để nâng cao kỹ năng nhé.';
-
-  const heroSub = mode === 'path'
-    ? 'Vượt qua từng chặng học để mở bài tiếp theo và duy trì chuỗi học tập 🔥'
-    : 'Ôn tập trắc nghiệm tự do không tính XP, giúp bạn củng cố kiến thức bất cứ lúc nào.';
-
   return (
     <View style={styles.gapMd}>
       {/* Top Gamification Bar: Title + Streak Pill + XP Pill */}
       <View style={styles.topGamifiedBar}>
         <View style={styles.topTitleRow}>
-          <Sparkles size={18} color={colors.brand} />
+          <Sparkles size={18} color={theme.brand} />
           <Text style={styles.topPageTitle}>Luyện tập</Text>
         </View>
         <View style={styles.topBadgesRow}>
@@ -465,7 +477,6 @@ function HomeView({
         </View>
       </View>
 
-      {/* Thẻ Mascot động viên chuẩn phong cách DewSkill - gọn gàng, tươi sáng */}
       <View style={styles.mascotMotivationCard}>
         <View style={styles.mascotWrapCompact}>
           <Mascot mood={mascotMood} size={54} />
@@ -483,21 +494,15 @@ function HomeView({
             </View>
           ) : null}
         </View>
-        <Pressable
-          onPress={() => { play('tap'); onQuickStart(activePathTopic); }}
+        <DuoButton
+          variant="accent"
+          size="sm"
+          text="Luyện"
+          icon={<Play size={13} color="#FFFFFF" fill="#FFFFFF" />}
+          loading={starting}
           disabled={starting}
-          style={styles.mascotQuickCta}
-          accessibilityRole="button"
-        >
-          {starting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
-              <Text style={styles.mascotQuickCtaText}>Luyện</Text>
-            </>
-          )}
-        </Pressable>
+          onPress={() => { play('tap'); onQuickStart(activePathTopic); }}
+        />
       </View>
 
       {/* Banner hết XP luyện tập - chỉ hiện khi xpEmpty hoặc xpTotal <= 0 */}
@@ -533,7 +538,7 @@ function HomeView({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
-              <Icon size={15} color={active ? colors.brandDark : colors.muted} />
+              <Icon size={15} color={active ? theme.brandDark : colors.muted} />
               <Text style={[styles.modeTabText, active && styles.modeTabTextActive]}>{label}</Text>
             </Pressable>
           );
@@ -546,6 +551,7 @@ function HomeView({
           {mode === 'path' ? (
             <PathView
               topics={pathTopics}
+              activeTopicId={pathActiveTopicId}
               loading={pathLoading}
               error={pathError}
               starting={starting}
@@ -560,7 +566,7 @@ function HomeView({
           ) : null}
 
           {mode === 'free' && error ? <Text style={styles.error}>{error}</Text> : null}
-          {mode === 'free' && loading ? <ActivityIndicator color={colors.brand} /> : null}
+          {mode === 'free' && loading ? <ActivityIndicator color={theme.brand} /> : null}
           {mode === 'free' && !loading && !topics.length && !error ? (
             <View style={styles.empty}>
               <Mascot mood="thinking" size={72} />
@@ -571,34 +577,39 @@ function HomeView({
 
           {mode === 'free' && topics.length ? (
             <View style={[styles.card, { gap: 14 }]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                {topics.map((topic) => {
+                  const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
+                  const tone = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
+                  const active = topic.id === topicId;
+                  const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
+                  return (
+                    <Pressable
+                      key={topic.id}
+                      onPress={() => { play('tap'); setTopicId(topic.id); }}
+                      style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
+                      <View>
+                        <Text style={styles.chipName}>{topic.name}</Text>
+                        <Text style={styles.chipMeta}>{`${total} câu hỏi`}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
               <View style={styles.freeModeNotice}>
                 <Text style={styles.freeModeNoticeBold}>Chế độ luyện tự do - Ôn tập không tính XP: </Text>
                 <Text style={styles.freeModeNoticeText}>
                   Chỉ gồm câu hỏi trắc nghiệm để bạn ôn nhanh. Không cộng và không trừ XP; muốn nhận XP và mở khóa bài học hãy chuyển sang tab Theo lộ trình.
                 </Text>
-              </View>
-
-              <Text style={styles.sectionTitle}>1. Chọn chủ đề</Text>
-              <View style={styles.topicGrid}>
-                {topics.map((topic) => {
-                  const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
-                  const color = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
-                  const active = topic.id === topicId;
-                  return (
-                    <Pressable
-                      key={topic.id}
-                      onPress={() => { play('tap'); setTopicId(topic.id); }}
-                      style={[styles.topic, { borderColor: active ? color.to : '#E2E8F0', borderBottomColor: active ? color.to : '#CBD5E1', borderBottomWidth: 4, backgroundColor: active ? color.soft : '#FFFFFF' }]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <View style={[styles.topicIcon, gradient(color.from, color.to)]}><Icon size={20} color="#FFFFFF" /></View>
-                      <Text numberOfLines={1} style={styles.topicName}>{topic.name}</Text>
-                      <Text numberOfLines={1} style={styles.topicDesc}>{topic.description || `${topic.counts.easy + topic.counts.medium + topic.counts.hard} câu hỏi`}</Text>
-                      {active ? <View style={styles.topicCheck}><CheckCircle2 size={18} color={color.to} /></View> : null}
-                    </Pressable>
-                  );
-                })}
               </View>
 
               <Text style={styles.sectionTitle}>2. Độ khó (chỉ trắc nghiệm · 0 XP)</Text>
@@ -609,7 +620,7 @@ function HomeView({
                     <Pressable
                       key={level.id}
                       onPress={() => { play('tap'); setDifficulty(level.id); }}
-                      style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', borderBottomColor: active ? level.color : '#CBD5E1', borderBottomWidth: 4, backgroundColor: active ? level.soft : '#FFFFFF' }]}
+                      style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', backgroundColor: active ? level.soft : '#FFFFFF' }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                     >
@@ -1340,6 +1351,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                   lessonId={`dp-lesson-${stepVideo.id}`}
                   antiSeekEnabled={false}
                   done={done}
+                  brandedChrome
                   playerApiRef={playerApiRef}
                   onProgress={(progress) => onTick(progress.currentTime)}
                   onWatched={async () => {
@@ -1544,61 +1556,89 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   );
 }
 
-/** Đài vinh danh & Cúp hoàn thành khóa học ở cuối lộ trình (đồng bộ Web CourseFinaleMonument). */
-function CourseFinaleMonument({ current, play, onOpenCeremony }: {
-  current: DpTopicPath;
-  play: (s: GameSound) => void;
-  onOpenCeremony: () => void;
-}) {
-  const completed = current.completedUnits || 0;
-  const total = current.totalUnits || 0;
-  const courseDone = !current.next && total > 0 && completed >= total;
-
+/** Hình cúp đồ họa. Chưa xong thì xám mờ, hoàn thành thì vàng. */
+function CupArtwork({ width, height, gold }: { width: number; height: number; gold: boolean }) {
+  const tone = gold
+    ? {
+      hi: '#FFFBEB', mid: '#FDE68A', deep: '#F59E0B', ink: '#B45309',
+      handle: '#D97706', handleEdge: '#92400E', handleLite: '#FBBF24', handleLiteEdge: '#F59E0B',
+      stem: '#D97706', baseTop: '#B45309',
+    }
+    : {
+      hi: '#F8FAFC', mid: '#CBD5E1', deep: '#64748B', ink: '#0F172A',
+      handle: '#334155', handleEdge: '#1E293B', handleLite: '#94A3B8', handleLiteEdge: '#64748B',
+      stem: '#475569', baseTop: '#334155',
+    };
   return (
-    <View style={styles.finaleDoneCard}>
-      {courseDone ? <Confetti count={24} spread={180} /> : null}
-      <View style={styles.finaleBadge}>
-        <Sparkles size={13} color="#FEF3C7" />
-        <Text style={styles.finaleBadgeText}>
-          {courseDone ? 'ĐÃ CHINH PHỤC TOÀN BỘ KHÓA HỌC' : `ĐÍCH ĐẾN CUỐI KHÓA · ${completed}/${total} CHẶNG`}
-        </Text>
+    <Svg width={width} height={height} viewBox="0 0 220 250">
+      <Defs>
+        <LinearGradient id="finaleCupBody" x1="0.28" y1="0" x2="0.78" y2="1">
+          <Stop offset="0" stopColor={tone.hi} />
+          <Stop offset="0.3" stopColor={tone.mid} />
+          <Stop offset="0.64" stopColor={tone.deep} />
+          <Stop offset="1" stopColor={tone.ink} />
+        </LinearGradient>
+        <LinearGradient id="finaleCupRim" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={tone.hi} />
+          <Stop offset="1" stopColor={tone.ink} />
+        </LinearGradient>
+        <LinearGradient id="finaleCupBase" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={tone.mid} />
+          <Stop offset="1" stopColor={tone.ink} />
+        </LinearGradient>
+      </Defs>
+      <Ellipse cx="110" cy="232" rx="64" ry="9" fill={tone.ink} opacity={0.18} />
+      <Path d="M58 78c-28 2-34 48-6 62 6-16 4-40 14-52-2-4-4-8-8-10z" fill={tone.handle} />
+      <Path d="M162 78c28 2 34 48 6 62-6-16-4-40-14-52 2-4 4-8 8-10z" fill={tone.handleEdge} />
+      <Path d="M66 64c-22 6-24 46 2 58 2-14 6-36 16-46-4-6-10-10-18-12z" fill={tone.handleLite} />
+      <Path d="M154 64c22 6 24 46-2 58-2-14-6-36-16-46 4-6 10-10 18-12z" fill={tone.handleLiteEdge} />
+      <Path d="M74 58c-2 0-8 78 16 108h40c24-30 18-108 16-108-8 10-20 16-36 16s-28-6-36-16z" fill="url(#finaleCupBody)" />
+      <Ellipse cx="110" cy="58" rx="48" ry="16" fill="url(#finaleCupRim)" />
+      <Ellipse cx="110" cy="56" rx="34" ry="8" fill={tone.ink} opacity={0.42} />
+      <Ellipse cx="90" cy="98" rx="14" ry="28" fill="#FFFFFF" opacity={0.62} />
+      <Path d="M110 86l6.2 12.6 13.8 2-10 9.8 2.4 13.6L110 117.4 97.6 124l2.4-13.6-10-9.8 13.8-2z" fill={tone.hi} />
+      <Path d="M110 92l3.4 7 7.6 1.1-5.5 5.4 1.3 7.5L110 109.2 103.2 113l1.3-7.5-5.5-5.4 7.6-1.1z" fill={tone.ink} />
+      <Path d="M96 166h28l10 24H86z" fill={tone.stem} />
+      <Ellipse cx="110" cy="196" rx="46" ry="12" fill={tone.ink} />
+      <Ellipse cx="110" cy="190" rx="40" ry="9" fill="url(#finaleCupBase)" />
+      <Ellipse cx="110" cy="214" rx="58" ry="13" fill={tone.ink} />
+      <Ellipse cx="110" cy="208" rx="50" ry="10" fill={tone.baseTop} />
+      <Ellipse cx="92" cy="204" rx="16" ry="4" fill="#FFFFFF" opacity={0.45} />
+    </Svg>
+  );
+}
+
+/** Cúp đồ họa mờ dưới rương chặng cuối. Hoàn thành thì phóng to và bắn pháo. */
+function CourseFinaleCup({ courseDone, onPress }: {
+  courseDone: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(courseDone ? 0.28 : 1)).current;
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    if (!courseDone) {
+      scale.setValue(1);
+      return undefined;
+    }
+    scale.setValue(0.28);
+    Animated.spring(scale, { toValue: 1, friction: 5, tension: 70, useNativeDriver: USE_NATIVE_DRIVER }).start();
+    const timer = setInterval(() => setBurst((n) => n + 1), 2600);
+    return () => clearInterval(timer);
+  }, [courseDone, scale]);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.finaleGhost}
+      accessibilityRole="button"
+      accessibilityLabel="Cúp Vàng Vinh Danh cuối khóa"
+    >
+      <View style={styles.finaleCupStage}>
+        {courseDone ? <Confetti key={burst} count={26} spread={140} /> : null}
+        <Animated.View style={{ opacity: courseDone ? 1 : 0.3, transform: [{ scale }] }}>
+          <CupArtwork gold={courseDone} width={courseDone ? 214 : 168} height={courseDone ? 244 : 192} />
+        </Animated.View>
       </View>
-      <View style={styles.finaleStageRow}>
-        <Mascot mood="graduate" size={76} />
-        <View style={styles.finaleCupWrap}>
-          <View style={styles.finaleCrownBadge}>
-            <Crown size={18} color="#FFFFFF" fill="#FEF08A" />
-          </View>
-          <View style={styles.finaleCupCircle}>
-            <Trophy size={46} color="#FFFFFF" />
-          </View>
-          <View style={styles.finaleStarsRow}>
-            {[0, 1, 2].map((i) => <Star key={i} size={14} color="#F59E0B" fill="#FBBF24" />)}
-          </View>
-        </View>
-        <Mascot mood="celebrate" size={76} />
-      </View>
-      <Text style={styles.finaleDoneTitle}>
-        {courseDone
-          ? `Chúc mừng hoàn thành khóa học ${current.topic.name}!`
-          : `Cúp Vàng Vinh Danh - ${current.topic.name}`}
-      </Text>
-      <Text style={styles.finaleDoneSub}>
-        {courseDone
-          ? `Tuyệt vời! Bạn đã vượt qua trọn vẹn ${total}/${total} chặng học và chính thức rước Cúp Vàng Vinh Danh cùng linh vật Thắng Tin Học!`
-          : `Hoàn thành hết ${total} chặng học (${completed}/${total} đã xong) để chính thức mở khóa lễ trao Cúp Vàng Vinh Danh cùng linh vật chúc mừng!`}
-      </Text>
-      <Pressable
-        onPress={() => { play('win'); onOpenCeremony(); }}
-        style={styles.finaleBtn}
-        accessibilityRole="button"
-      >
-        <Trophy size={17} color="#FFFFFF" />
-        <Text style={styles.finaleBtnText}>
-          {courseDone ? 'Nhận Cúp & Xem Vinh Danh' : 'Xem Hiệu Ứng Chúc Mừng Nhận Cúp'}
-        </Text>
-      </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
@@ -1678,6 +1718,7 @@ function UnitStageHeader({
   progress,
   onOpenVideo,
   onToggleTestOut,
+  isStarted = false,
 }: {
   unit: DpPathUnit;
   tone: { from: string; to: string };
@@ -1688,16 +1729,19 @@ function UnitStageHeader({
   progress: number;
   onOpenVideo: () => void;
   onToggleTestOut: () => void;
+  isStarted?: boolean;
 }) {
   const hasGuide = Boolean(unit.lesson) || collectUnitVideos(unit).length > 0;
   const done = unit.state === 'completed';
+  const activeAndStarted = !locked && (doneSteps > 0 || Boolean(isStarted));
+  const isColored = done || activeAndStarted;
   const statusLabel = done
     ? (unit.testedOut ? 'Đã vượt' : 'Hoàn thành')
-    : isNextUnit && !locked
+    : activeAndStarted
       ? 'Đang học'
       : locked
         ? 'Chưa mở'
-        : 'Mở khóa';
+        : 'Chưa bắt đầu';
 
   return (
     <View style={styles.unitHeaderOuter}>
@@ -1705,11 +1749,11 @@ function UnitStageHeader({
       <View
         style={[
           styles.unitHeaderBanner,
-          locked
+          !isColored
             ? gradient('#94A3B8', '#64748B')
             : gradient(tone.from, tone.to),
           {
-            boxShadow: `0px 4px 0px ${locked ? '#475569' : darken(tone.to, 0.22)}`,
+            boxShadow: `0px 4px 0px ${!isColored ? '#475569' : darken(tone.to, 0.22)}`,
           } as never,
         ]}
       >
@@ -1800,6 +1844,7 @@ function PathView({
   starting,
   play,
   initialTopicId = '',
+  activeTopicId = '',
   onTopicChange,
   onStartStep,
   onPathChanged,
@@ -1807,6 +1852,7 @@ function PathView({
   onContinueVideoOpened,
 }: {
   topics: DpTopicPath[];
+  activeTopicId?: string;
   loading: boolean;
   error: string;
   starting: boolean;
@@ -1844,23 +1890,39 @@ function PathView({
   useEffect(() => {
     if (topicId && topics.some((item) => item.topic.id === topicId)) return;
     if (!topics.length) return;
-    const linked = initialTopicId ? topics.find((item) => item.topic.id === initialTopicId) : undefined;
-    const inProgress = topics.find((item) => item.next && item.completedUnits > 0);
-    setTopicId((linked || inProgress || topics[0]).topic.id);
-  }, [topicId, topics, initialTopicId]);
+    let cancelled = false;
+    const userKey = String(user?.id || user?._id || '').trim();
+    void (async () => {
+      const savedId = await resolveSavedPathTopicId(userKey, activeTopicId);
+      if (cancelled) return;
+      const picked = pickActivePathTopic({ topics, activeTopicId }, initialTopicId, savedId);
+      if (picked?.topic?.id) setTopicId(picked.topic.id);
+    })();
+    return () => { cancelled = true; };
+  }, [topicId, topics, initialTopicId, activeTopicId, user?.id, user?._id]);
 
   useEffect(() => {
-    if (topicId && onTopicChange) onTopicChange(topicId);
-  }, [topicId, onTopicChange]);
+    if (!activeTopicId) return;
+    const userKey = String(user?.id || user?._id || '').trim();
+    void syncLastPathTopicFromServer(activeTopicId, userKey);
+  }, [activeTopicId, user?.id, user?._id]);
+
+  useEffect(() => {
+    if (!topicId) return;
+    onTopicChange?.(topicId);
+    const userKey = String(user?.id || user?._id || '').trim();
+    void persistLastPathTopicId(topicId, userKey);
+  }, [topicId, onTopicChange, user?.id, user?._id]);
 
   useEffect(() => {
     if (error) setPopover(null);
   }, [error]);
 
   const current = topics.find((item) => item.topic.id === topicId) || null;
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const color = DP_TOPIC_COLORS[current?.topic.color || 'red'] || DP_TOPIC_COLORS.red;
 
-  if (loading && !topics.length) return <ActivityIndicator color={colors.brand} />;
+  if (loading && !topics.length) return <ActivityIndicator color={theme.brand} />;
   if (!topics.length) {
     return (
       <View style={styles.gapMd}>
@@ -1892,7 +1954,13 @@ function PathView({
   return (
     <View style={styles.gapMd}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        style={styles.chipScroller}
+        contentContainerStyle={styles.chipRow}
+      >
         {topics.map((item) => {
           const Icon = TOPIC_ICONS[item.topic.icon] || BookOpen;
           const tone = DP_TOPIC_COLORS[item.topic.color] || DP_TOPIC_COLORS.red;
@@ -1901,7 +1969,7 @@ function PathView({
             <Pressable
               key={item.topic.id}
               onPress={() => { play('tap'); setTopicId(item.topic.id); setPopover(null); }}
-              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', borderBottomColor: active ? tone.to : '#CBD5E1', borderBottomWidth: 4, backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
             >
@@ -1930,16 +1998,16 @@ function PathView({
                 </View>
                 <Text style={[styles.muted, { marginTop: 6 }]}>
                   {current.next
-                    ? `Tiếp theo: Chặng ${nextUnit?.index} · ${current.next.unitTitle} - ${current.next.stepLabel}`
+                    ? `${pathTopicNextLinePrefix(current)}: Chặng ${nextUnit?.index} · ${current.next.unitTitle} - ${current.next.stepLabel}`
                     : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
                 </Text>
               </View>
               {current.next && nextUnit ? (
                 <DuoButton
-                  variant="primary"
+                  variant={isBrandStudent ? 'danger' : 'primary'}
                   size="md"
                   icon={<Play size={16} color="#FFFFFF" />}
-                  text="Tiếp tục học"
+                  text={pathTopicPrimaryCtaLabel(current)}
                   onPress={() => { if (nextUnit && current.next) toggleHub(nextUnit, current.next.nodeKey || 'study'); }}
                 />
               ) : null}
@@ -2047,39 +2115,16 @@ function PathView({
                     </View>
                   </View>
 
-                  {/* Duolingo Unit End Milestone Chest */}
-                  <View style={styles.unitChestWrap}>
-                    <View style={[styles.unitChestBox, doneSteps === totalSteps && totalSteps > 0 ? styles.unitChestBoxDone : styles.unitChestBoxPending]}>
-                      <View style={[styles.unitChestIconBox, doneSteps === totalSteps && totalSteps > 0 ? styles.unitChestIconDone : styles.unitChestIconPending]}>
-                        <Gift size={20} color={doneSteps === totalSteps && totalSteps > 0 ? '#FFFFFF' : '#94A3B8'} strokeWidth={2.5} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.unitChestTitle, doneSteps === totalSteps && totalSteps > 0 && styles.unitChestTitleDone]}>
-                          {doneSteps === totalSteps && totalSteps > 0 ? 'Mở rương chặng · +50 XP' : `Rương phần thưởng chặng (${doneSteps}/${totalSteps})`}
-                        </Text>
-                        <Text style={styles.unitChestSub}>
-                          {doneSteps === totalSteps && totalSteps > 0 ? 'Chúc mừng bạn đã chinh phục toàn bộ chặng!' : 'Hoàn thành các bài tập để nhận quà'}
-                        </Text>
-                      </View>
-                      {doneSteps === totalSteps && totalSteps > 0 ? (
-                        <View style={styles.unitChestBadge}>
-                          <Sparkles size={14} color="#D97706" />
-                        </View>
-                      ) : (
-                        <Lock size={16} color="#CBD5E1" />
-                      )}
-                    </View>
-                  </View>
+                  <UnitStageChest unit={unit} play={play} onClaimed={onPathChanged} />
+                  {isLast ? (
+                    <CourseFinaleCup
+                      courseDone={!current.next && (current.totalUnits || 0) > 0 && (current.completedUnits || 0) >= (current.totalUnits || 0)}
+                      onPress={() => { play('win'); setTrophyCeremonyOpen(true); }}
+                    />
+                  ) : null}
                 </View>
               );
             })}
-            <View style={{ padding: spacing.md, zIndex: 2 }}>
-              <CourseFinaleMonument
-                current={current}
-                play={play}
-                onOpenCeremony={() => setTrophyCeremonyOpen(true)}
-              />
-            </View>
           </View>
         </>
       ) : null
@@ -2398,6 +2443,8 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
   onConfirm: () => void;
   onBuyXp: () => void;
 }) {
+  const { user } = useAuth();
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const notEnough = xpTotal < stakeXp;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
@@ -2463,7 +2510,7 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
               </View>
               <View style={styles.flex}>
                 <DuoButton
-                  variant="primary"
+                  variant={isBrandStudent ? 'danger' : 'primary'}
                   size="md"
                   fullWidth
                   text="Bắt đầu"
@@ -3065,6 +3112,7 @@ export function DailyPracticeScreen() {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [mode, setMode] = useState<PracticeMode>('path');
   const [pathTopics, setPathTopics] = useState<DpTopicPath[]>([]);
+  const [pathActiveTopicId, setPathActiveTopicId] = useState('');
   const [pathLoading, setPathLoading] = useState(true);
   const [pathError, setPathError] = useState('');
   const [stakePrompt, setStakePrompt] = useState<{ unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; stakeXp: number } | null>(null);
@@ -3081,7 +3129,10 @@ export function DailyPracticeScreen() {
   const loadPath = useCallback(() => {
     setPathLoading(true);
     dailyPracticeApi.path()
-      .then((data) => setPathTopics(data.topics))
+      .then((data) => {
+        setPathTopics(data.topics);
+        setPathActiveTopicId(String(data.activeTopicId || '').trim());
+      })
       .catch((err: unknown) => setPathError(err instanceof Error ? err.message : 'Không tải được lộ trình luyện tập'))
       .finally(() => setPathLoading(false));
   }, []);
@@ -3148,9 +3199,14 @@ export function DailyPracticeScreen() {
     return undefined;
   };
   const quickStart = (preferredTopic?: DpTopicPath | null) => {
+    const remembered = pickActivePathTopic(
+      { topics: pathTopics, activeTopicId: pathActiveTopicId },
+      linkedTopicId,
+      pathActiveTopicId,
+    );
     const target = (preferredTopic?.next ? preferredTopic : null)
+      || (remembered?.next ? remembered : null)
       || (linkedTopicId ? pathTopics.find((t) => t.topic.id === linkedTopicId && t.next) : null)
-      || pathTopics.find((t) => t.next && t.completedUnits > 0)
       || pathTopics.find((t) => t.next);
     if (target?.next) {
       setMode('path');
@@ -3188,7 +3244,14 @@ export function DailyPracticeScreen() {
 
   return (
     <AppScreen scroll={false} hideBrandingTopBar={Boolean(session)}>
-      <ScrollView ref={scrollRef} scrollEnabled={scrollEnabled} contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef}
+        scrollEnabled={scrollEnabled}
+        showsVerticalScrollIndicator={mode !== 'path'}
+        contentContainerStyle={styles.screen}
+        style={mode === 'path' ? { scrollbarWidth: 'none' } : undefined}
+        keyboardShouldPersistTaps="handled"
+      >
         {session ? (
           <PlayView
             session={session}
@@ -3250,6 +3313,7 @@ export function DailyPracticeScreen() {
             onPathChanged={() => { load(); loadPath(); }}
             onBuyXp={goToBuyXp}
             initialWatchStage={route.params?.watch === 'stage'}
+            pathActiveTopicId={pathActiveTopicId}
           />
         )}
       </ScrollView>
@@ -3295,7 +3359,7 @@ export function DailyPracticeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   screen: { padding: spacing.lg, paddingBottom: 120 },
   relatedCard: { gap: spacing.md, padding: spacing.md, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.brandSoft },
   relatedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -3328,12 +3392,12 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.ink, fontSize: 15, fontWeight: '600', textAlign: 'center' },
   sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   topicGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  topic: { width: '48%', flexGrow: 1, padding: 12, borderRadius: 18, borderWidth: 2, gap: 4 },
+  topic: { width: '48%', flexGrow: 1, padding: 12, borderRadius: 18, borderWidth: 1.5, gap: 4 },
   topicIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   topicName: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   topicDesc: { color: colors.muted, fontSize: 13, fontWeight: '400' },
   topicCheck: { position: 'absolute', top: 10, right: 10 },
-  level: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 16, borderWidth: 2, gap: 2 },
+  level: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 16, borderWidth: 1.5, gap: 2 },
   starsRow: { flexDirection: 'row', gap: 2 },
   levelLabel: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   levelMeta: { color: '#64748B', fontSize: 12, fontWeight: '400' },
@@ -3353,7 +3417,7 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   quitBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 14, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+    borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
   },
   quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '800' },
   quitBackdrop: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
@@ -3402,19 +3466,16 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: 24,
     gap: spacing.md,
-    borderWidth: 2,
-    borderBottomWidth: 5,
+    borderWidth: 1.5,
     marginTop: spacing.sm,
   },
   feedbackOk: {
     backgroundColor: '#D1FAE5',
     borderColor: '#6EE7B7',
-    borderBottomColor: '#10B981',
   },
   feedbackBad: {
     backgroundColor: '#FEE2E2',
     borderColor: '#FCA5A5',
-    borderBottomColor: '#EF4444',
   },
   feedbackRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   feedbackTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
@@ -3542,8 +3603,9 @@ const styles = StyleSheet.create({
   },
   modeTabText: { color: '#64748B', fontSize: 13, fontWeight: '700' },
   modeTabTextActive: { color: '#047857', fontWeight: '800' },
-  chipRow: { gap: 8, paddingRight: spacing.sm },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 16, borderWidth: 2 },
+  chipScroller: { flexGrow: 0, overflow: 'hidden' },
+  chipRow: { gap: 8, paddingRight: spacing.sm, alignItems: 'center' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 16, borderWidth: 1.5 },
   chipIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   chipName: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   chipMeta: { color: colors.muted, fontSize: 12, fontWeight: '400' },
@@ -3745,10 +3807,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderBottomWidth: 3,
-    borderBottomColor: '#CBD5E1',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -3771,18 +3831,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1.5,
   },
   unitChestBoxPending: {
     backgroundColor: '#F8FAFC',
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
   },
   unitChestBoxDone: {
     backgroundColor: '#FFFBEB',
     borderColor: '#FDE68A',
-    borderBottomColor: '#F59E0B',
   },
   unitChestIconBox: {
     width: 40,
@@ -4141,6 +4198,20 @@ const styles = StyleSheet.create({
   },
   finaleLockedEyebrow: { color: '#D97706', fontSize: 11, fontWeight: '600' },
   finaleLockedTitle: { color: colors.ink, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  finaleGhost: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -4,
+    marginBottom: 10,
+    paddingVertical: 2,
+  },
+  finaleCupStage: {
+    width: 230,
+    height: 250,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'visible',
+  },
   finaleDoneCard: {
     alignItems: 'center', gap: 10, padding: spacing.xl, borderRadius: 28, borderWidth: 2, borderColor: '#FCD34D',
     backgroundColor: '#FFFBEB', overflow: 'hidden',
@@ -4213,10 +4284,10 @@ const styles = StyleSheet.create({
   buyXpCode: { color: '#B45309', fontSize: 13, fontWeight: '600', marginTop: 2 },
   buyXpPackCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18,
-    borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+    borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
   },
   buyXpPackCardActive: {
-    borderColor: '#F59E0B', borderBottomColor: '#D97706', backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B', backgroundColor: '#FFFBEB',
   },
   buyXpPackBolt: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   buyXpPackTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
@@ -4224,21 +4295,23 @@ const styles = StyleSheet.create({
   stakeGrid2Col: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginTop: 8 },
   stakeColBox: {
     flex: 1, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF',
-    borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1', alignItems: 'center', gap: 3,
+    borderWidth: 1.5, borderColor: '#E2E8F0', alignItems: 'center', gap: 3,
   },
   stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   playWrap: { gap: spacing.lg, paddingTop: 20, maxWidth: 760, width: '100%', alignSelf: 'center' },
   topBarCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
-    borderRadius: 20, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+    borderRadius: 20, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
   topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
   topBarStepTitle: { flex: 1, color: '#475569', fontSize: 13, fontWeight: '600', marginRight: 8 },
   topBarCount: { color: '#334155', fontSize: 12, fontWeight: '600' },
   xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '500' },
   playQuestionCard: {
-    padding: spacing.xl, borderRadius: 24, borderWidth: 2, borderBottomWidth: 5, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+    padding: spacing.xl, borderRadius: 24, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
     gap: 14,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   promptMascotBox: {
     padding: 6, borderRadius: 18, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9',
@@ -4246,7 +4319,7 @@ const styles = StyleSheet.create({
   questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
   questionLabelBadge: {
     paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: '#FEF2F2',
-    borderWidth: 1.5, borderColor: '#FECACA', borderBottomWidth: 3, borderBottomColor: '#FCA5A5', color: '#DC2626', fontSize: 11, fontWeight: '900',
+    borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 11, fontWeight: '900',
     textTransform: 'uppercase', overflow: 'hidden',
   },
   instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '400' },
@@ -4256,7 +4329,7 @@ const styles = StyleSheet.create({
   },
   hintFooterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 14, borderWidth: 2, borderColor: '#FDE68A', borderBottomWidth: 4, borderBottomColor: '#F59E0B', backgroundColor: '#FFFBEB',
+    borderRadius: 14, borderWidth: 1.5, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
   },
   hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '800' },
   selectAnswerHint: { color: '#94A3B8', fontSize: 13, fontWeight: '400' },
@@ -4291,10 +4364,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: '#FFF7ED',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#FED7AA',
-    borderBottomWidth: 3,
-    borderBottomColor: '#FDBA74',
   },
   streakBadgeText: {
     color: '#C2410C',
@@ -4309,10 +4380,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: '#ECFDF5',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#A7F3D0',
-    borderBottomWidth: 3,
-    borderBottomColor: '#6EE7B7',
   },
   xpBadgeText: {
     color: '#047857',
@@ -4371,26 +4440,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.brand,
-  },
-  mascotQuickCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: '#10B981',
-    borderWidth: 1.5,
-    borderColor: '#059669',
-    borderBottomWidth: 4,
-    borderBottomColor: '#047857',
-  } as never,
-  mascotQuickCtaText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.4,
   },
   xpEmptyBanner: {
     flexDirection: 'row',
@@ -4556,4 +4605,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pathSummaryTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-});
+}));

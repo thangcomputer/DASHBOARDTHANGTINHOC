@@ -1,10 +1,10 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarX2, Flame, Gamepad2, Play, Trophy, Users, X, Zap } from 'lucide-react-native';
 import { navigationRef } from '../../navigation/navigationRef';
 import { dailyPracticeApi, reminderCopy, type DpStats } from '../../services/dailyPracticeApi';
-import { colors, radius, spacing } from '../../theme/tokens';
+import { colors, radius, spacing, theme, createThemedStyles } from '../../theme/tokens';
 import { Mascot } from './Mascot';
 import { useGameSounds } from './useGameSounds';
 
@@ -132,7 +132,7 @@ export function DailyPracticeReminder({ userId, ready }: { userId: string; ready
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   card: { width: '100%', maxWidth: 380, borderRadius: 28, backgroundColor: colors.surface, overflow: 'hidden', boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)' },
   hero: {
@@ -173,4 +173,4 @@ const styles = StyleSheet.create({
     boxShadow: '0px 8px 18px rgba(185, 28, 28, 0.3)',
   } as never,
   primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-});
+}));

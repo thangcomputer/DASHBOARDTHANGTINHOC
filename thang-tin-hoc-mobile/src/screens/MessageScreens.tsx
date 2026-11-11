@@ -26,6 +26,7 @@ import {
 } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
+import { isFreePortalMenu } from '../components/FreePortalModals';
 import { messageService, scheduleService } from '../services/mockService';
 import { getMobileImageSource } from '../services/apiClient';
 import {
@@ -64,7 +65,7 @@ import { getTeacherPublicCard } from '../services/teacherApi';
 import { getStudentChatCard, getStudentDetail } from '../services/studentApi';
 import { getContactAvatarSource, getRoleBadgeConfig } from '../utils/contactAvatars';
 import { useMockResource } from '../hooks/useMockResource';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import type { ChatMessage, Conversation, ScheduleItem } from '../types';
 import {
@@ -90,7 +91,7 @@ function getScheduleMeetState(
   now: Date,
   fallbackMeetingUrl = '',
 ) {
-  if (schedule.status !== 'upcoming' || !schedule.date || !schedule.startTime) return null;
+  if (schedule.status === 'cancelled' || !schedule.date || !schedule.startTime) return null;
   const date = schedule.date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   const startTime = schedule.startTime.match(/^(\d{1,2}):(\d{2})/);
   const endTime = schedule.endTime?.match(/^(\d{1,2}):(\d{2})/);
@@ -108,9 +109,11 @@ function getScheduleMeetState(
     if (![endHour, endMinute].every(Number.isFinite) || endHour > 23 || endMinute > 59) return null;
     endAt = Date.UTC(Number(year), Number(month) - 1, Number(day), endHour - 7, endMinute);
   }
-  if (now.getTime() > endAt) return null;
+  const nowMs = now.getTime();
+  if (nowMs > endAt) return null;
+  if (schedule.status !== 'upcoming' && nowMs < startAt) return null;
   return {
-    isLive: now.getTime() >= startAt,
+    isLive: nowMs >= startAt,
     meetingUrl: normalizeMeetingUrl(schedule.meetingUrl) || normalizeMeetingUrl(fallbackMeetingUrl),
     startAt: startAt,
   };
@@ -363,6 +366,7 @@ export function MessagesScreen() {
   const [socketStatus, setSocketStatus] = useState('');
   const [pinningConversationId, setPinningConversationId] = useState<string | null>(null);
   const [conversationOptionsId, setConversationOptionsId] = useState<string | null>(null);
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const categoryFilters = user?.role === 'teacher'
     ? [
       { id: 'all' as const, label: 'Tất cả' },
@@ -478,7 +482,7 @@ export function MessagesScreen() {
       <View style={[styles.inboxFilterRow, !isTeacher && styles.inboxFilterRowStudent]}>
         {isTeacher ? (
           <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
-            <Plus size={25} color={colors.brand} strokeWidth={2.8} />
+            <Plus size={25} color={theme.brand} strokeWidth={2.8} />
           </Pressable>
         ) : null}
         <ScrollView
@@ -493,7 +497,7 @@ export function MessagesScreen() {
               <Pressable
                 key={filter.id}
                 onPress={() => setCategory(filter.id)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
+                style={[styles.filterChip, active && (isBrandStudent ? styles.filterChipActiveBrand : styles.filterChipActive)]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
               >
@@ -662,7 +666,7 @@ export function MessagesScreen() {
                 const selected = selectedMembers.includes(member.id);
                 return (
                   <Pressable key={member.id} onPress={() => setSelectedMembers((current) => selected ? current.filter((id) => id !== member.id) : [...current, member.id])} style={styles.memberRow} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}>
-                    <Avatar name={member.name} color={member.color} size={34} />
+                    <Avatar name={member.name} color={member.color} avatar={member.avatar || member.avatarUri} size={34} />
                     <View style={styles.conversationCopy}>
                       <Text style={styles.title}>{member.name}</Text>
                       <Text style={styles.role}>{member.role}</Text>
@@ -1008,7 +1012,18 @@ export function ConversationScreen() {
         studentCard.reload();
       }
     }));
-    return () => subscriptions.forEach((subscription) => subscription.remove());
+    const refreshSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.DATA_REFRESH, (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const type = String((payload as Record<string, unknown>).type || '').toLowerCase();
+      if (type === 'student' || type === 'students') {
+        if (user.role === 'student') ownStudentProfile.reload();
+        if (user.role === 'teacher') studentCard.reload();
+      }
+    });
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+      refreshSubscription.remove();
+    };
   }, [ownStudentProfile.reload, route.params.participantId, studentCard.reload, user]);
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);
@@ -1286,13 +1301,44 @@ export function ConversationScreen() {
     ) return null;
     const participantId = String(route.params.participantId);
     const scheduleList = scheduleResource.data || [];
+    const resolveEnrollmentLink = (courseName?: string) => {
+      const normalizedCourse = String(courseName || '').trim().toLowerCase();
+      if (user.role === 'teacher') {
+        const list = studentCard.data?.enrollments || [];
+        const matched = list.find((e) => (
+          e.linkHoc
+          && (
+            (e.teacherId && e.teacherId === user.id)
+            || (normalizedCourse && String(e.courseName || '').trim().toLowerCase() === normalizedCourse)
+          )
+        )) || list.find((e) => e.linkHoc);
+        return normalizeMeetingUrl(matched?.linkHoc || '');
+      }
+      const rawEnrollments = Array.isArray(ownStudentProfile.data?.enrollments)
+        ? ownStudentProfile.data.enrollments
+        : [];
+      const matchedRaw = rawEnrollments.find((entry) => {
+        if (!entry || typeof entry !== 'object') return false;
+        const link = typeof entry.linkHoc === 'string' ? entry.linkHoc.trim() : '';
+        if (!link) return false;
+        const tId = entry.teacherId && typeof entry.teacherId === 'object'
+          ? String((entry.teacherId as Record<string, unknown>)._id || (entry.teacherId as Record<string, unknown>).id || '')
+          : String(entry.teacherId || '');
+        const cName = String(entry.courseName || entry.course || '').trim().toLowerCase();
+        return (tId && tId === participantId) || (normalizedCourse && cName === normalizedCourse);
+      }) || rawEnrollments.find((entry) => entry && typeof entry === 'object' && typeof entry.linkHoc === 'string' && entry.linkHoc.trim());
+      return normalizeMeetingUrl(typeof matchedRaw?.linkHoc === 'string' ? matchedRaw.linkHoc : '');
+    };
     const profileMeetingUrl = user.role === 'teacher'
-      ? normalizeMeetingUrl(studentCard.data?.meetingUrl)
-      : normalizeMeetingUrl(
-        ownStudentProfile.data?.joinClassUrl
-        || ownStudentProfile.data?.linkHoc
-        || ownStudentProfile.data?.online_meeting_url
-        || '',
+      ? (resolveEnrollmentLink() || normalizeMeetingUrl(studentCard.data?.meetingUrl))
+      : (
+        resolveEnrollmentLink()
+        || normalizeMeetingUrl(
+          ownStudentProfile.data?.joinClassUrl
+          || ownStudentProfile.data?.linkHoc
+          || ownStudentProfile.data?.online_meeting_url
+          || '',
+        )
       );
     return scheduleList
       .filter((schedule) => user.role === 'teacher'
@@ -1301,7 +1347,7 @@ export function ConversationScreen() {
       .map((schedule) => getScheduleMeetState(
         schedule,
         scheduleNow,
-        profileMeetingUrl,
+        resolveEnrollmentLink(schedule.courseName || schedule.subject) || profileMeetingUrl,
       ))
       .filter((schedule): schedule is NonNullable<typeof schedule> => Boolean(schedule))
       .sort((left, right) => (
@@ -1314,6 +1360,7 @@ export function ConversationScreen() {
     route.params.participantRole,
     scheduleNow,
     scheduleResource.data,
+    studentCard.data?.enrollments,
     studentCard.data?.meetingUrl,
     ownStudentProfile.data,
     user,
@@ -2431,7 +2478,8 @@ export function ConversationScreen() {
                 : 'Meet chưa đến giờ học, nút đang tắt'}
               accessibilityHint={meetingSchedule?.isLive && meetingSchedule.meetingUrl ? 'Mở liên kết Meet' : undefined}
             >
-              <Video size={19} color={meetingSchedule?.isLive ? '#FFFFFF' : '#94A3B8'} />
+              {meetingSchedule?.isLive ? <View style={styles.meetHeaderLiveDot} /> : null}
+              <Video size={17} color={meetingSchedule?.isLive ? '#FFFFFF' : '#94A3B8'} />
             </Pressable>
           ) : null}
           {pendingAttendanceSchedule ? (
@@ -2609,7 +2657,7 @@ export function ConversationScreen() {
                   accessibilityLabel="Xem tin nhắn cũ hơn"
                 >
                   {loadingOlder
-                    ? <ActivityIndicator size="small" color={colors.brand} />
+                    ? <ActivityIndicator size="small" color={theme.brand} />
                     : <Text style={styles.loadOlderText}>Xem tin nhắn cũ hơn</Text>}
                 </Pressable>
                 {olderError ? <Text style={styles.loadOlderError}>{olderError}</Text> : null}
@@ -2635,7 +2683,7 @@ export function ConversationScreen() {
                 return (
                   <View key={message.id} style={styles.systemMessageRow}>
                     <View style={styles.systemMessageCard}>
-                      <CalendarDays size={14} color={colors.brand} />
+                      <CalendarDays size={14} color={theme.brand} />
                       <Text style={styles.systemMessageText}>{message.text}</Text>
                       {message.time ? <Text style={styles.systemMessageTime}>{message.time}</Text> : null}
                     </View>
@@ -3437,7 +3485,7 @@ export function ConversationScreen() {
                     } else {
                       void pickImage();
                     }
-                  }}><ImagePlus size={18} color={colors.brand} /><Text style={styles.role}>{isPreview ? 'Chọn ảnh mẫu' : 'Chọn ảnh từ thiết bị'}</Text></Pressable>
+                  }}><ImagePlus size={18} color={theme.brand} /><Text style={styles.role}>{isPreview ? 'Chọn ảnh mẫu' : 'Chọn ảnh từ thiết bị'}</Text></Pressable>
                   <Pressable style={styles.pickerOption} onPress={() => {
                     if (isPreview) {
                       setSelectedAttachment({ name: 'Tai-lieu-demo.pdf', type: 'file' });
@@ -3445,7 +3493,7 @@ export function ConversationScreen() {
                     } else {
                       void pickDocument();
                     }
-                  }}><FileText size={18} color={colors.brand} /><Text style={styles.role}>{isPreview ? 'Chọn tệp mẫu' : 'Chọn tệp từ thiết bị'}</Text></Pressable>
+                  }}><FileText size={18} color={theme.brand} /><Text style={styles.role}>{isPreview ? 'Chọn tệp mẫu' : 'Chọn tệp từ thiết bị'}</Text></Pressable>
                   {selectedAttachment ? <Pressable style={styles.pickerOption} onPress={() => setSelectedAttachment(null)}><Text style={styles.role}>Bỏ tệp đang chọn</Text></Pressable> : null}
                   <Text style={styles.note}>{isPreview ? 'Bản xem trước không tải hoặc truyền dữ liệu thật.' : 'Tối đa 50 MB; ảnh, PDF, Office, ZIP/RAR, video và âm thanh được hỗ trợ.'}</Text>
                 </>
@@ -3533,14 +3581,20 @@ export function ConversationScreen() {
                     <View style={styles.teacherAttendanceModalActions}>
                       <Pressable
                         onPress={() => setTeacherAttendanceModalVisible(false)}
-                        style={styles.teacherAttendanceCancelButton}
+                        style={({ pressed }) => [
+                          styles.teacherAttendanceCancelButton,
+                          pressed && styles.teacherAttendanceCancelButtonPressed,
+                        ]}
                         accessibilityRole="button"
                       >
                         <Text style={styles.teacherAttendanceCancelText}>Hủy</Text>
                       </Pressable>
                       <Pressable
                         onPress={confirmTeacherAttendance}
-                        style={styles.teacherAttendanceConfirmButton}
+                        style={({ pressed }) => [
+                          styles.teacherAttendanceConfirmButton,
+                          pressed && styles.teacherAttendanceConfirmButtonPressed,
+                        ]}
                         accessibilityRole="button"
                       >
                         <Text style={styles.teacherAttendanceConfirmText}>Xác nhận điểm danh</Text>
@@ -3592,7 +3646,12 @@ export function ConversationScreen() {
                 <Pressable
                   onPress={() => { void respondToChatAttendance('accept'); }}
                   disabled={attendancePromptBusy}
-                  style={[styles.attendancePromptButton, styles.attendancePromptAccept, attendancePromptBusy && styles.attendancePromptDisabled]}
+                  style={({ pressed }) => [
+                    styles.attendancePromptButton,
+                    styles.attendancePromptAccept,
+                    attendancePromptBusy && styles.attendancePromptDisabled,
+                    pressed && !attendancePromptBusy && styles.attendancePromptButtonPressed,
+                  ]}
                   accessibilityRole="button"
                 >
                   <CheckCircle2 size={16} color="#FFFFFF" />
@@ -3603,7 +3662,12 @@ export function ConversationScreen() {
                 <Pressable
                   onPress={() => { void respondToChatAttendance('dispute'); }}
                   disabled={attendancePromptBusy}
-                  style={[styles.attendancePromptButton, styles.attendancePromptDispute, attendancePromptBusy && styles.attendancePromptDisabled]}
+                  style={({ pressed }) => [
+                    styles.attendancePromptButton,
+                    styles.attendancePromptDispute,
+                    attendancePromptBusy && styles.attendancePromptDisabled,
+                    pressed && !attendancePromptBusy && styles.attendancePromptButtonPressed,
+                  ]}
                   accessibilityRole="button"
                 >
                   <X size={16} color="#FFFFFF" />
@@ -3844,7 +3908,7 @@ export function ConversationScreen() {
                     <ScrollView style={styles.groupInfoList} nestedScrollEnabled>
                       {groupDetails.groupParticipants.map((participant) => (
                         <View key={participant.userId} style={styles.groupInfoMember}>
-                          <Avatar name={participant.name} color="#E8EEF8" size={34} />
+                          <Avatar name={participant.name} color="#E8EEF8" avatar={participant.avatar} size={34} />
                           <View style={styles.groupInfoMemberCopy}>
                             <Text numberOfLines={1} style={styles.groupInfoMemberName}>{participant.name}</Text>
                             <Text style={styles.groupInfoMemberRole}>
@@ -4164,7 +4228,7 @@ export function ConversationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.canvas },
   chatScreen: { flex: 1, paddingBottom: spacing.xs, gap: spacing.xs, backgroundColor: '#FFFFFF' },
   conversation: { flexDirection: 'row', alignItems: 'center' },
@@ -4191,9 +4255,10 @@ const styles = StyleSheet.create({
   groupDeleteHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FEF2F2' },
   groupLeaveHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFF7ED' },
   groupActionDisabled: { opacity: 0.5 },
-  meetHeaderAction: { width: 34, height: 34, borderRadius: 10 },
-  meetHeaderActionLive: { backgroundColor: '#DC2626' },
+  meetHeaderAction: { minWidth: 44, height: 34, paddingHorizontal: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  meetHeaderActionLive: { backgroundColor: '#DC2626', borderBottomWidth: 3, borderBottomColor: '#991B1B' },
   meetHeaderActionUpcoming: { backgroundColor: '#F1F5F9', opacity: 0.55 },
+  meetHeaderLiveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FFFFFF' },
   attendanceHeaderAction: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
   teacherAttendanceModal: { width: '100%', maxWidth: 440, maxHeight: '90%', overflow: 'hidden', borderRadius: 28, backgroundColor: '#FFFFFF' },
   teacherAttendanceModalHeader: { minHeight: 92, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, backgroundColor: '#0DA76B' },
@@ -4216,9 +4281,51 @@ const styles = StyleSheet.create({
   teacherAttendanceGradeMaximum: { color: '#CBD5E1', fontSize: typography.body, fontWeight: '900' },
   teacherAttendanceNoteInput: { minHeight: 82, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#E5EDF5', borderRadius: 18, backgroundColor: '#F8FAFC', color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
   teacherAttendanceModalActions: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
-  teacherAttendanceCancelButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
-  teacherAttendanceCancelText: { color: '#94A3B8', fontSize: typography.caption, fontWeight: '900' },
-  teacherAttendanceConfirmButton: { minHeight: 48, flex: 2, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: '#0DA76B' },
+  teacherAttendanceCancelButton: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 4,
+    borderBottomColor: '#CBD5E1',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  teacherAttendanceCancelButtonPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+    backgroundColor: '#F8FAFC',
+  },
+  teacherAttendanceCancelText: { color: '#64748B', fontSize: typography.caption, fontWeight: '900' },
+  teacherAttendanceConfirmButton: {
+    minHeight: 48,
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    borderRadius: 16,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#059669',
+    borderBottomWidth: 4,
+    borderBottomColor: '#047857',
+    shadowColor: '#064E3B',
+    shadowOpacity: 0.22,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  teacherAttendanceConfirmButtonPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+  },
   teacherAttendanceConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900', textAlign: 'center' },
   attendancePromptCard: { width: '100%', maxWidth: 400, overflow: 'hidden', borderRadius: 24, backgroundColor: colors.surface },
   attendancePromptHeader: { minHeight: 184, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.lg, backgroundColor: '#D7192D' },
@@ -4234,9 +4341,42 @@ const styles = StyleSheet.create({
   attendancePromptTime: { color: '#334155', fontSize: typography.caption, fontWeight: '600' },
   attendancePromptMessage: { marginHorizontal: spacing.md, marginTop: spacing.md, color: colors.muted, fontSize: typography.caption, lineHeight: 20, textAlign: 'center' },
   attendancePromptActions: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.md },
-  attendancePromptButton: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1 },
-  attendancePromptAccept: { backgroundColor: '#059669', borderColor: '#059669' },
-  attendancePromptDispute: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
+  attendancePromptButton: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  attendancePromptButtonPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+  },
+  attendancePromptAccept: {
+    backgroundColor: '#10B981',
+    borderColor: '#059669',
+    borderBottomWidth: 4,
+    borderBottomColor: '#047857',
+    shadowColor: '#064E3B',
+    shadowOpacity: 0.22,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  attendancePromptDispute: {
+    backgroundColor: '#334155',
+    borderColor: '#1E293B',
+    borderBottomWidth: 4,
+    borderBottomColor: '#0F172A',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.22,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
   attendancePromptAcceptText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   attendancePromptDisputeText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   attendancePromptDisabled: { opacity: 0.6 },
@@ -4267,22 +4407,48 @@ const styles = StyleSheet.create({
   filtersWrapper: { flex: 1, minWidth: 0 },
   filtersScroll: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2, paddingRight: 2 },
   filterChip: {
-    minHeight: 36,
-    borderRadius: 12,
+    minHeight: 38,
+    borderRadius: 14,
     borderWidth: 1.5,
+    borderBottomWidth: 3,
     borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
     justifyContent: 'center',
     alignItems: 'center',
+    outlineStyle: 'none' as never,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   filterChipActive: {
     backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    borderColor: '#34D399',
+    borderBottomWidth: 3,
+    borderBottomColor: '#059669',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  filterText: { color: '#64748B', fontSize: typography.caption, fontWeight: '700' },
-  filterTextActive: { color: '#FFFFFF', fontWeight: '800' },
+  filterChipActiveBrand: {
+    backgroundColor: '#EF4444',
+    borderColor: '#F87171',
+    borderBottomWidth: 3,
+    borderBottomColor: '#DC2626',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  filterText: { color: '#64748B', fontSize: 13, fontWeight: '800' },
+  filterTextActive: { color: '#FFFFFF', fontWeight: '900' },
   contactListCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
@@ -4643,4 +4809,4 @@ const styles = StyleSheet.create({
   weekScheduleEditorCloseText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
   infoClose: { minHeight: 42, minWidth: 100, marginTop: spacing.sm, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.brandSoft },
   infoCloseText: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
-});
+}), { remapGreen: true });

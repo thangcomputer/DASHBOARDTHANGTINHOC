@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Switch, Text, View } from 'react-native';
 import { Card, SectionHeading } from './ui';
-import { colors, spacing, typography } from '../theme/tokens';
+import { colors, spacing, typography, theme } from '../theme/tokens';
 import {
   getCommunicationPreferences,
   updateCommunicationPreferences,
@@ -69,7 +69,7 @@ export function CommunicationPreferencesCard({ role }: { role: 'student' | 'teac
   return (
     <Card style={{ gap: spacing.sm }}>
       <SectionHeading title="Quyền riêng tư liên lạc" />
-      {loading ? <ActivityIndicator color={colors.brand} /> : null}
+      {loading ? <ActivityIndicator color={theme.brand} /> : null}
       {preferenceRows.map((row) => (
         <View
           key={row.key}
@@ -91,7 +91,7 @@ export function CommunicationPreferencesCard({ role }: { role: 'student' | 'teac
             value={preferences[row.key]}
             onValueChange={(value) => { void togglePreference(row.key, value); }}
             disabled={savingKey !== null || loading}
-            trackColor={{ false: '#CBD5E1', true: colors.brand }}
+            trackColor={{ false: '#CBD5E1', true: theme.brand }}
             accessibilityLabel={row.title}
           />
         </View>

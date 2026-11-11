@@ -18,6 +18,7 @@ import { formatNotificationStudentMask } from '../utils/studentMask';
 import { LMS_PLAYER_OPEN_EVENT, isLmsPlayerOpen } from '../utils/lmsPlayerOverlay';
 import { getMessagingRole } from '../lib/messagingRoles';
 import StudentQuizInviteHost from './student/StudentQuizInviteHost';
+import MeetStartAlert from './student/MeetStartAlert';
 import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmModal';
 import StudentAssignedTeacherModal from './student/StudentAssignedTeacherModal';
 import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
@@ -40,12 +41,12 @@ import TeacherStudentNoteModal, {
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
 import LearningGoalModal from './student/LearningGoalModal';
 import DailyPracticeReminder from './student/dailyPractice/DailyPracticeReminder';
-import { isStudentSchedulesApiBlocked } from './student/dailyPractice/FreeFeatureLock';
+import { isStudentSchedulesApiBlocked, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
 import dailyPracticeApi from '../services/dailyPracticeApi';
 import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT } from '../utils/learningGoal';
-import { hasRealCourseEnrollment } from '../utils/enrollments';
+import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -274,21 +275,21 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const mobileFooterRouteKey = `${location.pathname}${location.hash}`;
   const mobileFooterVisible = mobileFooterHiddenRouteKey !== mobileFooterRouteKey;
   const [brandLogo, setBrandLogo] = useState('');
-  const isFreePortalStudent = role === 'student' && Boolean(
-    (session?.freePortal === true || (() => {
-      try {
-        return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true;
-      } catch {
-        return false;
-      }
-    })()) && !hasRealCourseEnrollment(session || (() => {
-      try {
-        return JSON.parse(localStorage.getItem('student_user') || '{}');
-      } catch {
-        return null;
-      }
-    })())
-  );
+  const studentForPortalUi = session || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('student_user') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const freeMenuFromData = useFreePortalMenu(studentForPortalUi);
+  const isFreePortalStudent = role === 'student' && (freeMenuFromData || isFreePortalSelfRegistrationStudent(studentForPortalUi));
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isFreePortalStudent) root.setAttribute('data-free-portal-student', 'true');
+    else root.removeAttribute('data-free-portal-student');
+    return () => root.removeAttribute('data-free-portal-student');
+  }, [isFreePortalStudent]);
   const scrollPositions = useRef(new WeakMap());
   const focusRestoreTimer = useRef(null);
   const [ratingDetail, setRatingDetail] = useState(null);
@@ -1792,7 +1793,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       currentUserRole={getMessagingRole(session) || role}
       getConversations={getConversations}
     >
-      <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
+      <div className={`flex h-[100dvh] max-h-[100dvh] ${isFreePortalStudent ? 'bg-[#f4fbf8]' : 'bg-[#f8fafc]'} relative font-sans overflow-hidden`}>
         {isRefetching ? (
           <div className="sr-only" role="status" aria-live="polite">
             Đang đồng bộ dữ liệu
@@ -1850,7 +1851,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 />
               </button>
 
-              <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 shrink-0">
+              <div className="flex items-center flex-nowrap justify-end gap-1 sm:gap-2 shrink-0 relative z-10">
                 {showAdminBranch && (
                   <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
                     <BranchFilterDropdown />
@@ -1897,7 +1898,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 }`
                 : isImmersivePage
                   ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-                  : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]'
+                  : `flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]${isFreePortalStudent ? ' student-canvas-bg' : ''}`
             }
             style={isInboxPage
               ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }
@@ -1906,11 +1907,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             <div
               className={
                 isInboxPage || isBiPage
-                  ? `cms-page min-w-0 w-full max-w-full flex-1 min-h-0 h-full flex flex-col overflow-hidden ${isInboxPage ? 'pt-4' : ''}`
+                  ? `cms-page min-w-0 w-full max-w-full flex-1 min-h-0 h-full flex flex-col overflow-hidden ${isInboxPage ? 'pt-4' : ''}${role === 'student' ? ' student-canvas' : ''}`
                   : isImmersivePage
-                    ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
-                    : 'cms-page min-w-0 w-full max-w-full'
+                    ? `cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden${role === 'student' ? ' student-canvas' : ''}`
+                    : `cms-page min-w-0 w-full max-w-full${role === 'student' ? ' student-canvas' : ''}`
               }
+              {...(role === 'student' ? { 'data-student-shell': true, ...(isFreePortalStudent ? { 'data-free-portal-student': true } : {}) } : (role === 'teacher' ? { 'data-teacher-shell': true } : {}))}
             >
               <Outlet context={{ session, role }} />
             </div>
@@ -1918,6 +1920,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         </main>
 
         {role === 'student' ? <StudentQuizInviteHost /> : null}
+        {(role === 'student' || role === 'teacher') ? <MeetStartAlert role={role} session={session} /> : null}
         <ClassRoomHost />
 
         <LoginInboxAlertPopup

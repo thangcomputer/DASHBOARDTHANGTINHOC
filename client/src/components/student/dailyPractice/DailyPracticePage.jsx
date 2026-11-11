@@ -11,9 +11,9 @@ import {
   DIFFICULTIES, QUESTION_TYPES, QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, difficultyMeta, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage, topicColor, topicIcon,
 } from '../../../utils/dailyPractice';
 import DailyPracticeHero from './DailyPracticeHero';
-import DailyPracticeQuickStats from './DailyPracticeQuickStats';
 import DailyPracticeGoalPanel from './DailyPracticeGoalPanel';
 import Mascot from './Mascot';
+import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import Celebration from './Celebration';
 import ComboLightningOverlay from './ComboLightningOverlay';
@@ -86,6 +86,11 @@ function HomeScreen({
   }, [path, activePathTopicId, initialTopicId]);
 
   useEffect(() => {
+    const serverId = String(path?.activeTopicId || '').trim();
+    if (serverId) setActivePathTopicId(serverId);
+  }, [path?.activeTopicId]);
+
+  useEffect(() => {
     if (topicId || !topics.length) return;
     const linked = initialTopicId && topics.find((topic) => topic.id === initialTopicId);
     setTopicId(linked ? linked.id : topics[0].id);
@@ -99,22 +104,30 @@ function HomeScreen({
     }
     : null;
 
+  const topicPathDone = Boolean(
+    pathTopic?.totalUnits && (pathTopic.completedUnits || 0) >= pathTopic.totalUnits,
+  );
+
   const heroAction = () => {
     gameSounds.tap();
     if (mode === 'path') {
       if (pathContinue) focusCurrentPathLesson();
+      else document.getElementById('dp-path-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     if (topicId) onStart(topicId, difficulty);
   };
 
   const heroLabel = mode === 'path'
-    ? (pathContinue ? 'Tiếp tục luyện tập' : 'Xem lộ trình bên dưới')
+    ? (pathContinue
+      ? pathTopicPrimaryCtaLabel(pathTopic)
+      : (topicPathDone ? 'Ôn lại lộ trình' : 'Xem chi tiết lộ trình'))
     : 'Bắt đầu luyện tập';
   const heroDisabled = mode === 'free' ? (!topicId || starting) : starting;
+  const freePortal = isFreePortalAccount();
 
   return (
-    <div className="dp-shell mx-auto w-full max-w-6xl space-y-5 xl:max-w-7xl">
+    <div className="dp-shell mx-auto w-full max-w-6xl space-y-5 xl:max-w-7xl" data-lms-ui>
 
       <DailyPracticeHero
         stats={stats}
@@ -122,13 +135,10 @@ function HomeScreen({
         onPrimaryAction={heroAction}
         primaryDisabled={heroDisabled}
         primaryLabel={heroLabel}
-      />
-
-      <DailyPracticeQuickStats
-        stats={stats}
-        pathTopic={pathTopic}
-        freeTopicName={selected?.name}
-        mode={mode}
+        pathTopic={mode === 'path' ? pathTopic : null}
+        pathContinue={Boolean(pathContinue)}
+        freeTopicName={selected?.name || topics[0]?.name || ''}
+        onBuyXp={() => setBuyXpOpen(true)}
       />
 
       {xpEmpty && (
@@ -147,10 +157,17 @@ function HomeScreen({
 
       <div className="grid gap-5 lg:grid-cols-12 lg:items-start lg:gap-6">
         <div className="min-w-0 space-y-4 lg:col-span-8">
-          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="tablist" aria-label="Chế độ luyện tập">
+          <div
+            className={`grid grid-cols-2 gap-1 rounded-[16px] p-1 ${
+              freePortal ? 'border border-[#D5E7DF] bg-[#E8F3EE]' : 'bg-slate-100'
+            }`}
+            role="tablist"
+            aria-label="Chế độ luyện tập"
+          >
             {MODES.map((item) => {
               const Icon = item.icon;
               const active = mode === item.id;
+              const displayLabel = freePortal && item.id === 'path' ? 'Lộ trình' : item.label;
               return (
                 <button
                   key={item.id}
@@ -158,15 +175,22 @@ function HomeScreen({
                   role="tab"
                   aria-selected={active}
                   onClick={() => { gameSounds.tap(); onModeChange(item.id); }}
-                  className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-black transition !shadow-none ${active ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-black transition !shadow-none ${
+                    active
+                      ? (freePortal
+                        ? 'bg-white text-[#059669] shadow-sm ring-1 ring-emerald-200/60'
+                        : 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200')
+                      : 'text-[#64748B] hover:text-slate-700'
+                  }`}
                 >
-                  <Icon size={16} aria-hidden="true" /> {item.label}
+                  <Icon size={15} aria-hidden="true" /> {displayLabel}
                 </button>
               );
             })}
           </div>
 
           {mode === 'path' && (
+            <div id="dp-path-panel" className="scroll-mt-4">
             <PathView
               path={path}
               practiceStats={stats}
@@ -183,6 +207,7 @@ function HomeScreen({
               requestedLesson={requestedLesson}
               onRequestedLessonOpened={onRequestedLessonOpened}
             />
+            </div>
           )}
 
           {mode === 'free' && error && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{error}</p>}
@@ -197,36 +222,35 @@ function HomeScreen({
 
           {mode === 'free' && topics.length > 0 && (
             <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="-mx-1 flex gap-2 overflow-x-auto overflow-y-hidden px-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
+                {topics.map((topic) => {
+                  const Icon = topicIcon(topic.icon);
+                  const tone = topicColor(topic.color);
+                  const active = topic.id === topicId;
+                  const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
+                  return (
+                    <button
+                      key={topic.id}
+                      type="button"
+                      onClick={() => { gameSounds.tap(); setTopicId(topic.id); }}
+                      className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 px-3 py-2.5 text-left transition !shadow-none sm:min-w-[160px] ${active ? 'shadow-sm' : ''}`}
+                      style={{ borderColor: active ? tone.to : '#E2E8F0', background: active ? tone.soft : '#FFFFFF' }}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white" style={{ background: `linear-gradient(180deg, ${tone.from}, ${tone.to})` }}>
+                        <Icon size={16} aria-hidden="true" />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-black text-slate-900">{topic.name}</span>
+                        <span className="block text-[11px] font-semibold text-slate-500">{total} câu</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
               <p className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
                 Luyện tự do chỉ <span className="font-black">trắc nghiệm ôn</span>, không tính XP, không video, không dùng câu đã gắn chặng.
               </p>
-              <section>
-                <h2 className="mb-2 text-sm font-black text-slate-800">Chọn chủ đề</h2>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {topics.map((topic) => {
-                    const Icon = topicIcon(topic.icon);
-                    const color = topicColor(topic.color);
-                    const active = topic.id === topicId;
-                    const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
-                    return (
-                      <button
-                        key={topic.id}
-                        type="button"
-                        onClick={() => { gameSounds.tap(); setTopicId(topic.id); }}
-                        className={`relative flex min-w-[140px] shrink-0 flex-col rounded-2xl border-2 p-3 text-left transition !shadow-none ${active ? 'dp-pop ring-1 ring-slate-200' : 'hover:border-slate-300'}`}
-                        style={{ borderColor: active ? color.to : '#E2E8F0', background: active ? color.soft : '#FFFFFF' }}
-                      >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}>
-                          <Icon size={20} aria-hidden="true" />
-                        </span>
-                        <span className="mt-2 block text-sm font-black text-slate-900">{topic.name}</span>
-                        <span className="block text-[11px] text-slate-500">{total} câu</span>
-                        {active && <CheckCircle2 size={16} className="absolute right-2 top-2" style={{ color: color.to }} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
 
               <section>
                 <h2 className="mb-2 text-sm font-black text-slate-800">Chọn độ khó</h2>

@@ -21,18 +21,27 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Search, type LucideIcon } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, droplet, radius, spacing, typography } from '../theme/tokens';
+import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { Assignment, ScheduleItem } from '../types';
 import { getWebLogoUrl } from '../services/webSettingsApi';
+import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import type { AppStackParamList } from '../navigation/types';
 import { useAuth } from '../app/AuthContext';
-import { hasRealCourseEnrollment } from './FreePortalModals';
+import { hasRealCourseEnrollment, isFreePortalMenu } from '../utils/freePortalHelper';
+
+/** Học viên đăng ký theo khóa → tone đỏ (đồng bộ web app); học viên miễn phí & giảng viên giữ tone xanh. */
+export function useIsBrandStudent(): boolean {
+  const auth = useAuth();
+  const user = auth?.user;
+  return Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
+}
 
 const BRANDING_HEADER_VISIBILITY_EVENT = 'mobile:branding-header-visibility';
 export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility';
+export const MOBILE_OPEN_MENU_EVENT = 'mobile:open-menu';
 const BRANDING_HEADER_HEIGHT = 58;
 
 const SCROLL_TOGGLE_DISTANCE = 12;
@@ -203,12 +212,13 @@ function BrandingTopBar() {
     >
       <BlurView intensity={Platform.OS === 'android' ? 65 : 48} tint="light" style={styles.brandingTopBar}>
         <Pressable
-          onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
-          style={styles.topBarAction}
+          onPress={() => DeviceEventEmitter.emit(MOBILE_OPEN_MENU_EVENT)}
+          style={({ pressed }) => [styles.topBarMenu, pressed && styles.topBarNeoPressed]}
           accessibilityRole="button"
-          accessibilityLabel="Mở tìm kiếm"
+          accessibilityLabel="Mở danh mục"
         >
-          <Search size={20} color={colors.muted} />
+          <Menu size={20} color="#475569" />
+          <Text style={styles.topBarMenuLabel}>Menu</Text>
         </Pressable>
         <Pressable
           onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
@@ -242,14 +252,14 @@ function BrandingTopBar() {
         </Pressable>
         <Pressable
           onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
-          style={styles.topBarAction}
+          style={({ pressed }) => [styles.topBarAction, pressed && styles.topBarNeoPressed]}
           accessibilityRole="button"
           accessibilityLabel={unreadCount > 0 ? `Mở thông báo, ${unreadCount} chưa đọc` : 'Mở thông báo'}
         >
           <View style={styles.notificationBell}>
             <Bell size={20} color={colors.muted} />
             {unreadCount > 0 ? (
-              <View style={styles.notificationUnreadBadge}>
+              <View style={[styles.notificationUnreadBadge, !isFreeStudent && styles.notificationUnreadBadgeBrand]}>
                 <Text style={styles.notificationUnreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
               </View>
             ) : null}
@@ -281,6 +291,7 @@ export function AppHeader({
   showBackButton?: boolean;
   centered?: boolean;
 }) {
+  const isBrandStudent = useIsBrandStudent();
   const navigation = useNavigation();
   const route = useRoute();
   const parentNavigation = navigation.getParent();
@@ -299,9 +310,9 @@ export function AppHeader({
       tint="light"
       style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, centered ? styles.headerCentered : null, containerStyle]}
     >
-      {Icon ? <View style={styles.headerIcon}><Icon size={19} color={colors.brand} /></View> : null}
+      {Icon ? <View style={[styles.headerIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}><Icon size={19} color={isBrandStudent ? '#DC2626' : theme.brand} /></View> : null}
       {handleBack ? (
-        <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null]} accessibilityRole="button" accessibilityLabel="Quay lại">
+        <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null, compact && isBrandStudent && { backgroundColor: '#DC2626' }]} accessibilityRole="button" accessibilityLabel="Quay lại">
           <ChevronLeft size={compact ? 20 : 22} color={compact ? colors.surface : colors.ink} />
         </Pressable>
       ) : null}
@@ -332,12 +343,13 @@ export function SectionHeading({
   action?: string;
   onPress?: () => void;
 }) {
+  const isBrandStudent = useIsBrandStudent();
   return (
     <View style={styles.sectionHeading}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {action ? (
         <Pressable onPress={onPress} accessibilityRole="button">
-          <Text style={styles.sectionAction}>{action}</Text>
+          <Text style={[styles.sectionAction, isBrandStudent && { color: '#DC2626' }]}>{action}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -367,13 +379,15 @@ const badgePalette: Record<string, { backgroundColor: string; color: string }> =
   'Vắng': { backgroundColor: colors.redSoft, color: colors.red },
   'Đi trễ': { backgroundColor: colors.goldSoft, color: '#9A6C0A' },
   'Có phép': { backgroundColor: colors.blueSoft, color: colors.blue },
-  upcoming: { backgroundColor: colors.brandSoft, color: colors.brandDark },
+  upcoming: { backgroundColor: theme.brandSoft, color: theme.brandDark },
   completed: { backgroundColor: colors.greenSoft, color: colors.green },
   cancelled: { backgroundColor: colors.redSoft, color: colors.red },
 };
 
 export function StatusBadge({ label, compact = false }: { label: string; compact?: boolean }) {
-  const palette = badgePalette[label] || { backgroundColor: colors.canvas, color: colors.muted };
+  const isBrandStudent = useIsBrandStudent();
+  const basePalette = badgePalette[label] || { backgroundColor: colors.canvas, color: colors.muted };
+  const palette = isBrandStudent && label === 'upcoming' ? { backgroundColor: '#FEF2F2', color: '#B91C1C' } : basePalette;
   const displayLabel = ({
     upcoming: 'Sắp tới',
     completed: 'Hoàn thành',
@@ -386,13 +400,33 @@ export function StatusBadge({ label, compact = false }: { label: string; compact
   );
 }
 
-export function Avatar({ name, color = colors.brandSoft, size = 48, imageUri, imageSource }: { name: string; color?: string; size?: number; imageUri?: string; imageSource?: ImageSourcePropType }) {
-  const initials = name.split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase();
+export function Avatar({
+  name,
+  color = theme.brandSoft,
+  size = 48,
+  avatar,
+  imageUri,
+  imageSource,
+  textColor,
+}: {
+  name: string;
+  color?: string;
+  size?: number;
+  avatar?: string;
+  imageUri?: string;
+  imageSource?: ImageSourcePropType;
+  textColor?: string;
+}) {
+  const initials = (name || '').split(/\s+/).slice(-2).map((part) => part[0] || '').join('').toUpperCase();
+  const effectiveSource: ImageSourcePropType | undefined = imageSource
+    || (avatar ? getMobileImageSource(resolveMobilePublicUrl(avatar)) : undefined)
+    || (imageUri ? { uri: imageUri } : undefined);
+
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]}>
-      {imageSource || imageUri
-        ? <Image source={imageSource || { uri: imageUri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-        : <Text style={[styles.avatarText, { fontSize: Math.max(13, size * 0.3) }]}>{initials}</Text>}
+      {effectiveSource
+        ? <Image source={effectiveSource} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        : <Text style={[styles.avatarText, { fontSize: Math.max(13, size * 0.3) }, textColor ? { color: textColor } : null]}>{initials}</Text>}
     </View>
   );
 }
@@ -410,6 +444,7 @@ export function PrimaryButton({
   variant?: 'primary' | 'secondary' | 'quiet';
   disabled?: boolean;
 }) {
+  const isBrandStudent = useIsBrandStudent();
   const secondary = variant === 'secondary';
   const quiet = variant === 'quiet';
   return (
@@ -419,13 +454,14 @@ export function PrimaryButton({
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.button,
+        isBrandStudent && !secondary && !quiet && styles.buttonBrand,
         secondary && styles.buttonSecondary,
         quiet && styles.buttonQuiet,
         (disabled || loading) && styles.buttonDisabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
-      {loading ? <ActivityIndicator color={secondary || quiet ? colors.brand : '#FFFFFF'} /> : (
+      {loading ? <ActivityIndicator color={secondary || quiet ? (isBrandStudent ? '#DC2626' : theme.brand) : '#FFFFFF'} /> : (
         <Text style={[styles.buttonText, (secondary || quiet) && styles.buttonTextSecondary]}>{title}</Text>
       )}
     </Pressable>
@@ -476,9 +512,10 @@ export function FormField({
 }
 
 export function EmptyState({ title, message }: { title: string; message: string }) {
+  const isBrandStudent = useIsBrandStudent();
   return (
     <Card style={styles.stateCard}>
-      <View style={styles.stateIcon}><Inbox size={22} color={colors.brand} /></View>
+      <View style={[styles.stateIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}><Inbox size={22} color={isBrandStudent ? '#DC2626' : theme.brand} /></View>
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateMessage}>{message}</Text>
     </Card>
@@ -513,6 +550,7 @@ export function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
 }
 
 export function ProgressBar({ value }: { value: number }) {
+  const isBrandStudent = useIsBrandStudent();
   return (
     <View
       style={styles.progressTrack}
@@ -521,7 +559,7 @@ export function ProgressBar({ value }: { value: number }) {
       accessibilityValue={{ min: 0, max: 100, now: value }}
       accessibilityLabel={`Tiến độ ${value}%`}
     >
-      <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, value))}%` }]} />
+      <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, value))}%` }, isBrandStudent && { backgroundColor: '#EF4444' }]} />
     </View>
   );
 }
@@ -599,16 +637,20 @@ export const uiStyles = StyleSheet.create({
   muted: { color: colors.muted, fontSize: typography.small, lineHeight: 19 },
 });
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
   brandingTopBarContainer: { overflow: 'hidden' },
   brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
-  brandingHomeCentered: { position: 'absolute', left: '50%', top: '50%', width: 168, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 16, backgroundColor: '#FFFFFF', backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)', boxShadow: droplet.logo, transform: [{ translateX: -84 }, { translateY: -24 }] },
-  brandingLogo: { width: 140, height: 42 },
+  brandingHomeCentered: { position: 'absolute', left: '50%', top: '50%', width: 168, height: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 16, backgroundColor: '#FFFFFF', ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)' } : {}), boxShadow: droplet.logo, transform: [{ translateX: -84 }, { translateY: -23 }] },
+  brandingLogo: { width: 140, height: 40 },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
-  topBarAction: { zIndex: 1, width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.72)', shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
+  topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  topBarAction: { zIndex: 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
+  topBarNeoPressed: { boxShadow: droplet.buttonPressed },
   notificationBell: { position: 'relative' },
   notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },
+  notificationUnreadBadgeBrand: { backgroundColor: '#EF4444' },
   notificationUnreadBadgeText: { color: '#FFFFFF', fontSize: 8, lineHeight: 11, fontWeight: '800' },
   fill: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.lg },
@@ -631,7 +673,19 @@ const styles = StyleSheet.create({
   headerAction: { width: 44, height: 44, borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.78)', alignItems: 'center', justifyContent: 'center', shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   headerActionCompact: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  card: { backgroundColor: colors.surface, borderRadius: 20, padding: spacing.lg, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', gap: spacing.md },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: spacing.lg,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    gap: spacing.md,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   sectionTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '700' },
   sectionAction: { color: colors.brand, fontSize: typography.small, fontWeight: '700' },
@@ -642,17 +696,37 @@ const styles = StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.brandDark, fontWeight: '800' },
   button: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#059669', borderBottomWidth: 4, borderBottomColor: '#047857' },
+  buttonBrand: { backgroundColor: '#EF4444', borderColor: '#DC2626', borderBottomColor: '#B91C1C' },
   buttonSecondary: { backgroundColor: '#F8FAFC', borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1' },
   buttonQuiet: { backgroundColor: 'transparent', borderWidth: 0, borderBottomWidth: 0 },
   buttonDisabled: { opacity: 0.5, borderBottomWidth: 2 },
   buttonText: { color: '#FFFFFF', fontWeight: '900', fontSize: typography.body, letterSpacing: 0.4 },
   buttonTextSecondary: { color: '#475569', fontWeight: '800' },
   pressed: { transform: [{ translateY: 2 }], borderBottomWidth: 2 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 50, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', paddingHorizontal: spacing.lg },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: 50,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: spacing.lg,
+  },
   searchInput: { flex: 1, color: colors.ink, fontSize: typography.body, paddingVertical: spacing.md },
   fieldGroup: { gap: spacing.sm },
   fieldLabel: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
-  input: { minHeight: 52, borderRadius: 16, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: colors.surface, color: colors.ink, paddingHorizontal: spacing.lg, fontSize: typography.body },
+  input: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    color: colors.ink,
+    paddingHorizontal: spacing.lg,
+    fontSize: typography.body,
+  },
   stateCard: { alignItems: 'center', paddingVertical: spacing.xxxl },
   stateIcon: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
   stateTitle: { color: colors.ink, fontWeight: '700', fontSize: typography.heading, textAlign: 'center' },
@@ -679,4 +753,4 @@ const styles = StyleSheet.create({
   menuIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   menuCopy: { flex: 1, gap: 2 },
   menuTitle: { color: colors.ink, fontSize: typography.body, fontWeight: '600' },
-});
+}));

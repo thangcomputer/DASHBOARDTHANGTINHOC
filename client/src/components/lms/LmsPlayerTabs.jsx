@@ -8,6 +8,7 @@ import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
+import { lmsBtn } from '../../utils/lmsButtonClass';
 import { useSocket } from '../../context/SocketContext';
 function initials(name = '') {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
@@ -750,7 +751,7 @@ function QaPanel({
           type="button"
           onClick={submit}
           disabled={sending || !title.trim() || !lessonId}
-          className="inline-flex items-center gap-2 px-4 min-h-10 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold"
+          className={lmsBtn('primary', { size: 'sm', className: 'text-xs disabled:opacity-50' })}
         >
           <MessageSquare size={14} /> {sending ? 'Đang gửi...' : 'Gửi câu hỏi'}
         </button>
@@ -879,7 +880,7 @@ function QaPanel({
                           type="button"
                           disabled={sending || !String(answerDrafts[id] || '').trim()}
                           onClick={() => submitAnswer(id)}
-                          className="px-3 min-h-9 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs font-bold"
+                          className={lmsBtn('danger', { size: 'sm', className: 'text-xs disabled:opacity-40' })}
                         >
                           Gửi trả lời
                         </button>
@@ -1039,7 +1040,7 @@ function ReviewsPanel({ courseId, courseTitle, audience = 'student', light = fal
           type="button"
           onClick={submit}
           disabled={sending || !comment.trim()}
-          className="px-4 min-h-10 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold"
+          className={lmsBtn('primary', { size: 'sm', className: 'text-xs disabled:opacity-50' })}
         >
           {sending ? 'Đang gửi...' : 'Gửi đánh giá'}
         </button>
@@ -1115,7 +1116,7 @@ function ResourcesPanel({ files, light = false }) {
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-bold shrink-0 no-underline"
+                  className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 text-xs no-underline' })}
                 >
                   <ExternalLink size={14} /> Mở
                 </a>
@@ -1130,7 +1131,7 @@ function ResourcesPanel({ files, light = false }) {
                       window.cmsAlert(err?.message || 'Không tải được tài liệu', 'error');
                     }
                   }}
-                  className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 border-0 cursor-pointer"
+                  className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 text-xs border-0' })}
                 >
                   <Download size={14} /> Tải về
                 </button>

@@ -13,11 +13,14 @@ export const setSoundMuted = (val) => {
 /** Gọi sau click/touch đầu tiên để bật được âm thanh (Chrome/Safari autoplay policy) */
 export const unlockAudio = () => {
   try {
+    if (typeof navigator !== 'undefined' && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+      return;
+    }
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === 'suspended') {
-      void audioCtx.resume();
+      void audioCtx.resume().catch(() => {});
     }
   } catch {
     /* noop */

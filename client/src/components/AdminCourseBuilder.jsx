@@ -8,6 +8,7 @@ import { useToast } from '../utils/useToast';
 import { probeYouTubeDurationSeconds, extractYouTubeId } from '../utils/youtubeDuration';
 import api, { buildMediaDownloadUrl } from '../services/api';
 import { trainingUploadDisplayName } from './admin/utils/trainingUpload';
+import { lmsBtn } from '../utils/lmsButtonClass';
 
 function formatFileSize(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
@@ -310,7 +311,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
   };
 
   const ui = (
-    <div className="fixed inset-0 z-[500] flex flex-col overflow-hidden bg-slate-50 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[500] flex flex-col overflow-hidden bg-slate-50 animate-in fade-in duration-200" data-lms-ui>
       {/* HEADER */}
       <header className="shrink-0 bg-white border-b border-slate-200 shadow-sm pt-[env(safe-area-inset-top,0px)]">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3">
@@ -360,7 +361,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                 type="button"
                 onClick={handleSave}
                 disabled={saving || fileUploading}
-                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-600 text-white text-sm font-bold shadow-md hover:shadow-lg transition disabled:opacity-60"
+                className={lmsBtn('danger', { size: 'md', className: 'min-h-11 px-3 sm:px-4 text-sm disabled:opacity-60' })}
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 <span className="hidden sm:inline">{saving ? 'Đang lưu...' : 'Lưu giáo trình'}</span>
@@ -403,7 +404,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                         className="w-full min-w-0 border border-slate-200 px-3 py-2 rounded-xl text-sm outline-none focus:border-violet-400"
                       />
                       <div className="flex gap-2 shrink-0">
-                        <button type="button" onClick={() => updateChapterTitle(chapter.id, tempTitle)} className="flex-1 sm:flex-none text-xs bg-red-600 text-white px-3 py-2 rounded-xl font-bold">Lưu</button>
+                        <button type="button" onClick={() => updateChapterTitle(chapter.id, tempTitle)} className={lmsBtn('danger', { size: 'sm', className: 'flex-1 sm:flex-none text-xs' })}>Lưu</button>
                         <button type="button" onClick={() => setEditingChapterId(null)} className="flex-1 sm:flex-none text-xs text-slate-500 hover:bg-slate-200 px-3 py-2 rounded-xl font-bold">Hủy</button>
                       </div>
                     </div>
@@ -556,7 +557,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                               </div>
                             </div>
                             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-                              <button type="button" onClick={() => setEditingLessonId(null)} className="min-h-11 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold transition">Hủy</button>
+                              <button type="button" onClick={() => setEditingLessonId(null)} className={lmsBtn('secondary', { size: 'md', className: 'min-h-11 px-4 text-sm' })}>Hủy</button>
                               <button
                                 type="button"
                                 onClick={() => updateLesson(chapter.id, lesson.id, {
@@ -568,7 +569,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                   allowEarlyAccess: tempAllowEarlyAccess,
                                   isPreview: tempIsPreview,
                                 })}
-                                className="min-h-11 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition"
+                                className={lmsBtn('danger', { size: 'md', className: 'min-h-11 px-4 text-sm' })}
                               >
                                 Lưu bài học
                               </button>

@@ -1,20 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import FreeMeetPlanModal from './dailyPractice/FreeMeetPlanModal';
+import MeetScheduleEmptyState from './MeetScheduleEmptyState';
+import { useStudentSubscription } from './subscription/subscriptionContext';
+import { hasMeetAccessClient } from '../../utils/subscription';
 import { useNavigate } from 'react-router-dom';
 import {
-  Award, BookOpen, Calendar, CheckCircle, CheckCircle2, ChevronRight, ClipboardList, Clock, ExternalLink,
-  Flame, Gamepad2, PlayCircle, Trophy, Video, XCircle,
+  BookOpen, Calendar, CheckCircle2, ChevronRight, ClipboardList, Clock, Crown, ExternalLink, Flame, Gamepad2, Plus,
+  PlayCircle, Trophy, Video, Zap,
 } from 'lucide-react';
-import LmsGoalMergedCard from './LmsGoalMergedCard';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
+import { CompactCoursePicker } from './StudentShared';
 import WelcomeHero from '../WelcomeHero';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
-import dailyPracticeApi from '../../services/dailyPracticeApi';
+import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../services/dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
-import { isFreePortalCourseName } from '../../utils/enrollments';
+import { isFreePortalCourseName, isFreePortalSelfRegistrationStudent } from '../../utils/enrollments';
+import { isMeetEnded, isMeetLiveNow, meetLessonName, vnScheduleClock } from '../../utils/meetJoin';
 import { isFreePortalLocked } from './dailyPractice/FreeFeatureLock';
 import meetClassApi from '../../services/meetClassApi';
+import { DuoButton, DuoDailyQuestsCard, DuoHeroCard } from '../duo';
+import { pickActivePathTopic } from './dailyPractice/PathView';
+import { pathTopicHasLearningProgress, pathTopicNextLinePrefix } from '../../../../shared/dailyPractice/lastPathTopic.mjs';
+import { resolveSavedPathTopicId, syncLastPathTopicFromServer } from '../../utils/lastPathTopic';
 
 function normalizeCourseName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
@@ -28,23 +37,16 @@ function formatDayLabel(date) {
   return `${weekday} ${day}`;
 }
 
+
+function shortDayLabel(dayKey) {
+  const [, month, day] = String(dayKey || '').split('-');
+  return day && month ? `${day}/${month}` : 'Hôm nay';
+}
+
 function formatDeadline(deadline) {
   const d = deadline ? new Date(deadline) : null;
   if (!d || Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
-}
-
-function vnNow() {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date()).map((part) => [part.type, part.value]));
-  return { day: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) };
-}
-
-function clockMinutes(value) {
-  const [hour, minute] = String(value || '').split(':').map(Number);
-  if (!Number.isFinite(hour)) return 0;
-  return hour * 60 + (Number.isFinite(minute) ? minute : 0);
 }
 
 function deadlineMs(item) {
@@ -52,29 +54,71 @@ function deadlineMs(item) {
   return Number.isFinite(t) && t > 0 ? t : Number.MAX_SAFE_INTEGER;
 }
 
-/** Một dòng trong "Việc cần làm hôm nay" - bấm là tới đúng việc. */
-function TaskRow({ icon: Icon, tone, title, sub, cta, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-red-200 hover:bg-red-50/40"
-    >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
-        <Icon size={19} aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-black text-slate-900">{title}</span>
-        {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
-      </span>
-      <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-red-600">
-        {cta} <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-      </span>
-    </button>
-  );
+function parseHmToMinutes(timeStr) {
+  const m = String(timeStr || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
+function sortMeetClasses(rows = [], clock = vnScheduleClock()) {
+  return [...rows]
+    .filter((m) => m?.status !== 'cancelled')
+    .map((m) => {
+      const isToday = m.day === clock.day;
+      const live = isMeetLiveNow({
+        day: m.day,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        nowDay: clock.day,
+        nowMinutes: clock.minutes,
+      });
+      const start = parseHmToMinutes(m.startTime) ?? 0;
+      const futureToday = isToday && clock.minutes < start;
+      const nextStart = live
+        ? -1
+        : futureToday
+          ? start - clock.minutes
+          : m.day && m.day > clock.day
+            ? 100000 + start
+            : 200000 + start;
+      let dayLabel = shortDayLabel(m.day);
+      if (live) dayLabel = 'Đang diễn ra';
+      else if (isToday) dayLabel = 'Hôm nay';
+      return { ...m, live, nextStart, dayLabel };
+    })
+    .sort((a, b) => a.nextStart - b.nextStart);
+}
 
+function TaskRow({ icon: Icon, tone, title, sub, cta, onClick, freePortalUi = false }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`duo-pressable flex w-full flex-col gap-2.5 rounded-2xl border bg-white p-3 sm:flex-row sm:items-center sm:justify-between shadow-sm transition cursor-pointer ${
+        freePortalUi ? 'border-[#E2E8F0] hover:border-emerald-200' : 'border-slate-200 hover:border-red-200'
+      }`}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
+          <Icon size={20} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-black text-slate-900">{title}</span>
+          {sub ? <span className="block truncate text-xs text-slate-500">{sub}</span> : null}
+        </div>
+      </div>
+      <DuoButton
+        variant={freePortalUi ? 'primary' : 'danger'}
+        size="sm"
+        className="w-full shrink-0 sm:w-auto"
+        rightIcon={<ChevronRight size={14} aria-hidden="true" />}
+        label={cta}
+        onClick={(e) => {
+          e?.stopPropagation?.();
+          onClick();
+        }}
+      />
+    </div>
+  );
+}
 
 export default function StudentOverviewTab({
   studentData,
@@ -83,29 +127,44 @@ export default function StudentOverviewTab({
   setActiveCourseName,
   viewStudent,
   progressPct,
-  myAssignments,
+  myAssignments = [],
   mySchedules = [],
   studyLogs: _studyLogs = [],
 }) {
   const navigate = useNavigate();
-  const [pendingQuizzes, setPendingQuizzes] = useState([]);
   const [videoCourses, setVideoCourses] = useState({ byId: new Map(), byName: new Map(), error: '' });
   const [practice, setPractice] = useState(null);
+  const [pathData, setPathData] = useState(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [meetClasses, setMeetClasses] = useState([]);
+  const [pendingQuizzes, setPendingQuizzes] = useState([]);
+  const [meetPlanOpen, setMeetPlanOpen] = useState(false);
+  const subCtx = useStudentSubscription();
+  const portalSub = subCtx?.subscription;
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const reloadMeetClasses = () => {
     meetClassApi.mine()
-      .then((res) => { if (!cancelled) setMeetClasses(res.data || []); })
-      .catch(() => { });
-    return () => { cancelled = true; };
+      .then((res) => setMeetClasses(res.data || []))
+      .catch(() => setMeetClasses([]));
+  };
+
+  useEffect(() => {
+    reloadMeetClasses();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reloadMeetClasses();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
+
+  useEffect(() => {
+    reloadMeetClasses();
+  }, [portalSub?.state, portalSub?.expiresAt, portalSub?.meetLifetime]);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,11 +203,11 @@ export default function StudentOverviewTab({
 
   useEffect(() => {
     let cancelled = false;
-    let session = null;
+    let portalSession = null;
     try {
-      session = JSON.parse(localStorage.getItem('student_user') || 'null');
+      portalSession = JSON.parse(localStorage.getItem('student_user') || 'null');
     } catch { /* ignore */ }
-    if (isFreePortalLocked(session)) return () => { cancelled = true; };
+    if (isFreePortalLocked(portalSession)) return () => { cancelled = true; };
     api.quizzes.getStudentQuizzes()
       .then((res) => {
         if (!res?.success || cancelled) return;
@@ -163,13 +222,42 @@ export default function StudentOverviewTab({
   }, []);
 
   useEffect(() => {
-    const load = () => dailyPracticeApi.student.overview().then(setPractice).catch(() => { });
+    const load = () => {
+      dailyPracticeApi.student.overview().then(setPractice).catch(() => { });
+      dailyPracticeApi.student.path()
+        .then((data) => {
+          setPathData(data);
+          syncLastPathTopicFromServer(data?.activeTopicId);
+        })
+        .catch(() => { setPathData(null); });
+    };
     load();
+    const onFocus = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onFocus);
+    const onStats = (event) => {
+      const detail = event?.detail || {};
+      setPractice((prev) => {
+        if (!prev) return prev;
+        if (detail.stats) return { ...prev, stats: { ...prev.stats, ...detail.stats } };
+        if (typeof detail.xpTotal === 'number') return { ...prev, stats: { ...prev.stats, xpTotal: detail.xpTotal } };
+        return prev;
+      });
+    };
     window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
-    return () => window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+    return () => {
+      window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
+      window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, []);
 
-  // ── Buổi học: chỉ hiển thị ở thẻ chào mừng ────────────────────────────────
+  let portalSession = null;
+  try {
+    portalSession = JSON.parse(localStorage.getItem('student_user') || 'null');
+  } catch { /* ignore */ }
+  const practiceLocked = isFreePortalLocked(portalSession);
+
   const ongoingSchedule = useMemo(() => {
     void nowTick;
     return (mySchedules || []).find((s) => s.status === 'scheduled' && isScheduleOngoingNow(s));
@@ -183,74 +271,167 @@ export default function StudentOverviewTab({
       .sort((a, b) => `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`.localeCompare(`${normalizeScheduleDate(b.date)}-${b.startTime || ''}`))[0] || null;
   }, [mySchedules, ongoingSchedule, nowTick]);
 
-  const clockForMeet = vnNow();
-  const meetCardsPre = meetClasses.map((item) => {
-    const live = item.day === clockForMeet.day && clockForMeet.minutes >= clockMinutes(item.startTime) && clockForMeet.minutes < clockMinutes(item.endTime);
-    return { ...item, live };
-  });
-  const liveMeet = meetCardsPre.find((item) => item.live);
-  const isLiveSchedule = Boolean(ongoingSchedule);
-  const isLiveMeet = Boolean(liveMeet);
   const sessionRange = nextSchedule
     ? `${nextSchedule.startTime || ''}${nextSchedule.endTime ? `–${nextSchedule.endTime}` : ''}`
     : '';
-  const heroChips = isLiveSchedule
-    ? [{ tone: 'live', label: `Đang học · Ca ${sessionRange}` }]
-    : isLiveMeet
-      ? [{ tone: 'live', label: `Meet · ${liveMeet.slotLabel} ${liveMeet.startTime}–${liveMeet.endTime}` }]
-      : nextSchedule
-        ? [{ icon: Calendar, label: `Buổi tới: Ca ${sessionRange} · ${formatDayLabel(nextSchedule.date)}` }]
-        : meetCardsPre[0]
-          ? [{ icon: Calendar, label: `Meet ${meetCardsPre[0].slotLabel} · ${formatDayLabel(meetCardsPre[0].day)}` }]
-          : [];
 
-  // ── Khóa học hiện tại ──────────────────────────────────────────────────
+  const clockForMeet = vnScheduleClock();
+  const meetCardsPre = useMemo(
+    () => sortMeetClasses(meetClasses, clockForMeet),
+    [meetClasses, clockForMeet.day, clockForMeet.minutes],
+  );
+
   const currentCourseName = activeCourseName || viewStudent?.course || '';
 
-  // ── Lịch học hôm nay: tổng hợp lịch 1 kèm 1 và lịch Meet hôm nay ────────
   const todayKey = clockForMeet.day;
-  const today1on1Schedules = useMemo(() => {
-    return (mySchedules || [])
+  const todayClasses = useMemo(() => {
+    const today1on1Schedules = (mySchedules || [])
       .filter((s) => s.status !== 'cancelled' && normalizeScheduleDate(s.date) === todayKey)
       .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
-  }, [mySchedules, todayKey]);
 
-  const todayMeetClasses = useMemo(() => {
-    return meetCardsPre.filter((item) => item.day === todayKey);
-  }, [meetCardsPre, todayKey]);
+    const todayMeetClasses = meetCardsPre.filter((item) => item.day === todayKey);
 
-  const todayClasses = useMemo(() => {
     const list = [];
     today1on1Schedules.forEach((s) => {
-      const live = isScheduleOngoingNow(s);
-      const meetLink = s.linkHoc || s.meetingUrl || viewStudent?.linkHoc || viewStudent?.joinClassUrl || viewStudent?.online_meeting_url || '';
+      const sDay = normalizeScheduleDate(s.date);
+      const liveByClock = isMeetLiveNow({
+        day: sDay,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        nowDay: todayKey,
+        nowMinutes: clockForMeet.minutes,
+      });
+      const live = isScheduleOngoingNow(s) || (s.status !== 'cancelled' && s.status !== 'no_show' && liveByClock);
+      const sTeacherId = String(s.teacherId?._id || s.teacherId?.id || s.teacherId || '');
+      const sCourse = normalizeCourseName(s.course || s.courseName || '');
+      const matchedEnrollment = (enrollments || []).find((e) => (
+        sTeacherId
+        && String(e?.teacherId?._id || e?.teacherId?.id || e?.teacherId || '') === sTeacherId
+        && (!sCourse || normalizeCourseName(e?.courseName || e?.name || '') === sCourse)
+        && String(e?.linkHoc || '').trim()
+      ))
+        || (enrollments || []).find((e) => (
+          sTeacherId
+          && String(e?.teacherId?._id || e?.teacherId?.id || e?.teacherId || '') === sTeacherId
+          && String(e?.linkHoc || '').trim()
+        ))
+        || (enrollments || []).find((e) => (
+          sCourse
+          && normalizeCourseName(e?.courseName || e?.name || '') === sCourse
+          && String(e?.linkHoc || '').trim()
+        ));
+      const rawMeetLink = String(
+        s.linkHoc
+        || s.meetingUrl
+        || matchedEnrollment?.linkHoc
+        || viewStudent?.linkHoc
+        || viewStudent?.joinClassUrl
+        || viewStudent?.online_meeting_url
+        || studentData?.linkHoc
+        || studentData?.online_meeting_url
+        || '',
+      ).trim();
+      const meetLink = rawMeetLink && !/^https?:\/\//i.test(rawMeetLink)
+        ? `https://${rawMeetLink}`
+        : rawMeetLink;
+      const joinable = live || isScheduleOngoingNow(s);
+      const ended = isMeetEnded({
+        day: sDay,
+        endTime: s.endTime,
+        nowDay: todayKey,
+        nowMinutes: clockForMeet.minutes,
+      });
       list.push({
         id: s._id || s.id || `1on1-${s.date}-${s.startTime}`,
-        type: '1on1',
         title: s.title || s.subject || s.content || s.courseName || currentCourseName || 'Buổi học 1 kèm 1',
         time: s.startTime && s.endTime ? `${s.startTime} – ${s.endTime}` : (s.startTime || 'Trong ngày'),
-        dateLabel: formatDayLabel(s.date) || 'Hôm nay',
-        meetLink: String(meetLink || '').trim(),
-        live,
+        dateLabel: shortDayLabel(sDay) || 'Hôm nay',
+        meetLink,
+        live: live && !ended,
+        joinable: joinable && !ended,
+        ended,
+        waitLabel: s.startTime ? `Vào lúc ${s.startTime}` : '',
         teacher: s.teacherName || s.teacher || viewStudent?.teacher || '',
       });
     });
     todayMeetClasses.forEach((m) => {
+      const joinable = isMeetLiveNow({
+        day: m.day,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        nowDay: todayKey,
+        nowMinutes: clockForMeet.minutes,
+      });
+      const ended = isMeetEnded({
+        day: m.day,
+        endTime: m.endTime,
+        nowDay: todayKey,
+        nowMinutes: clockForMeet.minutes,
+      });
       list.push({
         id: m.id || `meet-${m.day}-${m.startTime}`,
-        type: 'meet',
-        title: m.title || m.courseName || (m.slotLabel ? `Lớp Google Meet · ${m.slotLabel}` : 'Lớp Google Meet'),
+        title: meetLessonName(m),
         time: m.startTime && m.endTime ? `${m.startTime} – ${m.endTime}` : (m.slotLabel || 'Trong ngày'),
-        dateLabel: formatDayLabel(m.day) || 'Hôm nay',
+        dateLabel: shortDayLabel(m.day),
         meetLink: String(m.linkHoc || '').trim(),
-        live: m.live,
+        live: m.live && !ended,
+        joinable: joinable && !ended,
+        ended,
+        waitLabel: m.startTime ? `Vào lúc ${m.startTime}` : 'Chưa đến giờ vào lớp',
         teacher: m.teacherName || m.teacher || '',
       });
     });
     return list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0));
-  }, [today1on1Schedules, todayMeetClasses, currentCourseName, viewStudent]);
+  }, [mySchedules, meetCardsPre, todayKey, currentCourseName, viewStudent, clockForMeet.minutes, nowTick]);
 
-  // ── Khóa học của tôi: một chỗ duy nhất cho tiến độ ────────────────────────
+  const nextLessons = useMemo(() => {
+    const rows = [];
+    meetCardsPre.forEach((item) => {
+      if (!item.day || item.day <= todayKey || item.status === 'cancelled') return;
+      rows.push({
+        sort: `${item.day} ${item.startTime || ''}`,
+        name: meetLessonName(item),
+        meta: `${item.startTime || ''}–${item.endTime || ''} (${formatDayLabel(item.day)})`,
+      });
+    });
+    (mySchedules || []).forEach((item) => {
+      if (item.status === 'cancelled') return;
+      const day = normalizeScheduleDate(item.date);
+      if (!day || day <= todayKey) return;
+      rows.push({
+        sort: `${day} ${item.startTime || ''}`,
+        name: item.title || item.subject || item.content || item.courseName || 'Buổi học',
+        meta: `${item.startTime || ''}${item.endTime ? `–${item.endTime}` : ''} (${formatDayLabel(item.date)})`,
+      });
+    });
+    rows.sort((a, b) => a.sort.localeCompare(b.sort));
+    return rows;
+  }, [meetCardsPre, mySchedules, todayKey]);
+
+  const coursePickerItems = useMemo(() => {
+    return (enrollments || []).map((c, index) => {
+      const name = c.courseName || c.name || `Khóa học ${index + 1}`;
+      const vc = (c.courseId && videoCourses.byId.get(String(c.courseId)))
+        || videoCourses.byName.get(normalizeCourseName(name))
+        || null;
+      const isVideo = c.deliveryMode === 'video' || Boolean(vc);
+      const d = isVideo ? (vc?.completed || 0) : (Number(c.completedSessions) || 0);
+      const t = isVideo ? (vc?.total || 0) : (Number(c.totalSessions) || 0);
+      const u = isVideo ? 'bài' : 'buổi';
+      const p = t ? Math.min(100, Math.round((d / t) * 100)) : 0;
+      return {
+        key: c.enrollmentId || c.id || name,
+        name,
+        teacherName: c.teacherName || c.teacher,
+        done: d,
+        total: t,
+        unit: u,
+        pct: p,
+        completed: t > 0 && d >= t,
+      };
+    });
+  }, [enrollments, videoCourses]);
+
   const videoCourse = (viewStudent?.courseId && videoCourses.byId.get(String(viewStudent.courseId)))
     || videoCourses.byName.get(normalizeCourseName(currentCourseName))
     || null;
@@ -264,22 +445,74 @@ export default function StudentOverviewTab({
   const nextSubject = (videoCourse?.subjects || []).find((s) => s.opened !== false
     && (Number(s.completedUnitCount) || 0) < (Number(s.totalUnitCount) || 0));
   const freePortalCourse = isFreePortalCourseName(currentCourseName);
-  const courseCta = isVideoCourse
-    ? nextSubject
-      ? {
-        label: `Học tiếp: ${nextSubject.name}`,
-        onClick: () => navigate(`/student/lesson-practice/subjects/${nextSubject.id}?courseId=${encodeURIComponent(videoCourse.id)}`),
-      }
-      : { label: total && done >= total ? 'Ôn lại khóa học' : 'Vào học', onClick: () => navigate('/student/lesson-practice') }
-    : { label: 'Xem lịch học', onClick: () => navigate('/student#schedule') };
+  const freePortalUi = isFreePortalSelfRegistrationStudent({
+    ...(portalSession || {}),
+    role: 'student',
+    course: currentCourseName || portalSession?.course,
+    enrollments,
+    courses: viewStudent?.courses,
+  });
+  const accentIconClass = freePortalUi ? 'text-emerald-600' : 'text-red-600';
+  const freePortalAccount = freePortalUi;
+  const meetAccess = hasMeetAccessClient(portalSub);
+  const meetScheduleEmptyMode = freePortalAccount
+    ? (portalSub?.state === 'expired'
+      ? 'renew'
+      : !meetAccess
+        ? 'purchase'
+        : 'default')
+    : 'default';
+  const canOpenScheduleTab = meetScheduleEmptyMode === 'default' && !freePortalAccount;
 
-  // ── Việc cần làm hôm nay: chỉ hiện việc còn tồn, bấm là tới đúng việc ──────
+  const practiceStats = practice?.stats;
+  const pathTopic = useMemo(
+    () => pickActivePathTopic(pathData, '', resolveSavedPathTopicId(undefined, pathData?.activeTopicId)),
+    [pathData],
+  );
+  const activePathUnit = useMemo(() => {
+    if (!pathTopic?.units?.length) return null;
+    const nextId = pathTopic.next?.unitId;
+    return pathTopic.units.find((u) => u.id === nextId)
+      || pathTopic.units.find((u) => u.state !== 'locked' && u.state !== 'completed')
+      || pathTopic.units[0];
+  }, [pathTopic]);
+  const heroProgress = pathTopic?.totalUnits
+    ? Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100)
+    : (practiceStats?.playedToday ? 100 : 0);
+  const todayAnswers = practiceStats?.todaySessions
+    ? practiceStats.todaySessions * 10
+    : (practiceStats?.playedToday ? 10 : 0);
+  const todayXp = practiceStats?.todayXp ?? studentData?.lms?.dailyXpToday ?? 0;
+
+  const liveMeet = meetCardsPre.find((item) => item.live);
+  const nextMeet = meetCardsPre[0] || null;
+  const isLiveSchedule = Boolean(ongoingSchedule);
+  const isLiveMeet = Boolean(liveMeet);
+  const heroChips = useMemo(() => {
+    if (isLiveSchedule) {
+      return [{ tone: 'live', label: `Đang học · Ca ${sessionRange}` }];
+    }
+    if (isLiveMeet && liveMeet) {
+      return [{ tone: 'live', label: `Đang diễn ra · Meet ${meetLessonName(liveMeet)} ${liveMeet.startTime || ''}–${liveMeet.endTime || ''}` }];
+    }
+    const chips = [];
+    if (nextSchedule) {
+      chips.push({ icon: Calendar, label: `Buổi tới: Ca ${sessionRange} · ${formatDayLabel(nextSchedule.date)}` });
+    }
+    if (nextMeet) {
+      chips.push({
+        icon: Video,
+        label: `Meet · ${meetLessonName(nextMeet)} · ${nextMeet.startTime || ''}–${nextMeet.endTime || ''} · ${nextMeet.dayLabel || formatDayLabel(nextMeet.day)}`,
+      });
+    }
+    return chips;
+  }, [isLiveSchedule, sessionRange, isLiveMeet, liveMeet, nextSchedule, nextMeet]);
+
   const pendingHomework = useMemo(
     () => (myAssignments || []).filter((a) => !a.mySubmission).sort((a, b) => deadlineMs(a) - deadlineMs(b)),
     [myAssignments],
   );
   const nearestQuiz = [...pendingQuizzes].sort((a, b) => deadlineMs(a) - deadlineMs(b))[0];
-  const practiceStats = practice?.stats;
   const tasks = [];
   if (pendingHomework.length) {
     const first = pendingHomework[0];
@@ -287,7 +520,7 @@ export default function StudentOverviewTab({
     tasks.push({
       key: 'hw',
       icon: ClipboardList,
-      tone: 'bg-gradient-to-b from-orange-400 to-orange-600',
+      tone: freePortalUi ? 'bg-[#EA580C]' : 'bg-gradient-to-b from-orange-400 to-orange-600',
       title: `Bài tập cần nộp (${pendingHomework.length})`,
       sub: `${first.title || 'Bài tập'}${first.deadline ? ` · hạn ${formatDeadline(first.deadline)}` : ''}`,
       cta: 'Nộp bài',
@@ -298,79 +531,59 @@ export default function StudentOverviewTab({
     tasks.push({
       key: 'quiz',
       icon: Trophy,
-      tone: 'bg-gradient-to-b from-red-500 to-red-700',
+      tone: freePortalUi ? 'bg-[#059669]' : 'bg-gradient-to-b from-red-500 to-red-700',
       title: `Trắc nghiệm chưa làm (${pendingQuizzes.length})`,
       sub: `${nearestQuiz?.title || 'Bài trắc nghiệm'}${nearestQuiz?.deadline ? ` · hạn ${formatDeadline(nearestQuiz.deadline)}` : ''}`,
       cta: 'Làm bài',
       onClick: () => navigate('/student/exam'),
     });
   }
-  if (practiceStats && !practiceStats.playedToday && practice.topics?.length) {
+  if (practiceStats && !practiceStats.playedToday) {
     const lost = practiceStats.streakState === 'lost';
     const atRisk = practiceStats.streakState === 'at_risk' && practiceStats.streak > 0;
     tasks.push({
       key: 'practice',
       icon: lost ? Gamepad2 : Flame,
-      tone: lost ? 'bg-gradient-to-b from-slate-400 to-slate-600' : 'bg-gradient-to-b from-orange-400 to-red-600',
-      title: atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày',
-      sub: atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút',
+      tone: lost
+        ? 'bg-slate-600'
+        : (freePortalUi ? 'bg-orange-500' : 'bg-red-500'),
+      title: freePortalUi
+        ? (atRisk ? `Duy trì chuỗi ${practiceStats.streak} ngày` : lost ? 'Luyện tập để lấy lại chuỗi' : 'Luyện tập hằng ngày')
+        : (atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày'),
+      sub: freePortalUi
+        ? (atRisk ? 'Luyện tập hôm nay để giữ vững chuỗi học' : 'Khoảng 5 phút mỗi ngày để củng cố kiến thức')
+        : (atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút'),
       cta: 'Làm ngay',
       onClick: () => navigate('/student/daily-practice'),
     });
   }
-
-  const meetCards = meetCardsPre;
 
   return (
     <div className="cms-sd cms-sd-stack min-w-0 lg:!gap-3 lg:-mb-4 th-dashboard-overview th-dashboard-overview--student">
       <header className="cms-sd-page !py-0 flex min-w-0">
         <WelcomeHero
           role="student"
-          name={studentData.name}
+          name={studentData?.name}
           chips={heroChips}
           showJoin={false}
+          accent={freePortalAccount ? 'emerald' : 'brand'}
         />
       </header>
 
-      {meetCards.length > 0 && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
-            <Video size={18} className="text-red-600" aria-hidden="true" /> Lịch Meet
-          </h3>
-          <ul className="space-y-2">
-            {meetCards.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-black text-slate-900">{item.slotLabel} {item.startTime}–{item.endTime}</p>
-                  <p className="text-xs font-semibold text-slate-500">{formatDayLabel(item.day)}{item.live ? ' · Đang diễn ra' : ''}</p>
-                </div>
-                {item.live && item.linkHoc ? (
-                  <a href={item.linkHoc} target="_blank" rel="noopener noreferrer" className="cms-btn cms-btn-primary !py-2 text-sm">Vào Meet</a>
-                ) : item.live ? (
-                  <span className="text-xs font-bold text-amber-600">Chờ link từ trung tâm</span>
-                ) : <span className="text-xs font-bold text-slate-400">Chưa đến giờ</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
         <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3">
-          {/* Cột trái: Lịch học hôm nay → khóa học (nếu có) → việc cần làm → hoạt động gần đây */}
           <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3">
-            {/* Lịch học hôm nay */}
-            <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className={`flex min-w-0 flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm ${freePortalUi ? 'border-[#E2E8F0]' : 'border-slate-200'}`}>
               <div className="flex items-center justify-between gap-2">
-                <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                  <Calendar size={18} className="text-red-600" aria-hidden="true" /> Lịch học hôm nay
+                <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
+                  <Calendar size={18} className={accentIconClass} aria-hidden="true" /> Lịch học hôm nay
                 </h3>
-                {todayClasses.some((c) => c.live) && (
+                {todayClasses.some((c) => c.live) ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    <span>Đang diễn ra</span>
+                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-500" />
+                    Đang diễn ra
                   </span>
-                )}
+                ) : null}
               </div>
 
               {todayClasses.length > 0 ? (
@@ -378,47 +591,62 @@ export default function StudentOverviewTab({
                   {todayClasses.map((item) => (
                     <div
                       key={item.id}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-3.5 transition-all ${item.live ? 'border-emerald-300 bg-emerald-50/50 shadow-xs' : 'border-slate-200 bg-slate-50/60'
-                        }`}
+                      className={`flex flex-row items-center justify-between gap-2.5 rounded-[16px] border-[1.5px] p-3 transition-all ${
+                        item.live ? 'border-[#BBF7D0] bg-[#F0FDF4]' : 'border-[#E2E8F0] bg-[#F8FAFC]'
+                      }`}
                     >
                       <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-black text-slate-900 truncate">
-                          {item.title}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 font-semibold">
-                          <span className="flex items-center gap-1">
-                            <Clock size={13} className="text-slate-400" />
-                            {item.time}
-                          </span>
-                          <span>·</span>
-                          <span className="flex items-center gap-1">
-                            <Calendar size={13} className="text-slate-400" />
-                            {item.dateLabel}
-                          </span>
-                          {item.teacher && (
+                        <div className="flex items-center gap-1.5">
+                          {item.live ? (
+                            <span className="shrink-0 rounded-[6px] bg-red-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white uppercase">
+                              ĐANG DIỄN RA
+                            </span>
+                          ) : null}
+                          <p className="truncate text-[14px] font-extrabold text-[#1E293B]">{item.title}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1 text-[12px] font-semibold text-[#64748B]">
+                          <Clock size={13} className="shrink-0 text-[#64748B]" aria-hidden="true" />
+                          <span>{item.time}</span>
+                          <span className="text-[#94A3B8]">·</span>
+                          <span>{item.dateLabel}</span>
+                          {item.teacher ? (
                             <>
-                              <span>·</span>
-                              <span className="text-slate-500">GV: {item.teacher}</span>
+                              <span className="text-[#94A3B8]">·</span>
+                              <span className="font-bold text-[#059669]">GV: {item.teacher}</span>
                             </>
-                          )}
+                          ) : null}
                         </div>
                       </div>
-
                       <div className="shrink-0">
-                        {item.meetLink ? (
-                          <a
-                            href={item.meetLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-98"
-                          >
-                            <Video size={15} />
-                            <span>Vào lớp Meet</span>
-                            <ExternalLink size={13} />
-                          </a>
+                        {item.ended ? (
+                          <DuoButton
+                            variant="secondary"
+                            size="sm"
+                            disabled
+                            label="Đã kết thúc"
+                          />
+                        ) : item.meetLink && item.joinable ? (
+                          <DuoButton
+                            variant="danger"
+                            className="duo-btn--meet-live"
+                            size="sm"
+                            icon={<Video size={14} color="#FFFFFF" aria-hidden="true" />}
+                            rightIcon={<ExternalLink size={12} color="#FFFFFF" aria-hidden="true" />}
+                            label="Vào Meet"
+                            onClick={() => window.open(item.meetLink, '_blank', 'noopener,noreferrer')}
+                          />
+                        ) : item.meetLink ? (
+                          <DuoButton
+                            variant="secondary"
+                            size="sm"
+                            disabled
+                            icon={<Video size={14} color="#94A3B8" aria-hidden="true" />}
+                            label="Vào Meet"
+                            title={item.waitLabel || 'Chưa đến giờ vào lớp'}
+                          />
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
-                            <Clock size={13} /> Chưa có link Meet
+                          <span className="inline-flex items-center rounded-[10px] bg-[#F1F5F9] px-2.5 py-1.5 text-[11px] font-bold text-[#94A3B8]">
+                            Chưa có link
                           </span>
                         )}
                       </div>
@@ -426,74 +654,132 @@ export default function StudentOverviewTab({
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                    <Calendar size={20} />
-                  </div>
-                  <p className="mt-2 text-sm font-bold text-slate-700">Hôm nay không có lịch</p>
-                  {nextSchedule ? (
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      Lịch tới: <strong className="text-slate-800">{nextSchedule.title || nextSchedule.subject || 'Buổi học'}</strong> · {sessionRange} ({formatDayLabel(nextSchedule.date)})
-                    </p>
-                  ) : meetCardsPre[0] ? (
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      Lịch Meet tới: <strong className="text-slate-800">{meetCardsPre[0].title || 'Lớp Meet'}</strong> · {meetCardsPre[0].startTime}–{meetCardsPre[0].endTime} ({formatDayLabel(meetCardsPre[0].day)})
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-400">Bạn có thể tự ôn luyện hoặc làm bài tập hôm nay nhé!</p>
-                  )}
-                </div>
+                <MeetScheduleEmptyState
+                  mode={meetScheduleEmptyMode}
+                  freePortalUi={freePortalUi}
+                  nextSchedule={nextLessons.length ? null : nextSchedule}
+                  sessionRange={sessionRange}
+                  formatDayLabel={formatDayLabel}
+                  nextMeet={nextLessons.length ? null : meetCardsPre[0]}
+                  onViewSchedule={canOpenScheduleTab ? () => navigate('/student#schedule') : undefined}
+                  onPurchaseMeet={() => setMeetPlanOpen(true)}
+                  onRenewMeet={() => subCtx?.openRenew?.()}
+                />
               )}
+              {nextLessons.length > 0 ? (
+                <div className="border-t border-slate-100 pt-2.5">
+                  <p className="text-xs font-black text-slate-500">Lịch học tiếp theo</p>
+                  <ul className="mt-1.5 space-y-1">
+                    {nextLessons.map((item) => (
+                      <li key={`${item.sort}-${item.name}`} className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                          <Plus size={11} strokeWidth={3} aria-hidden="true" />
+                        </span>
+                        <span>
+                          <strong className="font-black text-slate-800">{item.name}</strong>
+                          {' · '}
+                          {item.meta}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </section>
 
-            {/* Khóa học của tôi - Ẩn khi là tài khoản miễn phí */}
-            {!freePortalCourse && Boolean(currentCourseName) && (
+            {!freePortalCourse && Boolean(currentCourseName) ? (
               <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                    <BookOpen size={18} className="text-red-600" aria-hidden="true" /> Khóa học của tôi
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
+                    <BookOpen size={18} className={accentIconClass} aria-hidden="true" /> Khóa học của tôi
                   </h3>
-                  {enrollments.length > 1 && (
-                    <select
-                      value={currentCourseName}
-                      onChange={(e) => setActiveCourseName(e.target.value)}
-                      className="max-w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-red-300"
-                      aria-label="Chọn khóa học"
-                    >
-                      {enrollments.map((c) => {
-                        const name = c.courseName || c.name;
-                        return <option key={c.enrollmentId || c.id || name} value={name}>{name}</option>;
-                      })}
-                    </select>
-                  )}
                 </div>
-                <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
+
+                {coursePickerItems.length > 1 ? (
+                  <CompactCoursePicker
+                    aria-label="Chọn khóa học"
+                    items={coursePickerItems}
+                    activeCourseName={currentCourseName}
+                    onChange={setActiveCourseName}
+                    showProgress={false}
+                  />
+                ) : (
+                  <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
+                )}
+
                 <div>
                   <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isVideoCourse
+                          ? 'bg-blue-500'
+                          : 'bg-gradient-to-r from-red-500 to-orange-400'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-slate-600">
                     <span><span className="text-slate-900">{done}/{total}</span> {unit} · {pct}%</span>
                     <span>Còn {Math.max(0, total - done)} {unit}</span>
-                    {viewStudent?.avgGrade != null && viewStudent.avgGrade !== '' && <span>Điểm TB <span className="text-slate-900">{viewStudent.avgGrade}</span>/10</span>}
-                    {!isVideoCourse && viewStudent?.teacher && <span className="truncate">GV: {viewStudent.teacher}</span>}
+                    {viewStudent?.avgGrade != null && viewStudent.avgGrade !== '' && (
+                      <span>Điểm TB <span className="text-slate-900">{viewStudent.avgGrade}</span>/10</span>
+                    )}
+                    {!isVideoCourse && viewStudent?.teacher && (
+                      <span className="truncate">GV: {viewStudent.teacher}</span>
+                    )}
                   </div>
-                  {videoCourses.error && <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>}
+                  {videoCourses.error && (
+                    <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>
+                  )}
                 </div>
-                <button type="button" onClick={courseCta.onClick} className="cms-btn cms-btn-primary self-start">
-                  <PlayCircle size={16} aria-hidden="true" /> <span className="max-w-[260px] truncate">{courseCta.label}</span>
-                </button>
-              </section>
-            )}
 
-            {/* Việc cần làm hôm nay - ngay dưới thẻ khóa học */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {isVideoCourse ? (
+                    <DuoButton
+                      variant="blue"
+                      size="md"
+                      className="flex-1 min-w-[200px]"
+                      icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
+                      label={nextSubject ? `Học tiếp: ${nextSubject.name}` : 'Vào học video'}
+                      onClick={() => {
+                        if (nextSubject && videoCourse?.id) {
+                          navigate(`/student/lesson-practice/subjects/${nextSubject.id}?courseId=${encodeURIComponent(videoCourse.id)}`);
+                        } else {
+                          navigate('/student/lesson-practice');
+                        }
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <DuoButton
+                        variant={freePortalUi ? 'primary' : 'danger'}
+                        size="md"
+                        className="flex-1 min-w-[140px]"
+                        icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
+                        label="Vào bài học"
+                        onClick={() => navigate('/student/lesson-practice')}
+                      />
+                      <DuoButton
+                        variant="secondary"
+                        size="md"
+                        className="flex-1 min-w-[140px]"
+                        icon={<Calendar size={16} color="#475569" aria-hidden="true" />}
+                        label="Lịch học"
+                        onClick={() => navigate('/student#schedule')}
+                      />
+                    </>
+                  )}
+                </div>
+              </section>
+            ) : null}
+
             <section className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                <CheckCircle2 size={18} className="text-red-600" aria-hidden="true" /> Việc cần làm hôm nay
+              <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
+                <CheckCircle2 size={18} className={accentIconClass} aria-hidden="true" /> Việc cần làm hôm nay
               </h3>
               {tasks.length ? (
-                <div className="grid min-w-0 grid-cols-1 gap-2.5 md:grid-cols-2">
-                  {tasks.map(({ key, ...task }) => <TaskRow key={key} {...task} />)}
+                <div className="flex flex-col gap-2.5">
+                  {tasks.map(({ key, ...task }) => <TaskRow key={key} freePortalUi={freePortalUi} {...task} />)}
                 </div>
               ) : (
                 <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
@@ -505,17 +791,50 @@ export default function StudentOverviewTab({
                 </div>
               )}
             </section>
-
-            {/* Hoạt động gần đây - Đã ẩn trên Web và Mobile theo yêu cầu */}
           </div>
 
-          {/* Cột phải: mục tiêu + bảng xếp hạng, nằm ngay đầu trang */}
           <div className="flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3">
-            <LmsGoalMergedCard />
             <LearningLeaderboardCard />
+            {!practiceLocked ? (
+              <>
+                <DuoHeroCard
+                  stageTitle={activePathUnit?.title || pathTopic?.topic?.name || 'Windows cơ bản'}
+                  lessonSubtitle={
+                    pathTopic?.next?.unitTitle
+                      ? `${pathTopicNextLinePrefix(pathTopic)}: ${pathTopic.next.unitTitle}`
+                      : activePathUnit?.description
+                      || (practiceStats?.playedToday ? 'Hôm nay bạn đã hoàn thành bài tập xuất sắc!' : 'Bắt đầu hành trình chinh phục kiến thức')
+                  }
+                  progressPercent={heroProgress}
+                  playedToday={practiceStats?.playedToday ?? false}
+                  streak={practiceStats?.streak ?? 0}
+                  onContinue={() => navigate(pathTopic?.next ? '/student/daily-practice?watch=stage' : '/student/daily-practice')}
+                  continueLabel={
+                    practiceStats?.playedToday
+                      ? 'ÔN TẬP THÊM'
+                      : (pathTopicHasLearningProgress(pathTopic) ? 'TIẾP TỤC HỌC' : 'BẮT ĐẦU')
+                  }
+                  mascotReaction={practiceStats?.playedToday ? 'happy' : 'studying'}
+                />
+                <DuoDailyQuestsCard
+                  todayAnswers={todayAnswers}
+                  todayXp={todayXp}
+                  onOpenPractice={() => navigate('/student/daily-practice')}
+                />
+              </>
+            ) : null}
           </div>
         </div>
       </div>
+      <FreeMeetPlanModal
+        open={meetPlanOpen}
+        onClose={() => setMeetPlanOpen(false)}
+        onPaid={() => {
+          setMeetPlanOpen(false);
+          subCtx?.refresh?.();
+          reloadMeetClasses();
+        }}
+      />
     </div>
   );
 }

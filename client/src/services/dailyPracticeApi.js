@@ -42,8 +42,13 @@ const dailyPracticeApi = {
     overview: async () => parse(await apiFetch('/daily-practice/my/overview', { cache: 'no-store' }), true),
     start: async (topicId, difficulty) => parse(await apiFetch('/daily-practice/my/sessions', json('POST', { topicId, difficulty })), true),
     path: async () => parse(await apiFetch('/daily-practice/my/path', { cache: 'no-store' })),
+    setActivePathTopic: async (topicId) => parse(await apiFetch('/daily-practice/my/path/active-topic', {
+      method: 'PUT',
+      body: JSON.stringify({ topicId }),
+    })),
     unitVideos: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${unitId}/videos`, { cache: 'no-store' })),
     videoWatched: async (unitId, videoId) => parse(await apiFetch('/daily-practice/my/path/videos/watched', json('POST', { unitId, videoId }))),
+    claimUnitChest: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/chest/claim`, json('POST', {})), true),
     answerVideoCheck: async (unitId, videoId, checkId, body) => parse(await apiFetch(
       `/daily-practice/my/path/units/${unitId}/videos/${encodeURIComponent(videoId)}/checks/${checkId}/answer`,
       json('POST', body),
