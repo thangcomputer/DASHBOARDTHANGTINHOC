@@ -40,8 +40,7 @@ test('mục tiêu học: đặt, tính tiến độ, heartbeat chống bơm phú
     assert.equal(saved.progress.dailyTargetMinutes, 180);
     assert.equal(saved.progress.periodTargetMinutes, 180 * 30);
 
-    const now = new Date();
-    now.setHours(12, 0, 0, 0);
+    const now = new Date(saved.goal.startedAt);
     assert.equal((await learningGoalService.recordStudyMinute(studentId, now)).todayMinutes, 1);
     assert.equal((await learningGoalService.recordStudyMinute(studentId, new Date(now.getTime() + 10 * 1000))).todayMinutes, 1, 'heartbeat quá sát bị bỏ qua');
     assert.equal((await learningGoalService.recordStudyMinute(studentId, new Date(now.getTime() + 60 * 1000))).todayMinutes, 2);
