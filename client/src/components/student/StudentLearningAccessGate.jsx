@@ -42,11 +42,12 @@ export default function StudentLearningAccessGate({
   const mustKick = useMemo(() => {
     if (role === 'admin' || role === 'staff') return false;
     if (role !== 'student') return false;
+    if (student?.freePortal === true || sessionProp?.freePortal === true) return false;
     if (isStudentsLoading && !student) return false;
     // Chỉ kick khi đã có hồ sơ và không còn khóa usable (hủy/hoàn/pending…)
     if (student && !hasLearningAccessEnrollment(student)) return true;
     return false;
-  }, [role, isStudentsLoading, student]);
+  }, [role, isStudentsLoading, student, sessionProp]);
 
   useEffect(() => {
     if (!mustKick || kickingRef.current) return;

@@ -785,7 +785,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     }
 
     // HV hết khóa (hủy/hoàn) → không cấp session Dashboard; phải đăng ký + thanh toán lại
-    if (userRole === 'student' && !studentHasLearningAccess(user)) {
+    if (userRole === 'student' && user.freePortal !== true && !studentHasLearningAccess(user)) {
       return res.status(403).json({
         success: false,
         code: 'NEEDS_RE_ENROLL',
@@ -912,7 +912,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
         message: 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.',
       });
     }
-    if (userRole === 'student' && !studentHasLearningAccess(user)) {
+    if (userRole === 'student' && user.freePortal !== true && !studentHasLearningAccess(user)) {
       return res.status(403).json({
         success: false,
         code: 'NEEDS_RE_ENROLL',

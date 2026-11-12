@@ -33,27 +33,51 @@ function freePortalFlags(student) {
   if (!student || student.freePortal !== true) {
     return { freePortal: false, freeUnlocked: false, needsFreeSurvey: false };
   }
+  const hasSurvey = Boolean(student.freeSurvey?.answeredAt || student.freeSurvey?.done);
   return {
     freePortal: true,
     freeUnlocked: student.freeUnlocked === true,
-    needsFreeSurvey: !student.freeSurvey?.answeredAt,
+    needsFreeSurvey: !hasSurvey,
   };
 }
 
 async function saveFreeSurvey(studentId, body = {}) {
-  const source = String(body.source || '');
-  const level = String(body.level || '');
-  const fear = String(body.fear || '');
-  const sourceNote = String(body.sourceNote || '').trim().slice(0, 80);
-  if (!SURVEY_SOURCES.has(source) || !SURVEY_LEVELS.has(level) || !SURVEY_FEARS.has(fear)) {
-    const error = new Error('Hãy chọn đủ 3 câu');
-    error.status = 400;
-    throw error;
-  }
-  if (source === 'other' && sourceNote.length < 2) {
-    const error = new Error('Hãy ghi bạn biết trung tâm qua đâu');
-    error.status = 400;
-    throw error;
+  const isMobileFormat = Boolean(body.fromWhere || body.birthYear || body.occupation);
+  let survey = {};
+  if (isMobileFormat) {
+    const fromWhere = String(body.fromWhere || '').trim().slice(0, 100);
+    const birthYear = Number(body.birthYear) || null;
+    const occupation = String(body.occupation || '').trim().slice(0, 100);
+    survey = {
+      fromWhere,
+      birthYear,
+      occupation,
+      done: true,
+      answeredAt: new Date(),
+    };
+  } else {
+    const source = String(body.source || '');
+    const level = String(body.level || '');
+    const fear = String(body.fear || '');
+    const sourceNote = String(body.sourceNote || '').trim().slice(0, 80);
+    if (!SURVEY_SOURCES.has(source) || !SURVEY_LEVELS.has(level) || !SURVEY_FEARS.has(fear)) {
+      const error = new Error('Hãy chọn đủ 3 câu');
+      error.status = 400;
+      throw error;
+    }
+    if (source === 'other' && sourceNote.length < 2) {
+      const error = new Error('Hãy ghi bạn biết trung tâm qua đâu');
+      error.status = 400;
+      throw error;
+    }
+    survey = {
+      source,
+      sourceNote: source === 'other' ? sourceNote : '',
+      level,
+      fear,
+      done: true,
+      answeredAt: new Date(),
+    };
   }
   const student = await Student.findById(studentId).select('freePortal freeSurvey').lean();
   if (!student?.freePortal) {
@@ -62,13 +86,6 @@ async function saveFreeSurvey(studentId, body = {}) {
     throw error;
   }
   if (student.freeSurvey?.answeredAt) return student.freeSurvey;
-  const survey = {
-    source,
-    sourceNote: source === 'other' ? sourceNote : '',
-    level,
-    fear,
-    answeredAt: new Date(),
-  };
   await Student.updateOne(
     { _id: studentId, freePortal: true },
     { $set: { freeSurvey: survey } },

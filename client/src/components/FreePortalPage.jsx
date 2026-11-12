@@ -241,6 +241,7 @@ export default function FreePortalPage({ onLogin }) {
   };
 
   const login = async (forceDevice = false) => {
+    const isForce = forceDevice === true;
     const id = normalizePhone(phone);
     if (!id || !isValidVNPhone(id)) { setError('Số điện thoại không hợp lệ'); return; }
     if (!password) { setError('Hãy nhập mật khẩu'); return; }
@@ -250,13 +251,18 @@ export default function FreePortalPage({ onLogin }) {
       const response = await fetch(`${API_BASE}/auth/login/public`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ phone: id, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: forceDevice }),
+        body: JSON.stringify({ phone: id, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: isForce }),
       });
       const data = await response.json();
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') { setDeviceConflict(true); return; }
       if (!data.success) { setError(data.message || 'Số điện thoại hoặc mật khẩu không đúng'); return; }
       acceptSession(data.data);
     } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
+  };
+
+  const handleLoginSubmit = (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    login(false);
   };
 
   const finishSocial = async (event) => {
@@ -769,7 +775,7 @@ export default function FreePortalPage({ onLogin }) {
                 </form>
               ) : (
                 /* Form Body thông thường */
-                <form onSubmit={isRegister ? handleRequestOtp : login} className="space-y-2 sm:space-y-2.5">
+                <form onSubmit={isRegister ? handleRequestOtp : handleLoginSubmit} className="space-y-2 sm:space-y-2.5">
                   {(isRegister || pending) && (
                     <CompactField
                       label="Họ và tên"

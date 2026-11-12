@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { PlatformPressable } from '@react-navigation/elements';
 import { BlurView } from 'expo-blur';
 import {
   addMobileNotificationReceivedListener,
@@ -1001,7 +1002,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       }
       return;
     }
-    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile'].includes(destination)) {
+    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile', 'DailyPractice'].includes(destination)) {
       navigationRef.navigate('MainTabs', { screen: destination as keyof MainTabsParamList });
       return;
     }
@@ -1351,6 +1352,15 @@ function MainTabs() {
   return (
     <Tab.Navigator
       initialRouteName="Home"
+      screenListeners={({ route }) => ({
+        tabPress: (e) => {
+          const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(route.name);
+          if (locked) {
+            e.preventDefault();
+            DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+          }
+        },
+      })}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
@@ -1393,7 +1403,7 @@ function MainTabs() {
         tabBarButton: (props) => {
           const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(route.name);
           return (
-            <Pressable
+            <PlatformPressable
               {...props}
               onPress={(e) => {
                 if (locked) {
@@ -1485,14 +1495,6 @@ function MainTabs() {
               component={MessagesScreen}
               options={{
                 title: 'Tin nhắn',
-              }}
-              listeners={{
-                tabPress: (e) => {
-                  if (freeLocked) {
-                    e.preventDefault();
-                    DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
-                  }
-                },
               }}
             />
             <Tab.Screen

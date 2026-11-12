@@ -193,6 +193,7 @@ export function getLearningAccessEnrollments(student) {
 }
 
 export function hasLearningAccessEnrollment(student) {
+  if (student?.freePortal === true) return true;
   return getLearningAccessEnrollments(student).length > 0;
 }
 

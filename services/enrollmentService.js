@@ -95,6 +95,7 @@ function isPlaceholderCourseName(name) {
  */
 function studentHasLearningAccess(student) {
   if (!student) return false;
+  if (student.freePortal === true) return true;
   const list = getEnrollmentsFromStudent(student);
   return list.some((e) => {
     if (e?.learningAccess === false) return false;
