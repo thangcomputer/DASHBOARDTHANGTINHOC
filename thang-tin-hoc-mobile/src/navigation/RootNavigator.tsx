@@ -68,7 +68,7 @@ import { navigationRef } from './navigationRef';
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 const MOBILE_OPEN_FREE_LOCK_MODAL_EVENT = 'mobile:open-free-lock-modal';
-const FREE_LOCKED_DESTINATIONS = new Set<string>(['Messages', 'Assignments', 'StudentExam', 'Support']);
+const FREE_LOCKED_DESTINATIONS = new Set<string>(['Messages', 'Assignments', 'Materials', 'StudentExam', 'Support']);
 
 function noteUserActivity() {
   notePinActivity();
@@ -678,14 +678,14 @@ function NavTabContent({
           color={isHome || selected ? '#FFFFFF' : tone}
           strokeWidth={isHome || selected ? 2.5 : 2}
         />
-        {badgeCount > 0 ? (
-          <Text style={[styles.persistentTabBadge, isBrandStudent && styles.persistentTabBadgeBrand]}>
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </Text>
-        ) : locked ? (
+        {locked ? (
           <View style={styles.navLockBadge}>
             <Lock size={10} color="#FBBF24" strokeWidth={2.5} />
           </View>
+        ) : badgeCount > 0 ? (
+          <Text style={[styles.persistentTabBadge, isBrandStudent && styles.persistentTabBadgeBrand]}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Text>
         ) : null}
       </View>
       {isHome ? null : (
@@ -792,7 +792,7 @@ function PersistentTabBar({
       </BlurView>
       {orderedItems.map(({ name, label, shortLabel, icon: Icon }) => {
         const selected = name === activeTab;
-        const locked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(name)) || (name === 'Feed' && feedPostLocked);
+        const locked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(name));
         const badgeCount = name === 'Messages'
           ? unreadConversationCount
           : name === 'Schedule' ? todayScheduleCount : 0;
@@ -800,7 +800,7 @@ function PersistentTabBar({
           <Pressable
             key={name}
             onPress={() => {
-              if (locked && name !== 'Feed') {
+              if (locked) {
                 DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
                 return;
               }
@@ -1389,6 +1389,22 @@ function MainTabs() {
         },
         tabBarIconStyle: { width: '100%', height: 64 },
         tabBarAccessibilityLabel: navTabLabel(route.name, isTeacher),
+        tabBarButton: (props) => {
+          const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(route.name);
+          return (
+            <Pressable
+              {...props}
+              onPress={(e) => {
+                if (locked) {
+                  e.preventDefault?.();
+                  DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+                  return;
+                }
+                props.onPress?.(e);
+              }}
+            />
+          );
+        },
         tabBarBackground: () => (
           <BlurView
             intensity={Platform.OS === 'android' ? 75 : 60}

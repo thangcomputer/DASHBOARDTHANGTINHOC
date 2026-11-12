@@ -76,3 +76,16 @@ test('mobile: màn gia hạn khi hết hạn, thẻ hạn ở hồ sơ + drawer,
   assert.ok(auth.includes("'mobile:subscription-expired'"));
   assert.ok(auth.includes('subscriptionApi.overview()'));
 });
+
+test('mobile: tài khoản miễn phí có khóa ở nav menu footer, bấm vào không xem được nếu chưa mua gói', () => {
+  const rootNav = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');
+  assert.ok(rootNav.includes("const FREE_LOCKED_DESTINATIONS = new Set<string>(['Messages', 'Assignments', 'Materials', 'StudentExam', 'Support'])"));
+  assert.ok(rootNav.includes('tabBarButton: (props) => {'));
+  assert.ok(rootNav.includes('DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT)'));
+  assert.ok(rootNav.includes('navLockBadge'));
+
+  const msgScreens = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
+  assert.ok(msgScreens.includes('isFreePortalLocked'));
+  assert.ok(msgScreens.includes('inboxLockedCard'));
+  assert.ok(msgScreens.includes('Hộp thư đang khóa'));
+});

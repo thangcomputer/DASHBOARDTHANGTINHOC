@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Ban, Bell, BookOpen, BookText, CalendarDays, Camera, Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileSpreadsheet,
-  FileText, Film, GraduationCap, KeyRound, Landmark, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Table2, Target, Trash2, UserRound, Users, WalletCards, X,
+  FileText, Film, GraduationCap, KeyRound, Landmark, Link2, Lock, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Sparkles, Table2, Target, Trash2, UserRound, Users, WalletCards, X,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -34,7 +34,7 @@ import { enableMobilePushNotifications, requestWebNotificationPermission } from 
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
 import { SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
 import { DuoButton } from '../components/duo/DuoButton';
-import { isFreePortalMenu } from '../utils/freePortalHelper';
+import { isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
 import { pinUserKey } from '../services/pinLock';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
@@ -752,6 +752,35 @@ export function ScheduleScreen() {
   };
 
   const sortDayIndex = sortMenu?.kind === 'day' ? sortMenu.dayIndex : -1;
+
+  const isLocked = Boolean(user && user.role === 'student' && isFreePortalLocked(user));
+  if (isLocked) {
+    return (
+      <AppScreen scrollViewRef={screenScrollRef}>
+        <AppHeader title="Lịch học" subtitle="Lịch học và ca học trực tiếp cùng giảng viên" showBackButton={false} centered compact />
+        <View style={styles.resourceLockedWrap}>
+          <View style={styles.resourceLockedCard}>
+            <View style={styles.resourceLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.resourceLockedTitle}>Lịch học đang khóa</Text>
+            <Text style={styles.resourceLockedDesc}>
+              Lịch học trực tiếp 1 kèm 1 cùng Giảng viên chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
+            </Text>
+            <Pressable
+              onPress={() => DeviceEventEmitter.emit('mobile:open-free-lock-modal')}
+              style={styles.resourceLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.resourceLockedCtaText}>Đăng ký gói Meet để mở khóa</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
 
   return (
     <AppScreen scrollViewRef={screenScrollRef}>
@@ -2153,6 +2182,7 @@ export function AssignmentsScreen({
   const route = useRoute<RouteProp<AppStackParamList, 'Assignments'>>();
   const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const isTeacher = user?.role === 'teacher';
+  const isLocked = !isTeacher && isFreePortalLocked(user);
   const [filter, setFilter] = useState('Tất cả');
   const [courseFilter, setCourseFilter] = useState('');
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
@@ -2479,6 +2509,34 @@ export function AssignmentsScreen({
       setIsSubmitting(false);
     }
   };
+
+  if (isLocked) {
+    return (
+      <AppScreen scrollViewRef={screenScrollRef}>
+        {!embedded ? <AppHeader title="Bài tập" subtitle="Bài tập trong các khóa học của bạn" showBackButton={false} centered /> : null}
+        <View style={styles.resourceLockedWrap}>
+          <View style={styles.resourceLockedCard}>
+            <View style={styles.resourceLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.resourceLockedTitle}>Bài tập đang khóa</Text>
+            <Text style={styles.resourceLockedDesc}>
+              Tính năng giao bài và nộp bài tập chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
+            </Text>
+            <Pressable
+              onPress={() => DeviceEventEmitter.emit('mobile:open-free-lock-modal')}
+              style={styles.resourceLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.resourceLockedCtaText}>Đăng ký gói Meet để mở khóa</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
 
   const content = (
     <>
@@ -2859,6 +2917,35 @@ export function StudentResourcesScreen() {
     { id: 'software', label: 'Phần mềm', count: software.length },
     { id: 'assignments', label: 'Bài tập', count: pendingAssignments },
   ];
+  const isLocked = Boolean(user && user.role === 'student' && isFreePortalLocked(user));
+  if (isLocked) {
+    return (
+      <AppScreen scrollViewRef={screenScrollRef}>
+        <AppHeader title="Bài tập và tài nguyên" subtitle="Tài liệu, phần mềm và bài tập trong khóa học" showBackButton={false} centered compact />
+        <View style={styles.resourceLockedWrap}>
+          <View style={styles.resourceLockedCard}>
+            <View style={styles.resourceLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.resourceLockedTitle}>Mục này đang khóa</Text>
+            <Text style={styles.resourceLockedDesc}>
+              Bài tập và tài nguyên học tập chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
+            </Text>
+            <Pressable
+              onPress={() => DeviceEventEmitter.emit('mobile:open-free-lock-modal')}
+              style={styles.resourceLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.resourceLockedCtaText}>Đăng ký gói Meet để mở khóa</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
+
   return (
     <AppScreen scrollViewRef={screenScrollRef}>
       <AppHeader title="Bài tập và tài nguyên" subtitle="Tài liệu, phần mềm và bài tập trong khóa học" showBackButton={false} centered compact />
@@ -6272,4 +6359,11 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   fieldLabel: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
   note: { color: colors.muted, fontSize: typography.caption, lineHeight: 18, fontStyle: 'italic' },
   savedText: { color: colors.green, fontSize: typography.small, fontWeight: '700' },
+  resourceLockedWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, minHeight: 420 },
+  resourceLockedCard: { width: '100%', maxWidth: 420, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+  resourceLockedIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  resourceLockedTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  resourceLockedDesc: { fontSize: 13, lineHeight: 20, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  resourceLockedCtaBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B981', borderBottomWidth: 3, borderBottomColor: '#059669' },
+  resourceLockedCtaText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 }));

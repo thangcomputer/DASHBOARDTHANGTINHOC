@@ -4,12 +4,13 @@ import {
 } from 'react-native';
 import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, GraduationCap, HelpCircle,
-  LayoutGrid, Lock, Monitor, Play, RefreshCw, Trophy, User,
+  LayoutGrid, Lock, Monitor, Play, RefreshCw, Sparkles, Trophy, User,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
+import { isFreePortalLocked } from '../utils/freePortalHelper';
 import { AppHeader, AppScreen, Card, EmptyState, useBrandingHeaderScrollHandler } from '../components/ui';
 import {
   getStudentQuizForExam, submitStudentQuiz,
@@ -519,6 +520,34 @@ export function StudentExamScreen() {
   const columns = width >= 540 ? 2 : 1;
   const submittedQuizzes = quizzes.filter((quiz) => quiz.mySubmission);
 
+  if (user?.role === 'student' && isFreePortalLocked(user)) {
+    return (
+      <AppScreen scrollViewRef={screenScrollRef}>
+        <AppHeader title="Phòng luyện đề & thi" subtitle="Phòng thi chứng chỉ và trắc nghiệm" showBackButton={false} centered />
+        <View style={styles.examLockedWrap}>
+          <View style={styles.examLockedCard}>
+            <View style={styles.examLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.examLockedTitle}>Phòng thi đang khóa</Text>
+            <Text style={styles.examLockedDesc}>
+              Tính năng làm bài thi và luyện đề chứng chỉ chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
+            </Text>
+            <Pressable
+              onPress={() => DeviceEventEmitter.emit('mobile:open-free-lock-modal')}
+              style={styles.examLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.examLockedCtaText}>Đăng ký gói Meet để mở khóa</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
+
   return (
     <AppScreen scrollViewRef={screenScrollRef}>
       <AppHeader
@@ -902,4 +931,11 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   reviewAnswerLabel: { color: '#64748B', fontSize: typography.micro, fontWeight: '700' },
   reviewAnswer: { color: '#0F172A', fontSize: typography.caption, fontWeight: '700' },
   reviewCorrect: { color: '#15803D', fontSize: typography.caption, fontWeight: '800' },
+  examLockedWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, minHeight: 420 },
+  examLockedCard: { width: '100%', maxWidth: 420, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+  examLockedIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  examLockedTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  examLockedDesc: { fontSize: 13, lineHeight: 20, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  examLockedCtaBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B981', borderBottomWidth: 3, borderBottomColor: '#059669' },
+  examLockedCtaText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 }));

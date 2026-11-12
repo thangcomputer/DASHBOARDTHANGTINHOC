@@ -22,11 +22,11 @@ import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-na
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Bot, CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle, MessageSquare,
-  MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, UserPlus, UserRound, Video, X,
+  MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, Sparkles, ThumbsUp, Trash2, UserPlus, UserRound, Video, X,
 } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
-import { isFreePortalMenu } from '../components/FreePortalModals';
+import { isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
 import { messageService, scheduleService } from '../services/mockService';
 import { getMobileImageSource } from '../services/apiClient';
 import {
@@ -59,6 +59,8 @@ import {
   SOCKET_EVENTS,
   joinChatGroup,
 } from '../services/socketService';
+
+const MOBILE_OPEN_FREE_LOCK_MODAL_EVENT = 'mobile:open-free-lock-modal';
 import { getCallHistory, type CallHistoryEntry } from '../services/callHistoryApi';
 import { CommunicationPreferencesCard } from '../components/CommunicationPreferencesCard';
 import { getTeacherPublicCard } from '../services/teacherApi';
@@ -355,6 +357,7 @@ export function MessagesScreen() {
   const navigation = useNavigation<Navigation>();
   const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
+  const isLocked = !isTeacher && isFreePortalLocked(user);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'all' | 'student' | 'teacher' | 'recruitment' | 'admin' | 'support' | 'group'>('all');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -378,7 +381,10 @@ export function MessagesScreen() {
       { id: 'teacher' as const, label: 'Giảng viên' },
       { id: 'group' as const, label: 'Nhóm' },
     ];
-  const loader = useCallback(() => messageService.conversations(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
+  const loader = useCallback(
+    () => (isLocked ? Promise.resolve([]) : messageService.conversations(isTeacher ? 'teacher' : 'student', user)),
+    [isLocked, isTeacher, user],
+  );
   const resource = useMockResource(loader);
   useFocusEffect(useCallback(() => {
     resource.reload();
@@ -473,6 +479,56 @@ export function MessagesScreen() {
       setIsCreatingGroup(false);
     }
   };
+
+  if (isLocked) {
+    return (
+      <AppScreen contentStyle={styles.inboxScreen}>
+        <AppHeader title="Hộp thư" icon={MessageCircle} showBackButton={false} />
+        <View style={styles.inboxLockedContainer}>
+          <View style={styles.inboxLockedCard}>
+            <View style={styles.inboxLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.inboxLockedTitle}>Hộp thư đang khóa</Text>
+            <Text style={styles.inboxLockedDesc}>
+              Tính năng nhắn tin trực tiếp cùng Giảng viên chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
+            </Text>
+
+            <View style={styles.inboxLockedBenefits}>
+              <View style={styles.inboxBenefitRow}>
+                <View style={styles.inboxBenefitDot}>
+                  <Check size={12} color="#059669" strokeWidth={3} />
+                </View>
+                <Text style={styles.inboxBenefitText}>Nhắn tin & hỏi bài 1 kèm 1 với Giảng viên</Text>
+              </View>
+              <View style={styles.inboxBenefitRow}>
+                <View style={styles.inboxBenefitDot}>
+                  <Check size={12} color="#059669" strokeWidth={3} />
+                </View>
+                <Text style={styles.inboxBenefitText}>Nhận tài liệu và bài tập theo tiến độ riêng</Text>
+              </View>
+              <View style={styles.inboxBenefitRow}>
+                <View style={styles.inboxBenefitDot}>
+                  <Check size={12} color="#059669" strokeWidth={3} />
+                </View>
+                <Text style={styles.inboxBenefitText}>Hỗ trợ giải đáp thắc mắc học tập 24/7</Text>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={() => DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT)}
+              style={styles.inboxLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.inboxLockedCtaText}>Đăng ký gói Meet để mở khóa</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
 
   return (
     <AppScreen contentStyle={styles.inboxScreen}>
@@ -2431,6 +2487,37 @@ export function ConversationScreen() {
     markCurrentConversationRead();
     return () => connectedSubscription.remove();
   }, [isFocused, isPreview, markCurrentConversationRead, resource.error, resource.loading, user]);
+
+  if (user?.role === 'student' && isFreePortalLocked(user)) {
+    return (
+      <AppScreen contentStyle={styles.inboxScreen}>
+        <AppHeader title="Cuộc trò chuyện" icon={MessageCircle} />
+        <View style={styles.inboxLockedContainer}>
+          <View style={styles.inboxLockedCard}>
+            <View style={styles.inboxLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.inboxLockedTitle}>Hộp thư đang khóa</Text>
+            <Text style={styles.inboxLockedDesc}>
+              Vui lòng đăng ký gói Meet để mở khóa nhắn tin trực tiếp cùng Giảng viên.
+            </Text>
+            <Pressable
+              onPress={() => {
+                DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+                navigation.goBack();
+              }}
+              style={styles.inboxLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.inboxLockedCtaText}>Đăng ký gói Meet để mở khóa</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 4 : 0}>
@@ -4812,4 +4899,15 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   weekScheduleEditorCloseText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
   infoClose: { minHeight: 42, minWidth: 100, marginTop: spacing.sm, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.brandSoft },
   infoCloseText: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
+  inboxLockedContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, minHeight: 420 },
+  inboxLockedCard: { width: '100%', maxWidth: 420, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+  inboxLockedIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  inboxLockedTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  inboxLockedDesc: { fontSize: 13, lineHeight: 20, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  inboxLockedBenefits: { width: '100%', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#F1F5F9', marginBottom: 20 },
+  inboxBenefitRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  inboxBenefitDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
+  inboxBenefitText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#1E293B' },
+  inboxLockedCtaBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B981', borderBottomWidth: 3, borderBottomColor: '#059669' },
+  inboxLockedCtaText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 }), { remapGreen: true });
