@@ -176,6 +176,11 @@ export default function FeedBoard({ session, role }) {
   const isHighAdminViewerUser = meAdminRole === 'HIGH_ADMIN';
   const canModerateFeed = meRole === 'admin' || meRole === 'staff' || isSuperAdminViewerUser || isHighAdminViewerUser;
   const studentSubscription = useStudentSubscription();
+  const isFreePortalStudent = meRole === 'student' && (
+    session?.freePortal === true
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+  );
+  const isGreenTone = meRole === 'teacher' || isFreePortalStudent;
   const postLocked = useMemo(
     () => isFeedPostLocked({
       role: meRole,
@@ -1099,10 +1104,10 @@ export default function FeedBoard({ session, role }) {
                   type="button"
                   onClick={handlePost}
                   disabled={posting}
-                  className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-5 py-2 rounded-2xl shadow-xs transition-all disabled:opacity-50 cursor-pointer ${
-                    meRole === 'teacher'
-                      ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
-                      : 'bg-red-600 hover:bg-red-700 text-white border border-red-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2'
+                  className={`duo-btn cms-feed-post-btn inline-flex items-center gap-1.5 text-xs font-extrabold px-5 py-2.5 rounded-2xl shadow-xs transition-all disabled:opacity-50 cursor-pointer ${
+                    isGreenTone
+                      ? 'cms-feed-post-btn--emerald bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
+                      : 'cms-feed-post-btn--danger bg-[#DC2626] border-[1.5px] border-[#F87171] border-b-4 border-b-[#991B1B] text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
                   }`}
                 >
                   {posting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
@@ -1117,7 +1122,7 @@ export default function FeedBoard({ session, role }) {
           <div className="cms-feed-list-heading flex items-center justify-between gap-2 px-1 pt-1">
             <h2 className="text-base font-extrabold text-slate-900">Bài viết mới nhất</h2>
             <span className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 text-sm font-extrabold ${
-              meRole === 'teacher'
+              isGreenTone
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'bg-indigo-50 text-red-600'
             }`}>
@@ -1573,7 +1578,7 @@ export default function FeedBoard({ session, role }) {
                               type="button"
                               onClick={() => handleComment(post.id)}
                               disabled={busyId === ('c-' + post.id)}
-                              className={`${meRole === 'teacher' ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-600 hover:text-red-700'} p-1 font-bold disabled:opacity-40`}
+                              className={`${isGreenTone ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-600 hover:text-red-700'} p-1 font-bold disabled:opacity-40`}
                               title="Gửi bình luận"
                             >
                               {busyId === ('c-' + post.id) ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}

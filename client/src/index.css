@@ -3181,7 +3181,7 @@ body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
 }
 
 /* Nút tô màu thương hiệu phẳng mềm mại trong khu học viên (chuẩn Mobile App, không khối 3D gờ dày). */
-[data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.select-none):not(.dp-node) {
+[data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node) {
   border-bottom-width: 1px;
   border-style: solid;
   border-color: #dc2626;
@@ -3189,7 +3189,7 @@ body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
   transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-[data-student-shell] :is(button, a):is(.bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.select-none):not(.dp-node) {
+[data-student-shell] :is(button, a):is(.bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node) {
   border-bottom-width: 1px;
   border-style: solid;
   border-color: #059669 !important;
@@ -3197,12 +3197,12 @@ body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
   transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-[data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-red-500, .from-red-600, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-red-500, .to-red-600, .to-red-700, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(:disabled):not([aria-disabled='true']):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.select-none):not(.dp-node):active {
+[data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-red-500, .from-red-600, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-red-500, .to-red-600, .to-red-700, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(:disabled):not([aria-disabled='true']):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node):active {
   transform: scale(0.98);
   border-bottom-width: 1px;
 }
 
-[data-student-shell][data-free-portal-student] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.select-none):not(.dp-node):not(.meet-start-alert__join):not(.cms-btn-danger):not(.duo-btn--danger) {
+[data-student-shell][data-free-portal-student] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node):not(.meet-start-alert__join):not(.cms-btn-danger):not(.duo-btn--danger) {
   background: #10b981 !important;
   background-image: none !important;
   border-color: #059669 !important;
@@ -3219,6 +3219,50 @@ body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
 
 [data-student-shell][data-free-portal-student] button.dp-3d-btn:is(.bg-red-600, .from-red-500, .from-red-600):active {
   box-shadow: 0 1px 0 #047857 !important;
+}
+
+/* Nút Đăng bài FeedBoard 3D nổi bật */
+.cms-feed-post-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 800;
+  border-style: solid;
+  border-width: 1.5px;
+  border-bottom-width: 4px !important;
+  border-radius: 16px;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.08s ease, border-bottom-width 0.08s ease, filter 0.12s ease;
+  user-select: none;
+  cursor: pointer;
+}
+
+.cms-feed-post-btn:not(:disabled):hover {
+  filter: brightness(1.05);
+}
+
+.cms-feed-post-btn:not(:disabled):active {
+  transform: translateY(2px) !important;
+  border-bottom-width: 2px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08) !important;
+}
+
+.cms-feed-post-btn--emerald,
+[data-teacher-shell] .cms-feed-post-btn,
+[data-free-portal-student] .cms-feed-post-btn,
+html[data-free-portal-student] .cms-feed-post-btn {
+  background: #10b981 !important;
+  border-color: #34d399 !important;
+  border-bottom-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+.cms-feed-post-btn--danger {
+  background: #dc2626 !important;
+  border-color: #f87171 !important;
+  border-bottom-color: #991b1b !important;
+  color: #ffffff !important;
 }
 
 /* Nút phụ nền trắng / viền: phẳng mềm mại chuẩn mobile, không đế xám cộm */
@@ -6630,22 +6674,28 @@ body select {
   cursor: var(--lms-cursor-hand) !important;
 }
 
-body button:not(:disabled):not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item),
-body input[type='button']:not(:disabled):not([aria-disabled='true']),
-body input[type='submit']:not(:disabled):not([aria-disabled='true']),
-body input[type='reset']:not(:disabled):not([aria-disabled='true']),
-body [role='button']:not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item) {
+/* Phục hồi button bình thường: loại bỏ bóng giọt nước (inset) khỏi button mặc định theo yêu cầu.
+   Chỉ kích hoạt hiệu ứng giọt nước khi có class .btn-droplet, .cms-button-droplet hoặc trong vùng [data-button-droplet]. */
+.btn-droplet,
+.cms-button-droplet,
+[data-button-droplet] body button:not(:disabled):not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item),
+[data-button-droplet] body input[type='button']:not(:disabled):not([aria-disabled='true']),
+[data-button-droplet] body input[type='submit']:not(:disabled):not([aria-disabled='true']),
+[data-button-droplet] body input[type='reset']:not(:disabled):not([aria-disabled='true']),
+[data-button-droplet] body [role='button']:not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item) {
   box-shadow:
     inset 1px 1px 2px rgba(15, 23, 42, 0.16),
     inset -1px -1px 2px rgba(255, 255, 255, 0.32),
     0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
-body button:not(:disabled):not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item):active,
-body input[type='button']:not(:disabled):not([aria-disabled='true']):active,
-body input[type='submit']:not(:disabled):not([aria-disabled='true']):active,
-body input[type='reset']:not(:disabled):not([aria-disabled='true']):active,
-body [role='button']:not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item):active {
+.btn-droplet:active,
+.cms-button-droplet:active,
+[data-button-droplet] body button:not(:disabled):not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item):active,
+[data-button-droplet] body input[type='button']:not(:disabled):not([aria-disabled='true']):active,
+[data-button-droplet] body input[type='submit']:not(:disabled):not([aria-disabled='true']):active,
+[data-button-droplet] body input[type='reset']:not(:disabled):not([aria-disabled='true']):active,
+[data-button-droplet] body [role='button']:not([aria-disabled='true']):not(.cms-sidebar-glass__nav-item):active {
   box-shadow:
     inset 2px 2px 5px rgba(15, 23, 42, 0.2),
     inset -1px -1px 3px rgba(255, 255, 255, 0.2);
