@@ -1527,7 +1527,7 @@ export default function FloatingMessenger({ session, role }) {
   } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
-    openChat, closeChat, minimizeChat,
+    openChat, closeChat, minimizeChat, minimizeAllChats,
   } = useFloatingMessenger();
   const freePortalMenu = useFreePortalMenu(session);
 
@@ -1555,33 +1555,40 @@ export default function FloatingMessenger({ session, role }) {
   const closeAllSupportChats = useCallback(() => {
     setSupportChatPage(false);
     document.body.classList.remove('cms-support-chat-page');
+    const currentTabs = tabsRef.current || [];
+    currentTabs.forEach((t) => {
+      const isSupportPeer = isAiSupportPeer(t.user)
+        || String(t.user?.role || '').toLowerCase() === 'support'
+        || String(t.user?.adminRole || '').toUpperCase() === 'SUPPORT'
+        || String(t.user?.id || '') === 'support'
+        || String(t.user?.name || '').toLowerCase().includes('support');
+      if (isSupportPeer) {
+        closeChat(t.id);
+      } else {
+        minimizeChat(t.id);
+      }
+    });
     if (activeTabId) {
       closeChat(activeTabId);
     }
-    if (Array.isArray(tabs)) {
-      tabs.forEach((t) => {
-        if (isAiSupportPeer(t.user) || String(t.user?.role || '').toLowerCase() === 'support') {
-          closeChat(t.id);
-        }
-      });
-    }
-  }, [activeTabId, closeChat, tabs]);
+    minimizeAllChats();
+  }, [activeTabId, closeChat, minimizeChat, minimizeAllChats]);
 
   useEffect(() => {
-    if (!isSupportRoute && supportChatPage) {
-      closeAllSupportChats();
+    if (!isSupportRoute) {
+      if (supportChatPage || document.body.classList.contains('cms-support-chat-page')) {
+        closeAllSupportChats();
+      }
     }
   }, [isSupportRoute, supportChatPage, closeAllSupportChats]);
 
   useEffect(() => {
     const onExitSupport = () => {
-      if (supportChatPage) {
-        closeAllSupportChats();
-      }
+      closeAllSupportChats();
     };
     window.addEventListener('cms:exit-support-page', onExitSupport);
     return () => window.removeEventListener('cms:exit-support-page', onExitSupport);
-  }, [supportChatPage, closeAllSupportChats]);
+  }, [closeAllSupportChats]);
 
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';

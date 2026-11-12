@@ -9,6 +9,7 @@ import { getMobileSoundEnabled } from '../services/soundPreferences';
 import { SOCKET_EVENTS } from '../services/socketService';
 import { DuoButton } from './duo/DuoButton';
 import { useAuth } from '../app/AuthContext';
+import { isFreePortalMenu } from './FreePortalModals';
 import type { DemoUser } from '../types';
 
 type AlertClassItem = {
@@ -62,6 +63,9 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
   const currentUser = user || auth?.user;
   const role = String(currentUser?.role || 'student').toLowerCase();
   const isTeacher = role === 'teacher';
+  const isFreePortal = role === 'student' && (
+    (currentUser as any)?.freePortal === true || isFreePortalMenu(currentUser)
+  );
 
   const [item, setItem] = useState<AlertClassItem | null>(null);
   const [ready, setReady] = useState(false);
@@ -133,62 +137,64 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
         const todayStr = clock.day;
         const candidates: AlertClassItem[] = [];
 
-        // 1. Quét lịch học 1 kèm 1 / lịch theo khóa từ /schedules
-        try {
-          const schRes = await mobileApiRequest<{ data?: any[] }>('/schedules?limit=100');
-          const schList = Array.isArray(schRes?.data) ? schRes.data : [];
-          for (const s of schList) {
-            const id = String(s._id || s.id || '');
-            if (!id || isDismissed(id)) continue;
-            const sDay = normalizeScheduleDay(s.date);
-            if (sDay !== todayStr) continue;
-            const status = String(s.status || '').toLowerCase();
-            if (status === 'cancelled' || status === 'completed' || status === 'no_show') continue;
+        // 1. Quét lịch học 1 kèm 1 / lịch theo khóa từ /schedules (chỉ dành cho GV hoặc học viên chính quy)
+        if (!isFreePortal) {
+          try {
+            const schRes = await mobileApiRequest<{ data?: any[] }>('/schedules?limit=100');
+            const schList = Array.isArray(schRes?.data) ? schRes.data : [];
+            for (const s of schList) {
+              const id = String(s._id || s.id || '');
+              if (!id || isDismissed(id)) continue;
+              const sDay = normalizeScheduleDay(s.date);
+              if (sDay !== todayStr) continue;
+              const status = String(s.status || '').toLowerCase();
+              if (status === 'cancelled' || status === 'completed' || status === 'no_show') continue;
 
-            const inWindow = isMeetJoinWindow({
-              day: sDay,
-              startTime: s.startTime,
-              endTime: s.endTime,
-              nowDay: clock.day,
-              nowMinutes: clock.minutes,
-              earlyMinutes: 1,
-            });
-
-            if (inWindow) {
-              const isLive = isMeetLiveNow({
+              const inWindow = isMeetJoinWindow({
                 day: sDay,
                 startTime: s.startTime,
                 endTime: s.endTime,
                 nowDay: clock.day,
                 nowMinutes: clock.minutes,
+                earlyMinutes: 1,
               });
 
-              const person = isTeacher
-                ? `Học viên: ${s.studentName || s.studentId?.name || 'Học viên'}`
-                : `Giảng viên: ${s.teacherName || s.teacherId?.name || 'Giảng viên'}`;
+              if (inWindow) {
+                const isLive = isMeetLiveNow({
+                  day: sDay,
+                  startTime: s.startTime,
+                  endTime: s.endTime,
+                  nowDay: clock.day,
+                  nowMinutes: clock.minutes,
+                });
 
-              const link = String(
-                s.linkHoc ||
-                s.meetingUrl ||
-                (role === 'student' ? (currentUser as any)?.linkHoc : '') ||
-                ''
-              ).trim();
+                const person = isTeacher
+                  ? `Học viên: ${s.studentName || s.studentId?.name || 'Học viên'}`
+                  : `Giảng viên: ${s.teacherName || s.teacherId?.name || 'Giảng viên'}`;
 
-              candidates.push({
-                id,
-                course: s.course || s.courseName || 'Khóa học',
-                title: s.title || s.course || 'Ca học theo lịch',
-                day: sDay,
-                startTime: s.startTime || '',
-                endTime: s.endTime || '',
-                linkHoc: link,
-                personInfo: person,
-                isLive,
-              });
+                const link = String(
+                  s.linkHoc ||
+                  s.meetingUrl ||
+                  (role === 'student' ? (currentUser as any)?.linkHoc : '') ||
+                  ''
+                ).trim();
+
+                candidates.push({
+                  id,
+                  course: s.course || s.courseName || 'Khóa học',
+                  title: s.title || s.course || 'Ca học theo lịch',
+                  day: sDay,
+                  startTime: s.startTime || '',
+                  endTime: s.endTime || '',
+                  linkHoc: link,
+                  personInfo: person,
+                  isLive,
+                });
+              }
             }
+          } catch {
+            /* Bỏ qua lỗi fetch schedules */
           }
-        } catch {
-          /* Bỏ qua lỗi fetch schedules */
         }
 
         // 2. Quét thêm từ meet-classes (nếu có lớp meet nhóm)
@@ -241,12 +247,12 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
     };
 
     tick();
-    const timer = setInterval(tick, 15000);
+    const timer = setInterval(tick, 45000);
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [ready, role, isTeacher]);
+  }, [ready, role, isTeacher, isFreePortal]);
 
   // Âm thanh chuông báo
   useEffect(() => {

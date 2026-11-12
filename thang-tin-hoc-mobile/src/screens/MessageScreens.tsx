@@ -862,16 +862,17 @@ export function ConversationScreen() {
       active = false;
     };
   }, [groupDetailsVersion, isGroupConversation, isPreview, route.params.conversationId, user]);
+  const isFreePortal = Boolean(user && user.role === 'student' && isFreePortalMenu(user));
   const scheduleLoader = useCallback(
-    () => user?.role === 'teacher' || user?.role === 'student'
+    () => (user?.role === 'teacher' || (user?.role === 'student' && !isFreePortal))
       ? scheduleService.list(user.role)
       : Promise.resolve([]),
-    [user?.role],
+    [user?.role, isFreePortal],
   );
   const scheduleResource = useMockResource(scheduleLoader);
   const pendingAttendanceLoader = useCallback(
-    () => user?.role === 'student' ? scheduleService.pendingAttendanceConfirm(user) : Promise.resolve([]),
-    [user],
+    () => (user?.role === 'student' && !isFreePortal) ? scheduleService.pendingAttendanceConfirm(user) : Promise.resolve([]),
+    [user, isFreePortal],
   );
   const pendingAttendanceResource = useMockResource(pendingAttendanceLoader);
   const [scheduleNow, setScheduleNow] = useState(() => new Date());
@@ -879,13 +880,14 @@ export function ConversationScreen() {
   const [attendancePromptBusy, setAttendancePromptBusy] = useState(false);
   const [handledAttendancePromptIds, setHandledAttendancePromptIds] = useState<string[]>([]);
   useEffect(() => {
-    const interval = setInterval(() => setScheduleNow(new Date()), 15000);
+    const interval = setInterval(() => setScheduleNow(new Date()), 30000);
     return () => clearInterval(interval);
   }, []);
   useEffect(() => {
-    const interval = setInterval(scheduleResource.reload, 20000);
+    if (isFreePortal) return undefined;
+    const interval = setInterval(scheduleResource.reload, 30000);
     return () => clearInterval(interval);
-  }, [scheduleResource.reload]);
+  }, [scheduleResource.reload, isFreePortal]);
   useEffect(() => {
     const scheduleEvents = [
       SOCKET_EVENTS.SCHEDULE_NEW,
@@ -922,9 +924,10 @@ export function ConversationScreen() {
     };
   }, [route.params.participantId, scheduleResource.reload, user?.role]);
   useEffect(() => {
-    const interval = setInterval(pendingAttendanceResource.reload, 20000);
+    if (isFreePortal) return undefined;
+    const interval = setInterval(pendingAttendanceResource.reload, 30000);
     return () => clearInterval(interval);
-  }, [pendingAttendanceResource.reload]);
+  }, [pendingAttendanceResource.reload, isFreePortal]);
   useEffect(() => {
     if (!user) return undefined;
     const eventNames = [

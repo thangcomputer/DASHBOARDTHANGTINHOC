@@ -460,13 +460,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) {
       return true;
     }
+    if (currentUser?.freePortal === true || isFreePortalSelfRegistrationStudent(currentUser)) {
+      return true;
+    }
     try {
       const stored = JSON.parse(localStorage.getItem('student_user') || 'null');
       if (stored?.freePortal === true || isFreePortalSelfRegistrationStudent(stored)) return true;
     } catch { /* noop */ }
     const me = (students || []).find((s) => String(s?.id || s?._id) === String(currentUserId));
     return Boolean(me?.freePortal === true || isFreePortalSelfRegistrationStudent(me));
-  }, [currentUserRole, currentUserId, students]);
+  }, [currentUserRole, currentUserId, currentUser, students]);
   const isGreenTheme = currentUserRole === 'teacher' || isFreePortalStudent;
   const [scheduleNow, setScheduleNow] = useState(() => new Date());
   const [activeConv, setActiveConv] = useState(null);

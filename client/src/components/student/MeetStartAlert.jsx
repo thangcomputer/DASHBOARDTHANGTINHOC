@@ -53,6 +53,10 @@ function dayLabel(day) {
 export default function MeetStartAlert({ role = 'student', session = null }) {
   const [item, setItem] = useState(null);
   const audioRef = useRef(null);
+  const isFreePortal = role === 'student' && (
+    session?.freePortal === true ||
+    (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+  );
 
   // Lắng nghe socket event 'class:reminder' từ server
   useEffect(() => {
@@ -86,18 +90,20 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         const clock = vnScheduleClock();
         const todayStr = clock.day;
 
-        // 1. Quét lịch từ Schedule (Lịch 1 kèm 1 / lịch theo khóa)
+        // 1. Quét lịch từ Schedule (Lịch 1 kèm 1 / lịch theo khóa - chỉ với GV hoặc học viên chính quy)
         let scheduleRows = [];
-        try {
-          const schRes = await api.schedules.getAll({ limit: 100 });
-          const allSch = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
-          scheduleRows = allSch.filter((s) => {
-            const sDate = normalizeScheduleDate(s.date);
-            const st = String(s.status || '').toLowerCase();
-            return sDate === todayStr && st !== 'cancelled' && st !== 'no_show' && st !== 'completed';
-          });
-        } catch {
-          /* Bỏ qua lỗi fetch schedules */
+        if (!isFreePortal) {
+          try {
+            const schRes = await api.schedules.getAll({ limit: 100 });
+            const allSch = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
+            scheduleRows = allSch.filter((s) => {
+              const sDate = normalizeScheduleDate(s.date);
+              const st = String(s.status || '').toLowerCase();
+              return sDate === todayStr && st !== 'cancelled' && st !== 'no_show' && st !== 'completed';
+            });
+          } catch {
+            /* Bỏ qua lỗi fetch schedules */
+          }
         }
 
         // 2. Quét thêm từ MeetClass (Lớp Meet nhóm/chung nếu có)
@@ -209,12 +215,12 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
     };
 
     tick();
-    const timer = setInterval(tick, 15000); // Quét lại mỗi 15 giây
+    const timer = setInterval(tick, 45000); // Quét lại mỗi 45 giây thay vì 15 giây
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [role]);
+  }, [role, isFreePortal]);
 
   // Âm thanh chuông báo khi popup hiện
   useEffect(() => {

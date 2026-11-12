@@ -3157,14 +3157,23 @@ html[data-free-portal-student] .duo-btn--danger:not([data-destructive]),
 }
 
 html[data-free-portal-student] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon,
-[data-free-portal-student] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon {
+[data-free-portal-student] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon,
+[data-teacher-shell] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon,
+[data-role-teacher] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon,
+body:has([data-role-teacher]) .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon,
+.cms-fm-support-button--emerald:not(.is-expanded) .cms-fm-support-button__icon {
   background: #10b981 !important;
   box-shadow: inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2) !important;
 }
 
 html[data-free-portal-student] .cms-fm-support-button,
-[data-free-portal-student] .cms-fm-support-button {
+[data-free-portal-student] .cms-fm-support-button,
+[data-teacher-shell] .cms-fm-support-button,
+[data-role-teacher] .cms-fm-support-button,
+body:has([data-role-teacher]) .cms-fm-support-button,
+.cms-fm-support-button--emerald {
   border-color: #10b981 !important;
+  background: #ffffff !important;
 }
 
 html[data-free-portal-student] .cms-chat-composer-send,

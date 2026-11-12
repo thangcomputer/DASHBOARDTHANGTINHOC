@@ -1134,7 +1134,9 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
 
 function FloatingSupportButton() {
   const { user } = useAuth();
+  const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
+  const isGreenTone = isTeacher || freeMenu;
   const freeLocked = isFreePortalLocked(user);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -1175,13 +1177,14 @@ function FloatingSupportButton() {
         onHoverOut={() => setHovered(false)}
         style={({ pressed }) => [
           styles.floatingSupportButton,
+          isGreenTone && styles.floatingSupportButtonGreen,
           Platform.OS === 'web' && { opacity: pressed || hovered ? 1 : 0.58 },
           pressed && styles.floatingSupportButtonPressed,
         ]}
         accessibilityRole="button"
         accessibilityLabel="Mở hỗ trợ"
       >
-        <View style={[styles.floatingSupportIcon, !freeMenu && styles.floatingSupportIconBrand]}>
+        <View style={[styles.floatingSupportIcon, !isGreenTone && styles.floatingSupportIconBrand]}>
           <Headphones size={22} color="#FFFFFF" strokeWidth={2.5} />
         </View>
         <View style={styles.floatingSupportLabel}>
@@ -1583,6 +1586,7 @@ const styles = StyleSheet.create({
   navLockBadge: { position: 'absolute', top: -6, right: -6, width: 17, height: 17, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
   floatingSupportHandle: { position: 'absolute', right: 0, zIndex: 19 },
   floatingSupportButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3, paddingLeft: 4, paddingRight: 14, borderWidth: 2, borderRightWidth: 0, borderColor: '#F59E0B', borderTopLeftRadius: 999, borderBottomLeftRadius: 999, backgroundColor: '#FFF8EB', backgroundImage: 'linear-gradient(145deg, #FFF8EB 0%, #FFFFFF 100%)', boxShadow: 'inset 2px 2px 5px rgba(120, 53, 15, 0.16), inset -2px -2px 5px rgba(255, 255, 255, 0.98), 0px 2px 5px rgba(15, 23, 42, 0.08)' },
+  floatingSupportButtonGreen: { borderColor: '#10B981', backgroundColor: '#FFFFFF', backgroundImage: 'none' },
   floatingSupportButtonPressed: { transform: [{ translateY: 1 }], boxShadow: 'inset 3px 3px 8px rgba(120, 53, 15, 0.24), inset -2px -2px 5px rgba(255, 255, 255, 0.88)' },
   floatingSupportLabel: { paddingHorizontal: 2 },
   floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },

@@ -157,6 +157,18 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
     setActiveTabId((cur) => (cur === convId ? null : cur));
   }, []);
 
+  /** Thu tất cả cửa sổ chat thành chat-head */
+  const minimizeAllChats = useCallback(() => {
+    setTabs((prev) => prev.map((t) => ({ ...t, minimized: true })));
+    setActiveTabId(null);
+  }, []);
+
+  /** Đóng tất cả cửa sổ chat */
+  const closeAllChats = useCallback(() => {
+    setTabs([]);
+    setActiveTabId(null);
+  }, []);
+
   /** Click head → mở cửa sổ; người trước đó trở lại head tròn */
   const focusChat = useCallback((convId) => {
     setActiveTabId(convId);
@@ -219,7 +231,9 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
     closeChat,
     minimizeChat,
     focusChat,
-  }), [supportOpen, tabs, activeTabId, openChat, closeChat, minimizeChat, focusChat]);
+    minimizeAllChats,
+    closeAllChats,
+  }), [supportOpen, tabs, activeTabId, openChat, closeChat, minimizeChat, focusChat, minimizeAllChats, closeAllChats]);
 
   return (
     <FloatingMessengerContext.Provider value={value}>
@@ -240,6 +254,8 @@ export function useFloatingMessenger() {
       closeChat: () => { },
       minimizeChat: () => { },
       focusChat: () => { },
+      minimizeAllChats: () => { },
+      closeAllChats: () => { },
     };
   }
   return ctx;

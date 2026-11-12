@@ -657,7 +657,7 @@ export function HomeScreen() {
     studentTasks.push({
       key: 'practice',
       icon: lost ? Gamepad2 : Flame,
-      tone: lost ? '#64748B' : (isBrandStudent ? '#DC2626' : (freeMenu ? '#EA580C' : '#DC2626')),
+      tone: lost ? '#64748B' : (isBrandStudent ? '#DC2626' : '#10B981'),
       title: isBrandStudent
         ? (atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày')
         : (atRisk ? `Duy trì chuỗi ${practiceStats.streak} ngày` : lost ? 'Luyện tập để lấy lại chuỗi' : 'Luyện tập hằng ngày'),
@@ -684,7 +684,7 @@ export function HomeScreen() {
   const heroProgress = pathTopic?.totalUnits
     ? Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100)
     : (practiceStats?.playedToday ? 100 : 0);
-  const scheduleAccent = isBrandStudent ? '#DC2626' : (freeMenu ? '#059669' : '#DC2626');
+  const scheduleAccent = isBrandStudent ? '#DC2626' : '#059669';
   const portalSub = subscription?.subscription;
   const meetAccess = hasMeetAccessClient(portalSub);
   const meetEmptyMode: 'default' | 'purchase' | 'renew' = freeMenu
@@ -859,7 +859,7 @@ export function HomeScreen() {
               {!freePortalCourse && Boolean(currentCourse) ? (
                 <Card style={styles.ovCard}>
                   <View style={styles.ovHeadRow}>
-                    <BookOpen size={18} color={isBrandStudent ? '#DC2626' : (freeMenu ? colors.brand : '#DC2626')} />
+                    <BookOpen size={18} color={isBrandStudent ? '#DC2626' : colors.brand} />
                     <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
                   </View>
                   <CompactCoursePicker
@@ -1043,7 +1043,7 @@ function OverviewTaskRow({ icon: Icon, tone, title, sub, cta, onPress, freeMenu,
         </View>
       </Pressable>
       <DuoButton
-        variant={isBrandStudent ? 'danger' : (freeMenu ? 'primary' : 'danger')}
+        variant={isBrandStudent ? 'danger' : 'primary'}
         size="sm"
         label={cta}
         rightIcon={<ChevronRight size={14} color="#FFFFFF" />}
