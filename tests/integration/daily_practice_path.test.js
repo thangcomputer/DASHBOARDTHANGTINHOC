@@ -319,4 +319,66 @@ test('giao diện lộ trình: web + mobile có màn lộ trình, luyện tự d
   assert.ok(read('client/src/components/student/dailyPractice/UnitStageChest.jsx').includes('claimUnitChest'));
   assert.ok(read('client/src/services/dailyPracticeApi.js').includes('claimUnitChest'));
   assert.ok(mobile.includes('<UnitStageChest'));
+
+  // Hiệu ứng mở rương chặng bay ra nhận 50XP + chạy số 1..50 + lớp phủ trắng
+  const webChest = read('client/src/components/student/dailyPractice/UnitStageChest.jsx');
+  assert.ok(webChest.includes('useAnimatedCount'), 'web UnitStageChest phải có hàm chạy số XP');
+  assert.ok(webChest.includes('bg-white/90 backdrop-blur-md'), 'web UnitStageChest phải có lớp phủ trắng mờ');
+  assert.ok(webChest.includes('Mở Rương Thành Công!'), 'web UnitStageChest phải có tiêu đề mở rương');
+
+  const mobileChest = read('thang-tin-hoc-mobile/src/components/dailyPractice/UnitStageChest.tsx');
+  assert.ok(mobileChest.includes('useAnimatedCount'), 'mobile UnitStageChest phải có hàm chạy số XP');
+  assert.ok(mobileChest.includes('rgba(255, 255, 255'), 'mobile UnitStageChest phải có lớp phủ trắng');
+  assert.ok(mobileChest.includes('Mở Rương Thành Công!'), 'mobile UnitStageChest phải có tiêu đề mở rương');
+});
+
+test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọt nước, bản đồ Việt Nam và quản lý âm thanh', () => {
+  const animConst = read('client/src/components/student/dailyPractice/animationConstants.js');
+  assert.ok(animConst.includes('DEWSKILL_ANIMATION'), 'hằng số thời lượng animation dùng chung');
+  assert.ok(animConst.includes('useReducedMotion'), 'hỗ trợ prefers-reduced-motion');
+  assert.ok(animConst.includes('STREAK_MILESTONES'), 'mốc chuỗi 3, 7, 30 ngày');
+
+  const gameBtn = read('client/src/components/student/dailyPractice/GameButton.jsx');
+  assert.ok(gameBtn.includes('SoundToggleButton'), 'nút bật/tắt âm thanh');
+  assert.ok(gameBtn.includes('dp-game-btn'), 'nút 3D GameButton');
+
+  const answerFeedback = read('client/src/components/student/dailyPractice/AnswerFeedback.jsx');
+  assert.ok(answerFeedback.includes("'Chính xác!'"), 'thông báo Chính xác! khi trả lời đúng');
+  assert.ok(answerFeedback.includes('<XPRewardAnimation'), 'kích hoạt XPRewardAnimation khi xác nhận XP');
+
+  const xpReward = read('client/src/components/student/dailyPractice/XPRewardAnimation.jsx');
+  assert.ok(xpReward.includes('hasClaimedRewardKey'), 'chống cộng/hiển thị XP trùng lặp');
+  assert.ok(xpReward.includes('dp-xp-star-particle'), 'hạt sao vàng bay về khu vực thanh XP');
+  assert.ok(xpReward.includes('AnimatedXpCounter'), 'tổng XP cập nhật chuyển số mượt');
+
+  const progressBar = read('client/src/components/student/dailyPractice/AnimatedProgressBar.jsx');
+  assert.ok(progressBar.includes('from-emerald-500 via-teal-500 to-emerald-400'), 'thanh tiến độ xanh lá thương hiệu');
+  assert.ok(progressBar.includes('dp-progress-complete-flash'), 'hiệu ứng hoàn thành 100% hữu hạn');
+
+  const levelUnlock = read('client/src/components/student/dailyPractice/LevelUnlockEffect.jsx');
+  assert.ok(levelUnlock.includes('Mở khóa chặng mới'), 'hiệu ứng mở khóa chặng mới');
+  assert.ok(levelUnlock.includes('useNewlyUnlockedUnit'), 'tự động cập nhật trạng thái mở khóa từ dữ liệu');
+
+  const streakCeleb = read('client/src/components/student/dailyPractice/StreakCelebration.jsx');
+  assert.ok(streakCeleb.includes('ReactiveStreakFlame'), 'ngọn lửa phản ứng khi chuỗi tăng');
+  assert.ok(streakCeleb.includes('STREAK_MILESTONES'), 'hiển thị các mốc 3, 7, 30 ngày');
+
+  const mascot = read('client/src/components/student/dailyPractice/Mascot.jsx');
+  for (const state of ['idle', 'correct', 'incorrect', 'learning', 'loading', 'completed', 'unlocked', 'streak', 'error']) {
+    assert.ok(mascot.includes(`${state}: '/mascot/`), `Mascot hỗ trợ trạng thái ${state}`);
+  }
+
+  const achievement = read('client/src/components/student/dailyPractice/AchievementPopup.jsx');
+  assert.ok(achievement.includes('Tiếp tục học'), 'nút Tiếp tục học');
+  assert.ok(achievement.includes('Xem lại kết quả'), 'nút Xem lại kết quả');
+  assert.ok(achievement.includes('Đóng'), 'nút Đóng');
+  assert.ok(achievement.includes('hasCelebratedSession'), 'chỉ kích hoạt chúc mừng 1 lần cho mỗi sự kiện hoàn thành');
+
+  const pathDecor = read('client/src/components/student/dailyPractice/PathDecor.jsx');
+  assert.ok(pathDecor.includes('VietnamLearningMap'), 'bản đồ hành trình học tập Việt Nam');
+  assert.ok(pathDecor.includes('Hoàng Sa') && pathDecor.includes('Trường Sa'), 'bản đồ Việt Nam có Hoàng Sa & Trường Sa');
+
+  const soundUtil = read('client/src/utils/sound.js');
+  assert.ok(soundUtil.includes('export const GameSoundManager'), 'GameSoundManager quản lý âm thanh');
+  assert.ok(soundUtil.includes('if (saved === null) return true;'), 'mặc định tắt âm thanh khi chưa cấu hình');
 });

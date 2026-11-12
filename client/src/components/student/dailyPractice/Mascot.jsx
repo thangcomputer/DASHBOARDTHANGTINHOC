@@ -1,9 +1,23 @@
 /**
- * Linh vật cảm xúc - chỉ dùng trong Luyện tập hằng ngày.
- * Asset: /mascot/*.gif (từ cam-xuc-animation). Mood cũ idle/happy/sad/thinking vẫn hoạt động.
+ * Linh vật cảm xúc giọt nước xanh lá DewSkill (chiếc mũ tốt nghiệp ôm sát đầu).
+ * Asset: /mascot/*.gif & .webp đã có trong thư mục public/mascot.
+ * Hỗ trợ đầy đủ 9 trạng thái Mascot Emotion System chuẩn:
+ * idle, correct, incorrect, learning, loading, completed, unlocked, streak, error
+ * cùng toàn bộ các mood hiện có để tương thích ngược 100%.
  */
 const MOOD_SRC = {
+  // 9 trạng thái chuẩn Mascot Emotion System
   idle: '/mascot/cam-xuc-hoc-bai.gif',
+  correct: '/mascot/cam-xuc-vui.gif',
+  incorrect: '/mascot/cam-xuc-suy-nghi.gif',
+  learning: '/mascot/doc-sach.gif',
+  loading: '/mascot/nang-dong.gif',
+  completed: '/mascot/om-trai-tim-vui.gif',
+  unlocked: '/mascot/tot-nghiep-vui-ve.gif',
+  streak: '/mascot/quyet-tam.gif',
+  error: '/mascot/cam-xuc-buon.gif',
+
+  // Tương thích ngược các khóa mood hiện có
   studying: '/mascot/doc-sach.gif',
   happy: '/mascot/cam-xuc-vui.gif',
   celebrate: '/mascot/om-trai-tim-vui.gif',
@@ -25,7 +39,16 @@ const MOOD_SRC = {
 };
 
 const MOOD_LABEL = {
-  idle: 'Linh vật sẵn sàng học',
+  idle: 'Linh vật DewSkill đứng chờ vui vẻ',
+  correct: 'Linh vật DewSkill giơ ngón cái mỉm cười',
+  incorrect: 'Linh vật DewSkill suy nghĩ động viên',
+  learning: 'Linh vật DewSkill đang đọc sách học bài',
+  loading: 'Linh vật DewSkill tập trung làm việc',
+  completed: 'Linh vật DewSkill nhảy vui ăn mừng',
+  unlocked: 'Linh vật DewSkill vui mừng mở khóa chặng mới',
+  streak: 'Linh vật DewSkill quyết tâm giữ chuỗi ngày',
+  error: 'Linh vật DewSkill hơi buồn khi gặp lỗi',
+
   studying: 'Linh vật đang học',
   happy: 'Linh vật vui mừng',
   celebrate: 'Linh vật ăn mừng',
@@ -47,6 +70,14 @@ const MOOD_LABEL = {
 };
 
 const MOTION = {
+  correct: 'dp-bounce',
+  completed: 'dp-bounce',
+  unlocked: 'dp-bounce',
+  streak: 'dp-bounce',
+  loading: 'dp-float',
+  learning: 'dp-float',
+  incorrect: 'dp-float',
+  error: 'dp-droop',
   happy: 'dp-bounce',
   celebrate: 'dp-bounce',
   graduate: 'dp-bounce',
@@ -60,17 +91,19 @@ const MOTION = {
   sleepy: 'dp-droop',
 };
 
-export default function Mascot({ mood = 'idle', size = 96, className = '' }) {
-  const key = MOOD_SRC[mood] ? mood : 'idle';
+export default function Mascot({ mood = 'idle', emotion, size = 96, className = '' }) {
+  const requested = emotion || mood || 'idle';
+  const key = MOOD_SRC[requested] ? requested : 'idle';
   const src = MOOD_SRC[key];
   const motion = MOTION[key] || 'dp-float';
   return (
     <img
       src={src}
-      alt={MOOD_LABEL[key] || 'Linh vật'}
+      alt={MOOD_LABEL[key] || 'Linh vật DewSkill'}
       width={size}
       height={size}
-      className={`object-contain ${motion} ${className}`}
+      data-mascot-emotion={key}
+      className={`object-contain select-none ${motion} ${className}`}
       style={{ width: size, height: size }}
       draggable={false}
       decoding="async"
@@ -78,4 +111,4 @@ export default function Mascot({ mood = 'idle', size = 96, className = '' }) {
   );
 }
 
-export { MOOD_SRC };
+export { MOOD_SRC, MOOD_LABEL };

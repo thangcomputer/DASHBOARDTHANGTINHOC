@@ -3,6 +3,8 @@ import { Award, Check, Crown, Flame, Gift, Sparkles, Star, Target, Timer, Trophy
 import { gameSounds } from '../../../utils/sound';
 import { practiceFinishXpDisplay } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
+import AchievementPopup from './AchievementPopup';
+import StreakCelebration from './StreakCelebration';
 
 const CONFETTI_COLORS = ['#F59E0B', '#EF4444', '#10B981', '#0EA5E9', '#A855F7', '#F97316', '#FACC15'];
 
@@ -66,14 +68,14 @@ function StageShell({ children, button, onNext }) {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-6 px-2 py-6 text-center">
       {children}
-      <button type="button" onClick={onNext} className="dp-3d-btn mt-2 w-full rounded-2xl bg-sky-500 py-3.5 text-base font-black uppercase tracking-wide text-white">
+      <button type="button" onClick={onNext} className="dp-3d-btn mt-2 w-full rounded-2xl bg-emerald-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-[0_5px_0_#047857]">
         {button}
       </button>
     </div>
   );
 }
 
-function DoneStage({ summary, onNext }) {
+function DoneStage({ summary, onNext, onReviewResults, onClose }) {
   const xpDisplay = practiceFinishXpDisplay(summary);
   const xp = useCountUp(xpDisplay.amount);
   const isPerfect = Boolean(
@@ -87,59 +89,40 @@ function DoneStage({ summary, onNext }) {
     else if (good) gameSounds.win();
     else gameSounds.sad();
   }, [good, isPerfect]);
+
+  // Kết hợp AchievementPopup đầy đủ độ chính xác, điểm số, XP thực tế, huy chương phát sáng & 3 nút (Đóng, Tiếp tục học, Xem lại kết quả)
+  // đồng thời hiển thị thêm thông tin Combo và Thời gian bên dưới.
+  const headline = isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!');
+
   return (
-    <StageShell button="Nhận XP" onNext={onNext}>
-      <div className="dp-fly-in"><Mascot mood={good ? 'celebrate' : 'sad'} size={150} /></div>
-      {isPerfect && (
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-3.5 py-1 text-xs font-black uppercase tracking-wider text-amber-900 shadow-sm animate-pulse">
-          <Crown size={14} className="fill-amber-500 text-amber-600" />
-          <span>Bách phát bách trúng 100%</span>
-          <Crown size={14} className="fill-amber-500 text-amber-600" />
-        </div>
-      )}
-      <h2 className="text-3xl font-black text-sky-600">{isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!')}</h2>
-      <p className="max-w-xs text-xs font-semibold text-slate-500">{xpDisplay.caption}</p>
-      <div className="grid w-full grid-cols-3 gap-2.5">
+    <div className="mx-auto flex min-h-[72vh] max-w-xl flex-col items-center justify-center gap-4 px-2 py-6 text-center" data-celebration-headline={headline}>
+      <AchievementPopup
+        summary={summary}
+        eventKey={summary?.sessionId || summary?.id || ''}
+        onContinue={onNext}
+        onReviewResults={onReviewResults || onNext}
+        onClose={onClose || onNext}
+      />
+      <div className="grid w-full max-w-lg grid-cols-3 gap-2.5">
         <StatCard label="Nhận về" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
         <StatCard label="Combo" tone="#0EA5E9" icon={Target} value={`x${summary.maxCombo || 0}`} delay={300} />
         <StatCard label="Thời gian" tone="#10B981" icon={Timer} value={formatDuration(summary.durationSeconds)} delay={450} />
       </div>
-    </StageShell>
+    </div>
   );
 }
 
 function StreakStage({ summary, onNext }) {
   const streak = summary.stats?.streak || 1;
-  const count = useCountUp(streak, 700);
   useEffect(() => { gameSounds.correct(); }, []);
   return (
     <StageShell button="Tiếp tục" onNext={onNext}>
-      <p className="dp-card-in relative rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">
-        {streak > 1 ? `Chuỗi ${streak} ngày rồi! Giữ lửa mỗi ngày để kiến thức nhớ thật lâu nhé.` : 'Chuỗi tỏa sáng! Hãy luyện tập mỗi ngày để tạo thói quen học tập nhé.'}
-      </p>
-      <div className="dp-flame relative flex h-36 w-36 items-center justify-center">
-        <Flame size={140} className="fill-orange-400 text-orange-500" aria-hidden="true" />
-        <Flame size={70} className="absolute bottom-3 fill-amber-300 text-amber-300" aria-hidden="true" />
-      </div>
-      <div>
-        <p className="text-7xl font-black leading-none text-orange-500 tabular-nums">{count}</p>
-        <p className="mt-1 text-2xl font-black text-orange-500">ngày liên tiếp</p>
-      </div>
-      {summary.week?.length > 0 && (
-        <div className="grid w-full grid-cols-7 gap-1.5">
-          {summary.week.map((day, index) => (
-            <div key={day.day} className="flex flex-col items-center gap-1.5">
-              <span className={`text-xs font-black ${day.today ? 'text-orange-500' : 'text-slate-400'}`}>{day.label}</span>
-              <span
-                className={`dp-card-in flex h-9 w-9 items-center justify-center rounded-full ${day.played ? 'bg-orange-500 text-white' : 'bg-slate-200'}`}
-                style={{ animationDelay: `${index * 70}ms` }}
-              >
-                {day.played && <Check size={18} strokeWidth={3.5} aria-hidden="true" />}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* StreakCelebration hiển thị ngọn lửa phản ứng & lời chúc mừng ở các mốc 3, 7, 30 ngày liên tiếp */}
+      <StreakCelebration
+        streak={streak}
+        streakIncreased={Boolean(summary.streakIncreased)}
+        week={summary.week || []}
+      />
     </StageShell>
   );
 }
@@ -160,7 +143,7 @@ function QuestStage({ onNext }) {
             <div className="h-full rounded-full bg-amber-400 transition-all duration-700 ease-out" style={{ width: filled ? '100%' : '0%' }} />
             <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white drop-shadow">1 / 1</span>
           </div>
-          <span className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-b from-sky-400 to-sky-600 text-white shadow-md ${filled ? 'dp-bounce' : ''}`}>
+          <span className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md ${filled ? 'dp-bounce' : ''}`}>
             <Gift size={26} aria-hidden="true" />
           </span>
         </div>
@@ -188,7 +171,7 @@ function CourseTrophyStage({ summary, onNext }) {
 
         <div className="relative mt-5 flex items-center justify-center gap-3 sm:gap-6">
           <div className="dp-fly-in">
-            <Mascot mood="graduate" size={112} />
+            <Mascot mood="unlocked" size={112} />
           </div>
           <div className="relative flex flex-col items-center">
             <div className="mb-1.5 flex items-center gap-1">
@@ -210,7 +193,7 @@ function CourseTrophyStage({ summary, onNext }) {
             </span>
           </div>
           <div className="dp-fly-in hidden sm:block">
-            <Mascot mood="celebrate" size={104} />
+            <Mascot mood="completed" size={104} />
           </div>
         </div>
 
@@ -248,7 +231,7 @@ function CourseTrophyStage({ summary, onNext }) {
  * Chuỗi màn ăn mừng sau lượt chơi (kiểu Duolingo):
  * Đã luyện tập xong → Cúp hoàn thành chặng/khóa học (nếu có) → chuỗi ngày (khi tăng) → nhiệm vụ hằng ngày (lượt đầu trong ngày) → kết quả chi tiết.
  */
-export default function Celebration({ summary, onDone }) {
+export default function Celebration({ summary, onDone, onClose, onReviewResults }) {
   const hasTrophyStage = Boolean(summary.path?.passed && (summary.path?.topicCompleted || summary.path?.unitCompleted || summary.path?.testOut));
   const stages = useMemo(() => [
     'done',
@@ -265,7 +248,14 @@ export default function Celebration({ summary, onDone }) {
   const stage = stages[index];
   return (
     <div key={stage}>
-      {stage === 'done' && <DoneStage summary={summary} onNext={next} />}
+      {stage === 'done' && (
+        <DoneStage
+          summary={summary}
+          onNext={next}
+          onReviewResults={onReviewResults || onDone}
+          onClose={onClose || onDone}
+        />
+      )}
       {stage === 'trophy' && <CourseTrophyStage summary={summary} onNext={next} />}
       {stage === 'streak' && <StreakStage summary={summary} onNext={next} />}
       {stage === 'quest' && <QuestStage onNext={next} />}

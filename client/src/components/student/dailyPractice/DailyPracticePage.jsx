@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, XCircle, Zap,
+  ArrowLeft, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, Zap,
 } from 'lucide-react';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
@@ -13,6 +13,10 @@ import {
 import DailyPracticeHero from './DailyPracticeHero';
 import DailyPracticeGoalPanel from './DailyPracticeGoalPanel';
 import Mascot from './Mascot';
+import AnimatedProgressBar from './AnimatedProgressBar';
+import AnswerFeedback from './AnswerFeedback';
+import { SoundToggleButton } from './GameButton';
+import { AnimatedXpCounter } from './XPRewardAnimation';
 import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import Celebration from './Celebration';
@@ -501,7 +505,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 pt-6 pb-12 sm:gap-6 sm:px-6 sm:pt-10">
-      {/* Thanh trên: thoát · tiến độ · XP */}
+      {/* Thanh trên: thoát · tiến độ · XP · âm thanh */}
       <header className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/80 sm:gap-4 sm:px-5 sm:py-3.5">
         <button
           type="button"
@@ -511,23 +515,15 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         >
           <LogOut size={16} aria-hidden="true" /> Thoát
         </button>
-        <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-extrabold text-slate-600 sm:text-[13px]">{contextLabel}</span>
-            <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-black tabular-nums text-slate-700">
-              {index + 1}/{total}
-            </span>
-          </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200/70">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-        <div className="relative shrink-0">
+        <AnimatedProgressBar
+          progress={progress}
+          currentStep={index + 1}
+          totalSteps={total}
+          label={contextLabel}
+        />
+        <div className="relative flex shrink-0 items-center gap-2">
           {combo >= 2 && (
-            <span className="dp-combo absolute -top-3 right-0 z-[1] flex h-5 min-w-5 items-center justify-center whitespace-nowrap rounded-full bg-orange-500 px-2 text-[10px] font-black leading-none text-white shadow-sm">
+            <span className="dp-combo absolute -top-3 right-12 z-[1] flex h-5 min-w-5 items-center justify-center whitespace-nowrap rounded-full bg-orange-500 px-2 text-[10px] font-black leading-none text-white shadow-sm">
               Combo x{combo}
             </span>
           )}
@@ -541,7 +537,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           >
             <span className="flex items-center gap-1 leading-none">
               <Zap size={16} className="fill-amber-400 text-amber-500" aria-hidden="true" />
-              {walletXp}
+              <AnimatedXpCounter value={walletXp} />
             </span>
             {isTestOutStake ? (
               <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">−{stakeXp} cược</span>
@@ -549,6 +545,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
               <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">{perQuestionStake} XP/câu</span>
             ) : null)}
           </span>
+          <SoundToggleButton compact />
         </div>
       </header>
 
@@ -558,7 +555,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         <div className="flex items-start gap-4 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6">
           <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-slate-50 ring-1 ring-emerald-100/80 sm:flex">
             <Mascot
-              mood={result ? (result.correct ? 'happy' : 'sad') : reveal ? 'idea' : 'studying'}
+              mood={result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning'}
               size={52}
               className="shrink-0"
             />
@@ -640,28 +637,21 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       )}
 
       {result && (
-        <div className={`dp-slide-up flex items-center gap-4 rounded-2xl px-5 py-4 shadow-sm ${result.correct ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-red-50 ring-1 ring-red-200'}`}>
-          <div className="min-w-0 flex-1">
-            <p className={`flex flex-wrap items-center gap-2 text-base font-black sm:text-lg ${result.correct ? 'text-emerald-700' : 'text-red-600'}`}>
-              {result.correct ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
-              {feedbackTitle}
-            </p>
-            {!result.correct && result.correctAnswer?.text && (
-              <p className="mt-1 truncate text-sm font-bold text-slate-700">Đáp án đúng: {result.correctAnswer.text}</p>
-            )}
-            {result.explanation && <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-600">{result.explanation}</p>}
-          </div>
-          <button
-            type="button"
-            onClick={next}
-            disabled={busy}
-            className={`cms-btn shrink-0 !rounded-xl !px-5 !py-3 text-white ${result.correct ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-red-600 hover:!bg-red-700'}`}
-          >
-            {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-            {index + 1 < total ? 'Tiếp theo' : 'Kết quả'}
-            <ArrowRight size={16} />
-          </button>
-        </div>
+        <AnswerFeedback
+          result={result}
+          feedbackTitle={feedbackTitle}
+          confirmedXp={
+            result.correct
+              ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
+                ? result.xpDelta
+                : (isPerQuestion ? perQuestionStake : 0))
+              : 0
+          }
+          rewardKey={`${session.id}:${question.id}`}
+          isLastQuestion={index + 1 >= total}
+          busy={busy}
+          onNext={next}
+        />
       )}
 
       {buyXpOpen && (
@@ -1295,7 +1285,12 @@ export default function DailyPracticePage() {
           onFinished={finished}
         />
       ) : summary && celebrating ? (
-        <Celebration summary={summary} onDone={() => setCelebrating(false)} />
+        <Celebration
+          summary={summary}
+          onDone={() => setCelebrating(false)}
+          onReviewResults={() => setCelebrating(false)}
+          onClose={goHome}
+        />
       ) : summary ? (
         <ResultScreen
           summary={summary}

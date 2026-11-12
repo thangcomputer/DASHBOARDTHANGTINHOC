@@ -4,6 +4,9 @@ import {
 } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 import { topicColor, topicIcon } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
+import { SoundToggleButton } from './GameButton';
+import { AnimatedXpCounter } from './XPRewardAnimation';
+import StreakCelebration, { ReactiveStreakFlame } from './StreakCelebration';
 
 /** Banner luyện tập hằng ngày — thiết kế chuẩn Duolingo, gọn gàng, đồng bộ và có chiều sâu. */
 export default function DailyPracticeHero({
@@ -58,6 +61,7 @@ export default function DailyPracticeHero({
     {
       label: 'Chuỗi',
       value: `${streak} ngày`,
+      isStreak: true,
       icon: Flame,
       cardClass: 'border-orange-200/70 bg-gradient-to-br from-orange-50/90 via-white to-amber-50/60',
       iconWrap: 'bg-gradient-to-br from-orange-100 to-amber-100 ring-orange-200/80',
@@ -66,7 +70,7 @@ export default function DailyPracticeHero({
     },
     {
       label: 'XP hôm nay',
-      value: `${(stats?.todayXp || 0).toLocaleString('vi-VN')}`,
+      xpValue: stats?.todayXp || 0,
       icon: Zap,
       cardClass: 'border-amber-200/70 bg-gradient-to-br from-amber-50/90 via-white to-yellow-50/60',
       iconWrap: 'bg-gradient-to-br from-amber-100 to-yellow-100 ring-amber-200/80',
@@ -75,7 +79,7 @@ export default function DailyPracticeHero({
     },
     {
       label: 'Tổng XP luyện',
-      value: `${(stats?.xpTotal || 0).toLocaleString('vi-VN')}`,
+      xpValue: stats?.xpTotal || 0,
       icon: Trophy,
       cardClass: 'border-violet-200/70 bg-gradient-to-br from-violet-50/90 via-white to-indigo-50/60',
       iconWrap: 'bg-gradient-to-br from-violet-100 to-indigo-100 ring-violet-200/80',
@@ -168,6 +172,11 @@ export default function DailyPracticeHero({
                   Chặng <strong className="font-black tabular-nums" style={{ color: accentText }}>{completedUnits}/{totalUnits}</strong>
                 </span>
               ) : null}
+
+              {/* Huy hiệu chúc mừng mốc chuỗi 3, 7, 30 ngày */}
+              {streak >= 3 && (
+                <StreakCelebration streak={streak} streakIncreased={playedToday} compact />
+              )}
             </div>
 
             {/* Tiêu đề chính & mô tả phụ */}
@@ -211,17 +220,25 @@ export default function DailyPracticeHero({
         <div className="flex flex-col gap-3.5 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between xl:shrink-0 xl:flex-col xl:items-end xl:justify-center xl:border-t-0 xl:pt-0">
           {/* 3 chỉ số gamification */}
           <dl className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-2.5">
-            {metrics.map(({ label, value, icon: Icon, cardClass, iconWrap, iconClass, valueClass }) => (
+            {metrics.map(({ label, value, xpValue, isStreak, icon: Icon, cardClass, iconWrap, iconClass, valueClass }) => (
               <div
                 key={label}
                 className={`flex items-center gap-2.5 rounded-2xl border px-3 py-2 shadow-2xs ${cardClass}`}
               >
                 <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ${iconWrap}`}>
-                  <Icon size={17} className={iconClass} aria-hidden="true" />
+                  {isStreak ? (
+                    <ReactiveStreakFlame streak={streak} streakIncreased={playedToday} size={18} />
+                  ) : (
+                    <Icon size={17} className={iconClass} aria-hidden="true" />
+                  )}
                 </span>
                 <div className="min-w-0">
                   <dd className={`truncate text-sm font-black leading-tight tabular-nums ${valueClass}`}>
-                    {value}
+                    {typeof xpValue === 'number' ? (
+                      <AnimatedXpCounter value={xpValue} formatLocale />
+                    ) : (
+                      value
+                    )}
                   </dd>
                   <dt className="truncate text-[11px] font-semibold leading-tight text-slate-500">
                     {label}
@@ -231,11 +248,14 @@ export default function DailyPracticeHero({
             ))}
           </dl>
 
-          {/* Nút bấm chính (không bao giờ bị rớt dòng chữ) + chú thích XP */}
+          {/* Nút bấm chính + nút bật/tắt âm thanh hiệu ứng + chú thích XP */}
           <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:items-end xl:w-full xl:flex-row xl:items-center xl:justify-end xl:gap-3">
-            <p className="order-2 text-center text-[11px] font-semibold text-slate-400 sm:text-right xl:order-1">
-              XP dùng cho lượt luyện & gợi ý
-            </p>
+            <div className="order-2 flex items-center justify-between gap-2 sm:justify-end xl:order-1">
+              <p className="text-[11px] font-semibold text-slate-400">
+                XP dùng cho lượt luyện & gợi ý
+              </p>
+              <SoundToggleButton />
+            </div>
             <button
               type="button"
               disabled={primaryDisabled}

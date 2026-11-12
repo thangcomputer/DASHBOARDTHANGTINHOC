@@ -108,21 +108,33 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
             type="button"
             disabled={locked || out}
             onClick={() => { gameSounds.tap(); onSubmit({ index }); }}
+            data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
             className={`${CHIP} group flex items-center gap-3.5 !rounded-2xl !px-4 !py-4 text-left text-[15px] sm:!px-5 ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop'
                 : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake'
                   : out ? 'border-slate-100 bg-slate-50 text-slate-300 line-through opacity-60'
-                    : 'border-slate-200/90 hover:border-sky-400 hover:bg-sky-50/40'
+                    : 'border-slate-200/90 hover:scale-[1.01] hover:border-emerald-400 hover:bg-emerald-50/40 active:translate-y-[2px]'
               }`}
           >
-            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect ? 'bg-emerald-500 text-white'
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect ? 'dp-pop bg-emerald-500 text-white'
                 : isWrongPick ? 'bg-red-500 text-white'
                   : out ? 'bg-slate-100 text-slate-300'
-                    : 'bg-slate-100 text-slate-600 group-hover:bg-sky-500 group-hover:text-white'
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-emerald-500 group-hover:text-white'
               }`}
             >
-              {String.fromCharCode(65 + index)}
+              {isCorrect ? (
+                <Check size={18} strokeWidth={3.2} aria-label="Đúng" />
+              ) : isWrongPick ? (
+                <X size={18} strokeWidth={3} aria-label="Sai" />
+              ) : (
+                String.fromCharCode(65 + index)
+              )}
             </span>
             <span className="flex-1 leading-snug">{option}</span>
+            {isCorrect && (
+              <span className="dp-pop flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-2xs" aria-hidden="true">
+                <Check size={14} strokeWidth={3.2} />
+              </span>
+            )}
           </button>
         );
       })}
@@ -148,9 +160,15 @@ export function TrueFalseQuestion({ result, chosen, onSubmit }) {
             type="button"
             disabled={locked}
             onClick={() => { gameSounds.tap(); onSubmit({ value }); }}
-            className={`${CHIP} flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 dp-shake' : CHIP_IDLE
+            data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
+            className={`${CHIP} relative flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake' : `${CHIP_IDLE} hover:scale-[1.01] hover:border-emerald-400 active:translate-y-[2px]`
               }`}
           >
+            {isCorrect && (
+              <span className="dp-pop absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-2xs" aria-hidden="true">
+                <Check size={14} strokeWidth={3.2} />
+              </span>
+            )}
             <span className={`flex h-12 w-12 items-center justify-center rounded-full text-white ${tone === 'emerald' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-gradient-to-b from-red-400 to-red-600'}`}>
               <Icon size={26} strokeWidth={3} aria-hidden="true" />
             </span>

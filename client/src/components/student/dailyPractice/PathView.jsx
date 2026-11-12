@@ -26,6 +26,7 @@ import { DropletMark, PathITBackdrop, PathStageArt } from './PathDecor';
 import FreeMeetPlanModal from './FreeMeetPlanModal';
 import { collectUnitVideos, UnitStageHeader } from './PathUnitStageHeader';
 import { UnitStageChest } from './UnitStageChest';
+import LevelUnlockEffect, { useNewlyUnlockedUnit } from './LevelUnlockEffect';
 
 export { collectUnitVideos, UnitStageHeader };
 
@@ -163,7 +164,7 @@ function ProgressRing({ size, progress, color }) {
 }
 
 /** Một nút trên lộ trình - bên trong popover có 3 nấc Dễ / Vừa / Khó. */
-function PracticeHubNode({ node, color, isNext, selected, onClick }) {
+function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selected, onClick }) {
   const locked = node.state === 'locked';
   const done = node.state === 'completed';
   const size = 64;
@@ -171,14 +172,19 @@ function PracticeHubNode({ node, color, isNext, selected, onClick }) {
   const doneCount = levels.filter((level) => level.state === 'completed').length;
   const progress = levels.length ? doneCount / levels.length : 0;
   const HubIcon = NODE_ICONS[node.icon] || Dumbbell;
+  // Nút khóa màu xám; nút đã hoàn thành chuyển xanh lá có dấu tích; nút đang học phát sáng nhẹ
   const face = locked
     ? '#E5E7EB'
     : done
-      ? 'radial-gradient(circle at 50% 30%, #FFD84D 0%, #F59E0B 65%)'
+      ? 'radial-gradient(circle at 50% 30%, #34D399 0%, #10B981 68%)'
       : `radial-gradient(circle at 50% 30%, ${color.from} 0%, ${color.to} 60%)`;
-  const base = locked ? '#C4C9D1' : done ? darken('#F59E0B', 0.18) : darken(color.to, 0.15);
+  const base = locked ? '#C4C9D1' : done ? '#047857' : darken(color.to, 0.15);
   return (
-    <div className="relative flex flex-col items-center" data-path-hub="">
+    <div
+      className={`relative flex flex-col items-center ${isNewlyUnlocked ? 'dp-node-unlock-pop' : ''}`}
+      data-path-hub=""
+      data-node-state={node.state}
+    >
       {isNext && !selected && (
         <span className="dp-bob absolute -top-11 z-30 whitespace-nowrap rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wide shadow-sm" style={{ color: color.to }}>
           Bắt đầu
@@ -193,7 +199,9 @@ function PracticeHubNode({ node, color, isNext, selected, onClick }) {
           onClick={onClick}
           aria-label={node.kind === 'study' || node.icon === 'book' ? `${node.label}. Bài 1, Bài 2…` : `${node.label}. 3 cấp Dễ, Vừa, Khó`}
           aria-expanded={selected}
-          className="dp-node absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full disabled:cursor-not-allowed"
+          className={`dp-node absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full disabled:cursor-not-allowed ${
+            isNext ? 'dp-node-active-glow' : ''
+          }`}
           style={{
             width: size,
             height: size - 6,
@@ -211,9 +219,27 @@ function PracticeHubNode({ node, color, isNext, selected, onClick }) {
               />
             ))}
           </span>
+          {/* Nút đã hoàn thành có dấu tích nổi bật */}
+          {done && (
+            <span
+              className="dp-pop absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs ring-2 ring-white"
+              aria-hidden="true"
+            >
+              <Check size={13} strokeWidth={3.5} />
+            </span>
+          )}
+          {/* Nút khóa hiển thị biểu tượng ổ khóa xám */}
+          {locked && (
+            <span
+              className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-300 text-slate-600 ring-2 ring-white"
+              aria-hidden="true"
+            >
+              <Lock size={11} strokeWidth={2.8} />
+            </span>
+          )}
         </button>
       </div>
-      <span className={`mt-1 text-xs font-black ${locked ? 'text-slate-400' : 'text-slate-700'}`}>{node.label}</span>
+      <span className={`mt-1 text-xs font-black ${locked ? 'text-slate-400' : done ? 'text-emerald-700' : 'text-slate-700'}`}>{node.label}</span>
     </div>
   );
 }
@@ -820,6 +846,11 @@ export default function PathView({
   }, [popover, videoOpen, lessonOpen]);
 
   const current = topics.find((item) => item.topic.id === topicId) || null;
+  const newlyUnlockedUnitId = useNewlyUnlockedUnit(current?.units || []);
+  const newlyUnlockedUnit = useMemo(
+    () => (newlyUnlockedUnitId ? current?.units?.find((u) => u.id === newlyUnlockedUnitId) || null : null),
+    [current, newlyUnlockedUnitId],
+  );
   const topicsRef = useRef(topics);
   const currentRef = useRef(current);
   topicsRef.current = topics;
@@ -984,11 +1015,20 @@ export default function PathView({
             )}
           </section>
 
+          {newlyUnlockedUnit && (
+            <LevelUnlockEffect unlockedUnit={newlyUnlockedUnit} active />
+          )}
+
           <div className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-[#F7F7F7] shadow-sm">
-            <PathITBackdrop accentSoft={color.soft} />
+            <PathITBackdrop
+              accentSoft={color.soft}
+              completedUnits={current.completedUnits}
+              totalUnits={current.totalUnits}
+            />
             {current.units.map((unit, unitIndex) => {
               const tone = unitColor(unit.index);
               const locked = unit.state === 'locked';
+              const isUnitNewlyUnlocked = newlyUnlockedUnitId === unit.id;
               const testOutOpen = popover?.unitId === unit.id && popover.testOut;
               const isNextUnit = current.next?.unitId === unit.id;
               const pathItems = buildUnitPathItems(unit);
@@ -1078,6 +1118,7 @@ export default function PathView({
                                   node={item.node}
                                   color={tone}
                                   isNext={hubNext}
+                                  isNewlyUnlocked={isUnitNewlyUnlocked && index === 0}
                                   selected={Boolean(hubSelected)}
                                   onClick={() => toggleHub(unit, item.node.key)}
                                 />
