@@ -1,142 +1,435 @@
 /**
- * LoadingScreen.jsx - 4 kiểu loading screen toàn màn hình
- * Được render bọc App khi khởi tạo, tuỳ vào loadingStyle từ API.
+ * LoadingScreen.jsx - Màn hình và biểu tượng tải dữ liệu xịn xò chuẩn Thắng Tin Học
+ * Hỗ trợ 4 phong cách 3D hiện đại, hiệu ứng ánh sáng gradient, vòng quay laser và thanh tiến trình.
+ * Dùng cho: Khởi động hệ thống, xác thực tài khoản, tải trang (Suspense), và nạp dữ liệu tab.
  */
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 
-const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+const API = import.meta.env.VITE_API_URL || '';
 
-export default function LoadingScreen({ onReady }) {
-  const [style, setStyle] = useState(1);
-  const [logoUrl, setLogoUrl] = useState('');
+// Bộ nhớ cache tạm thời để tránh re-fetch lặp lại khi chuyển trang/tab
+let _cachedSettings = null;
+let _settingsFetchPromise = null;
+
+async function getCachedWebSettings() {
+  if (_cachedSettings) return _cachedSettings;
+  if (_settingsFetchPromise) return _settingsFetchPromise;
+
+  _settingsFetchPromise = (async () => {
+    try {
+      const r = await fetch(`${API}/api/settings/web`);
+      const res = await r.json();
+      if (res?.success && res?.data) {
+        _cachedSettings = {
+          loadingStyle: Number(res.data.loadingStyle) || 1,
+          logoUrl: res.data.logoUrl || '/brand/logo.webp',
+        };
+        return _cachedSettings;
+      }
+    } catch {
+      // Fallback mặc định
+    }
+    _cachedSettings = { loadingStyle: 1, logoUrl: '/brand/logo.webp' };
+    return _cachedSettings;
+  })();
+
+  try {
+    return await _settingsFetchPromise;
+  } finally {
+    _settingsFetchPromise = null;
+  }
+}
+
+/**
+ * LoadingScreen
+ * @param {boolean} splash - Nếu là splash khởi động đầu tiên của app, tự động ẩn sau khi hoàn tất
+ * @param {function} onReady - Callback khi splash kết thúc
+ * @param {string} mode - 'fullscreen' | 'tab' | 'inline' | 'preview'
+ * @param {string} message - Tiêu đề trạng thái (mặc định: 'Đang tải dữ liệu…')
+ * @param {string} subtext - Dòng ghi chú nhỏ phía dưới
+ * @param {number} style - Ép kiểu hiển thị (1..4) nếu cần
+ */
+export default function LoadingScreen({
+  splash = false,
+  onReady,
+  mode = 'fullscreen',
+  message = 'Đang tải dữ liệu…',
+  subtext = 'Vui lòng đợi trong giây lát, hệ thống đang đồng bộ dữ liệu…',
+  style: propStyle,
+}) {
+  const [style, setStyle] = useState(() => propStyle || _cachedSettings?.loadingStyle || 1);
+  const [logoUrl, setLogoUrl] = useState(() => _cachedSettings?.logoUrl || '/brand/logo.webp');
   const [show, setShow] = useState(true);
+  const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    // Fetch web settings rồi hiện loading 1.5s
-    fetch(`${API}/api/settings/web`)
-      .then(r => r.json())
-      .then(res => {
-        if (res.success && res.data) {
-          setStyle(res.data.loadingStyle || 1);
-          setLogoUrl(res.data.logoUrl || '');
-        }
-      })
-      .catch(() => { })
-      .finally(() => {
+    if (propStyle) setStyle(propStyle);
+  }, [propStyle]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCachedWebSettings().then((cfg) => {
+      if (!isMounted) return;
+      if (!propStyle && cfg.loadingStyle) setStyle(cfg.loadingStyle);
+      if (cfg.logoUrl) setLogoUrl(cfg.logoUrl);
+    });
+
+    // Nếu là splash khởi động lúc mở website
+    if (splash) {
+      const timer = setTimeout(() => {
+        if (!isMounted) return;
+        setFading(true);
         setTimeout(() => {
+          if (!isMounted) return;
           setShow(false);
           onReady?.();
-        }, 1500);
-      });
-  }, []);
+        }, 350);
+      }, 900); // 900ms đủ êm dịu, không giam người dùng quá lâu
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
+    }
 
-  if (!show) return null;
+    return () => {
+      isMounted = false;
+    };
+  }, [splash, propStyle, onReady]);
 
+  const resolvedLogo = useMemo(() => {
+    if (!logoUrl) return '/brand/logo.webp';
+    if (logoUrl.startsWith('http') || logoUrl.startsWith('/')) return logoUrl;
+    return `${API}/${logoUrl}`;
+  }, [logoUrl]);
+
+  if (!show && splash) return null;
+
+  // ─── Giao diện TAB COMPACT (khi nạp tab bên trong dashboard) ───
+  if (mode === 'tab') {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[320px] w-full animate-in fade-in duration-300">
+        <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="compact" />
+        <div className="mt-5 text-center">
+          <p className="text-sm font-bold text-slate-700 tracking-wide">{message}</p>
+          <div className="mt-2.5 mx-auto w-36 h-1 bg-emerald-100 rounded-full overflow-hidden relative">
+            <div className="loading-laser-beam" />
+          </div>
+        </div>
+        <LoadingStyles />
+      </div>
+    );
+  }
+
+  // ─── Giao diện INLINE / PREVIEW (nhỏ gọn trong card hoặc modal) ───
+  if (mode === 'inline' || mode === 'preview') {
+    return (
+      <div className="flex flex-col items-center justify-center py-6 px-3 w-full">
+        <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="mini" />
+        {message && <p className="mt-2 text-xs font-semibold text-slate-600">{message}</p>}
+        <LoadingStyles />
+      </div>
+    );
+  }
+
+  // ─── Giao diện TOÀN MÀN HÌNH (FULLSCREEN - XỊN XÒ) ───
   return (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-900 via-slate-900 to-indigo-950 flex flex-col items-center justify-center transition-opacity duration-500">
-      <style>{`
-        @keyframes gradientSpin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes pulse3d {
-          0%, 100% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.15); opacity: 1; }
-        }
-        @keyframes cube3dFull {
-          0%   { transform: rotateX(0deg) rotateY(0deg); }
-          25%  { transform: rotateX(90deg) rotateY(0deg); }
-          50%  { transform: rotateX(90deg) rotateY(90deg); }
-          75%  { transform: rotateX(0deg) rotateY(90deg); }
-          100% { transform: rotateX(0deg) rotateY(0deg); }
-        }
-        @keyframes typewrite {
-          0%   { width: 0; }
-          50%  { width: 200px; }
-          90%  { width: 200px; }
-          100% { width: 0; }
-        }
-        @keyframes blinkCursor {
-          50% { border-color: transparent; }
-        }
-        .loading-gradient-ring {
-          width: 56px; height: 56px;
-          border-radius: 50%;
-          border: 4px solid transparent;
-          border-top: 4px solid #818cf8;
-          border-right: 4px solid #6366f1;
-          animation: gradientSpin 1s linear infinite;
-          box-shadow: 0 0 20px rgba(99,102,241,0.3);
-        }
-        .loading-pulse-logo {
-          animation: pulse3d 1.5s ease-in-out infinite;
-        }
-        .loading-typewriter {
-          font-family: 'JetBrains Mono', 'Fira Code', monospace;
-          font-size: 16px;
-          color: #c4b5fd;
-          overflow: hidden;
-          white-space: nowrap;
-          border-right: 3px solid #818cf8;
-          width: 0;
-          animation: typewrite 3s steps(18) infinite, blinkCursor 0.5s step-end infinite alternate;
-        }
-        .loading-cube-3d {
-          width: 48px; height: 48px;
-          background: linear-gradient(135deg, #22d3ee, #6366f1);
-          border-radius: 12px;
-          animation: cube3dFull 2.5s infinite ease-in-out;
-          box-shadow: 0 0 30px rgba(99,102,241,0.4);
-        }
-      `}</style>
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed inset-0 z-[999999] flex flex-col items-center justify-center select-none transition-all duration-350 ${
+        fading ? 'opacity-0 scale-102 pointer-events-none' : 'opacity-100 scale-100'
+      }`}
+      style={{
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f0fdf4 45%, #ecfeff 80%, #f1f5f9 100%)',
+      }}
+    >
+      <LoadingStyles />
 
-      {/* Style 1: Gradient Spinner */}
-      {style === 1 && (
-        <div className="flex flex-col items-center gap-6">
-          <div className="loading-gradient-ring" />
-          <p className="text-indigo-300 text-sm font-medium tracking-wider animate-pulse">Đang khởi tạo...</p>
-        </div>
-      )}
+      {/* Hiệu ứng nền ambient glow mờ ảo phía sau */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute -top-[10%] -left-[10%] w-[55vw] h-[55vw] rounded-full blur-3xl opacity-35"
+          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, transparent 70%)' }}
+        />
+        <div
+          className="absolute -bottom-[10%] -right-[10%] w-[50vw] h-[50vw] rounded-full blur-3xl opacity-30"
+          style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.25) 0%, transparent 70%)' }}
+        />
+      </div>
 
-      {/* Style 2: Logo Pulse */}
-      {style === 2 && (
-        <div className="flex flex-col items-center gap-6">
-          <div className="loading-pulse-logo">
-            {logoUrl ? (
-              <img src={logoUrl.startsWith('http') ? logoUrl : `${API}${logoUrl}`}
-                alt="Logo" className="w-20 h-20 object-contain drop-shadow-2xl" />
-            ) : (
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-red-700 flex items-center justify-center shadow-2xl shadow-indigo-500/30">
-                <span className="text-white text-2xl font-black">S?T</span>
-              </div>
-            )}
-          </div>
-          <p className="text-indigo-300 text-sm font-medium tracking-wider">Thắng Tin Học</p>
-          <div className="flex gap-1">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-            ))}
-          </div>
+      {/* Hộp thẻ kính 3D nổi bật ở giữa */}
+      <div className="relative z-10 flex flex-col items-center px-8 py-9 md:px-12 md:py-11 rounded-[32px] bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_25px_60px_-15px_rgba(16,185,129,0.22),0_0_0_1px_rgba(16,185,129,0.06),0_8px_20px_rgba(0,0,0,0.04)] max-w-sm md:max-w-md w-[90%] text-center">
+        {/* Biểu tượng 3D chính theo phong cách được chọn */}
+        <div className="mb-6 relative flex items-center justify-center">
+          <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="large" />
         </div>
-      )}
 
-      {/* Style 3: Typewriter */}
-      {style === 3 && (
-        <div className="flex flex-col items-center gap-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-2xl mb-2">
-            <span className="text-white text-lg">📚</span>
-          </div>
-          <div className="loading-typewriter">Đang tải dữ liệu...</div>
+        {/* Nhãn thương hiệu */}
+        <div className="flex items-center justify-center gap-1.5 mb-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-600">
+            Thắng Tin Học
+          </span>
         </div>
-      )}
 
-      {/* Style 4: 3D Cube */}
-      {style === 4 && (
-        <div className="flex flex-col items-center gap-6" style={{ perspective: '600px' }}>
-          <div className="loading-cube-3d" style={{ transformStyle: 'preserve-3d' }} />
-          <p className="text-cyan-300 text-sm font-medium tracking-wider animate-pulse">Đang kết nối...</p>
+        {/* Tiêu đề trạng thái với gradient bóng bẩy */}
+        <h2 className="text-lg md:text-xl font-black text-slate-800 tracking-tight leading-snug">
+          {message}
+        </h2>
+
+        {/* Thanh laser progress siêu mượt */}
+        <div className="mt-4 w-48 md:w-56 h-1.5 bg-slate-100 rounded-full overflow-hidden relative shadow-inner">
+          <div className="loading-laser-beam" />
         </div>
-      )}
+
+        {/* Phụ đề gợi ý */}
+        {subtext && (
+          <p className="mt-3.5 text-xs text-slate-500 font-medium leading-relaxed max-w-xs">
+            {subtext}
+          </p>
+        )}
+      </div>
     </div>
+  );
+}
+
+/**
+ * Biểu tượng 3D tương ứng theo 4 kiểu phong cách:
+ * Style 1: Tối giản (Luxury Orbital Dual Ring)
+ * Style 2: Thương hiệu (Brand 3D Hologram + Radar Sonar Wave)
+ * Style 3: Giáo dục (Data Stream / Smart Learning Core)
+ * Style 4: Công nghệ (Isometric 3D Cyber Cube)
+ */
+export function LoadingIcon3D({ style = 1, logoUrl = '/brand/logo.webp', size = 'large' }) {
+  const isLarge = size === 'large';
+  const isMini = size === 'mini';
+
+  const ringSize = isLarge ? 96 : isMini ? 40 : 64;
+  const coreSize = isLarge ? 72 : isMini ? 30 : 48;
+  const logoImgSize = isLarge ? 44 : isMini ? 18 : 30;
+
+  // ─── Style 1: Tối giản (Vòng quay hào quang kép Holographic) ───
+  if (style === 1) {
+    return (
+      <div className="relative flex items-center justify-center" style={{ width: ringSize, height: ringSize }}>
+        {/* Vòng quay gradient bên ngoài */}
+        <div
+          className="absolute inset-0 rounded-full loading-orbital-ring"
+          style={{
+            background: 'conic-gradient(from 0deg, transparent 0%, #10b981 65%, #06b6d4 95%)',
+            mask: 'radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px))',
+            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px))',
+          }}
+        />
+
+        {/* Vòng quay ngược phụ họa nét đứt */}
+        <div
+          className="absolute inset-1.5 rounded-full border border-dashed border-emerald-400/40 loading-orbital-counter"
+        />
+
+        {/* Lõi trung tâm với logo */}
+        <div
+          className="rounded-full bg-white flex items-center justify-center shadow-[0_4px_16px_rgba(16,185,129,0.18)] border border-emerald-100/80 loading-core-pulse"
+          style={{ width: coreSize, height: coreSize }}
+        >
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="object-contain"
+            style={{ width: logoImgSize, height: logoImgSize }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Style 2: Thương hiệu (3D Brand Badge + Sóng Radar Sonar) ───
+  if (style === 2) {
+    return (
+      <div className="relative flex items-center justify-center" style={{ width: ringSize, height: ringSize }}>
+        {/* 2 vòng sóng radar lan tỏa */}
+        <div className="absolute inset-0 rounded-3xl bg-emerald-400/25 loading-sonar-wave" />
+        <div className="absolute inset-0 rounded-3xl bg-teal-400/20 loading-sonar-wave" style={{ animationDelay: '0.7s' }} />
+
+        {/* Khối huy hiệu nổi 3D */}
+        <div
+          className="relative rounded-2xl bg-gradient-to-br from-white via-emerald-50/70 to-emerald-100/50 p-2 flex items-center justify-center shadow-[0_10px_25px_-5px_rgba(16,185,129,0.35),0_0_0_1.5px_rgba(16,185,129,0.3)] loading-badge-float"
+          style={{ width: coreSize + 8, height: coreSize + 8 }}
+        >
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="object-contain drop-shadow-md"
+            style={{ width: logoImgSize + 4, height: logoImgSize + 4 }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Style 3: Giáo dục (Dòng dữ liệu số & Lõi tri thức) ───
+  if (style === 3) {
+    return (
+      <div className="relative flex items-center justify-center" style={{ width: ringSize, height: ringSize }}>
+        {/* Vòng quay tia sáng công nghệ */}
+        <div
+          className="absolute inset-0 rounded-full border-2 border-transparent border-t-emerald-500 border-r-teal-400 loading-orbital-ring"
+          style={{ boxShadow: '0 0 16px rgba(16,185,129,0.4)' }}
+        />
+
+        {/* 3 hạt electron quỹ đạo bay quanh */}
+        <div className="absolute inset-0 loading-orbital-counter">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] absolute -top-1 left-1/2 -translate-x-1/2" />
+        </div>
+
+        {/* Khối trung tâm biểu tượng sách / logo */}
+        <div
+          className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-[0_8px_24px_rgba(16,185,129,0.4)] loading-core-pulse text-white font-black"
+          style={{ width: coreSize, height: coreSize }}
+        >
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="object-contain brightness-0 invert"
+            style={{ width: logoImgSize, height: logoImgSize }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Style 4: Công nghệ (Khối lập phương 3D Isometric Neon) ───
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: ringSize, height: ringSize, perspective: '400px' }}>
+      {/* Vòng đĩa phát sáng chân đế */}
+      <div
+        className="absolute bottom-1 w-14 h-4 rounded-full bg-emerald-400/30 blur-[6px] loading-core-pulse"
+      />
+
+      {/* Khối cube xoay 3D */}
+      <div
+        className="loading-cube-3d-modern"
+        style={{
+          width: isLarge ? 42 : isMini ? 18 : 28,
+          height: isLarge ? 42 : isMini ? 18 : 28,
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        <div className="cube-face cube-front" />
+        <div className="cube-face cube-back" />
+        <div className="cube-face cube-right" />
+        <div className="cube-face cube-left" />
+        <div className="cube-face cube-top" />
+        <div className="cube-face cube-bottom" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Preview nhanh cho màn hình Cài đặt Web (Admin WebSettingsTab)
+ */
+export function LoadingPreview({ style }) {
+  return (
+    <div className="flex items-center justify-center h-full w-full">
+      <LoadingIcon3D style={style} size="mini" />
+    </div>
+  );
+}
+
+/**
+ * TabFallback - Dành riêng cho Suspense lazy tab fallback
+ */
+export function TabFallback({ message = 'Đang tải dữ liệu…' }) {
+  return <LoadingScreen mode="tab" message={message} />;
+}
+
+/**
+ * Toàn bộ CSS Animation độc lập, hiệu năng cao và bóng bẩy
+ */
+function LoadingStyles() {
+  return (
+    <style>{`
+      @keyframes orbitalSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes orbitalReverse {
+        0% { transform: rotate(360deg); }
+        100% { transform: rotate(0deg); }
+      }
+      @keyframes coreBreath {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 4px 12px rgba(16,185,129,0.15)); }
+        50% { transform: scale(1.05); filter: drop-shadow(0 6px 20px rgba(16,185,129,0.35)); }
+      }
+      @keyframes badgeFloat {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-4px) rotate(1deg); }
+      }
+      @keyframes sonarExpand {
+        0% { transform: scale(0.85); opacity: 0.8; }
+        100% { transform: scale(1.45); opacity: 0; }
+      }
+      @keyframes laserSweep {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(50%); }
+        100% { transform: translateX(200%); }
+      }
+      @keyframes cubeIsoSpin {
+        0%   { transform: rotateX(-22deg) rotateY(0deg); }
+        50%  { transform: rotateX(-22deg) rotateY(180deg); }
+        100% { transform: rotateX(-22deg) rotateY(360deg); }
+      }
+
+      .loading-orbital-ring {
+        animation: orbitalSpin 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.45));
+      }
+      .loading-orbital-counter {
+        animation: orbitalReverse 2.4s linear infinite;
+      }
+      .loading-core-pulse {
+        animation: coreBreath 2s ease-in-out infinite;
+      }
+      .loading-badge-float {
+        animation: badgeFloat 2.6s ease-in-out infinite;
+      }
+      .loading-sonar-wave {
+        animation: sonarExpand 1.8s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+      }
+      .loading-laser-beam {
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(90deg, #10b981 0%, #14b8a6 50%, #06b6d4 100%);
+        border-radius: 999px;
+        box-shadow: 0 0 10px #10b981, 0 0 4px #06b6d4;
+        animation: laserSweep 1.4s ease-in-out infinite;
+      }
+
+      /* 3D Cube faces */
+      .loading-cube-3d-modern {
+        position: relative;
+        animation: cubeIsoSpin 3.5s linear infinite;
+        transform-origin: center center;
+      }
+      .cube-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.75), rgba(6, 182, 212, 0.85));
+        box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.4), 0 0 12px rgba(16, 185, 129, 0.3);
+      }
+      .cube-front  { transform: translateZ(21px); }
+      .cube-back   { transform: rotateY(180deg) translateZ(21px); }
+      .cube-right  { transform: rotateY(90deg) translateZ(21px); }
+      .cube-left   { transform: rotateY(-90deg) translateZ(21px); }
+      .cube-top    { transform: rotateX(90deg) translateZ(21px); background: linear-gradient(135deg, rgba(52, 211, 153, 0.9), rgba(34, 211, 238, 0.9)); }
+      .cube-bottom { transform: rotateX(-90deg) translateZ(21px); opacity: 0.6; }
+    `}</style>
   );
 }

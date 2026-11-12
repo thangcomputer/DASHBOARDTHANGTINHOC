@@ -981,7 +981,8 @@
   }
 
   .cms-modal-panel {
-    @apply bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden shadow-2xl;
+    @apply bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-y-auto overflow-x-hidden shadow-2xl;
+    max-height: min(92dvh, 900px);
   }
 
   .cms-fab {
@@ -2268,7 +2269,10 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-brand-red text-white font-extrabold rounded-2xl hover:bg-brand-darkRed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 focus-visible:ring-offset-2 transition-[transform,box-shadow,border] disabled:opacity-55 disabled:cursor-not-allowed disabled:hover:bg-brand-red;
+    @apply inline-flex items-center justify-center gap-2 bg-brand-red text-white font-extrabold rounded-2xl hover:bg-brand-darkRed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 focus-visible:ring-offset-2 disabled:opacity-55 disabled:cursor-not-allowed disabled:hover:bg-brand-red;
+    transition-property: transform, box-shadow, border;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
     border-bottom: 4px solid #991b1b;
     box-shadow: none;
   }
@@ -2279,7 +2283,10 @@
   }
 
   .btn-primary-blue {
-    @apply inline-flex items-center justify-center gap-2 bg-brand-red text-white font-extrabold rounded-2xl hover:bg-brand-darkRed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 focus-visible:ring-offset-2 transition-[transform,box-shadow,border] disabled:opacity-55 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 bg-brand-red text-white font-extrabold rounded-2xl hover:bg-brand-darkRed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 focus-visible:ring-offset-2 disabled:opacity-55 disabled:cursor-not-allowed;
+    transition-property: transform, box-shadow, border;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
     border-bottom: 4px solid #991b1b;
     box-shadow: none;
   }
@@ -2290,7 +2297,10 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 bg-white text-slate-700 font-extrabold rounded-2xl border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 focus-visible:ring-offset-2 transition-[transform,border] disabled:opacity-55 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 bg-white text-slate-700 font-extrabold rounded-2xl border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 focus-visible:ring-offset-2 disabled:opacity-55 disabled:cursor-not-allowed;
+    transition-property: transform, border;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
     border-bottom-width: 4px;
     border-bottom-color: #cbd5e1;
   }
@@ -2897,6 +2907,7 @@ span.duo-btn {
 }
 
 @keyframes duo-meet-glow {
+
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55), 0 0 14px rgba(239, 68, 68, 0.55);
@@ -6642,7 +6653,8 @@ body .cms-glass-card {
   --lms-cursor-hand: url('/brand/cursor-pointer-32.png') 8 1, pointer;
 }
 
-@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+@media (-webkit-min-device-pixel-ratio: 1.5),
+(min-resolution: 144dpi) {
   :root {
     --lms-cursor-arrow: url('/brand/cursor-48.png') 16 1, auto;
     --lms-cursor-hand: url('/brand/cursor-pointer-48.png') 14 1, pointer;
@@ -7277,6 +7289,7 @@ body .cms-login-icon-btn:active {
     transform: scale(min(1, calc((100vh - 40px) / 560px)));
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
+
   .cms-login-autoscale-right {
     transform-origin: center center;
     transform: scale(min(1, calc((100vh - 32px) / 540px)));
@@ -7290,6 +7303,7 @@ body .cms-login-icon-btn:active {
     transform: scale(min(1, calc((100vh - 48px) / 540px)));
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
+
   .free-portal-autoscale-right {
     transform-origin: center center;
     transform: scale(min(1, calc((100vh - 36px) / 700px)));
@@ -7307,7 +7321,7 @@ body .cms-login-icon-btn:active {
   padding: 8px 18px;
   background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
   border: 1.5px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 
+  box-shadow:
     inset 0 2px 3px rgba(255, 255, 255, 1),
     inset 0 -2px 4px rgba(5, 150, 105, 0.18),
     0 12px 28px -6px rgba(4, 78, 57, 0.35),
@@ -7345,7 +7359,7 @@ body .cms-login-icon-btn:active {
 
 .dew-logo-pod:hover {
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 
+  box-shadow:
     inset 0 2px 4px rgba(255, 255, 255, 1),
     inset 0 -2px 4px rgba(5, 150, 105, 0.25),
     0 18px 36px -6px rgba(4, 78, 57, 0.45),
@@ -7704,7 +7718,7 @@ body .cms-login-icon-btn:active {
   animation: dp-star-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
 }
 
-/* Lộ trình kiểu Duolingo: nút 3D có "đế", nhấn xuống khi bấm */
+/* Lộ trình kiểu Duo: nút 3D có "đế", nhấn xuống khi bấm */
 body button.dp-node,
 body button.dp-node:not(:disabled):not([aria-disabled='true']) {
   pointer-events: auto;
@@ -7996,12 +8010,10 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
   padding: 7px 22px;
   border-radius: 9999px;
   /* Kính mờ tráng gương cao cấp: Thấy rõ độ mờ trong suốt (blur) mà vẫn sáng lóa như gương */
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.72) 0%,
-    rgba(255, 255, 255, 0.38) 45%,
-    rgba(255, 255, 255, 0.52) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(255, 255, 255, 0.38) 45%,
+      rgba(255, 255, 255, 0.52) 100%);
   backdrop-filter: blur(20px) saturate(190%) brightness(125%);
   -webkit-backdrop-filter: blur(20px) saturate(190%) brightness(125%);
   border: 1.5px solid rgba(255, 255, 255, 0.88);
@@ -8025,12 +8037,10 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
   right: 8px;
   height: 48%;
   border-radius: 9999px 9999px 36px 36px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.35) 60%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.35) 60%,
+      rgba(255, 255, 255, 0) 100%);
   pointer-events: none;
   z-index: 2;
 }
@@ -8053,12 +8063,10 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
 
 .dew-mirror-logo:hover {
   transform: translateY(-2px) scale(1.03);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.82) 0%,
-    rgba(255, 255, 255, 0.48) 45%,
-    rgba(255, 255, 255, 0.65) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.48) 45%,
+      rgba(255, 255, 255, 0.65) 100%);
   box-shadow:
     inset 0 2px 3px 0 #ffffff,
     inset 0 -2px 3px 0 rgba(255, 255, 255, 0.6),
@@ -8082,33 +8090,89 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
 
 /* Lightning Combo & Perfect Mascot Overlays */
 @keyframes lightning-flash {
-  0% { opacity: 0; }
-  10% { opacity: 0.95; }
-  15% { opacity: 0.35; }
-  25% { opacity: 0.9; }
-  35% { opacity: 0.25; }
-  45% { opacity: 0.85; }
-  60% { opacity: 0.7; }
-  100% { opacity: 0.75; }
+  0% {
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.95;
+  }
+
+  15% {
+    opacity: 0.35;
+  }
+
+  25% {
+    opacity: 0.9;
+  }
+
+  35% {
+    opacity: 0.25;
+  }
+
+  45% {
+    opacity: 0.85;
+  }
+
+  60% {
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 0.75;
+  }
 }
 
 @keyframes combo-pop {
-  0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
-  50% { transform: scale(1.12) rotate(2deg); opacity: 1; }
-  75% { transform: scale(0.96) rotate(-1deg); }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  0% {
+    transform: scale(0.3) rotate(-8deg);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.12) rotate(2deg);
+    opacity: 1;
+  }
+
+  75% {
+    transform: scale(0.96) rotate(-1deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
 }
 
 @keyframes mascot-celebrate-burst {
-  0% { transform: scale(0.3) translateY(40px); opacity: 0; }
-  60% { transform: scale(1.08) translateY(-8px); opacity: 1; }
-  80% { transform: scale(0.97) translateY(3px); }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+  0% {
+    transform: scale(0.3) translateY(40px);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.08) translateY(-8px);
+    opacity: 1;
+  }
+
+  80% {
+    transform: scale(0.97) translateY(3px);
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes ray-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .animate-lightning-flash {
@@ -8146,19 +8210,23 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
   box-shadow: none !important;
   transform: none !important;
 }
+
 [data-student-shell] .student-flat-zone :is(button, a):not(.cms-btn):not(.duo-btn):active {
   transform: scale(0.97) !important;
   border-bottom-width: 1px !important;
 }
+
 [data-student-shell] .student-flat-zone button.border.bg-white.border-red-500,
 [data-student-shell] .student-flat-zone button.border.bg-white.border-red-600 {
   border-color: #ef4444 !important;
   color: #dc2626 !important;
 }
+
 [data-student-shell] .student-flat-zone button.bg-red-600,
 [data-student-shell] .student-flat-zone a.bg-red-600 {
   border-color: #dc2626 !important;
 }
+
 [data-student-shell] .student-flat-zone button.border.bg-white:not(.border-red-500):not(.border-red-600) {
   border-color: #e2e8f0 !important;
 }

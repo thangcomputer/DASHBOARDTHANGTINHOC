@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { lazy, Suspense } from 'react';
+import { TabFallback } from './LoadingScreen';
 import CmsSelect from './ui/CmsSelect';
 import {
   Award, Bell, ChevronRight, Clock, FileText, Monitor,
@@ -738,7 +739,7 @@ const StudentExamRoom = ({
         </div>
 
         {roomTab === 'mos-ic3' ? (
-          <Suspense fallback={<div className="py-10 text-center text-sm font-medium text-slate-500">Đang tải nội dung MOS / IC3...</div>}>
+          <Suspense fallback={<TabFallback message="Đang tải nội dung MOS / IC3…" />}>
             <CertPrepCatalogPage />
           </Suspense>
         ) : roomTab === 'quiz' ? (

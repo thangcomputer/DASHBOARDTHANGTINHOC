@@ -40,25 +40,63 @@ function notifyConnectivity(ok) {
   } catch { /* ignore */ }
 }
 
+let _activeNetworkRequests = 0;
+let _networkLoadingTimer = null;
+
+function notifyNetworkLoading(active) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent('cms:api-loading', {
+      detail: { active, count: _activeNetworkRequests },
+    }));
+  } catch { /* ignore */ }
+}
+
+function startRequestTracking(skipIndicator = false) {
+  if (skipIndicator) return;
+  _activeNetworkRequests += 1;
+  if (_activeNetworkRequests === 1) {
+    clearTimeout(_networkLoadingTimer);
+    _networkLoadingTimer = setTimeout(() => {
+      if (_activeNetworkRequests > 0) notifyNetworkLoading(true);
+    }, 70);
+  }
+}
+
+function endRequestTracking(skipIndicator = false) {
+  if (skipIndicator) return;
+  _activeNetworkRequests = Math.max(0, _activeNetworkRequests - 1);
+  if (_activeNetworkRequests === 0) {
+    clearTimeout(_networkLoadingTimer);
+    notifyNetworkLoading(false);
+  }
+}
+
 /** fetch có retry khi mạng tụt (không retry response HTTP đã nhận) */
 async function fetchWithNetworkRetry(url, options = {}, maxAttempts = 3) {
-  let lastErr;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false && attempt === 0) {
-        await sleep(400);
+  const skipIndicator = Boolean(options.silent || options.skipLoadingIndicator);
+  startRequestTracking(skipIndicator);
+  try {
+    let lastErr;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false && attempt === 0) {
+          await sleep(400);
+        }
+        const res = await fetch(url, options);
+        notifyConnectivity(true);
+        return res;
+      } catch (err) {
+        lastErr = err;
+        notifyConnectivity(false);
+        if (!isNetworkFetchError(err) || attempt >= maxAttempts - 1) break;
+        await sleep(Math.min(1000 * (2 ** attempt), 8000));
       }
-      const res = await fetch(url, options);
-      notifyConnectivity(true);
-      return res;
-    } catch (err) {
-      lastErr = err;
-      notifyConnectivity(false);
-      if (!isNetworkFetchError(err) || attempt >= maxAttempts - 1) break;
-      await sleep(Math.min(1000 * (2 ** attempt), 8000));
     }
+    throw new NetworkOfflineError(lastErr?.message || 'Không kết nối được máy chủ');
+  } finally {
+    endRequestTracking(skipIndicator);
   }
-  throw new NetworkOfflineError(lastErr?.message || 'Không kết nối được máy chủ');
 }
 
 /** CSRF double-submit (cookie csrf_token + header X-CSRF-Token) */

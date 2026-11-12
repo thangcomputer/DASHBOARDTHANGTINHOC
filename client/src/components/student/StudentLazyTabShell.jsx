@@ -1,20 +1,11 @@
 import React, { Suspense, lazy } from 'react';
-import { Loader2 } from 'lucide-react';
+import { TabFallback } from '../LoadingScreen';
 
 const LazyStudentScheduleTab = lazy(() => import('./StudentScheduleTab'));
 const LazyStudentMaterialsTab = lazy(() => import('./StudentMaterialsTab'));
 const LazyStudentEvaluationTab = lazy(() => import('./StudentEvaluationTab'));
 const LazyStudentProfileTab = lazy(() => import('./StudentProfileTab'));
 const LazyStudentOverviewTab = lazy(() => import('./StudentOverviewTab'));
-
-function TabFallback() {
-  return (
-    <div className="flex items-center justify-center py-24 text-gray-400">
-      <Loader2 className="animate-spin mr-2" size={22} />
-      <span className="font-bold text-sm">Đang tải tab...</span>
-    </div>
-  );
-}
 
 function LazyStudentTab({ Component, props }) {
   return (

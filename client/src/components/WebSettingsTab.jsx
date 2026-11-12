@@ -9,34 +9,14 @@ import {
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/useToast';
+import LoadingScreen, { LoadingIcon3D } from './LoadingScreen';
 
 function LoadingPreview({ style }) {
-  const previewStyles = {
-    1: (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-7 h-7 rounded-full border-2 border-sky-200 border-t-red-600 animate-spin" />
-      </div>
-    ),
-    2: (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-red-500 to-red-600 animate-pulse shadow" />
-      </div>
-    ),
-    3: (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-[10px] font-mono text-gray-600 typing-text">Đang tải...</p>
-      </div>
-    ),
-    4: (
-      <div className="flex items-center justify-center h-full" style={{ perspective: '200px' }}>
-        <div
-          className="w-6 h-6 bg-gradient-to-br from-cyan-400 to-red-600 rounded-md shadow"
-          style={{ animation: 'cube3d 2s infinite linear', transformStyle: 'preserve-3d' }}
-        />
-      </div>
-    ),
-  };
-  return previewStyles[style] || previewStyles[1];
+  return (
+    <div className="flex items-center justify-center h-full w-full py-1">
+      <LoadingIcon3D style={style} size="mini" />
+    </div>
+  );
 }
 
 function FaviconRow({
@@ -606,17 +586,15 @@ export default function WebSettingsTab() {
 
       {previewLoading && (
         <div
-          className="fixed inset-0 bg-gray-900/90 flex flex-col items-center justify-center z-[200] animate-in fade-in duration-300"
+          className="fixed inset-0 z-[200] animate-in fade-in duration-300 cursor-pointer"
           onClick={() => setPreviewLoading(false)}
           role="presentation"
         >
-          <div className="mb-6 transform scale-150">
-            <LoadingPreview style={config.loadingStyle} />
-          </div>
-          <p className="text-white/60 text-sm mt-4">Nhấn bất kỳ để đóng</p>
-          <p className="text-white/30 text-xs mt-1">
-            Kiểu {config.loadingStyle}: {LOADING_STYLES[config.loadingStyle - 1]?.name}
-          </p>
+          <LoadingScreen
+            style={config.loadingStyle}
+            message="Xem trước hiệu ứng loading…"
+            subtext="Nhấn bất kỳ đâu để đóng chế độ xem trước"
+          />
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
-import { Loader2 } from 'lucide-react';
 import ErrorBoundary from '../ErrorBoundary';
+import { TabFallback } from '../LoadingScreen';
 
 const LazySystemSettingsTab = lazy(() => import('../SystemSettingsTab'));
 const LazyStaffManagementTab = lazy(() => import('../StaffManagementTab'));
@@ -20,15 +20,6 @@ const LazyLessonPracticeTab = lazy(() => import('./tabs/AdminLessonPracticeTab')
 const LazyDailyPracticeTab = lazy(() => import('./tabs/AdminDailyPracticeTab'));
 const LazySubscriptionTab = lazy(() => import('./tabs/AdminSubscriptionTab'));
 const LazyMeetClassTab = lazy(() => import('./tabs/AdminMeetClassTab'));
-
-function TabFallback() {
-  return (
-    <div className="flex items-center justify-center py-24 text-gray-400">
-      <Loader2 className="animate-spin mr-2" size={22} />
-      <span className="font-bold text-sm">Đang tải tab...</span>
-    </div>
-  );
-}
 
 const EXTERNAL_TABS = {
   settings: LazySystemSettingsTab,

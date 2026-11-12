@@ -52,6 +52,7 @@ import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { useIsDesktopExamDevice } from './utils/examDevice';
 import { BranchProvider } from './context/BranchContext';
 import LoadingScreen from './components/LoadingScreen';
+import TopLoadingBar from './components/ui/TopLoadingBar';
 import PopupBanner from './components/PopupBanner';
 import StudyHeartbeat from './components/student/StudyHeartbeat';
 import OfflineBanner from './components/OfflineBanner';
@@ -257,31 +258,22 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
   // Hiển thị loading khi đang verify token
   if (isAuthLoading) {
     return (
-      <div style={{
-        minHeight: '100vh', background: '#0f172a',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexDirection: 'column', gap: '1rem',
-      }}>
-        <div style={{
-          width: '44px', height: '44px', border: '3px solid #1e293b',
-          borderTop: '3px solid #3b82f6', borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }} />
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Đang xác thực...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
+      <LoadingScreen
+        message="Đang xác thực tài khoản…"
+        subtext="Hệ thống quản lý đào tạo Thắng Tin Học"
+      />
     );
   }
 
   return (
-    <Suspense fallback={<LoadingScreen />}><Routes>
+    <Suspense fallback={<LoadingScreen message="Đang tải dữ liệu trang…" />}><Routes>
       {/* ═══ Public ═══ */}
       <Route path="/" element={<LoginPage onLogin={onLogin} />} />
       <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
       <Route path="/DANGNHAPMIENPHI" element={<FreePortalPage onLogin={onLogin} />} />
       <Route path="/admin/login" element={<AdminLoginPage onLogin={onLogin} />} />
       <Route path="/dangkykhoahoc" element={<RegistrationForm onNavigate={go} />} />
-      <Route path="/pay/:sessionId" element={<Suspense fallback={<LoadingScreen />}><PublicPaymentPage /></Suspense>} />
+      <Route path="/pay/:sessionId" element={<Suspense fallback={<LoadingScreen message="Đang nạp cổng thanh toán…" />}><PublicPaymentPage /></Suspense>} />
 
       {/* ═══ Admin ═══ */}
       <Route element={
@@ -737,7 +729,8 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <LoadingScreen />
+      <TopLoadingBar />
+      <LoadingScreen splash onReady={() => {}} />
       <OfflineBanner />
       <SocketProvider
         userId={session ? (session.id || session._id) : ''}
