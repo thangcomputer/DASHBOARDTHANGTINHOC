@@ -283,7 +283,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   })();
   const freeMenuFromData = useFreePortalMenu(studentForPortalUi);
-  const isFreePortalStudent = role === 'student' && (freeMenuFromData || isFreePortalSelfRegistrationStudent(studentForPortalUi));
+  const isFreePortalStudent = role === 'student' && Boolean(
+    freeMenuFromData
+    || studentForPortalUi?.freePortal === true
+    || isFreePortalSelfRegistrationStudent(studentForPortalUi)
+  );
   useEffect(() => {
     const root = document.documentElement;
     if (isFreePortalStudent) root.setAttribute('data-free-portal-student', 'true');

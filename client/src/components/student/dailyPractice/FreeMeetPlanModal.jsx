@@ -31,7 +31,13 @@ const OFFER_PLANS = [
 
 export function isFreePortalAccount() {
   try {
-    return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true;
+    if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) {
+      return true;
+    }
+    const u = JSON.parse(localStorage.getItem('student_user') || '{}');
+    if (u?.freePortal === true) return true;
+    const course = String(u?.course || '').toLowerCase();
+    return course === 'tài khoản miễn phí' || course.includes('miễn phí');
   } catch {
     return false;
   }

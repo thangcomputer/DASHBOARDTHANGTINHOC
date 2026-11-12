@@ -19,7 +19,9 @@ export const ScheduleView = ({
   onSelectCourse,
   setNoteModalSched,
 }) => {
-  const isFree = isFreePortalSelfRegistrationStudent(student);
+  const isFree = isFreePortalSelfRegistrationStudent(student)
+    || student?.freePortal === true
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
   const todayKey = formatLocalDateKey(new Date());
   const currentMonth = todayKey.slice(5, 7);
   const currentYear = todayKey.slice(0, 4);

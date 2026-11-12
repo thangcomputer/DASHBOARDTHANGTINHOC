@@ -15,6 +15,7 @@ import {
   enrichEnrollmentsWithTeachers,
   uniqueTeacherNames,
   formatTeacherDisplay,
+  isFreePortalSelfRegistrationStudent,
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { getScheduleDisplayKind } from '../utils/scheduleTime';
@@ -230,6 +231,13 @@ const StudentDashboard = () => {
     result.status = (isCompletedByStatus || isCompletedBySessions) ? 'Đã hoàn thành' : 'Đang học';
     return result;
   }, [student, teachers, session?.gender, session?.avatar]);
+
+  const isFreeStudent = Boolean(
+    session?.freePortal === true
+    || studentData?.freePortal === true
+    || isFreePortalSelfRegistrationStudent(studentData)
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+  );
 
   const enrollments = useMemo(() => studentData?.courses || [], [studentData?.courses]);
   const selectableEnrollments = useMemo(
@@ -757,7 +765,7 @@ const StudentDashboard = () => {
                         window.cmsAlert?.('Lỗi kết nối khi nộp bài. Vui lòng thử lại.', 'error');
                       });
                   }}
-                  className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] mt-4"
+                  className={`w-full ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] mt-4`}
                 >
                   {isSubmitting ? 'Đang nộp...' : 'Xác nhận Nộp bài'}
                 </button>

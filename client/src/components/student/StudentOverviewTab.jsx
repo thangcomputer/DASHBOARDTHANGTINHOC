@@ -445,13 +445,22 @@ export default function StudentOverviewTab({
   const nextSubject = (videoCourse?.subjects || []).find((s) => s.opened !== false
     && (Number(s.completedUnitCount) || 0) < (Number(s.totalUnitCount) || 0));
   const freePortalCourse = isFreePortalCourseName(currentCourseName);
-  const freePortalUi = isFreePortalSelfRegistrationStudent({
-    ...(portalSession || {}),
-    role: 'student',
-    course: currentCourseName || portalSession?.course,
-    enrollments,
-    courses: viewStudent?.courses,
-  });
+  const freePortalUi = Boolean(
+    portalSession?.freePortal === true
+    || viewStudent?.freePortal === true
+    || studentData?.freePortal === true
+    || isFreePortalCourseName(currentCourseName)
+    || isFreePortalCourseName(portalSession?.course)
+    || isFreePortalCourseName(viewStudent?.course)
+    || isFreePortalSelfRegistrationStudent({
+      ...(portalSession || {}),
+      role: 'student',
+      course: currentCourseName || portalSession?.course,
+      enrollments,
+      courses: viewStudent?.courses,
+    })
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+  );
   const accentIconClass = freePortalUi ? 'text-emerald-600' : 'text-red-600';
   const freePortalAccount = freePortalUi;
   const meetAccess = hasMeetAccessClient(portalSub);
@@ -520,7 +529,7 @@ export default function StudentOverviewTab({
     tasks.push({
       key: 'hw',
       icon: ClipboardList,
-      tone: freePortalUi ? 'bg-[#EA580C]' : 'bg-gradient-to-b from-orange-400 to-orange-600',
+      tone: freePortalUi ? 'bg-emerald-600' : 'bg-gradient-to-b from-orange-400 to-orange-600',
       title: `Bài tập cần nộp (${pendingHomework.length})`,
       sub: `${first.title || 'Bài tập'}${first.deadline ? ` · hạn ${formatDeadline(first.deadline)}` : ''}`,
       cta: 'Nộp bài',
@@ -546,7 +555,7 @@ export default function StudentOverviewTab({
       icon: lost ? Gamepad2 : Flame,
       tone: lost
         ? 'bg-slate-600'
-        : (freePortalUi ? 'bg-orange-500' : 'bg-red-500'),
+        : (freePortalUi ? 'bg-emerald-500' : 'bg-red-500'),
       title: freePortalUi
         ? (atRisk ? `Duy trì chuỗi ${practiceStats.streak} ngày` : lost ? 'Luyện tập để lấy lại chuỗi' : 'Luyện tập hằng ngày')
         : (atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày'),

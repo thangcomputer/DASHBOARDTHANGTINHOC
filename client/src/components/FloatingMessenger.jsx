@@ -20,6 +20,7 @@ import { getPresenceUserId } from '../utils/presence';
 import { useData } from '../context/DataContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
+import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
 import { getMessagingRole } from '../lib/messagingRoles';
@@ -2830,19 +2831,29 @@ export default function FloatingMessenger({ session, role }) {
             onPointerCancel={handleSupportPointerUp}
             onClickCapture={handleSupportClickCapture}
           >
-            <button
-              type="button"
-              onClick={handleSupportFabClick}
-              className={`cms-fm-support-button ${(meRole === 'teacher' || (meRole === 'student' && freePortalMenu)) ? 'cms-fm-support-button--emerald' : ''} ${fabExpanded ? 'is-expanded' : ''}`}
-              title={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
-              aria-label={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
-              aria-expanded={fabExpanded}
-            >
-              <span className="cms-fm-support-button__icon" aria-hidden="true">
-                {fabExpanded ? <X size={22} strokeWidth={2.5} /> : <Headphones size={22} strokeWidth={2.5} />}
-              </span>
-              <span className="cms-fm-support-button__label">Hỗ trợ</span>
-            </button>
+            {(() => {
+              const isFreeStudent = meRole === 'student' && Boolean(
+                freePortalMenu
+                || session?.freePortal === true
+                || isFreePortalSelfRegistrationStudent(session)
+                || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+              );
+              return (
+                <button
+                  type="button"
+                  onClick={handleSupportFabClick}
+                  className={`cms-fm-support-button ${(meRole === 'teacher' || isFreeStudent) ? 'cms-fm-support-button--emerald' : ''} ${fabExpanded ? 'is-expanded' : ''}`}
+                  title={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
+                  aria-label={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
+                  aria-expanded={fabExpanded}
+                >
+                  <span className="cms-fm-support-button__icon" aria-hidden="true">
+                    {fabExpanded ? <X size={22} strokeWidth={2.5} /> : <Headphones size={22} strokeWidth={2.5} />}
+                  </span>
+                  <span className="cms-fm-support-button__label">Hỗ trợ</span>
+                </button>
+              );
+            })()}
           </div>
         )}
       </div>

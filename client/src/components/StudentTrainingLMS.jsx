@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
-import { getClientEnrollments } from '../utils/enrollments';
+import { getClientEnrollments, isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 import {
   buildExamSubjectsFromProgress,
   getExamSubjectMeta,
@@ -426,6 +426,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const { students, examSubjectsCatalog } = useData();
   const session = (() => { try { return JSON.parse(localStorage.getItem('student_user') || '{}'); } catch { return {}; } })();
   const student = (students || []).find(s => s.id === session.id) || {};
+  const isFreeStudent = Boolean(
+    session?.freePortal === true
+    || student?.freePortal === true
+    || isFreePortalSelfRegistrationStudent(student)
+    || isFreePortalSelfRegistrationStudent(session)
+    || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
+  );
   const studentCacheId = student?.id || session.id || session._id || '';
 
   useEffect(() => {
@@ -1136,7 +1143,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         <div className="p-4 sm:p-5 flex-1 flex flex-col">
           <div className="flex items-start gap-3 mb-2">
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-slate-800 text-base sm:text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
+              <h3 className={`font-bold text-slate-800 text-base sm:text-lg ${isFreeStudent ? 'group-hover:text-emerald-600' : 'group-hover:text-red-600'} transition-colors line-clamp-2 leading-snug`}>
                 {course.title}
               </h3>
             </div>
@@ -1146,7 +1153,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           </div>
           <div className="flex items-center gap-2 mb-3">
             <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
-              <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
+              <div className={`h-full rounded-full ${isFreeStudent ? 'bg-emerald-600' : 'bg-red-600'} border border-white/60 transition-all`} style={{ width: `${progress}%` }} />
             </div>
           </div>
           <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -1254,7 +1261,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   title={t.label}
                   aria-label={t.label}
                   className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
-                    ? 'bg-red-500 text-white shadow-sm'
+                    ? (isFreeStudent ? 'bg-emerald-600 text-white shadow-sm' : 'bg-red-500 text-white shadow-sm')
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                 >
@@ -1284,7 +1291,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   role="tab"
                   aria-selected={mainTab === t.key}
                   onClick={() => setMainTab(t.key)}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? (isFreeStudent ? 'bg-white text-emerald-600 shadow-sm' : 'bg-white text-red-600 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <t.icon size={15} /> {t.label}
                   {t.count > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-black text-slate-600">{t.count}</span>}
@@ -1419,7 +1426,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   return (
                     <div key={fKey} className="p-4 rounded-xl border border-slate-100 hover:bg-green-50/50 hover:border-green-200 transition-all flex flex-col md:flex-row justify-between md:items-start gap-4 group">
                       <div className="flex items-start gap-4 min-w-0 flex-1">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-rose-500' : 'bg-green-500')
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? (isFreeStudent ? 'bg-emerald-600' : 'bg-rose-500') : (isFreeStudent ? 'bg-emerald-600' : 'bg-green-500'))
                           }`}>
                           {isLink ? 'Link' : (file.fileType || 'FILE')}
                         </div>
@@ -1477,7 +1484,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                         return (
                           <button
                             type="button"
-                            className={lmsBtn('danger', { className: 'w-full md:w-auto shrink-0 self-center md:self-start text-sm' })}
+                            className={lmsBtn(isFreeStudent ? 'primary' : 'danger', { className: 'w-full md:w-auto shrink-0 self-center md:self-start text-sm' })}
                             onClick={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -1856,7 +1863,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                     type="button"
                     onClick={() => setCatalogInfoTab(t.key)}
                     className={`flex-1 min-w-[7.5rem] min-h-11 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${catalogInfoTab === t.key
-                        ? 'text-red-600 border-b-2 border-red-600 bg-red-50/40'
+                        ? (isFreeStudent ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40' : 'text-red-600 border-b-2 border-red-600 bg-red-50/40')
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                       }`}
                   >
@@ -1883,21 +1890,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                               setCurrentLesson(lesson);
                             }}
                             className={`w-full flex items-center gap-3 py-2.5 px-1 text-left rounded-lg transition-colors ${playable
-                                ? `cursor-pointer hover:bg-slate-50 ${isActive ? 'bg-red-50/70' : ''}`
+                                ? `cursor-pointer hover:bg-slate-50 ${isActive ? (isFreeStudent ? 'bg-emerald-50/70' : 'bg-red-50/70') : ''}`
                                 : 'opacity-70 cursor-not-allowed'
                               }`}
                           >
                             {playable ? (
-                              <PlayCircle size={16} className={`shrink-0 ${isActive ? 'text-red-600' : 'text-red-500'}`} />
+                              <PlayCircle size={16} className={`shrink-0 ${isActive ? (isFreeStudent ? 'text-emerald-600' : 'text-red-600') : (isFreeStudent ? 'text-emerald-500' : 'text-red-500')}`} />
                             ) : (
                               <Lock size={16} className="text-slate-400 shrink-0" />
                             )}
-                            <span className={`flex-1 text-sm font-semibold truncate ${isActive ? 'text-red-700' : 'text-slate-700'}`}>
+                            <span className={`flex-1 text-sm font-semibold truncate ${isActive ? (isFreeStudent ? 'text-emerald-700' : 'text-red-700') : 'text-slate-700'}`}>
                               {idx + 1}. {lesson.title}
                             </span>
                             {lesson.isPreview || playable ? (
                               <span className={`text-[10px] font-black  px-2.5 py-1 rounded-full border shrink-0 ${isActive
-                                  ? 'bg-red-600 text-white border-red-600'
+                                  ? (isFreeStudent ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600')
                                   : 'bg-pink-50 text-pink-700 border-pink-200'
                                 }`}>
                                 {isActive ? 'Đang xem' : 'Xem thử'}
@@ -1992,7 +1999,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               <button
                 type="button"
                 onClick={() => (canContinueLearning ? enterCourseLearning() : startVideoCheckout(selectedCourse))}
-                className={lmsBtn(canContinueLearning ? 'primary' : 'danger', { size: 'lg', fullWidth: true, className: 'text-sm' })}
+                className={lmsBtn(canContinueLearning || isFreeStudent ? 'primary' : 'danger', { size: 'lg', fullWidth: true, className: 'text-sm' })}
               >
                 {canContinueLearning
                   ? 'Tiếp tục học'

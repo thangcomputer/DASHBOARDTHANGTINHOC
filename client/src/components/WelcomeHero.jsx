@@ -104,7 +104,8 @@ export default function WelcomeHero({
   showJoin = true,
   accent,
 }) {
-  const effectiveAccent = accent || (role === 'teacher' ? 'emerald' : 'brand');
+  const isFreePortal = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
+  const effectiveAccent = accent || (role === 'teacher' || isFreePortal ? 'emerald' : 'brand');
   const variant = VARIANTS[role] || VARIANTS.student;
   const theme = ACCENT[effectiveAccent] || ACCENT.brand;
   const { hour, date, dayIndex } = vnNow();

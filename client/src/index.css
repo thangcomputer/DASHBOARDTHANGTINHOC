@@ -3142,6 +3142,44 @@ html[data-free-portal-student] div.bg-red-600:not([role='alert']) {
   border-bottom-color: #047857 !important;
 }
 
+html[data-free-portal-student] .duo-btn--primary,
+[data-student-shell][data-free-portal-student] .duo-btn--primary {
+  background: #10b981 !important;
+  border-bottom-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+html[data-free-portal-student] .duo-btn--danger:not([data-destructive]),
+[data-student-shell][data-free-portal-student] .duo-btn--danger:not([data-destructive]) {
+  background: #10b981 !important;
+  border-bottom-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+html[data-free-portal-student] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon,
+[data-free-portal-student] .cms-fm-support-button:not(.is-expanded) .cms-fm-support-button__icon {
+  background: #10b981 !important;
+  box-shadow: inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2) !important;
+}
+
+html[data-free-portal-student] .cms-fm-support-button,
+[data-free-portal-student] .cms-fm-support-button {
+  border-color: #10b981 !important;
+}
+
+html[data-free-portal-student] .cms-chat-composer-send,
+[data-role-teacher] .cms-chat-composer-send,
+body:has([data-role-teacher]) .cms-chat-composer-send {
+  background: #10b981 !important;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25) !important;
+}
+
+html[data-free-portal-student] .cms-chat-composer-send:hover:not(:disabled),
+[data-role-teacher] .cms-chat-composer-send:hover:not(:disabled),
+body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
+  background: #059669 !important;
+}
+
 /* Nút tô màu thương hiệu phẳng mềm mại trong khu học viên (chuẩn Mobile App, không khối 3D gờ dày). */
 [data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.select-none):not(.dp-node) {
   border-bottom-width: 1px;

@@ -146,6 +146,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
     return <span className="text-sm text-red-500">Chưa nộp bài</span>;
   };
 
+  const isFreeStudent = typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student');
   const failedLocked = isExamProgressLocked(subject);
   const awaitingGrade =
     subject.thucHanh === 'da_nop' &&
@@ -249,7 +250,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               <button
                 type="button"
                 onClick={() => onStart(subject.id)}
-                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
+                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-red-600 hover:bg-red-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
               >
                 {(subject.attemptCount || 0) > 0 ? <><Play size={15} /> Thi lại</> : 'Vào thi ngay'}
               </button>
@@ -258,7 +259,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               <button
                 type="button"
                 onClick={() => onStart(subject.id)}
-                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
+                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-red-600 hover:bg-red-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
               >
                 <Play size={15} /> Thi lại
               </button>
@@ -322,7 +323,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
       onClick={(e) => e.stopPropagation()}
     >
       <div className="px-4 sm:px-5 pt-4 pb-2 flex items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-600 text-white shadow-sm">
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl ${typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600' : 'bg-red-600'} text-white shadow-sm`}>
           <Trophy size={15} className="shrink-0" aria-hidden="true" />
           <h2 className="font-black text-xs sm:text-sm whitespace-nowrap">Nhật ký điểm số</h2>
         </div>
@@ -816,8 +817,8 @@ const StudentExamRoom = ({
                         ? f.value === 'rot'
                           ? 'bg-red-600 text-white border-red-600'
                           : f.value === 'da_thi'
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-red-600 text-white border-blue-600'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600')
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                       }`}
                   >

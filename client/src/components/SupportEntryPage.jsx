@@ -17,6 +17,7 @@ import {
   Award,
 } from 'lucide-react';
 import { TEACHER_WELCOME_CHIPS, STUDENT_WELCOME_CHIPS } from '../utils/aiSupport';
+import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 
 const TEACHER_FAQS = [
   {
@@ -80,6 +81,20 @@ export default function SupportEntryPage() {
     return false;
   })();
 
+  const isFreeStudent = (() => {
+    try {
+      if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) {
+        return true;
+      }
+      const u = JSON.parse(localStorage.getItem('student_user') || 'null');
+      return Boolean(u?.freePortal === true || isFreePortalSelfRegistrationStudent(u));
+    } catch {
+      return false;
+    }
+  })();
+
+  const isGreenTheme = isTeacher || isFreeStudent;
+
   const chooseSupport = (mode, prompt = '') => {
     window.dispatchEvent(new CustomEvent('cms:open-support-choice', { detail: { mode, prompt } }));
   };
@@ -95,13 +110,13 @@ export default function SupportEntryPage() {
     <div className="mx-auto w-full max-w-5xl pt-4 pb-12 px-3 sm:px-6 space-y-6">
       {/* ─── Hero Header ─── */}
       <section className={`rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm ${
-        isTeacher
+        isGreenTheme
           ? 'bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white border-emerald-200/80'
           : 'bg-gradient-to-br from-red-50/90 via-rose-50/40 to-white border-red-200/80'
       }`}>
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
           <div className={`w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${
-            isTeacher
+            isGreenTheme
               ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white'
               : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] text-white'
           }`}>
@@ -109,7 +124,7 @@ export default function SupportEntryPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-2 bg-white/90 border border-slate-200/80 text-slate-700 shadow-xs">
-              <span className={`w-2 h-2 rounded-full animate-ping ${isTeacher ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              <span className={`w-2 h-2 rounded-full animate-ping ${isGreenTheme ? 'bg-emerald-500' : 'bg-red-500'}`} />
               Trung tâm Chăm sóc & Hỗ trợ Tin học
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -174,7 +189,7 @@ export default function SupportEntryPage() {
             type="button"
             onClick={() => chooseSupport('ai')}
             className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${
-              isTeacher
+              isGreenTheme
                 ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105'
                 : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] hover:brightness-105'
             }`}

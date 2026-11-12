@@ -687,13 +687,18 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
 // ── Màn kết quả ──────────────────────────────────────────────────────────────
 function RelatedLessonCard({ lesson }) {
   const navigate = useNavigate();
+  const isFree = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) || isFreePortalAccount();
   return (
-    <section className="dp-slide-up flex flex-col gap-3 rounded-[24px] bg-gradient-to-r from-red-50 to-amber-50 p-4 ring-1 ring-red-100 sm:flex-row sm:items-center">
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600 text-white shadow-sm">
+    <section className={`dp-slide-up flex flex-col gap-3 rounded-[24px] p-4 sm:flex-row sm:items-center ${
+      isFree ? 'bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-100' : 'bg-gradient-to-r from-red-50 to-amber-50 ring-1 ring-red-100'
+    }`}>
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
+        isFree ? 'bg-emerald-600' : 'bg-red-600'
+      }`}>
         <PlayCircle size={26} aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold text-red-600">
+        <p className={`text-[11px] font-bold ${isFree ? 'text-emerald-700' : 'text-red-600'}`}>
           {lesson.completed ? 'Ôn lại video liên quan' : 'Học tiếp video liên quan'} · {lesson.subjectName}
         </p>
         <p className="truncate text-sm font-black text-slate-900">{lesson.unitTitle}</p>
@@ -702,7 +707,7 @@ function RelatedLessonCard({ lesson }) {
       <button
         type="button"
         onClick={() => navigate(lessonResumeUrl(lesson))}
-        className="cms-btn cms-btn-primary shrink-0 !py-2.5"
+        className={`cms-btn ${isFree ? '!bg-emerald-600 hover:!bg-emerald-700 !border-b-[#059669]' : 'cms-btn-primary'} shrink-0 !py-2.5 text-white`}
       >
         <PlayCircle size={17} aria-hidden="true" /> Xem video liên quan
       </button>

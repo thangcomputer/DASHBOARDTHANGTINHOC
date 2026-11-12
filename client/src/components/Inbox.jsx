@@ -38,6 +38,7 @@ import ScheduleMessagePreviewModal, {
 } from './ScheduleMessagePreviewModal';
 import SupportAiHandoffPanel from './support/SupportAiHandoffPanel';
 import ScreenCaptureButton from './ScreenCaptureButton';
+import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 import {
   isAiSupportConversationId,
   AI_ESCALATE_MARKER,
@@ -454,6 +455,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
   const isSuperAdmin = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN';
   const isSupportAgent = currentUser?.adminRole === 'SUPPORT';
+  const isFreePortalStudent = useMemo(() => {
+    if (currentUserRole !== 'student') return false;
+    if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) {
+      return true;
+    }
+    try {
+      const stored = JSON.parse(localStorage.getItem('student_user') || 'null');
+      if (stored?.freePortal === true || isFreePortalSelfRegistrationStudent(stored)) return true;
+    } catch { /* noop */ }
+    const me = (students || []).find((s) => String(s?.id || s?._id) === String(currentUserId));
+    return Boolean(me?.freePortal === true || isFreePortalSelfRegistrationStudent(me));
+  }, [currentUserRole, currentUserId, students]);
+  const isGreenTheme = currentUserRole === 'teacher' || isFreePortalStudent;
   const [scheduleNow, setScheduleNow] = useState(() => new Date());
   const [activeConv, setActiveConv] = useState(null);
   // Hội thoại với Admin Super một chiều (server cũng chặn); HIGH_ADMIN và STAFF vẫn nhắn như cũ.
@@ -2545,7 +2559,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   type="button"
                   onClick={() => setShowCreateGroup(true)}
                   className={`w-11 h-11 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center rounded-2xl transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${
-                    currentUserRole === 'teacher'
+                    isGreenTheme
                       ? 'bg-white border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-[#10B981] hover:bg-emerald-50/50'
                       : 'bg-white border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] text-red-600 hover:bg-red-50/50'
                   }`}
@@ -2573,7 +2587,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     onClick={() => setContactTab(tab.id)}
                     className={`min-h-[38px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 flex items-center justify-center ${
                       active
-                        ? (currentUserRole === 'teacher'
+                        ? (isGreenTheme
                             ? 'bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
                             : 'bg-[#DC2626] border-[1.5px] border-[#F87171] border-b-4 border-b-[#B91C1C] text-white hover:brightness-105')
                         : 'bg-white border-[1.5px] border-slate-200 border-b-4 border-b-slate-300 text-slate-600 hover:bg-slate-50'
