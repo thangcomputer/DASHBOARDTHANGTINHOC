@@ -3,7 +3,7 @@
  * Hỗ trợ 4 phong cách 3D hiện đại, hiệu ứng ánh sáng gradient, vòng quay laser và thanh tiến trình.
  * Dùng cho: Khởi động hệ thống, xác thực tài khoản, tải trang (Suspense), và nạp dữ liệu tab.
  */
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import KineticDotsLoader from './ui/kinetic-dots-loader';
 
 const API = import.meta.env.VITE_API_URL || '';
@@ -55,25 +55,15 @@ export default function LoadingScreen({
   onReady,
   mode = 'fullscreen',
   message = 'Đang tải dữ liệu…',
-  subtext = 'Vui lòng đợi trong giây lát, hệ thống đang đồng bộ dữ liệu…',
-  style: propStyle,
+  _subtext,
+  style: _propStyle,
 }) {
-  const [style, setStyle] = useState(() => propStyle || _cachedSettings?.loadingStyle || 1);
-  const [logoUrl, setLogoUrl] = useState(() => _cachedSettings?.logoUrl || '/brand/logo.webp');
   const [show, setShow] = useState(true);
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    if (propStyle) setStyle(propStyle);
-  }, [propStyle]);
-
-  useEffect(() => {
     let isMounted = true;
-    getCachedWebSettings().then((cfg) => {
-      if (!isMounted) return;
-      if (!propStyle && cfg.loadingStyle) setStyle(cfg.loadingStyle);
-      if (cfg.logoUrl) setLogoUrl(cfg.logoUrl);
-    });
+    getCachedWebSettings();
 
     // Nếu là splash khởi động lúc mở website
     if (splash) {
@@ -85,7 +75,7 @@ export default function LoadingScreen({
           setShow(false);
           onReady?.();
         }, 350);
-      }, 900); // 900ms đủ êm dịu, không giam người dùng quá lâu
+      }, 900); // 900ms đủ êm dịu
       return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -95,24 +85,16 @@ export default function LoadingScreen({
     return () => {
       isMounted = false;
     };
-  }, [splash, propStyle, onReady]);
-
-  const resolvedLogo = useMemo(() => {
-    if (!logoUrl) return '/brand/logo.webp';
-    if (logoUrl.startsWith('http') || logoUrl.startsWith('/')) return logoUrl;
-    return `${API}/${logoUrl}`;
-  }, [logoUrl]);
+  }, [splash, onReady]);
 
   if (!show && splash) return null;
 
   // ─── Giao diện TAB COMPACT (khi nạp tab bên trong dashboard) ───
   if (mode === 'tab') {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4 min-h-[220px] w-full animate-in fade-in duration-300">
+      <div className="flex flex-col items-center justify-center py-16 px-4 min-h-[200px] w-full animate-in fade-in duration-300 select-none">
         <KineticDotsLoader dots={4} className="min-h-0 p-0" />
-        <div className="mt-4 text-center">
-          <p className="text-sm font-bold text-slate-700 tracking-wide">{message}</p>
-        </div>
+        <p className="mt-3 text-sm md:text-base font-bold text-slate-700 tracking-wide">{message}</p>
       </div>
     );
   }
@@ -120,14 +102,14 @@ export default function LoadingScreen({
   // ─── Giao diện INLINE / PREVIEW (nhỏ gọn trong card hoặc modal) ───
   if (mode === 'inline' || mode === 'preview') {
     return (
-      <div className="flex flex-col items-center justify-center py-4 px-2 w-full">
-        <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="mini" />
+      <div className="flex flex-col items-center justify-center py-4 px-2 w-full select-none">
+        <KineticDotsLoader dots={4} className="min-h-0 p-0 scale-75" />
         {message && <p className="mt-2 text-xs font-semibold text-slate-600">{message}</p>}
       </div>
     );
   }
 
-  // ─── Giao diện TOÀN MÀN HÌNH (FULLSCREEN - XỊN XÒ) ───
+  // ─── Giao diện TOÀN MÀN HÌNH (FULLSCREEN - KHÔNG CẦN THẺ NỀN TRẮNG) ───
   return (
     <div
       role="status"
@@ -136,49 +118,17 @@ export default function LoadingScreen({
         fading ? 'opacity-0 scale-102 pointer-events-none' : 'opacity-100 scale-100'
       }`}
       style={{
-        background: 'linear-gradient(135deg, #f8fafc 0%, #f0fdf4 45%, #ecfeff 80%, #f1f5f9 100%)',
+        background: 'rgba(248, 250, 252, 0.72)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
       }}
     >
-      <LoadingStyles />
-
-      {/* Hiệu ứng nền ambient glow mờ ảo phía sau */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute -top-[10%] -left-[10%] w-[55vw] h-[55vw] rounded-full blur-3xl opacity-35"
-          style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.25) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute -bottom-[10%] -right-[10%] w-[50vw] h-[50vw] rounded-full blur-3xl opacity-30"
-          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)' }}
-        />
-      </div>
-
-      {/* Hộp thẻ kính 3D nổi bật ở giữa */}
-      <div className="relative z-10 flex flex-col items-center px-8 py-8 md:px-12 md:py-10 rounded-[32px] bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_25px_60px_-15px_rgba(6,182,212,0.22),0_0_0_1px_rgba(6,182,212,0.08),0_8px_20px_rgba(0,0,0,0.04)] max-w-sm md:max-w-md w-[90%] text-center">
-        {/* Biểu tượng 3D chính theo phong cách được chọn */}
-        <div className="mb-4 relative flex items-center justify-center">
-          <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="large" />
-        </div>
-
-        {/* Nhãn thương hiệu */}
-        <div className="flex items-center justify-center gap-1.5 mb-2">
-          <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
-          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-600">
-            Thắng Tin Học
-          </span>
-        </div>
-
-        {/* Tiêu đề trạng thái với gradient bóng bẩy */}
-        <h2 className="text-lg md:text-xl font-black text-slate-800 tracking-tight leading-snug">
+      <div className="relative z-10 flex flex-col items-center justify-center text-center">
+        {/* Chỉ cần các dấu chấm nhảy và dòng chữ đang tải dữ liệu */}
+        <KineticDotsLoader dots={4} className="min-h-0 p-0" />
+        <p className="mt-3 text-base md:text-lg font-bold text-slate-800 tracking-wide">
           {message}
-        </h2>
-
-        {/* Phụ đề gợi ý */}
-        {subtext && (
-          <p className="mt-2.5 text-xs text-slate-500 font-medium leading-relaxed max-w-xs">
-            {subtext}
-          </p>
-        )}
+        </p>
       </div>
     </div>
   );

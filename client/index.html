@@ -14,55 +14,46 @@
   <body>
     <a class="skip-to-content" href="#main-content">Bỏ qua đến nội dung chính</a>
     <div id="root">
-      <div id="app-preloader" style="position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#f8fafc 0%,#f0fdf4 45%,#ecfeff 80%,#f1f5f9 100%);font-family:system-ui,-apple-system,sans-serif;color:#1e293b;user-select:none;">
+      <div id="app-preloader" style="position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(248,250,252,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:system-ui,-apple-system,sans-serif;color:#1e293b;user-select:none;">
         <style>
-          @keyframes preloaderSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          @keyframes preloaderPulse { 0%, 100% { transform: scale(1); filter: drop-shadow(0 4px 12px rgba(16,185,129,0.18)); } 50% { transform: scale(1.05); filter: drop-shadow(0 6px 20px rgba(16,185,129,0.35)); } }
-          @keyframes preloaderLaser { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-          .preloader-card {
-            display:flex;flex-direction:column;align-items:center;padding:36px 42px;border-radius:32px;
-            background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-            border:1px solid rgba(255,255,255,0.9);
-            box-shadow:0 25px 60px -15px rgba(16,185,129,0.22),0 0 0 1px rgba(16,185,129,0.06),0 8px 20px rgba(0,0,0,0.04);
-            max-width:380px;width:90%;text-align:center;
+          @keyframes htmlGravBounce {
+            0% { transform: translateY(0); animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1); }
+            50% { transform: translateY(-40px); animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0); }
+            100% { transform: translateY(0); }
           }
-          .preloader-ring-wrap { position:relative;width:92px;height:92px;display:flex;align-items:center;justify-content:center;margin-bottom:20px; }
-          .preloader-ring {
-            position:absolute;inset:0;border-radius:50%;
-            background:conic-gradient(from 0deg, transparent 0%, #10b981 65%, #06b6d4 95%);
-            animation:preloaderSpin 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-            filter:drop-shadow(0 0 10px rgba(16,185,129,0.45));
-            -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
-            mask:radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+          @keyframes htmlRubberMorph {
+            0% { transform: scale(1.4, 0.6); }
+            5% { transform: scale(0.9, 1.1); }
+            15% { transform: scale(1, 1); }
+            50% { transform: scale(1, 1); }
+            85% { transform: scale(0.9, 1.1); }
+            100% { transform: scale(1.4, 0.6); }
           }
-          .preloader-core {
-            width:68px;height:68px;border-radius:50%;background:#ffffff;
-            display:flex;align-items:center;justify-content:center;
-            border:1px solid rgba(16,185,129,0.2);box-shadow:0 4px 16px rgba(16,185,129,0.18);
-            animation:preloaderPulse 2s ease-in-out infinite;
+          @keyframes htmlShadowBreathe {
+            0% { transform: scale(1.4); opacity: 0.6; }
+            50% { transform: scale(0.5); opacity: 0.1; }
+            100% { transform: scale(1.4); opacity: 0.6; }
           }
-          .preloader-logo { width:42px;height:42px;object-fit:contain; }
-          .preloader-badge { font-size:11px;font-weight:900;letter-spacing:0.24em;color:#059669;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:6px; }
-          .preloader-title { font-size:18px;font-weight:900;color:#0f172a;letter-spacing:-0.02em;margin-bottom:14px; }
-          .preloader-track { width:180px;height:5px;background:#f1f5f9;border-radius:999px;overflow:hidden;position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,0.06); }
-          .preloader-beam { width:50%;height:100%;background:linear-gradient(90deg,#10b981,#14b8a6,#06b6d4);border-radius:999px;box-shadow:0 0 8px #10b981;animation:preloaderLaser 1.4s ease-in-out infinite; }
-          .preloader-tip { font-size:12px;color:#64748b;margin-top:12px;font-weight:500; }
+          @keyframes htmlRippleExpand {
+            0% { transform: scale(0.5); opacity: 0; border-width: 4px; }
+            5% { opacity: 0.8; }
+            30% { transform: scale(1.5); opacity: 0; border-width: 0px; }
+            100% { transform: scale(1.5); opacity: 0; }
+          }
+          .kdot-col { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 80px; width: 24px; }
+          .kdot-ball-wrap { position: relative; width: 20px; height: 20px; z-index: 10; animation: htmlGravBounce 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite; will-change: transform; }
+          .kdot-ball { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(180deg, #67e8f9 0%, #2563eb 100%); box-shadow: 0 0 15px rgba(6,182,212,0.6); animation: htmlRubberMorph 1.4s linear infinite; will-change: transform; position: relative; }
+          .kdot-specular { position: absolute; top: 4px; left: 4px; width: 6px; height: 6px; background: rgba(255,255,255,0.7); border-radius: 50%; filter: blur(0.5px); }
+          .kdot-ripple { position: absolute; bottom: 0; width: 40px; height: 12px; border: 1px solid rgba(6,182,212,0.3); border-radius: 100%; opacity: 0; animation: htmlRippleExpand 1.4s linear infinite; }
+          .kdot-shadow { position: absolute; bottom: -4px; width: 20px; height: 6px; border-radius: 100%; background: rgba(6,182,212,0.4); filter: blur(4px); animation: htmlShadowBreathe 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite; }
         </style>
-        <div class="preloader-card">
-          <div class="preloader-ring-wrap">
-            <div class="preloader-ring"></div>
-            <div class="preloader-core">
-              <img class="preloader-logo" src="/brand/logo.webp" alt="Thắng Tin Học" onerror="this.style.display='none'" />
-            </div>
-          </div>
-          <div class="preloader-badge">
-            <span style="width:7px;height:7px;border-radius:50%;background:#10b981;display:inline-block;"></span>
-            Thắng Tin Học
-          </div>
-          <div class="preloader-title">Đang tải dữ liệu…</div>
-          <div class="preloader-track"><div class="preloader-beam"></div></div>
-          <div class="preloader-tip">Hệ thống quản lý đào tạo trực tuyến</div>
+        <div style="display:flex;gap:20px;">
+          <div class="kdot-col"><div class="kdot-ball-wrap" style="animation-delay:0s;"><div class="kdot-ball" style="animation-delay:0s;"><div class="kdot-specular"></div></div></div><div class="kdot-ripple" style="animation-delay:0s;"></div><div class="kdot-shadow" style="animation-delay:0s;"></div></div>
+          <div class="kdot-col"><div class="kdot-ball-wrap" style="animation-delay:0.15s;"><div class="kdot-ball" style="animation-delay:0.15s;"><div class="kdot-specular"></div></div></div><div class="kdot-ripple" style="animation-delay:0.15s;"></div><div class="kdot-shadow" style="animation-delay:0.15s;"></div></div>
+          <div class="kdot-col"><div class="kdot-ball-wrap" style="animation-delay:0.3s;"><div class="kdot-ball" style="animation-delay:0.3s;"><div class="kdot-specular"></div></div></div><div class="kdot-ripple" style="animation-delay:0.3s;"></div><div class="kdot-shadow" style="animation-delay:0.3s;"></div></div>
+          <div class="kdot-col"><div class="kdot-ball-wrap" style="animation-delay:0.45s;"><div class="kdot-ball" style="animation-delay:0.45s;"><div class="kdot-specular"></div></div></div><div class="kdot-ripple" style="animation-delay:0.45s;"></div><div class="kdot-shadow" style="animation-delay:0.45s;"></div></div>
         </div>
+        <div style="margin-top:14px;font-size:16px;font-weight:700;color:#1e293b;letter-spacing:0.02em;">Đang tải dữ liệu…</div>
       </div>
     </div>
     <script type="module" src="/src/main.jsx"></script>

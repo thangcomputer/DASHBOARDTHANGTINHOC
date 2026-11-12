@@ -26,7 +26,7 @@ test('hệ thống loader xịn xò: LoadingScreen, TopLoadingBar, HTML preloade
   // 4. Kiểm tra index.html có preloader tức thì
   const indexHtml = fs.readFileSync(path.join(root, 'client/index.html'), 'utf8');
   assert.ok(indexHtml.includes('id="app-preloader"'), 'index.html phải có preloader tức thì');
-  assert.ok(indexHtml.includes('/brand/logo.webp'), 'index.html phải hiển thị logo thương hiệu');
+  assert.ok(indexHtml.includes('kdot-ball') || indexHtml.includes('htmlGravBounce'), 'index.html phải hiển thị các dấu chấm nhảy');
 
   // 5. Kiểm tra các Lazy Tab Shell sử dụng TabFallback
   const adminShell = fs.readFileSync(path.join(root, 'client/src/components/admin/AdminLazyTabShell.jsx'), 'utf8');
