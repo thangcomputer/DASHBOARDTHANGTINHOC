@@ -654,6 +654,7 @@ const AppSidebar = ({
       setMobileOpen(false);
       return;
     }
+    window.dispatchEvent(new CustomEvent('cms:exit-support-page'));
     if (item.isLogout) { onLogout?.(); return; }
     if (item.isChangePassword) {
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));

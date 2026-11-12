@@ -1042,8 +1042,14 @@ function ChatWindow({
               </button>
             </>
           ) : null}
-          <button type="button" className="cms-fm-icon-btn" onClick={() => onClose(tab.id)} aria-label="Đóng chat">
-            <X size={14} />
+          <button
+            type="button"
+            className="cms-fm-icon-btn"
+            onClick={() => onClose(tab.id)}
+            aria-label={fullPage ? 'Đóng hỗ trợ' : 'Đóng chat'}
+            title={fullPage ? 'Đóng hỗ trợ' : 'Đóng chat'}
+          >
+            <X size={fullPage ? 16 : 14} />
           </button>
         </div>
       </div>
@@ -1543,6 +1549,39 @@ export default function FloatingMessenger({ session, role }) {
     return () => document.body.classList.remove('cms-support-chat-page');
   }, [supportChatPage]);
 
+  const isSupportRoute = location.pathname.endsWith('/support') || location.pathname.includes('/support');
+
+  const closeAllSupportChats = useCallback(() => {
+    setSupportChatPage(false);
+    document.body.classList.remove('cms-support-chat-page');
+    if (activeTabId) {
+      closeChat(activeTabId);
+    }
+    if (Array.isArray(tabs)) {
+      tabs.forEach((t) => {
+        if (isAiSupportPeer(t.user) || String(t.user?.role || '').toLowerCase() === 'support') {
+          closeChat(t.id);
+        }
+      });
+    }
+  }, [activeTabId, closeChat, tabs]);
+
+  useEffect(() => {
+    if (!isSupportRoute && supportChatPage) {
+      closeAllSupportChats();
+    }
+  }, [isSupportRoute, supportChatPage, closeAllSupportChats]);
+
+  useEffect(() => {
+    const onExitSupport = () => {
+      if (supportChatPage) {
+        closeAllSupportChats();
+      }
+    };
+    window.addEventListener('cms:exit-support-page', onExitSupport);
+    return () => window.removeEventListener('cms:exit-support-page', onExitSupport);
+  }, [supportChatPage, closeAllSupportChats]);
+
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
@@ -1830,16 +1869,25 @@ export default function FloatingMessenger({ session, role }) {
 
   useEffect(() => {
     const onChooseSupport = (event) => {
-      if (event.detail?.mode === 'ai') {
+      const mode = event.detail?.mode;
+      const initialPrompt = event.detail?.prompt;
+      if (mode === 'ai') {
         setSupportChatPage(true);
+        if (initialPrompt && meId) {
+          try {
+            const cid = buildAiSupportConversationId(meRole, meId);
+            sessionStorage.setItem(`${FM_DRAFT_KEY_PREFIX}_${encodeURIComponent(meId)}_${encodeURIComponent(cid)}`, initialPrompt);
+          } catch { /* ignore */ }
+        }
         void handleOpenAiSupport();
-      } else if (event.detail?.mode === 'staff') {
+      } else if (mode === 'staff') {
         const onlineIds = new Set((onlineUsers || []).map((user) => String(user.userId || user.id || '')));
         const supportContact = fmContacts
           .filter((contact) => (
             String(contact?.productRole || '').toUpperCase() === 'SUPPORT'
             || String(contact?.adminRole || '').toUpperCase() === 'SUPPORT'
             || String(contact?.role || '').toLowerCase() === 'support'
+            || String(contact?.role || '').toLowerCase() === 'staff'
           ))
           .sort((a, b) => Number(onlineIds.has(String(b.id || ''))) - Number(onlineIds.has(String(a.id || '')))
             || String(a.name || '').localeCompare(String(b.name || ''), 'vi'))[0];
@@ -1856,7 +1904,7 @@ export default function FloatingMessenger({ session, role }) {
     };
     window.addEventListener('cms:open-support-choice', onChooseSupport);
     return () => window.removeEventListener('cms:open-support-choice', onChooseSupport);
-  }, [fmContacts, handleOpenAiSupport, onlineUsers, openChat, setSupportOpen, toast]);
+  }, [fmContacts, handleOpenAiSupport, meId, meRole, onlineUsers, openChat, setSupportOpen, toast]);
 
   const handleSupportFabClick = () => {
     if (meRole === 'student' || meRole === 'teacher') {
