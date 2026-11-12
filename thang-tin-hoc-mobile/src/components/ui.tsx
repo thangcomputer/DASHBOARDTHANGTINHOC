@@ -31,6 +31,17 @@ import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiCli
 import type { AppStackParamList } from '../navigation/types';
 import { useAuth } from '../app/AuthContext';
 import { hasRealCourseEnrollment, isFreePortalMenu } from '../utils/freePortalHelper';
+import { KineticDotsLoader } from './KineticDotsLoader';
+
+export { KineticDotsLoader };
+
+export function LoadingScreen({ message = 'Đang tải dữ liệu…' }: { message?: string }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }}>
+      <KineticDotsLoader message={message} />
+    </View>
+  );
+}
 
 /** Học viên đăng ký theo khóa → tone đỏ (đồng bộ web app); học viên miễn phí & giảng viên giữ tone xanh. */
 export function useIsBrandStudent(): boolean {

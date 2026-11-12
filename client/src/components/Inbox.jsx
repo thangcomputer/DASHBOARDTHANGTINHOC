@@ -3912,7 +3912,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Gửi ảnh (tối đa 10MB, lưu 10 ngày)"
                       >
-                        {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
+                        {isUploading ? <span className="w-5 h-5 border-2 border-emerald-300 border-t-emerald-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
                       </button>
                       <ScreenCaptureButton
                         size={20}

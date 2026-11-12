@@ -49,5 +49,18 @@ test('hệ thống loader xịn xò: LoadingScreen, TopLoadingBar, HTML preloade
   assert.ok(kineticDotsCode.includes('rubber-morph'), 'KineticDotsLoader phải có animation rubber-morph');
   assert.ok(kineticDotsCode.includes('ripple-expand'), 'KineticDotsLoader phải có shockwave ripple-expand');
   assert.ok(kineticDotsCode.includes('shadow-breathe'), 'KineticDotsLoader phải có shadow-breathe');
+  assert.ok(kineticDotsCode.includes("tone = 'emerald'"), 'KineticDotsLoader phải mặc định tone xanh lá');
+  assert.ok(kineticDotsCode.includes('from-emerald-300'), 'KineticDotsLoader phải có gradient màu xanh emerald');
+
+  // 8. Kiểm tra index.html dùng tone xanh lá
+  assert.ok(indexHtml.includes('#059669') || indexHtml.includes('#34d399'), 'index.html preloader phải dùng màu xanh lá');
+
+  // 9. Kiểm tra mobile app đồng bộ KineticDotsLoader tone xanh lá
+  const mobileLoaderCode = fs.readFileSync(path.join(root, 'thang-tin-hoc-mobile/src/components/KineticDotsLoader.tsx'), 'utf8');
+  assert.ok(mobileLoaderCode.includes('export function KineticDotsLoader'), 'Mobile phải có KineticDotsLoader');
+  assert.ok(mobileLoaderCode.includes('colors.brand') || mobileLoaderCode.includes('#059669'), 'Mobile KineticDotsLoader phải dùng tone xanh lá brand');
+
+  const mobileNavCode = fs.readFileSync(path.join(root, 'thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx'), 'utf8');
+  assert.ok(mobileNavCode.includes('<KineticDotsLoader'), 'Mobile RootNavigator phải dùng KineticDotsLoader');
 });
 

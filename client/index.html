@@ -42,10 +42,10 @@
           }
           .kdot-col { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 80px; width: 24px; }
           .kdot-ball-wrap { position: relative; width: 20px; height: 20px; z-index: 10; animation: htmlGravBounce 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite; will-change: transform; }
-          .kdot-ball { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(180deg, #67e8f9 0%, #2563eb 100%); box-shadow: 0 0 15px rgba(6,182,212,0.6); animation: htmlRubberMorph 1.4s linear infinite; will-change: transform; position: relative; }
+          .kdot-ball { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(180deg, #34d399 0%, #059669 100%); box-shadow: 0 0 16px rgba(16,185,129,0.7); animation: htmlRubberMorph 1.4s linear infinite; will-change: transform; position: relative; }
           .kdot-specular { position: absolute; top: 4px; left: 4px; width: 6px; height: 6px; background: rgba(255,255,255,0.7); border-radius: 50%; filter: blur(0.5px); }
-          .kdot-ripple { position: absolute; bottom: 0; width: 40px; height: 12px; border: 1px solid rgba(6,182,212,0.3); border-radius: 100%; opacity: 0; animation: htmlRippleExpand 1.4s linear infinite; }
-          .kdot-shadow { position: absolute; bottom: -4px; width: 20px; height: 6px; border-radius: 100%; background: rgba(6,182,212,0.4); filter: blur(4px); animation: htmlShadowBreathe 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite; }
+          .kdot-ripple { position: absolute; bottom: 0; width: 40px; height: 12px; border: 1px solid rgba(16,185,129,0.4); border-radius: 100%; opacity: 0; animation: htmlRippleExpand 1.4s linear infinite; }
+          .kdot-shadow { position: absolute; bottom: -4px; width: 20px; height: 6px; border-radius: 100%; background: rgba(16,185,129,0.45); filter: blur(4px); animation: htmlShadowBreathe 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite; }
         </style>
         <div style="display:flex;gap:20px;">
           <div class="kdot-col"><div class="kdot-ball-wrap" style="animation-delay:0s;"><div class="kdot-ball" style="animation-delay:0s;"><div class="kdot-specular"></div></div></div><div class="kdot-ripple" style="animation-delay:0s;"></div><div class="kdot-shadow" style="animation-delay:0s;"></div></div>

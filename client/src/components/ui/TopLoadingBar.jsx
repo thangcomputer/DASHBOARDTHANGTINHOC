@@ -86,8 +86,8 @@ export default function TopLoadingBar() {
           transition: progress === 100
             ? 'width 0.18s ease-out'
             : 'width 0.22s cubic-bezier(0.2, 0.8, 0.4, 1)',
-          background: 'linear-gradient(90deg, #10b981 0%, #14b8a6 45%, #06b6d4 85%, #38bdf8 100%)',
-          boxShadow: '0 0 10px rgba(16, 185, 129, 0.65), 0 0 4px rgba(6, 182, 212, 0.8)',
+          background: 'linear-gradient(90deg, #10b981 0%, #059669 40%, #10b981 75%, #34d399 100%)',
+          boxShadow: '0 0 12px rgba(16, 185, 129, 0.75), 0 0 4px rgba(52, 211, 153, 0.9)',
         }}
       />
 

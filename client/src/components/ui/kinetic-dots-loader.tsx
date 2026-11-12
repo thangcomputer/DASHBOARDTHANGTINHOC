@@ -7,23 +7,23 @@ interface KineticDotsLoaderProps {
   className?: string;
   dots?: number;
   message?: string;
-  tone?: 'cyan-blue' | 'emerald-cyan' | 'brand';
+  tone?: 'green' | 'emerald' | 'emerald-cyan' | 'cyan-blue' | 'brand';
 }
 
 export default function KineticDotsLoader({
   className,
   dots = 4,
   message,
-  tone = 'cyan-blue',
+  tone = 'emerald',
 }: KineticDotsLoaderProps) {
-  const isEmerald = tone === 'emerald-cyan';
+  const isCyan = tone === 'cyan-blue';
 
-  const ballGradient = isEmerald
-    ? 'bg-gradient-to-b from-emerald-300 via-teal-400 to-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.65)]'
-    : 'w-full h-full rounded-full bg-gradient-to-b from-cyan-300 to-blue-600 shadow-[0_0_15px_rgba(6,182,212,0.6)]';
+  const ballGradient = isCyan
+    ? 'bg-gradient-to-b from-cyan-300 to-blue-600 shadow-[0_0_15px_rgba(6,182,212,0.6)]'
+    : 'bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-600 shadow-[0_0_16px_rgba(16,185,129,0.75)]';
 
-  const rippleColor = isEmerald ? 'border-emerald-500/40' : 'border-cyan-500/30';
-  const shadowColor = isEmerald ? 'bg-emerald-500/45' : 'bg-cyan-500/40';
+  const rippleColor = isCyan ? 'border-cyan-500/30' : 'border-emerald-500/40';
+  const shadowColor = isCyan ? 'bg-cyan-500/40' : 'bg-emerald-500/45';
 
   return (
     <div className={cn('flex flex-col items-center justify-center min-h-[160px] p-6 bg-slate-950/0 select-none', className)}>

@@ -740,7 +740,7 @@ const StudentDashboard = () => {
                       onChange={(e) => setSubmissionLink(e.target.value)}
                     />
                     <label className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-3 rounded-xl cursor-pointer transition flex items-center justify-center font-bold sm:w-auto w-full" title="Tải file trực tiếp (Tối đa 3MB)">
-                      {isSubmitting ? <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /> : <FileUp size={20} />}
+                      {isSubmitting ? <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /> : <FileUp size={20} />}
                       <input type="file" className="hidden" onChange={handleStudentUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" disabled={isSubmitting} />
                     </label>
                   </div>

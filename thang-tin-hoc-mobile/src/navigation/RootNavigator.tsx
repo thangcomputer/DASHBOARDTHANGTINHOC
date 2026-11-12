@@ -58,6 +58,7 @@ import { PinLockGate } from '../components/pinLock/PinLockGate';
 import { TeacherPaymentNoticeModal } from '../components/TeacherPaymentNoticeModal';
 import { LearningGoalHost } from '../components/LearningGoalModal';
 import { FreeFeatureLockModal, FreeSurveyModal, isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
+import { KineticDotsLoader } from '../components/KineticDotsLoader';
 import { MobilePopupBanner } from '../components/MobilePopupBanner';
 import { noteStudyActivity } from '../services/studyActivity';
 import { notePinActivity, pinUserKey } from '../services/pinLock';
@@ -428,7 +429,7 @@ export function RootNavigator() {
   if (isRestoringSession) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }}>
-        <ActivityIndicator color={colors.brand} />
+        <KineticDotsLoader message="Đang nạp dữ liệu…" />
       </View>
     );
   }
