@@ -156,3 +156,4 @@ export function SoundToggleButton({ compact = false, className = '' }) {
     </button>
   );
 }
+

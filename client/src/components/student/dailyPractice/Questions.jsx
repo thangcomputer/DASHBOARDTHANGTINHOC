@@ -92,50 +92,126 @@ function ResultMark({ ok }) {
     : <X size={16} className="shrink-0 text-red-500" aria-label="Sai" />;
 }
 
+/**
+ * QuizAnswerOption - Ô đáp án trắc nghiệm chuẩn Game UI DewSkill:
+ * - Khi đúng: nền xanh lá nhạt (#ECFDF5), viền xanh đậm (#10B981), chữ cái A nền xanh lá chữ trắng,
+ *   dấu tích xanh tròn bên phải hiệu ứng pop (200-300ms), 3 tia sáng xanh góc trái trên, scale nhẹ 0.98 -> 1.
+ * - Khi sai: nền đỏ nhạt, viền đỏ, chữ cái A nền đỏ, icon X tròn bên phải, rung ngang nhẹ 1 lần (dp-shake).
+ * - Các đáp án khác giữ nguyên màu trung tính và tự khóa sau khi có kết quả.
+ */
+export function QuizAnswerOption({
+  index,
+  option,
+  locked,
+  isCorrect,
+  isWrongPick,
+  isChosen,
+  eliminated,
+  onSelect,
+}) {
+  const letter = String.fromCharCode(65 + index);
+  return (
+    <button
+      type="button"
+      disabled={locked || eliminated}
+      onClick={onSelect}
+      data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
+      className={`${CHIP} group relative flex h-full min-h-[62px] w-full items-center gap-3.5 !rounded-2xl !px-4 !py-3.5 text-left text-[15px] transition-all duration-200 sm:!px-5 ${
+        isCorrect
+          ? 'dp-option-select border-emerald-500 bg-gradient-to-r from-[#ECFDF5] via-[#E6F9EF] to-[#ECFDF5] text-emerald-950 !shadow-[0_3px_0_#34D399,0_8px_20px_-6px_rgba(16,185,129,0.22)]'
+          : isWrongPick
+            ? 'dp-shake border-red-400 bg-gradient-to-r from-red-50 via-rose-50/80 to-red-50 text-red-900 !shadow-[0_3px_0_#FCA5A5]'
+            : eliminated
+              ? 'border-slate-100 bg-slate-50 text-slate-300 line-through opacity-60'
+              : isChosen && !locked
+                ? 'scale-[0.98] border-emerald-400 bg-emerald-50/50 text-slate-900'
+                : 'border-slate-200/90 bg-white text-slate-800 hover:scale-[1.01] hover:border-emerald-400 hover:bg-emerald-50/35 active:scale-[0.98] active:translate-y-[2px]'
+      }`}
+    >
+      {/* 3 tia sáng xanh nhỏ ở góc trên bên trái khi chọn đúng (theo hình tham chiếu) */}
+      {isCorrect && (
+        <svg
+          className="dp-pop pointer-events-none absolute -left-2.5 -top-3 h-5 w-5 text-emerald-500"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path d="M5 14L2 11M10 10L8 5M15 11L16 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      )}
+
+      {/* Nút chữ cái A, B, C, D */}
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${
+          isCorrect
+            ? 'bg-emerald-500 text-white shadow-2xs'
+            : isWrongPick
+              ? 'bg-red-500 text-white shadow-2xs'
+              : eliminated
+                ? 'bg-slate-100 text-slate-300'
+                : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 group-hover:border-emerald-500 group-hover:bg-emerald-500 group-hover:text-white'
+        }`}
+      >
+        {letter}
+      </span>
+
+      {/* Nội dung đáp án */}
+      <span className="flex-1 font-bold leading-snug">{option}</span>
+
+      {/* Biểu tượng dấu tích xanh / X đỏ ở bên phải (pop 200-300ms) */}
+      {isCorrect && (
+        <span
+          className="dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs"
+          aria-label="Đúng"
+        >
+          <Check size={16} strokeWidth={3.2} />
+        </span>
+      )}
+      {isWrongPick && (
+        <span
+          className="dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500 text-white shadow-xs"
+          aria-label="Sai"
+        >
+          <X size={16} strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  );
+}
+
 // ── Trắc nghiệm ──────────────────────────────────────────────────────────────
 export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
   const eliminated = new Set(reveal?.eliminate || []);
   const locked = Boolean(result);
+  const allShort = useMemo(
+    () => (question.options || []).every((opt) => String(opt || '').length <= 28),
+    [question.options],
+  );
+
   return (
-    <div className="grid gap-3.5 sm:grid-cols-2">
+    <div className={`grid items-stretch gap-3.5 ${allShort ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
       {question.options.map((option, index) => {
-        const isCorrect = locked && result.correctAnswer?.correctIndex === index;
+        const isCorrect = locked && (
+          result.correctAnswer?.correctIndex === index
+          || (result.correct && chosen === index)
+        );
         const isWrongPick = locked && chosen === index && !isCorrect;
         const out = eliminated.has(index);
         return (
-          <button
-            key={option}
-            type="button"
-            disabled={locked || out}
-            onClick={() => { gameSounds.tap(); onSubmit({ index }); }}
-            data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
-            className={`${CHIP} group flex items-center gap-3.5 !rounded-2xl !px-4 !py-4 text-left text-[15px] sm:!px-5 ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop'
-                : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake'
-                  : out ? 'border-slate-100 bg-slate-50 text-slate-300 line-through opacity-60'
-                    : 'border-slate-200/90 hover:scale-[1.01] hover:border-emerald-400 hover:bg-emerald-50/40 active:translate-y-[2px]'
-              }`}
-          >
-            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect ? 'dp-pop bg-emerald-500 text-white'
-                : isWrongPick ? 'bg-red-500 text-white'
-                  : out ? 'bg-slate-100 text-slate-300'
-                    : 'bg-slate-100 text-slate-600 group-hover:bg-emerald-500 group-hover:text-white'
-              }`}
-            >
-              {isCorrect ? (
-                <Check size={18} strokeWidth={3.2} aria-label="Đúng" />
-              ) : isWrongPick ? (
-                <X size={18} strokeWidth={3} aria-label="Sai" />
-              ) : (
-                String.fromCharCode(65 + index)
-              )}
-            </span>
-            <span className="flex-1 leading-snug">{option}</span>
-            {isCorrect && (
-              <span className="dp-pop flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-2xs" aria-hidden="true">
-                <Check size={14} strokeWidth={3.2} />
-              </span>
-            )}
-          </button>
+          <QuizAnswerOption
+            key={`${index}-${option}`}
+            index={index}
+            option={option}
+            locked={locked}
+            isCorrect={isCorrect}
+            isWrongPick={isWrongPick}
+            isChosen={chosen === index}
+            eliminated={out}
+            onSelect={() => {
+              gameSounds.tap();
+              onSubmit({ index });
+            }}
+          />
         );
       })}
     </div>

@@ -381,4 +381,20 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   const soundUtil = read('client/src/utils/sound.js');
   assert.ok(soundUtil.includes('export const GameSoundManager'), 'GameSoundManager quản lý âm thanh');
   assert.ok(soundUtil.includes('if (saved === null) return true;'), 'mặc định tắt âm thanh khi chưa cấu hình');
+
+  // Kiểm tra giao diện trả lời trắc nghiệm DewSkill (Web + Mobile) theo hình tham chiếu
+  const webQuestions = read('client/src/components/student/dailyPractice/Questions.jsx');
+  assert.ok(webQuestions.includes('export function QuizAnswerOption'), 'Web có component QuizAnswerOption');
+  assert.ok(answerFeedback.includes('export function QuizActionButtons'), 'Web có component QuizActionButtons');
+  assert.ok(answerFeedback.includes("'Chưa chính xác, thử lại nhé!'"), 'Web hiển thị Chưa chính xác, thử lại nhé! khi sai');
+  assert.ok(answerFeedback.includes("'Giải thích'"), 'Web có nút Giải thích');
+  assert.ok(answerFeedback.includes("'Tiếp tục'"), 'Web có nút Tiếp tục');
+  assert.ok(progressBar.includes('export function QuizProgressBar'), 'Web có component QuizProgressBar');
+  assert.ok(progressBar.includes('data-progress-xp-pill'), 'Web hiện +XP trên thanh tiến độ khi xác nhận');
+
+  const mobileAnswerFeedback = read('thang-tin-hoc-mobile/src/components/dailyPractice/MobileAnswerFeedback.tsx');
+  assert.ok(mobileAnswerFeedback.includes("'Chính xác!'"), 'Mobile hiển thị Chính xác! khi đúng');
+  assert.ok(mobileAnswerFeedback.includes("'Chưa chính xác, thử lại nhé!'"), 'Mobile hiển thị Chưa chính xác, thử lại nhé! khi sai');
+  assert.ok(mobileAnswerFeedback.includes('Giải thích'), 'Mobile có nút Giải thích');
+  assert.ok(mobileAnswerFeedback.includes('Tiếp tục'), 'Mobile có nút Tiếp tục');
 });

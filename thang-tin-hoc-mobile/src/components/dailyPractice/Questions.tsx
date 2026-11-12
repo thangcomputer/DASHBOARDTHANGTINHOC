@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { Check, GripVertical, Lock, X } from 'lucide-react-native';
 import type { DpAnswer, DpAnswerResult, DpQuestion, DpReveal } from '../../services/dailyPracticeApi';
 import { Draggable, DropZone } from './DragKit';
 import type { GameSound } from './useGameSounds';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export type QuestionProps = {
   question: DpQuestion;
@@ -16,16 +19,45 @@ export type QuestionProps = {
 const norm = (value: string) => value.trim().toLowerCase();
 
 function Mark({ ok }: { ok: boolean }) {
+  const pop = useRef(new Animated.Value(0.45)).current;
+  useEffect(() => {
+    pop.setValue(0.45);
+    Animated.spring(pop, {
+      toValue: 1,
+      friction: 5,
+      tension: 160,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [ok, pop]);
+
   return (
-    <View style={{
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: ok ? '#10B981' : '#EF4444',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      {ok ? <Check size={15} color="#FFFFFF" strokeWidth={3} /> : <X size={15} color="#FFFFFF" strokeWidth={3} />}
+    <Animated.View
+      style={{
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: ok ? '#10B981' : '#EF4444',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transform: [{ scale: pop }],
+      }}
+    >
+      {ok ? <Check size={15} color="#FFFFFF" strokeWidth={3.2} /> : <X size={15} color="#FFFFFF" strokeWidth={3} />}
+    </Animated.View>
+  );
+}
+
+function OptionBurstRays() {
+  return (
+    <View style={styles.optionBurstRays} pointerEvents="none">
+      <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M5 14L2 11M10 10L8 5M15 11L16 6"
+          stroke="#10B981"
+          strokeWidth={2.6}
+          strokeLinecap="round"
+        />
+      </Svg>
     </View>
   );
 }
@@ -56,52 +88,80 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
   play: (sound: GameSound) => void;
 }) {
   const { width } = useWindowDimensions();
-  const twoColumns = width >= 500;
+  const allShort = useMemo(
+    () => (question.options || []).every((opt) => String(opt || '').length <= 28),
+    [question.options],
+  );
+  const twoColumns = width >= 500 || (width >= 340 && allShort);
   const eliminated = new Set(reveal?.eliminate || []);
+  const selectedScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!result) return;
+    selectedScale.setValue(0.98);
+    Animated.timing(selectedScale, {
+      toValue: 1,
+      duration: 210,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [result, selectedScale]);
+
   return (
     <View style={[styles.gap, twoColumns && styles.mcqGrid]}>
       {(question.options || []).map((option, index) => {
-        const isCorrect = Boolean(result) && result?.correctAnswer.correctIndex === index;
+        const isCorrect = Boolean(result) && (
+          result?.correctAnswer?.correctIndex === index
+          || (result?.correct && chosen === index)
+        );
         const isWrong = Boolean(result) && chosen === index && !isCorrect;
         const isChosen = chosen === index;
         const out = eliminated.has(index);
         return (
-          <Pressable
-            key={option}
-            disabled={Boolean(result) || out}
-            onPress={() => { play('tap'); onSubmit({ index }); }}
-            style={({ pressed }) => [
-              styles.option,
-              twoColumns && styles.optionHalf,
-              isChosen && !result && styles.optionSelected,
-              isCorrect && styles.chipOk,
-              isWrong && styles.chipBad,
-              out && styles.optionOut,
-              pressed && !result && !out && styles.optionPressed,
+          <Animated.View
+            key={`${index}-${option}`}
+            style={[
+              twoColumns ? styles.optionHalf : { width: '100%' },
+              (isCorrect || isWrong) && { transform: [{ scale: selectedScale }] },
             ]}
-            accessibilityRole="button"
           >
-            <View style={[
-              styles.letter,
-              isChosen && !result && { backgroundColor: '#E0F2FE', borderColor: '#38BDF8' },
-              isCorrect && { backgroundColor: '#10B981', borderColor: '#047857' },
-              isWrong && { backgroundColor: '#EF4444', borderColor: '#B91C1C' },
-            ]}>
+            <Pressable
+              disabled={Boolean(result) || out}
+              onPress={() => { play('tap'); onSubmit({ index }); }}
+              style={({ pressed }) => [
+                styles.option,
+                isChosen && !result && styles.optionSelected,
+                isCorrect && styles.optionCorrect,
+                isWrong && styles.optionWrong,
+                out && styles.optionOut,
+                pressed && !result && !out && styles.optionPressed,
+              ]}
+              accessibilityRole="button"
+            >
+              {isCorrect ? <OptionBurstRays /> : null}
+              <View style={[
+                styles.letter,
+                isChosen && !result && { backgroundColor: '#DCFCE7', borderColor: '#34D399' },
+                isCorrect && { backgroundColor: '#10B981', borderColor: '#059669' },
+                isWrong && { backgroundColor: '#EF4444', borderColor: '#DC2626' },
+              ]}>
+                <Text style={[
+                  styles.letterText,
+                  isChosen && !result && { color: '#047857' },
+                  (isCorrect || isWrong) && { color: '#FFFFFF' },
+                ]}>{String.fromCharCode(65 + index)}</Text>
+              </View>
               <Text style={[
-                styles.letterText,
-                isChosen && !result && { color: '#0369A1' },
-                (isCorrect || isWrong) && { color: '#FFFFFF' },
-              ]}>{String.fromCharCode(65 + index)}</Text>
-            </View>
-            <Text style={[
-              styles.optionText,
-              isChosen && !result && { color: '#0369A1', fontWeight: '700' },
-              isCorrect && { color: '#065F46', fontWeight: '700' },
-              isWrong && { color: '#991B1B', fontWeight: '700' },
-              out && styles.optionTextOut,
-            ]}>{option}</Text>
-            {isCorrect ? <Mark ok /> : isWrong ? <Mark ok={false} /> : null}
-          </Pressable>
+                styles.optionText,
+                twoColumns && width < 500 && { fontSize: 13.5, lineHeight: 19 },
+                isChosen && !result && { color: '#065F46', fontWeight: '700' },
+                isCorrect && { color: '#064E3B', fontWeight: '800' },
+                isWrong && { color: '#991B1B', fontWeight: '800' },
+                out && styles.optionTextOut,
+              ]}>{option}</Text>
+              {isCorrect ? <Mark ok /> : isWrong ? <Mark ok={false} /> : null}
+            </Pressable>
+          </Animated.View>
         );
       })}
     </View>
@@ -461,18 +521,21 @@ const styles = StyleSheet.create({
   chipBad: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
   chipText: { color: '#1E293B', fontSize: 14, fontWeight: '800' },
   chipTextSelected: { color: '#075985' },
-  mcqGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  mcqGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   option: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5,
-    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', minHeight: 56,
+    position: 'relative', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 13, borderRadius: 16, borderWidth: 1.5,
+    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', minHeight: 58, borderBottomWidth: 3, borderBottomColor: '#CBD5E1',
   },
-  optionPressed: { opacity: 0.92 },
-  optionSelected: { borderColor: '#0284C7', backgroundColor: '#F0F9FF' },
-  optionHalf: { width: '48%', flexGrow: 1 },
+  optionPressed: { opacity: 0.92, transform: [{ translateY: 1 }] },
+  optionSelected: { borderColor: '#34D399', backgroundColor: '#ECFDF5', borderBottomColor: '#10B981' },
+  optionCorrect: { borderColor: '#10B981', backgroundColor: '#ECFDF5', borderBottomColor: '#34D399' },
+  optionWrong: { borderColor: '#F87171', backgroundColor: '#FEF2F2', borderBottomColor: '#FCA5A5' },
+  optionBurstRays: { position: 'absolute', left: -8, top: -10, zIndex: 5 },
+  optionHalf: { width: '48.2%', flexGrow: 1 },
   optionOut: { opacity: 0.45, backgroundColor: '#F8FAFC' },
-  optionText: { flex: 1, color: '#1E293B', fontSize: 15, fontWeight: '700', lineHeight: 22 },
+  optionText: { flex: 1, color: '#1E293B', fontSize: 15, fontWeight: '700', lineHeight: 21 },
   optionTextOut: { textDecorationLine: 'line-through', color: '#94A3B8' },
-  letter: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#CBD5E1' },
+  letter: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: '#CBD5E1' },
   letterText: { color: '#475569', fontSize: 14, fontWeight: '900' },
   tf: {
     flex: 1, alignItems: 'center', gap: 8, paddingVertical: 20, borderRadius: 18, borderWidth: 1.5,

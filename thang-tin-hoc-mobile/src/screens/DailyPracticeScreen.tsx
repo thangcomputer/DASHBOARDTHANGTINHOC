@@ -23,6 +23,7 @@ import { MobileComboLightningOverlay } from '../components/dailyPractice/MobileC
 import { MobilePerfectStreakOverlay } from '../components/dailyPractice/MobilePerfectStreakOverlay';
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
 import { UnitStageChest } from '../components/dailyPractice/UnitStageChest';
+import { MobileAnswerFeedback } from '../components/dailyPractice/MobileAnswerFeedback';
 import { VideoPlayerFrame, type VideoPlayerApi } from './VideoPlayerFrame';
 import { resolveMobilePublicUrl } from '../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/videoSource';
@@ -2731,10 +2732,15 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
 
   const props = { question, reveal, result, play, onChange: setPending };
   const immediate = question.type === 'mcq' || question.type === 'truefalse';
-  const mood: MascotMood = result ? (result.correct ? 'happy' : 'sad') : reveal ? 'thinking' : 'idle';
+  const mood: MascotMood = result ? (result.correct ? 'happy' : 'thinking') : reveal ? 'thinking' : 'idle';
   const stepTitle = session.path
     ? `Chặng ${session.path.unitIndex} · ${session.path.pathNodeLabel || session.path.unitTitle} · ${session.path.stepLabel}`
     : `Luyện tự do · ${level.label}`;
+  const confirmedQuestionXp = result?.correct
+    ? (typeof result.xp === 'number' && result.xp > 0
+      ? result.xp
+      : (isPerQuestionStake && !session.xpDisabled ? QUESTION_STAKE_XP : 0))
+    : 0;
 
   return (
     <DragProvider onDraggingChange={onDraggingChange}>
@@ -2842,7 +2848,17 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
                 <Text style={styles.selectAnswerHint}>Chọn 1 đáp án bên trên</Text>
               )}
             </View>
-          ) : null}
+          ) : (
+            <MobileAnswerFeedback
+              question={question}
+              result={result}
+              confirmedXp={confirmedQuestionXp}
+              feedbackTitle={title}
+              busy={busy}
+              play={play}
+              onNext={() => { void next(); }}
+            />
+          )}
         </Animated.View>
 
         {quitOpen ? (
@@ -2855,37 +2871,6 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             onStay={() => setQuitOpen(false)}
             onQuit={() => { void confirmQuit(); }}
           />
-        ) : null}
-        {result ? (
-          <View style={[styles.feedback, result.correct ? styles.feedbackOk : styles.feedbackBad]}>
-            <View style={styles.feedbackRow}>
-              <Mascot mood={result.correct ? 'happy' : 'sad'} size={52} />
-              <View style={styles.flex}>
-                <View style={styles.feedbackTitleRow}>
-                  {result.correct ? <CheckCircle2 size={20} color="#047857" /> : <XCircle size={20} color="#DC2626" />}
-                  <Text style={[styles.feedbackTitle, { color: result.correct ? '#047857' : '#DC2626' }]}>{title}</Text>
-                  {result.wrongPenaltyXp ? (
-                    <Text style={[styles.feedbackXp, { color: '#DC2626' }]}>
-                      {`−${result.wrongPenaltyXp} XP`}
-                    </Text>
-                  ) : result.correct && result.xp > 0 ? (
-                    <Text style={styles.feedbackXp}>{`+${result.xp} XP`}</Text>
-                  ) : null}
-                </View>
-                {!result.correct ? <Text style={styles.feedbackAnswer}>{`Đáp án: ${result.correctAnswer.text}`}</Text> : null}
-                {result.explanation ? <Text style={styles.feedbackExplain}>{result.explanation}</Text> : null}
-              </View>
-            </View>
-            <DuoButton
-              variant={result.correct ? 'primary' : 'danger'}
-              size="lg"
-              fullWidth
-              loading={busy}
-              text={index + 1 < total ? (result.correct ? 'TIẾP TỤC' : 'ĐÃ HIỂU') : 'XEM KẾT QUẢ'}
-              rightIcon={<ArrowRight size={18} color="#FFFFFF" />}
-              onPress={() => { void next(); }}
-            />
-          </View>
         ) : null}
         {lightningCombo ? (
           <MobileComboLightningOverlay
@@ -4298,7 +4283,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     borderWidth: 1.5, borderColor: '#E2E8F0', alignItems: 'center', gap: 3,
   },
   stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  playWrap: { gap: spacing.lg, paddingTop: 20, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  playWrap: { gap: spacing.lg, paddingTop: 20, paddingBottom: 92, maxWidth: 760, width: '100%', alignSelf: 'center' },
   topBarCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
     borderRadius: 20, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',

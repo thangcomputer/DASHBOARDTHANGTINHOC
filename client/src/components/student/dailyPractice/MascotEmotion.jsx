@@ -75,3 +75,4 @@ export default function MascotEmotion({
 }
 
 export { MOOD_SRC, MOOD_LABEL, EMOTION_DEFAULT_SPEECH };
+

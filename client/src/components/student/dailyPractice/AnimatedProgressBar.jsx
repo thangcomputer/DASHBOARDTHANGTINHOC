@@ -3,15 +3,17 @@ import { Check, Sparkles } from 'lucide-react';
 import { DEWSKILL_ANIMATION, useReducedMotion } from './animationConstants';
 
 /**
- * AnimatedProgressBar - Thanh tiến độ bài học mượt mà chuẩn thương hiệu DewSkill:
+ * AnimatedProgressBar / QuizProgressBar - Thanh tiến độ bài học mượt mà chuẩn thương hiệu DewSkill:
  * - Chuyển động màu xanh lá ngọc lục bảo (emerald/teal).
+ * - Hiển thị huy hiệu +XP kèm tia sáng nhỏ phía trên thanh tiến độ khi trả lời đúng được xác nhận.
  * - Khi đạt 100%, hiển thị hiệu ứng hoàn thành hữu hạn (không chạy lặp vô hạn tốn CPU).
  */
-export default function AnimatedProgressBar({
+export function QuizProgressBar({
   progress = 0,
   currentStep = 0,
   totalSteps = 0,
   label = '',
+  confirmedXp = 0,
   className = '',
 }) {
   const clamped = Math.max(0, Math.min(100, Math.round(Number(progress) || 0)));
@@ -32,26 +34,47 @@ export default function AnimatedProgressBar({
   }, [isComplete, reducedMotion]);
 
   return (
-    <div className={`min-w-0 flex-1 ${className}`} data-progress-value={clamped}>
-      {(label || totalSteps > 0) && (
+    <div className={`relative min-w-0 flex-1 ${className}`} data-progress-value={clamped}>
+      {(label || totalSteps > 0 || confirmedXp > 0) && (
         <div className="mb-1.5 flex items-center justify-between gap-2">
           {label ? (
-            <span className="truncate text-xs font-extrabold text-slate-600 sm:text-[13px]">
+            <span className="truncate text-xs font-extrabold text-slate-700 sm:text-[13px]">
               {label}
             </span>
           ) : <span />}
-          {totalSteps > 0 && (
-            <span
-              className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-black tabular-nums transition-colors ${
-                isComplete
-                  ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              {isComplete && <Check size={12} strokeWidth={3} className="text-emerald-600" aria-hidden="true" />}
-              <span>{currentStep}/{totalSteps}</span>
-            </span>
-          )}
+
+          <div className="flex shrink-0 items-center gap-2">
+            {confirmedXp > 0 && (
+              <span
+                className="dp-pop relative inline-flex items-center gap-1 rounded-full border border-amber-300/80 bg-[#FFF3C4] px-2.5 py-0.5 text-[11px] font-black text-amber-900 shadow-2xs"
+                data-progress-xp-pill={confirmedXp}
+              >
+                <span>+{confirmedXp} XP</span>
+                {/* 3 tia sáng nhỏ góc phải trên theo hình mẫu */}
+                <svg
+                  className="pointer-events-none absolute -right-2.5 -top-2 h-3.5 w-3.5 text-amber-500"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path d="M3 7L1 4M8 5V1M12 8L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </span>
+            )}
+
+            {totalSteps > 0 && (
+              <span
+                className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-black tabular-nums transition-colors ${
+                  isComplete
+                    ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300'
+                    : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {isComplete && <Check size={12} strokeWidth={3} className="text-emerald-600" aria-hidden="true" />}
+                <span>{currentStep}/{totalSteps}</span>
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -65,7 +88,7 @@ export default function AnimatedProgressBar({
         aria-valuemax={100}
       >
         <div
-          className="relative h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400"
+          className="relative h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.35)]"
           style={{
             width: `${clamped}%`,
             transition: reducedMotion
@@ -74,7 +97,7 @@ export default function AnimatedProgressBar({
           }}
         >
           {/* Ánh sáng bóng 3D phía trên thanh tiến độ */}
-          <div className="pointer-events-none absolute inset-x-1.5 top-0.5 h-[3px] rounded-full bg-white/40" />
+          <div className="pointer-events-none absolute inset-x-1.5 top-0.5 h-[3px] rounded-full bg-white/45" />
 
           {/* Hiệu ứng hoàn thành 100% chạy đúng 1 lần, không lặp vô hạn */}
           {burstActive && (
@@ -97,3 +120,5 @@ export default function AnimatedProgressBar({
     </div>
   );
 }
+
+export default QuizProgressBar;

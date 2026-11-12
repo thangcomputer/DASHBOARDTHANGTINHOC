@@ -117,3 +117,4 @@ export function useAnimatedNumber(targetValue, duration = DEWSKILL_ANIMATION.XP_
 
   return displayValue;
 }
+

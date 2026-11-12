@@ -502,6 +502,13 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const contextLabel = headerChips[0]?.text || level.label;
   const answeredCount = index + (result ? 1 : 0);
   const quitLossXp = isPerQuestion ? Math.max(0, total - answeredCount) * perQuestionStake : stakeXp;
+  const confirmedQuestionXp = result?.correct
+    ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
+      ? result.xpDelta
+      : (typeof result.xp === 'number' && result.xp > 0
+        ? result.xp
+        : (isPerQuestion ? perQuestionStake : 0)))
+    : 0;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 pt-6 pb-12 sm:gap-6 sm:px-6 sm:pt-10">
@@ -520,6 +527,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           currentStep={index + 1}
           totalSteps={total}
           label={contextLabel}
+          confirmedXp={confirmedQuestionXp}
         />
         <div className="relative flex shrink-0 items-center gap-2">
           {combo >= 2 && (
@@ -550,13 +558,13 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       </header>
 
       {/* Thẻ câu */}
-      <section className={`relative rounded-[28px] bg-white p-6 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 sm:p-8 ${result && !result.correct ? 'dp-shake' : ''}`}>
+      <section className={`relative rounded-[28px] bg-white p-5 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 sm:p-8 ${result && !result.correct ? 'dp-shake' : ''}`}>
         {result?.correct && <Confetti />}
-        <div className="flex items-start gap-4 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6">
-          <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-slate-50 ring-1 ring-emerald-100/80 sm:flex">
+        <div className="flex items-start gap-3.5 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-slate-50 ring-1 ring-emerald-100/80 sm:h-16 sm:w-16">
             <Mascot
               mood={result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning'}
-              size={52}
+              size={50}
               className="shrink-0"
             />
           </div>
@@ -621,6 +629,19 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             )}
           </div>
         )}
+
+        {result && (
+          <AnswerFeedback
+            question={question}
+            result={result}
+            feedbackTitle={feedbackTitle}
+            confirmedXp={confirmedQuestionXp}
+            rewardKey={`${session.id}:${question.id}`}
+            isLastQuestion={index + 1 >= total}
+            busy={busy}
+            onNext={next}
+          />
+        )}
       </section>
 
       {quitOpen && (
@@ -633,24 +654,6 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           quitting={quitting}
           onStay={() => setQuitOpen(false)}
           onQuit={confirmQuit}
-        />
-      )}
-
-      {result && (
-        <AnswerFeedback
-          result={result}
-          feedbackTitle={feedbackTitle}
-          confirmedXp={
-            result.correct
-              ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
-                ? result.xpDelta
-                : (isPerQuestion ? perQuestionStake : 0))
-              : 0
-          }
-          rewardKey={`${session.id}:${question.id}`}
-          isLastQuestion={index + 1 >= total}
-          busy={busy}
-          onNext={next}
         />
       )}
 
