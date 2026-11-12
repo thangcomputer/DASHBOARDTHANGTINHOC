@@ -88,27 +88,21 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
   play: (sound: GameSound) => void;
 }) {
   const { width } = useWindowDimensions();
-  const allShort = useMemo(
-    () => (question.options || []).every((opt) => String(opt || '').length <= 28),
-    [question.options],
-  );
-  const twoColumns = width >= 500 || (width >= 340 && allShort);
+  const twoColumns = useMemo(() => {
+    const MIN_COL_DP = 180;
+    const COLUMN_GAP = 10;
+    const CONTENT_INSET = 56;
+    if (width < 600) return false;
+    const contentWidth = Math.max(0, width - CONTENT_INSET);
+    const colWidth = (contentWidth - COLUMN_GAP) / 2;
+    if (colWidth < MIN_COL_DP) return false;
+    const options = question.options || [];
+    return options.length > 0 && options.every((opt) => String(opt || '').length <= 24);
+  }, [width, question.options]);
   const eliminated = new Set(reveal?.eliminate || []);
-  const selectedScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!result) return;
-    selectedScale.setValue(0.98);
-    Animated.timing(selectedScale, {
-      toValue: 1,
-      duration: 210,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [result, selectedScale]);
 
   return (
-    <View style={[styles.gap, twoColumns && styles.mcqGrid]}>
+    <View style={[styles.mcqList, twoColumns && styles.mcqGrid]}>
       {(question.options || []).map((option, index) => {
         const isCorrect = Boolean(result) && (
           result?.correctAnswer?.correctIndex === index
@@ -118,16 +112,16 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
         const isChosen = chosen === index;
         const out = eliminated.has(index);
         return (
-          <Animated.View
+          <View
             key={`${index}-${option}`}
-            style={[
-              twoColumns ? styles.optionHalf : { width: '100%' },
-              (isCorrect || isWrong) && { transform: [{ scale: selectedScale }] },
-            ]}
+            style={twoColumns ? styles.optionHalf : styles.optionFull}
           >
             <Pressable
               disabled={Boolean(result) || out}
-              onPress={() => { play('tap'); onSubmit({ index }); }}
+              onPress={() => {
+                play('tap');
+                onSubmit({ index });
+              }}
               style={({ pressed }) => [
                 styles.option,
                 isChosen && !result && styles.optionSelected,
@@ -151,17 +145,27 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
                   (isCorrect || isWrong) && { color: '#FFFFFF' },
                 ]}>{String.fromCharCode(65 + index)}</Text>
               </View>
-              <Text style={[
-                styles.optionText,
-                twoColumns && width < 500 && { fontSize: 13.5, lineHeight: 19 },
-                isChosen && !result && { color: '#065F46', fontWeight: '700' },
-                isCorrect && { color: '#064E3B', fontWeight: '800' },
-                isWrong && { color: '#991B1B', fontWeight: '800' },
-                out && styles.optionTextOut,
-              ]}>{option}</Text>
-              {isCorrect ? <Mark ok /> : isWrong ? <Mark ok={false} /> : null}
+              <Text
+                style={[
+                  styles.optionText,
+                  isChosen && !result && { color: '#065F46', fontWeight: '700' },
+                  isCorrect && { color: '#064E3B', fontWeight: '800' },
+                  isWrong && { color: '#991B1B', fontWeight: '800' },
+                  out && styles.optionTextOut,
+                ]}
+                maxFontSizeMultiplier={1.35}
+              >
+                {option}
+              </Text>
+              {isCorrect || isWrong ? (
+                <View style={styles.optionMarkSlot}>
+                  <Mark ok={Boolean(isCorrect)} />
+                </View>
+              ) : (
+                <View style={styles.optionMarkPlaceholder} />
+              )}
             </Pressable>
-          </Animated.View>
+          </View>
         );
       })}
     </View>
@@ -508,7 +512,8 @@ export function SortQuestion({ question, reveal, result, play, onChange }: Quest
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  gap: { gap: 8 },
+  gap: { gap: 10 },
+  mcqList: { gap: 10, width: '100%' },
   gapLg: { gap: 14 },
   row: { flexDirection: 'row', gap: 10 },
   chip: {
@@ -521,21 +526,60 @@ const styles = StyleSheet.create({
   chipBad: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
   chipText: { color: '#1E293B', fontSize: 14, fontWeight: '800' },
   chipTextSelected: { color: '#075985' },
-  mcqGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  mcqGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
+  optionFull: { width: '100%' },
   option: {
-    position: 'relative', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 13, borderRadius: 16, borderWidth: 1.5,
-    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', minHeight: 58, borderBottomWidth: 3, borderBottomColor: '#CBD5E1',
+    position: 'relative',
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    minHeight: 52,
+    borderBottomWidth: 2,
+    borderBottomColor: '#CBD5E1',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   optionPressed: { opacity: 0.92, transform: [{ translateY: 1 }] },
   optionSelected: { borderColor: '#34D399', backgroundColor: '#ECFDF5', borderBottomColor: '#10B981' },
   optionCorrect: { borderColor: '#10B981', backgroundColor: '#ECFDF5', borderBottomColor: '#34D399' },
   optionWrong: { borderColor: '#F87171', backgroundColor: '#FEF2F2', borderBottomColor: '#FCA5A5' },
   optionBurstRays: { position: 'absolute', left: -8, top: -10, zIndex: 5 },
-  optionHalf: { width: '48.2%', flexGrow: 1 },
+  optionHalf: { width: '48.5%', maxWidth: '48.5%', minWidth: 180, flexGrow: 1 },
   optionOut: { opacity: 0.45, backgroundColor: '#F8FAFC' },
-  optionText: { flex: 1, color: '#1E293B', fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  optionText: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    color: '#1E293B',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 21,
+    textAlign: 'left',
+  },
+  optionMarkSlot: { flexShrink: 0, width: 28, alignItems: 'center', justifyContent: 'center' },
+  optionMarkPlaceholder: { flexShrink: 0, width: 28 },
   optionTextOut: { textDecorationLine: 'line-through', color: '#94A3B8' },
-  letter: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: '#CBD5E1' },
+  letter: {
+    flexShrink: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+  },
   letterText: { color: '#475569', fontSize: 14, fontWeight: '900' },
   tf: {
     flex: 1, alignItems: 'center', gap: 8, paddingVertical: 20, borderRadius: 18, borderWidth: 1.5,
