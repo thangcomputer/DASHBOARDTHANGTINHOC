@@ -42,4 +42,12 @@ test('hệ thống loader xịn xò: LoadingScreen, TopLoadingBar, HTML preloade
   const appCode = fs.readFileSync(path.join(root, 'client/src/App.jsx'), 'utf8');
   assert.ok(appCode.includes('<TopLoadingBar />'), 'App.jsx phải render TopLoadingBar');
   assert.ok(appCode.includes('<LoadingScreen') && !appCode.includes("borderTop: '3px solid #3b82f6'"), 'App.jsx không còn spinner xám cũ');
+
+  // 7. Kiểm tra kinetic-dots-loader.tsx
+  const kineticDotsCode = fs.readFileSync(path.join(root, 'client/src/components/ui/kinetic-dots-loader.tsx'), 'utf8');
+  assert.ok(kineticDotsCode.includes('gravity-bounce'), 'KineticDotsLoader phải có animation gravity-bounce');
+  assert.ok(kineticDotsCode.includes('rubber-morph'), 'KineticDotsLoader phải có animation rubber-morph');
+  assert.ok(kineticDotsCode.includes('ripple-expand'), 'KineticDotsLoader phải có shockwave ripple-expand');
+  assert.ok(kineticDotsCode.includes('shadow-breathe'), 'KineticDotsLoader phải có shadow-breathe');
 });
+

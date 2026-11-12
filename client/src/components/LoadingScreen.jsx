@@ -4,6 +4,7 @@
  * Dùng cho: Khởi động hệ thống, xác thực tài khoản, tải trang (Suspense), và nạp dữ liệu tab.
  */
 import React, { useEffect, useState, useMemo } from 'react';
+import KineticDotsLoader from './ui/kinetic-dots-loader';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -107,15 +108,11 @@ export default function LoadingScreen({
   // ─── Giao diện TAB COMPACT (khi nạp tab bên trong dashboard) ───
   if (mode === 'tab') {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[320px] w-full animate-in fade-in duration-300">
-        <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="compact" />
-        <div className="mt-5 text-center">
+      <div className="flex flex-col items-center justify-center py-16 px-4 min-h-[220px] w-full animate-in fade-in duration-300">
+        <KineticDotsLoader dots={4} className="min-h-0 p-0" />
+        <div className="mt-4 text-center">
           <p className="text-sm font-bold text-slate-700 tracking-wide">{message}</p>
-          <div className="mt-2.5 mx-auto w-36 h-1 bg-emerald-100 rounded-full overflow-hidden relative">
-            <div className="loading-laser-beam" />
-          </div>
         </div>
-        <LoadingStyles />
       </div>
     );
   }
@@ -123,10 +120,9 @@ export default function LoadingScreen({
   // ─── Giao diện INLINE / PREVIEW (nhỏ gọn trong card hoặc modal) ───
   if (mode === 'inline' || mode === 'preview') {
     return (
-      <div className="flex flex-col items-center justify-center py-6 px-3 w-full">
+      <div className="flex flex-col items-center justify-center py-4 px-2 w-full">
         <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="mini" />
         {message && <p className="mt-2 text-xs font-semibold text-slate-600">{message}</p>}
-        <LoadingStyles />
       </div>
     );
   }
@@ -149,25 +145,25 @@ export default function LoadingScreen({
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
           className="absolute -top-[10%] -left-[10%] w-[55vw] h-[55vw] rounded-full blur-3xl opacity-35"
-          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.25) 0%, transparent 70%)' }}
         />
         <div
           className="absolute -bottom-[10%] -right-[10%] w-[50vw] h-[50vw] rounded-full blur-3xl opacity-30"
-          style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.25) 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)' }}
         />
       </div>
 
       {/* Hộp thẻ kính 3D nổi bật ở giữa */}
-      <div className="relative z-10 flex flex-col items-center px-8 py-9 md:px-12 md:py-11 rounded-[32px] bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_25px_60px_-15px_rgba(16,185,129,0.22),0_0_0_1px_rgba(16,185,129,0.06),0_8px_20px_rgba(0,0,0,0.04)] max-w-sm md:max-w-md w-[90%] text-center">
+      <div className="relative z-10 flex flex-col items-center px-8 py-8 md:px-12 md:py-10 rounded-[32px] bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_25px_60px_-15px_rgba(6,182,212,0.22),0_0_0_1px_rgba(6,182,212,0.08),0_8px_20px_rgba(0,0,0,0.04)] max-w-sm md:max-w-md w-[90%] text-center">
         {/* Biểu tượng 3D chính theo phong cách được chọn */}
-        <div className="mb-6 relative flex items-center justify-center">
+        <div className="mb-4 relative flex items-center justify-center">
           <LoadingIcon3D style={style} logoUrl={resolvedLogo} size="large" />
         </div>
 
         {/* Nhãn thương hiệu */}
         <div className="flex items-center justify-center gap-1.5 mb-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-600">
+          <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
+          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-600">
             Thắng Tin Học
           </span>
         </div>
@@ -177,14 +173,9 @@ export default function LoadingScreen({
           {message}
         </h2>
 
-        {/* Thanh laser progress siêu mượt */}
-        <div className="mt-4 w-48 md:w-56 h-1.5 bg-slate-100 rounded-full overflow-hidden relative shadow-inner">
-          <div className="loading-laser-beam" />
-        </div>
-
         {/* Phụ đề gợi ý */}
         {subtext && (
-          <p className="mt-3.5 text-xs text-slate-500 font-medium leading-relaxed max-w-xs">
+          <p className="mt-2.5 text-xs text-slate-500 font-medium leading-relaxed max-w-xs">
             {subtext}
           </p>
         )}
@@ -208,38 +199,11 @@ export function LoadingIcon3D({ style = 1, logoUrl = '/brand/logo.webp', size = 
   const coreSize = isLarge ? 72 : isMini ? 30 : 48;
   const logoImgSize = isLarge ? 44 : isMini ? 18 : 30;
 
-  // ─── Style 1: Tối giản (Vòng quay hào quang kép Holographic) ───
+  // ─── Style 1: Kinetic Dots (Bouncing Liquid Spheres chuẩn chuyên nghiệp) ───
   if (style === 1) {
     return (
-      <div className="relative flex items-center justify-center" style={{ width: ringSize, height: ringSize }}>
-        {/* Vòng quay gradient bên ngoài */}
-        <div
-          className="absolute inset-0 rounded-full loading-orbital-ring"
-          style={{
-            background: 'conic-gradient(from 0deg, transparent 0%, #10b981 65%, #06b6d4 95%)',
-            mask: 'radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px))',
-            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px))',
-          }}
-        />
-
-        {/* Vòng quay ngược phụ họa nét đứt */}
-        <div
-          className="absolute inset-1.5 rounded-full border border-dashed border-emerald-400/40 loading-orbital-counter"
-        />
-
-        {/* Lõi trung tâm với logo */}
-        <div
-          className="rounded-full bg-white flex items-center justify-center shadow-[0_4px_16px_rgba(16,185,129,0.18)] border border-emerald-100/80 loading-core-pulse"
-          style={{ width: coreSize, height: coreSize }}
-        >
-          <img
-            src={logoUrl}
-            alt="Logo"
-            className="object-contain"
-            style={{ width: logoImgSize, height: logoImgSize }}
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        </div>
+      <div className="flex flex-col items-center justify-center">
+        <KineticDotsLoader dots={isMini ? 3 : 4} className={isMini ? 'min-h-0 p-0 scale-50' : 'min-h-0 p-0'} />
       </div>
     );
   }

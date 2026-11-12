@@ -51,6 +51,11 @@ const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), camXucAnimationStatic()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     fs: {
       allow: [PROJECT_ROOT],
