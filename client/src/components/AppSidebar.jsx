@@ -480,7 +480,7 @@ const AppSidebar = ({
     return '';
   };
   const freeLocked = useFreePortalLock(session) && freeMenu;
-  const freeLockKeys = new Set(['inbox', 'materials-files', 'exam', 'support']);
+  const freeLockKeys = new Set(['inbox', 'feed', 'materials-files', 'exam', 'support']);
   const itemFreeLocked = (item) => freeLocked && freeLockKeys.has(item?.key);
   const studentSubContext = useStudentSubscription();
   const feedLocked = role === 'student' && !hasFeedPostAccess({
@@ -639,13 +639,13 @@ const AppSidebar = ({
   };
 
   const handleClick = (item) => {
-    if (item?.key === 'feed') {
-      navigate(item.path || '/student/feed');
+    if (itemFreeLocked(item)) {
+      setFreeLockOpen(true);
       setMobileOpen(false);
       return;
     }
-    if (itemFreeLocked(item)) {
-      setFreeLockOpen(true);
+    if (item?.key === 'feed') {
+      navigate(item.path || '/student/feed');
       setMobileOpen(false);
       return;
     }

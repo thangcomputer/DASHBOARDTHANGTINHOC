@@ -112,7 +112,7 @@ function LockCard({ onClose, onBuy }) {
         <button
           type="button"
           onClick={onBuy}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-red-500 to-red-700 px-4 py-3 text-sm font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_24px_rgba(220,38,38,0.35)]"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-4 py-3 text-sm font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_24px_rgba(5,150,105,0.35)] hover:from-emerald-600 hover:to-emerald-800 transition-all"
         >
           <Sparkles size={16} aria-hidden="true" />
           Đăng ký gói Meet

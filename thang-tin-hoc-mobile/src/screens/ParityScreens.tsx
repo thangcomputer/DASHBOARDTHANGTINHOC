@@ -10,7 +10,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../app/AuthContext';
-import { isFreePortalMenu } from '../utils/freePortalHelper';
+import { isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
 import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScreen';
 import { CourseVideosScreen } from './CourseVideosScreen';
 import { AssignmentsScreen } from './FeatureScreens';
@@ -402,6 +402,37 @@ function getFeedRootComments(post: DemoFeedPost): Array<DemoFeedPost['comments']
 export function FeedScreen() {
   const { user, subscription } = useAuth();
   const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
+
+  if (user?.role === 'student' && isFreePortalLocked(user)) {
+    return (
+      <AppScreen contentStyle={styles.feedScreen}>
+        <AppHeader title="Bảng tin" icon={Radio} />
+        <View style={styles.feedLockedContainer}>
+          <View style={styles.feedLockedCard}>
+            <View style={styles.feedLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.feedLockedTitle}>Mục này đang khóa</Text>
+            <Text style={styles.feedLockedDesc}>
+              Đăng ký gói Meet để mở các mục đang khóa
+            </Text>
+            <Pressable
+              onPress={() => {
+                DeviceEventEmitter.emit('mobile:open-free-lock-modal');
+              }}
+              style={styles.feedLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.feedLockedCtaText}>Đăng ký gói Meet</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
+
   const postLocked = user?.role === 'student' && !hasFeedPostAccess({
     role: user?.role,
     user,
@@ -3782,4 +3813,11 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   financeSummary: { alignItems: 'center', gap: spacing.xs, backgroundColor: colors.greenSoft },
   total: { color: colors.ink, fontSize: typography.heading, fontWeight: '800', marginTop: spacing.xs },
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  feedLockedContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, minHeight: 420 },
+  feedLockedCard: { width: '100%', maxWidth: 420, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+  feedLockedIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  feedLockedTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  feedLockedDesc: { fontSize: 13, lineHeight: 20, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  feedLockedCtaBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B981', borderBottomWidth: 3, borderBottomColor: '#059669' },
+  feedLockedCtaText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 }));

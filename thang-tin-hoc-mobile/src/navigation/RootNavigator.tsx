@@ -69,7 +69,7 @@ import { navigationRef } from './navigationRef';
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 const MOBILE_OPEN_FREE_LOCK_MODAL_EVENT = 'mobile:open-free-lock-modal';
-const FREE_LOCKED_DESTINATIONS = new Set<string>(['Messages', 'Assignments', 'Materials', 'StudentExam', 'Support']);
+const FREE_LOCKED_DESTINATIONS = new Set<string>(['Messages', 'Feed', 'Assignments', 'Materials', 'StudentExam', 'Support']);
 
 function noteUserActivity() {
   notePinActivity();

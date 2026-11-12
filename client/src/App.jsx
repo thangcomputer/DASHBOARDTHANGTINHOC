@@ -435,7 +435,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/feed" element={
           <ErrorBoundary inline>
-            <FeedBoard session={session} role="student" />
+            <FreeFeatureLock session={session}>
+              <FeedBoard session={session} role="student" />
+            </FreeFeatureLock>
           </ErrorBoundary>
         } />
         <Route path="/student/news" element={
