@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDown, ArrowUp, Bot, CheckCircle2, Clapperboard, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, X,
+  ArrowDown, ArrowUp, BookOpen, Bot, CheckCircle2, Clapperboard, Eye, EyeOff, FileText, Gamepad2, ImagePlus, Loader2, Paperclip, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, X,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -851,11 +851,6 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
 }
 
 const MAX_UNIT_VIDEOS = 20;
-const STEP_VIDEO_LEVELS = [
-  { key: 'learn', label: 'Dễ' },
-  { key: 'practice', label: 'Vừa' },
-  { key: 'challenge', label: 'Khó' },
-];
 const PATH_NODE_PRESETS = [
   { key: 'study', label: 'Học bài', icon: 'book' },
   { key: 'practice-1', label: 'Luyện tập', icon: 'dumbbell' },
@@ -864,16 +859,20 @@ const PATH_NODE_PRESETS = [
   { key: 'complete', label: 'Hoàn thành', icon: 'crown' },
 ];
 
-function emptyStepVideos() {
-  return { learn: [], practice: [], challenge: [] };
-}
-
 function emptyNodeStepVideos() {
   return { learn: [], practice: [], challenge: [] };
 }
 
 function mapNodeStepVideos(raw) {
-  const mapItem = (v) => ({ id: v.id, title: v.title, url: v.url || '', content: v.content || '', checks: v.checks || [] });
+  const mapItem = (v) => ({
+    id: v.id,
+    title: v.title,
+    url: v.url || '',
+    content: v.content || '',
+    fileUrl: v.fileUrl || '',
+    fileName: v.fileName || '',
+    checks: v.checks || [],
+  });
   return {
     learn: (raw?.learn || []).map(mapItem),
     practice: (raw?.practice || []).map(mapItem),
@@ -907,47 +906,225 @@ function pathNodesFromUnit(unit) {
   return defaultPathNodes(unit);
 }
 
-function unitVideoCount(unit) {
-  const nodeTotal = (unit.pathNodes?.length ? unit.pathNodes : pathNodesFromUnit(unit)).reduce(
-    (sum, node) => sum + STEP_VIDEO_LEVELS.reduce((s, level) => s + (node.stepVideos?.[level.key]?.length || 0), 0),
-    0,
-  );
-  return (unit.videos?.length || 0) + nodeTotal;
+const BAI_FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.png,.jpg,.jpeg,.webp,.gif';
+
+function blankBai(title) {
+  return { title, url: '', content: '', fileUrl: '', fileName: '', checks: [], nodeKey: '' };
 }
 
-/** Nút lộ trình trong chặng: Học bài = Bài 1/2…; Luyện/Thử thách/Hoàn thành = Dễ/Vừa/Khó. */
+function lessonsFromUnit(unit) {
+  const nodes = unit.pathNodes?.length ? pathNodesFromUnit(unit) : [];
+  if (!nodes.length || isStockTemplate(nodes)) return [];
+  const lessons = [];
+  nodes.forEach((node) => {
+    if (node.icon !== 'book') return;
+    const learn = node.stepVideos?.learn || [];
+    if (!learn.length) {
+      lessons.push({ ...blankBai(node.label), nodeKey: node.key });
+      return;
+    }
+    learn.forEach((item) => {
+      lessons.push({
+        id: item.id,
+        title: item.title || node.label,
+        url: item.url || '',
+        content: item.content || '',
+        fileUrl: item.fileUrl || '',
+        fileName: item.fileName || '',
+        checks: item.checks || [],
+        nodeKey: learn.length === 1 ? node.key : '',
+      });
+    });
+  });
+  return lessons;
+}
+
+function isStockTemplate(nodes) {
+  if (nodes.length !== PATH_NODE_PRESETS.length) return false;
+  return nodes.every((node, index) => {
+    const preset = PATH_NODE_PRESETS[index];
+    const levels = ['learn', 'practice', 'challenge'];
+    const empty = levels.every((key) => (node.stepVideos?.[key] || []).every((row) => !String(row.url || '').trim() && !String(row.content || '').trim()));
+    return node.key === preset.key && node.label === preset.label && node.icon === preset.icon && empty;
+  });
+}
+
+function _uniqueNodeKey(nodes, base) {
+  const keys = new Set(nodes.map((node) => node.key));
+  if (!keys.has(base)) return base;
+  let index = 2;
+  while (keys.has(`${base}-${index}`)) index += 1;
+  return `${base}-${index}`;
+}
+
+function baiIssues(lesson, index) {
+  const name = `Bài ${index + 1}`;
+  const title = String(lesson.title || '').trim();
+  const url = String(lesson.url || '').trim();
+  const content = String(lesson.content || '').trim();
+  const fileUrl = String(lesson.fileUrl || '').trim();
+  const issues = [];
+  if (!title) issues.push(`${name}: chưa có tên`);
+  if (title && !url && !content && !fileUrl) issues.push(`${name}: thêm nội dung, file hoặc video`);
+  if (url && !/^https?:\/\/\S+$/i.test(url) && !/^\/uploads\/\S+$/.test(url)) issues.push(`${name}: link video cần bắt đầu bằng http hoặc /uploads`);
+  if (fileUrl && !/^https?:\/\/\S+$/i.test(fileUrl) && !/^\/uploads\/\S+$/.test(fileUrl)) issues.push(`${name}: file chưa được tải lên`);
+  return issues;
+}
+
+function stageItemSummary(unit) {
+  const count = lessonsFromUnit(unit).length;
+  if (!count) return 'Chưa có bài';
+  return `${count} bài · mỗi bài có nội dung, file, video, luyện tập`;
+}
+
+function BaiEditor({ lesson, unit, onChange, onComposeQuestion, onAiDraft }) {
+  const toast = useToast();
+  const [uploading, setUploading] = useState(false);
+  const [checksOn, setChecksOn] = useState(Boolean(lesson.checks?.length));
+
+  const uploadFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const data = await api.settings.uploadTrainingFile(file);
+      if (!data?.success || !data.fileUrl) throw new Error(data?.message || 'Upload thất bại');
+      onChange({ fileUrl: data.fileUrl, fileName: data.fileOriginalName || file.name });
+      toast.success('Đã tải file');
+    } catch (err) {
+      toast.error(err.message || 'Không tải được file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="block">
+        <span className={LABEL}>Tên bài</span>
+        <input className={INPUT} value={lesson.title} maxLength={120} onChange={(e) => onChange({ title: e.target.value })} placeholder="Ví dụ: Định dạng đoạn văn" />
+      </label>
+      <section className="space-y-1.5 rounded-xl bg-sky-50/70 p-2.5 ring-1 ring-sky-100">
+        <p className="flex items-center gap-1.5 text-xs font-black text-sky-800"><FileText size={14} /> Nội dung</p>
+        <textarea className={`${INPUT} !min-h-[88px]`} value={lesson.content || ''} maxLength={5000} onChange={(e) => onChange({ content: e.target.value })} placeholder="Phần chữ học viên đọc" />
+      </section>
+      <section className="space-y-1.5 rounded-xl bg-amber-50/70 p-2.5 ring-1 ring-amber-100">
+        <p className="flex items-center gap-1.5 text-xs font-black text-amber-900"><Paperclip size={14} /> File</p>
+        {lesson.fileUrl ? (
+          <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-amber-100">
+            <span className="min-w-0 flex-1 truncate">{lesson.fileName || 'Tài liệu đính kèm'}</span>
+            <button type="button" onClick={() => onChange({ fileUrl: '', fileName: '' })} className="font-bold text-red-600 !shadow-none">Gỡ</button>
+          </div>
+        ) : null}
+        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-black text-amber-800 ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+          {uploading ? 'Đang tải…' : 'Tải file'}
+          <input type="file" className="hidden" accept={BAI_FILE_ACCEPT} disabled={uploading} onChange={uploadFile} />
+        </label>
+        <p className="text-[11px] text-slate-500">PDF, Word, Excel, PowerPoint, ZIP hoặc ảnh. Tối đa 25MB.</p>
+      </section>
+      <section className="space-y-1.5 rounded-xl bg-red-50/60 p-2.5 ring-1 ring-red-100">
+        <p className="flex items-center gap-1.5 text-xs font-black text-red-800"><Clapperboard size={14} /> Video</p>
+        <input className={INPUT} value={lesson.url || ''} maxLength={500} onChange={(e) => onChange({ url: e.target.value })} placeholder="Link YouTube, Vimeo hoặc file .mp4" aria-label="Link video" />
+        {String(lesson.url || '').trim() ? (
+          <div>
+            <button type="button" onClick={() => setChecksOn((open) => !open)} className="text-[11px] font-black text-amber-800 !shadow-none">
+              {checksOn ? 'Ẩn câu hỏi trong video' : `Câu hỏi trong video (${lesson.checks?.length || 0})`}
+            </button>
+            {checksOn ? <div className="mt-1.5"><VideoChecksEditor checks={lesson.checks || []} onChange={(checks) => onChange({ checks })} /></div> : null}
+          </div>
+        ) : null}
+      </section>
+      <section className="space-y-1.5">
+        <p className="flex items-center gap-1.5 text-xs font-black text-emerald-800"><Gamepad2 size={14} /> Luyện tập</p>
+        <QuizNodeConfig unit={unit} onComposeQuestion={onComposeQuestion} onAiDraft={onAiDraft} />
+      </section>
+    </div>
+  );
+}
+
+/** Danh sách bài trong một chặng. Mỗi bài gồm nội dung, file, video và luyện tập. */
 function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
   const toast = useToast();
-  const [nodes, setNodes] = useState(() => pathNodesFromUnit(unit));
+  const initial = lessonsFromUnit(unit);
+  const [lessons, setLessons] = useState(initial);
+  const [openIndex, setOpenIndex] = useState(null);
   const [saving, setSaving] = useState(false);
-  const original = JSON.stringify(pathNodesFromUnit(unit));
-  const dirty = JSON.stringify(nodes) !== original;
+  const dirty = JSON.stringify(lessons) !== JSON.stringify(initial);
+  const problems = lessons.flatMap((lesson, index) => baiIssues(lesson, index));
 
-  const updateNode = (index, patch) => setNodes((list) => list.map((node, i) => (i === index ? { ...node, ...patch } : node)));
-  const updateLevelVideos = (nodeIndex, levelKey, videos) => setNodes((list) => list.map((node, i) => (
-    i === nodeIndex ? { ...node, stepVideos: { ...node.stepVideos, [levelKey]: videos } } : node
-  )));
-  const moveNode = (index, delta) => setNodes((list) => {
-    const target = index + delta;
-    if (target < 0 || target >= list.length) return list;
-    const next = [...list];
-    [next[index], next[target]] = [next[target], next[index]];
-    return next.map((node, i) => ({ ...node, sortOrder: i }));
-  });
-  const addPreset = (presetKey) => {
-    const preset = PATH_NODE_PRESETS.find((item) => item.key === presetKey);
-    if (!preset) return;
-    const suffix = nodes.filter((n) => n.key.startsWith(preset.key)).length;
-    const key = suffix ? `${preset.key}-${suffix + 1}` : preset.key;
-    setNodes((list) => [...list, { ...preset, key, sortOrder: list.length, active: true, stepVideos: emptyStepVideos() }]);
+  const patchLesson = (index, patch) => setLessons((list) => list.map((lesson, i) => (i === index ? { ...lesson, ...patch } : lesson)));
+
+  const moveLesson = (index, delta) => {
+    setLessons((list) => {
+      const target = index + delta;
+      if (target < 0 || target >= list.length) return list;
+      const next = [...list];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setOpenIndex((current) => (current === index ? index + delta : current));
   };
-  const removeNode = (index) => setNodes((list) => (list.length <= 1 ? list : list.filter((_, i) => i !== index)));
-  const restoreDefaults = () => {
-    if (!window.confirm('Khôi phục 5 nút mẫu (Học bài, Luyện tập, Thử thách, Luyện tập, Hoàn thành)? Video bài học nút đầu sẽ giữ nếu có.')) return;
-    setNodes(defaultPathNodes(unit));
+
+  const addLesson = () => {
+    if (lessons.length >= 12) return;
+    setLessons((list) => [...list, blankBai(`Bài ${list.length + 1}`)]);
+    setOpenIndex(lessons.length);
+  };
+
+  const removeLesson = (index) => {
+    setLessons((list) => list.filter((_, i) => i !== index));
+    setOpenIndex((current) => (current === index ? null : current > index ? current - 1 : current));
   };
 
   const save = async () => {
+    if (!lessons.length || problems.length) return;
+    const used = new Set();
+    const nodes = lessons.map((lesson, index) => {
+      const base = String(lesson.nodeKey || `bai-${index + 1}`).replace(/[^a-z0-9-_]/gi, '').slice(0, 40) || `bai-${index + 1}`;
+      let key = base;
+      let n = 2;
+      while (used.has(key)) {
+        key = `${base}-${n}`.slice(0, 40);
+        n += 1;
+      }
+      used.add(key);
+      return {
+        key,
+        label: String(lesson.title || '').trim().slice(0, 40) || `Bài ${index + 1}`,
+        icon: 'book',
+        sortOrder: index,
+        active: true,
+        stepVideos: {
+          learn: [{
+            id: lesson.id,
+            title: String(lesson.title || '').trim(),
+            url: String(lesson.url || '').trim(),
+            content: String(lesson.content || '').trim(),
+            fileUrl: String(lesson.fileUrl || '').trim(),
+            fileName: String(lesson.fileName || '').trim(),
+            checks: (lesson.checks || []).filter((check) => String(check.prompt || '').trim()),
+          }],
+          practice: [],
+          challenge: [],
+        },
+      };
+    });
+    let practiceKey = 'practice';
+    let practiceN = 2;
+    while (used.has(practiceKey)) {
+      practiceKey = `practice-${practiceN}`;
+      practiceN += 1;
+    }
+    nodes.push({
+      key: practiceKey,
+      label: 'Luyện tập',
+      icon: 'dumbbell',
+      sortOrder: nodes.length,
+      active: true,
+      stepVideos: emptyNodeStepVideos(),
+    });
     setSaving(true);
     try {
       await dailyPracticeApi.admin.updateUnit(unit.id, {
@@ -956,16 +1133,9 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
         active: unit.active,
         lessonUnitId: unit.lessonUnitId || '',
         videos: unit.videos || [],
-        pathNodes: nodes.map((node, index) => ({
-          key: node.key,
-          label: node.label,
-          icon: node.icon,
-          sortOrder: index,
-          active: node.active !== false,
-          stepVideos: node.stepVideos,
-        })),
+        pathNodes: nodes,
       });
-      toast.success('Đã lưu nút lộ trình');
+      toast.success('Đã lưu các bài trong chặng');
       onSaved();
     } catch (err) {
       toast.error(err.message);
@@ -975,74 +1145,58 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/40 p-2.5">
-      <div>
-        <p className="text-xs font-black text-slate-800">Nút trên lộ trình học viên (như hình snake)</p>
-        <p className="text-[11px] font-semibold text-slate-600">
-          <span className="font-black text-violet-700">Học bài</span> = Bài 1, 2… (nội dung chữ và/hoặc video).{' '}
-          <span className="font-black text-violet-700">Luyện / Thử thách / Hoàn thành</span> = trắc nghiệm Dễ, Vừa, Khó (lấy câu đã xếp vào chặng).
-        </p>
-      </div>
-      {nodes.map((node, nodeIndex) => {
-        const isStudy = node.icon === 'book';
-        return (
-          <div key={`${node.key}-${nodeIndex}`} className="space-y-2 rounded-xl border border-slate-200 bg-white p-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600 text-[11px] font-black text-white">{nodeIndex + 1}</span>
-              <input className={`${INPUT} !py-1.5 max-w-[140px]`} value={node.label} maxLength={40} onChange={(e) => updateNode(nodeIndex, { label: e.target.value })} aria-label="Tên nút" />
-              <select
-                className={`${INPUT} !py-1.5 max-w-[200px]`}
-                value={node.icon}
-                onChange={(e) => updateNode(nodeIndex, { icon: e.target.value })}
-                aria-label="Loại nút"
-              >
-                <option value="book">Học bài (nội dung / video)</option>
-                <option value="dumbbell">Luyện tập (trắc nghiệm)</option>
-                <option value="flame">Thử thách (trắc nghiệm)</option>
-                <option value="crown">Hoàn thành (trắc nghiệm)</option>
-              </select>
-              <span className="ml-auto flex shrink-0 flex-col">
-                <button type="button" disabled={nodeIndex === 0} onClick={() => moveNode(nodeIndex, -1)} className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
-                <button type="button" disabled={nodeIndex === nodes.length - 1} onClick={() => moveNode(nodeIndex, 1)} className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
-              </span>
-              <button type="button" disabled={nodes.length <= 1} onClick={() => removeNode(nodeIndex)} className="rounded-lg p-1.5 text-slate-400 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
-            </div>
-            {isStudy ? (
-              <UnitStepVideosPanel
-                unit={unit}
-                stepKey="learn"
-                stepLabel={`${node.label} · Bài học (Bài 1, 2…)`}
-                videos={node.stepVideos.learn || []}
-                onVideosChange={(videos) => updateLevelVideos(nodeIndex, 'learn', videos)}
-                deferSave
-                lessonMode
-              />
-            ) : (
-              <QuizNodeConfig
-                unit={unit}
-                node={node}
-                nodeIndex={nodeIndex}
-                onVideosChange={updateLevelVideos}
-                onComposeQuestion={onComposeQuestion}
-                onAiDraft={onAiDraft}
-              />
-            )}
-          </div>
-        );
-      })}
-      <div className="flex flex-wrap items-center gap-2">
-        <select className={`${INPUT} !py-1.5 max-w-[220px]`} defaultValue="" onChange={(e) => { if (e.target.value) { addPreset(e.target.value); e.target.value = ''; } }} aria-label="Thêm nút">
-          <option value="">+ Thêm nút mẫu…</option>
-          {PATH_NODE_PRESETS.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
-        </select>
-        <button type="button" onClick={restoreDefaults} className="cms-btn cms-btn-outline !py-1.5 text-xs">5 nút mẫu</button>
-        <button type="button" onClick={save} disabled={!dirty || saving} className="cms-btn cms-btn-primary ml-auto !py-1.5 text-xs">
-          {saving && <Loader2 size={13} className="animate-spin" />} Lưu nút lộ trình
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5">
+      <p className="text-[11px] font-semibold text-slate-500">Mỗi bài gồm nội dung, file, video và luyện tập. Học viên học lần lượt từng bài.</p>
+      {lessons.length === 0 ? (
+        <p className="rounded-xl bg-white px-3 py-4 text-center text-xs font-semibold text-slate-500">Chưa có bài. Bấm Thêm bài để soạn nội dung, file, video và luyện tập.</p>
+      ) : (
+        <ol className="space-y-1.5">
+          {lessons.map((lesson, index) => {
+            const open = openIndex === index;
+            const issues = baiIssues(lesson, index);
+            return (
+              <li key={lesson.id || lesson.nodeKey || index} className="rounded-xl bg-white ring-1 ring-slate-200">
+                <div className="flex items-center gap-2 px-2 py-1.5">
+                  <button type="button" onClick={() => setOpenIndex(open ? null : index)} className="flex min-w-0 flex-1 items-center gap-2 text-left !shadow-none">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-black text-white">{index + 1}</span>
+                    <BookOpen size={14} className="shrink-0 text-sky-700" aria-hidden="true" />
+                    <span className="truncate text-sm font-black text-slate-900">{lesson.title || `Bài ${index + 1}`}</span>
+                    {issues.length > 0 && <span className="shrink-0 text-[10px] font-bold text-amber-600">Chưa đủ</span>}
+                  </button>
+                  <span className="flex shrink-0 flex-col">
+                    <button type="button" disabled={index === 0} onClick={() => moveLesson(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
+                    <button type="button" disabled={index === lessons.length - 1} onClick={() => moveLesson(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
+                  </span>
+                  <button type="button" onClick={() => removeLesson(index)} aria-label="Xóa bài" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+                </div>
+                {open && (
+                  <div className="border-t border-slate-100 px-3 py-2.5">
+                    <BaiEditor
+                      lesson={lesson}
+                      unit={unit}
+                      onChange={(patch) => patchLesson(index, patch)}
+                      onComposeQuestion={onComposeQuestion}
+                      onAiDraft={onAiDraft}
+                    />
+                    {issues.length > 0 && <p className="mt-2 text-[11px] font-bold text-amber-700">{issues[0]}</p>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button type="button" onClick={addLesson} disabled={lessons.length >= 12} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm bài</button>
+        <button type="button" onClick={save} disabled={!dirty || saving || !lessons.length || problems.length > 0} className="cms-btn cms-btn-primary ml-auto !py-1.5 text-xs">
+          {saving && <Loader2 size={13} className="animate-spin" />} Lưu chặng
         </button>
       </div>
+      {problems.length > 0 && <p className="text-[11px] font-bold text-amber-700">{problems[0]}</p>}
     </div>
   );
 }
+
 
 /** Ảnh minh họa chặng - sửa ngay trong khung Lộ trình (desktop), không cần mở modal. */
 function UnitImagePanel({ unit, onSaved }) {
@@ -1247,17 +1401,12 @@ function UnitVideosPanel({ unit, onSaved }) {
   );
 }
 
-/** Nút luyện: nhấn mạnh trắc nghiệm; soạn câu / AI gắn ngay dưới (không phải cấp chặng). */
-function QuizNodeConfig({ unit, node, nodeIndex, onVideosChange, onComposeQuestion, onAiDraft }) {
-  const [showVideos, setShowVideos] = useState(false);
+/** Bước luyện tập: câu hỏi của chặng, chia Dễ / Vừa / Khó khi học viên làm. */
+function QuizNodeConfig({ unit, onComposeQuestion, onAiDraft }) {
   const counts = unit.counts || { easy: 0, medium: 0, hard: 0, total: 0 };
   return (
-    <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/50 p-2.5">
-      <p className="text-xs font-black text-emerald-900">Trắc nghiệm · 3 nấc Dễ, Vừa, Khó</p>
-      <p className="text-[11px] font-semibold text-slate-600">
-        Học viên bấm nút này sẽ <span className="font-black text-slate-800">làm câu hỏi</span> đã xếp vào chặng
-        (không phải xem video). Câu lấy theo độ khó từng nấc.
-      </p>
+    <div className="space-y-2 rounded-xl bg-emerald-50/70 p-2.5 ring-1 ring-emerald-100">
+      <p className="text-[11px] font-semibold text-slate-600">Câu hỏi đã xếp vào chặng này. Học viên làm lần lượt Dễ, Vừa, Khó.</p>
       <div className="grid grid-cols-3 gap-2">
         {[
           { key: 'easy', label: 'Dễ', n: counts.easy },
@@ -1271,42 +1420,16 @@ function QuizNodeConfig({ unit, node, nodeIndex, onVideosChange, onComposeQuesti
         ))}
       </div>
       {counts.total < MIN_UNIT_QUESTIONS && (
-        <p className="text-[11px] font-bold text-amber-700">Chặng cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản. Thêm câu bằng nút bên dưới.</p>
+        <p className="text-[11px] font-bold text-amber-700">Cần ít nhất {MIN_UNIT_QUESTIONS} câu đã xuất bản thì chặng hiện trên lộ trình.</p>
       )}
-      <div className="flex flex-wrap gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={() => onAiDraft?.(unit.id)}
-          className="cms-btn cms-btn-outline !py-1.5 text-xs"
-        >
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => onAiDraft?.(unit.id)} className="cms-btn cms-btn-outline !py-1.5 text-xs">
           <Bot size={14} /> AI tạo nháp
         </button>
-        <button
-          type="button"
-          onClick={() => onComposeQuestion?.(unit.id)}
-          className="cms-btn cms-btn-primary !py-1.5 text-xs"
-        >
+        <button type="button" onClick={() => onComposeQuestion?.(unit.id)} className="cms-btn cms-btn-primary !py-1.5 text-xs">
           <Plus size={14} /> Soạn câu hỏi
         </button>
       </div>
-      <button
-        type="button"
-        onClick={() => setShowVideos((v) => !v)}
-        className="text-[11px] font-black text-slate-600 underline-offset-2 hover:underline !shadow-none"
-      >
-        {showVideos ? 'Ẩn video ôn (tuỳ chọn)' : '+ Video ôn trước từng nấc (tuỳ chọn)'}
-      </button>
-      {showVideos && STEP_VIDEO_LEVELS.map((level) => (
-        <UnitStepVideosPanel
-          key={`${node.key}-${level.key}`}
-          unit={unit}
-          stepKey={level.key}
-          stepLabel={`${node.label} · ${level.label}`}
-          videos={node.stepVideos[level.key] || []}
-          onVideosChange={(videos) => onVideosChange(nodeIndex, level.key, videos)}
-          deferSave
-        />
-      ))}
     </div>
   );
 }
@@ -1515,11 +1638,11 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
   return (
     <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="mr-auto flex items-center gap-1.5 text-sm font-black text-slate-800"><Route size={16} className="text-red-600" /> Lộ trình chặng</p>
+        <p className="mr-auto flex items-center gap-1.5 text-sm font-black text-slate-800"><Route size={16} className="text-red-600" /> Các chặng</p>
         <button type="button" onClick={() => setModal({})} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm chặng</button>
       </div>
       <p className="text-[11px] text-slate-500">
-        Mỗi chặng có chuỗi nút kiểu Duolingo (Học bài, Luyện tập, Thử thách…). Bấm <span className="font-black text-slate-700">Cấu hình</span> để thêm Bài 1/2… vào «Học bài» và gắn câu Dễ/Vừa/Khó cho các nút luyện. Xong nút cuối mới mở chặng sau. Mỗi chặng cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản.
+        Mỗi chặng là một đoạn trên lộ trình. Mở chặng để thêm video, nội dung hoặc luyện tập. Học viên xong chặng này mới sang chặng sau.
       </p>
       {!units.length ? (
         <p className="rounded-xl bg-white p-4 text-center text-xs text-slate-500">Chưa có chặng nào. Thêm chặng rồi xếp câu hỏi vào chặng.</p>
@@ -1538,9 +1661,9 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                       {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      {unit.counts.total} câu · Dễ {unit.counts.easy} · Vừa {unit.counts.medium} · Khó {unit.counts.hard}
+                      {stageItemSummary(unit)}
+                      {unit.counts.total ? ` · ${unit.counts.total} câu` : ''}
                       {unit.counts.draft ? <span className="font-bold text-amber-600"> · {unit.counts.draft} nháp</span> : null}
-                      {unit.lessonUnitId ? <span className="font-bold text-red-600"> · gắn buổi bài giảng</span> : null}
                     </p>
                     {short && <p className="text-[11px] font-bold text-amber-600">Chưa hiện trên lộ trình: cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản</p>}
                   </button>
@@ -1548,13 +1671,10 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                     type="button"
                     onClick={() => setOpenVideosId(videosOpen ? '' : unit.id)}
                     aria-expanded={videosOpen}
-                    title="Nút lộ trình, ảnh và video của chặng"
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-red-600 text-white' : 'bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
+                    title="Video, nội dung và luyện tập của chặng"
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}
                   >
-                    <Route size={14} /> Cấu hình
-                    <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-[10px]">{(unit.pathNodes?.length || 5)} nút</span>
-                    {unitVideoCount(unit) > 0 ? <Clapperboard size={13} aria-label={`${unitVideoCount(unit)} video`} /> : null}
-                    {unit.imageUrl ? <ImagePlus size={13} aria-label="Đã có ảnh chặng" /> : null}
+                    {videosOpen ? 'Đóng' : 'Soạn'}
                   </button>
                   <span className="flex shrink-0 flex-col">
                     <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
@@ -1572,9 +1692,13 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                       onComposeQuestion={onComposeQuestion}
                       onAiDraft={onAiDraft}
                     />
-                    <UnitImagePanel key={`${unit.id}-image-${unit.imageUrl || ''}`} unit={unit} onSaved={onChanged} />
-                    <p className="text-[11px] font-bold text-slate-600">Video chung chặng (tuỳ chọn, popup danh sách phát)</p>
-                    <UnitVideosPanel key={`${unit.id}-all-${JSON.stringify(unit.videos || [])}`} unit={unit} onSaved={onChanged} />
+                    <details className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs">
+                      <summary className="cursor-pointer font-bold text-slate-600">Ảnh chặng và video danh sách (tuỳ chọn)</summary>
+                      <div className="mt-2 space-y-2">
+                        <UnitImagePanel key={`${unit.id}-image-${unit.imageUrl || ''}`} unit={unit} onSaved={onChanged} />
+                        <UnitVideosPanel key={`${unit.id}-all-${JSON.stringify(unit.videos || [])}`} unit={unit} onSaved={onChanged} />
+                      </div>
+                    </details>
                   </div>
                 )}
               </li>

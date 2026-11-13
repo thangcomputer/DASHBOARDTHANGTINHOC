@@ -169,6 +169,8 @@ function mapVideos(list, { admin = false } = {}) {
     title: video.title,
     url: video.url || '',
     content: video.content || '',
+    fileUrl: video.fileUrl || '',
+    fileName: video.fileName || '',
     checks: mapChecks(video.checks, { admin }),
   }));
 }
@@ -349,14 +351,17 @@ function videosInput(list, { requireUrl = true, label = 'Video' } = {}) {
     const title = String(raw?.title || '').trim().slice(0, 120);
     const url = String(raw?.url || '').trim().slice(0, 500);
     const content = String(raw?.content || '').trim().slice(0, 5000);
+    const fileUrl = String(raw?.fileUrl || '').trim().slice(0, 500);
+    const fileName = String(raw?.fileName || '').trim().slice(0, 180);
     if (!title) throw httpError(400, `${label} ${index + 1}: chưa nhập tên`);
     if (url && !isValidMediaUrl(url)) throw httpError(400, `${label} ${index + 1}: link video không hợp lệ`);
+    if (fileUrl && !isValidMediaUrl(fileUrl)) throw httpError(400, `${label} ${index + 1}: file không hợp lệ`);
     if (requireUrl) {
       if (!url) throw httpError(400, `${label} ${index + 1}: chưa có link video`);
-    } else if (!url && !content) {
-      throw httpError(400, `${label} ${index + 1}: cần nội dung bài học hoặc link video`);
+    } else if (!url && !content && !fileUrl) {
+      throw httpError(400, `${label} ${index + 1}: cần nội dung, file hoặc video`);
     }
-    const video = { title, url: url || '', content: content || '', checks: checksInput(raw?.checks, `${label} ${index + 1}`) };
+    const video = { title, url: url || '', content: content || '', fileUrl: fileUrl || '', fileName: fileName || '', checks: checksInput(raw?.checks, `${label} ${index + 1}`) };
     if (mongoose.Types.ObjectId.isValid(String(raw?.id || ''))) video._id = new mongoose.Types.ObjectId(String(raw.id));
     return video;
   });
@@ -532,6 +537,8 @@ function buildNodeLevels(node, nodeIndex, nodes, done, unitUnlocked, unitComplet
         kind: 'lesson',
         title: video.title,
         content: video.content || '',
+        fileUrl: video.fileUrl || '',
+        fileName: video.fileName || '',
         passPercent: 0,
         state: lessonDone ? 'completed' : lessonUnlocked ? 'active' : 'locked',
         videos: [{
@@ -539,6 +546,8 @@ function buildNodeLevels(node, nodeIndex, nodes, done, unitUnlocked, unitComplet
           title: video.title,
           url: video.url || '',
           content: video.content || '',
+          fileUrl: video.fileUrl || '',
+          fileName: video.fileName || '',
           checks: video.checks || [],
           nodeKey,
           nodeLabel: node.label,

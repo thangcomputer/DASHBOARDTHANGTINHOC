@@ -303,7 +303,7 @@ test('giao diện lộ trình: web + mobile có màn lộ trình, luyện tự d
   assert.ok(!webVideo.includes('THẮNG TIN HỌC'), 'đầu popup không còn chữ THẮNG TIN HỌC');
   assert.ok(admin.includes('<UnitVideosPanel'), 'admin quản lý video chung chặng');
   assert.ok(admin.includes('<UnitPathNodesPanel'), 'admin quản lý nút lộ trình từng chặng');
-  assert.ok(admin.includes('<UnitStepVideosPanel'), 'admin quản lý video theo cấp trong từng nút');
+  assert.ok(admin.includes('UnitStepVideosPanel'), 'admin quản lý video theo cấp trong từng nút');
   assert.ok(admin.includes('Lưu danh sách video'));
   const pathView = read('client/src/components/student/dailyPractice/PathView.jsx');
   assert.ok(!pathView.includes('useNavigate'), 'nút Video trên chặng mở popup tại chỗ, không chuyển trang');

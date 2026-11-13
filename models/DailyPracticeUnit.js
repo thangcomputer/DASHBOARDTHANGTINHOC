@@ -18,6 +18,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
       url: { type: String, default: '', trim: true, maxlength: 500 },
       /** Nội dung chữ (bài học) - dùng khi không chỉ có video. */
       content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
       /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
       checks: {
         type: [{
@@ -54,6 +56,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
             title: { type: String, required: true, trim: true, maxlength: 120 },
             url: { type: String, default: '', trim: true, maxlength: 500 },
             content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
             /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
             checks: {
               type: [{
@@ -77,6 +81,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
             title: { type: String, required: true, trim: true, maxlength: 120 },
             url: { type: String, default: '', trim: true, maxlength: 500 },
             content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
             /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
             checks: {
               type: [{
@@ -100,6 +106,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
             title: { type: String, required: true, trim: true, maxlength: 120 },
             url: { type: String, default: '', trim: true, maxlength: 500 },
             content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
             /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
             checks: {
               type: [{
@@ -129,6 +137,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
         title: { type: String, required: true, trim: true, maxlength: 120 },
         url: { type: String, default: '', trim: true, maxlength: 500 },
         content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
         /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
         checks: {
           type: [{
@@ -152,6 +162,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
         title: { type: String, required: true, trim: true, maxlength: 120 },
         url: { type: String, default: '', trim: true, maxlength: 500 },
         content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
         /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
         checks: {
           type: [{
@@ -175,6 +187,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
         title: { type: String, required: true, trim: true, maxlength: 120 },
         url: { type: String, default: '', trim: true, maxlength: 500 },
         content: { type: String, default: '', trim: true, maxlength: 5000 },
+      fileUrl: { type: String, default: '', trim: true, maxlength: 500 },
+      fileName: { type: String, default: '', trim: true, maxlength: 180 },
         /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
         checks: {
           type: [{
