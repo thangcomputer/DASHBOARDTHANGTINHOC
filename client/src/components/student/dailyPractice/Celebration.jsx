@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, Check, Crown, Flame, Gift, Sparkles, Star, Trophy } from 'lucide-react';
 import { gameSounds } from '../../../utils/sound';
 import Mascot from './Mascot';
@@ -30,13 +30,21 @@ function TrophyConfetti({ count = 36, spread = 220 }) {
   ));
 }
 
-function StageShell({ children, button, onNext }) {
+function StageShell({ children, button, onNext, autoAdvanceMs = 0 }) {
+  useEffect(() => {
+    if (!autoAdvanceMs) return undefined;
+    const timer = window.setTimeout(onNext, autoAdvanceMs);
+    return () => window.clearTimeout(timer);
+  }, [autoAdvanceMs, onNext]);
+
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-6 px-2 py-6 text-center">
       {children}
-      <button type="button" onClick={onNext} className="dp-3d-btn mt-2 w-full rounded-2xl bg-emerald-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-[0_5px_0_#047857]">
-        {button}
-      </button>
+      {button && !autoAdvanceMs ? (
+        <button type="button" onClick={onNext} className="dp-3d-btn mt-2 w-full rounded-2xl bg-emerald-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-[0_5px_0_#047857]">
+          {button}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -77,7 +85,7 @@ function StreakStage({ summary, onNext }) {
   const streak = summary.stats?.streak || 1;
   useEffect(() => { gameSounds.correct(); }, []);
   return (
-    <StageShell button="Tiếp tục" onNext={onNext}>
+    <StageShell onNext={onNext} autoAdvanceMs={3000}>
       {/* StreakCelebration hiển thị ngọn lửa phản ứng & lời chúc mừng ở các mốc 3, 7, 30 ngày liên tiếp */}
       <StreakCelebration
         streak={streak}
@@ -95,7 +103,7 @@ function QuestStage({ onNext }) {
     return () => window.clearTimeout(timer);
   }, []);
   return (
-    <StageShell button="Tiếp tục" onNext={onNext}>
+    <StageShell onNext={onNext} autoAdvanceMs={2000}>
       <h2 className="text-3xl font-black text-amber-500">Hoàn thành nhiệm vụ hằng ngày!</h2>
       <div className="dp-card-in w-full rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-left shadow-[0_0_0_6px_rgba(251,191,36,0.15)]">
         <p className="text-lg font-black text-amber-800">Luyện tập 1 lượt hôm nay</p>
@@ -201,26 +209,29 @@ export default function Celebration({ summary, onDone, onClose, onReviewResults,
     ...(summary.firstToday ? ['quest'] : []),
   ], [summary, hasTrophyStage]);
   const [index, setIndex] = useState(0);
-  const next = () => {
-    gameSounds.tap();
+  const advance = useCallback(() => {
     if (index + 1 < stages.length) setIndex(index + 1);
     else onDone();
-  };
+  }, [index, onDone, stages.length]);
+  const nextWithTap = useCallback(() => {
+    gameSounds.tap();
+    advance();
+  }, [advance]);
   const stage = stages[index];
   return (
     <div key={stage}>
       {stage === 'done' && (
         <DoneStage
           summary={summary}
-          onNext={next}
+          onNext={nextWithTap}
           onReviewResults={onReviewResults || onDone}
           onClose={onClose || onDone}
           onReplay={onReplay}
         />
       )}
-      {stage === 'trophy' && <CourseTrophyStage summary={summary} onNext={next} />}
-      {stage === 'streak' && <StreakStage summary={summary} onNext={next} />}
-      {stage === 'quest' && <QuestStage onNext={next} />}
+      {stage === 'trophy' && <CourseTrophyStage summary={summary} onNext={nextWithTap} />}
+      {stage === 'streak' && <StreakStage summary={summary} onNext={advance} />}
+      {stage === 'quest' && <QuestStage onNext={advance} />}
     </div>
   );
 }

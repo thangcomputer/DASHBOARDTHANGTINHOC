@@ -200,7 +200,16 @@ function DailyPracticeGoalPanel({
   const periodQuestions = progress.periodQuestions ?? todayQuestions;
   const periodVideos = progress.periodVideos ?? todayVideos;
   const period = goalData?.goal?.period || 'month';
-  const todayIdx = (new Date().getDay() + 6) % 7;
+  const todayIdx = useMemo(() => {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'short' }).format(new Date());
+      const map: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+      if (typeof map[parts] === 'number') return map[parts];
+    } catch {
+      // fallback
+    }
+    return (new Date().getDay() + 6) % 7;
+  }, []);
 
   return (
     <View style={styles.gapMd}>

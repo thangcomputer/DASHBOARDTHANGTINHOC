@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { Award, Check, Crown, Flame, Gift, Star, Trophy } from 'lucide-react-native';
 import { Mascot } from './Mascot';
@@ -9,6 +9,12 @@ import type { DpSummary } from '../../services/dailyPracticeApi';
 import { spacing } from '../../theme/tokens';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+const STREAK_MILESTONES = [
+  { days: 3, badge: 'Khởi đầu' },
+  { days: 7, badge: 'Tuần lễ' },
+  { days: 30, badge: 'Huyền thoại' },
+] as const;
 
 function useCountUp(target: number, duration = 900) {
   const [value, setValue] = useState(0);
@@ -36,19 +42,47 @@ function PopIn({ delay = 0, children, style }: { delay?: number; children: React
   );
 }
 
-function Shell({ children, button, onNext }: { children: React.ReactNode; button: string; onNext: () => void }) {
+function Shell({
+  children,
+  button,
+  onNext,
+  card = 'none',
+  autoAdvanceMs = 0,
+}: {
+  children: React.ReactNode;
+  button?: string;
+  onNext: () => void;
+  card?: 'none' | 'streak' | 'quest';
+  /** Tự chuyển bước sau N ms — không hiện nút Tiếp tục. */
+  autoAdvanceMs?: number;
+}) {
+  const cardStyle = card === 'streak' ? styles.stageCardStreak : card === 'quest' ? styles.stageCardQuest : null;
+  useEffect(() => {
+    if (!autoAdvanceMs) return undefined;
+    const timer = setTimeout(onNext, autoAdvanceMs);
+    return () => clearTimeout(timer);
+  }, [autoAdvanceMs, onNext]);
+
   return (
-    <View style={styles.shell}>
-      {children}
-      <View style={{ width: '100%', marginTop: spacing.sm }}>
-        <DuoButton
-          variant="primary"
-          size="lg"
-          fullWidth
-          text={button}
-          onPress={onNext}
-        />
-      </View>
+    <View style={styles.shellOuter}>
+      {cardStyle ? (
+        <View style={[styles.stageCard, cardStyle]}>
+          {children}
+        </View>
+      ) : (
+        children
+      )}
+      {button && !autoAdvanceMs ? (
+        <View style={styles.shellFooter}>
+          <DuoButton
+            variant="primary"
+            size="lg"
+            fullWidth
+            text={button}
+            onPress={onNext}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -155,28 +189,52 @@ function StreakStage({ summary, play, onNext }: { summary: DpSummary; play: (s: 
     loop.start();
     return () => loop.stop();
   }, [flicker, play]);
+  const speech = streak > 1
+    ? `Chuỗi ${streak} ngày rồi! Giữ lửa mỗi ngày để kiến thức nhớ thật lâu nhé.`
+    : 'Chuỗi tỏa sáng! Hãy luyện tập mỗi ngày để tạo thói quen học tập nhé.';
   return (
-    <Shell button="TIẾP TỤC" onNext={onNext}>
-      <PopIn style={styles.speech}>
-        <Text style={styles.speechText}>
-          {streak > 1 ? `Chuỗi ${streak} ngày rồi! Giữ lửa mỗi ngày để kiến thức nhớ thật lâu nhé.` : 'Chuỗi tỏa sáng! Hãy luyện tập mỗi ngày để tạo thói quen học tập nhé.'}
-        </Text>
-      </PopIn>
-      <Animated.View style={{ transform: [{ scale: flicker.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] }) }] }}>
-        <Flame size={130} color="#F97316" fill="#FB923C" />
-      </Animated.View>
-      <Text style={styles.streakNumber}>{count}</Text>
-      <Text style={styles.streakLabel}>ngày liên tiếp</Text>
-      {summary.week?.length ? (
-        <View style={styles.weekRow}>
-          {summary.week.map((day, index) => (
-            <View key={day.day} style={styles.weekDay}>
-              <Text style={[styles.weekLabel, day.today && { color: '#F97316' }]}>{day.label}</Text>
-              <PopIn delay={index * 70} style={[styles.weekDot, day.played && styles.weekDotOn]}>
-                {day.played ? <Check size={16} color="#FFFFFF" strokeWidth={3.5} /> : null}
-              </PopIn>
+    <Shell onNext={onNext} card="streak" autoAdvanceMs={3000}>
+      <View style={styles.streakGlow} pointerEvents="none" />
+      <View style={styles.streakBadge}>
+        <Flame size={14} color="#EA580C" fill="#FB923C" />
+        <Text style={styles.streakBadgeText}>CHUỖI NGÀY HỌC</Text>
+      </View>
+      <View style={styles.streakSpeechRow}>
+        <Mascot mood="happy" size={52} />
+        <Text style={styles.streakSpeechText}>{speech}</Text>
+      </View>
+      <View style={styles.streakHero}>
+        <Animated.View style={[styles.flameRing, { transform: [{ scale: flicker.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] }]}>
+          <Flame size={88} color="#F97316" fill="#FB923C" />
+        </Animated.View>
+        <Text style={styles.streakNumber}>{count}</Text>
+        <Text style={styles.streakLabel}>ngày liên tiếp</Text>
+      </View>
+      <View style={styles.milestoneRow}>
+        {STREAK_MILESTONES.map((item) => {
+          const reached = streak >= item.days;
+          return (
+            <View key={item.days} style={[styles.milestoneTile, reached && styles.milestoneTileOn]}>
+              <Text style={[styles.milestoneDays, reached && styles.milestoneDaysOn]}>{`Mốc ${item.days}`}</Text>
+              <Text style={[styles.milestoneBadge, reached && styles.milestoneBadgeOn]} numberOfLines={1}>
+                {reached ? `✓ ${item.badge}` : item.badge}
+              </Text>
             </View>
-          ))}
+          );
+        })}
+      </View>
+      {summary.week?.length ? (
+        <View style={styles.weekPanel}>
+          <View style={styles.weekRow}>
+            {summary.week.map((day, index) => (
+              <View key={day.day} style={styles.weekDay}>
+                <Text style={[styles.weekLabel, day.today && styles.weekLabelToday]}>{day.label}</Text>
+                <PopIn delay={index * 70} style={[styles.weekDot, day.played && styles.weekDotOn]}>
+                  {day.played ? <Check size={16} color="#FFFFFF" strokeWidth={3.5} /> : null}
+                </PopIn>
+              </View>
+            ))}
+          </View>
         </View>
       ) : null}
     </Shell>
@@ -189,9 +247,9 @@ function QuestStage({ play, onNext }: { play: (s: GameSound) => void; onNext: ()
     Animated.timing(fill, { toValue: 1, duration: 700, delay: 250, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(() => play('win'));
   }, [fill, play]);
   return (
-    <Shell button="TIẾP TỤC" onNext={onNext}>
+    <Shell onNext={onNext} card="quest" autoAdvanceMs={2000}>
       <Text style={styles.questTitle}>Hoàn thành nhiệm vụ hằng ngày!</Text>
-      <PopIn style={styles.questCard}>
+      <View style={styles.questInner}>
         <Text style={styles.questName}>Luyện tập 1 lượt hôm nay</Text>
         <View style={styles.questRow}>
           <View style={styles.questTrack}>
@@ -200,7 +258,7 @@ function QuestStage({ play, onNext }: { play: (s: GameSound) => void; onNext: ()
           </View>
           <View style={styles.questChest}><Gift size={24} color="#FFFFFF" /></View>
         </View>
-      </PopIn>
+      </View>
     </Shell>
   );
 }
@@ -232,21 +290,24 @@ export function Celebration({
     ...(summary.firstToday ? ['quest'] : []),
   ], [summary, hasTrophyStage]);
   const [index, setIndex] = useState(0);
-  const next = () => {
-    play('tap');
+  const advance = useCallback(() => {
     if (index + 1 < stages.length) setIndex(index + 1);
     else onDone();
-  };
+  }, [index, onDone, stages.length]);
+  const nextWithTap = useCallback(() => {
+    play('tap');
+    advance();
+  }, [advance, play]);
   const stage = stages[index];
-  if (stage === 'trophy') return <CourseTrophyStage key="trophy" summary={summary} play={play} onNext={next} />;
-  if (stage === 'streak') return <StreakStage key="streak" summary={summary} play={play} onNext={next} />;
-  if (stage === 'quest') return <QuestStage key="quest" play={play} onNext={next} />;
+  if (stage === 'trophy') return <CourseTrophyStage key="trophy" summary={summary} play={play} onNext={nextWithTap} />;
+  if (stage === 'streak') return <StreakStage key="streak" summary={summary} play={play} onNext={advance} />;
+  if (stage === 'quest') return <QuestStage key="quest" play={play} onNext={advance} />;
   return (
     <DoneStage
       key="done"
       summary={summary}
       play={play}
-      onNext={next}
+      onNext={nextWithTap}
       onClose={onClose}
       onReviewResults={onReviewResults}
       onReplay={onReplay}
@@ -262,9 +323,129 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: spacing.md,
-    backgroundColor: 'rgba(2, 6, 23, 0.68)',
   },
-  shell: { minHeight: 560, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, paddingVertical: spacing.lg },
+  shellOuter: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  shellFooter: { width: '100%' },
+  stageCard: {
+    width: '100%',
+    borderRadius: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    gap: spacing.md,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    elevation: 10,
+  },
+  stageCardStreak: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FDBA74',
+  },
+  stageCardQuest: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FCD34D',
+  },
+  streakGlow: {
+    position: 'absolute',
+    top: -28,
+    left: '12%',
+    width: '76%',
+    height: 100,
+    borderRadius: 999,
+    backgroundColor: '#FFEDD5',
+    opacity: 0.85,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  streakBadgeText: {
+    color: '#C2410C',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  streakSpeechRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+  },
+  streakSpeechText: {
+    flex: 1,
+    color: '#7C2D12',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  streakHero: { alignItems: 'center', gap: 2, paddingVertical: 4 },
+  flameRing: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF7ED',
+    borderWidth: 3,
+    borderColor: '#FDBA74',
+    marginBottom: 4,
+  },
+  milestoneRow: { flexDirection: 'row', gap: 8 },
+  milestoneTile: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  milestoneTileOn: {
+    borderColor: '#FDBA74',
+    backgroundColor: '#FFF7ED',
+  },
+  milestoneDays: { fontSize: 11, fontWeight: '800', color: '#94A3B8' },
+  milestoneDaysOn: { color: '#EA580C' },
+  milestoneBadge: { marginTop: 2, fontSize: 9, fontWeight: '800', color: '#CBD5E1' },
+  milestoneBadgeOn: { color: '#C2410C' },
+  weekPanel: {
+    paddingTop: spacing.sm,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#FFEDD5',
+  },
+  weekLabelToday: { color: '#F97316' },
+  questInner: {
+    padding: spacing.md,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFFFF',
+    gap: spacing.sm,
+  },
   button: {
     alignSelf: 'stretch', minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm,
     backgroundColor: '#0EA5E9', boxShadow: '0px 5px 0px #0369A1',
@@ -279,8 +460,8 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 19, fontWeight: '900' },
   speech: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
   speechText: { color: '#475569', fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  streakNumber: { color: '#F97316', fontSize: 72, fontWeight: '900', lineHeight: 78 },
-  streakLabel: { color: '#F97316', fontSize: 22, fontWeight: '900', marginTop: -spacing.md },
+  streakNumber: { color: '#EA580C', fontSize: 64, fontWeight: '900', lineHeight: 70 },
+  streakLabel: { color: '#F97316', fontSize: 18, fontWeight: '800' },
   weekRow: { flexDirection: 'row', alignSelf: 'stretch', justifyContent: 'space-between' },
   weekDay: { alignItems: 'center', gap: 6 },
   weekLabel: { color: '#94A3B8', fontSize: 12, fontWeight: '900' },

@@ -54,6 +54,13 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
   }, [load]);
 
   const todayIndex = useMemo(() => {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'short' }).format(new Date());
+      const map = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+      if (typeof map[parts] === 'number') return map[parts];
+    } catch {
+      // fallback
+    }
     const d = new Date().getDay();
     return d === 0 ? 6 : d - 1;
   }, []);
@@ -180,10 +187,20 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
         <div className="mt-3 grid grid-cols-7 gap-1">
           {WEEK_LABELS.map((label, index) => {
             const isToday = index === todayIndex;
-            const active = isToday && playedToday;
+            const active = (isToday && playedToday)
+              || (index < todayIndex && streak >= (todayIndex - index + (playedToday ? 1 : 0)));
             return (
               <div key={label} className="flex min-w-0 flex-col items-center gap-1">
-                <span className={`flex h-9 w-full max-w-9 items-center justify-center rounded-full text-[10px] font-black ${active ? 'bg-orange-500 text-white shadow-md shadow-orange-200' : isToday ? 'bg-orange-100 text-orange-700 ring-2 ring-orange-300' : 'bg-slate-100 text-slate-400'}`}>
+                <span
+                  title={active ? `${label}: Đã hoàn thành (Chuỗi ${streak} ngày)` : isToday ? `${label}: Hôm nay (Chưa hoàn thành lượt luyện)` : label}
+                  className={`flex h-9 w-full max-w-9 items-center justify-center rounded-full text-[10px] font-black transition-all ${
+                    active
+                      ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                      : isToday
+                        ? 'border-2 border-dashed border-orange-400 bg-orange-50 text-orange-700'
+                        : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
                   {active ? <Flame size={14} className="fill-amber-200" aria-hidden="true" /> : label}
                 </span>
               </div>
@@ -196,7 +213,7 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
         </p>
         <p className="mt-2 flex items-start gap-1 text-[10px] leading-snug text-slate-400">
           <Info size={11} className="mt-px shrink-0" aria-hidden="true" />
-          Lịch tuần hiển thị trạng thái hôm nay; chuỗi ngày tính theo lượt luyện tập hoàn thành mỗi ngày.
+          Lịch tuần hiển thị các ngày đạt chuỗi; hoàn thành ít nhất một lượt luyện tập mỗi ngày để giữ lửa.
         </p>
         <button type="button" onClick={() => navigate('/student')} className="mt-3 text-xs font-bold text-emerald-700 hover:underline">
           Xem tiến độ học tập
