@@ -18,8 +18,8 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const TIMING_MS: Record<number, number> = { 3: 2200, 5: 2800, 10: 2800 };
 
 const COMBO_ART = {
-  3: require('../../../assets/daily-practice/combo-x3.gif'),
-  5: require('../../../assets/daily-practice/combo-x5.gif'),
+  3: require('../../../assets/daily-practice/combo-x3.webp'),
+  5: require('../../../assets/daily-practice/combo-x5.webp'),
 } as const;
 
 function MobileComboArtOverlay({
