@@ -287,33 +287,11 @@ function DailyPracticeGoalPanel({
           </View>
         </View>
 
-        <View style={styles.goalFooterBox}>
-          <Calendar size={15} color="#64748B" />
-          <Text style={styles.goalFooterText}>
-            {'Đã hoàn thành '}
-            <Text style={{ fontWeight: '700', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text>
-            {' lượt bài hôm nay'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Nhiệm vụ hôm nay */}
-      <View style={styles.goalCard}>
-        <View style={styles.goalHeaderRow}>
-          <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB' }]}>
-              <Sparkles size={17} color="#D97706" />
-            </View>
-            <View>
-              <Text style={styles.goalCardTitle}>Nhiệm vụ hôm nay</Text>
-              <Text style={styles.goalCardSub}>Hoàn thành mục tiêu học và rèn luyện</Text>
-            </View>
+        <View style={{ gap: 8, marginTop: 4 }}>
+          <View style={styles.goalHeaderRow}>
+            <Text style={styles.goalLabelSmall}>Nhiệm vụ học hôm nay</Text>
+            <Text style={styles.goalValueSmall}>{`${missionDoneCount}/2 hoàn thành`}</Text>
           </View>
-          <View style={[styles.goalBadge, { backgroundColor: '#F1F5F9' }]}>
-            <Text style={[styles.goalBadgeText, { color: '#334155' }]}>{`${missionDoneCount}/2 hoàn thành`}</Text>
-          </View>
-        </View>
-
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {/* Cột 1: Luyện tập (Xanh lá) */}
           <Pressable
@@ -369,6 +347,16 @@ function DailyPracticeGoalPanel({
         <Text style={styles.missionFooterText}>
           {`Cả ${periodLabel(period)}: ${periodQuestions} câu · ${periodVideos} video`}
         </Text>
+        </View>
+
+        <View style={styles.goalFooterBox}>
+          <Calendar size={15} color="#64748B" />
+          <Text style={styles.goalFooterText}>
+            {'Đã hoàn thành '}
+            <Text style={{ fontWeight: '700', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text>
+            {' lượt bài hôm nay'}
+          </Text>
+        </View>
       </View>
 
       {/* Chuỗi luyện tập */}
@@ -799,23 +787,86 @@ export function collectUnitVideos(unit: DpPathUnit): DpPathVideo[] {
   return items;
 }
 
-/** Video tiếp theo của chặng đang học: ưu tiên chặng dở, rồi video chưa xem và đang mở. */
-export function continueStageTarget(topic?: DpTopicPath | null) {
+/**
+ * Video tiếp theo chuẩn theo tiến độ học viên:
+ * "Luyện tập tới đâu xem video tới đó"
+ * 1. Xác định chặng (Unit) đang học dở (next.unitId hoặc state === 'active' hoặc chặng mở cuối cùng).
+ * 2. Trong chặng đó:
+ *    - Nếu có node đang luyện (next.nodeKey): ưu tiên video của node đó.
+ *    - Tìm video chưa xem trong chặng.
+ *    - Nếu đã xem hết video chặng này: phát video chính của chặng đang luyện để ôn bài (không nhảy về chặng 1).
+ * 3. Nếu chặng hiện tại không có video: lùi về các chặng trước đã mở có video gần nhất (tuyệt đối không nhảy tới chặng bị khóa).
+ */
+export function continueStageTarget(topic?: DpTopicPath | null): { topicId: string; unit: DpPathUnit; videoId: string } | null {
   const units = topic?.units || [];
+  if (!units.length) return null;
   const nextId = topic?.next?.unitId || '';
-  const ranked = [...units].sort((a, b) => {
-    if (a.id === nextId) return -1;
-    if (b.id === nextId) return 1;
-    return (a.index || 0) - (b.index || 0);
-  });
-  for (const unit of ranked) {
-    if (unit.state === 'locked') continue;
+  const nextNodeKey = topic?.next?.nodeKey || '';
+
+  let targetUnitIndex = -1;
+  if (nextId) {
+    targetUnitIndex = units.findIndex((u) => u.id === nextId);
+  }
+  if (targetUnitIndex < 0) {
+    targetUnitIndex = units.findIndex((u) => u.state === 'active');
+  }
+  if (targetUnitIndex < 0) {
+    for (let i = units.length - 1; i >= 0; i--) {
+      if (units[i].state !== 'locked') {
+        targetUnitIndex = i;
+        break;
+      }
+    }
+  }
+  if (targetUnitIndex < 0) targetUnitIndex = 0;
+
+  const resolveUnitVideo = (unit: DpPathUnit, preferNodeKey = '') => {
+    if (!unit || unit.state === 'locked') return null;
+
+    if (preferNodeKey && Array.isArray(unit.pathNodes)) {
+      const activeNode = unit.pathNodes.find((n) => n.key === preferNodeKey);
+      if (activeNode) {
+        const nodeVideos: DpUnitVideo[] = [];
+        for (const level of activeNode.levels || []) {
+          for (const v of level.videos || []) {
+            if (v && v.id) nodeVideos.push({ ...v, stepLabel: v.stepLabel || level.label || '' });
+          }
+        }
+        const pendingInNode = nodeVideos.find((v) => v.state !== 'completed' && v.state !== 'locked');
+        if (pendingInNode) return { unit, videoId: pendingInNode.id };
+        if (nodeVideos.length > 0) return { unit, videoId: nodeVideos[0].id };
+      }
+    }
+
     const videos = collectUnitVideos(unit);
     const pending = videos.find((v) => v.state !== 'completed' && v.state !== 'locked');
-    if (pending) return { topicId: topic?.topic?.id || '', unit, videoId: pending.id };
-    if (unit.lesson) return { topicId: topic?.topic?.id || '', unit, videoId: '' };
-    if (videos.length > 0) return { topicId: topic?.topic?.id || '', unit, videoId: videos[0]?.id || '' };
+    if (pending) return { unit, videoId: pending.id };
+    if (unit.lesson) return { unit, videoId: '' };
+    if (videos.length > 0) return { unit, videoId: videos[0].id };
+    return null;
+  };
+
+  const activeUnit = units[targetUnitIndex];
+  const directMatch = resolveUnitVideo(activeUnit, nextNodeKey);
+  if (directMatch) {
+    return { topicId: topic?.topic?.id || '', unit: directMatch.unit, videoId: directMatch.videoId };
   }
+
+  for (let i = targetUnitIndex - 1; i >= 0; i--) {
+    const prevMatch = resolveUnitVideo(units[i]);
+    if (prevMatch) {
+      return { topicId: topic?.topic?.id || '', unit: prevMatch.unit, videoId: prevMatch.videoId };
+    }
+  }
+
+  for (let i = targetUnitIndex + 1; i < units.length; i++) {
+    if (units[i].state === 'locked') break;
+    const nextMatch = resolveUnitVideo(units[i]);
+    if (nextMatch) {
+      return { topicId: topic?.topic?.id || '', unit: nextMatch.unit, videoId: nextMatch.videoId };
+    }
+  }
+
   return null;
 }
 
@@ -2161,9 +2212,19 @@ function PathView({
       return;
     }
     if (videoOpen || lessonOpen || targetAppliedRef.current) return;
-    const activeTopic = topics.find((item) => item.topic.id === topicId) || topics[0];
-    const target = continueStageTarget(activeTopic);
-    if (!target) return;
+    const currentTopic = topics.find((item) => item.topic.id === topicId);
+    const currentTarget = currentTopic ? continueStageTarget(currentTopic) : null;
+    const preferred = currentTarget
+      ? currentTopic
+      : (topics.find((item) => item.next && continueStageTarget(item))
+         || topics.find((item) => continueStageTarget(item))
+         || topics[0]);
+    const target = currentTarget || (preferred ? continueStageTarget(preferred) : null);
+    if (!preferred || !target) return;
+    if (topicId !== preferred.topic.id) {
+      setTopicId(preferred.topic.id);
+      return;
+    }
     targetAppliedRef.current = true;
     onContinueVideoOpened?.();
     setVideoOpen({ unit: target.unit, videoId: target.videoId });

@@ -663,22 +663,86 @@ export function continuePracticeTarget(topic) {
   };
 }
 
-/** Video tiếp theo của chặng đang học: ưu tiên chặng dở, rồi video chưa xem và đang mở. */
+/**
+ * Video tiếp theo chuẩn theo tiến độ học viên:
+ * "Luyện tập tới đâu xem video tới đó"
+ * 1. Xác định chặng (Unit) đang học dở (next.unitId hoặc state === 'active' hoặc chặng mở cuối cùng).
+ * 2. Trong chặng đó:
+ *    - Nếu có node đang luyện (next.nodeKey): ưu tiên video của node đó.
+ *    - Tìm video chưa xem trong chặng.
+ *    - Nếu đã xem hết video chặng này: phát video chính của chặng đang luyện để ôn bài (không nhảy về chặng 1).
+ * 3. Nếu chặng hiện tại không có video: lùi về các chặng trước đã mở có video gần nhất (tuyệt đối không nhảy tới chặng bị khóa).
+ */
 export function continueStageTarget(topic) {
   const units = topic?.units || [];
+  if (!units.length) return null;
   const nextId = topic?.next?.unitId || '';
-  const ranked = [...units].sort((a, b) => {
-    if (a.id === nextId) return -1;
-    if (b.id === nextId) return 1;
-    return (a.index || 0) - (b.index || 0);
-  });
-  for (const unit of ranked) {
-    if (unit.state === 'locked') continue;
-    const videos = collectUnitVideos(unit);
-    const pending = videos.find((video) => video.state !== 'completed' && video.state !== 'locked');
-    if (pending) return { topicId: topic.topic?.id || '', unit, videoId: pending.id };
-    if (unit.lesson) return { topicId: topic.topic?.id || '', unit, videoId: '' };
+  const nextNodeKey = topic?.next?.nodeKey || '';
+
+  let targetUnitIndex = -1;
+  if (nextId) {
+    targetUnitIndex = units.findIndex((u) => u.id === nextId);
   }
+  if (targetUnitIndex < 0) {
+    targetUnitIndex = units.findIndex((u) => u.state === 'active');
+  }
+  if (targetUnitIndex < 0) {
+    for (let i = units.length - 1; i >= 0; i--) {
+      if (units[i].state !== 'locked') {
+        targetUnitIndex = i;
+        break;
+      }
+    }
+  }
+  if (targetUnitIndex < 0) targetUnitIndex = 0;
+
+  const resolveUnitVideo = (unit, preferNodeKey = '') => {
+    if (!unit || unit.state === 'locked') return null;
+
+    if (preferNodeKey && Array.isArray(unit.pathNodes)) {
+      const activeNode = unit.pathNodes.find((n) => n.key === preferNodeKey);
+      if (activeNode) {
+        const nodeVideos = [];
+        for (const level of activeNode.levels || []) {
+          for (const v of level.videos || []) {
+            if (v && v.id) nodeVideos.push({ ...v, stepLabel: v.stepLabel || level.label || '' });
+          }
+        }
+        const pendingInNode = nodeVideos.find((v) => v.state !== 'completed' && v.state !== 'locked');
+        if (pendingInNode) return { unit, videoId: pendingInNode.id };
+        if (nodeVideos.length > 0) return { unit, videoId: nodeVideos[0].id };
+      }
+    }
+
+    const videos = collectUnitVideos(unit);
+    const pending = videos.find((v) => v.state !== 'completed' && v.state !== 'locked');
+    if (pending) return { unit, videoId: pending.id };
+    if (unit.lesson) return { unit, videoId: '' };
+    if (videos.length > 0) return { unit, videoId: videos[0].id };
+    return null;
+  };
+
+  const activeUnit = units[targetUnitIndex];
+  const directMatch = resolveUnitVideo(activeUnit, nextNodeKey);
+  if (directMatch) {
+    return { topicId: topic?.topic?.id || '', unit: directMatch.unit, videoId: directMatch.videoId };
+  }
+
+  for (let i = targetUnitIndex - 1; i >= 0; i--) {
+    const prevMatch = resolveUnitVideo(units[i]);
+    if (prevMatch) {
+      return { topicId: topic?.topic?.id || '', unit: prevMatch.unit, videoId: prevMatch.videoId };
+    }
+  }
+
+  for (let i = targetUnitIndex + 1; i < units.length; i++) {
+    if (units[i].state === 'locked') break;
+    const nextMatch = resolveUnitVideo(units[i]);
+    if (nextMatch) {
+      return { topicId: topic?.topic?.id || '', unit: nextMatch.unit, videoId: nextMatch.videoId };
+    }
+  }
+
   return null;
 }
 
@@ -775,8 +839,14 @@ export default function PathView({
       return;
     }
     if (continueOpenedRef.current || !topics.length) return;
-    const preferred = topics.find((item) => item.next) || topics.find((item) => continueStageTarget(item)) || null;
-    const target = preferred ? continueStageTarget(preferred) : null;
+    const currentTopic = topics.find((item) => item.topic.id === topicId);
+    const currentTarget = currentTopic ? continueStageTarget(currentTopic) : null;
+    const preferred = currentTarget
+      ? currentTopic
+      : (topics.find((item) => item.next && continueStageTarget(item))
+         || topics.find((item) => continueStageTarget(item))
+         || topics[0]);
+    const target = currentTarget || (preferred ? continueStageTarget(preferred) : null);
     if (!preferred || !target) return;
     if (topicId !== preferred.topic.id) {
       setTopicId(preferred.topic.id);

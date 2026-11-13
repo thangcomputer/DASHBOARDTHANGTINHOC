@@ -402,3 +402,30 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   assert.ok(mobileAnswerFeedback.includes('Giải thích'), 'Mobile có nút Giải thích');
   assert.ok(mobileAnswerFeedback.includes('Tiếp tục'), 'Mobile có nút Tiếp tục');
 });
+
+test('luyện tập tới đâu xem video tới đó: web + mobile đồng bộ định tuyến video theo chặng đang học', () => {
+  const webPathView = read('client/src/components/student/dailyPractice/PathView.jsx');
+  const mobileScreen = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
+  const webGoal = read('client/src/components/student/dailyPractice/DailyPracticeGoalPanel.jsx');
+
+  // Cả web và mobile đều có hàm continueStageTarget với chú thích và logic đúng yêu cầu
+  for (const code of [webPathView, mobileScreen]) {
+    assert.ok(code.includes('continueStageTarget'), 'phải có continueStageTarget');
+    assert.ok(code.includes('Luyện tập tới đâu xem video tới đó'), 'phải có chú thích nghiệp vụ');
+    assert.ok(code.includes('targetUnitIndex'), 'phải định vị index chặng đang học');
+    assert.ok(code.includes("unit.state === 'locked'"), 'chặn không mở video chặng khóa');
+    assert.ok(code.includes('preferNodeKey'), 'ưu tiên video của node đang luyện');
+  }
+
+  // Web Goal Panel giữ nguyên topicId trong query params khi bấm xem video hoặc luyện tập
+  assert.ok(webGoal.includes("params.set('watch', 'stage')"));
+  assert.ok(webGoal.includes("params.set('practice', 'stage')"));
+  assert.ok(webGoal.includes('openPractice'));
+  assert.ok(webGoal.includes('openVideo'));
+
+  // Web PathView ưu tiên topicId đang mở thay vì nhảy về chủ đề đầu tiên
+  assert.ok(webPathView.includes('currentTopic ? continueStageTarget(currentTopic) : null'));
+
+  // Mobile DailyPracticeScreen ưu tiên topicId đang mở
+  assert.ok(mobileScreen.includes('currentTopic ? continueStageTarget(currentTopic) : null'));
+});

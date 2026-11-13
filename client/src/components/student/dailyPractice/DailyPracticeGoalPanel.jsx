@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarCheck, Check, Circle, Flag, Flame, Gamepad2, Gift, Info, PlayCircle, Target,
+  CalendarCheck, Check, Circle, Flame, Gamepad2, Gift, Info, PlayCircle, Target,
 } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import {
@@ -66,7 +66,23 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
   }, []);
 
   const openVideo = () => {
-    navigate('/student/daily-practice?watch=stage');
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set('watch', 'stage');
+      navigate(`/student/daily-practice?${params.toString()}`);
+    } catch {
+      navigate('/student/daily-practice?watch=stage');
+    }
+  };
+
+  const openPractice = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set('practice', 'stage');
+      navigate(`/student/daily-practice?${params.toString()}`);
+    } catch {
+      navigate('/student/daily-practice?practice=stage');
+    }
   };
 
   const { goal, progress = {} } = data || {};
@@ -110,10 +126,22 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
               </div>
               <span className="text-sm font-black tabular-nums text-slate-900">{activityDone} / {activityTarget}</span>
             </div>
-            <ul className="space-y-2 text-xs font-bold text-slate-800">
-              <ChecklistItem done={learnDone} label="Học bài (video)" />
-              <ChecklistItem done={practiceDone} label={`Luyện tập (≥ ${MISSION_QUESTIONS} câu)`} />
-            </ul>
+            <div className="grid grid-cols-1 gap-2">
+              <MissionRow
+                icon={Gamepad2}
+                title="Luyện tập"
+                done={practiceDone}
+                detail={`${Math.min(progress.todayQuestions || 0, MISSION_QUESTIONS)}/${MISSION_QUESTIONS} câu`}
+                onClick={openPractice}
+              />
+              <MissionRow
+                icon={PlayCircle}
+                title="Xem video"
+                done={learnDone}
+                detail={`${Math.min(progress.todayVideos || 0, MISSION_VIDEOS)}/${MISSION_VIDEOS} video`}
+                onClick={openVideo}
+              />
+            </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
               <div className="flex justify-between gap-2 text-[11px] font-bold text-slate-600">
                 <span>Giờ học hôm nay</span>
@@ -125,48 +153,22 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
                   style={{ width: `${pct(progress.todayMinutes, progress.dailyTargetMinutes)}%` }}
                 />
               </div>
-              <p className="mt-1.5 text-[10px] font-semibold text-slate-500">
-                {periodLabel(goal.period)}
-                {!goal.expired ? ` · còn ${progress.daysLeft} ngày` : ' · đã hết hạn'}
-              </p>
-              <button
-                type="button"
-                onClick={openLearningGoal}
-                className="mt-2 text-[11px] font-extrabold text-emerald-700 hover:underline"
-              >
-                {goal.expired ? 'Đặt mục tiêu mới' : 'Đổi mục tiêu'}
-              </button>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="min-w-0 text-[10px] font-semibold leading-snug text-slate-500">
+                  {periodLabel(goal.period)}
+                  {!goal.expired ? ` · còn ${progress.daysLeft} ngày` : ' · đã hết hạn'}
+                </p>
+                <button
+                  type="button"
+                  onClick={openLearningGoal}
+                  className="shrink-0 cursor-pointer rounded-[10px] border-[1.5px] border-[#A7F3D0] border-b-[3.5px] border-b-[#34D399] bg-white px-2.5 py-1 text-[10px] font-extrabold text-[#059669] transition-all hover:bg-[#ECFDF5] active:translate-y-[2px] active:border-b-[1.5px] !shadow-none"
+                >
+                  {goal.expired ? 'Đặt mục tiêu mới' : 'Đổi mục tiêu'}
+                </button>
+              </div>
             </div>
           </div>
         )}
-      </section>
-
-      <section className="dp-dew-side-card p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-100">
-              <Flag size={16} className="text-emerald-600" aria-hidden="true" />
-            </span>
-            Nhiệm vụ hôm nay
-          </h3>
-          <Gift size={20} className="shrink-0 text-amber-500" aria-hidden="true" />
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          <MissionRow
-            icon={Gamepad2}
-            title="Luyện tập"
-            done={(progress.todayQuestions || 0) >= MISSION_QUESTIONS}
-            detail={`${Math.min(progress.todayQuestions || 0, MISSION_QUESTIONS)}/${MISSION_QUESTIONS} câu`}
-            onClick={() => navigate('/student/daily-practice?practice=stage')}
-          />
-          <MissionRow
-            icon={PlayCircle}
-            title="Xem video"
-            done={(progress.todayVideos || 0) >= MISSION_VIDEOS}
-            detail={`${Math.min(progress.todayVideos || 0, MISSION_VIDEOS)}/${MISSION_VIDEOS} video`}
-            onClick={openVideo}
-          />
-        </div>
       </section>
 
       <section className="dp-dew-side-card p-4">
@@ -220,20 +222,6 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
         </button>
       </section>
     </div>
-  );
-}
-
-function ChecklistItem({ done, label }) {
-  return (
-    <li className="flex items-center gap-2">
-      <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${done ? 'dp-dew-check-on border-transparent' : 'border-slate-200 bg-white'}`}
-        aria-hidden="true"
-      >
-        {done ? <Check size={12} strokeWidth={3} /> : null}
-      </span>
-      <span className={done ? 'text-emerald-800' : 'text-slate-700'}>{label}</span>
-    </li>
   );
 }
 
