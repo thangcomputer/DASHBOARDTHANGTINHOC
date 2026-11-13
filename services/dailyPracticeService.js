@@ -624,40 +624,12 @@ async function loadSessionQuestion(session, questionId) {
   return question;
 }
 
-function answerResultView(session, question, row) {
-  const perQuestion = rules.usesPerQuestionStake(session);
-  const xp = Number(row?.xp) || 0;
-  const correct = Boolean(row?.correct);
-  return {
-    correct,
-    xp,
-    wrongPenaltyXp: !correct && perQuestion && xp < 0 ? Math.abs(xp) : 0,
-    alreadyAnswered: true,
-    stakeXp: session.stakeXp || 0,
-    sessionXp: session.xp || 0,
-    correctCount: session.correctCount || 0,
-    answered: (session.answers || []).length,
-    correctAnswer: rules.correctAnswerView(question),
-    explanation: question.explanation || '',
-    profileXp: null,
-  };
-}
-
 async function answerQuestion(studentId, sessionId, { questionId, answer } = {}) {
   const session = await loadOwnSession(studentId, sessionId);
   if (session.status !== 'in_progress') throw httpError(409, 'Lượt chơi đã kết thúc');
   const question = await loadSessionQuestion(session, questionId);
   const existing = (session.answers || []).find((row) => String(row.questionId) === String(question._id));
-  if (existing) {
-    const profile = await getProfile(session.studentId);
-    return {
-      ...answerResultView(session, question, existing),
-      profileXp: rules.clampXp(profile?.xpTotal),
-      purchasedXp: rules.clampXp(profile?.purchasedXp),
-      dailyXp: rules.clampXp(profile?.dailyXp),
-      xpEmpty: rules.clampXp(profile?.xpTotal) <= 0,
-    };
-  }
+  if (existing) throw httpError(409, 'Câu này đã được trả lời');
   const correct = rules.gradeAnswer(question, answer || {});
   const hintUsed = (session.hintsUsed || []).some((id) => String(id) === String(question._id));
   const perQuestion = rules.usesPerQuestionStake(session);
