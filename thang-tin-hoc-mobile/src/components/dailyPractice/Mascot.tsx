@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, Platform, StyleSheet, type ImageSourcePropType } from 'react-native';
 
 export type MascotMood =
@@ -17,7 +17,10 @@ export type MascotMood =
   | 'determinedSoft'
   | 'energy'
   | 'sleepy'
-  | 'connected';
+  | 'connected'
+  | 'combo3'
+  | 'combo5'
+  | 'combo10';
 
 const MOOD_SRC: Record<MascotMood, ImageSourcePropType> = {
   idle: require('../../../assets/mascot/cam-xuc-hoc-bai.gif'),
@@ -36,9 +39,12 @@ const MOOD_SRC: Record<MascotMood, ImageSourcePropType> = {
   energy: require('../../../assets/mascot/nang-dong.gif'),
   sleepy: require('../../../assets/mascot/ngu-gat.gif'),
   connected: require('../../../assets/mascot/ket-noi-thanh-cong.gif'),
+  combo3: require('../../../assets/mascot/cam-xuc-vui.gif'),
+  combo5: require('../../../assets/mascot/wor-excel-powerpoint-mascot.gif'),
+  combo10: require('../../../assets/mascot/tot-nghiep-vui-ve.gif'),
 };
 
-const BOUNCE_MOODS = new Set<MascotMood>(['happy', 'celebrate', 'graduate', 'done', 'energy']);
+const BOUNCE_MOODS = new Set<MascotMood>(['happy', 'celebrate', 'graduate', 'done', 'energy', 'combo3', 'combo5', 'combo10']);
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /** Linh vật đồng hành luyện tập - hiển thị GIF động theo cảm xúc từng ngữ cảnh (đồng bộ Web App). */

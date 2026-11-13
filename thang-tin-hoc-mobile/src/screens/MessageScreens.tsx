@@ -481,7 +481,7 @@ export function MessagesScreen() {
   };
 
   if (isLocked) {
-    return (
+  return (
       <AppScreen contentStyle={styles.inboxScreen}>
         <AppHeader title="Hộp thư" icon={MessageCircle} showBackButton={false} />
         <View style={styles.inboxLockedContainer}>
@@ -537,10 +537,10 @@ export function MessagesScreen() {
       {socketStatus ? <Text style={styles.socketStatus}>{socketStatus}</Text> : null}
       <View style={[styles.inboxFilterRow, !isTeacher && styles.inboxFilterRowStudent]}>
         {isTeacher ? (
-          <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
+        <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
             <Plus size={25} color={theme.brand} strokeWidth={2.8} />
-          </Pressable>
-        ) : null}
+        </Pressable>
+      ) : null}
         <ScrollView
           style={styles.filtersWrapper}
           horizontal
@@ -550,15 +550,15 @@ export function MessagesScreen() {
           {categoryFilters.map((filter) => {
             const active = category === filter.id;
             return (
-              <Pressable
-                key={filter.id}
-                onPress={() => setCategory(filter.id)}
+            <Pressable
+              key={filter.id}
+              onPress={() => setCategory(filter.id)}
                 style={[styles.filterChip, active && (isBrandStudent ? styles.filterChipActiveBrand : styles.filterChipActive)]}
-                accessibilityRole="button"
+              accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-              >
+            >
                 <Text style={[styles.filterText, active && styles.filterTextActive]}>{filter.label}</Text>
-              </Pressable>
+            </Pressable>
             );
           })}
         </ScrollView>
@@ -585,7 +585,7 @@ export function MessagesScreen() {
               && Boolean(conversation.participantId && onlineUserIds.includes(conversation.participantId));
             return (
               <View
-                key={conversation.id}
+          key={conversation.id}
                 style={[
                   styles.contactRow,
                   index === 0 && styles.contactRowFirst,
@@ -598,27 +598,27 @@ export function MessagesScreen() {
                   onPress={() => {
                     setConversationOptionsId(null);
                     navigation.navigate('Conversation', {
-                      conversationId: conversation.id,
-                      conversationName: conversation.name,
-                      participantId: conversation.participantId,
-                      participantRole: conversation.participantRole || conversation.category,
+            conversationId: conversation.id,
+            conversationName: conversation.name,
+            participantId: conversation.participantId,
+            participantRole: conversation.participantRole || conversation.category,
                       participantAdminRole: conversation.adminRole,
                       participantOnline: isOnline,
-                      participantAvatarUri: conversation.avatarUri,
+            participantAvatarUri: conversation.avatarUri,
                     });
                   }}
                   style={({ pressed }) => [styles.contactRowMain, pressed && styles.contactRowPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
-                >
+          accessibilityRole="button"
+          accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
+        >
                   <View style={styles.avatarContainer}>
                     <View style={[styles.avatarRing, { borderColor: badge.ring }]}>
                       <Image source={avatarSource} style={styles.avatarImg} />
-                    </View>
+              </View>
                     <View style={[styles.roleBadgePill, { backgroundColor: badge.bg }]}>
                       <Text style={styles.roleBadgePillText}>
                         {conversation.roleBadge || badge.label}
-                      </Text>
+                </Text>
                     </View>
                     {isOnline ? <View style={styles.onlineDot} /> : null}
                   </View>
@@ -642,8 +642,8 @@ export function MessagesScreen() {
                       </View>
                       {conversation.time ? (
                         <Text style={styles.contactTimeText}>{conversation.time}</Text>
-                      ) : null}
-                    </View>
+              ) : null}
+              </View>
 
                     <View style={styles.contactMessageRow}>
                       <Text
@@ -660,11 +660,11 @@ export function MessagesScreen() {
                           <Text style={styles.unreadCountText}>
                             {conversation.unread > 99 ? '99+' : conversation.unread}
                           </Text>
-                        </View>
+            </View>
                       ) : null}
                     </View>
                   </View>
-                </Pressable>
+        </Pressable>
                 <View style={styles.contactOptionsWrap}>
                   <Pressable
                     onPress={() => setConversationOptionsId((current) => current === conversation.id ? null : conversation.id)}
@@ -2670,18 +2670,18 @@ export function ConversationScreen() {
         ) : null}
         {isSearching ? (
           <View>
-            <View style={styles.inlineSearch}>
-              <Search size={17} color={colors.muted} />
-              <TextInput value={searchText} onChangeText={setSearchText} placeholder="Tìm kiếm tin nhắn cũ" style={styles.inlineSearchInput} autoFocus />
-              <Pressable onPress={() => { setSearchText(''); setIsSearching(false); }} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
+          <View style={styles.inlineSearch}>
+            <Search size={17} color={colors.muted} />
+            <TextInput value={searchText} onChangeText={setSearchText} placeholder="Tìm kiếm tin nhắn cũ" style={styles.inlineSearchInput} autoFocus />
+            <Pressable onPress={() => { setSearchText(''); setIsSearching(false); }} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          </View>
             {searchText.trim() ? (
               <Text style={styles.searchStatus}>
                 {searchLoading ? 'Đang tìm trong cuộc trò chuyện…' : searchError || `${visibleMessages.length} kết quả`}
               </Text>
-            ) : null}
+        ) : null}
           </View>
         ) : null}
         {pinnedMessage ? (
@@ -2711,12 +2711,12 @@ export function ConversationScreen() {
           </View>
         ) : null}
         <View style={styles.threadSurface}>
-          <ScrollView
-            ref={threadRef}
+        <ScrollView
+          ref={threadRef}
             style={styles.threadScroll}
-            contentContainerStyle={styles.thread}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.thread}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
             onScroll={(event) => {
               threadScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
             }}
@@ -2734,9 +2734,9 @@ export function ConversationScreen() {
               }
               threadRef.current?.scrollToEnd({ animated: true });
             }}
-          >
-            {resource.loading ? <LoadingSkeleton rows={2} /> : null}
-            {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+        >
+          {resource.loading ? <LoadingSkeleton rows={2} /> : null}
+          {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
             {!resource.loading && !resource.error && canLoadOlder ? (
               <View style={styles.loadOlderWrap}>
                 <Pressable
@@ -2753,10 +2753,10 @@ export function ConversationScreen() {
                 {olderError ? <Text style={styles.loadOlderError}>{olderError}</Text> : null}
               </View>
             ) : null}
-            {!resource.loading && !resource.error && !thread.length ? <EmptyState title="Bắt đầu cuộc trò chuyện" message="Gửi lời chào đầu tiên nhé." /> : null}
-            {!resource.loading && !resource.error && isSearching && !visibleMessages.length ? (
-              <EmptyState title="Không tìm thấy tin nhắn" message="Thử từ khóa khác." />
-            ) : null}
+          {!resource.loading && !resource.error && !thread.length ? <EmptyState title="Bắt đầu cuộc trò chuyện" message="Gửi lời chào đầu tiên nhé." /> : null}
+          {!resource.loading && !resource.error && isSearching && !visibleMessages.length ? (
+            <EmptyState title="Không tìm thấy tin nhắn" message="Thử từ khóa khác." />
+          ) : null}
             {visibleMessages.length > 0 ? (
               <View style={styles.dateDividerWrap}>
                 <View style={styles.dateDividerPill}>
@@ -2863,13 +2863,13 @@ export function ConversationScreen() {
                     onLongPress={() => handleMessageMenu(message)}
                     delayLongPress={350}
                     style={[
-                      styles.bubble,
+                styles.bubble,
                       isMine ? styles.bubbleMine : styles.bubbleOther,
                       isAiSupportAssistantMessage && styles.bubbleAiSupport,
                       message.attachmentType === 'image' && styles.imageMessageBubble,
                       message.recalled && styles.recalledMessageBubble,
-                      message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
-                      pinnedId === message.id && styles.pinnedBubble,
+                message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
+                pinnedId === message.id && styles.pinnedBubble,
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel={isMine ? 'Tin nhắn của tôi' : 'Tin nhắn'}
@@ -2885,12 +2885,12 @@ export function ConversationScreen() {
                         <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
                       </View>
                     ) : message.stickerId ? (
-                      <Image
-                        source={getChatStickerImage(message.stickerId)}
-                        style={styles.chatSticker}
-                        resizeMode="contain"
-                        accessibilityLabel={CHAT_STICKERS.find((sticker) => sticker.id === message.stickerId)?.name || 'Sticker'}
-                      />
+                  <Image
+                    source={getChatStickerImage(message.stickerId)}
+                    style={styles.chatSticker}
+                    resizeMode="contain"
+                    accessibilityLabel={CHAT_STICKERS.find((sticker) => sticker.id === message.stickerId)?.name || 'Sticker'}
+                  />
                     ) : message.sticker ? (
                       <Text style={styles.sticker}>{message.sticker}</Text>
                     ) : null}
@@ -2898,13 +2898,13 @@ export function ConversationScreen() {
                       <View style={styles.messagePinnedLabel}>
                         <Pin size={10} color="#1D4ED8" />
                         <Text style={styles.messagePinnedLabelText}>Đã ghim</Text>
-                      </View>
+              </View>
                     ) : null}
                     {message.gifLabel ? (
                       <View style={styles.chatGif}>
                         <Text style={styles.chatGifText}>GIF</Text>
                         <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.gifLabel}</Text>
-                      </View>
+            </View>
                     ) : null}
                     {message.text && !message.recalled && message.attachmentType !== 'file' ? (
                       message.attachmentType === 'image' ? (
@@ -2957,8 +2957,8 @@ export function ConversationScreen() {
                         >
                           <Text style={styles.reactionBadgeEmoji}>{emoji}</Text>
                           {count > 1 ? <Text style={styles.reactionBadgeCount}>{count}</Text> : null}
-                        </Pressable>
-                      ))}
+            </Pressable>
+          ))}
 
                       {showReactionControls ? (
                         <View
@@ -3375,7 +3375,7 @@ export function ConversationScreen() {
                 ) : null}
               </View>
             ) : null}
-          </ScrollView>
+        </ScrollView>
         </View>
         {replyingTo && !isAiSupportConversation ? (
           <View style={styles.replyBar}>
@@ -3387,10 +3387,10 @@ export function ConversationScreen() {
         ) : null}
         {
           selectedAttachment ? (
-            <View style={styles.replyBar}>
-              <Text numberOfLines={1} style={styles.replyBarText}>Tệp đã chọn: {selectedAttachment.name}</Text>
-              <Pressable onPress={() => setSelectedAttachment(null)} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.cancelReply}>×</Text></Pressable>
-            </View>
+          <View style={styles.replyBar}>
+            <Text numberOfLines={1} style={styles.replyBarText}>Tệp đã chọn: {selectedAttachment.name}</Text>
+            <Pressable onPress={() => setSelectedAttachment(null)} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.cancelReply}>×</Text></Pressable>
+          </View>
           ) : null
         }
         {
@@ -3401,63 +3401,63 @@ export function ConversationScreen() {
             </View>
           ) : (
             <View style={styles.composerBar}>
-              <View style={styles.composerTools}>
-                <Pressable
+          <View style={styles.composerTools}>
+            <Pressable
                   onPress={() => setPicker('attachment')}
-                  style={styles.composerIcon}
-                  accessibilityRole="button"
-                  accessibilityLabel="Gửi ảnh"
-                >
+              style={styles.composerIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Gửi ảnh"
+            >
                   <ImagePlus size={19} color="#64748B" />
-                </Pressable>
-                <Pressable
+            </Pressable>
+            <Pressable
                   onPress={() => isPreview ? setPicker('attachment') : void pickImage(true)}
-                  style={styles.composerIcon}
-                  accessibilityRole="button"
-                  accessibilityLabel="Chụp ảnh"
-                >
+              style={styles.composerIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Chụp ảnh"
+            >
                   <Camera size={19} color="#64748B" />
-                </Pressable>
-                <Pressable
+            </Pressable>
+            <Pressable
                   onPress={() => isPreview ? setPicker('attachment') : void pickDocument()}
-                  style={styles.composerIcon}
-                  accessibilityRole="button"
-                  accessibilityLabel="Đính kèm tệp"
-                >
+              style={styles.composerIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Đính kèm tệp"
+            >
                   <Paperclip size={19} color="#64748B" />
-                </Pressable>
-              </View>
+            </Pressable>
+          </View>
               <View style={styles.composerInputPill}>
-                <TextInput
-                  value={draft}
+            <TextInput
+              value={draft}
                   onChangeText={handleDraftChange}
-                  placeholder="Nhập tin nhắn..."
+              placeholder="Nhập tin nhắn..."
                   placeholderTextColor="#94A3B8"
                   style={styles.composerTextInput}
-                  multiline
-                  textAlignVertical="center"
-                  maxLength={500}
+              multiline
+              textAlignVertical="center"
+              maxLength={500}
                   returnKeyType="send"
                   submitBehavior="submit"
                   onSubmitEditing={() => { void send(); }}
                   onBlur={stopTyping}
-                  accessibilityLabel="Nhập tin nhắn"
-                />
-                <Pressable onPress={() => setPicker('sticker')} style={styles.composerEmoji} accessibilityRole="button" accessibilityLabel="Mở bảng emoji, sticker và GIF">
+              accessibilityLabel="Nhập tin nhắn"
+            />
+            <Pressable onPress={() => setPicker('sticker')} style={styles.composerEmoji} accessibilityRole="button" accessibilityLabel="Mở bảng emoji, sticker và GIF">
                   <Smile size={19} color="#94A3B8" />
-                </Pressable>
-              </View>
-              <Pressable
+            </Pressable>
+          </View>
+          <Pressable
                 onPress={() => { void send(); }}
-                disabled={sending || (!draft.trim() && !selectedAttachment)}
+            disabled={sending || (!draft.trim() && !selectedAttachment)}
                 style={[styles.composerSendBtn, (sending || (!draft.trim() && !selectedAttachment)) && styles.composerSendBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Gửi tin nhắn"
-                accessibilityState={{ disabled: sending || (!draft.trim() && !selectedAttachment) }}
-              >
-                <Send size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
+            accessibilityRole="button"
+            accessibilityLabel="Gửi tin nhắn"
+            accessibilityState={{ disabled: sending || (!draft.trim() && !selectedAttachment) }}
+          >
+            <Send size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
           )
         }
         <Modal visible={picker !== null} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
@@ -3491,60 +3491,60 @@ export function ConversationScreen() {
                   <View style={[styles.pickerPanel, picker === 'sticker' && styles.stickerPickerPanel]}>
                     {picker === 'sticker' ? (
                       <>
-                        <TextInput
-                          value={stickerSearch}
-                          onChangeText={setStickerSearch}
-                          placeholder="Tìm sticker..."
-                          placeholderTextColor={colors.muted}
-                          style={styles.stickerSearch}
-                          accessibilityLabel="Tìm sticker"
-                        />
-                        <ScrollView horizontal style={styles.stickerCategoryScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerCategories}>
-                          {STICKER_CATEGORIES.map((item) => (
-                            <Pressable
-                              key={item.id}
-                              onPress={() => setStickerCategory(item.id)}
-                              style={[styles.stickerCategory, stickerCategory === item.id && styles.stickerCategoryActive]}
-                              accessibilityRole="button"
-                              accessibilityState={{ selected: stickerCategory === item.id }}
-                            >
-                              <Text style={[styles.stickerCategoryText, stickerCategory === item.id && styles.stickerCategoryTextActive]}>{item.label}</Text>
-                            </Pressable>
-                          ))}
-                        </ScrollView>
-                        <ScrollView style={styles.pickerContent} contentContainerStyle={styles.stickerSections} keyboardShouldPersistTaps="handled">
-                          {recentStickers.length > 0 ? (
-                            <View style={styles.stickerSection}>
+                      <TextInput
+                        value={stickerSearch}
+                        onChangeText={setStickerSearch}
+                        placeholder="Tìm sticker..."
+                        placeholderTextColor={colors.muted}
+                        style={styles.stickerSearch}
+                        accessibilityLabel="Tìm sticker"
+                      />
+                      <ScrollView horizontal style={styles.stickerCategoryScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerCategories}>
+                        {STICKER_CATEGORIES.map((item) => (
+                          <Pressable
+                            key={item.id}
+                            onPress={() => setStickerCategory(item.id)}
+                            style={[styles.stickerCategory, stickerCategory === item.id && styles.stickerCategoryActive]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: stickerCategory === item.id }}
+                          >
+                            <Text style={[styles.stickerCategoryText, stickerCategory === item.id && styles.stickerCategoryTextActive]}>{item.label}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                      <ScrollView style={styles.pickerContent} contentContainerStyle={styles.stickerSections} keyboardShouldPersistTaps="handled">
+                        {recentStickers.length > 0 ? (
+                          <View style={styles.stickerSection}>
                               <Text style={styles.stickerSectionTitle}>Gần đây</Text>
-                              <View style={styles.stickerGrid}>
-                                {recentStickers.map((sticker) => (
-                                  <Pressable key={`recent-${sticker.id}`} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
-                                    <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
-                                  </Pressable>
-                                ))}
-                              </View>
+                            <View style={styles.stickerGrid}>
+                              {recentStickers.map((sticker) => (
+                                <Pressable key={`recent-${sticker.id}`} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
+                                  <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
+                                </Pressable>
+                              ))}
                             </View>
-                          ) : null}
-                          {STICKER_CATEGORIES.slice(1)
-                            .filter((item) => stickerCategory === 'all' || item.id === stickerCategory)
-                            .map((item) => {
-                              const stickers = visibleStickers.filter((sticker) => sticker.category === item.id);
-                              if (!stickers.length) return null;
-                              return (
-                                <View key={item.id} style={styles.stickerSection}>
+                          </View>
+                        ) : null}
+                        {STICKER_CATEGORIES.slice(1)
+                          .filter((item) => stickerCategory === 'all' || item.id === stickerCategory)
+                          .map((item) => {
+                            const stickers = visibleStickers.filter((sticker) => sticker.category === item.id);
+                            if (!stickers.length) return null;
+                            return (
+                              <View key={item.id} style={styles.stickerSection}>
                                   <Text style={styles.stickerSectionTitle}>{item.label}</Text>
-                                  <View style={styles.stickerGrid}>
-                                    {stickers.map((sticker) => (
-                                      <Pressable key={sticker.id} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
-                                        <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
-                                      </Pressable>
-                                    ))}
-                                  </View>
+                                <View style={styles.stickerGrid}>
+                                  {stickers.map((sticker) => (
+                                    <Pressable key={sticker.id} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
+                                      <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
+                                    </Pressable>
+                                  ))}
                                 </View>
-                              );
-                            })}
-                          {!visibleStickers.length ? <Text style={styles.pickerEmpty}>{stickerSearch.trim() ? 'Không tìm thấy sticker phù hợp.' : 'Danh mục này chưa có sticker.'}</Text> : null}
-                        </ScrollView>
+                              </View>
+                            );
+                          })}
+                        {!visibleStickers.length ? <Text style={styles.pickerEmpty}>{stickerSearch.trim() ? 'Không tìm thấy sticker phù hợp.' : 'Danh mục này chưa có sticker.'}</Text> : null}
+                      </ScrollView>
                       </>
                     ) : null}
                     {picker === 'emoji' ? (

@@ -371,7 +371,7 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   const achievement = read('client/src/components/student/dailyPractice/AchievementPopup.jsx');
   assert.ok(achievement.includes('Tiếp tục học'), 'nút Tiếp tục học');
   assert.ok(achievement.includes('Xem lại kết quả'), 'nút Xem lại kết quả');
-  assert.ok(achievement.includes('Đóng'), 'nút Đóng');
+  assert.ok(achievement.includes('Làm lại'), 'nút Làm lại');
   assert.ok(achievement.includes('hasCelebratedSession'), 'chỉ kích hoạt chúc mừng 1 lần cho mỗi sự kiện hoàn thành');
 
   const pathDecor = read('client/src/components/student/dailyPractice/PathDecor.jsx');

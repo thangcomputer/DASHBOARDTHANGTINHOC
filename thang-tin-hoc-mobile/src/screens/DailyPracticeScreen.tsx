@@ -18,9 +18,8 @@ import { AppScreen } from '../components/ui';
 import { Mascot, type MascotMood } from '../components/dailyPractice/Mascot';
 import { DropletMark, PathITBackdrop, PathMascotBuddy, PathSnakeConnector, StageBuddiesOverlay } from '../components/dailyPractice/PathDecor';
 import { DragProvider } from '../components/dailyPractice/DragKit';
-import { Celebration } from '../components/dailyPractice/Celebration';
-import { MobileComboLightningOverlay } from '../components/dailyPractice/MobileComboLightningOverlay';
-import { MobilePerfectStreakOverlay } from '../components/dailyPractice/MobilePerfectStreakOverlay';
+import { PracticeFinishOverlay } from '../components/dailyPractice/PracticeFinishOverlay';
+import { MobileComboCelebrationOverlay } from '../components/dailyPractice/MobileComboCelebrationOverlay';
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
 import { UnitStageChest } from '../components/dailyPractice/UnitStageChest';
 import { MobileAnswerFeedback } from '../components/dailyPractice/MobileAnswerFeedback';
@@ -2616,7 +2615,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [combo, setCombo] = useState(0);
-  const [lightningCombo, setLightningCombo] = useState<number | null>(null);
+  const [comboCelebration, setComboCelebration] = useState<number | null>(null);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
   const total = session.questions.length;
@@ -2625,6 +2624,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const headerChips = useMemo(
     () => playQuestionHeaderChips(session.path, meta.label, level),
     [session.path, meta.label, level],
+  );
+  const visiblePlayChips = useMemo(
+    () => headerChips.filter((chip) => chip.id === 'type'),
+    [headerChips],
   );
   const stakeXp = Number(session.stakeXp) || 0;
   const isTestOutStake = Boolean(session.path?.testOut && stakeXp > 0);
@@ -2664,8 +2667,8 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       setTitle(isCorrect ? randomPraise() : randomComfort());
       setCombo((value) => {
         const nextCombo = isCorrect ? value + 1 : 0;
-        if (nextCombo === 3 || (nextCombo > 3 && nextCombo % 3 === 0)) {
-          setLightningCombo(nextCombo);
+        if ([3, 5, 10].includes(nextCombo)) {
+          setComboCelebration(nextCombo);
         }
         return nextCombo;
       });
@@ -2755,7 +2758,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <Text numberOfLines={1} style={styles.topBarStepTitle}>{stepTitle}</Text>
               <Text style={styles.topBarCount}>{`${index + 1}/${total}`}</Text>
             </View>
-            <View style={styles.progressTrack}>
+            <View style={styles.playProgressTrack}>
               <Animated.View style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
             </View>
           </View>
@@ -2783,25 +2786,29 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         </View>
 
         <Animated.View style={[styles.playQuestionCard, { transform: [{ translateX: shakeX }] }]}>
-          {result?.correct ? <Confetti key={`c-${index}`} /> : null}
-          <View style={styles.badgeRow}>
-            <Text style={styles.badgeDark}>{`Câu ${index + 1}/${total}`}</Text>
-            {headerChips.map((chip) => (
-              <Text key={chip.id} style={[styles.badge, { backgroundColor: chip.soft, color: chip.color }]}>
-                {chip.text}
-              </Text>
-            ))}
-          </View>
+          {visiblePlayChips.length ? (
+            <View style={styles.playMetaChipRow}>
+              {visiblePlayChips.map((chip) => (
+                <Text key={chip.id} numberOfLines={1} style={[styles.playMetaChip, { backgroundColor: chip.soft, color: chip.color }]}>
+                  {chip.text}
+                </Text>
+              ))}
+            </View>
+          ) : null}
           <View style={styles.promptRow}>
             <View style={styles.promptMascotBox}>
-              <Mascot mood={mood} size={58} />
+              <Mascot mood={mood} size={44} />
             </View>
             <View style={styles.flex}>
               <View style={styles.questionLabelRow}>
-                <Text style={styles.questionLabelBadge}>Câu hỏi :</Text>
-                {!immediate && meta.instruction ? <Text style={styles.instructionInline}>{meta.instruction}</Text> : null}
+                <Text style={styles.questionLabelBadge}>CÂU HỎI</Text>
+                {!immediate && meta.instruction ? (
+                  <Text style={styles.instructionInline} numberOfLines={2}>{meta.instruction}</Text>
+                ) : null}
               </View>
-              <Text style={styles.prompt}>{question.prompt}</Text>
+              <Text style={styles.playPrompt} maxFontSizeMultiplier={1.35}>
+                {question.prompt}
+              </Text>
             </View>
           </View>
           {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image} resizeMode="contain" /> : null}
@@ -2872,11 +2879,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             onQuit={() => { void confirmQuit(); }}
           />
         ) : null}
-        {lightningCombo ? (
-          <MobileComboLightningOverlay
-            combo={lightningCombo}
+        {comboCelebration ? (
+          <MobileComboCelebrationOverlay
+            combo={comboCelebration}
             play={play}
-            onDone={() => setLightningCombo(null)}
+            onDone={() => setComboCelebration(null)}
           />
         ) : null}
       </View>
@@ -3091,7 +3098,6 @@ export function DailyPracticeScreen() {
   const [session, setSession] = useState<DpSession | null>(null);
   const [summary, setSummary] = useState<DpSummary | null>(null);
   const [celebrating, setCelebrating] = useState(false);
-  const [showPerfectOverlay, setShowPerfectOverlay] = useState(false);
   const [lastPick, setLastPick] = useState<PracticePick | null>(null);
   const [starting, setStarting] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -3218,10 +3224,45 @@ export function DailyPracticeScreen() {
   }, [route.params?.practice, navigation]);
 
   const goHome = () => {
+    setCelebrating(false);
     setSummary(null);
     setPathError('');
     load();
     loadPath();
+  };
+
+  const handleFinishContinue = () => {
+    const pathResult = summary?.path;
+    if (pathResult?.passed && pathResult.next) {
+      setCelebrating(false);
+      setSummary(null);
+      startStep(pathResult.next.unitId, pathResult.next.nodeKey || 'study', pathResult.next.step);
+      return;
+    }
+    goHome();
+  };
+
+  const handleFinishReplay = () => {
+    if (lastPick) {
+      setCelebrating(false);
+      setSummary(null);
+      void begin(lastPick);
+    }
+  };
+
+  const handleFinishRelatedVideo = () => {
+    const lesson = summary?.relatedLesson;
+    if (!lesson) return;
+    navigation.navigate('MainTabs', {
+      screen: 'CourseVideos',
+      params: {
+        resumeKey: Date.now(),
+        resumeSubjectId: lesson.subjectId,
+        resumeCourseId: lesson.courseId,
+        resumeUnitId: lesson.unitId,
+        resumeSectionId: lesson.sectionId,
+      },
+    });
   };
   const goToBuyXp = () => {
     setBuyXpOpen(true);
@@ -3247,35 +3288,11 @@ export function DailyPracticeScreen() {
             onFinished={(data) => {
               setSession(null);
               setSummary(data);
-              const isPerfect = Boolean(
-                data &&
-                (data.total || 0) >= 2 &&
-                (data.correctCount === data.total || data.maxCombo === data.total)
-              );
-              if (isPerfect) {
-                setShowPerfectOverlay(true);
-              }
               setCelebrating(true);
               setStats((prev) => (prev ? { ...prev, ...data.stats } : data.stats));
               DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT, null);
               scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}
-          />
-        ) : summary && celebrating ? (
-          <Celebration
-            summary={summary}
-            play={play}
-            onDone={() => { setCelebrating(false); scrollRef.current?.scrollTo({ y: 0, animated: false }); }}
-          />
-        ) : summary ? (
-          <ResultView
-            summary={summary}
-            play={play}
-            starting={starting}
-            onReplay={() => { if (lastPick) void begin(lastPick); }}
-            onNextStep={(next) => { startStep(next.unitId, next.nodeKey || 'study', next.step); }}
-            onHome={goHome}
-            onBuyXp={goToBuyXp}
           />
         ) : (
           <HomeView
@@ -3302,11 +3319,15 @@ export function DailyPracticeScreen() {
           />
         )}
       </ScrollView>
-      {showPerfectOverlay && summary ? (
-        <MobilePerfectStreakOverlay
-          total={summary.total || summary.correctCount}
+      {summary && celebrating ? (
+        <PracticeFinishOverlay
+          visible
+          summary={summary}
           play={play}
-          onDone={() => setShowPerfectOverlay(false)}
+          onDismiss={goHome}
+          onContinue={handleFinishContinue}
+          onReplay={lastPick ? handleFinishReplay : undefined}
+          onRelatedVideo={handleFinishRelatedVideo}
         />
       ) : null}
       {stakePrompt ? (
@@ -3440,13 +3461,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   badgeDark: { color: '#FFFFFF', backgroundColor: '#0F172A', fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
   badge: { fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
-  promptRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  promptRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   prompt: { color: colors.ink, fontSize: 16, fontWeight: '600', lineHeight: 24 },
   instruction: { color: '#64748B', fontSize: 13, fontWeight: '400', marginTop: 2 },
   image: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#F8FAFC' },
   hintBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
   hintText: { flex: 1, color: '#92400E', fontSize: 13, fontWeight: '400' },
-  answerArea: { marginTop: 4 },
+  answerArea: { marginTop: 2, width: '100%' },
   feedback: {
     padding: spacing.lg,
     borderRadius: 24,
@@ -4283,25 +4304,66 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     borderWidth: 1.5, borderColor: '#E2E8F0', alignItems: 'center', gap: 3,
   },
   stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  playWrap: { gap: spacing.lg, paddingTop: 20, paddingBottom: 92, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  playWrap: { gap: 10, paddingTop: 12, paddingBottom: 92, maxWidth: 760, width: '100%', alignSelf: 'center' },
   topBarCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
-    borderRadius: 20, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  topBarStepTitle: { flex: 1, color: '#475569', fontSize: 13, fontWeight: '600', marginRight: 8 },
-  topBarCount: { color: '#334155', fontSize: 12, fontWeight: '600' },
+  topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  topBarStepTitle: { flex: 1, color: '#64748B', fontSize: 12, fontWeight: '700', marginRight: 8 },
+  topBarCount: { color: '#0F172A', fontSize: 12, fontWeight: '800' },
+  playProgressTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
   xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '500' },
   playQuestionCard: {
-    padding: spacing.xl, borderRadius: 24, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
-    gap: 14,
-    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    gap: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  playMetaChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  playMetaChip: {
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
+    maxWidth: '72%',
   },
   promptMascotBox: {
-    padding: 6, borderRadius: 18, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9',
+    width: 48,
+    height: 48,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
-  questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
+  playPrompt: {
+    color: colors.ink,
+    fontSize: 19,
+    fontWeight: '800',
+    lineHeight: 26,
+    flexShrink: 1,
+  },
+  questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 2 },
   questionLabelBadge: {
     paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: '#FEF2F2',
     borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 11, fontWeight: '900',
@@ -4309,8 +4371,8 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '400' },
   playCardFooter: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-    paddingTop: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: '#F1F5F9',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+    paddingTop: 10, marginTop: 2, borderTopWidth: 1, borderTopColor: '#F1F5F9',
   },
   hintFooterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Award, Check, Crown, Flame, Gift, Star, Target, Timer, Trophy, Zap, type LucideIcon } from 'lucide-react-native';
+import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { Award, Check, Crown, Flame, Gift, Star, Trophy } from 'lucide-react-native';
 import { Mascot } from './Mascot';
 import { DuoButton } from '../duo/DuoButton';
+import { AchievementPopup } from './AchievementPopup';
 import type { GameSound } from './useGameSounds';
-import { practiceFinishXpDisplay, type DpSummary } from '../../services/dailyPracticeApi';
+import type { DpSummary } from '../../services/dailyPracticeApi';
 import { spacing } from '../../theme/tokens';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -35,23 +36,6 @@ function PopIn({ delay = 0, children, style }: { delay?: number; children: React
   );
 }
 
-function formatDuration(seconds?: number) {
-  const total = Math.max(0, Math.round(Number(seconds) || 0));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-}
-
-function StatCard({ label, tone, icon: Icon, value, delay }: { label: string; tone: string; icon: LucideIcon; value: string | number; delay: number }) {
-  return (
-    <PopIn delay={delay} style={[styles.statCard, { borderColor: tone }]}>
-      <Text style={[styles.statLabel, { backgroundColor: tone }]}>{label}</Text>
-      <View style={styles.statBody}>
-        <Icon size={18} color={tone} />
-        <Text style={[styles.statValue, { color: tone }]}>{value}</Text>
-      </View>
-    </PopIn>
-  );
-}
-
 function Shell({ children, button, onNext }: { children: React.ReactNode; button: string; onNext: () => void }) {
   return (
     <View style={styles.shell}>
@@ -69,41 +53,40 @@ function Shell({ children, button, onNext }: { children: React.ReactNode; button
   );
 }
 
-function DoneStage({ summary, play, onNext }: { summary: DpSummary; play: (s: GameSound) => void; onNext: () => void }) {
-  const xpDisplay = practiceFinishXpDisplay(summary);
-  const xp = useCountUp(xpDisplay.amount);
+function DoneStage({
+  summary,
+  play,
+  onNext,
+  onClose,
+  onReviewResults,
+}: {
+  summary: DpSummary;
+  play: (s: GameSound) => void;
+  onNext: () => void;
+  onClose?: () => void;
+  onReviewResults?: () => void;
+}) {
   const isPerfect = Boolean(
     summary &&
     (summary.total || 0) >= 2 &&
     (summary.correctCount === summary.total || summary.maxCombo === summary.total)
   );
   const good = summary.stars >= 2;
-  const fly = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (isPerfect) play('mascotVictory');
     else play(good ? 'win' : 'sad');
-    Animated.spring(fly, { toValue: 1, friction: 5, tension: 60, useNativeDriver: USE_NATIVE_DRIVER }).start();
-  }, [fly, good, isPerfect, play]);
+  }, [good, isPerfect, play]);
+
   return (
-    <Shell button="NHẬN XP" onNext={onNext}>
-      <Animated.View style={{ opacity: fly, transform: [{ translateY: fly.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }, { rotate: fly.interpolate({ inputRange: [0, 1], outputRange: ['-12deg', '0deg'] }) }] }}>
-        <Mascot mood={isPerfect ? 'celebrate' : (good ? 'done' : 'determinedSoft')} size={140} />
-      </Animated.View>
-      {isPerfect ? (
-        <View style={styles.perfectBadge}>
-          <Crown size={13} color="#D97706" fill="#FBBF24" />
-          <Text style={styles.perfectBadgeText}>BÁCH PHÁT BÁCH TRÚNG 100%</Text>
-          <Crown size={13} color="#D97706" fill="#FBBF24" />
-        </View>
-      ) : null}
-      <Text style={styles.doneTitle}>{isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!')}</Text>
-      <Text style={styles.doneCaption}>{xpDisplay.caption}</Text>
-      <View style={styles.statRow}>
-        <StatCard label="NHẬN VỀ" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
-        <StatCard label="COMBO" tone="#0EA5E9" icon={Target} value={`x${summary.maxCombo || 0}`} delay={300} />
-        <StatCard label="THỜI GIAN" tone="#10B981" icon={Timer} value={formatDuration(summary.durationSeconds)} delay={450} />
-      </View>
-    </Shell>
+    <View style={styles.doneOverlay}>
+      <AchievementPopup
+        summary={summary}
+        play={play}
+        onContinue={onNext}
+        onReviewResults={onReviewResults || onNext}
+        onClose={onClose || onNext}
+      />
+    </View>
   );
 }
 
@@ -223,7 +206,19 @@ function QuestStage({ play, onNext }: { play: (s: GameSound) => void; onNext: ()
  * Chuỗi màn ăn mừng sau lượt chơi (kiểu Duolingo):
  * Đã luyện tập xong → chuỗi ngày (khi tăng) → nhiệm vụ hằng ngày (lượt đầu trong ngày) → kết quả chi tiết.
  */
-export function Celebration({ summary, play, onDone }: { summary: DpSummary; play: (s: GameSound) => void; onDone: () => void }) {
+export function Celebration({
+  summary,
+  play,
+  onDone,
+  onClose,
+  onReviewResults,
+}: {
+  summary: DpSummary;
+  play: (s: GameSound) => void;
+  onDone: () => void;
+  onClose?: () => void;
+  onReviewResults?: () => void;
+}) {
   const hasTrophyStage = Boolean(summary.path?.passed && (summary.path?.topicCompleted || summary.path?.unitCompleted || summary.path?.testOut));
   const stages = useMemo(() => [
     'done',
@@ -241,10 +236,28 @@ export function Celebration({ summary, play, onDone }: { summary: DpSummary; pla
   if (stage === 'trophy') return <CourseTrophyStage key="trophy" summary={summary} play={play} onNext={next} />;
   if (stage === 'streak') return <StreakStage key="streak" summary={summary} play={play} onNext={next} />;
   if (stage === 'quest') return <QuestStage key="quest" play={play} onNext={next} />;
-  return <DoneStage key="done" summary={summary} play={play} onNext={next} />;
+  return (
+    <DoneStage
+      key="done"
+      summary={summary}
+      play={play}
+      onNext={next}
+      onClose={onClose}
+      onReviewResults={onReviewResults}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
+  doneOverlay: {
+    flex: 1,
+    minHeight: 480,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: spacing.md,
+    backgroundColor: 'rgba(15, 23, 42, 0.44)',
+  },
   shell: { minHeight: 560, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, paddingVertical: spacing.lg },
   button: {
     alignSelf: 'stretch', minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm,

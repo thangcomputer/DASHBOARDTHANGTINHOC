@@ -11,9 +11,19 @@ import { DuoButton } from './duo/DuoButton';
 import { useAuth } from '../app/AuthContext';
 import { isFreePortalMenu } from './FreePortalModals';
 import type { DemoUser } from '../types';
+import {
+  MEET_ALERT_SNOOZE_MS,
+  meetAlertDismissMs,
+  meetAlertIds,
+  meetAlertKicker,
+  minutesUntilMeetStart,
+  resolveMeetJoinLink,
+  sameMeetAlert,
+} from '../../../shared/meetStartAlert.mjs';
 
 type AlertClassItem = {
   id: string;
+  scheduleId?: string;
   course: string;
   title: string;
   day?: string;
@@ -25,8 +35,6 @@ type AlertClassItem = {
 };
 
 const STORAGE_KEY = 'meet_start_alerted_map';
-const SNOOZE_MS = 5 * 60 * 1000; // Nhắc lại sau 5 phút nếu người dùng chưa vào
-const JOIN_DISMISS_MS = 2 * 60 * 60 * 1000; // Tắt nhắc 2 giờ nếu đã bấm vào lớp
 
 function dayLabel(day?: string) {
   if (!day) return 'Hôm nay';
@@ -72,13 +80,19 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
   const dismissedMapRef = useRef<Record<string, number>>({});
   const player = useAudioPlayer(require('../assets/audio/notification.wav'));
 
-  const isDismissed = (id: string) => {
-    const until = dismissedMapRef.current[id];
-    return Boolean(until && Date.now() < until);
+  const isDismissed = (itemOrId: AlertClassItem | string) => {
+    const ids = typeof itemOrId === 'string' ? [itemOrId] : meetAlertIds(itemOrId);
+    return ids.some((id) => {
+      const until = dismissedMapRef.current[id];
+      return Boolean(until && Date.now() < until);
+    });
   };
 
-  const rememberDismissed = (id: string, durationMs: number) => {
-    dismissedMapRef.current[id] = Date.now() + durationMs;
+  const rememberDismissed = (item: AlertClassItem, durationMs: number) => {
+    const until = Date.now() + durationMs;
+    meetAlertIds(item).forEach((id) => {
+      dismissedMapRef.current[id] = until;
+    });
     void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dismissedMapRef.current)).catch(() => {});
   };
 
@@ -105,20 +119,35 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(SOCKET_EVENTS.CLASS_REMINDER, (data: any) => {
       if (!data) return;
-      const fakeId = String(data.scheduleId || `socket-${data.startTime || Date.now()}`);
-      if (isDismissed(fakeId)) return;
-      setItem({
-        id: fakeId,
+      const incoming: AlertClassItem = {
+        id: String(data.scheduleId || data.id || `socket-${data.startTime || Date.now()}`),
+        scheduleId: data.scheduleId ? String(data.scheduleId) : '',
         course: data.course || 'Khóa học',
         title: data.course || 'Ca học theo lịch',
         day: vnScheduleClock().day,
         startTime: data.startTime || '',
         endTime: data.endTime || '',
-        linkHoc: String(data.linkHoc || '').trim(),
+        linkHoc: resolveMeetJoinLink(
+          data.linkHoc,
+          data.meetingUrl,
+          role === 'student' ? (currentUser as any)?.linkHoc : '',
+        ),
         personInfo: isTeacher
           ? (data.studentName ? `Học viên: ${data.studentName}` : '')
           : (data.teacherName ? `Giảng viên: ${data.teacherName}` : ''),
         isLive: Boolean(data.isLive ?? true),
+      };
+      if (isDismissed(incoming)) return;
+      setItem((current) => {
+        if (current && sameMeetAlert(current, incoming)) {
+          return {
+            ...current,
+            ...incoming,
+            id: current.id,
+            linkHoc: resolveMeetJoinLink(incoming.linkHoc, current.linkHoc),
+          };
+        }
+        return current || incoming;
       });
     });
     return () => {
@@ -144,7 +173,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
             const schList = Array.isArray(schRes?.data) ? schRes.data : [];
             for (const s of schList) {
               const id = String(s._id || s.id || '');
-              if (!id || isDismissed(id)) continue;
+              if (!id) continue;
               const sDay = normalizeScheduleDay(s.date);
               if (sDay !== todayStr) continue;
               const status = String(s.status || '').toLowerCase();
@@ -172,15 +201,15 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
                   ? `Học viên: ${s.studentName || s.studentId?.name || 'Học viên'}`
                   : `Giảng viên: ${s.teacherName || s.teacherId?.name || 'Giảng viên'}`;
 
-                const link = String(
-                  s.linkHoc ||
-                  s.meetingUrl ||
-                  (role === 'student' ? (currentUser as any)?.linkHoc : '') ||
-                  ''
-                ).trim();
+                const link = resolveMeetJoinLink(
+                  s.linkHoc,
+                  s.meetingUrl,
+                  role === 'student' ? (currentUser as any)?.linkHoc : '',
+                );
 
-                candidates.push({
+                const row: AlertClassItem = {
                   id,
+                  scheduleId: id,
                   course: s.course || s.courseName || 'Khóa học',
                   title: s.title || s.course || 'Ca học theo lịch',
                   day: sDay,
@@ -189,7 +218,9 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
                   linkHoc: link,
                   personInfo: person,
                   isLive,
-                });
+                };
+                if (isDismissed(row)) continue;
+                candidates.push(row);
               }
             }
           } catch {
@@ -203,7 +234,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
           const meetList = Array.isArray(meetRes?.data) ? meetRes.data : [];
           for (const m of meetList) {
             const id = String(m._id || m.id || '');
-            if (!id || isDismissed(id) || String(m.status) === 'cancelled') continue;
+            if (!id || String(m.status) === 'cancelled') continue;
             const inWindow = isMeetJoinWindow({
               day: m.day,
               startTime: m.startTime,
@@ -220,17 +251,20 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
                 nowDay: clock.day,
                 nowMinutes: clock.minutes,
               });
-              candidates.push({
+              const row: AlertClassItem = {
                 id,
+                scheduleId: id,
                 course: m.title || 'Lớp học trực tuyến',
                 title: meetLessonName(m),
                 day: m.day,
                 startTime: m.startTime || '',
                 endTime: m.endTime || '',
-                linkHoc: String(m.linkHoc || '').trim(),
+                linkHoc: resolveMeetJoinLink(m.linkHoc),
                 personInfo: '',
                 isLive,
-              });
+              };
+              if (isDismissed(row)) continue;
+              candidates.push(row);
             }
           }
         } catch {
@@ -239,7 +273,18 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
 
         if (candidates.length > 0 && active) {
           candidates.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0));
-          setItem((current) => current || candidates[0]);
+          const target = candidates[0];
+          setItem((current) => {
+            if (current && sameMeetAlert(current, target)) {
+              return {
+                ...current,
+                ...target,
+                id: current.id,
+                linkHoc: resolveMeetJoinLink(target.linkHoc, current.linkHoc),
+              };
+            }
+            return current || target;
+          });
         }
       } catch {
         /* Bỏ qua lỗi */
@@ -276,32 +321,35 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
       player.pause();
       void player.seekTo(0).catch(() => {});
     };
-  }, [item, player]);
+  }, [item?.id, player]);
 
-  const handleClose = (snoozeTime = SNOOZE_MS) => {
-    if (item?.id) {
-      rememberDismissed(item.id, snoozeTime);
-    }
+  const handleClose = (durationMs: number) => {
+    if (item) rememberDismissed(item, durationMs);
+    player.pause();
+    void player.seekTo(0).catch(() => {});
     setItem(null);
   };
 
   if (!item) return null;
-  const link = String(item.linkHoc || '').trim();
-
-  const kickerText = item.isLive
-    ? (isTeacher ? '🔴 ĐÃ ĐẾN GIỜ VÀO LỚP DẠY!' : '🔴 ĐÃ ĐẾN GIỜ VÀO HỌC!')
-    : (isTeacher ? '⏰ SẮP ĐẾN GIỜ DẠY HỌC (CÒN 1 PHÚT)' : '⏰ SẮP ĐẾN GIỜ VÀO HỌC (CÒN 1 PHÚT)');
+  const link = resolveMeetJoinLink(item.linkHoc, role === 'student' ? (currentUser as any)?.linkHoc : '');
+  const untilStart = minutesUntilMeetStart(item.startTime, vnScheduleClock().minutes);
+  const kickerText = meetAlertKicker({
+    isLive: item.isLive,
+    isTeacher,
+    minutesUntilStart: untilStart,
+  });
+  const quietMs = meetAlertDismissMs(item, vnScheduleClock().minutes);
 
   const actionText = item.isLive
     ? (isTeacher ? 'Vào lớp dạy ngay' : 'Vào lớp ngay')
     : 'Vào lớp chuẩn bị';
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => handleClose(SNOOZE_MS)}>
+    <Modal visible transparent animationType="fade" onRequestClose={() => handleClose(quietMs)}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Pressable
-            onPress={() => handleClose(SNOOZE_MS)}
+            onPress={() => handleClose(quietMs)}
             style={styles.close}
             accessibilityRole="button"
             accessibilityLabel="Đóng"
@@ -335,7 +383,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
               text={actionText}
               icon={<Video size={16} color="#FFFFFF" />}
               onPress={() => {
-                handleClose(JOIN_DISMISS_MS);
+                handleClose(quietMs);
                 void Linking.openURL(link);
               }}
               style={styles.join}
@@ -344,7 +392,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
             <Text style={styles.nolink}>Buổi học trực tuyến chưa có link Meet</Text>
           )}
 
-          <Pressable onPress={() => handleClose(SNOOZE_MS)} accessibilityRole="button" style={styles.laterPress}>
+          <Pressable onPress={() => handleClose(MEET_ALERT_SNOOZE_MS)} accessibilityRole="button" style={styles.laterPress}>
             <Text style={styles.later}>Để sau (nhắc lại sau 5 phút)</Text>
           </Pressable>
         </View>

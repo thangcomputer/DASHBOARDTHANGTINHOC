@@ -1,0 +1,158 @@
+/* Phản hồi câu hỏi DewSkill — 4 trạng thái theo mockup */
+
+.dp-quiz-feedback {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  border-width: 1.5px;
+  border-style: solid;
+  padding: 1.1rem 1.15rem 1.25rem;
+  animation: dp-feedback-card-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.dp-quiz-feedback::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  opacity: 0.35;
+  background-repeat: repeat-x;
+  background-size: 48px 28px;
+}
+
+.dp-quiz-feedback--correct {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(165deg, #ecfdf5 0%, #d1fae5 48%, #ecfdf5 100%);
+  box-shadow: 0 14px 32px -18px rgba(16, 185, 129, 0.35);
+}
+
+.dp-quiz-feedback--correct::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='28' viewBox='0 0 48 28'%3E%3Cpath fill='%2310b981' fill-opacity='.18' d='M0 18 Q12 8 24 18 T48 18 V28 H0Z'/%3E%3C/svg%3E");
+}
+
+.dp-quiz-feedback--wrong {
+  border-color: rgba(244, 63, 94, 0.28);
+  background: linear-gradient(165deg, #fff1f2 0%, #ffe4e6 52%, #fff7f8 100%);
+  box-shadow: 0 14px 32px -18px rgba(239, 68, 68, 0.22);
+}
+
+.dp-quiz-feedback--wrong::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='28' viewBox='0 0 48 28'%3E%3Cpath fill='%23f43f5e' fill-opacity='.16' d='M0 18 Q12 8 24 18 T48 18 V28 H0Z'/%3E%3C/svg%3E");
+}
+
+.dp-quiz-feedback__mascot-tag {
+  border-radius: 999px;
+  border: 1px solid #fecdd3;
+  background: #fff;
+  padding: 0.2rem 0.55rem;
+  font-size: 10px;
+  font-weight: 800;
+  color: #be123c;
+}
+
+.dp-quiz-btn-explain {
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  font-weight: 800;
+  box-shadow: 0 3px 0 #e2e8f0;
+}
+
+.dp-quiz-btn-explain--wrong {
+  border-color: #fecaca;
+  color: #b91c1c;
+  box-shadow: 0 3px 0 #fecaca;
+}
+
+.dp-quiz-btn-retry {
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  font-weight: 800;
+  color: #475569;
+  box-shadow: 0 3px 0 #e2e8f0;
+}
+
+.dp-quiz-btn-continue {
+  border-radius: 14px;
+  border-bottom-width: 4px;
+  border-bottom-color: #15803d;
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 55%, #16a34a 100%);
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 8px 18px -8px rgba(22, 163, 74, 0.65);
+}
+
+.dp-quiz-btn-continue:active:not(:disabled) {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+.dp-quiz-explain-panel {
+  border-radius: 18px;
+  border: 1.5px solid #bfdbfe;
+  background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 42%, #fff 100%);
+  padding: 1rem 1.1rem;
+}
+
+.dp-quiz-explain-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.65rem;
+}
+
+.dp-quiz-hint-modal {
+  border-radius: 24px;
+  border: 1.5px solid #fde68a;
+  background: linear-gradient(165deg, #fffbeb 0%, #fef3c7 55%, #fffbeb 100%);
+  box-shadow: 0 24px 48px -20px rgba(245, 158, 11, 0.45);
+  overflow: hidden;
+}
+
+.dp-quiz-hint-modal::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26px;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='28' viewBox='0 0 48 28'%3E%3Cpath fill='%23f59e0b' fill-opacity='.2' d='M0 18 Q12 8 24 18 T48 18 V28 H0Z'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 48px 28px;
+}
+
+.dp-quiz-hint-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: #fde68a;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 0.3rem 0.7rem;
+}
+
+.dp-quiz-hint-bubble {
+  border-radius: 18px;
+  border: 1.5px solid #fcd34d;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.85rem 1rem;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #78350f;
+}

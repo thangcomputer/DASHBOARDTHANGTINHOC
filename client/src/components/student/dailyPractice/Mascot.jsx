@@ -36,6 +36,14 @@ const MOOD_SRC = {
   cursor: '/mascot/con-tro.webp',
   pointer: '/mascot/con-tro.webp',
   'con-tro': '/mascot/con-tro.webp',
+
+  // Game feedback aliases (cùng asset, trạng thái chuyển động riêng)
+  wrong: '/mascot/cam-xuc-suy-nghi.gif',
+  hint: '/mascot/y-tuong.gif',
+  combo3: '/mascot/cam-xuc-vui.gif',
+  combo5: '/mascot/wor-excel-powerpoint-mascot.gif',
+  combo10: '/mascot/tot-nghiep-vui-ve.gif',
+  victory: '/mascot/hoan-thanh-checklish.gif',
 };
 
 const MOOD_LABEL = {
@@ -89,6 +97,13 @@ const MOTION = {
   quit: 'dp-droop',
   offline: 'dp-droop',
   sleepy: 'dp-droop',
+  combo3: 'dp-bounce',
+  combo5: 'dp-bounce',
+  combo10: 'dp-bounce',
+  studying: 'dp-float',
+  victory: 'dp-bounce',
+  hint: 'dp-float',
+  wrong: 'dp-float',
 };
 
 export default function Mascot({ mood = 'idle', emotion, size = 96, className = '' }) {

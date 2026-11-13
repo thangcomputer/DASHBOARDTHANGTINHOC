@@ -195,12 +195,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   buttonText: {
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 0.2,
+    flexShrink: 1,
   },
   iconLeft: {
     marginRight: 2,

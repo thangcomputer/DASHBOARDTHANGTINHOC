@@ -8,14 +8,15 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
-import { BookOpen, Check, ChevronRight, Sparkles, Star, X, Zap } from 'lucide-react-native';
+import { BookOpen, Check, ChevronRight, X, Zap } from 'lucide-react-native';
 import type { DpAnswerResult, DpQuestion } from '../../services/dailyPracticeApi';
 import { Mascot } from './Mascot';
 import type { GameSound } from './useGameSounds';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+const DEW_GREEN = '#059669';
+const DEW_GREEN_DARK = '#047857';
 
 export function buildMobileConciseSummary(question: DpQuestion | null | undefined, result: DpAnswerResult): string {
   const answerText = String(result?.correctAnswer?.text || '').trim();
@@ -50,6 +51,24 @@ export function buildMobileConciseSummary(question: DpQuestion | null | undefine
   return 'Hãy xem phần giải thích để nhớ kỹ kiến thức nhé!';
 }
 
+function normalizeExplanationBody(explanation: string | undefined, answerText: string) {
+  const raw = String(explanation || '').trim();
+  const ans = String(answerText || '').trim();
+  if (!raw) return '';
+
+  let body = raw;
+  if (ans) {
+    const exactPrefix = new RegExp(`^đáp án đúng\\s*[:：]\\s*${ans.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\.?`, 'i');
+    body = body.replace(exactPrefix, '').trim();
+  }
+  if (/^đáp án đúng/i.test(body)) {
+    const inner = body.replace(/^đáp án đúng\s*[:：]\s*/i, '').replace(/\.+\s*$/, '').trim();
+    if (ans && inner.toLowerCase() === ans.toLowerCase()) return '';
+    body = inner;
+  }
+  return body;
+}
+
 export function MobileAnswerFeedback({
   question,
   result,
@@ -67,20 +86,18 @@ export function MobileAnswerFeedback({
   play: (sound: GameSound) => void;
   onNext: () => void;
 }) {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 640;
   const isCorrect = Boolean(result.correct);
   const [explainOpen, setExplainOpen] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const checkPop = useRef(new Animated.Value(0.45)).current;
-  const xpPop = useRef(new Animated.Value(0.6)).current;
+  const checkPop = useRef(new Animated.Value(0.5)).current;
+  const xpPop = useRef(new Animated.Value(0.65)).current;
 
   useEffect(() => {
     setExplainOpen(false);
     slideAnim.setValue(0);
-    checkPop.setValue(0.45);
-    xpPop.setValue(0.6);
+    checkPop.setValue(0.5);
+    xpPop.setValue(0.65);
 
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -92,24 +109,25 @@ export function MobileAnswerFeedback({
       Animated.spring(checkPop, {
         toValue: 1,
         friction: 5,
-        tension: 150,
+        tension: 160,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(xpPop, {
         toValue: 1,
-        friction: 5,
-        tension: 130,
+        friction: 6,
+        tension: 140,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
   }, [result, slideAnim, checkPop, xpPop]);
 
-  const bannerLabel = isCorrect ? 'Chính xác!' : 'Chưa chính xác, thử lại nhé!';
+  const bannerLabel = isCorrect ? 'Chính xác!' : 'Chưa chính xác!';
   const conciseLine = buildMobileConciseSummary(question, result);
-  const detailExplanation = result.explanation
-    || (result.correctAnswer?.text
-      ? `Đáp án chính xác của câu hỏi này là: "${result.correctAnswer.text}". Hãy ghi nhớ khái niệm này để áp dụng nhanh trong các bài thực hành tiếp theo.`
-      : 'Hãy đọc kỹ lại đề bài và các phương án để nắm vững kiến thức trọng tâm của bài học.');
+  const answerText = String(result.correctAnswer?.text || '').trim();
+  const detailExplanation = normalizeExplanationBody(result.explanation, answerText)
+    || (!result.explanation && answerText
+      ? 'Hãy ghi nhớ khái niệm này để áp dụng nhanh trong các bài thực hành tiếp theo.'
+      : 'Hãy đọc kỹ lại đề bài và các phương án để nắm vững kiến thức trọng tâm.');
 
   return (
     <Animated.View
@@ -122,38 +140,19 @@ export function MobileAnswerFeedback({
             {
               translateY: slideAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [12, 0],
+                outputRange: [14, 0],
               }),
             },
           ],
         },
       ]}
     >
-      <View style={[styles.mainLayout, isWide && styles.mainLayoutWide]}>
-        {/* Khu vực Mascot DewSkill + ngôi sao & pháo giấy nhẹ */}
-        <View style={styles.mascotStage}>
-          {isCorrect ? (
-            <>
-              <View style={[styles.decorStar, { left: 4, top: 4 }]}>
-                <Star size={14} color="#F59E0B" fill="#FBBF24" />
-              </View>
-              <View style={[styles.decorStar, { right: 4, top: 8 }]}>
-                <Star size={12} color="#F59E0B" fill="#FDE68A" />
-              </View>
-              <View style={[styles.decorStar, { left: 2, bottom: 8 }]}>
-                <Sparkles size={13} color="#F59E0B" />
-              </View>
-              <View style={[styles.confettiBit, { left: -2, top: 34, backgroundColor: '#38BDF8', transform: [{ rotate: '-18deg' }] }]} />
-              <View style={[styles.confettiBit, { right: 0, top: 36, backgroundColor: '#F472B6', transform: [{ rotate: '16deg' }] }]} />
-              <View style={[styles.confettiBit, { right: 8, bottom: 12, backgroundColor: '#34D399', transform: [{ rotate: '-12deg' }] }]} />
-            </>
-          ) : null}
-          <Mascot mood={isCorrect ? 'happy' : 'thinking'} size={88} />
+      <View style={styles.bannerRow}>
+        <View style={styles.mascotCol}>
+          <Mascot mood={isCorrect ? 'happy' : 'thinking'} size={64} />
         </View>
-
-        {/* Nội dung chính: Tiêu đề + giải thích ngắn + huy hiệu XP */}
-        <View style={[styles.bodyCol, isWide && styles.bodyColWide]}>
-          <View style={[styles.titleRow, isWide && styles.titleRowWide]}>
+        <View style={styles.bodyCol}>
+          <View style={styles.titleRow}>
             <Animated.View
               style={[
                 styles.statusCircle,
@@ -161,92 +160,88 @@ export function MobileAnswerFeedback({
               ]}
             >
               {isCorrect ? (
-                <Check size={16} color="#FFFFFF" strokeWidth={3.4} />
+                <Check size={15} color="#FFFFFF" strokeWidth={3.4} />
               ) : (
-                <X size={16} color="#FFFFFF" strokeWidth={3.2} />
+                <X size={15} color="#FFFFFF" strokeWidth={3.2} />
               )}
             </Animated.View>
-            <Text style={[styles.titleText, { color: isCorrect ? '#065F46' : '#B91C1C' }]}>
+            <Text
+              style={[styles.titleText, { color: isCorrect ? DEW_GREEN_DARK : '#B91C1C' }]}
+              maxFontSizeMultiplier={1.3}
+            >
               {bannerLabel}
             </Text>
           </View>
 
-          <Text style={[styles.conciseText, isWide && { textAlign: 'left' }]}>
+          <Text style={styles.conciseText} maxFontSizeMultiplier={1.35}>
             {conciseLine}
           </Text>
 
-          {/* Huy hiệu XP xác nhận */}
-          <Animated.View style={{ transform: [{ scale: xpPop }], marginTop: 4 }}>
+          <Animated.View style={[styles.xpRow, { transform: [{ scale: xpPop }] }]}>
             {isCorrect ? (
               <View style={styles.xpPillGold}>
-                <Zap size={14} color="#F59E0B" fill="#FBBF24" />
-                <Text style={styles.xpPillGoldText}>
-                  {confirmedXp > 0 ? `+${confirmedXp} XP` : feedbackTitle || 'Ôn tập · 0 XP'}
+                <Zap size={13} color="#F59E0B" fill="#FBBF24" />
+                <Text style={styles.xpPillGoldText} maxFontSizeMultiplier={1.25}>
+                  {confirmedXp > 0 ? `+${confirmedXp} XP` : feedbackTitle || 'Xuất sắc!'}
                 </Text>
               </View>
             ) : result.wrongPenaltyXp && result.wrongPenaltyXp > 0 ? (
-              <View style={styles.xpPillPenalty}>
-                <Zap size={13} color="#EF4444" fill="#FCA5A5" />
-                <Text style={styles.xpPillPenaltyText}>{`−${result.wrongPenaltyXp} XP`}</Text>
+              <View style={styles.xpPillMuted}>
+                <Zap size={12} color="#EF4444" fill="#FCA5A5" />
+                <Text style={styles.xpPillMutedText} maxFontSizeMultiplier={1.25}>{`−${result.wrongPenaltyXp} XP`}</Text>
               </View>
             ) : (
-              <View style={styles.xpPillPenalty}>
-                <Text style={styles.xpPillPenaltyText}>{feedbackTitle || 'Đừng nản, cố lên nhé!'}</Text>
-              </View>
+              <Text style={styles.encourageText} maxFontSizeMultiplier={1.3}>
+                {feedbackTitle || 'Đừng nản, thử lại nhé!'}
+              </Text>
             )}
           </Animated.View>
         </View>
-
-        {/* Cụm 2 nút: Giải thích & Tiếp tục > */}
-        <View style={[styles.actionsWrap, isWide && styles.actionsWrapWide]}>
-          <Pressable
-            onPress={() => {
-              play('tap');
-              setExplainOpen((prev) => !prev);
-            }}
-            style={({ pressed }) => [
-              styles.explainBtn,
-              isCorrect ? styles.explainBtnOk : styles.explainBtnBad,
-              pressed && { transform: [{ translateY: 2 }] },
-            ]}
-            accessibilityRole="button"
-          >
-            <Text style={styles.explainBtnText}>{explainOpen ? 'Ẩn giải thích' : 'Giải thích'}</Text>
-          </Pressable>
-
-          <Pressable
-            disabled={busy}
-            onPress={() => {
-              play('tap');
-              onNext();
-            }}
-            style={({ pressed }) => [
-              styles.continueBtn,
-              pressed && { transform: [{ translateY: 2 }], borderBottomWidth: 2 },
-              busy && { opacity: 0.65 },
-            ]}
-            accessibilityRole="button"
-          >
-            {busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
-            <Text style={styles.continueBtnText}>Tiếp tục</Text>
-            <ChevronRight size={18} color="#FFFFFF" strokeWidth={3} />
-          </Pressable>
-        </View>
       </View>
 
-      {/* Khung giải thích chi tiết mở ra khi bấm "Giải thích" */}
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={() => {
+            play('tap');
+            setExplainOpen((prev) => !prev);
+          }}
+          style={({ pressed }) => [styles.explainBtn, pressed && styles.btnPressed]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: explainOpen }}
+        >
+          <BookOpen size={15} color={isCorrect ? DEW_GREEN_DARK : '#B91C1C'} />
+          <Text style={styles.explainBtnText} maxFontSizeMultiplier={1.25}>
+            {explainOpen ? 'Ẩn giải thích' : 'Giải thích'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          disabled={busy}
+          onPress={() => {
+            play('tap');
+            onNext();
+          }}
+          style={({ pressed }) => [
+            styles.continueBtn,
+            pressed && styles.btnPressed,
+            busy && { opacity: 0.65 },
+          ]}
+          accessibilityRole="button"
+        >
+          {busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+          <Text style={styles.continueBtnText} maxFontSizeMultiplier={1.25}>Tiếp tục</Text>
+          <ChevronRight size={17} color="#FFFFFF" strokeWidth={3} />
+        </Pressable>
+      </View>
+
       {explainOpen ? (
         <View style={[styles.explainPanel, isCorrect ? styles.explainPanelOk : styles.explainPanelBad]}>
-          <View style={[styles.explainIconBox, { backgroundColor: isCorrect ? '#D1FAE5' : '#FEE2E2' }]}>
-            <BookOpen size={15} color={isCorrect ? '#047857' : '#B91C1C'} />
-          </View>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={styles.explainHeader}>GIẢI THÍCH CHI TIẾT</Text>
-            {result.correctAnswer?.text ? (
-              <Text style={styles.explainCorrectAns}>{`Đáp án đúng: ${result.correctAnswer.text}`}</Text>
-            ) : null}
-            <Text style={styles.explainBody}>{detailExplanation}</Text>
-          </View>
+          {answerText ? (
+            <Text style={styles.explainCorrectAns} maxFontSizeMultiplier={1.3}>{`✓ Đáp án đúng: ${answerText}`}</Text>
+          ) : null}
+          {detailExplanation ? (
+            <Text style={styles.explainBody} maxFontSizeMultiplier={1.35}>{detailExplanation}</Text>
+          ) : null}
         </View>
       ) : null}
     </Animated.View>
@@ -255,186 +250,164 @@ export function MobileAnswerFeedback({
 
 const styles = StyleSheet.create({
   card: {
-    marginTop: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 24,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderRadius: 18,
     borderWidth: 1.5,
+    gap: 10,
+    width: '100%',
   },
   cardOk: {
     backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    borderColor: '#6EE7B7',
   },
   cardBad: {
     backgroundColor: '#FFF1F2',
     borderColor: '#FECACA',
   },
-  mainLayout: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 12,
-  },
-  mainLayoutWide: {
+  bannerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  mascotStage: {
-    width: 112,
-    height: 94,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  decorStar: {
-    position: 'absolute',
-    zIndex: 2,
-  },
-  confettiBit: {
-    position: 'absolute',
-    width: 11,
-    height: 6,
-    borderRadius: 2,
-    zIndex: 2,
-  },
-  bodyCol: {
-    alignItems: 'center',
-    gap: 4,
+    alignItems: 'flex-start',
+    gap: 10,
     width: '100%',
   },
-  bodyColWide: {
+  mascotCol: {
+    width: 68,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  bodyCol: {
     flex: 1,
-    alignItems: 'flex-start',
-    width: 'auto',
+    minWidth: 0,
+    gap: 5,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: 7,
     flexWrap: 'wrap',
   },
-  titleRowWide: {
-    justifyContent: 'flex-start',
-  },
   statusCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   titleText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
+    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
   conciseText: {
     color: '#1E293B',
-    fontSize: 14.5,
+    fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
-    textAlign: 'center',
+  },
+  xpRow: {
+    marginTop: 2,
   },
   xpPillGold: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: '#FFF3C4',
-    borderWidth: 1.5,
-    borderColor: '#FCD34D',
-  },
-  xpPillGoldText: {
-    color: '#92400E',
-    fontSize: 13.5,
-    fontWeight: '900',
-  },
-  xpPillPenalty: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
+    backgroundColor: '#FEF9C3',
+    borderWidth: 1,
+    borderColor: '#FDE047',
+  },
+  xpPillGoldText: {
+    color: '#92400E',
+    fontSize: 12.5,
+    fontWeight: '900',
+  },
+  xpPillMuted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#FECACA',
   },
-  xpPillPenaltyText: {
+  xpPillMutedText: {
     color: '#B91C1C',
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
   },
-  actionsWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-    marginTop: 4,
+  encourageText: {
+    color: '#9F1239',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
-  actionsWrapWide: {
-    flexDirection: 'column',
-    width: 168,
-    marginTop: 0,
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+    width: '100%',
   },
   explainBtn: {
     flex: 1,
-    width: '100%',
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderBottomWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  explainBtnOk: {
-    borderColor: '#A7F3D0',
-    borderBottomColor: '#6EE7B7',
-  },
-  explainBtnBad: {
-    borderColor: '#FECACA',
-    borderBottomColor: '#FCA5A5',
-  },
-  explainBtnText: {
-    color: '#334155',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  continueBtn: {
-    flex: 1.25,
-    width: '100%',
     minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 16,
-    backgroundColor: '#059669',
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#6EE7B7',
+  },
+  explainBtnText: {
+    color: '#334155',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  continueBtn: {
+    flex: 1.15,
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: DEW_GREEN,
     borderBottomWidth: 4,
-    borderBottomColor: '#047857',
+    borderBottomColor: DEW_GREEN_DARK,
   },
   continueBtnText: {
     color: '#FFFFFF',
-    fontSize: 14.5,
+    fontSize: 14,
     fontWeight: '900',
   },
+  btnPressed: {
+    transform: [{ translateY: 1 }],
+    opacity: 0.92,
+  },
   explainPanel: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 16,
+    marginTop: 2,
+    padding: 11,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    gap: 6,
+    width: '100%',
   },
   explainPanelOk: {
     borderColor: '#A7F3D0',
@@ -442,28 +415,15 @@ const styles = StyleSheet.create({
   explainPanelBad: {
     borderColor: '#FECACA',
   },
-  explainIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  explainHeader: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '800',
-  },
   explainCorrectAns: {
-    color: '#065F46',
-    fontSize: 13.5,
+    color: DEW_GREEN_DARK,
+    fontSize: 13,
     fontWeight: '800',
   },
   explainBody: {
     color: '#334155',
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 18,
     fontWeight: '500',
   },
 });

@@ -1,11 +1,13 @@
-import { useEffect, useMemo } from 'react';
-import { Award, CheckCircle2, Eye, Play, Sparkles, Star, Trophy, X, Zap } from 'lucide-react';
+import { useEffect } from 'react';
+import {
+  Award, CheckCircle2, Eye, GraduationCap, Play, PlayCircle, RotateCcw, Star, Target, Timer, Trophy, X, Zap,
+} from 'lucide-react';
 import { practiceFinishXpDisplay } from '../../../utils/dailyPractice';
 import { GameSoundManager } from '../../../utils/sound';
-import MascotEmotion from './MascotEmotion';
+import Mascot from './Mascot';
 import GameButton from './GameButton';
-import LevelUnlockEffect from './LevelUnlockEffect';
 import { DEWSKILL_ANIMATION, useAnimatedNumber, useReducedMotion } from './animationConstants';
+import './achievementPopup.css';
 
 const CELEBRATED_MEMORY = new Set();
 
@@ -34,59 +36,57 @@ export function markCelebratedSession(eventKey) {
   }
 }
 
-const CONFETTI_PALETTE = ['#10B981', '#F59E0B', '#0EA5E9', '#34D399', '#FBBF24', '#A855F7'];
+function formatDuration(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
 
-function LightConfetti({ count = 28, spread = 190 }) {
-  const reducedMotion = useReducedMotion();
-  const pieces = useMemo(
-    () =>
-      Array.from({ length: count }, (_, i) => {
-        const angle = (i / count) * Math.PI * 2 + (i % 3) * 0.18;
-        const distance = spread * (0.48 + ((i * 5) % 9) / 14);
-        return {
-          dx: `${Math.round(Math.cos(angle) * distance)}px`,
-          dy: `${Math.round(Math.sin(angle) * distance - 36)}px`,
-          rot: `${(i * 67) % 720 - 360}deg`,
-          color: CONFETTI_PALETTE[i % CONFETTI_PALETTE.length],
-          delay: `${(i * 35) % 240}ms`,
-        };
-      }),
-    [count, spread],
+function LaurelIcon({ className = '' }) {
+  return (
+    <svg className={className} viewBox="0 0 32 40" width="22" height="28" fill="none" aria-hidden="true">
+      <path d="M6 36C6 26 10 18 16 12C13 22 12 30 8 36H6Z" fill="#86EFAC" stroke="#22C55E" strokeWidth="1" />
+      <path d="M9 33C13 27 14 20 18 14C16 22 15 28 11 33H9Z" fill="#4ADE80" />
+    </svg>
   );
+}
 
-  if (reducedMotion) return null;
-
-  return pieces.map((piece, index) => (
-    <span
-      key={index}
-      className="cms-goal-confetti"
-      style={{
-        background: piece.color,
-        '--dx': piece.dx,
-        '--dy': piece.dy,
-        '--rot': piece.rot,
-        animationDelay: piece.delay,
-      }}
-      aria-hidden="true"
-    />
-  ));
+function StatTile({ label, tone, icon: Icon, value, bodyClass, delay, onClick, disabled }) {
+  const Tag = onClick && !disabled ? 'button' : 'div';
+  return (
+    <Tag
+      type={Tag === 'button' ? 'button' : undefined}
+      onClick={onClick && !disabled ? onClick : undefined}
+      disabled={disabled}
+      className={`dp-card-in overflow-hidden rounded-2xl border border-slate-100 bg-white text-center shadow-sm${onClick && !disabled ? ' cursor-pointer transition hover:ring-2 hover:ring-emerald-200/80' : ''}${disabled ? ' opacity-70' : ''}`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <p
+        className="flex items-center justify-center gap-1 px-1.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white sm:text-[11px]"
+        style={{ backgroundColor: tone }}
+      >
+        <Icon size={13} strokeWidth={2.5} aria-hidden="true" />
+        {label}
+      </p>
+      <p className={`flex min-h-[52px] items-center justify-center gap-1 px-2 py-2.5 text-base font-black tabular-nums sm:text-lg ${bodyClass}`} style={{ color: tone }}>
+        {value}
+      </p>
+    </Tag>
+  );
 }
 
 /**
- * AchievementPopup - Popup chúc mừng hoàn thành bài học chuẩn Game Hóa DewSkill:
- * - Hiển thị độ chính xác (%), điểm số (câu đúng/tổng số) và XP thực tế đã xác nhận.
- * - Mascot ăn mừng kèm pháo giấy nhẹ.
- * - Huy chương xuất hiện với hiệu ứng pop và phát sáng (1–2s).
- * - Đầy đủ 3 nút: Đóng, Tiếp tục học, Xem lại kết quả.
- * - Chỉ kích hoạt chúc mừng 1 lần cho mỗi sự kiện hoàn thành.
+ * Popup hoàn thành lượt luyện — một màn duy nhất theo mockup DewSkill.
  */
 export default function AchievementPopup({
   summary,
   eventKey = '',
   onContinue,
   onReviewResults,
-  onClose,
+  onReplay,
+  onDismiss,
+  onRelatedVideo,
 }) {
+  const reducedMotion = useReducedMotion();
   const total = Math.max(1, Number(summary?.total) || 1);
   const correctCount = Math.max(0, Number(summary?.correctCount) || 0);
   const accuracy = typeof summary?.path?.scorePercent === 'number'
@@ -100,163 +100,162 @@ export default function AchievementPopup({
   const isPerfect = Boolean(
     summary && (summary.total || 0) >= 2 && (summary.correctCount === summary.total || summary.maxCombo === summary.total),
   );
-  const unlockedUnit = summary?.path?.unlockedUnit || null;
+  const mascotMood = good ? 'completed' : (summary?.passed ? 'graduate' : 'sad');
+  const maxCombo = Math.max(0, Number(summary?.maxCombo) || 0);
+  const durationLabel = formatDuration(summary?.durationSeconds);
+  const hasRelatedVideo = Boolean(summary?.relatedLesson);
 
   useEffect(() => {
     const key = eventKey || summary?.sessionId || summary?.id || '';
     if (key && hasCelebratedSession(key)) return;
     if (key) markCelebratedSession(key);
-    if (good) {
-      GameSoundManager.complete();
-    }
+    if (good) GameSoundManager.complete();
   }, [eventKey, summary, good]);
+
+  const xpValueText = xpDisplay.prefix ? `${xpDisplay.prefix}${animatedXp}` : `${animatedXp}`;
 
   return (
     <div
       data-achievement-popup="true"
-      className="dp-card-in relative mx-auto w-full max-w-lg overflow-hidden rounded-[32px] border-2 border-emerald-200/90 bg-gradient-to-b from-emerald-50/75 via-white to-teal-50/35 p-5 text-center shadow-[0_24px_60px_-15px_rgba(16,185,129,0.22)] sm:p-7"
+      className="dp-achievement-shell relative mx-auto w-full max-w-[480px] overflow-hidden rounded-[24px] bg-white text-center shadow-[0_24px_48px_-12px_rgba(15,23,42,0.22)] ring-1 ring-slate-200/80"
     >
-      {good && <LightConfetti count={30} spread={200} />}
-
-      {/* Nút Đóng ở góc trên */}
-      {onClose && (
+      {onDismiss && (
         <button
           type="button"
           onClick={() => {
             GameSoundManager.click();
-            onClose();
+            onDismiss();
           }}
           aria-label="Đóng"
-          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 !shadow-none"
+          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-800 !shadow-none"
         >
           <X size={17} />
         </button>
       )}
 
-      {/* Huy chương phát sáng + Mascot ăn mừng */}
-      <div className="relative mt-1 flex flex-col items-center">
-        <div className="mb-2 flex items-center justify-center gap-1.5">
+      <div className="dp-achievement-header px-4 pb-6 pt-5 sm:px-5 sm:pt-6">
+        <div className="dp-achievement-header__rays" aria-hidden="true" />
+        <div className="dp-achievement-header__wave" aria-hidden="true" />
+
+        <div className="relative mb-3 flex items-center justify-center gap-1.5">
           {[1, 2, 3].map((n) => (
             <Star
               key={n}
-              size={n === 2 ? 26 : 20}
-              className={n <= stars ? 'dp-star-in fill-amber-400 text-amber-500 drop-shadow-xs' : 'fill-slate-200 text-slate-300'}
-              style={{ animationDelay: `${n * 140}ms` }}
+              size={n === 2 ? 22 : 17}
+              className={n <= stars ? 'dp-star-in fill-amber-400 text-amber-500' : 'fill-slate-200 text-slate-300'}
+              style={{ animationDelay: reducedMotion ? '0ms' : `${n * 120}ms` }}
             />
           ))}
         </div>
 
-        <div className="relative flex items-center justify-center gap-3 sm:gap-5">
-          <div className="dp-fly-in">
-            <MascotEmotion emotion={good ? 'completed' : 'incorrect'} size={118} />
-          </div>
+        <div className="relative flex items-end justify-center gap-2 sm:gap-4">
+          <MotionMascot mood={mascotMood} reducedMotion={reducedMotion} />
+          {isPerfect ? (
+            <div
+              data-achievement-medal="true"
+              className="dp-achievement-perfect-badge relative mb-1 flex h-[88px] w-[88px] shrink-0 flex-col items-center justify-center rounded-[22px] bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-white shadow-[0_6px_0_#B45309,0_14px_24px_rgba(245,158,11,0.35)] ring-[3px] ring-amber-100 sm:h-[96px] sm:w-[96px]"
+            >
+              <Trophy size={36} strokeWidth={2.2} className="drop-shadow-sm" aria-hidden="true" />
+              <span className="mt-0.5 text-[9px] font-black uppercase tracking-wide text-amber-950 sm:text-[10px]">
+                HOÀN HẢO
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
 
-          {/* Huy chương pop + phát sáng 1.4s */}
-          <div
-            data-achievement-medal="true"
-            className="dp-medal-glow relative flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-[26px] bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 text-white shadow-[0_8px_0_#B45309,0_16px_32px_rgba(245,158,11,0.4)] ring-4 ring-amber-200"
-          >
+      <div className="px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+          <LaurelIcon className="shrink-0 scale-x-[-1] opacity-90" />
+          <div className="min-w-0">
             {isPerfect ? (
-              <Trophy size={44} strokeWidth={2.3} className="drop-shadow-xs" aria-hidden="true" />
+              <>
+                <h2 className="text-lg font-black leading-tight text-emerald-800 sm:text-xl">Xuất sắc tuyệt đối!</h2>
+                <p className="text-lg font-black leading-tight text-emerald-800 sm:text-xl">Đã luyện tập xong!</p>
+              </>
             ) : (
-              <Award size={44} strokeWidth={2.3} className="drop-shadow-xs" aria-hidden="true" />
+              <h2 className="text-lg font-black leading-snug text-emerald-800 sm:text-xl">
+                {good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!'}
+              </h2>
             )}
-            <Sparkles
-              size={18}
-              className="dp-twinkle absolute -right-2 -top-2 fill-yellow-200 text-amber-500"
-              aria-hidden="true"
-            />
-            <span className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-amber-950">
-              {isPerfect ? 'Hoàn hảo' : good ? 'Đạt chuẩn' : 'Cố gắng'}
-            </span>
           </div>
-        </div>
-      </div>
-
-      {/* Tiêu đề chính (giữ nguyên chuỗi kiểm thử 'Đã luyện tập xong!') */}
-      <h2 className="mt-4 text-2xl font-black tracking-tight text-emerald-700 sm:text-3xl">
-        {isPerfect
-          ? 'Xuất sắc tuyệt đối! Đã luyện tập xong!'
-          : good
-            ? 'Đã luyện tập xong!'
-            : 'Hoàn thành lượt luyện!'}
-      </h2>
-      <p className="mx-auto mt-1 max-w-sm text-xs font-semibold text-slate-500 sm:text-sm">
-        {xpDisplay.caption}
-      </p>
-
-      {/* 3 chỉ số thực tế: Độ chính xác · Điểm số · XP xác nhận */}
-      <div className="mt-5 grid w-full grid-cols-3 gap-2.5">
-        <div className="dp-card-in overflow-hidden rounded-2xl border-2 border-emerald-500 bg-white" style={{ animationDelay: '100ms' }}>
-          <p className="bg-emerald-500 px-2 py-1 text-center text-[10px] font-black uppercase tracking-wider text-white">
-            Chính xác
-          </p>
-          <p className="flex items-center justify-center gap-1 px-2 py-3 text-xl font-black tabular-nums text-emerald-600">
-            <CheckCircle2 size={18} aria-hidden="true" />
-            <span>{animatedAccuracy}%</span>
-          </p>
+          <LaurelIcon className="shrink-0 opacity-90" />
         </div>
 
-        <div className="dp-card-in overflow-hidden rounded-2xl border-2 border-sky-500 bg-white" style={{ animationDelay: '220ms' }}>
-          <p className="bg-sky-500 px-2 py-1 text-center text-[10px] font-black uppercase tracking-wider text-white">
-            Điểm số
+        {xpDisplay.caption ? (
+          <p className="mx-auto mt-2 inline-block rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-100/80 sm:text-xs">
+            {xpDisplay.caption}
           </p>
-          <p className="flex items-center justify-center gap-1 px-2 py-3 text-xl font-black tabular-nums text-sky-600">
-            <Award size={18} aria-hidden="true" />
-            <span>{correctCount}/{total}</span>
-          </p>
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <StatTile label="Chính xác" tone="#22C55E" icon={CheckCircle2} value={`${animatedAccuracy}%`} bodyClass="dp-achievement-stat-body--green" delay={80} />
+          <StatTile label="Điểm số" tone="#3B82F6" icon={Award} value={`${correctCount}/${total}`} bodyClass="dp-achievement-stat-body--blue" delay={160} />
+          <StatTile label="Nhận về" tone="#F59E0B" icon={Zap} value={xpValueText} bodyClass="dp-achievement-stat-body--amber" delay={240} />
         </div>
 
-        <div className="dp-card-in overflow-hidden rounded-2xl border-2 border-amber-500 bg-white" style={{ animationDelay: '340ms' }}>
-          <p className="bg-amber-500 px-2 py-1 text-center text-[10px] font-black uppercase tracking-wider text-white">
-            Nhận về
-          </p>
-          <p className="flex items-center justify-center gap-1 px-2 py-3 text-xl font-black tabular-nums text-amber-600">
-            <Zap size={18} className="fill-amber-400" aria-hidden="true" />
-            <span>{xpDisplay.prefix ? `${xpDisplay.prefix}${animatedXp}` : animatedXp}</span>
-          </p>
-        </div>
-      </div>
-
-      {/* Nếu vừa mở khóa chặng mới, hiển thị hiệu ứng mở khóa ngay bên dưới */}
-      {unlockedUnit && (
-        <div className="mt-4">
-          <LevelUnlockEffect unlockedUnit={unlockedUnit} active />
-        </div>
-      )}
-
-      {/* Ba nút hành động: Đóng · Xem lại kết quả · Tiếp tục học */}
-      <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-        {onClose && (
-          <GameButton
-            variant="outline"
-            onClick={onClose}
-            className="w-full sm:w-auto sm:px-4 !py-3 text-xs"
-          >
-            <X size={15} />
-            <span>Đóng</span>
+        <div className="dp-achievement-actions mt-4">
+          {onReplay ? (
+            <GameButton variant="outline" onClick={onReplay} className="!py-2.5 text-[11px] sm:text-xs">
+              <RotateCcw size={14} />
+              <span>Làm lại</span>
+            </GameButton>
+          ) : null}
+          {onReviewResults ? (
+            <GameButton variant="outline" onClick={onReviewResults} className="!py-2.5 text-[11px] sm:text-xs">
+              <Eye size={14} />
+              <span className="truncate">Xem lại kết quả</span>
+            </GameButton>
+          ) : null}
+          <GameButton variant="primary" onClick={onContinue} className="!py-2.5 text-[11px] font-black uppercase sm:text-xs">
+            <Play size={14} fill="currentColor" />
+            <span className="truncate">Tiếp tục học</span>
           </GameButton>
-        )}
-        {onReviewResults && (
-          <GameButton
-            variant="outline"
-            onClick={onReviewResults}
-            className="w-full flex-1 !py-3 text-xs"
-          >
-            <Eye size={15} />
-            <span>Xem lại kết quả</span>
-          </GameButton>
-        )}
-        <GameButton
-          variant="primary"
-          onClick={onContinue}
-          className="w-full flex-1 !py-3.5 text-sm uppercase"
-        >
-          <Play size={16} fill="currentColor" />
-          <span>Tiếp tục học</span>
-        </GameButton>
+        </div>
+
+        <div className="dp-achievement-divider mt-4" aria-hidden="true">
+          <span className="dp-achievement-divider__line" />
+          <GraduationCap size={16} className="text-emerald-600" />
+          <span className="dp-achievement-divider__line" />
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <StatTile
+            label="Video liên quan"
+            tone="#F59E0B"
+            icon={PlayCircle}
+            value={hasRelatedVideo ? <PlayCircle size={22} className="text-amber-500" /> : '—'}
+            bodyClass="dp-achievement-stat-body--amber"
+            delay={300}
+            onClick={hasRelatedVideo ? onRelatedVideo : undefined}
+            disabled={!hasRelatedVideo}
+          />
+          <StatTile
+            label="Combo"
+            tone="#3B82F6"
+            icon={Target}
+            value={`×${maxCombo}`}
+            bodyClass="dp-achievement-stat-body--blue"
+            delay={380}
+          />
+          <StatTile
+            label="Thời gian"
+            tone="#22C55E"
+            icon={Timer}
+            value={durationLabel}
+            bodyClass="dp-achievement-stat-body--green"
+            delay={460}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
+function MotionMascot({ mood, reducedMotion }) {
+  return (
+    <div className={reducedMotion ? '' : 'dp-bounce'} style={{ maxWidth: 118 }}>
+      <Mascot mood={mood} size={100} className="mx-auto" />
+    </div>
+  );
+}

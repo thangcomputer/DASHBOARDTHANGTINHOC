@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Award, BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, Sparkles, Star, Trophy, X,
+  Award, BookOpen, Check, CheckCircle2, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Monitor, Play, Route, Sparkles, Star, Trophy, X,
 } from 'lucide-react';
 import { resolveMediaUrl } from '../../../services/api';
 import {
@@ -743,7 +743,8 @@ export function pickActivePathTopic(path, initialTopicId = '', savedTopicId = ''
 
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
-  path, practiceStats, loading, error, starting, initialTopicId = '', onTopicChange, onStartStep, onPathChanged, layout = 'default',
+  path, practiceStats, loading, error, starting, initialTopicId = '', activeTopicId = '',
+  onTopicChange, onStartStep, onPathChanged, layout = 'default', showSubjectBar = false,
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const topics = useMemo(() => path?.topics || [], [path]);
@@ -793,6 +794,13 @@ export default function PathView({
     );
     if (picked?.topic?.id) setTopicId(picked.topic.id);
   }, [topicId, topics, initialTopicId, path?.activeTopicId]);
+
+  useEffect(() => {
+    if (!activeTopicId || activeTopicId === topicId) return;
+    if (!topics.some((item) => item.topic.id === activeTopicId)) return;
+    setTopicId(activeTopicId);
+    setPopover(null);
+  }, [activeTopicId, topicId, topics]);
 
   useEffect(() => {
     if (error) setPopover(null);
@@ -952,55 +960,78 @@ export default function PathView({
   const offsetScale = wide ? 52 : 44;
 
   return (
-    <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <div className="space-y-4">
       {errorBanner}
-      <div className="-mx-1 flex gap-2 overflow-x-auto overflow-y-hidden px-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
-        {topics.map((item) => {
-          const Icon = topicIcon(item.topic.icon);
-          const tone = topicColor(item.topic.color);
-          const active = item.topic.id === topicId;
-          return (
-            <button
-              key={item.topic.id}
-              type="button"
-              onClick={() => { gameSounds.tap(); setTopicId(item.topic.id); setPopover(null); }}
-              className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 px-3 py-2.5 text-left transition !shadow-none sm:min-w-[160px] ${active ? 'shadow-sm' : ''}`}
-              style={{ borderColor: active ? tone.to : '#E2E8F0', background: active ? tone.soft : '#FFFFFF' }}
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white" style={{ background: `linear-gradient(180deg, ${tone.from}, ${tone.to})` }}>
-                <Icon size={16} aria-hidden="true" />
-              </span>
-              <span>
-                <span className="block text-sm font-black text-slate-900">{item.topic.name}</span>
-                <span className="block text-[11px] font-semibold text-slate-500">{item.completedUnits}/{item.totalUnits} chặng</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {showSubjectBar ? (
+        <div className="dp-dew-subject-strip">
+          {topics.map((item) => {
+            const Icon = topicIcon(item.topic.icon);
+            const tone = topicColor(item.topic.color);
+            const active = item.topic.id === topicId;
+            return (
+              <button
+                key={item.topic.id}
+                type="button"
+                onClick={() => { gameSounds.tap(); setTopicId(item.topic.id); setPopover(null); }}
+                className={`dp-dew-subject-chip flex shrink-0 items-center gap-2.5 px-3.5 py-3 text-left !shadow-none sm:min-w-[168px] ${active ? 'dp-dew-subject-chip--active' : ''}`}
+                style={{ borderColor: active ? tone.to : '#E2E8F0', background: active ? tone.soft : '#FFFFFF' }}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: `linear-gradient(180deg, ${tone.from}, ${tone.to})` }}>
+                  <Icon size={17} aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-slate-900">{item.topic.name}</span>
+                  <span className="block text-[11px] font-bold text-emerald-600">
+                    {item.totalUnits > 0 ? 'Đã sẵn sàng' : 'Đang soạn'}
+                    <span className="ml-1 font-semibold text-slate-400">· {item.completedUnits}/{item.totalUnits}</span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {current && (
         <>
-          <section className="relative flex flex-col gap-3 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:p-5">
-            <Mascot mood={current.next ? 'studying' : 'done'} size={52} className="absolute -right-1 top-3 hidden opacity-90 sm:block" aria-hidden="true" />
-            <div className="min-w-0 flex-1 sm:pr-14">
-              <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider" style={{ color: color.text }}>
-                <DropletMark size={12} fill={color.to} />
-                Lộ trình {current.topic.name}
-              </p>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, background: `linear-gradient(90deg, ${color.from}, ${color.to})` }} />
-                </div>
-                <span className="text-sm font-black text-slate-700 tabular-nums">{current.completedUnits}/{current.totalUnits}</span>
-              </div>
-              <p className="mt-1.5 text-xs text-slate-500">
-                {current.next
-                  ? `${pathTopicNextLinePrefix(current)}: Chặng ${nextUnit?.index} · ${current.next.nodeLabel || current.next.unitTitle}, ${current.next.stepLabel}`
-                  : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
-              </p>
+          <section className="dp-dew-chapter-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+            {current.completedUnits >= current.totalUnits && current.totalUnits > 0 ? (
+              <span className="dp-dew-chapter-card__badge" title="Đã hoàn thành chủ đề">
+                <CheckCircle2 size={22} className="text-white" strokeWidth={2.5} aria-hidden="true" />
+              </span>
+            ) : null}
+            <div className="dp-dew-chapter-card__icon flex h-14 w-14 shrink-0 items-center justify-center sm:h-16 sm:w-16">
+              <Monitor size={30} className="text-white" strokeWidth={2.2} aria-hidden="true" />
             </div>
-            {current.next && nextUnit && (
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-black uppercase tracking-widest text-white/85">
+                CHƯƠNG {nextUnit?.index || current.units?.[0]?.index || 1}
+                {' · '}
+                {current.completedUnits >= current.totalUnits && current.totalUnits > 0
+                  ? 'ĐÃ VƯỢT'
+                  : (current.completedUnits > 0 || current.next ? 'ĐANG HỌC' : 'BẮT ĐẦU')}
+              </p>
+              <h2 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">
+                {nextUnit?.title || current.units?.[0]?.title || current.topic.name}
+              </h2>
+              <p className="mt-1 text-xs font-medium leading-relaxed text-white/90">
+                {current.next
+                  ? `${pathTopicNextLinePrefix(current)}: ${current.next.nodeLabel || current.next.unitTitle} · ${current.next.stepLabel}`
+                  : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này. Luyện lại bất kỳ bước nào để giữ phong độ.'}
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/25">
+                  <div
+                    className="h-full rounded-full bg-white transition-all duration-500"
+                    style={{ width: `${Math.max(percent, current.completedUnits > 0 ? 6 : 0)}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-sm font-black tabular-nums text-white">
+                  {current.completedUnits}/{current.totalUnits}
+                </span>
+              </div>
+            </div>
+            {current.next && nextUnit ? (
               <button
                 type="button"
                 data-path-hub=""
@@ -1008,18 +1039,19 @@ export default function PathView({
                   if (current.next?.unitId) markUnitStarted(current.next.unitId);
                   focusCurrentPathLesson();
                 }}
-                className="cms-btn cms-btn-primary shrink-0 !py-2.5"
+                className="dp-dew-chapter-card__cta inline-flex shrink-0 items-center justify-center gap-2 px-5 py-3 text-sm !shadow-none"
               >
-                <Play size={16} /> {pathTopicPrimaryCtaLabel(current)}
+                <Play size={16} fill="currentColor" aria-hidden="true" />
+                {pathTopicPrimaryCtaLabel(current)}
               </button>
-            )}
+            ) : null}
           </section>
 
           {newlyUnlockedUnit && (
             <LevelUnlockEffect unlockedUnit={newlyUnlockedUnit} active />
           )}
 
-          <div className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-[#F7F7F7] shadow-sm">
+          <div className="dp-dew-path-lane relative overflow-hidden">
             <PathITBackdrop
               accentSoft={color.soft}
               completedUnits={current.completedUnits}

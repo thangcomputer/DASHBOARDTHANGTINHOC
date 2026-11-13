@@ -18,15 +18,17 @@ import AnswerFeedback from './AnswerFeedback';
 import { SoundToggleButton } from './GameButton';
 import { AnimatedXpCounter } from './XPRewardAnimation';
 import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
+import { reviewItemFollowUpLine } from '../../../../../shared/dailyPractice/reviewDisplay.mjs';
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
-import Celebration from './Celebration';
-import ComboLightningOverlay from './ComboLightningOverlay';
-import PerfectStreakMascotOverlay from './PerfectStreakMascotOverlay';
+import PracticeFinishOverlay from './PracticeFinishOverlay';
+import ComboCelebrationOverlay from './ComboCelebrationOverlay';
+import { shouldShowComboCelebration } from './quizFeedbackOrchestration';
 import BuyXpModal from './BuyXpModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import FreeMeetPlanModal, { isFreePortalAccount } from './FreeMeetPlanModal';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from './Questions';
+import './dailyPracticeDew.css';
 
 const MODE_STORAGE_KEY = 'cms_daily_practice_mode';
 const MODES = [
@@ -385,7 +387,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     return () => window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
   }, []);
   const [combo, setCombo] = useState(0);
-  const [lightningCombo, setLightningCombo] = useState(null);
+  const [comboCelebration, setComboCelebration] = useState(null);
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
@@ -422,8 +424,8 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       if (data.correct) {
         setCombo((value) => {
           const nextVal = value + 1;
-          if (nextVal === 3 || (nextVal > 3 && nextVal % 3 === 0)) {
-            setLightningCombo(nextVal);
+          if (shouldShowComboCelebration(nextVal)) {
+            setComboCelebration(nextVal);
           }
           return nextVal;
         });
@@ -667,12 +669,12 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         />
       )}
 
-      {lightningCombo && (
-        <ComboLightningOverlay
-          combo={lightningCombo}
-          onDone={() => setLightningCombo(null)}
+      {comboCelebration ? (
+        <ComboCelebrationOverlay
+          combo={comboCelebration}
+          onDone={() => setComboCelebration(null)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -941,13 +943,23 @@ function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOp
           </button>
           {reviewOpen && (
             <ul className="space-y-2.5 px-4 pb-4">
-              {summary.review.map((item) => (
-                <li key={item.id} className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-sm font-bold text-slate-800">{item.prompt}</p>
-                  <p className="mt-1 text-sm font-semibold text-emerald-700">✓ {item.correctAnswer?.text}</p>
-                  {item.explanation && <p className="mt-0.5 text-xs text-slate-500">{item.explanation}</p>}
-                </li>
-              ))}
+              {summary.review.map((item) => {
+                const answerText = String(item.correctAnswer?.text || '').trim();
+                const followUp = reviewItemFollowUpLine(item);
+                return (
+                  <li key={item.id} className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-sm font-bold text-slate-800">{item.prompt}</p>
+                    {answerText ? (
+                      <p className="mt-1 text-sm font-semibold leading-snug text-emerald-700">✓ {answerText}</p>
+                    ) : followUp ? (
+                      <p className="mt-1 text-sm font-medium leading-snug text-slate-600">{followUp}</p>
+                    ) : null}
+                    {answerText && followUp ? (
+                      <p className="mt-1 text-xs leading-snug text-slate-500">{followUp}</p>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -1012,7 +1024,7 @@ export default function DailyPracticePage() {
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   const [celebrating, setCelebrating] = useState(false);
-  const [showPerfectStreak, setShowPerfectStreak] = useState(false);
+  const [finishRematchOpen, setFinishRematchOpen] = useState(false);
   const [lastPick, setLastPick] = useState(null);
   const [starting, setStarting] = useState(false);
   const [mode, setMode] = useState(() => {
@@ -1259,22 +1271,61 @@ export default function DailyPracticePage() {
   const finished = (data) => {
     setSession(null);
     setSummary(data);
-    const isPerfect = Boolean(
-      data &&
-      (data.total || 0) >= 2 &&
-      (data.correctCount === data.total || data.maxCombo === data.total)
-    );
-    if (isPerfect) {
-      setShowPerfectStreak(true);
-    }
     setCelebrating(true);
     applyStats(data.stats);
     loadOverview(true);
     window.dispatchEvent(new CustomEvent(LEARNING_GOAL_CHANGED_EVENT));
   };
 
+  const navigate = useNavigate();
+
+  const closeFinishPopup = () => {
+    setCelebrating(false);
+    goHome();
+  };
+
+  const finishRematchStakeXp = summary?.xpDisabled ? 0 : (
+    summary?.path?.testOut ? TEST_OUT_XP
+      : (summary?.recovery ? 0 : ((summary?.total || 10) * QUESTION_STAKE_XP))
+  );
+
+  const handleFinishContinue = () => {
+    const pathResult = summary?.path;
+    if (pathResult?.passed && pathResult.next) {
+      setCelebrating(false);
+      setSummary(null);
+      startStep(pathResult.next.unitId, pathResult.next.nodeKey || 'study', pathResult.next.step);
+      return;
+    }
+    closeFinishPopup();
+  };
+
+  const handleFinishReplay = () => {
+    const pathResult = summary?.path;
+    const currentXpTotal = overview?.stats?.xpTotal;
+    if (pathResult && !pathResult.passed) {
+      if (typeof currentXpTotal === 'number' && currentXpTotal < finishRematchStakeXp) {
+        setBuyXpOpen(true);
+        return;
+      }
+      setFinishRematchOpen(true);
+      return;
+    }
+    if (lastPick) {
+      setCelebrating(false);
+      setSummary(null);
+      queueBegin(lastPick);
+    }
+  };
+
+  const handleFinishRelatedVideo = () => {
+    if (summary?.relatedLesson) {
+      navigate(lessonResumeUrl(summary.relatedLesson));
+    }
+  };
+
   return (
-    <div className="cms-sd-page min-h-full bg-slate-50/80 pb-10">
+    <div className="dp-dew-page cms-sd-page min-h-full bg-slate-50/80 pb-10">
       {session ? (
         <PlayScreen
           session={session}
@@ -1286,23 +1337,6 @@ export default function DailyPracticePage() {
             loadOverview(true);
           }}
           onFinished={finished}
-        />
-      ) : summary && celebrating ? (
-        <Celebration
-          summary={summary}
-          onDone={() => setCelebrating(false)}
-          onReviewResults={() => setCelebrating(false)}
-          onClose={goHome}
-        />
-      ) : summary ? (
-        <ResultScreen
-          summary={summary}
-          liveXpTotal={overview?.stats?.xpTotal}
-          starting={starting}
-          onReplay={() => lastPick && queueBegin(lastPick)}
-          onNextStep={(next) => startStep(next.unitId, next.nodeKey || 'study', next.step)}
-          onOpenBuyXp={() => setBuyXpOpen(true)}
-          onHome={goHome}
         />
       ) : (
         <HomeScreen
@@ -1331,6 +1365,15 @@ export default function DailyPracticePage() {
           }}
         />
       )}
+      {summary && celebrating ? (
+        <PracticeFinishOverlay
+          summary={summary}
+          onDismiss={closeFinishPopup}
+          onContinue={handleFinishContinue}
+          onReplay={lastPick || (summary.path && !summary.path.passed) ? handleFinishReplay : undefined}
+          onRelatedVideo={handleFinishRelatedVideo}
+        />
+      ) : null}
       {welcomeTarget && !session && (
         <WelcomeBackModal
           unitIndex={welcomeTarget.unit?.index}
@@ -1378,12 +1421,24 @@ export default function DailyPracticePage() {
         onClose={() => setMeetOfferOpen(false)}
         onPaid={() => { loadOverview(); loadPath(); }}
       />
-      {showPerfectStreak && summary && (
-        <PerfectStreakMascotOverlay
-          total={summary.total || summary.correctCount}
-          onDone={() => setShowPerfectStreak(false)}
+      {finishRematchOpen && summary ? (
+        <StakeSessionConfirm
+          stakeXp={finishRematchStakeXp}
+          xpTotal={overview?.stats?.xpTotal}
+          starting={starting}
+          onStay={() => setFinishRematchOpen(false)}
+          onOpenMeet={() => {
+            setFinishRematchOpen(false);
+            setBuyXpOpen(true);
+          }}
+          onGo={() => {
+            setFinishRematchOpen(false);
+            setCelebrating(false);
+            setSummary(null);
+            if (lastPick) queueBegin(lastPick);
+          }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

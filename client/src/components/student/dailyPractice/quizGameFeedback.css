@@ -1,0 +1,180 @@
+/* Game feedback — spring panel, banner fade, hint pulse, combo stars */
+
+.dp-quiz-feedback--panel-in {
+  animation: dp-feedback-panel-spring 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes dp-feedback-panel-spring {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dp-quiz-feedback__banner {
+  transition:
+    opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 420ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 480px;
+  overflow: hidden;
+}
+
+.dp-quiz-feedback--compact .dp-quiz-feedback__banner {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+.dp-quiz-feedback--compact {
+  padding-top: 0.65rem;
+  padding-bottom: 0.85rem;
+}
+
+.dp-mascot-correct-pop {
+  animation: dp-mascot-hop 680ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 280ms;
+}
+
+@keyframes dp-mascot-hop {
+  0% {
+    transform: translateY(8px) scale(0.92);
+  }
+  40% {
+    transform: translateY(-14px) scale(1.06);
+  }
+  70% {
+    transform: translateY(2px) scale(0.98);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dp-star-burst {
+  animation: dp-star-burst 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.dp-star-burst:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.dp-star-burst:nth-child(3) {
+  animation-delay: 220ms;
+}
+
+@keyframes dp-star-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-12deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.15) rotate(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.dp-hint-nudge {
+  animation: dp-hint-pulse 1.4s ease-in-out infinite;
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.85),
+    0 6px 18px -6px rgba(245, 158, 11, 0.55);
+}
+
+@keyframes dp-hint-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.dp-explain-nudge {
+  animation: dp-explain-glow 1.6s ease-in-out infinite;
+  box-shadow:
+    0 0 0 2px rgba(16, 185, 129, 0.55),
+    0 4px 14px -4px rgba(16, 185, 129, 0.35);
+}
+
+@keyframes dp-explain-glow {
+  0%,
+  100% {
+    border-color: #e2e8f0;
+  }
+  50% {
+    border-color: #34d399;
+  }
+}
+
+.dp-combo-glow-wash {
+  animation: dp-combo-glow 2.6s ease-out both;
+}
+
+@keyframes dp-combo-glow {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes dp-combo-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(12px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-combo-pop {
+  animation: dp-combo-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dp-quiz-feedback--panel-in,
+  .dp-mascot-correct-pop,
+  .dp-star-burst,
+  .dp-hint-nudge,
+  .dp-explain-nudge,
+  .dp-combo-glow-wash,
+  .animate-combo-pop {
+    animation: none !important;
+  }
+
+  .dp-quiz-feedback__banner {
+    transition: opacity 200ms ease;
+  }
+
+  .dp-quiz-feedback--compact .dp-quiz-feedback__banner {
+    opacity: 0;
+    max-height: none;
+  }
+}

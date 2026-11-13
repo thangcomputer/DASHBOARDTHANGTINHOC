@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Award, Check, Crown, Flame, Gift, Sparkles, Star, Target, Timer, Trophy, Zap } from 'lucide-react';
+import { Award, Check, Crown, Flame, Gift, Sparkles, Star, Trophy } from 'lucide-react';
 import { gameSounds } from '../../../utils/sound';
-import { practiceFinishXpDisplay } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
 import AchievementPopup from './AchievementPopup';
 import StreakCelebration from './StreakCelebration';
@@ -30,40 +29,6 @@ function TrophyConfetti({ count = 36, spread = 220 }) {
   ));
 }
 
-function useCountUp(target, duration = 900) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    const end = Number(target) || 0;
-    if (!end) return undefined;
-    let frame = 0;
-    const started = performance.now();
-    const tick = (now) => {
-      const progress = Math.min(1, (now - started) / duration);
-      setValue(Math.round(end * (1 - (1 - progress) ** 3)));
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [target, duration]);
-  return value;
-}
-
-function formatDuration(seconds) {
-  const total = Math.max(0, Math.round(Number(seconds) || 0));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-}
-
-function StatCard({ label, tone, icon: Icon, value, delay }) {
-  return (
-    <div className="dp-card-in overflow-hidden rounded-2xl border-2 bg-white" style={{ borderColor: tone, animationDelay: `${delay}ms` }}>
-      <p className="px-2 py-1 text-center text-[10px] font-black uppercase tracking-wider text-white" style={{ background: tone }}>{label}</p>
-      <p className="flex items-center justify-center gap-1.5 px-2 py-3 text-xl font-black tabular-nums" style={{ color: tone }}>
-        <Icon size={20} aria-hidden="true" /> {value}
-      </p>
-    </div>
-  );
-}
-
 function StageShell({ children, button, onNext }) {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-6 px-2 py-6 text-center">
@@ -76,26 +41,26 @@ function StageShell({ children, button, onNext }) {
 }
 
 function DoneStage({ summary, onNext, onReviewResults, onClose }) {
-  const xpDisplay = practiceFinishXpDisplay(summary);
-  const xp = useCountUp(xpDisplay.amount);
   const isPerfect = Boolean(
     summary &&
     (summary.total || 0) >= 2 &&
     (summary.correctCount === summary.total || summary.maxCombo === summary.total)
   );
   const good = summary.stars >= 2;
+  const headline = isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!');
+
   useEffect(() => {
     if (isPerfect) gameSounds.mascotVictory();
     else if (good) gameSounds.win();
     else gameSounds.sad();
   }, [good, isPerfect]);
 
-  // Kết hợp AchievementPopup đầy đủ độ chính xác, điểm số, XP thực tế, huy chương phát sáng & 3 nút (Đóng, Tiếp tục học, Xem lại kết quả)
-  // đồng thời hiển thị thêm thông tin Combo và Thời gian bên dưới.
-  const headline = isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!');
-
   return (
-    <div className="mx-auto flex min-h-[72vh] max-w-xl flex-col items-center justify-center gap-4 px-2 py-6 text-center" data-celebration-headline={headline}>
+    <div
+      className="fixed inset-0 z-[9200] flex max-h-[100dvh] items-center justify-center overflow-y-auto bg-slate-950/44 p-3 sm:p-4"
+      data-celebration-headline={headline}
+      role="presentation"
+    >
       <AchievementPopup
         summary={summary}
         eventKey={summary?.sessionId || summary?.id || ''}
@@ -103,11 +68,6 @@ function DoneStage({ summary, onNext, onReviewResults, onClose }) {
         onReviewResults={onReviewResults || onNext}
         onClose={onClose || onNext}
       />
-      <div className="grid w-full max-w-lg grid-cols-3 gap-2.5">
-        <StatCard label="Nhận về" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
-        <StatCard label="Combo" tone="#0EA5E9" icon={Target} value={`x${summary.maxCombo || 0}`} delay={300} />
-        <StatCard label="Thời gian" tone="#10B981" icon={Timer} value={formatDuration(summary.durationSeconds)} delay={450} />
-      </div>
     </div>
   );
 }

@@ -5,9 +5,17 @@ import api from '../../services/api';
 import { isMeetLiveNow, isMeetJoinWindow, meetLessonName, vnScheduleClock } from '../../utils/meetJoin';
 import { normalizeScheduleDate } from '../../utils/scheduleTime';
 import { NOTIFICATION_SOUND_URL, isSoundMuted, unlockAudio } from '../../utils/sound';
+import {
+  MEET_ALERT_SNOOZE_MS,
+  meetAlertDismissMs,
+  meetAlertIds,
+  meetAlertKicker,
+  minutesUntilMeetStart,
+  resolveMeetJoinLink,
+  sameMeetAlert,
+} from '../../../../shared/meetStartAlert.mjs';
 
 const STORAGE_KEY = 'meet_start_alerted';
-const SNOOZE_MS = 5 * 60 * 1000; // Nhắc lại sau 5 phút nếu chưa vào lớp
 
 function readDismissed() {
   try {
@@ -18,9 +26,12 @@ function readDismissed() {
   }
 }
 
-function rememberDismissed(id, durationMs = SNOOZE_MS) {
+function rememberDismissedKeys(ids, durationMs) {
   const map = readDismissed();
-  map[String(id)] = Date.now() + durationMs;
+  const until = Date.now() + durationMs;
+  ids.forEach((id) => {
+    if (id) map[String(id)] = until;
+  });
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(map));
   } catch {
@@ -28,10 +39,15 @@ function rememberDismissed(id, durationMs = SNOOZE_MS) {
   }
 }
 
-function isDismissed(id) {
+function isDismissed(itemOrId) {
   const map = readDismissed();
-  const until = map[String(id)];
-  return Boolean(until && Date.now() < until);
+  const ids = typeof itemOrId === 'object' && itemOrId
+    ? meetAlertIds(itemOrId)
+    : [String(itemOrId || '')];
+  return ids.some((id) => {
+    const until = map[String(id)];
+    return Boolean(until && Date.now() < until);
+  });
 }
 
 function dayLabel(day) {
@@ -63,23 +79,42 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
     const onClassReminder = (e) => {
       const reminder = e?.detail;
       if (!reminder) return;
-      const fakeId = `socket-${reminder.startTime || Date.now()}`;
-      if (isDismissed(fakeId)) return;
-      setItem({
-        id: fakeId,
+      const clock = vnScheduleClock();
+      const incoming = {
+        id: String(reminder.scheduleId || reminder.id || `socket-${reminder.startTime || Date.now()}`),
+        scheduleId: reminder.scheduleId ? String(reminder.scheduleId) : '',
         title: reminder.course || reminder.title || 'Buổi học trực tuyến',
         course: reminder.course || reminder.title || 'Buổi học trực tuyến',
+        day: reminder.day || clock.day,
         startTime: reminder.startTime || '',
         endTime: reminder.endTime || '',
-        linkHoc: reminder.linkHoc || reminder.meetingUrl || '',
+        linkHoc: resolveMeetJoinLink(
+          reminder.linkHoc,
+          reminder.meetingUrl,
+          reminder.joinClassUrl,
+          session?.linkHoc,
+          session?.online_meeting_url,
+        ),
         personInfo: role === 'teacher' ? (reminder.studentName ? `Học viên: ${reminder.studentName}` : '') : (reminder.teacherName ? `Giảng viên: ${reminder.teacherName}` : ''),
-        isLive: true,
+        isLive: reminder.isLive !== false,
+      };
+      if (isDismissed(incoming)) return;
+      setItem((current) => {
+        if (current && sameMeetAlert(current, incoming)) {
+          return {
+            ...current,
+            ...incoming,
+            id: current.id,
+            linkHoc: resolveMeetJoinLink(incoming.linkHoc, current.linkHoc),
+          };
+        }
+        return current || incoming;
       });
     };
 
     window.addEventListener('class:live-reminder', onClassReminder);
     return () => window.removeEventListener('class:live-reminder', onClassReminder);
-  }, [role]);
+  }, [role, session]);
 
   // Quét định kỳ lịch học hôm nay từ API (mỗi 15 giây)
   useEffect(() => {
@@ -121,7 +156,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         // Chuyển scheduleRows thành chuẩn chung
         scheduleRows.forEach((s) => {
           const id = String(s._id || s.id || '');
-          if (!id || isDismissed(id)) return;
+          if (!id) return;
           const sDay = normalizeScheduleDate(s.date);
           const inWindow = isMeetJoinWindow({
             day: sDay,
@@ -141,20 +176,20 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
               nowMinutes: clock.minutes,
             });
 
-            const link = String(
-              s.linkHoc ||
-              s.meetingUrl ||
-              s.joinClassUrl ||
-              session?.linkHoc ||
-              session?.online_meeting_url ||
-              ''
-            ).trim();
+            const link = resolveMeetJoinLink(
+              s.linkHoc,
+              s.meetingUrl,
+              s.joinClassUrl,
+              session?.linkHoc,
+              session?.online_meeting_url,
+            );
             const person = role === 'teacher'
               ? `Học viên: ${s.studentName || s.studentId?.name || 'Học viên'}`
               : `Giảng viên: ${s.teacherName || s.teacherId?.name || 'Giảng viên'}`;
 
-            candidateItems.push({
+            const row = {
               id,
+              scheduleId: id,
               course: s.course || s.courseName || 'Khóa học',
               title: s.title || s.course || 'Ca học theo lịch',
               day: sDay,
@@ -163,14 +198,16 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
               linkHoc: link,
               personInfo: person,
               isLive,
-            });
+            };
+            if (isDismissed(row)) return;
+            candidateItems.push(row);
           }
         });
 
         // Chuyển meetRows thành chuẩn chung
         meetRows.forEach((m) => {
           const id = String(m._id || m.id || '');
-          if (!id || isDismissed(id) || String(m.status) === 'cancelled') return;
+          if (!id || String(m.status) === 'cancelled') return;
           const inWindow = isMeetJoinWindow({
             day: m.day,
             startTime: m.startTime,
@@ -189,17 +226,20 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
               nowMinutes: clock.minutes,
             });
 
-            candidateItems.push({
+            const row = {
               id,
+              scheduleId: id,
               course: m.title || 'Lớp học trực tuyến',
               title: meetLessonName(m),
               day: m.day,
               startTime: m.startTime,
               endTime: m.endTime || '',
-              linkHoc: String(m.linkHoc || '').trim(),
+              linkHoc: resolveMeetJoinLink(m.linkHoc, session?.linkHoc, session?.online_meeting_url),
               personInfo: '',
               isLive,
-            });
+            };
+            if (isDismissed(row)) return;
+            candidateItems.push(row);
           }
         });
 
@@ -207,7 +247,17 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         if (candidateItems.length > 0 && active) {
           candidateItems.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0));
           const target = candidateItems[0];
-          setItem((current) => current || target);
+          setItem((current) => {
+            if (current && sameMeetAlert(current, target)) {
+              return {
+                ...current,
+                ...target,
+                id: current.id,
+                linkHoc: resolveMeetJoinLink(target.linkHoc, current.linkHoc),
+              };
+            }
+            return current || target;
+          });
         }
       } catch {
         /* Im lặng khi mất kết nối */
@@ -220,7 +270,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
       active = false;
       clearInterval(timer);
     };
-  }, [role, isFreePortal]);
+  }, [role, isFreePortal, session]);
 
   // Âm thanh chuông báo khi popup hiện
   useEffect(() => {
@@ -235,41 +285,46 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
       audio.pause();
       audioRef.current = null;
     };
-  }, [item]);
+  }, [item?.id]);
 
   if (!item) return null;
 
-  const close = () => {
-    const id = String(item.id || '');
-    if (id) {
-      rememberDismissed(id, SNOOZE_MS);
+  const stopAlert = (durationMs) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
+    rememberDismissedKeys(meetAlertIds(item), durationMs);
     setItem(null);
+  };
+
+  const closeQuiet = () => {
+    stopAlert(meetAlertDismissMs(item, vnScheduleClock().minutes));
+  };
+
+  const snoozeFive = () => {
+    stopAlert(MEET_ALERT_SNOOZE_MS);
   };
 
   const onJoin = () => {
-    const id = String(item.id || '');
-    if (id) {
-      rememberDismissed(id, 2 * 60 * 60 * 1000);
-    }
-    setItem(null);
+    stopAlert(meetAlertDismissMs(item, vnScheduleClock().minutes));
   };
 
-  const link = String(item.linkHoc || '').trim();
+  const link = resolveMeetJoinLink(item.linkHoc, session?.linkHoc, session?.online_meeting_url);
   const isTeacher = role === 'teacher';
+  const untilStart = minutesUntilMeetStart(item.startTime, vnScheduleClock().minutes);
+  const kicker = meetAlertKicker({ isLive: item.isLive, isTeacher, minutesUntilStart: untilStart });
 
   return (
     <div className="meet-start-alert" role="dialog" aria-modal="true" aria-labelledby="meet-start-alert-title">
-      <button type="button" className="meet-start-alert__backdrop" aria-label="Đóng cảnh báo" onClick={close} />
+      <button type="button" className="meet-start-alert__backdrop" aria-label="Đóng cảnh báo" onClick={closeQuiet} />
       <div className="meet-start-alert__card">
-        <button type="button" className="meet-start-alert__close" onClick={close} aria-label="Đóng">
+        <button type="button" className="meet-start-alert__close" onClick={closeQuiet} aria-label="Đóng">
           <X size={18} />
         </button>
 
         <p className="meet-start-alert__kicker">
-          {item.isLive
-            ? (isTeacher ? '🔴 ĐÃ ĐẾN GIỜ VÀO LỚP DẠY!' : '🔴 ĐÃ ĐẾN GIỜ VÀO HỌC!')
-            : (isTeacher ? '⏰ SẮP ĐẾN GIỜ DẠY HỌC (CÒN 1 PHÚT)' : '⏰ SẮP ĐẾN GIỜ VÀO HỌC (CÒN 1 PHÚT)')}
+          {kicker}
         </p>
 
         <h2 id="meet-start-alert-title" className="meet-start-alert__title">
@@ -312,7 +367,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
           <button
             type="button"
             className="meet-start-alert__later text-xs font-bold text-slate-500 hover:text-slate-700 py-1.5 transition"
-            onClick={close}
+            onClick={snoozeFive}
           >
             Nhắc lại sau 5 phút
           </button>
