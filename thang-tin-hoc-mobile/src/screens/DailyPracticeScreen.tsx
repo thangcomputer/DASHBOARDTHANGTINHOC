@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, DeviceEventEmitter, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
+  ActivityIndicator, Animated, DeviceEventEmitter, Easing, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -1209,6 +1209,9 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }: {
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [pop]);
+  const levels = node.levels || [];
+  const single = levels.length === 1 ? levels[0] : null;
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.quitBackdrop} onPress={onClose}>
@@ -1217,28 +1220,81 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }: {
             <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng">
               <X size={18} color="rgba(255,255,255,0.85)" />
             </Pressable>
-            <Text style={styles.popoverTitle}>{`${node.label} · Nội dung chặng`}</Text>
-            <Text style={styles.popoverMeta}>Đọc lý thuyết, xem video & trả lời câu kiểm tra nhanh</Text>
-            {(node.levels || []).map((step, index) => {
-              const locked = step.state === 'locked';
-              const done = step.state === 'completed';
-              return (
-                <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
-                  <View style={[styles.hubLevelIcon, done && { backgroundColor: '#10B981' }]}>
-                    {done ? <Check size={16} strokeWidth={3} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <BookOpen size={16} color="#FFFFFF" />}
+            <Text style={styles.popoverTitle}>{node.label}</Text>
+            <Text style={styles.popoverMeta}>Bài học lý thuyết, tài liệu & video bài giảng</Text>
+
+            {single ? (
+              <View style={{ gap: 8, marginTop: 8 }}>
+                {single.content ? (
+                  <View style={{ backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 12, padding: 10 }}>
+                    <Text numberOfLines={3} style={{ color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '500' }}>
+                      {single.content}
+                    </Text>
                   </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.hubLevelTitle}>{step.label || `Bài ${index + 1}`}</Text>
-                    <Text numberOfLines={1} style={styles.hubLevelXp}>{step.title || step.videos?.[0]?.title || 'Lý thuyết & bài tập nhanh'}</Text>
+                ) : null}
+
+                {Boolean(single.fileUrl || single.videos?.[0]?.fileUrl) && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 }}>
+                    <FileText size={14} color="#FDE68A" />
+                    <Text numberOfLines={1} style={{ flex: 1, color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                      {single.fileName || single.videos?.[0]?.fileName || 'Tài liệu đính kèm'}
+                    </Text>
                   </View>
-                  {!locked ? (
-                    <Pressable onPress={() => onOpenLesson(step)} style={styles.hubLevelBtn} accessibilityRole="button">
-                      <Text style={styles.hubLevelBtnText}>{done ? 'XEM LẠI' : 'HỌC'}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
+                )}
+
+                {Boolean(single.videos?.[0]?.url) && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }}>
+                    <PlayCircle size={14} color="#FECACA" />
+                    <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' }}>
+                      Video bài giảng {single.videos?.[0]?.checks?.length ? `(${single.videos[0].checks.length} câu hỏi)` : ''}
+                    </Text>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => onOpenLesson(single)}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 12,
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    marginTop: 4,
+                  }}
+                  accessibilityRole="button"
+                >
+                  <BookOpen size={16} color="#0F172A" />
+                  <Text style={{ color: '#0F172A', fontSize: 14, fontWeight: '800' }}>
+                    {single.state === 'completed' ? 'XEM LẠI BÀI HỌC' : 'VÀO HỌC NGAY'}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              levels.map((step, index) => {
+                const locked = step.state === 'locked';
+                const done = step.state === 'completed';
+                return (
+                  <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
+                    <View style={[styles.hubLevelIcon, done && { backgroundColor: '#10B981' }]}>
+                      {done ? <Check size={16} strokeWidth={3} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <BookOpen size={16} color="#FFFFFF" />}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.hubLevelTitle}>{step.title && step.title !== node.label ? step.title : (step.label || `Bài ${index + 1}`)}</Text>
+                      <Text numberOfLines={1} style={styles.hubLevelXp}>
+                        {done ? 'Đã học' : [step.content && 'Lý thuyết', (step.fileUrl || step.fileName) && 'File', step.videos?.[0]?.url && 'Video'].filter(Boolean).join(' · ') || 'Sẵn sàng'}
+                      </Text>
+                    </View>
+                    {!locked ? (
+                      <Pressable onPress={() => onOpenLesson(step)} style={styles.hubLevelBtn} accessibilityRole="button">
+                        <Text style={styles.hubLevelBtnText}>{done ? 'XEM LẠI' : 'HỌC'}</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
           </Animated.View>
         </Pressable>
       </Pressable>
@@ -1529,6 +1585,32 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                 </Text>
               </View>
             )}
+
+            {/* File tài liệu đính kèm */}
+            {Boolean(step.fileUrl || stepVideo?.fileUrl) ? (
+              <View style={styles.lessonFileCard}>
+                <View style={styles.lessonFileIconWrap}>
+                  <FileText size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.lessonFileSubtitle}>TÀI LIỆU ĐÍNH KÈM</Text>
+                  <Text numberOfLines={1} style={styles.lessonFileName}>
+                    {step.fileName || stepVideo?.fileName || 'Tài liệu bài học'}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    const raw = step.fileUrl || stepVideo?.fileUrl || '';
+                    const full = resolveMobilePublicUrl(raw);
+                    if (full) Linking.openURL(full);
+                  }}
+                  style={styles.lessonFileBtn}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.lessonFileBtnText}>Mở file</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {stepVideo?.url && playable ? (
               <View style={styles.lessonVideoFrameWrap}>
@@ -4577,6 +4659,47 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2',
   },
   lessonVideoCalloutTitle: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  lessonFileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  lessonFileIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lessonFileSubtitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  lessonFileName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginTop: 1,
+  },
+  lessonFileBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#D97706',
+  },
+  lessonFileBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   lessonBodyBox: { gap: 8, padding: 14, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
   lessonBodyText: { color: '#334155', fontSize: 14, lineHeight: 21 },
   lessonCheckCard: { padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },

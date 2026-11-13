@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Award, BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, Sparkles, Star, Trophy, X,
+  Award, BookOpen, Check, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Loader2, Lock, Paperclip, Play, PlayCircle, Route, Sparkles, Star, Trophy, X,
 } from 'lucide-react';
 import {
   pickActivePathTopic as pickActivePathTopicShared,
@@ -267,26 +267,87 @@ function PathHubPopoverPortal({ anchorRef, anchorKey = '', children }) {
   );
 }
 
-/** Popover nút Học bài - Bài 1, Bài 2… (nội dung / video). */
-function StudyHubPopover({ node, color, onClose, onOpenLesson }) {
+/** Popover nút Học bài - Bài 1, Bài 2… (nội dung / file / video / luyện tập). */
+function StudyHubPopover({ node, unit, color, onClose, onOpenLesson, onStartPractice }) {
   const lessons = node.levels || [];
+  const single = lessons.length === 1 ? lessons[0] : null;
+
   return (
-    <div className="dp-pop relative w-full rounded-2xl p-3 text-left text-white shadow-xl sm:p-3.5" style={{ background: `linear-gradient(160deg, ${color.from}, ${color.to})` }}>
+    <div className="dp-pop relative w-full rounded-2xl p-3.5 text-left text-white shadow-2xl sm:p-4" style={{ background: `linear-gradient(160deg, ${color.from}, ${color.to})` }}>
       <span data-pop-arrow className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color.from }} />
-      <button type="button" onClick={onClose} aria-label="Đóng" className="absolute right-1.5 top-1.5 rounded-full p-1 text-white/80 hover:bg-white/15 !shadow-none"><X size={14} /></button>
-      <p className="pr-6 text-base font-black leading-tight sm:text-[17px]">{node.label}</p>
-      <p className="mt-0.5 text-[10px] font-semibold leading-snug text-white/85 sm:text-[11px]">Học lần lượt. Xong bài trước mới mở bài sau</p>
+      <button type="button" onClick={onClose} aria-label="Đóng" className="absolute right-2 top-2 rounded-full p-1 text-white/80 hover:bg-white/15 !shadow-none"><X size={15} /></button>
+
+      <div className="flex items-center gap-2 pr-6">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/20">
+          <BookOpen size={15} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-black leading-tight sm:text-[17px]">{node.label}</p>
+          <p className="text-[10px] font-semibold text-white/85">Bài học chặng</p>
+        </div>
+      </div>
+
       {!lessons.length ? (
-        <p className="mt-2 rounded-xl border border-white/20 bg-black/10 px-2.5 py-2 text-[11px] font-semibold text-white/90">
+        <p className="mt-2.5 rounded-xl border border-white/20 bg-black/10 px-2.5 py-2 text-[11px] font-semibold text-white/90">
           Chặng này chưa gắn bài học. Bạn có thể sang nút Luyện tập.
         </p>
+      ) : single ? (
+        <div className="mt-2.5 space-y-2">
+          {single.content ? (
+            <p className="line-clamp-3 rounded-xl bg-black/20 p-2.5 text-xs font-medium leading-relaxed text-white/95">
+              {single.content}
+            </p>
+          ) : null}
+
+          <div className="space-y-1">
+            {Boolean(single.fileUrl || single.videos?.[0]?.fileUrl) && (
+              <div className="flex items-center gap-1.5 rounded-lg bg-white/20 px-2.5 py-1.5 text-xs font-bold text-white">
+                <Paperclip size={13} className="shrink-0 text-amber-300" />
+                <span className="truncate">{single.fileName || single.videos?.[0]?.fileName || 'Tài liệu đính kèm'}</span>
+              </div>
+            )}
+            {Boolean(single.videos?.[0]?.url) && (
+              <div className="flex items-center gap-1.5 px-1 text-[11px] font-bold text-white/90">
+                <PlayCircle size={13} className="shrink-0 text-red-200" />
+                <span>Video bài giảng{single.videos?.[0]?.checks?.length ? ` (${single.videos[0].checks.length} câu hỏi video)` : ''}</span>
+              </div>
+            )}
+            {unit?.counts?.total > 0 && (
+              <div className="flex items-center gap-1.5 px-1 text-[11px] font-bold text-white/85">
+                <Gamepad2 size={13} className="shrink-0 text-emerald-200" />
+                <span>{unit.counts.easy} câu Dễ · {unit.counts.medium} Vừa · {unit.counts.hard} Khó</span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => onOpenLesson(single)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-black uppercase text-slate-900 shadow-md hover:bg-slate-50 !shadow-none"
+            >
+              <BookOpen size={14} /> {single.state === 'completed' ? 'Xem lại bài học' : 'Vào học ngay'}
+            </button>
+            {unit?.counts?.total > 0 && onStartPractice && (
+              <button
+                type="button"
+                onClick={() => onStartPractice()}
+                className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-black/20 py-1.5 text-[11px] font-black uppercase text-white hover:bg-black/30 !shadow-none"
+              >
+                <Gamepad2 size={13} /> Luyện tập ({unit.counts.total} câu)
+              </button>
+            )}
+          </div>
+        </div>
       ) : (
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-2.5 space-y-1.5">
           {lessons.map((lesson, index) => {
             const locked = lesson.state === 'locked';
             const done = lesson.state === 'completed';
             const hasVideo = Boolean(lesson.videos?.[0]?.url);
+            const hasFile = Boolean(lesson.fileUrl || lesson.videos?.[0]?.fileUrl);
             const hasContent = Boolean(lesson.content || lesson.videos?.[0]?.content);
+            const displayTitle = lesson.title && lesson.title !== node.label ? lesson.title : (lesson.label || `Bài ${index + 1}`);
             return (
               <li key={lesson.key} className={`rounded-xl border px-2.5 py-2 ${locked ? 'border-white/10 bg-black/10 opacity-60' : 'border-white/25 bg-white/10'}`}>
                 <div className="flex items-center gap-2">
@@ -294,10 +355,13 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }) {
                     {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-black sm:text-[13px]">{lesson.label}{lesson.title ? ` · ${lesson.title}` : ''}</p>
-                    <p className="text-[10px] text-white/80">
-                      {done ? 'Đã học' : locked ? 'Chưa mở' : [hasContent && 'Nội dung', hasVideo && 'Video'].filter(Boolean).join(' · ') || 'Sẵn sàng'}
-                    </p>
+                    <p className="truncate text-xs font-black sm:text-[13px]">{displayTitle}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-white/80">
+                      {done ? <span className="font-bold text-emerald-200">Đã học</span> : null}
+                      {hasContent ? <span>Lý thuyết</span> : null}
+                      {hasFile ? <span className="flex items-center gap-0.5 text-amber-200"><Paperclip size={10} /> File</span> : null}
+                      {hasVideo ? <span className="flex items-center gap-0.5 text-red-200"><PlayCircle size={10} /> Video</span> : null}
+                    </div>
                   </div>
                   {!locked && (
                     <button
@@ -1175,6 +1239,7 @@ export default function PathView({
           {(openHub.node.kind === 'study' || openHub.node.icon === 'book') ? (
             <StudyHubPopover
               node={openHub.node}
+              unit={openHub.unit}
               color={openHub.tone}
               onClose={closePopover}
               onOpenLesson={(lesson) => {
@@ -1182,6 +1247,12 @@ export default function PathView({
                 const next = { unit: openHub.unit, lesson, color: openHub.tone };
                 if (takeWelcomeBackTurn()) setWelcomeLesson(next);
                 else setLessonOpen(next);
+              }}
+              onStartPractice={() => {
+                const targetNode = openHub.unit.pathNodes?.find((n) => n.kind !== 'study' && n.icon !== 'book');
+                const nodeKey = targetNode?.key || 'practice';
+                setPopover(null);
+                onStartStep(openHub.unit.id, nodeKey, 'learn', false);
               }}
             />
           ) : (
@@ -1243,12 +1314,19 @@ export default function PathView({
       {lessonOpen && (
         <PathLessonModal
           lesson={lessonOpen.lesson}
+          unit={lessonOpen.unit}
           unitId={lessonOpen.unit.id}
           color={lessonOpen.color}
           onClose={closeLesson}
           onComplete={async (videoId) => {
             await dailyPracticeApi.student.videoWatched(lessonOpen.unit.id, videoId);
             onPathChanged?.();
+          }}
+          onStartPractice={() => {
+            const targetNode = lessonOpen.unit.pathNodes?.find((n) => n.kind !== 'study' && n.icon !== 'book');
+            const nodeKey = targetNode?.key || 'practice';
+            closeLesson();
+            onStartStep(lessonOpen.unit.id, nodeKey, 'learn', false);
           }}
         />
       )}

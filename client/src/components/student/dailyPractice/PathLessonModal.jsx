@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BookOpen, CheckCircle2, Loader2, Play, X } from 'lucide-react';
+import {
+  BookOpen, CheckCircle2, Download, ExternalLink, FileText, Gamepad2, Loader2, Paperclip, Play, X,
+} from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
-import { resolveMediaUrl } from '../../../services/api';
+import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
@@ -97,7 +99,7 @@ function CheckCard({
 
 /** Popup một bài học: nội dung chữ to + video chống tua, dừng để trả lời mốc. */
 export default function PathLessonModal({
-  lesson, unitId, color, onClose, onComplete,
+  lesson, unit, unitId, color, onClose, onComplete, onStartPractice,
 }) {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(lesson?.state === 'completed');
@@ -124,6 +126,8 @@ export default function PathLessonModal({
   const maxSeenRef = useRef(0);
   const video = lesson?.videos?.[0] || null;
   const content = String(lesson?.content || video?.content || '').trim();
+  const fileUrl = String(lesson?.fileUrl || video?.fileUrl || '').trim();
+  const fileName = String(lesson?.fileName || video?.fileName || '').trim() || 'Tài liệu bài học';
   const url = String(video?.url || '').trim();
   const title = lesson?.title || video?.title || lesson?.label || 'Bài học';
   const body = useMemo(() => content.split(/\n+/).filter(Boolean), [content]);
@@ -306,10 +310,11 @@ export default function PathLessonModal({
   };
 
   const markDone = async () => {
-    if (!video?.id || saving || done || pending.length || (url && !watchedEnough && !vimeo)) return;
+    if (saving || done || pending.length || (url && !watchedEnough && !vimeo)) return;
+    const targetId = video?.id || (lesson?.key ? `${lesson.key}:learn` : 'lesson');
     setSaving(true);
     try {
-      await onComplete?.(video.id);
+      await onComplete?.(targetId);
       setDone(true);
       gameSounds.tap();
     } finally {
@@ -317,7 +322,7 @@ export default function PathLessonModal({
     }
   };
 
-  const canFinish = Boolean(video?.id) && !done && pending.length === 0 && (!url || watchedEnough || vimeo);
+  const canFinish = !done && pending.length === 0 && (!url || watchedEnough || vimeo);
 
   return createPortal(
     <div className="fixed inset-0 z-[9600] flex items-center justify-center bg-slate-950/55 p-3 sm:p-6" role="presentation" onClick={onClose}>
@@ -341,77 +346,149 @@ export default function PathLessonModal({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
           {body.length > 0 && (
             <div className="space-y-3 rounded-2xl bg-slate-50 p-4 text-base leading-relaxed text-slate-800 ring-1 ring-slate-100 sm:p-5 sm:text-lg sm:leading-8">
+              <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500">
+                <BookOpen size={14} className="text-sky-600" /> Nội dung lý thuyết
+              </p>
               {body.map((para, index) => (
                 <p key={index}>{para}</p>
               ))}
             </div>
           )}
+
+          {fileUrl && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 sm:p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
+                  <FileText size={22} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-amber-800">
+                    <Paperclip size={12} /> Tài liệu đính kèm
+                  </p>
+                  <p className="truncate text-sm font-black text-slate-900">{fileName}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <a
+                  href={resolveMediaUrl(fileUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-black text-amber-900 shadow-sm hover:bg-amber-100/60"
+                >
+                  <ExternalLink size={14} /> Xem file
+                </a>
+                <a
+                  href={buildMediaDownloadUrl(fileUrl, fileName)}
+                  download={fileName}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-black text-white shadow-sm hover:bg-amber-700"
+                >
+                  <Download size={14} /> Tải về
+                </a>
+              </div>
+            </div>
+          )}
+
           {url ? (
-            <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-[#23262E]">
-              {yt ? (
-                <StudentVideoPlayer
-                  videoId={url}
-                  lessonId={`dp-lesson-${video?.id || 'video'}`}
-                  courseId="daily-practice"
-                  antiSeekEnabled={!done}
-                  lessonCompleted={done}
-                  requiredRatio={WATCH_REQUIRED_RATIO}
-                  onEligibilityReached={() => setWatchedEnough(true)}
-                  playerApiRef={playerApiRef}
-                  appearance="window"
+            <div className="space-y-2">
+              <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500">
+                <Play size={13} className="text-red-600" fill="currentColor" /> Video bài giảng
+                {checks.length > 0 && <span className="font-semibold text-slate-400">({checks.length} mốc kiểm tra)</span>}
+              </p>
+              <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-[#23262E]">
+                {yt ? (
+                  <StudentVideoPlayer
+                    videoId={url}
+                    lessonId={`dp-lesson-${video?.id || 'video'}`}
+                    courseId="daily-practice"
+                    antiSeekEnabled={!done}
+                    lessonCompleted={done}
+                    requiredRatio={WATCH_REQUIRED_RATIO}
+                    onEligibilityReached={() => setWatchedEnough(true)}
+                    playerApiRef={playerApiRef}
+                    appearance="window"
+                  />
+                ) : null}
+                {!yt && vimeo && !started && (
+                  <button type="button" onClick={() => setStarted(true)} aria-label="Phát video" className="flex h-full w-full items-center justify-center !shadow-none">
+                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-red-600"><Play size={36} className="ml-1 text-white" fill="white" /></span>
+                  </button>
+                )}
+                {!yt && vimeo && started && (
+                  <iframe src={`https://player.vimeo.com/video/${vimeo}?autoplay=1`} title="Video bài học" className="h-full w-full border-0" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+                )}
+                {!yt && !vimeo && isDirectVideo(url) && (
+                  <video
+                    src={resolveMediaUrl(url) || url}
+                    className="h-full w-full bg-black object-contain"
+                    controls
+                    controlsList="nodownload noplaybackrate"
+                    playsInline
+                    onTimeUpdate={(e) => {
+                      const el = e.currentTarget;
+                      onTick(el.currentTime, el);
+                      if (el.duration > 0 && el.currentTime / el.duration >= WATCH_REQUIRED_RATIO) setWatchedEnough(true);
+                    }}
+                    onSeeking={(e) => {
+                      const el = e.currentTarget;
+                      const cap = gateRef.current ? Number(gateRef.current.atSec) || 0 : maxSeenRef.current;
+                      if (el.currentTime > cap + 0.8) el.currentTime = cap;
+                    }}
+                  />
+                )}
+                {cheer && gate && <AnswerCheer onDone={() => finishCheck(gate.id)} />}
+                <CheckCard
+                  gate={cheer ? null : gate}
+                  picked={picked}
+                  setPicked={setPicked}
+                  answerText={answerText}
+                  setAnswerText={setAnswerText}
+                  checkHint={checkHint}
+                  paidHint={paidHint}
+                  checkError={checkError}
+                  checkBusy={checkBusy}
+                  missed={missed}
+                  uploadPct={uploadPct}
+                  grading={grading}
+                  hintStep={hintStep}
+                  onHintNext={() => finishCheck(gate.id)}
+                  onSubmit={submitCheck}
+                  onFile={sendScreenshot}
+                  onHint={buyHint}
+                  onQuit={onClose}
                 />
-              ) : null}
-              {!yt && vimeo && !started && (
-                <button type="button" onClick={() => setStarted(true)} aria-label="Phát video" className="flex h-full w-full items-center justify-center !shadow-none">
-                  <span className="flex h-20 w-20 items-center justify-center rounded-full bg-red-600"><Play size={36} className="ml-1 text-white" fill="white" /></span>
-                </button>
-              )}
-              {!yt && vimeo && started && (
-                <iframe src={`https://player.vimeo.com/video/${vimeo}?autoplay=1`} title="Video bài học" className="h-full w-full border-0" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
-              )}
-              {!yt && !vimeo && isDirectVideo(url) && (
-                <video
-                  src={resolveMediaUrl(url) || url}
-                  className="h-full w-full bg-black object-contain"
-                  controls
-                  controlsList="nodownload noplaybackrate"
-                  playsInline
-                  onTimeUpdate={(e) => {
-                    const el = e.currentTarget;
-                    onTick(el.currentTime, el);
-                    if (el.duration > 0 && el.currentTime / el.duration >= WATCH_REQUIRED_RATIO) setWatchedEnough(true);
-                  }}
-                  onSeeking={(e) => {
-                    const el = e.currentTarget;
-                    const cap = gateRef.current ? Number(gateRef.current.atSec) || 0 : maxSeenRef.current;
-                    if (el.currentTime > cap + 0.8) el.currentTime = cap;
-                  }}
-                />
-              )}
-              {cheer && gate && <AnswerCheer onDone={() => finishCheck(gate.id)} />}
-              <CheckCard
-                gate={cheer ? null : gate}
-                picked={picked}
-                setPicked={setPicked}
-                answerText={answerText}
-                setAnswerText={setAnswerText}
-                checkHint={checkHint}
-                paidHint={paidHint}
-                checkError={checkError}
-                checkBusy={checkBusy}
-                missed={missed}
-                uploadPct={uploadPct}
-                grading={grading}
-                hintStep={hintStep}
-                onHintNext={() => finishCheck(gate.id)}
-                onSubmit={submitCheck}
-                onFile={sendScreenshot}
-                onHint={buyHint}
-                onQuit={onClose}
-              />
+              </div>
             </div>
           ) : null}
-          {!body.length && !url && (
+
+          {unit?.counts?.total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5 sm:p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                  <Gamepad2 size={20} />
+                </span>
+                <div>
+                  <p className="text-xs font-black text-emerald-950">Luyện tập trắc nghiệm chặng này</p>
+                  <p className="text-[11px] font-semibold text-emerald-700">
+                    {unit.counts.easy} câu Dễ · {unit.counts.medium} câu Vừa · {unit.counts.hard} câu Khó ({unit.counts.total} câu)
+                  </p>
+                </div>
+              </div>
+              {onStartPractice && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onStartPractice();
+                  }}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-700 !shadow-none"
+                >
+                  Luyện tập ngay
+                </button>
+              )}
+            </div>
+          )}
+
+          {!body.length && !fileUrl && !url && (
             <p className="text-base font-semibold text-slate-500">Bài này chưa có nội dung.</p>
           )}
           {url && pending.length > 0 && (
