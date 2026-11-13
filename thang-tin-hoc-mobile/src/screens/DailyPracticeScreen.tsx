@@ -14,9 +14,9 @@ import Svg, { Circle as SvgCircle, Defs, Ellipse, LinearGradient, Path, Stop } f
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList } from '../navigation/types';
-import { AppScreen } from '../components/ui';
+import { AppScreen, ChromeScrollView } from '../components/ui';
 import { Mascot, type MascotMood } from '../components/dailyPractice/Mascot';
-import { DropletMark, PathITBackdrop, PathMascotBuddy, PathSnakeConnector, StageBuddiesOverlay } from '../components/dailyPractice/PathDecor';
+import { DropletMark, PathITBackdrop } from '../components/dailyPractice/PathDecor';
 import { DragProvider } from '../components/dailyPractice/DragKit';
 import { PracticeFinishOverlay } from '../components/dailyPractice/PracticeFinishOverlay';
 import { MobileComboCelebrationOverlay } from '../components/dailyPractice/MobileComboCelebrationOverlay';
@@ -47,7 +47,8 @@ import {
   resolveSavedPathTopicId,
   syncLastPathTopicFromServer,
 } from '../utils/lastPathTopic';
-import { pathTopicNextLinePrefix, pathTopicPrimaryCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
+import { unitStageCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
+import { VietnamJourneyStage } from '../components/dailyPractice/VietnamJourneyStage';
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
@@ -389,6 +390,76 @@ function DailyPracticeGoalPanel({
   );
 }
 
+/** Hàng môn — cố định trên tab Lộ trình / Luyện tự do. */
+function PracticeSubjectStrip({
+  pathTopics,
+  freeTopics,
+  activeId,
+  onSelect,
+  play,
+}: {
+  pathTopics: DpTopicPath[];
+  freeTopics: DpTopic[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  play: (s: GameSound) => void;
+}) {
+  const usePathList = pathTopics.length > 0;
+  if (!usePathList && !freeTopics.length) return null;
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.chipScroller}
+      contentContainerStyle={styles.chipRow}
+    >
+      {usePathList
+        ? pathTopics.map((item) => {
+          const Icon = TOPIC_ICONS[item.topic.icon] || BookOpen;
+          const tone = DP_TOPIC_COLORS[item.topic.color] || DP_TOPIC_COLORS.red;
+          const active = item.topic.id === activeId;
+          return (
+            <Pressable
+              key={item.topic.id}
+              onPress={() => { play('tap'); onSelect(item.topic.id); }}
+              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
+              <View>
+                <Text style={styles.chipName}>{item.topic.name}</Text>
+                <Text style={styles.chipMeta}>{`${item.completedUnits}/${item.totalUnits} chặng`}</Text>
+              </View>
+            </Pressable>
+          );
+        })
+        : freeTopics.map((topic) => {
+          const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
+          const tone = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
+          const active = topic.id === activeId;
+          const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
+          return (
+            <Pressable
+              key={topic.id}
+              onPress={() => { play('tap'); onSelect(topic.id); }}
+              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
+              <View>
+                <Text style={styles.chipName}>{topic.name}</Text>
+                <Text style={styles.chipMeta}>{`${total} câu hỏi`}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+    </ScrollView>
+  );
+}
+
 function HomeView({
   topics, stats, loading, error, starting, onStart, play, initialTopicId = '',
   mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onQuickStart, onPathChanged, onBuyXp,
@@ -526,6 +597,18 @@ function HomeView({
         </View>
       ) : null}
 
+      <View style={styles.practicePanel}>
+      <PracticeSubjectStrip
+        pathTopics={pathTopics}
+        freeTopics={topics}
+        activeId={mode === 'path' ? (selectedPathTopicId || topicId || pathActiveTopicId) : (topicId || selectedPathTopicId)}
+        onSelect={(id) => {
+          setTopicId(id);
+          setSelectedPathTopicId(id);
+        }}
+        play={play}
+      />
+
       {/* Segmented Mode Tabs: Lộ trình | Luyện tự do | Mục tiêu */}
       <View style={styles.modeTabs} accessibilityRole="tablist">
         {MODES.map(({ id, label, icon: Icon }) => {
@@ -544,6 +627,7 @@ function HomeView({
           );
         })}
       </View>
+      </View>
 
       {/* Nội dung chính tương ứng từng Tab */}
       <View style={isWide ? { flexDirection: 'row', alignItems: 'flex-start', gap: 20 } : undefined}>
@@ -551,7 +635,7 @@ function HomeView({
           {mode === 'path' ? (
             <PathView
               topics={pathTopics}
-              activeTopicId={pathActiveTopicId}
+              activeTopicId={selectedPathTopicId || pathActiveTopicId}
               loading={pathLoading}
               error={pathError}
               starting={starting}
@@ -577,34 +661,6 @@ function HomeView({
 
           {mode === 'free' && topics.length ? (
             <View style={[styles.card, { gap: 14 }]}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipRow}
-              >
-                {topics.map((topic) => {
-                  const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
-                  const tone = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
-                  const active = topic.id === topicId;
-                  const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
-                  return (
-                    <Pressable
-                      key={topic.id}
-                      onPress={() => { play('tap'); setTopicId(topic.id); }}
-                      style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
-                      <View>
-                        <Text style={styles.chipName}>{topic.name}</Text>
-                        <Text style={styles.chipMeta}>{`${total} câu hỏi`}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-
               <View style={styles.freeModeNotice}>
                 <Text style={styles.freeModeNoticeBold}>Chế độ luyện tự do - Ôn tập không tính XP: </Text>
                 <Text style={styles.freeModeNoticeText}>
@@ -612,7 +668,7 @@ function HomeView({
                 </Text>
               </View>
 
-              <Text style={styles.sectionTitle}>2. Độ khó (chỉ trắc nghiệm · 0 XP)</Text>
+              <Text style={styles.sectionTitle}>Độ khó (chỉ trắc nghiệm · 0 XP)</Text>
               <View style={styles.row}>
                 {DP_DIFFICULTIES.map((level) => {
                   const active = level.id === difficulty;
@@ -747,10 +803,7 @@ function buildUnitPathItems(unit: DpPathUnit) {
 }
 const NODE_ICONS: Record<string, LucideIcon> = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
 const STEP_ICONS: Record<DpStepKey, LucideIcon> = { learn: BookOpen, practice: Dumbbell, challenge: Flame, checkpoint: Trophy };
-/** Nút lộ trình uốn lượn kiểu Duolingo. */
-const NODE_OFFSETS = [0, 58, 0, -58];
-const NODE_CONNECTOR_STEP = 22;
-const NODE_LANE_WIDTH = 320;
+const NODE_LANE_WIDTH = 420;
 type PopoverState = { unitId: string; nodeKey?: string; stepKey?: DpStepKey; testOut: boolean };
 
 /** Màu tối hơn cho "đế" nút 3D. */
@@ -979,40 +1032,47 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }: {
     Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [pop]);
   return (
-    <Animated.View style={[styles.popover, styles.hubPopover, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
-      <View style={[styles.popoverArrow, { backgroundColor: color.from }]} />
-      <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng"><X size={16} color="rgba(255,255,255,0.85)" /></Pressable>
-      <Text style={styles.popoverTitle}>{node.label}</Text>
-      <Text style={styles.popoverMeta}>Làm lần lượt 3 nấc - xong nấc trước mới mở nấc sau</Text>
-      {(node.levels || []).map((step, index) => {
-        const locked = step.state === 'locked';
-        const done = step.state === 'completed';
-        const Icon = STEP_ICONS[step.key];
-        return (
-          <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
-            <View style={styles.hubLevelIcon}>
-              {done ? <Check size={16} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <Icon size={16} color="#FFFFFF" />}
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.hubLevelTitle}>{`Nấc ${index + 1} · ${STEP_LABELS[step.key] || step.label}`}</Text>
-              <Text style={styles.hubLevelXp}>
-                {done ? 'Đã xong · Ôn lại (0 XP)' : `Cần đúng ${step.passPercent}% · 5 XP/câu (tối đa 50 XP)`}
-              </Text>
-            </View>
-            {!locked ? (
-              <Pressable
-                onPress={() => onStartStep(step.key, { review: done })}
-                disabled={starting}
-                style={styles.hubLevelBtn}
-                accessibilityRole="button"
-              >
-                <Text style={styles.hubLevelBtnText}>{starting ? '…' : done ? 'Ôn lại' : 'Làm'}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        );
-      })}
-    </Animated.View>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.quitBackdrop} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360 }}>
+          <Animated.View style={[styles.hubModalCard, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }] }]}>
+            <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng">
+              <X size={18} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+            <Text style={styles.popoverTitle}>{node.label}</Text>
+            <Text style={styles.popoverMeta}>Làm lần lượt 3 nấc - xong nấc trước mới mở nấc sau</Text>
+            {(node.levels || []).map((step, index) => {
+              const locked = step.state === 'locked';
+              const done = step.state === 'completed';
+              const Icon = STEP_ICONS[step.key];
+              return (
+                <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
+                  <View style={styles.hubLevelIcon}>
+                    {done ? <Check size={16} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <Icon size={16} color="#FFFFFF" />}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.hubLevelTitle}>{`Nấc ${index + 1} · ${STEP_LABELS[step.key] || step.label}`}</Text>
+                    <Text style={styles.hubLevelXp}>
+                      {done ? 'Đã xong · Ôn lại (0 XP)' : `Cần đúng ${step.passPercent}% · 5 XP/câu (tối đa 50 XP)`}
+                    </Text>
+                  </View>
+                  {!locked ? (
+                    <Pressable
+                      onPress={() => onStartStep(step.key, { review: done })}
+                      disabled={starting}
+                      style={styles.hubLevelBtn}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.hubLevelBtnText}>{starting ? '…' : done ? 'Ôn lại' : 'Làm'}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+          </Animated.View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -1028,32 +1088,39 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }: {
     Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [pop]);
   return (
-    <Animated.View style={[styles.popover, styles.hubPopover, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
-      <View style={[styles.popoverArrow, { backgroundColor: color.from }]} />
-      <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng"><X size={16} color="rgba(255,255,255,0.85)" /></Pressable>
-      <Text style={styles.popoverTitle}>{`${node.label} · Nội dung chặng`}</Text>
-      <Text style={styles.popoverMeta}>Đọc lý thuyết, xem video & trả lời câu kiểm tra nhanh</Text>
-      {(node.levels || []).map((step, index) => {
-        const locked = step.state === 'locked';
-        const done = step.state === 'completed';
-        return (
-          <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
-            <View style={[styles.hubLevelIcon, done && { backgroundColor: '#10B981' }]}>
-              {done ? <Check size={16} strokeWidth={3} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <BookOpen size={16} color="#FFFFFF" />}
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.hubLevelTitle}>{step.label || `Bài ${index + 1}`}</Text>
-              <Text numberOfLines={1} style={styles.hubLevelXp}>{step.title || step.videos?.[0]?.title || 'Lý thuyết & bài tập nhanh'}</Text>
-            </View>
-            {!locked ? (
-              <Pressable onPress={() => onOpenLesson(step)} style={styles.hubLevelBtn} accessibilityRole="button">
-                <Text style={styles.hubLevelBtnText}>{done ? 'XEM LẠI' : 'HỌC'}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        );
-      })}
-    </Animated.View>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.quitBackdrop} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360 }}>
+          <Animated.View style={[styles.hubModalCard, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }] }]}>
+            <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng">
+              <X size={18} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+            <Text style={styles.popoverTitle}>{`${node.label} · Nội dung chặng`}</Text>
+            <Text style={styles.popoverMeta}>Đọc lý thuyết, xem video & trả lời câu kiểm tra nhanh</Text>
+            {(node.levels || []).map((step, index) => {
+              const locked = step.state === 'locked';
+              const done = step.state === 'completed';
+              return (
+                <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
+                  <View style={[styles.hubLevelIcon, done && { backgroundColor: '#10B981' }]}>
+                    {done ? <Check size={16} strokeWidth={3} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <BookOpen size={16} color="#FFFFFF" />}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.hubLevelTitle}>{step.label || `Bài ${index + 1}`}</Text>
+                    <Text numberOfLines={1} style={styles.hubLevelXp}>{step.title || step.videos?.[0]?.title || 'Lý thuyết & bài tập nhanh'}</Text>
+                  </View>
+                  {!locked ? (
+                    <Pressable onPress={() => onOpenLesson(step)} style={styles.hubLevelBtn} accessibilityRole="button">
+                      <Text style={styles.hubLevelBtnText}>{done ? 'XEM LẠI' : 'HỌC'}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+          </Animated.View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -1707,6 +1774,131 @@ function CourseTrophyCeremonyModal({ current, play, onClose }: {
   );
 }
 
+const PATH_NODE_ICONS: Record<string, LucideIcon> = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
+const PATH_LEVEL_LABELS: Record<string, string> = { learn: 'Dễ', practice: 'Vừa', challenge: 'Khó' };
+
+function pathNodeStatusLabel(state: DpNodeState) {
+  if (state === 'locked') return { text: 'Đang khóa', bg: '#F1F5F9', color: '#475569' };
+  if (state === 'completed') return { text: 'Đã xong', bg: '#D1FAE5', color: '#065F46' };
+  return { text: 'Đang mở', bg: '#FEF3C7', color: '#92400E' };
+}
+
+/** Tổng quan mốc trong chặng — từ đầu đến cuối, mở / khóa. */
+function UnitStageRoadmapModal({
+  unit,
+  tone,
+  play,
+  onClose,
+  onPickNode,
+  onOpenVideo,
+}: {
+  unit: DpPathUnit;
+  tone: { from: string; to: string };
+  play: (key: string) => void;
+  onClose: () => void;
+  onPickNode: (nodeKey: string) => void;
+  onOpenVideo?: () => void;
+}) {
+  const nodes = useMemo(
+    () => [...(unit.pathNodes || [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [unit.pathNodes],
+  );
+  const openCount = nodes.filter((n) => n.state !== 'locked').length;
+  const hasVideo = Boolean(unit.lesson) || collectUnitVideos(unit).length > 0;
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.roadmapBackdrop} onPress={onClose}>
+        <Pressable style={styles.roadmapSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={[styles.roadmapHeader, gradient(tone.from, tone.to)]}>
+            <View style={styles.roadmapHeaderIcon}>
+              <Route size={22} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.roadmapEyebrow}>{`Chặng ${unit.index} · Lộ trình trong chặng`}</Text>
+              <Text style={styles.roadmapTitle}>{unit.title}</Text>
+              <Text style={styles.roadmapSub}>{`${openCount}/${nodes.length} mốc đã mở`}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.roadmapClose} accessibilityRole="button" accessibilityLabel="Đóng">
+              <X size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          <ScrollView style={styles.roadmapScroll} contentContainerStyle={styles.roadmapScrollInner}>
+            {nodes.map((node, index) => {
+              const locked = node.state === 'locked';
+              const done = node.state === 'completed';
+              const active = node.state === 'active';
+              const Icon = PATH_NODE_ICONS[node.icon] || Dumbbell;
+              const badge = pathNodeStatusLabel(node.state);
+              const levels = node.levels || [];
+              const doneLv = levels.filter((l) => l.state === 'completed').length;
+              const levelLine = levels.length
+                ? `${doneLv}/${levels.length} cấp (${levels.map((l) => PATH_LEVEL_LABELS[l.key] || l.label).join(' · ')})`
+                : '';
+              const row = (
+                <>
+                  <View style={styles.roadmapNodeCol}>
+                    <View
+                      style={[
+                        styles.roadmapNodeBadge,
+                        locked && styles.roadmapNodeLocked,
+                        done && styles.roadmapNodeDone,
+                        active && styles.roadmapNodeActive,
+                      ]}
+                    >
+                      {locked ? <Lock size={18} color="#94A3B8" /> : done ? <Check size={20} color="#FFFFFF" strokeWidth={3} /> : <Icon size={18} color={active ? '#B45309' : '#047857'} />}
+                    </View>
+                    <Text style={styles.roadmapNodeIndex}>{index + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1, paddingTop: 2 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.roadmapNodeTitle}>{node.label}</Text>
+                      <View style={[styles.roadmapStatusPill, { backgroundColor: badge.bg }]}>
+                        <Text style={[styles.roadmapStatusText, { color: badge.color }]}>{badge.text}</Text>
+                      </View>
+                    </View>
+                    {levelLine ? <Text style={styles.roadmapLevelLine}>{levelLine}</Text> : null}
+                    {locked ? (
+                      <Text style={styles.roadmapHint}>Hoàn thành mốc trước để mở khóa</Text>
+                    ) : (
+                      <View style={styles.roadmapGoRow}>
+                        <Play size={12} color="#047857" fill="#047857" />
+                        <Text style={styles.roadmapGoText}>Vào mốc này</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              );
+              return locked ? (
+                <View key={node.key} style={styles.roadmapRow}>{row}</View>
+              ) : (
+                <Pressable
+                  key={node.key}
+                  style={styles.roadmapRow}
+                  onPress={() => { play('tap'); onPickNode(node.key); }}
+                  accessibilityRole="button"
+                >
+                  {row}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          {hasVideo && onOpenVideo ? (
+            <Pressable
+              onPress={() => { play('tap'); onOpenVideo(); }}
+              style={styles.roadmapVideoBtn}
+              accessibilityRole="button"
+            >
+              <VideoIcon size={18} color="#334155" />
+              <Text style={styles.roadmapVideoBtnText}>Video & hướng dẫn chặng</Text>
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 /** Header chặng kiểu Duolingo đồng bộ Web UnitStageHeader. */
 function UnitStageHeader({
   unit,
@@ -1716,8 +1908,9 @@ function UnitStageHeader({
   doneSteps,
   totalSteps,
   progress,
-  onOpenVideo,
+  onOpenRoadmap,
   onToggleTestOut,
+  onStageAction,
   isStarted = false,
 }: {
   unit: DpPathUnit;
@@ -1727,11 +1920,12 @@ function UnitStageHeader({
   doneSteps: number;
   totalSteps: number;
   progress: number;
-  onOpenVideo: () => void;
+  onOpenRoadmap: () => void;
   onToggleTestOut: () => void;
+  onStageAction?: () => void;
   isStarted?: boolean;
 }) {
-  const hasGuide = Boolean(unit.lesson) || collectUnitVideos(unit).length > 0;
+  const hasRoadmap = (unit.pathNodes || []).length > 0;
   const done = unit.state === 'completed';
   const activeAndStarted = !locked && (doneSteps > 0 || Boolean(isStarted));
   const isColored = done || activeAndStarted;
@@ -1742,6 +1936,8 @@ function UnitStageHeader({
       : locked
         ? 'Chưa mở'
         : 'Chưa bắt đầu';
+
+  const ctaLabel = unitStageCtaLabel(unit, { isNextUnit });
 
   return (
     <View style={styles.unitHeaderOuter}>
@@ -1769,20 +1965,27 @@ function UnitStageHeader({
           </View>
         </View>
         <View style={styles.unitHeaderRight}>
-          {hasGuide ? (
+          {ctaLabel && onStageAction ? (
             <Pressable
-              onPress={onOpenVideo}
-              style={styles.unitHeaderGuideBtn}
+              onPress={onStageAction}
+              style={styles.unitHeaderCtaBtn}
               accessibilityRole="button"
-              accessibilityLabel="Video & hướng dẫn chặng"
+              accessibilityLabel={ctaLabel}
             >
-              <BookOpen size={20} color="#FFFFFF" />
+              <Play size={14} color="#047857" fill="#047857" />
+              <Text style={styles.unitHeaderCtaText}>{ctaLabel}</Text>
             </Pressable>
-          ) : (
-            <View style={[styles.unitHeaderGuideBtn, { opacity: 0.7 }]}>
-              {locked ? <Lock size={18} color="#FFFFFF" /> : <BookOpen size={18} color="#FFFFFF" />}
-            </View>
-          )}
+          ) : null}
+          {hasRoadmap ? (
+            <Pressable
+              onPress={onOpenRoadmap}
+              style={[styles.unitHeaderGuideBtn, styles.unitHeaderGuideBtnLit]}
+              accessibilityRole="button"
+              accessibilityLabel="Lộ trình mốc trong chặng"
+            >
+              <BookOpen size={20} color="#047857" strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
       {locked && unit.canTestOut ? (
@@ -1813,26 +2016,33 @@ function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }:
     Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [pop]);
   return (
-    <Animated.View style={[styles.popover, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
-      <View style={[styles.popoverArrow, { backgroundColor: color.from }]} />
-      <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng"><X size={16} color="rgba(255,255,255,0.85)" /></Pressable>
-      <Text style={styles.popoverTitle}>{testOut ? 'Kiểm tra vượt chặng' : step.label}</Text>
-      <Text style={styles.popoverMeta}>
-        {testOut ? `Chặng ${unit.index} · Đạt ${step.passPercent}% để vượt chặng` : `Bước ${order}/${unit.steps.length} · Cần đúng ${step.passPercent}%`}
-      </Text>
-      <Text style={styles.popoverHint}>{testOut ? 'Hoàn thành chặng này và mọi chặng trước đó nếu đạt yêu cầu.' : STEP_HINTS[step.key]}</Text>
-      <Pressable
-        onPress={onStart}
-        disabled={starting}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.popoverButton, { transform: [{ translateY: pressed ? 3 : 0 }], boxShadow: `0px ${pressed ? 1 : 4}px 0px rgba(15,23,42,0.18)` } as never]}
-      >
-        {starting ? <ActivityIndicator color={color.to} /> : <Play size={16} color={color.to} />}
-        <Text style={[styles.popoverButtonText, { color: color.to }]}>
-          {`${step.state === 'completed' && !testOut ? 'LUYỆN LẠI' : 'BẮT ĐẦU'} +${maxXpFor(step)} XP`}
-        </Text>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.quitBackdrop} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360 }}>
+          <Animated.View style={[styles.hubModalCard, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }] }]}>
+            <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng">
+              <X size={18} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+            <Text style={styles.popoverTitle}>{testOut ? 'Kiểm tra vượt chặng' : step.label}</Text>
+            <Text style={styles.popoverMeta}>
+              {testOut ? `Chặng ${unit.index} · Đạt ${step.passPercent}% để vượt chặng` : `Bước ${order}/${unit.steps.length} · Cần đúng ${step.passPercent}%`}
+            </Text>
+            <Text style={styles.popoverHint}>{testOut ? 'Hoàn thành chặng này và mọi chặng trước đó nếu đạt yêu cầu.' : STEP_HINTS[step.key]}</Text>
+            <Pressable
+              onPress={onStart}
+              disabled={starting}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.popoverButton, { transform: [{ translateY: pressed ? 3 : 0 }], boxShadow: `0px ${pressed ? 1 : 4}px 0px rgba(15,23,42,0.18)` } as never]}
+            >
+              {starting ? <ActivityIndicator color={color.to} /> : <Play size={16} color={color.to} />}
+              <Text style={[styles.popoverButtonText, { color: color.to }]}>
+                {`${step.state === 'completed' && !testOut ? 'LUYỆN LẠI' : 'BẮT ĐẦU'} +${maxXpFor(step)} XP`}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
       </Pressable>
-    </Animated.View>
+    </Modal>
   );
 }
 
@@ -1869,6 +2079,7 @@ function PathView({
   const [topicId, setTopicId] = useState('');
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const [videoOpen, setVideoOpen] = useState<{ unit: DpPathUnit; videoId: string } | null>(null);
+  const [roadmapOpen, setRoadmapOpen] = useState<DpPathUnit | null>(null);
   const [lessonOpen, setLessonOpen] = useState<{ unit: DpPathUnit; step: DpPathStep } | null>(null);
   const [trophyCeremonyOpen, setTrophyCeremonyOpen] = useState(false);
   const targetAppliedRef = useRef(false);
@@ -1908,6 +2119,13 @@ function PathView({
   }, [activeTopicId, user?.id, user?._id]);
 
   useEffect(() => {
+    if (!activeTopicId || activeTopicId === topicId) return;
+    if (!topics.some((item) => item.topic.id === activeTopicId)) return;
+    setTopicId(activeTopicId);
+    setPopover(null);
+  }, [activeTopicId, topicId, topics]);
+
+  useEffect(() => {
     if (!topicId) return;
     onTopicChange?.(topicId);
     const userKey = String(user?.id || user?._id || '').trim();
@@ -1944,78 +2162,38 @@ function PathView({
     play('tap');
     setPopover((prev) => (prev && prev.unitId === unit.id && !prev.testOut && prev.nodeKey === nodeKey ? null : { unitId: unit.id, nodeKey, testOut: false }));
   };
-  const nextUnit = current?.next ? current.units.find((unit) => unit.id === current.next?.unitId) : undefined;
-  const percent = current?.totalUnits ? Math.round((current.completedUnits / current.totalUnits) * 100) : 0;
+  const openUnitStageAction = (unit: DpPathUnit, isNextUnit: boolean) => {
+    play('tap');
+    let nodeKey = 'study';
+    if (unit.state === 'completed') {
+      nodeKey = unit.pathNodes?.[0]?.key || 'study';
+    } else if (isNextUnit && current?.next?.unitId === unit.id && current.next.nodeKey) {
+      nodeKey = current.next.nodeKey;
+    } else {
+      const active = unit.pathNodes?.find((n) => n.state === 'active');
+      nodeKey = active?.key || unit.pathNodes?.[0]?.key || 'study';
+    }
+    setPopover({ unitId: unit.id, nodeKey, testOut: false });
+  };
   const watch = (lesson: { subjectId: string; unitId: string }) => navigation.navigate('MainTabs', {
     screen: 'CourseVideos',
     params: { resumeKey: Date.now(), resumeSubjectId: lesson.subjectId, resumeCourseId: '', resumeUnitId: lesson.unitId, resumeSectionId: '' },
   });
 
+  const activePopoverUnit = popover && !popover.testOut && current
+    ? current.units.find((u) => u.id === popover.unitId) || null
+    : null;
+  const activePopoverNode = activePopoverUnit
+    ? activePopoverUnit.pathNodes?.find((n) => n.key === popover.nodeKey) || null
+    : null;
+
   return (
     <View style={styles.gapMd}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        style={styles.chipScroller}
-        contentContainerStyle={styles.chipRow}
-      >
-        {topics.map((item) => {
-          const Icon = TOPIC_ICONS[item.topic.icon] || BookOpen;
-          const tone = DP_TOPIC_COLORS[item.topic.color] || DP_TOPIC_COLORS.red;
-          const active = item.topic.id === topicId;
-          return (
-            <Pressable
-              key={item.topic.id}
-              onPress={() => { play('tap'); setTopicId(item.topic.id); setPopover(null); }}
-              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
-              <View>
-                <Text style={styles.chipName}>{item.topic.name}</Text>
-                <Text style={styles.chipMeta}>{`${item.completedUnits}/${item.totalUnits} chặng`}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
 
       {current ? (
         <>
-          <View style={[styles.card, { borderColor: '#E2E8F0' }]}>
-            <View style={styles.pathSummaryTopRow}>
-              <View style={styles.flex}>
-                <View style={styles.inline}>
-                  <DropletMark size={12} fill={color.to} />
-                  <Text style={[styles.pathEyebrow, { color: color.to }]}>{`LỘ TRÌNH ${current.topic.name.toUpperCase()}`}</Text>
-                </View>
-                <View style={[styles.inline, { marginTop: 6 }]}>
-                  <View style={styles.pathTrack}><View style={[styles.pathFill, gradient(color.from, color.to), { width: `${percent}%` }]} /></View>
-                  <Text style={styles.pathCount}>{`${current.completedUnits}/${current.totalUnits}`}</Text>
-                </View>
-                <Text style={[styles.muted, { marginTop: 6 }]}>
-                  {current.next
-                    ? `${pathTopicNextLinePrefix(current)}: Chặng ${nextUnit?.index} · ${current.next.unitTitle} - ${current.next.stepLabel}`
-                    : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
-                </Text>
-              </View>
-              {current.next && nextUnit ? (
-                <DuoButton
-                  variant={isBrandStudent ? 'danger' : 'primary'}
-                  size="md"
-                  icon={<Play size={16} color="#FFFFFF" />}
-                  text={pathTopicPrimaryCtaLabel(current)}
-                  onPress={() => { if (nextUnit && current.next) toggleHub(nextUnit, current.next.nodeKey || 'study'); }}
-                />
-              ) : null}
-            </View>
-          </View>
-
           <View style={styles.pathTimelineWrap}>
-            <PathITBackdrop accentSoft={color.soft} />
             {current.units.map((unit, unitIdx) => {
               const locked = unit.state === 'locked';
               const doneSteps = unit.steps.filter((step) => step.state === 'completed').length;
@@ -2028,11 +2206,24 @@ function PathView({
               const tone = unitColor(unit.index);
               const isLast = unitIdx === current.units.length - 1;
               const pathItems = buildUnitPathItems(unit);
+              const nextIdx = pathItems.findIndex((item) => (
+                current.next?.unitId === unit.id
+                && (current.next.nodeKey ? current.next.nodeKey === item.node?.key : item.node?.key === 'study')
+              ));
               const unitVideos = collectUnitVideos(unit);
               const preferredVideoId = unitVideos.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id || unitVideos[0]?.id || '';
               return (
                 <View key={unit.id} style={[styles.pathUnitRow, !isLast && styles.pathUnitRowBorder]}>
-                  <StageBuddiesOverlay unitIndex={unitIdx} unlocked={!locked} />
+                  <PathITBackdrop
+                    accentSoft={tone.soft}
+                    hideMap
+                    fullBleed
+                    topicCompletedUnits={current.completedUnits}
+                    topicTotalUnits={current.totalUnits}
+                    unitIndex={unitIdx}
+                    unitTotal={current.units.length}
+                    unitState={unit.state}
+                  />
                   <UnitStageHeader
                     unit={unit}
                     tone={tone}
@@ -2041,8 +2232,9 @@ function PathView({
                     doneSteps={doneSteps}
                     totalSteps={totalSteps}
                     progress={progress}
-                    onOpenVideo={() => { play('tap'); setPopover(null); setVideoOpen({ unit, videoId: preferredVideoId }); }}
+                    onOpenRoadmap={() => { play('tap'); setPopover(null); setRoadmapOpen(unit); }}
                     onToggleTestOut={() => toggleTestOut(unit)}
+                    onStageAction={() => openUnitStageAction(unit, isNextUnit)}
                   />
                   {testOutOpen && testOutStep ? (
                     <StepPopover
@@ -2056,25 +2248,25 @@ function PathView({
                     />
                   ) : null}
                   <View style={styles.nodeSnakeWrap}>
-                    <View style={[styles.nodeColumn, { width: NODE_LANE_WIDTH, maxWidth: '100%' }]}>
-                      {pathItems.map((item, index) => {
+                    <VietnamJourneyStage
+                      pathItems={pathItems}
+                      laneWidthPx={NODE_LANE_WIDTH}
+                      nextIdx={nextIdx}
+                      locked={locked}
+                      mapProps={{
+                        topicCompletedUnits: current.completedUnits,
+                        topicTotalUnits: current.totalUnits,
+                        unitIndex: unitIdx,
+                        unitTotal: current.units.length,
+                        unitState: unit.state,
+                      }}
+                      renderChest={() => (
+                        <UnitStageChest unit={unit} play={play} variant="chip" onClaimed={onPathChanged} />
+                      )}
+                      renderNode={(item, { hubNext }) => {
                         const hubSelected = item.kind === 'hub' && popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === item.node.key;
-                        const offset = NODE_OFFSETS[index % NODE_OFFSETS.length];
-                        const previous = index > 0 ? NODE_OFFSETS[(index - 1) % NODE_OFFSETS.length] : null;
-                        const hubNext = item.kind === 'hub' && Boolean(
-                          current.next?.unitId === unit.id
-                          && (current.next.nodeKey ? current.next.nodeKey === item.node.key : item.node.key === 'study'),
-                        );
-                        const linkActive = item.state !== 'locked';
-                        const mascotSide = offset >= 0 ? 'left' : 'right';
                         return (
-                          <View key={item.key} style={[styles.nodeSlot, { transform: [{ translateX: offset }] }]}>
-                            {hubNext ? (
-                              <PathMascotBuddy side={mascotSide} mood={locked ? 'thinking' : 'idle'} size={50} />
-                            ) : null}
-                            {previous !== null ? (
-                              <PathSnakeConnector fromX={previous} toX={offset} active={linkActive} color={tone} />
-                            ) : null}
+                          <View style={styles.nodeSlot}>
                             <PracticeHubNode
                               node={item.node}
                               color={tone}
@@ -2082,40 +2274,12 @@ function PathView({
                               selected={Boolean(hubSelected)}
                               onPress={() => toggleHub(unit, item.node.key)}
                             />
-                            {hubSelected ? (
-                              <View style={{ transform: [{ translateX: -offset }], width: '100%', maxWidth: 340 }}>
-                                {item.node.kind === 'study' || item.node.icon === 'book' ? (
-                                  <StudyHubPopover
-                                    node={item.node}
-                                    color={tone}
-                                    onClose={() => setPopover(null)}
-                                    onOpenLesson={(step) => {
-                                      play('tap');
-                                      setPopover(null);
-                                      setLessonOpen({ unit, step });
-                                    }}
-                                  />
-                                ) : (
-                                  <LevelHubPopover
-                                    node={item.node}
-                                    color={tone}
-                                    starting={starting}
-                                    onClose={() => setPopover(null)}
-                                    onStartStep={(stepKey, opts) => {
-                                      setPopover(null);
-                                      onStartStep(unit.id, item.node.key, stepKey, false, opts);
-                                    }}
-                                  />
-                                )}
-                              </View>
-                            ) : null}
                           </View>
                         );
-                      })}
-                    </View>
+                      }}
+                    />
                   </View>
 
-                  <UnitStageChest unit={unit} play={play} onClaimed={onPathChanged} />
                   {isLast ? (
                     <CourseFinaleCup
                       courseDone={!current.next && (current.totalUnits || 0) > 0 && (current.completedUnits || 0) >= (current.totalUnits || 0)}
@@ -2128,6 +2292,33 @@ function PathView({
           </View>
         </>
       ) : null
+      }
+      {
+        activePopoverUnit && activePopoverNode ? (
+          activePopoverNode.kind === 'study' || activePopoverNode.icon === 'book' ? (
+            <StudyHubPopover
+              node={activePopoverNode}
+              color={unitColor(activePopoverUnit.index)}
+              onClose={() => setPopover(null)}
+              onOpenLesson={(step) => {
+                play('tap');
+                setPopover(null);
+                setLessonOpen({ unit: activePopoverUnit, step });
+              }}
+            />
+          ) : (
+            <LevelHubPopover
+              node={activePopoverNode}
+              color={unitColor(activePopoverUnit.index)}
+              starting={starting}
+              onClose={() => setPopover(null)}
+              onStartStep={(stepKey, opts) => {
+                setPopover(null);
+                onStartStep(activePopoverUnit.id, activePopoverNode.key, stepKey, false, opts);
+              }}
+            />
+          )
+        ) : null
       }
       {
         trophyCeremonyOpen && current ? (
@@ -2148,6 +2339,28 @@ function PathView({
             onClose={() => setLessonOpen(null)}
             onCompleted={onPathChanged}
             onOpenVideo={(videoId) => setVideoOpen({ unit: lessonOpen.unit, videoId })}
+          />
+        ) : null
+      }
+      {
+        roadmapOpen ? (
+          <UnitStageRoadmapModal
+            unit={roadmapOpen}
+            tone={unitColor(roadmapOpen.index)}
+            play={play}
+            onClose={() => setRoadmapOpen(null)}
+            onPickNode={(nodeKey) => {
+              const unit = roadmapOpen;
+              setRoadmapOpen(null);
+              setPopover({ unitId: unit.id, nodeKey, testOut: false });
+            }}
+            onOpenVideo={() => {
+              const unit = roadmapOpen;
+              const unitVideos = collectUnitVideos(unit);
+              const preferredVideoId = unitVideos.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id || unitVideos[0]?.id || '';
+              setRoadmapOpen(null);
+              setVideoOpen({ unit, videoId: preferredVideoId });
+            }}
           />
         ) : null
       }
@@ -2616,6 +2829,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [error, setError] = useState('');
   const [combo, setCombo] = useState(0);
   const [comboCelebration, setComboCelebration] = useState<number | null>(null);
+  const [wrongTryCount, setWrongTryCount] = useState(0);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
   const total = session.questions.length;
@@ -2653,8 +2867,14 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     Animated.timing(progress, { toValue: (index + (result ? 1 : 0)) / total, duration: 400, useNativeDriver: false }).start();
   }, [index, progress, result, total]);
 
+  const retryQuestion = useCallback(() => {
+    setResult(null);
+    setPending(null);
+    setChosen(null);
+  }, []);
+
   const submit = useCallback(async (answer: DpAnswer | null) => {
-    if (!answer || busy || result) return;
+    if (!answer || busy || result?.correct) return;
     setBusy(true);
     setError('');
     setChosen('index' in answer ? answer.index : 'value' in answer ? answer.value : null);
@@ -2673,8 +2893,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         return nextCombo;
       });
       if (isCorrect) {
+        setWrongTryCount(0);
         comboPop.setValue(0.6);
         Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: USE_NATIVE_DRIVER }).start();
+      } else {
+        setWrongTryCount(typeof data.wrongTryCount === 'number' ? data.wrongTryCount : (wrongTryCount + 1));
       }
       play(isCorrect ? 'correct' : 'wrong');
     } catch (err) {
@@ -2682,10 +2905,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     } finally {
       setBusy(false);
     }
-  }, [busy, comboPop, play, question.id, result, session.id]);
+  }, [busy, comboPop, play, question.id, result, session.id, wrongTryCount]);
 
   const askHint = async () => {
-    if (reveal || result || busy) return;
+    if (reveal || result?.correct || busy) return;
     setBusy(true);
     try {
       const data = await dailyPracticeApi.hint(session.id, question.id);
@@ -2708,6 +2931,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       setResult(null);
       setReveal(null);
       setHintText('');
+      setWrongTryCount(0);
       return;
     }
     setBusy(true);
@@ -2864,6 +3088,8 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               busy={busy}
               play={play}
               onNext={() => { void next(); }}
+              onRetry={retryQuestion}
+              wrongTryCount={wrongTryCount}
             />
           )}
         </Animated.View>
@@ -3270,7 +3496,7 @@ export function DailyPracticeScreen() {
 
   return (
     <AppScreen scroll={false} hideBrandingTopBar={Boolean(session)}>
-      <ScrollView
+      <ChromeScrollView
         ref={scrollRef}
         scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={mode !== 'path'}
@@ -3318,7 +3544,7 @@ export function DailyPracticeScreen() {
             pathActiveTopicId={pathActiveTopicId}
           />
         )}
-      </ScrollView>
+      </ChromeScrollView>
       {summary && celebrating ? (
         <PracticeFinishOverlay
           visible
@@ -3609,11 +3835,30 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   modeTabText: { color: '#64748B', fontSize: 13, fontWeight: '700' },
   modeTabTextActive: { color: '#047857', fontWeight: '800' },
-  chipScroller: { flexGrow: 0, overflow: 'hidden' },
+  practicePanel: {
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 4,
+  },
+  chipScroller: { flexGrow: 0, minHeight: 58, marginHorizontal: -2 },
   chipRow: { gap: 8, paddingRight: spacing.sm, alignItems: 'center' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 16, borderWidth: 1.5 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    maxWidth: 220,
+  },
+  chipName: { color: colors.ink, fontSize: 14, fontWeight: '600', flexShrink: 1 },
   chipIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  chipName: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   chipMeta: { color: colors.muted, fontSize: 12, fontWeight: '400' },
   pathEyebrow: { fontSize: 12, fontWeight: '600' },
   pathTrack: { flex: 1, height: 12, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
@@ -3629,15 +3874,27 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   pathTimelineWrap: {
     position: 'relative',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 0,
+    borderWidth: 0,
     overflow: 'visible',
     marginBottom: spacing.sm,
+    marginHorizontal: -spacing.md,
+    width: undefined,
+    alignSelf: 'stretch',
   },
   pathSummaryCard: { position: 'relative', overflow: 'hidden', paddingRight: 56 },
   pathSummaryMascot: { position: 'absolute', right: 4, top: 8 },
-  pathUnitRow: { alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: spacing.md, gap: spacing.sm, zIndex: 2 },
+  pathUnitRow: {
+    position: 'relative',
+    alignItems: 'center',
+    minHeight: undefined,
+    paddingHorizontal: 0,
+    paddingVertical: spacing.sm,
+    gap: 6,
+    zIndex: 2,
+    overflow: 'visible',
+  },
   pathUnitRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   unitStageCenter: { alignItems: 'center', width: '100%', maxWidth: 360, gap: 6 },
   unitStageHeader: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
@@ -3691,7 +3948,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   nodeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, paddingVertical: 4, paddingRight: spacing.md },
   nodeRowItem: { flexDirection: 'row', alignItems: 'flex-end' },
   nodeRowDash: { width: 14, height: 3, borderRadius: 999, marginBottom: 28, marginHorizontal: 2 },
-  nodeSnakeWrap: { alignSelf: 'center', width: '100%', maxWidth: 440, paddingHorizontal: 36, position: 'relative', marginTop: 8 },
+  nodeSnakeWrap: { alignSelf: 'stretch', width: '100%', maxWidth: '100%', paddingHorizontal: 8, position: 'relative', marginTop: 8 },
   pathMascotSide: { position: 'absolute', top: 12, zIndex: 0, opacity: 0.95 },
   unitBanner: {
     width: '100%',
@@ -3759,7 +4016,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   unitBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   unitTestOut: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FFFFFF' },
   unitTestOutText: { color: '#334155', fontSize: 12, fontWeight: '600' },
-  nodeColumn: { alignItems: 'center', alignSelf: 'center', gap: 22, paddingVertical: spacing.xs, zIndex: 1 },
+  nodeColumn: { alignItems: 'center', alignSelf: 'center', gap: 0, paddingVertical: spacing.xs, zIndex: 1 },
   nodeSlot: { alignItems: 'center', gap: spacing.sm },
   connector: { position: 'absolute', top: -24, left: '50%', width: 0, height: 0 },
   connectorDot: { position: 'absolute', width: 8, height: 8, borderRadius: 4 },
@@ -3784,26 +4041,40 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   pathMascot: { position: 'absolute' },
   popover: { width: 270, padding: spacing.md, borderRadius: 18, gap: 2, marginTop: 6 },
   popoverArrow: { position: 'absolute', top: -7, left: 127, width: 16, height: 16, transform: [{ rotate: '45deg' }] },
-  popoverClose: { position: 'absolute', top: 6, right: 6, padding: 6, zIndex: 2 },
-  popoverTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  popoverMeta: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' },
+  popoverClose: { position: 'absolute', top: 12, right: 12, padding: 6, zIndex: 10 },
+  popoverTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+  popoverMeta: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '600', marginBottom: 2 },
   popoverHint: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2, fontWeight: '400' },
   popoverButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 10, borderRadius: 12, backgroundColor: '#FFFFFF',
   },
-  popoverButtonText: { fontSize: 14, fontWeight: '600' },
+  popoverButtonText: { fontSize: 14, fontWeight: '700' },
+  hubModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 24,
+    padding: spacing.lg,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
+  },
   hubPopover: { width: '100%', maxWidth: 340, alignSelf: 'center', gap: 8 },
   hubLevelRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, paddingHorizontal: 10, paddingVertical: 10, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  hubLevelRowLocked: { opacity: 0.6, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.1)' },
-  hubLevelIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  hubLevelTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  hubLevelRowLocked: { opacity: 0.6, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.12)' },
+  hubLevelIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
+  hubLevelTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   hubLevelHint: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 1, fontWeight: '400' },
-  hubLevelXp: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', marginTop: 2 },
-  hubLevelBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: '#FFFFFF' },
-  hubLevelBtnText: { color: '#1E293B', fontSize: 12, fontWeight: '600' },
+  hubLevelXp: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500', marginTop: 2 },
+  hubLevelBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: '#FFFFFF', minWidth: 64, alignItems: 'center', justifyContent: 'center' },
+  hubLevelBtnText: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
   comboChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#F97316' },
   comboText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   nodeBubble: {
@@ -4437,9 +4708,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   mascotMotivationCard: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 20,
     backgroundColor: '#FFFFFF',
@@ -4584,10 +4856,117 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   unitHeaderProgressFill: { height: '100%', borderRadius: 999, backgroundColor: '#FFFFFF' },
   unitHeaderProgressCount: { color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '600' },
   unitHeaderRight: {
-    width: 64, borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 92,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  unitHeaderGuideBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  unitHeaderCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+  },
+  unitHeaderCtaText: { color: '#047857', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  unitHeaderGuideBtn: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  unitHeaderGuideBtnLit: {
+    backgroundColor: '#FDE047',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.92)',
+    boxShadow: '0px 0px 14px rgba(254,240,138,0.95)',
+  },
+  roadmapBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
+  roadmapSheet: {
+    maxHeight: '92%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  roadmapHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  roadmapHeaderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  roadmapEyebrow: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.88)', textTransform: 'uppercase' },
+  roadmapTitle: { fontSize: 18, fontWeight: '900', color: '#FFFFFF', marginTop: 2 },
+  roadmapSub: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)', marginTop: 4 },
+  roadmapClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
+  roadmapScroll: { maxHeight: 420 },
+  roadmapScrollInner: { paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
+  roadmapRow: { flexDirection: 'row', gap: 12, paddingVertical: 4 },
+  roadmapNodeCol: { alignItems: 'center', width: 48 },
+  roadmapNodeBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roadmapNodeLocked: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' },
+  roadmapNodeDone: { backgroundColor: '#10B981', borderColor: '#34D399' },
+  roadmapNodeActive: { borderColor: '#FCD34D', backgroundColor: '#FFFBEB', boxShadow: '0px 0px 12px rgba(251,191,36,0.55)' },
+  roadmapNodeIndex: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '900',
+    backgroundColor: '#1E293B',
+    color: '#FFFFFF',
+    overflow: 'hidden',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  roadmapNodeTitle: { fontSize: 15, fontWeight: '900', color: '#0F172A', flexShrink: 1 },
+  roadmapStatusPill: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  roadmapStatusText: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase' },
+  roadmapLevelLine: { fontSize: 11, fontWeight: '600', color: '#64748B', marginTop: 2 },
+  roadmapHint: { fontSize: 11, fontWeight: '600', color: '#94A3B8', marginTop: 4 },
+  roadmapGoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  roadmapGoText: { fontSize: 11, fontWeight: '800', color: '#047857' },
+  roadmapVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+  },
+  roadmapVideoBtnText: { fontSize: 14, fontWeight: '800', color: '#334155' },
   missionRowCard: {
     flexDirection: 'row',
     alignItems: 'center',
