@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, BookOpen, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, Zap,
 } from 'lucide-react';
-import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../../services/dailyPracticeApi';
+import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { LEARNING_GOAL_CHANGED_EVENT, lessonResumeUrl } from '../../../utils/learningGoal';
 import {
@@ -19,6 +19,11 @@ import AnswerFeedback from './AnswerFeedback';
 import { SoundToggleButton } from './GameButton';
 import { AnimatedXpCounter } from './XPRewardAnimation';
 import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
+import {
+  RETRY_BASELINE_EMPTY,
+  canSubmitRetryAfterWrong,
+  serializePracticeAnswer,
+} from '../../../../../shared/dailyPractice/practiceAnswerCompare.mjs';
 import { reviewItemFollowUpLine } from '../../../../../shared/dailyPractice/reviewDisplay.mjs';
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import PracticeFinishOverlay from './PracticeFinishOverlay';
@@ -392,7 +397,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const [comboCelebration, setComboCelebration] = useState(null);
   const [wrongTryCount, setWrongTryCount] = useState(0);
   const [answerResetKey, setAnswerResetKey] = useState(0);
+  const [retryBaselineKey, setRetryBaselineKey] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
+  const [hintChargedXp, setHintChargedXp] = useState(0);
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
@@ -419,7 +426,24 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
 
   useEffect(() => {
     setExplainOpen(false);
+    setHintChargedXp(0);
   }, [question.id, answerResetKey]);
+
+  useEffect(() => {
+    setRetryBaselineKey('');
+  }, [question.id]);
+
+  useEffect(() => {
+    if (!result || result.correct) {
+      setRetryBaselineKey('');
+      return;
+    }
+    if (pending == null || question.type !== 'order') return;
+    setRetryBaselineKey((prev) => {
+      if (prev === RETRY_BASELINE_EMPTY || prev === '') return serializePracticeAnswer(pending);
+      return prev;
+    });
+  }, [result, pending, question.type]);
 
   const resetInteractiveAnswer = useCallback(() => {
     setPending(null);
@@ -452,7 +476,11 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         setCombo(0);
         setFeedbackTitle(randomComfort());
         gameSounds.wrong();
-        if (question.type !== 'mcq' && question.type !== 'truefalse') {
+        if (question.type === 'mcq' || question.type === 'truefalse') {
+          setChosen(null);
+          setPending(null);
+        } else {
+          setRetryBaselineKey(RETRY_BASELINE_EMPTY);
           resetInteractiveAnswer();
         }
       }
@@ -474,7 +502,16 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     try {
       const data = await dailyPracticeApi.student.hint(session.id, question.id);
       gameSounds.hint();
-      if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
+      const charged = Math.max(0, Number(data.charged) || 0);
+      if (typeof data.profileXp === 'number') {
+        setProfileXp(data.profileXp);
+        emitDailyPracticeStats({
+          xpTotal: data.profileXp,
+          ...(typeof data.purchasedXp === 'number' ? { purchasedXp: data.purchasedXp } : {}),
+          ...(typeof data.dailyXp === 'number' ? { dailyXp: data.dailyXp } : {}),
+        });
+      }
+      if (charged > 0) setHintChargedXp(charged);
       setReveal(data.reveal || {});
       setHintText(data.hint || '');
     } catch (err) {
@@ -576,6 +613,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             ) : (isPerQuestion ? (
               <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">{perQuestionStake} XP/câu</span>
             ) : null)}
+            {hintChargedXp > 0 ? (
+              <span className="dp-xp-hint-spend" aria-live="polite">−{hintChargedXp} XP</span>
+            ) : null}
           </span>
           <SoundToggleButton compact />
         </div>
@@ -623,10 +663,15 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         )}
 
         {hintText ? (
-          <p className="dp-play-hint-reveal">
-            <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className="mt-0.5 shrink-0 text-slate-500" />
-            <span>{hintText}</span>
-          </p>
+          <div className="mt-5 space-y-1.5">
+            <p className="dp-play-hint-reveal !mt-0">
+              <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className="mt-0.5 shrink-0 text-slate-500" />
+              <span>{hintText}</span>
+            </p>
+            {hintChargedXp > 0 ? (
+              <p className="dp-play-hint-charge">Đã trừ <strong>−{hintChargedXp} XP</strong> từ ví của bạn.</p>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="mt-6" key={`${question.id}-${answerResetKey}`}>
@@ -649,8 +694,25 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             isLastQuestion={index + 1 >= total}
             busy={busy}
             onNext={next}
-            onRetry={() => submit(pending)}
-            canRetry={Boolean(pending) && !busy}
+            onRetry={() => {
+              if (immediate) {
+                setResult(null);
+                setChosen(null);
+                setPending(null);
+                return;
+              }
+              submit(pending);
+            }}
+            canRetry={Boolean(
+              result
+              && !result.correct
+              && !busy
+              && (immediate || canSubmitRetryAfterWrong({
+                pending,
+                retryBaselineKey,
+                questionType: question.type,
+              })),
+            )}
             wrongTryCount={wrongTryCount}
             explainOpen={explainOpen}
             onExplainOpenChange={setExplainOpen}

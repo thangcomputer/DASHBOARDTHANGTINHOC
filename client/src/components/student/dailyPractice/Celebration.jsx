@@ -41,7 +41,7 @@ function StageShell({ children, button, onNext }) {
   );
 }
 
-function DoneStage({ summary, onNext, onReviewResults, onClose }) {
+function DoneStage({ summary, onNext, onReviewResults, onClose, onReplay }) {
   const isPerfect = Boolean(
     summary &&
     (summary.total || 0) >= 2 &&
@@ -58,16 +58,15 @@ function DoneStage({ summary, onNext, onReviewResults, onClose }) {
 
   return (
     <div
-      className="dp-practice-finish-scrim"
+      className="flex min-h-full items-center justify-center px-3 py-6"
       data-celebration-headline={headline}
-      role="dialog"
-      aria-modal="true"
     >
       <AchievementPopup
         summary={summary}
         eventKey={summary?.sessionId || summary?.id || ''}
         onContinue={onNext}
         onReviewResults={onReviewResults || onNext}
+        onReplay={onReplay}
         onClose={onClose || onNext}
       />
     </div>
@@ -193,7 +192,7 @@ function CourseTrophyStage({ summary, onNext }) {
  * Chuỗi màn ăn mừng sau lượt chơi (kiểu Duolingo):
  * Đã luyện tập xong → Cúp hoàn thành chặng/khóa học (nếu có) → chuỗi ngày (khi tăng) → nhiệm vụ hằng ngày (lượt đầu trong ngày) → kết quả chi tiết.
  */
-export default function Celebration({ summary, onDone, onClose, onReviewResults }) {
+export default function Celebration({ summary, onDone, onClose, onReviewResults, onReplay }) {
   const hasTrophyStage = Boolean(summary.path?.passed && (summary.path?.topicCompleted || summary.path?.unitCompleted || summary.path?.testOut));
   const stages = useMemo(() => [
     'done',
@@ -216,6 +215,7 @@ export default function Celebration({ summary, onDone, onClose, onReviewResults 
           onNext={next}
           onReviewResults={onReviewResults || onDone}
           onClose={onClose || onDone}
+          onReplay={onReplay}
         />
       )}
       {stage === 'trophy' && <CourseTrophyStage summary={summary} onNext={next} />}

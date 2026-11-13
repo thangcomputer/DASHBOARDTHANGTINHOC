@@ -25,6 +25,11 @@ import {
 } from '../../../shared/dailyPractice/pathHubProgressRing.mjs';
 import { PATH_HUB_DUO } from '../../../shared/dailyPractice/pathHubDuoVisual.mjs';
 import { pathNodeColor } from '../../../shared/dailyPractice/pathNodeColors.mjs';
+import {
+  RETRY_BASELINE_EMPTY,
+  canSubmitRetryAfterWrong,
+  serializePracticeAnswer,
+} from '../../../shared/dailyPractice/practiceAnswerCompare.mjs';
 import { DragProvider } from '../components/dailyPractice/DragKit';
 import { PracticeFinishOverlay } from '../components/dailyPractice/PracticeFinishOverlay';
 import { MobileComboCelebrationOverlay } from '../components/dailyPractice/MobileComboCelebrationOverlay';
@@ -59,6 +64,8 @@ import { unitStageCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.m
 import { shouldNudgeHintButton } from '../../../shared/dailyPractice/quizWrongEncouragement.mjs';
 import { PLAY_QUESTION_CHROME } from '../../../shared/dailyPractice/playQuestionChrome.mjs';
 import { VietnamJourneyStage } from '../components/dailyPractice/VietnamJourneyStage';
+import { LevelUnlockBanner } from '../components/dailyPractice/LevelUnlockBanner';
+import { useNewlyUnlockedUnit } from '../components/dailyPractice/useNewlyUnlockedUnit';
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
@@ -2192,6 +2199,11 @@ function PathView({
   }, [error]);
 
   const current = topics.find((item) => item.topic.id === topicId) || null;
+  const newlyUnlockedUnitId = useNewlyUnlockedUnit(current?.units || []);
+  const newlyUnlockedUnit = useMemo(
+    () => (newlyUnlockedUnitId ? current?.units?.find((u) => u.id === newlyUnlockedUnitId) || null : null),
+    [current, newlyUnlockedUnitId],
+  );
   const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const color = DP_TOPIC_COLORS[current?.topic.color || 'red'] || DP_TOPIC_COLORS.red;
 
@@ -2248,6 +2260,7 @@ function PathView({
 
       {current ? (
         <>
+          {newlyUnlockedUnit ? <LevelUnlockBanner unit={newlyUnlockedUnit} /> : null}
           <View style={styles.pathTimelineWrap}>
             {current.units.map((unit, unitIdx) => {
               const locked = unit.state === 'locked';
@@ -2877,6 +2890,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [result, setResult] = useState<DpAnswerResult | null>(null);
   const [reveal, setReveal] = useState<DpReveal | null>(null);
   const [hintText, setHintText] = useState('');
+  const [hintChargedXp, setHintChargedXp] = useState(0);
   const [busy, setBusy] = useState(false);
   const [xp, setXp] = useState(0);
   const [profileXp, setProfileXp] = useState<number | null>(() => (
@@ -2888,6 +2902,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [comboCelebration, setComboCelebration] = useState<number | null>(null);
   const [wrongTryCount, setWrongTryCount] = useState(0);
   const [answerResetKey, setAnswerResetKey] = useState(0);
+  const [retryBaselineKey, setRetryBaselineKey] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
@@ -2896,12 +2911,41 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const level = DP_DIFFICULTIES.find((d) => d.id === question.difficulty) || DP_DIFFICULTIES[0];
   useEffect(() => {
     setExplainOpen(false);
+    setHintChargedXp(0);
   }, [question.id, answerResetKey]);
+
+  useEffect(() => {
+    setRetryBaselineKey('');
+  }, [question.id]);
+
+  useEffect(() => {
+    if (!result || result.correct) {
+      setRetryBaselineKey('');
+      return;
+    }
+    if (pending == null || question.type !== 'order') return;
+    setRetryBaselineKey((prev) => {
+      if (prev === RETRY_BASELINE_EMPTY || prev === '') return serializePracticeAnswer(pending);
+      return prev;
+    });
+  }, [result, pending, question.type]);
+
   const stakeXp = Number(session.stakeXp) || 0;
   const isTestOutStake = Boolean(session.path?.testOut && stakeXp > 0);
-  const isPerQuestionStake = Boolean(session.path && !session.path.testOut && stakeXp > 0);
+  const isPerQuestionStake = Boolean(
+    !session.xpDisabled
+    && !session.review
+    && !session.recovery
+    && session.path
+    && !session.path.testOut,
+  );
   const walletXp = profileXp !== null ? inPlayWalletXp(profileXp, isTestOutStake ? stakeXp : 0) : null;
-  const hintCostXp = 2;
+  const perQuestionStakeXp = session.perQuestionStakeXp || QUESTION_STAKE_XP;
+  const hintCostXp = session.xpDisabled
+    ? 0
+    : (isPerQuestionStake
+      ? Math.floor(perQuestionStakeXp / 2)
+      : (stakeXp > 0 && total > 0 ? Math.floor(stakeXp / (2 * total)) : 0));
   const shakeX = useShake(result && !result.correct ? `${index}-wrong` : null);
   const progress = useRef(new Animated.Value(0)).current;
 
@@ -2959,7 +3003,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: USE_NATIVE_DRIVER }).start();
       } else {
         setWrongTryCount(typeof data.wrongTryCount === 'number' ? data.wrongTryCount : (wrongTryCount + 1));
-        if (question.type !== 'mcq' && question.type !== 'truefalse') {
+        if (question.type === 'mcq' || question.type === 'truefalse') {
+          setChosen(null);
+          setPending(null);
+        } else {
+          setRetryBaselineKey(RETRY_BASELINE_EMPTY);
           resetInteractiveAnswer();
         }
       }
@@ -2977,9 +3025,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     try {
       const data = await dailyPracticeApi.hint(session.id, question.id);
       play('hint');
+      const charged = Math.max(0, Number((data as { charged?: number }).charged) || 0);
       setReveal(data.reveal || {});
       setHintText(data.hint || '');
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
+      if (charged > 0) setHintChargedXp(charged);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lấy được gợi ý');
     } finally {
@@ -3066,7 +3116,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <Zap size={14} color="#F59E0B" fill="#FBBF24" />
               <View style={{ alignItems: 'center' }}>
                 <Text style={styles.xpText}>{walletXp}</Text>
-                {isPerQuestionStake ? <Text style={styles.xpSubText}>{`${QUESTION_STAKE_XP}/câu`}</Text> : null}
+                {isPerQuestionStake ? <Text style={styles.xpSubText}>{`${perQuestionStakeXp}/câu`}</Text> : null}
+                {hintChargedXp > 0 ? (
+                  <Text style={styles.xpHintSpend} accessibilityLiveRegion="polite">{`−${hintChargedXp} XP`}</Text>
+                ) : null}
               </View>
             </View>
           ) : (
@@ -3109,9 +3162,14 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
           </View>
           {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image} resizeMode="contain" /> : null}
           {hintText ? (
-            <View style={styles.hintBox}>
-              <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
-              <Text style={styles.hintText}>{hintText}</Text>
+            <View style={styles.hintRevealWrap}>
+              <View style={styles.hintBox}>
+                <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
+                <Text style={styles.hintText}>{hintText}</Text>
+              </View>
+              {hintChargedXp > 0 ? (
+                <Text style={styles.hintChargeLine}>{`Đã trừ −${hintChargedXp} XP từ ví của bạn.`}</Text>
+              ) : null}
             </View>
           ) : null}
           <View key={`${question.id}-${answerResetKey}`} style={styles.answerArea}>
@@ -3129,12 +3187,30 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               question={question}
               result={result}
               confirmedXp={confirmedQuestionXp}
+              rewardKey={`${session.id}:${question.id}`}
               feedbackTitle={title}
               busy={busy}
               play={play}
               onNext={() => { void next(); }}
-              onRetry={() => { void submit(pending); }}
-              canRetry={Boolean(pending) && !busy}
+              onRetry={() => {
+                if (immediate) {
+                  setResult(null);
+                  setChosen(null);
+                  setPending(null);
+                  return;
+                }
+                void submit(pending);
+              }}
+              canRetry={Boolean(
+                result
+                && !result.correct
+                && !busy
+                && (immediate || canSubmitRetryAfterWrong({
+                  pending,
+                  retryBaselineKey,
+                  questionType: question.type,
+                })),
+              )}
               wrongTryCount={wrongTryCount}
               explainOpen={explainOpen}
               onExplainOpenChange={setExplainOpen}
@@ -3792,6 +3868,9 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     fontWeight: PLAY_QUESTION_CHROME.hintRevealBox.fontWeight,
     lineHeight: 20,
   },
+  hintRevealWrap: { marginTop: 12, gap: 6 },
+  hintChargeLine: { color: '#B45309', fontSize: 12, fontWeight: '600', paddingHorizontal: 4 },
+  xpHintSpend: { color: '#DC2626', fontSize: 10, fontWeight: '800', marginTop: 2 },
   answerArea: { marginTop: 2, width: '100%' },
   feedback: {
     padding: spacing.lg,

@@ -753,26 +753,31 @@ async function useHint(studentId, sessionId, { questionId } = {}) {
   if ((session.answers || []).some((a) => String(a.questionId) === String(question._id) && a.correct)) {
     throw httpError(409, 'Câu này đã được trả lời đúng');
   }
-  const perQuestionHint = rules.usesPerQuestionStake(session);
+  const qid = question._id;
+  const xpOff = rules.isPracticeXpDisabled(session);
+  const perQuestionHint = !xpOff && rules.usesPerQuestionStake(session);
+  const alreadyHinted = (session.hintsUsed || []).some((id) => String(id) === String(qid));
   let chargedXp = 0;
-  if (perQuestionHint) {
+  if (perQuestionHint && !alreadyHinted) {
     const before = await getProfile(session.studentId);
     const cost = rules.hintCostXp();
-    const alreadyHinted = (session.hintsUsed || []).some((id) => String(id) === String(question._id));
-    if (!alreadyHinted && rules.clampXp(before?.xpTotal) < cost) {
+    if (rules.clampXp(before?.xpTotal) < cost) {
       const err = httpError(402, `Cần ${cost} XP để mở gợi ý. Bạn chưa đủ XP.`);
       err.currentXp = rules.clampXp(before?.xpTotal);
       err.needXp = cost;
       throw err;
     }
   }
-  const marked = await DailyPracticeSession.updateOne(
-    { _id: session._id, hintsUsed: { $ne: question._id } },
-    { $addToSet: { hintsUsed: question._id } },
-  );
-  if (perQuestionHint && marked.modifiedCount > 0) {
-    chargedXp = rules.hintCostXp();
-    await adjustProfileXp(session.studentId, -chargedXp, { source: 'spend' });
+  if (!alreadyHinted) {
+    const marked = await DailyPracticeSession.findOneAndUpdate(
+      { _id: session._id, status: 'in_progress', hintsUsed: { $ne: qid } },
+      { $addToSet: { hintsUsed: qid } },
+      { new: true },
+    );
+    if (perQuestionHint && marked) {
+      chargedXp = rules.hintCostXp();
+      await adjustProfileXp(session.studentId, -chargedXp, { source: 'spend' });
+    }
   }
   const profileAfter = await getProfile(session.studentId);
   const total = session.questionIds?.length || rules.SESSION_SIZE;
@@ -785,11 +790,12 @@ async function useHint(studentId, sessionId, { questionId } = {}) {
     ...rules.hintReveal(question),
     hintCostXp,
     charged: chargedXp,
+    xpDelta: chargedXp > 0 ? -chargedXp : 0,
     profileXp: rules.clampXp(profileAfter?.xpTotal),
     purchasedXp: rules.clampXp(profileAfter?.purchasedXp),
     dailyXp: rules.clampXp(profileAfter?.dailyXp),
     stakeXp,
-    xpDisabled: session.mode === 'free',
+    xpDisabled: xpOff,
   };
 }
 

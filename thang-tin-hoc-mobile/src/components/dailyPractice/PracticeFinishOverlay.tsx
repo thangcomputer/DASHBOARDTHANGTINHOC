@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AchievementPopup } from './AchievementPopup';
+import { Celebration } from './Celebration';
 import { PracticeReviewModal } from './PracticeReviewModal';
 import type { GameSound } from './useGameSounds';
 import type { DpSummary } from '../../services/dailyPracticeApi';
@@ -36,14 +36,13 @@ export function PracticeFinishOverlay({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <AchievementPopup
+            <Celebration
               summary={summary}
               play={play}
-              onContinue={onContinue}
+              onDone={onContinue}
+              onClose={onDismiss}
               onReviewResults={() => setReviewOpen(true)}
               onReplay={onReplay}
-              onDismiss={onDismiss}
-              onRelatedVideo={onRelatedVideo}
             />
           </ScrollView>
         </View>

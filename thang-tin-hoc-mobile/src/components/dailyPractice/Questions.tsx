@@ -117,7 +117,7 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
             style={twoColumns ? styles.optionHalf : styles.optionFull}
           >
             <Pressable
-              disabled={Boolean(result) || out}
+              disabled={Boolean(result?.correct) || out}
               onPress={() => {
                 play('tap');
                 onSubmit({ index });
@@ -187,13 +187,13 @@ export function TrueFalseQuestion({ result, chosen, onSubmit, play }: {
         return (
           <Pressable
             key={String(value)}
-            disabled={Boolean(result)}
+            disabled={Boolean(result?.correct)}
             onPress={() => { play('tap'); onSubmit({ value }); }}
             style={({ pressed }) => [
               styles.tf,
               isCorrect && styles.chipOk,
               isWrong && styles.chipBad,
-              pressed && !result && styles.optionPressed,
+              pressed && !result?.correct && styles.optionPressed,
             ]}
             accessibilityRole="button"
           >

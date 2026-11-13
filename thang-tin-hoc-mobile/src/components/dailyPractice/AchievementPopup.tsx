@@ -146,6 +146,7 @@ export function AchievementPopup({
   );
   const mascotMood = good ? 'celebrate' : (summary?.passed ? 'graduate' : 'sad');
   const durationLabel = formatDuration(summary.durationSeconds);
+  const continueLabel = summary?.path ? 'TIẾP TỤC HÀNH TRÌNH' : 'TIẾP TỤC HỌC';
 
   const shell = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -270,7 +271,7 @@ export function AchievementPopup({
             variant="primary"
             size="md"
             fullWidth
-            text="TIẾP TỤC HỌC"
+            text={continueLabel}
             icon={<Play size={15} color="#FFFFFF" fill="#FFFFFF" />}
             onPress={onContinue}
             style={styles.actionPrimaryBtn}

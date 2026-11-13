@@ -116,8 +116,7 @@ export function QuizAnswerOption({
       disabled={locked || eliminated}
       onClick={onSelect}
       data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
-      className={`${CHIP} group relative flex h-full min-h-[62px] w-full items-center gap-3.5 !rounded-2xl !px-4 !py-3.5 text-left text-[15px] transition-all duration-200 sm:!px-5 ${
-        isCorrect
+      className={`${CHIP} group relative flex h-full min-h-[62px] w-full items-center gap-3.5 !rounded-2xl !px-4 !py-3.5 text-left text-[15px] transition-all duration-200 sm:!px-5 ${isCorrect
           ? 'dp-option-select border-emerald-500 bg-gradient-to-r from-[#ECFDF5] via-[#E6F9EF] to-[#ECFDF5] text-emerald-950 !shadow-[0_3px_0_#34D399,0_8px_20px_-6px_rgba(16,185,129,0.22)]'
           : isWrongPick
             ? 'dp-shake border-red-400 bg-gradient-to-r from-red-50 via-rose-50/80 to-red-50 text-red-900 !shadow-[0_3px_0_#FCA5A5]'
@@ -126,7 +125,7 @@ export function QuizAnswerOption({
               : isChosen && !locked
                 ? 'scale-[0.98] border-emerald-400 bg-emerald-50/50 text-slate-900'
                 : 'border-slate-200/90 bg-white text-slate-800 hover:scale-[1.01] hover:border-emerald-400 hover:bg-emerald-50/35 active:scale-[0.98] active:translate-y-[2px]'
-      }`}
+        }`}
     >
       {/* 3 tia sáng xanh nhỏ ở góc trên bên trái khi chọn đúng (theo hình tham chiếu) */}
       {isCorrect && (
@@ -142,15 +141,14 @@ export function QuizAnswerOption({
 
       {/* Nút chữ cái A, B, C, D */}
       <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${
-          isCorrect
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect
             ? 'bg-emerald-500 text-white shadow-2xs'
             : isWrongPick
               ? 'bg-red-500 text-white shadow-2xs'
               : eliminated
                 ? 'bg-slate-100 text-slate-300'
                 : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 group-hover:border-emerald-500 group-hover:bg-emerald-500 group-hover:text-white'
-        }`}
+          }`}
       >
         {letter}
       </span>
@@ -310,7 +308,7 @@ export function OrderQuestion({ question, reveal, result, onChange }) {
               disabled={locked || isLocked}
               {...(isLocked ? {} : bind(item, item))}
               className={`${CHIP} flex flex-1 items-center gap-2 text-left ${result?.correct ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50')
-                  : locked ? 'border-slate-200 bg-slate-50'
+                : locked ? 'border-slate-200 bg-slate-50'
                   : isLocked ? 'border-amber-300 bg-amber-50'
                     : selected === item ? CHIP_SELECTED : CHIP_IDLE
                 } ${draggingId === item ? 'opacity-30' : ''}`}
@@ -390,7 +388,7 @@ export function MatchQuestion({ question, reveal, result, onChange }) {
                   }
                 }}
                 className={`${ZONE} flex min-h-[44px] items-center gap-2 px-3 py-2 text-left text-sm font-bold !shadow-none ${result?.correct ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-solid border-red-300 bg-red-50 text-red-700')
-                    : locked ? 'border-solid border-slate-200 bg-slate-50 text-slate-700'
+                  : locked ? 'border-solid border-slate-200 bg-slate-50 text-slate-700'
                     : index === lockedIndex ? 'border-solid border-amber-300 bg-amber-50 text-amber-800'
                       : value ? 'border-solid border-sky-300 bg-sky-50 text-sky-800'
                         : selected ? 'border-sky-400 bg-sky-50/50 text-slate-400' : 'border-slate-300 bg-slate-50 text-slate-400'
@@ -484,7 +482,7 @@ export function FillQuestion({ question, reveal, result, onChange }) {
                 }
               }}
               className={`${ZONE} mx-1 inline-flex min-w-[84px] items-center justify-center px-3 py-0.5 align-middle text-[15px] font-black leading-8 !shadow-none ${result?.correct ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-solid border-red-300 bg-red-50 text-red-600')
-                  : locked ? 'border-solid border-slate-200 bg-slate-50 text-slate-700'
+                : locked ? 'border-solid border-slate-200 bg-slate-50 text-slate-700'
                   : isLocked ? 'border-solid border-amber-300 bg-amber-50 text-amber-700'
                     : chip !== null ? 'border-solid border-sky-300 bg-sky-50 text-sky-700'
                       : selected !== null ? 'border-sky-400 bg-sky-50/50' : 'border-slate-300 bg-slate-50'

@@ -12,6 +12,7 @@ import {
 import { BookOpen, Check, ChevronRight, RotateCcw, X, Zap } from 'lucide-react-native';
 import type { DpAnswerResult, DpQuestion } from '../../services/dailyPracticeApi';
 import { Mascot } from './Mascot';
+import { XPRewardBurst } from './XPRewardBurst';
 import type { GameSound } from './useGameSounds';
 import { resolveWrongEncouragement } from '../../../../shared/dailyPractice/quizWrongEncouragement.mjs';
 import { PLAY_QUESTION_CHROME } from '../../../../shared/dailyPractice/playQuestionChrome.mjs';
@@ -84,6 +85,7 @@ export function MobileAnswerFeedback({
   onRetry,
   canRetry = false,
   wrongTryCount = 0,
+  rewardKey = '',
   explainOpen: explainOpenProp,
   onExplainOpenChange,
 }: {
@@ -97,6 +99,7 @@ export function MobileAnswerFeedback({
   onRetry?: () => void;
   canRetry?: boolean;
   wrongTryCount?: number;
+  rewardKey?: string;
   explainOpen?: boolean;
   onExplainOpenChange?: (open: boolean) => void;
 }) {
@@ -217,8 +220,9 @@ export function MobileAnswerFeedback({
             }}
             style={({ pressed }) => [
               styles.retryBannerBtn,
-              pressed && styles.btnPressed,
-              (busy || !canRetry) && { opacity: 0.55 },
+              pressed && canRetry && styles.btnPressed,
+              !canRetry && !busy && { opacity: 0.38 },
+              busy && { opacity: 0.5 },
             ]}
             accessibilityRole="button"
           >
@@ -262,12 +266,16 @@ export function MobileAnswerFeedback({
               {conciseLine}
             </Text>
             <Animated.View style={[styles.xpRow, { transform: [{ scale: xpPop }] }]}>
-              <View style={styles.xpPillGold}>
-                <Zap size={13} color="#F59E0B" fill="#FBBF24" />
-                <Text style={styles.xpPillGoldText} maxFontSizeMultiplier={1.25}>
-                  {confirmedXp > 0 ? `+${confirmedXp} XP` : feedbackTitle || 'Xuất sắc!'}
-                </Text>
-              </View>
+              {confirmedXp > 0 ? (
+                <XPRewardBurst xpAmount={confirmedXp} burstKey={rewardKey} />
+              ) : (
+                <View style={styles.xpPillGold}>
+                  <Zap size={13} color="#F59E0B" fill="#FBBF24" />
+                  <Text style={styles.xpPillGoldText} maxFontSizeMultiplier={1.25}>
+                    {feedbackTitle || 'Xuất sắc!'}
+                  </Text>
+                </View>
+              )}
             </Animated.View>
           </View>
         </View>

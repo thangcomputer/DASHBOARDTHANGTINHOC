@@ -59,12 +59,14 @@ function DoneStage({
   onNext,
   onClose,
   onReviewResults,
+  onReplay,
 }: {
   summary: DpSummary;
   play: (s: GameSound) => void;
   onNext: () => void;
   onClose?: () => void;
   onReviewResults?: () => void;
+  onReplay?: () => void;
 }) {
   const isPerfect = Boolean(
     summary &&
@@ -84,6 +86,7 @@ function DoneStage({
         play={play}
         onContinue={onNext}
         onReviewResults={onReviewResults || onNext}
+        onReplay={onReplay}
         onClose={onClose || onNext}
       />
     </View>
@@ -212,12 +215,14 @@ export function Celebration({
   onDone,
   onClose,
   onReviewResults,
+  onReplay,
 }: {
   summary: DpSummary;
   play: (s: GameSound) => void;
   onDone: () => void;
   onClose?: () => void;
   onReviewResults?: () => void;
+  onReplay?: () => void;
 }) {
   const hasTrophyStage = Boolean(summary.path?.passed && (summary.path?.topicCompleted || summary.path?.unitCompleted || summary.path?.testOut));
   const stages = useMemo(() => [
@@ -244,6 +249,7 @@ export function Celebration({
       onNext={next}
       onClose={onClose}
       onReviewResults={onReviewResults}
+      onReplay={onReplay}
     />
   );
 }

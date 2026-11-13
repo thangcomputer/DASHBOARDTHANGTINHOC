@@ -113,9 +113,8 @@ export function QuizActionButtons({
           onToggleExplain?.();
         }}
         aria-expanded={explainOpen}
-        className={`dp-quiz-btn-explain inline-flex min-h-[44px] items-center justify-center gap-1.5 px-3 py-2.5 text-sm transition active:translate-y-[2px] ${
-          isCorrect ? '' : 'dp-quiz-btn-explain--wrong'
-        } ${highlightExplain ? 'dp-explain-nudge' : ''}`}
+        className={`dp-quiz-btn-explain inline-flex min-h-[44px] items-center justify-center gap-1.5 px-3 py-2.5 text-sm transition active:translate-y-[2px] ${isCorrect ? '' : 'dp-quiz-btn-explain--wrong'
+          } ${highlightExplain ? 'dp-explain-nudge' : ''}`}
       >
         <BookOpen size={15} aria-hidden="true" />
         <span>{explainOpen ? 'Ẩn giải thích' : 'Giải thích'}</span>
@@ -182,11 +181,9 @@ export function AnswerFeedback({
   return (
     <div
       data-answer-feedback={isCorrect ? 'correct' : 'incorrect'}
-      className={`dp-quiz-feedback dp-quiz-feedback--panel-in mt-5 ${
-        isCorrect && bannerFaded ? 'dp-quiz-feedback--compact' : ''
-      } ${
-        isCorrect ? 'dp-quiz-feedback--correct' : `dp-quiz-feedback--wrong dp-quiz-feedback--wrong-inline${suppressShake ? '' : ' dp-shake'}`
-      }`}
+      className={`dp-quiz-feedback dp-quiz-feedback--panel-in mt-5 ${isCorrect && bannerFaded ? 'dp-quiz-feedback--compact' : ''
+        } ${isCorrect ? 'dp-quiz-feedback--correct' : `dp-quiz-feedback--wrong dp-quiz-feedback--wrong-inline${suppressShake ? '' : ' dp-shake'}`
+        }`}
     >
       <div className={`relative z-[1] flex text-left ${isCorrect ? 'flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-left' : 'flex-row items-start gap-2.5 sm:gap-3'}`}>
         <div className={`dp-quiz-feedback__banner flex w-full min-w-0 flex-1 ${isCorrect ? 'flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-left' : 'flex-row items-start gap-2.5 sm:gap-3'}`}>
@@ -210,9 +207,8 @@ export function AnswerFeedback({
           <div className="flex min-w-0 flex-1 flex-col items-start">
             <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
               <span
-                className={`dp-check-pop flex shrink-0 items-center justify-center rounded-full border ${
-                  isCorrect ? 'h-7 w-7 border-emerald-200 bg-white' : 'h-6 w-6 border-red-200 bg-white'
-                }`}
+                className={`dp-check-pop flex shrink-0 items-center justify-center rounded-full border ${isCorrect ? 'h-7 w-7 border-emerald-200 bg-white' : 'h-6 w-6 border-red-200 bg-white'
+                  }`}
                 aria-hidden="true"
               >
                 {isCorrect ? (

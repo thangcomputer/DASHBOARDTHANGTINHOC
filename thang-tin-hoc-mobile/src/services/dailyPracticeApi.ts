@@ -10,7 +10,7 @@ export function emitDailyPracticeStats(payload: unknown) {
   if (!payload || typeof payload !== 'object') return;
   const obj = payload as Record<string, unknown>;
   const stats = (obj.stats && typeof obj.stats === 'object') ? { ...(obj.stats as Record<string, unknown>) } : {};
-  if (typeof obj.profileXp === 'number' && typeof stats.xpTotal !== 'number') {
+  if (typeof obj.profileXp === 'number') {
     stats.xpTotal = obj.profileXp;
   }
   if (typeof obj.currentXp === 'number' && typeof stats.xpTotal !== 'number') {
@@ -392,7 +392,7 @@ export const dailyPracticeApi = {
     emitDailyPracticeStats(data);
     return data;
   }),
-  hint: (sessionId: string, questionId: string) => call<{ hint: string; reveal: DpReveal; profileXp?: number; hintPenaltyXp?: number }>(`/sessions/${sessionId}/hint`, { questionId }).then((data) => {
+  hint: (sessionId: string, questionId: string) => call<{ hint: string; reveal: DpReveal; profileXp?: number; charged?: number; hintCostXp?: number; xpDelta?: number }>(`/sessions/${sessionId}/hint`, { questionId }).then((data) => {
     emitDailyPracticeStats(data);
     return data;
   }),
