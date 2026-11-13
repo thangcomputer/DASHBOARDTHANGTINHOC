@@ -622,6 +622,26 @@
     overflow-y: auto;
   }
 
+  @media (max-width: 1023px) {
+    #main-content > header.cms-topbar {
+      transition:
+        transform 450ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 350ms ease,
+        visibility 0s linear 0s;
+    }
+
+    #main-content > header.cms-topbar.cms-topbar--scroll-away {
+      transform: translateY(calc(-100% - 0.35rem));
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition:
+        transform 450ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 350ms ease,
+        visibility 0s linear 450ms;
+    }
+  }
+
   .cms-topbar__row {
     position: relative;
     display: grid;
@@ -2750,6 +2770,44 @@ button[role="combobox"]:not(.duo-btn):not(.cms-btn) {
 .duo-stage-icon-btn:not(:disabled):active {
   transform: translateY(1px);
   border-bottom-width: 1px;
+}
+
+.duo-stage-roadmap-btn {
+  background: linear-gradient(180deg, #fefce8 0%, #fde047 42%, #facc15 100%);
+  border: 0;
+  border-bottom: 3px solid #ca8a04;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 0 16px rgba(254, 240, 138, 0.95),
+    0 1px 0 rgba(255, 255, 255, 0.85) inset;
+  animation: duo-roadmap-btn-pulse 2.4s ease-in-out infinite;
+  transition: transform 0.08s ease, border-bottom-width 0.08s ease;
+}
+
+.duo-stage-roadmap-btn:active {
+  transform: translateY(1px);
+  border-bottom-width: 1px;
+}
+
+@keyframes duo-roadmap-btn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.92),
+      0 0 14px rgba(254, 240, 138, 0.85),
+      0 1px 0 rgba(255, 255, 255, 0.85) inset;
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 1),
+      0 0 22px rgba(253, 224, 71, 1),
+      0 0 32px rgba(250, 204, 21, 0.45),
+      0 1px 0 rgba(255, 255, 255, 0.85) inset;
+  }
+}
+
+.dp-roadmap-node-glow {
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.35), 0 0 14px rgba(251, 191, 36, 0.55);
 }
 
 .duo-unit-chest {

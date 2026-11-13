@@ -34,6 +34,7 @@ describe('lastPathTopic', () => {
     const {
       pathTopicHasLearningProgress,
       pathTopicPrimaryCtaLabel,
+      unitStageCtaLabel,
     } = require('../../shared/dailyPractice/lastPathTopic.cjs');
     const fresh = {
       completedUnits: 0,
@@ -46,5 +47,25 @@ describe('lastPathTopic', () => {
       units: [{ state: 'active', steps: [{ state: 'completed' }], pathNodes: [] }],
     };
     assert.equal(pathTopicPrimaryCtaLabel(touched), 'Tiếp tục học');
+  });
+
+  it('banner chặng: locked không CTA, completed Ôn lại, mới Bắt đầu', () => {
+    const { unitStageCtaLabel } = require('../../shared/dailyPractice/lastPathTopic.cjs');
+    assert.equal(
+      unitStageCtaLabel({ state: 'locked', steps: [], pathNodes: [] }, { isNextUnit: false }),
+      null,
+    );
+    assert.equal(
+      unitStageCtaLabel({ state: 'completed', steps: [{ state: 'completed' }], pathNodes: [] }, { isNextUnit: false }),
+      'Ôn lại',
+    );
+    assert.equal(
+      unitStageCtaLabel({ state: 'active', steps: [], pathNodes: [] }, { isNextUnit: true }),
+      'Tiếp tục học',
+    );
+    assert.equal(
+      unitStageCtaLabel({ state: 'active', steps: [], pathNodes: [] }, { isNextUnit: false }),
+      'Bắt đầu',
+    );
   });
 });

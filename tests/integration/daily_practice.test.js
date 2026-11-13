@@ -187,7 +187,11 @@ test('lượt chơi đầy đủ: bắt đầu → trả lời → gợi ý → 
 
     const wrong = await service.answerQuestion(studentId, session.id, { questionId: byType.order.id, answer: WRONG.order });
     assert.equal(wrong.correct, false);
+    assert.equal(wrong.wrongTryCount, 1);
     assert.deepEqual(wrong.correctAnswer.items, SAMPLES.order.items);
+    const wrongAgain = await service.answerQuestion(studentId, session.id, { questionId: byType.order.id, answer: WRONG.order });
+    assert.equal(wrongAgain.correct, false);
+    assert.equal(wrongAgain.wrongTryCount, 2);
     for (const type of ['truefalse', 'match', 'fill', 'sort']) {
       const res = await service.answerQuestion(studentId, session.id, { questionId: byType[type].id, answer: CORRECT[type] });
       assert.equal(res.correct, true, type);

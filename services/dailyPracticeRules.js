@@ -167,6 +167,22 @@ function validateQuestion(input = {}) {
   return doc;
 }
 
+const EXPLANATION_MIN_LEN = 10;
+
+/** Bắt buộc giải thích riêng khi xuất bản (không trùng gợi ý). */
+function assertExplanationForPublish(doc, status) {
+  if (status !== 'published') return;
+  const explain = clean(doc.explanation, 800);
+  const hint = clean(doc.hint, 300);
+  if (!explain) return;
+  if (explain.length < EXPLANATION_MIN_LEN) {
+    throw httpError(400, `Cần nhập Giải thích chi tiết (tối thiểu ${EXPLANATION_MIN_LEN} ký tự) trước khi xuất bản`);
+  }
+  if (hint && norm(explain) === norm(hint)) {
+    throw httpError(400, 'Giải thích không được trùng nội dung Gợi ý');
+  }
+}
+
 /** Bản câu hỏi gửi cho học viên - không lộ đáp án. */
 function publicQuestion(q, rng = Math.random) {
   const view = {
@@ -540,6 +556,8 @@ module.exports = {
   shuffle,
   parseFill,
   validateQuestion,
+  assertExplanationForPublish,
+  EXPLANATION_MIN_LEN,
   publicQuestion,
   gradeAnswer,
   correctAnswerView,

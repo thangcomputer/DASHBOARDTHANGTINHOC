@@ -4,6 +4,7 @@ import { gameSounds } from '../../../utils/sound';
 import Mascot from './Mascot';
 import AchievementPopup from './AchievementPopup';
 import StreakCelebration from './StreakCelebration';
+import './achievementPopup.css';
 
 const CONFETTI_COLORS = ['#F59E0B', '#EF4444', '#10B981', '#0EA5E9', '#A855F7', '#F97316', '#FACC15'];
 
@@ -57,9 +58,10 @@ function DoneStage({ summary, onNext, onReviewResults, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9200] flex max-h-[100dvh] items-center justify-center overflow-y-auto bg-slate-950/44 p-3 sm:p-4"
+      className="dp-practice-finish-scrim"
       data-celebration-headline={headline}
-      role="presentation"
+      role="dialog"
+      aria-modal="true"
     >
       <AchievementPopup
         summary={summary}

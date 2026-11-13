@@ -105,6 +105,38 @@ export function useBrandingHeaderScrollHandler() {
   }, []);
 }
 
+function mergeScrollHandlers(
+  chrome: (event: NativeSyntheticEvent<NativeScrollEvent>) => void,
+  custom?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void,
+) {
+  if (!custom) return chrome;
+  return (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    custom(event);
+    chrome(event);
+  };
+}
+
+/** ScrollView gắn ẩn/hiện header + thanh điều hướng — dùng khi `AppScreen` đặt `scroll={false}` hoặc cuộn lồng nhau. */
+export const ChromeScrollView = React.forwardRef<React.ComponentRef<typeof ScrollView>, React.ComponentProps<typeof ScrollView>>(function ChromeScrollView({
+  onScroll,
+  onScrollEndDrag,
+  onMomentumScrollEnd,
+  scrollEventThrottle,
+  ...rest
+}, ref) {
+  const handleChromeScroll = useBrandingHeaderScrollHandler();
+  return (
+    <ScrollView
+      ref={ref}
+      {...rest}
+      scrollEventThrottle={scrollEventThrottle ?? 16}
+      onScroll={mergeScrollHandlers(handleChromeScroll, onScroll)}
+      onScrollEndDrag={mergeScrollHandlers(handleChromeScroll, onScrollEndDrag)}
+      onMomentumScrollEnd={mergeScrollHandlers(handleChromeScroll, onMomentumScrollEnd)}
+    />
+  );
+});
+
 export function AppScreen({
   children,
   scroll = true,

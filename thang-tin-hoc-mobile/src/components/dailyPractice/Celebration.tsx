@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: spacing.md,
-    backgroundColor: 'rgba(15, 23, 42, 0.44)',
+    backgroundColor: 'rgba(2, 6, 23, 0.68)',
   },
   shell: { minHeight: 560, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, paddingVertical: spacing.lg },
   button: {

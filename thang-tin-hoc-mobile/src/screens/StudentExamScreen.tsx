@@ -11,7 +11,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
 import { isFreePortalLocked } from '../utils/freePortalHelper';
-import { AppHeader, AppScreen, Card, EmptyState, useBrandingHeaderScrollHandler } from '../components/ui';
+import { AppHeader, AppScreen, Card, ChromeScrollView, EmptyState } from '../components/ui';
 import {
   getStudentQuizForExam, submitStudentQuiz,
   type StudentQuiz, type StudentQuizDetail, type StudentQuizResult,
@@ -63,7 +63,6 @@ export function StudentExamScreen() {
   const navigation = useNavigation<Navigation>();
   const route = useRoute<RouteProp<AppStackParamList, 'StudentExam'>>();
   const { width } = useWindowDimensions();
-  const handleHeaderScroll = useBrandingHeaderScrollHandler();
   const [activeTab, setActiveTab] = useState<RoomTab | null>(null);
   const [quizzes, setQuizzes] = useState<StudentQuiz[]>([]);
   const [loading, setLoading] = useState(true);
@@ -280,7 +279,7 @@ export function StudentExamScreen() {
           onBack={requestExit}
         />
         {result ? (
-          <ScrollView style={styles.examScroll} contentContainerStyle={styles.resultContent} showsVerticalScrollIndicator={false} onScroll={handleHeaderScroll} scrollEventThrottle={16}>
+          <ScrollView style={styles.examScroll} contentContainerStyle={styles.resultContent} showsVerticalScrollIndicator={false}>
             <Card style={styles.resultCard}>
               <View style={styles.resultHero}>
                 <View style={styles.resultInfo}>
@@ -372,7 +371,7 @@ export function StudentExamScreen() {
             ) : null}
           </ScrollView>
         ) : (
-          <ScrollView style={styles.examScroll} contentContainerStyle={styles.roomContent} showsVerticalScrollIndicator={false} onScroll={handleHeaderScroll} scrollEventThrottle={16}>
+          <ScrollView style={styles.examScroll} contentContainerStyle={styles.roomContent} showsVerticalScrollIndicator={false}>
             <View style={styles.roomHeader}>
               <View style={styles.flex}>
                 <Text numberOfLines={1} style={styles.roomTitle}>{quizDetail.courseName}</Text>

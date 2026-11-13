@@ -17,6 +17,14 @@ import type { AppStackParamList } from '../navigation/types';
 import { AppScreen, ChromeScrollView } from '../components/ui';
 import { Mascot, type MascotMood } from '../components/dailyPractice/Mascot';
 import { DropletMark, PathITBackdrop } from '../components/dailyPractice/PathDecor';
+import { pathNodeMapLabel, pathNodeStartBubbleLabel } from '../../../shared/dailyPractice/pathNodeNudge.mjs';
+import {
+  PATH_HUB_PROGRESS_RING,
+  pathHubNodeProgress,
+  pathHubProgressColor,
+} from '../../../shared/dailyPractice/pathHubProgressRing.mjs';
+import { PATH_HUB_DUO } from '../../../shared/dailyPractice/pathHubDuoVisual.mjs';
+import { pathNodeColor } from '../../../shared/dailyPractice/pathNodeColors.mjs';
 import { DragProvider } from '../components/dailyPractice/DragKit';
 import { PracticeFinishOverlay } from '../components/dailyPractice/PracticeFinishOverlay';
 import { MobileComboCelebrationOverlay } from '../components/dailyPractice/MobileComboCelebrationOverlay';
@@ -48,6 +56,8 @@ import {
   syncLastPathTopicFromServer,
 } from '../utils/lastPathTopic';
 import { unitStageCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
+import { shouldNudgeHintButton } from '../../../shared/dailyPractice/quizWrongEncouragement.mjs';
+import { PLAY_QUESTION_CHROME } from '../../../shared/dailyPractice/playQuestionChrome.mjs';
 import { VietnamJourneyStage } from '../components/dailyPractice/VietnamJourneyStage';
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
@@ -815,23 +825,35 @@ function darken(hex: string, amount = 0.28) {
 
 const maxXpFor = (step: DpPathStep) => 10 * (DP_DIFFICULTIES.find((d) => d.id === (step.difficulty || 'medium'))?.xp || 15);
 
-function ProgressRing({ size, progress, color }: { size: number; progress: number; color: string }) {
-  const stroke = 7;
+function ProgressRing({
+  size,
+  progress,
+  progressColor,
+  dimmed = false,
+}: {
+  size: number;
+  progress: number;
+  progressColor: string;
+  dimmed?: boolean;
+}) {
+  const stroke = PATH_HUB_PROGRESS_RING.stroke;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const visibleArc = clamped > 0 && clamped < 1 ? Math.max(clamped, 0.06) : clamped;
   return (
-    <Svg width={size} height={size} style={styles.ring} pointerEvents="none">
-      <SvgCircle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#E2E8F0" strokeWidth={stroke} />
+    <Svg width={size} height={size} style={[styles.ring, dimmed && { opacity: 0.55 }]} pointerEvents="none">
+      <SvgCircle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={PATH_HUB_PROGRESS_RING.track} strokeWidth={stroke} />
       <SvgCircle
         cx={size / 2}
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke={color}
+        stroke={progressColor}
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={`${circumference} ${circumference}`}
-        strokeDashoffset={circumference * (1 - progress)}
+        strokeDashoffset={circumference * (1 - visibleArc)}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
     </Svg>
@@ -870,7 +892,13 @@ function StepNode({ step, isNext, unitProgress, color, selected, onPress }: {
       ) : null
       }
       <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
-        {isNext ? <ProgressRing size={box} progress={unitProgress} color={color.from} /> : null}
+        {isNext ? (
+          <ProgressRing
+            size={box}
+            progress={unitProgress}
+            progressColor={PATH_HUB_PROGRESS_RING.progressActive}
+          />
+        ) : null}
         <Pressable
           onPress={onPress}
           disabled={locked}
@@ -934,43 +962,37 @@ function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { fro
   );
 }
 
-/** Một nút trên lộ trình - popover 3 nấc Dễ / Vừa / Khó (hoặc nút Học). */
-function PracticeHubNode({ node, color, isNext, selected, onPress }: {
+/** Một nút trên lộ trình - nút tròn 3D vàng kim + icon trắng + 3 chấm + sao viền theo mẫu thiết kế. */
+function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0 }: {
   node: DpPathNode;
   color: { from: string; to: string };
   isNext: boolean;
   selected: boolean;
   onPress: () => void;
+  nodeIndex?: number;
 }) {
   const locked = node.state === 'locked';
   const done = node.state === 'completed';
-  const size = 74;
-  const box = size + 24;
   const levels = node.levels || [];
-  const progress = levels.length ? levels.filter((l) => l.state === 'completed').length / levels.length : 0;
+  const size = PATH_HUB_DUO.buttonSize.mobile;
+  const progress = pathHubNodeProgress(node);
+  const progressColor = pathHubProgressColor(node, progress, color);
+  const showRing =
+    PATH_HUB_DUO.showProgressRing && !locked && isNext && progress > 0 && progress < 1;
+  const box = showRing ? size + PATH_HUB_PROGRESS_RING.pad : size;
   const HubIcon = NODE_ICONS[node.icon] || Dumbbell;
-  const bob = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!isNext || selected) return undefined;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(bob, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
-      Animated.timing(bob, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [bob, isNext, selected]);
-  const nodeTone = done ? { from: '#FFD84D', to: '#F59E0B' } : color;
-  const baseShadowColor = locked ? '#CBD5E1' : done ? '#D97706' : darken(color.to, 0.2);
+  const mapLabel = pathNodeMapLabel(node);
+  const startBubble = pathNodeStartBubbleLabel(node);
+  const badgeCorner = nodeIndex % 2 === 0 ? 'top-right' : 'top-left';
   return (
-    <View style={styles.nodeWrap}>
-      {isNext && !selected ? (
-        <Animated.Text style={[styles.nodeBubble, { color: color.to, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }] }]}>
-          BẮT ĐẦU
-        </Animated.Text>
-      ) : null
-      }
-      <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
-        {isNext ? <ProgressRing size={box} progress={progress} color={color.from} /> : null}
+    <View style={[styles.hubRoot, styles.hubRootColumn, { width: box }]}>
+      <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' }}>
+        {isNext && !selected ? (
+          <View style={styles.pathStartBubbleMap}>
+            <Text style={[styles.pathStartBubbleText, { color: '#D97706' }]}>{startBubble}</Text>
+          </View>
+        ) : null}
+        {showRing ? <ProgressRing size={box} progress={progress} progressColor={progressColor} /> : null}
         <Pressable
           onPress={onPress}
           disabled={locked}
@@ -980,42 +1002,75 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
           style={({ pressed }) => [
             styles.node,
             locked
-              ? { backgroundColor: '#E2E8F0', borderBottomColor: '#CBD5E1' }
-              : { backgroundColor: nodeTone.from, borderBottomColor: baseShadowColor },
+              ? { backgroundColor: '#E8EDF2', borderBottomColor: '#C4C9D1' }
+              : { backgroundColor: '#FBBF24', borderBottomColor: '#D97706', borderTopColor: '#FEF08A', borderTopWidth: 1 },
             {
               width: size,
-              height: size - 4,
+              height: size,
               borderRadius: size / 2,
               borderBottomWidth: pressed ? 2 : 6,
               transform: [{ translateY: pressed ? 4 : 0 }],
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 4,
+              gap: 2,
             },
           ]}
         >
-          <HubIcon size={26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={2.8} />
-          <View style={{ flexDirection: 'row', gap: 3 }}>
-            {levels.map((level) => (
-              <View
-                key={level.key}
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: level.state === 'completed' || level.state === 'active' ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
-                }}
-              />
-            ))}
-          </View>
-          {done ? (
-            <View style={styles.nodeCrown}>
-              <Star size={14} color="#D97706" fill="#FBBF24" />
+          <HubIcon size={26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={PATH_HUB_DUO.iconStroke} />
+          {!locked ? (
+            <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
+              {[0, 1, 2].map((i) => {
+                const lvl = levels[i];
+                const isDoneOrActive = lvl ? (lvl.state === 'completed' || lvl.state === 'active') : true;
+                return (
+                  <View
+                    key={i}
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: isDoneOrActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
+                    }}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
+          {/* Ngôi sao vàng đính góc trên phải nút */}
+          {!locked && (
+            <View style={{ position: 'absolute', top: -4, right: -2, zIndex: 10 }} pointerEvents="none">
+              <Svg width={18} height={18} viewBox="0 0 24 24">
+                <Path
+                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                  fill="#F59E0B"
+                  stroke="#D97706"
+                  strokeWidth={1.5}
+                />
+              </Svg>
+            </View>
+          )}
+          {locked ? (
+            <View
+              style={[
+                styles.pathHubLockBadge,
+                badgeCorner === 'top-left' ? styles.nodeCrownLeft : styles.nodeCrownRight,
+              ]}
+            >
+              <Lock size={11} color="#64748B" strokeWidth={2.8} />
             </View>
           ) : null}
         </Pressable>
       </View >
-      <Text style={[styles.nodeLabel, locked && { color: '#94A3B8' }]}>{node.label}</Text>
+      <Text
+        numberOfLines={2}
+        style={[
+          styles.pathNodeLabelBelow,
+          { color: locked ? PATH_HUB_DUO.labelLockedColor : '#334155' },
+          isNext && !selected ? styles.pathNodeLabelCurrentText : null,
+        ]}
+      >
+        {mapLabel}
+      </Text>
     </View >
   );
 }
@@ -2260,24 +2315,26 @@ function PathView({
                         unitTotal: current.units.length,
                         unitState: unit.state,
                       }}
-                      renderChest={() => (
-                        <UnitStageChest unit={unit} play={play} variant="chip" onClaimed={onPathChanged} />
-                      )}
-                      renderNode={(item, { hubNext }) => {
+                      renderNode={(item, { hubNext, index }) => {
                         const hubSelected = item.kind === 'hub' && popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === item.node.key;
+                        const nodeTone = pathNodeColor(item.node, index, { mapDuo: true });
                         return (
                           <View style={styles.nodeSlot}>
                             <PracticeHubNode
                               node={item.node}
-                              color={tone}
+                              color={nodeTone}
                               isNext={hubNext}
                               selected={Boolean(hubSelected)}
+                              nodeIndex={index}
                               onPress={() => toggleHub(unit, item.node.key)}
                             />
                           </View>
                         );
                       }}
                     />
+                  </View>
+                  <View style={styles.pathUnitFooter}>
+                    <UnitStageChest unit={unit} play={play} variant="chip" onClaimed={onPathChanged} />
                   </View>
 
                   {isLast ? (
@@ -2830,19 +2887,16 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [combo, setCombo] = useState(0);
   const [comboCelebration, setComboCelebration] = useState<number | null>(null);
   const [wrongTryCount, setWrongTryCount] = useState(0);
+  const [answerResetKey, setAnswerResetKey] = useState(0);
+  const [explainOpen, setExplainOpen] = useState(false);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
   const total = session.questions.length;
   const meta = DP_TYPES[question.type];
   const level = DP_DIFFICULTIES.find((d) => d.id === question.difficulty) || DP_DIFFICULTIES[0];
-  const headerChips = useMemo(
-    () => playQuestionHeaderChips(session.path, meta.label, level),
-    [session.path, meta.label, level],
-  );
-  const visiblePlayChips = useMemo(
-    () => headerChips.filter((chip) => chip.id === 'type'),
-    [headerChips],
-  );
+  useEffect(() => {
+    setExplainOpen(false);
+  }, [question.id, answerResetKey]);
   const stakeXp = Number(session.stakeXp) || 0;
   const isTestOutStake = Boolean(session.path?.testOut && stakeXp > 0);
   const isPerQuestionStake = Boolean(session.path && !session.path.testOut && stakeXp > 0);
@@ -2871,6 +2925,13 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     setResult(null);
     setPending(null);
     setChosen(null);
+    setAnswerResetKey((key) => key + 1);
+  }, []);
+
+  const resetInteractiveAnswer = useCallback(() => {
+    setPending(null);
+    setChosen(null);
+    setAnswerResetKey((key) => key + 1);
   }, []);
 
   const submit = useCallback(async (answer: DpAnswer | null) => {
@@ -2898,6 +2959,9 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: USE_NATIVE_DRIVER }).start();
       } else {
         setWrongTryCount(typeof data.wrongTryCount === 'number' ? data.wrongTryCount : (wrongTryCount + 1));
+        if (question.type !== 'mcq' && question.type !== 'truefalse') {
+          resetInteractiveAnswer();
+        }
       }
       play(isCorrect ? 'correct' : 'wrong');
     } catch (err) {
@@ -2905,7 +2969,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     } finally {
       setBusy(false);
     }
-  }, [busy, comboPop, play, question.id, result, session.id, wrongTryCount]);
+  }, [busy, comboPop, play, question.id, question.type, resetInteractiveAnswer, result, session.id, wrongTryCount]);
 
   const askHint = async () => {
     if (reveal || result?.correct || busy) return;
@@ -2932,6 +2996,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       setReveal(null);
       setHintText('');
       setWrongTryCount(0);
+      setAnswerResetKey((key) => key + 1);
       return;
     }
     setBusy(true);
@@ -3010,27 +3075,34 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         </View>
 
         <Animated.View style={[styles.playQuestionCard, { transform: [{ translateX: shakeX }] }]}>
-          {visiblePlayChips.length ? (
-            <View style={styles.playMetaChipRow}>
-              {visiblePlayChips.map((chip) => (
-                <Text key={chip.id} numberOfLines={1} style={[styles.playMetaChip, { backgroundColor: chip.soft, color: chip.color }]}>
-                  {chip.text}
+          {!result?.correct ? (
+            <Pressable
+              onPress={() => { void askHint(); }}
+              disabled={Boolean(reveal) || busy}
+              style={[
+                styles.hintCornerBtn,
+                reveal ? styles.disabled : null,
+                shouldNudgeHintButton(wrongTryCount, Boolean(reveal)) ? styles.hintFooterBtnNudge : null,
+              ]}
+              accessibilityRole="button"
+            >
+                <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
+                <Text style={styles.hintCornerBtnText}>
+                  {reveal ? 'Đã gợi ý' : session.xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp}`}
                 </Text>
-              ))}
-            </View>
+            </Pressable>
           ) : null}
-          <View style={styles.promptRow}>
+          <View style={[styles.promptRow, !result?.correct ? styles.promptRowHintPad : null]}>
             <View style={styles.promptMascotBox}>
-              <Mascot mood={mood} size={44} />
+              <Mascot mood={mood} size={PLAY_QUESTION_CHROME.mascotSize.mobile} />
             </View>
             <View style={styles.flex}>
-              <View style={styles.questionLabelRow}>
-                <Text style={styles.questionLabelBadge}>CÂU HỎI</Text>
-                {!immediate && meta.instruction ? (
-                  <Text style={styles.instructionInline} numberOfLines={2}>{meta.instruction}</Text>
-                ) : null}
+              <View style={styles.questionMetaRow}>
+                <Text style={styles.questionEyebrow}>{PLAY_QUESTION_CHROME.label}</Text>
+                <Text style={styles.questionMetaSep} aria-hidden>·</Text>
+                <Text style={styles.playTypeChip} numberOfLines={1}>{meta.label}</Text>
               </View>
-              <Text style={styles.playPrompt} maxFontSizeMultiplier={1.35}>
+              <Text style={styles.playPrompt} maxFontSizeMultiplier={1.3}>
                 {question.prompt}
               </Text>
             </View>
@@ -3038,11 +3110,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
           {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image} resizeMode="contain" /> : null}
           {hintText ? (
             <View style={styles.hintBox}>
-              <Lightbulb size={16} color="#F59E0B" fill="#FCD34D" />
+              <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
               <Text style={styles.hintText}>{hintText}</Text>
             </View>
           ) : null}
-          <View key={question.id} style={styles.answerArea}>
+          <View key={`${question.id}-${answerResetKey}`} style={styles.answerArea}>
             {question.type === 'mcq' ? <McqQuestion question={question} reveal={reveal} result={result} chosen={typeof chosen === 'number' ? chosen : null} onSubmit={submit} play={play} /> : null}
             {question.type === 'truefalse' ? <TrueFalseQuestion result={result} chosen={typeof chosen === 'boolean' ? chosen : null} onSubmit={submit} play={play} /> : null}
             {question.type === 'order' ? <OrderQuestion {...props} /> : null}
@@ -3052,20 +3124,42 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
           </View>
           {error ? <Text style={styles.errorInline}>{error}</Text> : null}
 
-          {!result ? (
-            <View style={styles.playCardFooter}>
-              <Pressable
-                onPress={() => { void askHint(); }}
-                disabled={Boolean(reveal) || busy}
-                style={[styles.hintFooterBtn, reveal ? styles.disabled : null]}
-                accessibilityRole="button"
-              >
-                <Lightbulb size={16} color="#D97706" fill={reveal ? 'transparent' : '#FCD34D'} />
-                <Text style={styles.hintFooterBtnText}>
-                  {reveal ? 'Đã dùng gợi ý' : session.xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp} XP`}
-                </Text>
-              </Pressable>
-              {!immediate ? (
+          {result ? (
+            <MobileAnswerFeedback
+              question={question}
+              result={result}
+              confirmedXp={confirmedQuestionXp}
+              feedbackTitle={title}
+              busy={busy}
+              play={play}
+              onNext={() => { void next(); }}
+              onRetry={() => { void submit(pending); }}
+              canRetry={Boolean(pending) && !busy}
+              wrongTryCount={wrongTryCount}
+              explainOpen={explainOpen}
+              onExplainOpenChange={setExplainOpen}
+            />
+          ) : null}
+
+          {!result?.correct ? (
+            <View style={[styles.playCardFooter, result ? styles.playCardFooterTight : null, result && !result.correct ? styles.playCardFooterExplainOnly : null]}>
+              {result && !result.correct ? (
+                <Pressable
+                  onPress={() => {
+                    play('tap');
+                    setExplainOpen((open) => !open);
+                  }}
+                  style={({ pressed }) => [styles.hintFooterBtn, styles.explainFooterBtn, pressed && { opacity: 0.92 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: explainOpen }}
+                >
+                  <BookOpen size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
+                  <Text style={styles.explainFooterBtnText}>
+                    {explainOpen ? 'Ẩn giải thích' : 'Giải thích'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {!result && !immediate ? (
                 <DuoButton
                   variant="primary"
                   size="md"
@@ -3075,29 +3169,18 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
                   disabled={!pending || busy}
                   onPress={() => { void submit(pending); }}
                 />
-              ) : (
+              ) : null}
+              {!result && immediate ? (
                 <Text style={styles.selectAnswerHint}>Chọn 1 đáp án bên trên</Text>
-              )}
+              ) : null}
             </View>
-          ) : (
-            <MobileAnswerFeedback
-              question={question}
-              result={result}
-              confirmedXp={confirmedQuestionXp}
-              feedbackTitle={title}
-              busy={busy}
-              play={play}
-              onNext={() => { void next(); }}
-              onRetry={retryQuestion}
-              wrongTryCount={wrongTryCount}
-            />
-          )}
+          ) : null}
         </Animated.View>
 
         {quitOpen ? (
           <QuitConfirm
             stats={stats}
-            answered={index + (result ? 1 : 0)}
+            answered={index + (result?.correct ? 1 : 0)}
             total={total}
             busy={quitting}
             play={play}
@@ -3688,11 +3771,27 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   badgeDark: { color: '#FFFFFF', backgroundColor: '#0F172A', fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
   badge: { fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
   promptRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  promptRowHintPad: { paddingRight: 88 },
   prompt: { color: colors.ink, fontSize: 16, fontWeight: '600', lineHeight: 24 },
   instruction: { color: '#64748B', fontSize: 13, fontWeight: '400', marginTop: 2 },
   image: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#F8FAFC' },
-  hintBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
-  hintText: { flex: 1, color: '#92400E', fontSize: 13, fontWeight: '400' },
+  hintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: PLAY_QUESTION_CHROME.hintRevealBox.backgroundColor,
+    borderWidth: 1,
+    borderColor: PLAY_QUESTION_CHROME.hintRevealBox.borderColor,
+  },
+  hintText: {
+    flex: 1,
+    color: PLAY_QUESTION_CHROME.hintRevealBox.color,
+    fontSize: PLAY_QUESTION_CHROME.hintRevealBox.fontSize,
+    fontWeight: PLAY_QUESTION_CHROME.hintRevealBox.fontWeight,
+    lineHeight: 20,
+  },
   answerArea: { marginTop: 2, width: '100%' },
   feedback: {
     padding: spacing.lg,
@@ -3948,7 +4047,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   nodeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, paddingVertical: 4, paddingRight: spacing.md },
   nodeRowItem: { flexDirection: 'row', alignItems: 'flex-end' },
   nodeRowDash: { width: 14, height: 3, borderRadius: 999, marginBottom: 28, marginHorizontal: 2 },
-  nodeSnakeWrap: { alignSelf: 'stretch', width: '100%', maxWidth: '100%', paddingHorizontal: 8, position: 'relative', marginTop: 8 },
+  nodeSnakeWrap: { alignSelf: 'stretch', width: '100%', maxWidth: '100%', paddingHorizontal: 6, position: 'relative', marginTop: 8, overflow: 'visible' },
   pathMascotSide: { position: 'absolute', top: 12, zIndex: 0, opacity: 0.95 },
   unitBanner: {
     width: '100%',
@@ -4030,8 +4129,105 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   unitLockChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.2)' },
   unitLockText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   nodeWrap: { alignItems: 'center' },
+  hubRoot: { position: 'relative', overflow: 'visible', alignItems: 'center', justifyContent: 'center' },
+  hubRootColumn: { flexDirection: 'column', width: 'auto' },
+  pathNodeLabelBelow: {
+    marginTop: 6,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    maxWidth: 120,
+    paddingHorizontal: 4,
+  },
+  pathNodeLabelCurrentText: { fontWeight: '800', color: '#334155' },
+  pathNodeLabelPill: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -11,
+    zIndex: 0,
+    maxWidth: 112,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  pathNodeLabelRight: { left: '100%', marginLeft: 14 },
+  pathNodeLabelLeft: { right: '100%', marginRight: 14 },
+  pathNodeLabelDone: { borderColor: '#A7F3D0' },
+  pathNodeLabelLocked: { borderColor: '#E2E8F0' },
+  pathNodeLabelText: { fontSize: 12, fontWeight: '700', color: '#334155', lineHeight: 16 },
+  pathNodeLabelCurrent: {
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  pathUnitFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 6,
+    zIndex: 2,
+  },
+  pathStartBubbleMap: {
+    position: 'absolute',
+    bottom: '100%',
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8E2D5',
+    backgroundColor: '#FFFFFF',
+    zIndex: 5,
+  },
+  pathStartBubble: {
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBECE0',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  pathStartBubbleText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    color: '#079D68',
+  },
   node: { alignItems: 'center', justifyContent: 'center' },
-  nodeCrown: { position: 'absolute', top: -10, right: -2 },
+  nodeCrown: { position: 'absolute', top: -8 },
+  nodeCrownRight: { right: -2 },
+  nodeCrownLeft: { left: -2 },
+  pathHubLockBadge: {
+    position: 'absolute',
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#CBD5E1',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
   videoWatchedBadge: {
     position: 'absolute', top: -4, right: -4, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#10B981', borderWidth: 2, borderColor: '#FFFFFF',
@@ -4089,6 +4285,31 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  pathNudgeBubble: {
+    position: 'absolute',
+    top: -34,
+    left: 0,
+    right: 0,
+    alignSelf: 'center',
+    zIndex: 30,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBECE0',
+    shadowColor: '#079D68',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  pathNudgeBubbleText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
   nodeLabel: { marginTop: 8, color: '#334155', fontSize: 13, fontWeight: '600' },
   unitChestWrap: {
@@ -4593,6 +4814,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '500' },
   playQuestionCard: {
+    position: 'relative',
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 20,
@@ -4606,6 +4828,27 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  hintCornerBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: PLAY_QUESTION_CHROME.hintButton.borderColor,
+    backgroundColor: PLAY_QUESTION_CHROME.hintButton.backgroundColor,
+  },
+  hintCornerBtnText: {
+    color: PLAY_QUESTION_CHROME.hintButton.color,
+    fontSize: PLAY_QUESTION_CHROME.hintButton.fontSize,
+    fontWeight: PLAY_QUESTION_CHROME.hintButton.fontWeight,
+    maxWidth: 120,
+  },
   playMetaChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   playMetaChip: {
     fontSize: 11,
@@ -4617,37 +4860,71 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     maxWidth: '72%',
   },
   promptMascotBox: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    backgroundColor: PLAY_QUESTION_CHROME.mascotWrap.backgroundColor,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
+    borderColor: PLAY_QUESTION_CHROME.mascotWrap.borderColor,
   },
   playPrompt: {
-    color: colors.ink,
-    fontSize: 19,
-    fontWeight: '800',
-    lineHeight: 26,
+    color: PLAY_QUESTION_CHROME.prompt.color,
+    fontSize: PLAY_QUESTION_CHROME.prompt.fontSize,
+    fontWeight: PLAY_QUESTION_CHROME.prompt.fontWeight,
+    lineHeight: PLAY_QUESTION_CHROME.prompt.lineHeight,
     flexShrink: 1,
+    marginTop: 4,
   },
-  questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 2 },
-  questionLabelBadge: {
-    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: '#FEF2F2',
-    borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 11, fontWeight: '900',
-    textTransform: 'uppercase', overflow: 'hidden',
+  questionMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
+  questionEyebrow: {
+    fontSize: PLAY_QUESTION_CHROME.eyebrow.fontSize,
+    fontWeight: PLAY_QUESTION_CHROME.eyebrow.fontWeight,
+    color: PLAY_QUESTION_CHROME.eyebrow.color,
   },
-  instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '400' },
+  questionMetaSep: { color: '#CBD5E1', fontSize: 12, fontWeight: '400' },
+  playTypeChip: {
+    fontSize: PLAY_QUESTION_CHROME.typeChip.fontSize,
+    fontWeight: PLAY_QUESTION_CHROME.typeChip.fontWeight,
+    color: PLAY_QUESTION_CHROME.typeChip.color,
+    flexShrink: 1,
+    maxWidth: '70%',
+  },
   playCardFooter: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
     paddingTop: 10, marginTop: 2, borderTopWidth: 1, borderTopColor: '#F1F5F9',
   },
+  playCardFooterTight: {
+    paddingTop: 8,
+    marginTop: 0,
+  },
+  playCardFooterExplainOnly: {
+    justifyContent: 'flex-start',
+  },
+  explainFooterBtn: {
+    borderColor: PLAY_QUESTION_CHROME.hintButton.borderColor,
+    backgroundColor: PLAY_QUESTION_CHROME.hintButton.backgroundColor,
+  },
+  explainFooterBtnText: {
+    color: PLAY_QUESTION_CHROME.hintButton.color,
+    fontSize: PLAY_QUESTION_CHROME.hintButton.fontSize,
+    fontWeight: PLAY_QUESTION_CHROME.hintButton.fontWeight,
+  },
   hintFooterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 14, borderWidth: 1.5, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
+  },
+  hintFooterBtnNudge: {
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+    backgroundColor: '#FEF3C7',
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '800' },
   selectAnswerHint: { color: '#94A3B8', fontSize: 13, fontWeight: '400' },

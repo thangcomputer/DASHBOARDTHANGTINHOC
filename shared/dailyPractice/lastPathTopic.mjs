@@ -66,3 +66,22 @@ export function pathTopicPrimaryCtaLabel(topicRow) {
 export function pathTopicNextLinePrefix(topicRow) {
   return pathTopicHasLearningProgress(topicRow) ? 'Tiếp theo' : 'Bắt đầu';
 }
+
+function unitHasTouchedProgress(unit) {
+  if (!unit) return false;
+  for (const step of unit.steps || []) {
+    if (step.state === 'completed' || step.state === 'active') return true;
+  }
+  for (const node of unit.pathNodes || []) {
+    if (node.state === 'completed' || node.state === 'active') return true;
+  }
+  return false;
+}
+
+/** Nhãn nút hành động trên banner chặng: Bắt đầu / Tiếp tục học / Ôn lại. */
+export function unitStageCtaLabel(unit, { isNextUnit = false } = {}) {
+  if (!unit || unit.state === 'locked') return null;
+  if (unit.state === 'completed') return 'Ôn lại';
+  if (unitHasTouchedProgress(unit) || isNextUnit) return 'Tiếp tục học';
+  return 'Bắt đầu';
+}

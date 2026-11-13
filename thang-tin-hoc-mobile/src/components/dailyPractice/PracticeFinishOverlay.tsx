@@ -25,6 +25,7 @@ export function PracticeFinishOverlay({
 }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const insets = useSafeAreaInsets();
+  const reviewItems = (summary.reviewAll?.length ? summary.reviewAll : summary.review) || [];
 
   return (
     <>
@@ -47,7 +48,7 @@ export function PracticeFinishOverlay({
           </ScrollView>
         </View>
       </Modal>
-      <PracticeReviewModal review={summary.review || []} visible={reviewOpen} onClose={() => setReviewOpen(false)} />
+      <PracticeReviewModal review={reviewItems} visible={reviewOpen} onClose={() => setReviewOpen(false)} />
     </>
   );
 }
@@ -55,7 +56,7 @@ export function PracticeFinishOverlay({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.44)',
+    backgroundColor: 'rgba(2, 6, 23, 0.68)',
     justifyContent: 'center',
   },
   scroll: {

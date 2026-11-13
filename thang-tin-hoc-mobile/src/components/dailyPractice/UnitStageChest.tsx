@@ -111,9 +111,10 @@ type Props = {
   unit: DpPathUnit;
   play?: (sound: GameSound) => void;
   onClaimed?: () => void;
+  variant?: 'bar' | 'chip';
 };
 
-export function UnitStageChest({ unit, play, onClaimed }: Props) {
+export function UnitStageChest({ unit, play, onClaimed, variant = 'bar' }: Props) {
   const { doneSteps, totalSteps } = unitStepProgress(unit);
   const rewardXp = unit.chestRewardXp ?? UNIT_CHEST_REWARD_XP;
   const complete = unit.state === 'completed' || (totalSteps > 0 && doneSteps >= totalSteps);
@@ -237,25 +238,75 @@ export function UnitStageChest({ unit, play, onClaimed }: Props) {
     </>
   );
 
+  const ariaLabel = claimedStyle
+    ? `Đã mở rương chặng, +${rewardXp} XP`
+    : doneStyle
+      ? `Mở rương chặng, nhận ${rewardXp} XP`
+      : `Rương phần thưởng chặng ${doneSteps}/${totalSteps}`;
+
+  const chipIcon = (
+    <View style={[styles.chipIcon, claimedStyle ? styles.iconClaimed : doneStyle ? styles.iconDone : styles.iconPending]}>
+      {claimedStyle ? (
+        <Check size={18} color="#FFFFFF" strokeWidth={3} />
+      ) : doneStyle && claiming ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Gift size={18} color={doneStyle ? '#FFFFFF' : '#94A3B8'} strokeWidth={2.5} />
+      )}
+    </View>
+  );
+
+  const chipProgress = (
+    <Text style={[styles.chipCount, claimedStyle ? styles.chipCountClaimed : doneStyle ? styles.chipCountDone : styles.chipCountPending]}>
+      {claimedStyle ? `+${rewardXp}` : `${doneSteps}/${totalSteps}`}
+    </Text>
+  );
+
+  const chipWrapStyle = [styles.chipWrap, doneStyle && !claimedStyle && styles.chipWrapReady];
+
+  const chipNode = (
+    <View style={chipWrapStyle}>
+      {chipIcon}
+      {chipProgress}
+    </View>
+  );
+
   return (
     <>
-      <View style={styles.wrap}>
-        {claimable ? (
+      {variant === 'chip' ? (
+        claimable ? (
           <Pressable
             onPress={onPress}
             disabled={claiming}
-            style={[styles.box, styles.boxDone, claiming && styles.boxBusy]}
+            style={chipWrapStyle}
             accessibilityRole="button"
-            accessibilityLabel={`Mở rương chặng, nhận ${rewardXp} XP`}
+            accessibilityLabel={ariaLabel}
           >
-            {content}
+            {chipIcon}
+            {chipProgress}
           </Pressable>
         ) : (
-          <View style={[styles.box, claimedStyle ? styles.boxClaimed : doneStyle ? styles.boxDone : styles.boxPending]}>
-            {content}
-          </View>
-        )}
-      </View>
+          <View accessibilityLabel={ariaLabel}>{chipNode}</View>
+        )
+      ) : (
+        <View style={styles.wrap}>
+          {claimable ? (
+            <Pressable
+              onPress={onPress}
+              disabled={claiming}
+              style={[styles.box, styles.boxDone, claiming && styles.boxBusy]}
+              accessibilityRole="button"
+              accessibilityLabel={ariaLabel}
+            >
+              {content}
+            </Pressable>
+          ) : (
+            <View style={[styles.box, claimedStyle ? styles.boxClaimed : doneStyle ? styles.boxDone : styles.boxPending]}>
+              {content}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Modal hiệu ứng bay ra nhận 50XP + lớp phủ trắng mờ chuyên nghiệp */}
       <Modal
@@ -349,6 +400,41 @@ export function UnitStageChest({ unit, play, onClaimed }: Props) {
 }
 
 const styles = StyleSheet.create({
+  chipWrap: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  chipWrapReady: {
+    ...(Platform.OS === 'web' ? {
+      boxShadow: '0 0 12px rgba(251,191,36,0.45)',
+    } : {
+      shadowColor: '#F59E0B',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.45,
+      shadowRadius: 8,
+      elevation: 4,
+    }),
+  },
+  chipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: '#CBD5E1',
+  },
+  chipCount: {
+    fontSize: 9,
+    fontWeight: '900',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  chipCountPending: { backgroundColor: '#F8FAFC', color: '#64748B' },
+  chipCountDone: { backgroundColor: '#FEF3C7', color: '#92400E' },
+  chipCountClaimed: { backgroundColor: '#D1FAE5', color: '#065F46' },
   wrap: {
     paddingHorizontal: 20,
     paddingTop: 10,

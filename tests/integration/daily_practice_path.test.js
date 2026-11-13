@@ -375,8 +375,12 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   assert.ok(achievement.includes('hasCelebratedSession'), 'chỉ kích hoạt chúc mừng 1 lần cho mỗi sự kiện hoàn thành');
 
   const pathDecor = read('client/src/components/student/dailyPractice/PathDecor.jsx');
-  assert.ok(pathDecor.includes('VietnamLearningMap'), 'bản đồ hành trình học tập Việt Nam');
-  assert.ok(pathDecor.includes('Hoàng Sa') && pathDecor.includes('Trường Sa'), 'bản đồ Việt Nam có Hoàng Sa & Trường Sa');
+  assert.ok(pathDecor.includes('VietnamMapBackground'), 'bản đồ hành trình học tập Việt Nam');
+  assert.ok(pathDecor.includes('VIETNAM_MAINLAND_PATH'), 'bản đồ dùng viền đất liền Natural Earth');
+  const pathView = read('client/src/components/student/dailyPractice/PathView.jsx');
+  assert.ok(pathView.includes('VietnamJourneyStage'), 'lộ trình gắn nút lên bản đồ viewBox');
+  assert.ok(read('client/src/components/student/dailyPractice/dewVietnamJourney/DewSkillVietnamJourney.jsx').includes('ds-journey'), 'tích hợp bộ React mẫu DewSkill');
+  assert.ok(read('shared/dailyPractice/dewSkillJourneyAnchors.mjs').includes('dewSkillAnchorsForCount'), 'mốc theo số hoạt động chặng');
 
   const soundUtil = read('client/src/utils/sound.js');
   assert.ok(soundUtil.includes('export const GameSoundManager'), 'GameSoundManager quản lý âm thanh');

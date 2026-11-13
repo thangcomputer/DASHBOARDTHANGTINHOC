@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import AchievementPopup from './AchievementPopup';
 import PracticeReviewModal from './PracticeReviewModal';
+import './achievementPopup.css';
 
 export default function PracticeFinishOverlay({
   summary,
@@ -11,10 +12,19 @@ export default function PracticeFinishOverlay({
   onRelatedVideo,
 }) {
   const [reviewOpen, setReviewOpen] = useState(false);
+  const reviewItems = (summary?.reviewAll?.length ? summary.reviewAll : summary?.review) || [];
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[9200] flex max-h-[100dvh] items-center justify-center overflow-y-auto bg-slate-950/44 p-3 sm:p-4" role="presentation">
+      <div className="dp-practice-finish-scrim" role="dialog" aria-modal="true">
         <AchievementPopup
           summary={summary}
           eventKey={summary?.sessionId || summary?.id || ''}
@@ -26,7 +36,7 @@ export default function PracticeFinishOverlay({
         />
       </div>
       {reviewOpen ? (
-        <PracticeReviewModal review={summary?.review || []} onClose={() => setReviewOpen(false)} />
+        <PracticeReviewModal review={reviewItems} onClose={() => setReviewOpen(false)} />
       ) : null}
     </>,
     document.body,

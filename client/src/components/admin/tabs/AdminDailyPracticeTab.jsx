@@ -426,7 +426,22 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
     return body;
   };
 
+  const EXPLAIN_MIN = 10;
+  const explainOk = String(form.explanation || '').trim().length >= EXPLAIN_MIN;
+  const hintDup = form.hint.trim() && form.explanation.trim()
+    && form.hint.trim().toLocaleLowerCase('vi') === form.explanation.trim().toLocaleLowerCase('vi');
+
   const save = async () => {
+    if (form.status === 'published') {
+      if (!explainOk) {
+        toast.error(`Cần nhập Giải thích chi tiết (ít nhất ${EXPLAIN_MIN} ký tự) khi xuất bản.`);
+        return;
+      }
+      if (hintDup) {
+        toast.error('Giải thích không được trùng nội dung Gợi ý.');
+        return;
+      }
+    }
     setSaving(true);
     try {
       const saved = question
@@ -599,18 +614,39 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className={LABEL} htmlFor="dp-q-hint">Gợi ý (không lộ thẳng đáp án)</label>
-            <input id="dp-q-hint" className={INPUT} value={form.hint} maxLength={300} onChange={(e) => set({ hint: e.target.value })} />
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-3">
+            <label className={LABEL} htmlFor="dp-q-hint">Gợi ý (khi học viên bấm Gợi ý · trừ XP)</label>
+            <p className="mb-1.5 text-[11px] font-semibold text-amber-900/80">Chỉ manh mối ngắn — không lộ hết đáp án, không dùng làm giải thích.</p>
+            <input id="dp-q-hint" className={INPUT} value={form.hint} maxLength={300} onChange={(e) => set({ hint: e.target.value })} placeholder="Ví dụ: Nghĩ phím tắt chung của PowerPoint…" />
           </div>
           <div>
             <label className={LABEL} htmlFor="dp-q-image">Ảnh minh họa (URL, không bắt buộc)</label>
             <input id="dp-q-image" className={INPUT} value={form.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })} placeholder="https://..." />
           </div>
         </div>
-        <div>
-          <label className={LABEL} htmlFor="dp-q-explain">Giải thích (hiện sau khi trả lời)</label>
-          <textarea id="dp-q-explain" rows={2} className={INPUT} value={form.explanation} maxLength={800} onChange={(e) => set({ explanation: e.target.value })} />
+        <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-3">
+          <label className={LABEL} htmlFor="dp-q-explain">
+            Giải thích chi tiết
+            {form.status === 'published' ? <span className="text-red-600"> *</span> : null}
+          </label>
+          <p className="mb-1.5 text-[11px] font-semibold text-sky-900/85">
+            Học viên xem khi bấm <b>Giải thích</b> sau khi trả lời. Viết riêng (vì sao đúng, mẹo nhớ) — không copy Gợi ý.
+          </p>
+          <textarea
+            id="dp-q-explain"
+            rows={4}
+            className={`${INPUT} !min-h-[88px]`}
+            value={form.explanation}
+            maxLength={800}
+            onChange={(e) => set({ explanation: e.target.value })}
+            placeholder="Ví dụ: Ctrl + M thêm slide mới trong PowerPoint; khác Ctrl + N (tài liệu mới)…"
+          />
+          {form.status === 'published' && !explainOk ? (
+            <p className="mt-1 text-[11px] font-bold text-red-600">Cần ít nhất {EXPLAIN_MIN} ký tự để xuất bản.</p>
+          ) : null}
+          {hintDup ? (
+            <p className="mt-1 text-[11px] font-bold text-red-600">Giải thích đang trùng với Gợi ý.</p>
+          ) : null}
         </div>
       </div>
     </Modal>
@@ -1868,6 +1904,9 @@ export default function AdminDailyPracticeTab() {
                               {q.status === 'draft'
                                 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Nháp{q.source === 'ai' ? ' · AI' : ''}</span>
                                 : <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700"><CheckCircle2 size={10} /> Đã xuất bản</span>}
+                              {!String(q.explanation || '').trim() ? (
+                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">Thiếu giải thích</span>
+                              ) : null}
                             </div>
                             <p className="text-sm font-bold text-slate-800">{q.prompt}</p>
                             <p className="mt-0.5 truncate text-xs text-slate-500">{answerSummary(q)}</p>

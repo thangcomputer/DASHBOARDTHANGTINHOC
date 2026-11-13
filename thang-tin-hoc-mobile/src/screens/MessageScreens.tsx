@@ -24,7 +24,7 @@ import {
   Bot, CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle, MessageSquare,
   MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, Sparkles, ThumbsUp, Trash2, UserPlus, UserRound, Video, X,
 } from 'lucide-react-native';
-import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
+import { AppHeader, AppScreen, Avatar, Card, ChromeScrollView, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
 import { messageService, scheduleService } from '../services/mockService';
@@ -2711,7 +2711,7 @@ export function ConversationScreen() {
           </View>
         ) : null}
         <View style={styles.threadSurface}>
-        <ScrollView
+        <ChromeScrollView
           ref={threadRef}
             style={styles.threadScroll}
           contentContainerStyle={styles.thread}
@@ -3375,7 +3375,7 @@ export function ConversationScreen() {
                 ) : null}
               </View>
             ) : null}
-        </ScrollView>
+        </ChromeScrollView>
         </View>
         {replyingTo && !isAiSupportConversation ? (
           <View style={styles.replyBar}>

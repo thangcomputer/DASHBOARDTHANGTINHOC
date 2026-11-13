@@ -17,18 +17,7 @@ export function resolveFeedbackMascotEmotion({ isCorrect, wrongTryCount = 0 }) {
   return 'incorrect';
 }
 
-export function resolveWrongEncouragement(wrongTryCount, fallback = '') {
-  if (wrongTryCount >= 4) {
-    return 'Ôn lại phần kiến thức liên quan rồi quay lại — mỗi lần thử bạn tiến thêm một bước!';
-  }
-  if (wrongTryCount >= 3) {
-    return 'Mở Giải thích từng bước để nắm chắc khái niệm nhé!';
-  }
-  if (wrongTryCount >= 2) {
-    return 'Lần tới thử Gợi ý trước khi chọn — bạn làm được mà!';
-  }
-  return fallback || 'Đừng nản — đọc lại đề và thử lại nhé!';
-}
+export { resolveWrongEncouragement, shouldNudgeHintButton } from '../../../../../shared/dailyPractice/quizWrongEncouragement.mjs';
 
 export function shouldSuppressWrongShake(wrongTryCount) {
   return wrongTryCount >= 4;

@@ -1,0 +1,129 @@
+/* Đầu thẻ câu — đồng bộ shared/dailyPractice/playQuestionChrome.mjs */
+
+.dp-play-mascot-wrap {
+  display: flex;
+  height: 3.25rem;
+  width: 3.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+@media (min-width: 640px) {
+  .dp-play-mascot-wrap {
+    height: 3.5rem;
+    width: 3.5rem;
+  }
+}
+
+.dp-play-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  color: #64748b;
+}
+
+.dp-play-eyebrow {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.dp-play-meta-sep {
+  color: #cbd5e1;
+  font-weight: 400;
+  user-select: none;
+}
+
+.dp-play-type-chip {
+  font-weight: 500;
+  color: #475569;
+}
+
+.dp-play-prompt {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.4375rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+@media (min-width: 640px) {
+  .dp-play-prompt {
+    font-size: 1.0625rem;
+  }
+}
+
+.dp-play-hint-corner {
+  display: inline-flex;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0.625rem;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding-inline: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  transition: background-color 0.15s ease;
+  box-shadow: none !important;
+}
+
+.dp-play-hint-corner:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.dp-play-hint-corner:disabled {
+  opacity: 0.55;
+}
+
+.dp-play-hint-corner .dp-play-hint-xp {
+  border-radius: 0.375rem;
+  background: #f1f5f9;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.dp-play-hint-reveal {
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.375rem;
+  color: #334155;
+}
+
+.dp-play-footer-explain {
+  display: inline-flex;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding-inline: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  transition: background-color 0.15s ease;
+}
+
+.dp-play-footer-explain:hover {
+  background: #f8fafc;
+}

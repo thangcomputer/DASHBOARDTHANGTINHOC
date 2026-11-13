@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, Zap,
+  ArrowLeft, BookOpen, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, Zap,
 } from 'lucide-react';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { LEARNING_GOAL_CHANGED_EVENT, lessonResumeUrl } from '../../../utils/learningGoal';
 import {
-  DIFFICULTIES, QUESTION_TYPES, QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, difficultyMeta, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage, topicColor, topicIcon,
+  DIFFICULTIES, QUESTION_TYPES, QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, difficultyMeta, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage,
 } from '../../../utils/dailyPractice';
 import DailyPracticeHero from './DailyPracticeHero';
+import DailyPracticeSubjectBar from './DailyPracticeSubjectBar';
 import DailyPracticeGoalPanel from './DailyPracticeGoalPanel';
 import Mascot from './Mascot';
 import AnimatedProgressBar from './AnimatedProgressBar';
@@ -22,13 +23,15 @@ import { reviewItemFollowUpLine } from '../../../../../shared/dailyPractice/revi
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import PracticeFinishOverlay from './PracticeFinishOverlay';
 import ComboCelebrationOverlay from './ComboCelebrationOverlay';
-import { shouldShowComboCelebration } from './quizFeedbackOrchestration';
+import { shouldNudgeHintButton, shouldShowComboCelebration } from './quizFeedbackOrchestration';
 import BuyXpModal from './BuyXpModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import FreeMeetPlanModal, { isFreePortalAccount } from './FreeMeetPlanModal';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from './Questions';
 import './dailyPracticeDew.css';
+import './playQuestionChrome.css';
+import { PLAY_QUESTION_CHROME } from '../../../../../shared/dailyPractice/playQuestionChrome.mjs';
 
 const MODE_STORAGE_KEY = 'cms_daily_practice_mode';
 const MODES = [
@@ -131,6 +134,17 @@ function HomeScreen({
     : 'Bắt đầu luyện tập';
   const heroDisabled = mode === 'free' ? (!topicId || starting) : starting;
   const freePortal = isFreePortalAccount();
+  const pathTopicRows = path?.topics || [];
+  const subjectBarTopics = pathTopicRows.length ? pathTopicRows : topics;
+  const subjectBarVariant = pathTopicRows.length ? 'path' : 'free';
+  const subjectBarActiveId = mode === 'path'
+    ? (activePathTopicId || topicId)
+    : (topicId || activePathTopicId);
+
+  const pickSubject = (id) => {
+    setActivePathTopicId(id);
+    setTopicId(id);
+  };
 
   return (
     <div className="dp-shell mx-auto w-full max-w-6xl space-y-5 xl:max-w-7xl" data-lms-ui>
@@ -162,7 +176,18 @@ function HomeScreen({
       )}
 
       <div className="grid gap-5 lg:grid-cols-12 lg:items-start lg:gap-6">
-        <div className="min-w-0 space-y-4 lg:col-span-8">
+        <div className="min-w-0 lg:col-span-8">
+          <section className="dp-dew-main-panel flex flex-col gap-3 sm:gap-4">
+          {subjectBarTopics.length > 0 ? (
+            <DailyPracticeSubjectBar
+              className="dp-dew-subject-carousel--responsive"
+              topics={subjectBarTopics}
+              variant={subjectBarVariant}
+              activeTopicId={subjectBarActiveId}
+              onSelect={pickSubject}
+            />
+          ) : null}
+
           <div
             className={`grid grid-cols-2 gap-1 rounded-[16px] p-1 ${
               freePortal ? 'border border-[#D5E7DF] bg-[#E8F3EE]' : 'bg-slate-100'
@@ -204,10 +229,12 @@ function HomeScreen({
               error={pathError}
               starting={starting}
               initialTopicId={initialTopicId}
+              activeTopicId={activePathTopicId}
               onTopicChange={setActivePathTopicId}
               onStartStep={onStartStep}
               onPathChanged={onPathChanged}
               layout="wide"
+              showSubjectBar={false}
               continueVideo={continueVideo}
               onContinueVideoOpened={onContinueVideoOpened}
               requestedLesson={requestedLesson}
@@ -228,32 +255,6 @@ function HomeScreen({
 
           {mode === 'free' && topics.length > 0 && (
             <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="-mx-1 flex gap-2 overflow-x-auto overflow-y-hidden px-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
-                {topics.map((topic) => {
-                  const Icon = topicIcon(topic.icon);
-                  const tone = topicColor(topic.color);
-                  const active = topic.id === topicId;
-                  const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
-                  return (
-                    <button
-                      key={topic.id}
-                      type="button"
-                      onClick={() => { gameSounds.tap(); setTopicId(topic.id); }}
-                      className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 px-3 py-2.5 text-left transition !shadow-none sm:min-w-[160px] ${active ? 'shadow-sm' : ''}`}
-                      style={{ borderColor: active ? tone.to : '#E2E8F0', background: active ? tone.soft : '#FFFFFF' }}
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white" style={{ background: `linear-gradient(180deg, ${tone.from}, ${tone.to})` }}>
-                        <Icon size={16} aria-hidden="true" />
-                      </span>
-                      <span>
-                        <span className="block text-sm font-black text-slate-900">{topic.name}</span>
-                        <span className="block text-[11px] font-semibold text-slate-500">{total} câu</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
               <p className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
                 Luyện tự do chỉ <span className="font-black">trắc nghiệm ôn</span>, không tính XP, không video, không dùng câu đã gắn chặng.
               </p>
@@ -296,6 +297,7 @@ function HomeScreen({
               </button>
             </div>
           )}
+          </section>
         </div>
 
         <aside className="min-w-0 lg:col-span-4">
@@ -388,6 +390,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   }, []);
   const [combo, setCombo] = useState(0);
   const [comboCelebration, setComboCelebration] = useState(null);
+  const [wrongTryCount, setWrongTryCount] = useState(0);
+  const [answerResetKey, setAnswerResetKey] = useState(0);
+  const [explainOpen, setExplainOpen] = useState(false);
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
@@ -412,8 +417,18 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     [session.path, meta.label, level],
   );
 
+  useEffect(() => {
+    setExplainOpen(false);
+  }, [question.id, answerResetKey]);
+
+  const resetInteractiveAnswer = useCallback(() => {
+    setPending(null);
+    setChosen(null);
+    setAnswerResetKey((key) => key + 1);
+  }, []);
+
   const submit = useCallback(async (answer) => {
-    if (busy || result) return;
+    if (busy || result?.correct) return;
     setBusy(true);
     setError('');
     setChosen(answer.index ?? answer.value ?? null);
@@ -422,6 +437,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       setResult(data);
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       if (data.correct) {
+        setWrongTryCount(0);
         setCombo((value) => {
           const nextVal = value + 1;
           if (shouldShowComboCelebration(nextVal)) {
@@ -432,9 +448,13 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         setFeedbackTitle(randomPraise());
         gameSounds.correct();
       } else {
+        setWrongTryCount(typeof data.wrongTryCount === 'number' ? data.wrongTryCount : (wrongTryCount + 1));
         setCombo(0);
         setFeedbackTitle(randomComfort());
         gameSounds.wrong();
+        if (question.type !== 'mcq' && question.type !== 'truefalse') {
+          resetInteractiveAnswer();
+        }
       }
     } catch (err) {
       if (err.status === 402) setBuyXpOpen(true);
@@ -442,10 +462,10 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     } finally {
       setBusy(false);
     }
-  }, [busy, result, session.id, question.id]);
+  }, [busy, question.type, resetInteractiveAnswer, result, session.id, question.id, wrongTryCount]);
 
   const askHint = async () => {
-    if (reveal || result || busy) return;
+    if (reveal || result?.correct || busy) return;
     if (!xpDisabled && hintShareXp > 0 && profileXp < hintShareXp) {
       setBuyXpOpen(true);
       return;
@@ -473,6 +493,8 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       setResult(null);
       setReveal(null);
       setHintText('');
+      setWrongTryCount(0);
+      setAnswerResetKey((key) => key + 1);
       return;
     }
     setBusy(true);
@@ -499,10 +521,10 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   };
 
   const props = { question, reveal, result, onChange: setPending };
-  const progress = Math.round(((index + (result ? 1 : 0)) / total) * 100);
+  const progress = Math.round(((index + (result?.correct ? 1 : 0)) / total) * 100);
   const immediate = question.type === 'mcq' || question.type === 'truefalse';
   const contextLabel = headerChips[0]?.text || level.label;
-  const answeredCount = index + (result ? 1 : 0);
+  const answeredCount = index + (result?.correct ? 1 : 0);
   const quitLossXp = isPerQuestion ? Math.max(0, total - answeredCount) * perQuestionStake : stakeXp;
   const confirmedQuestionXp = result?.correct
     ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
@@ -562,26 +584,37 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       {/* Thẻ câu */}
       <section className={`relative rounded-[28px] bg-white p-5 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 sm:p-8 ${result && !result.correct ? 'dp-shake' : ''}`}>
         {result?.correct && <Confetti />}
-        <div className="flex items-start gap-3.5 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-slate-50 ring-1 ring-emerald-100/80 sm:h-16 sm:w-16">
+        {!result?.correct ? (
+          <button
+            type="button"
+            onClick={askHint}
+            disabled={Boolean(reveal) || busy}
+            aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, trừ ngay ${hintShareXp} XP`)}
+            title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, trừ ngay −${hintShareXp} XP`}
+            className={`absolute right-4 top-4 z-20 dp-play-hint-corner sm:right-6 sm:top-6 disabled:opacity-50 ${shouldNudgeHintButton(wrongTryCount, Boolean(reveal)) ? 'dp-hint-nudge' : ''}`}
+          >
+            <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className={reveal ? 'text-slate-400' : 'text-slate-500'} />
+            <span>{reveal ? 'Đã gợi ý' : 'Gợi ý'}</span>
+            {!xpDisabled && !reveal && hintShareXp > 0 ? (
+              <span className="dp-play-hint-xp">−{hintShareXp}</span>
+            ) : null}
+          </button>
+        ) : null}
+        <div className="flex items-start gap-3.5 border-b border-slate-100 pb-5 pr-20 sm:gap-5 sm:pb-6 sm:pr-24">
+          <div className="dp-play-mascot-wrap">
             <Mascot
               mood={result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning'}
-              size={50}
+              size={PLAY_QUESTION_CHROME.mascotSize.web}
               className="shrink-0"
             />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-lg bg-red-50 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider text-red-600 ring-1 ring-red-100">
-                Câu hỏi :
-              </span>
-              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                {meta.label}
-              </span>
+            <div className="dp-play-meta-row">
+              <span className="dp-play-eyebrow">{PLAY_QUESTION_CHROME.label}</span>
+              <span className="dp-play-meta-sep" aria-hidden="true">·</span>
+              <span className="dp-play-type-chip">{meta.label}</span>
             </div>
-            <h2 className="mt-2.5 text-xl font-black leading-snug tracking-tight text-slate-900 sm:text-2xl">
-              {question.prompt}
-            </h2>
+            <p className="dp-play-prompt">{question.prompt}</p>
           </div>
         </div>
 
@@ -589,14 +622,14 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           <img src={question.imageUrl} alt="" className="mt-5 max-h-60 w-full rounded-2xl bg-slate-50 object-contain p-2 ring-1 ring-slate-200/70" />
         )}
 
-        {hintText && (
-          <p className="dp-pop mt-5 flex items-start gap-2.5 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
-            <Lightbulb size={17} className="mt-0.5 shrink-0 fill-amber-300 text-amber-500" />
+        {hintText ? (
+          <p className="dp-play-hint-reveal">
+            <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className="mt-0.5 shrink-0 text-slate-500" />
             <span>{hintText}</span>
           </p>
-        )}
+        ) : null}
 
-        <div className="mt-6" key={question.id}>
+        <div className="mt-6" key={`${question.id}-${answerResetKey}`}>
           {question.type === 'mcq' && <McqQuestion {...props} chosen={chosen} onSubmit={submit} />}
           {question.type === 'truefalse' && <TrueFalseQuestion {...props} chosen={chosen} onSubmit={submit} />}
           {question.type === 'order' && <OrderQuestion {...props} />}
@@ -605,32 +638,6 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           {question.type === 'sort' && <SortQuestion {...props} />}
         </div>
         {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
-
-        {!result && (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-            <button
-              type="button"
-              onClick={askHint}
-              disabled={Boolean(reveal) || busy}
-              aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, trừ ngay ${hintShareXp} XP`)}
-              title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, trừ ngay −${hintShareXp} XP`}
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-200/90 bg-amber-50/70 px-4 text-xs font-extrabold text-amber-800 transition hover:bg-amber-100/80 disabled:opacity-50 !shadow-none"
-            >
-              <Lightbulb size={17} className={reveal ? 'text-slate-400' : 'fill-amber-300 text-amber-500'} />
-              <span>{reveal ? 'Đã mở gợi ý' : 'Gợi ý'}</span>
-              {!xpDisabled && !reveal && hintShareXp > 0 && (
-                <span className="rounded-md bg-amber-200/80 px-1.5 py-0.5 text-[11px] font-black text-amber-900">−{hintShareXp} XP</span>
-              )}
-            </button>
-            {!immediate ? (
-              <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary min-w-[160px] !py-3">
-                {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />} Kiểm tra
-              </button>
-            ) : (
-              <p className="text-xs font-semibold text-slate-400">Chọn một đáp án phía trên để trả lời</p>
-            )}
-          </div>
-        )}
 
         {result && (
           <AnswerFeedback
@@ -642,7 +649,41 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             isLastQuestion={index + 1 >= total}
             busy={busy}
             onNext={next}
+            onRetry={() => submit(pending)}
+            canRetry={Boolean(pending) && !busy}
+            wrongTryCount={wrongTryCount}
+            explainOpen={explainOpen}
+            onExplainOpenChange={setExplainOpen}
           />
+        )}
+
+        {!result?.correct && (
+          <div className={`flex flex-wrap items-center gap-2.5 border-t border-slate-100 ${result ? 'mt-3 pt-3' : 'mt-6 pt-5'} ${result && !result.correct ? 'justify-start' : 'justify-end'}`}>
+            {result && !result.correct ? (
+              <button
+                type="button"
+                onClick={() => {
+                  gameSounds.tap();
+                  setExplainOpen((open) => !open);
+                }}
+                aria-expanded={explainOpen}
+                className="dp-play-footer-explain"
+              >
+                <BookOpen size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} aria-hidden="true" />
+                <span>{explainOpen ? 'Ẩn giải thích' : 'Giải thích'}</span>
+              </button>
+            ) : null}
+            {!result && !immediate ? (
+              <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary min-w-[160px] !py-3">
+                {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
+                {' '}
+                Kiểm tra
+              </button>
+            ) : null}
+            {!result && immediate ? (
+              <p className="text-xs font-semibold text-slate-400">Chọn một đáp án phía trên để trả lời</p>
+            ) : null}
+          </div>
         )}
       </section>
 

@@ -104,6 +104,8 @@ export type DpAnswerResult = {
   explanation: string;
   profileXp?: number;
   wrongPenaltyXp?: number;
+  wrongTryCount?: number;
+  xpDelta?: number;
 };
 
 export type DpReveal = {
@@ -267,7 +269,8 @@ export type DpSummary = {
   reviewMode?: boolean;
   streakIncreased: boolean;
   stats: DpStats;
-  review: Array<{ id: string; prompt: string; correctAnswer: DpCorrectAnswer; explanation: string }>;
+  review: Array<{ id: string; prompt: string; correct?: boolean; correctAnswer: DpCorrectAnswer; explanation: string }>;
+  reviewAll?: Array<{ id: string; prompt: string; correct?: boolean; correctAnswer: DpCorrectAnswer; explanation: string }>;
   relatedLesson?: DpRelatedLesson | null;
   path?: DpPathResult | null;
   maxCombo?: number;

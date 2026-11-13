@@ -1,6 +1,12 @@
 import React, { useId } from 'react';
 import { Image, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
-import Svg, { Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { ClipPath, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import {
+  VIETNAM_JOURNEY_SPINE,
+  VIETNAM_MAINLAND_PATH,
+  VIETNAM_MAP_VIEWBOX,
+} from '../../../../shared/dailyPractice/vietnamMapGeo.mjs';
+import { VN_MAP_COLORS, bandPaint, vietnamMapBandStates } from '../../../../shared/dailyPractice/vietnamMapModel.mjs';
 import { Cpu, Monitor } from 'lucide-react-native';
 import { Mascot, type MascotMood } from './Mascot';
 
@@ -137,11 +143,140 @@ export function StageDropletBadge({ index, locked, accentTo }: { index: number; 
   );
 }
 
-export function PathITBackdrop({ accentSoft = '#EFF6FF' }: { accentSoft?: string }) {
+export function VietnamMapBackground({
+  topicCompletedUnits = 0,
+  topicTotalUnits = 1,
+  unitIndex = 0,
+  unitTotal = 1,
+  unitState = 'locked',
+  showSpine = true,
+}: {
+  topicCompletedUnits?: number;
+  topicTotalUnits?: number;
+  unitIndex?: number;
+  unitTotal?: number;
+  unitState?: string;
+  showSpine?: boolean;
+}) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const model = vietnamMapBandStates({
+    topicCompletedUnits,
+    topicTotalUnits,
+    unitIndex,
+    unitTotal,
+    unitState,
+  });
+  const bands: Array<['north' | 'central' | 'south', { y0: number; y1: number }]> = [
+    ['north', model.bands.north],
+    ['central', model.bands.central],
+    ['south', model.bands.south],
+  ];
+  const journeyStroke = model.journeyLit >= 0.68
+    ? VN_MAP_COLORS.journeyDone
+    : model.journeyLit > 0
+      ? VN_MAP_COLORS.journeyActive
+      : VN_MAP_COLORS.journeyLocked;
+
   return (
-    <View style={[StyleSheet.absoluteFill, styles.backdrop, { backgroundColor: accentSoft }]} pointerEvents="none">
-      <Monitor size={72} color="rgba(125,211,252,0.35)" strokeWidth={1.2} style={styles.iconMonitor} />
-      <Cpu size={60} color="rgba(254,202,202,0.45)" strokeWidth={1.2} style={styles.iconCpu} />
+    <Svg
+      width="100%"
+      height="100%"
+      viewBox={VIETNAM_MAP_VIEWBOX}
+      preserveAspectRatio="xMidYMid meet"
+      pointerEvents="none"
+    >
+      <Defs>
+        <LinearGradient id={`vn-base-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#D1FAE5" />
+          <Stop offset="0.48" stopColor="#A7F3D0" />
+          <Stop offset="1" stopColor="#BAE6FD" />
+        </LinearGradient>
+        {bands.map(([key, box]) => (
+          <ClipPath key={key} id={`vn-${uid}-${key}`}>
+            <Rect x="0" y={box.y0} width="220" height={box.y1 - box.y0} />
+          </ClipPath>
+        ))}
+      </Defs>
+      <Path
+        d={VIETNAM_MAINLAND_PATH}
+        fill={`url(#vn-base-${uid})`}
+        fillOpacity={0.55}
+        stroke="#99F6E4"
+        strokeOpacity={0.35}
+        strokeWidth={0.8}
+      />
+      {bands.map(([key]) => {
+        const paint = bandPaint(model[key]);
+        return (
+          <G key={key} clipPath={`url(#vn-${uid}-${key})`}>
+            <Path
+              d={VIETNAM_MAINLAND_PATH}
+              fill={paint.fill}
+              fillOpacity={paint.fillOpacity}
+              stroke={paint.stroke}
+              strokeOpacity={paint.strokeOpacity}
+              strokeWidth={1.2}
+            />
+          </G>
+        );
+      })}
+      {showSpine && VIETNAM_JOURNEY_SPINE ? (
+        <Path
+          d={VIETNAM_JOURNEY_SPINE}
+          fill="none"
+          stroke={journeyStroke}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="7 6"
+          opacity={0.42}
+        />
+      ) : null}
+    </Svg>
+  );
+}
+
+export function PathITBackdrop({
+  accentSoft = '#EFF6FF',
+  topicCompletedUnits = 0,
+  topicTotalUnits = 1,
+  unitIndex = 0,
+  unitTotal = 1,
+  unitState = 'locked',
+  hideMap = false,
+  fullBleed = false,
+}: {
+  accentSoft?: string;
+  topicCompletedUnits?: number;
+  topicTotalUnits?: number;
+  unitIndex?: number;
+  unitTotal?: number;
+  unitState?: string;
+  hideMap?: boolean;
+  fullBleed?: boolean;
+}) {
+  const plain = fullBleed || hideMap;
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.backdrop, plain && styles.backdropFull]} pointerEvents="none">
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          plain
+            ? { backgroundColor: '#F0F7FF', opacity: 1 }
+            : { backgroundColor: accentSoft, opacity: 0.97 },
+        ]}
+      />
+      {hideMap ? null : (
+        <View style={styles.vnMapStage}>
+          <VietnamMapBackground
+            topicCompletedUnits={topicCompletedUnits}
+            topicTotalUnits={topicTotalUnits}
+            unitIndex={unitIndex}
+            unitTotal={unitTotal}
+            unitState={unitState}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -199,8 +334,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  backdrop: { borderRadius: 22, overflow: 'hidden', opacity: 0.92 },
-  iconMonitor: { position: 'absolute', right: 4, top: '16%' as const },
-  iconCpu: { position: 'absolute', left: 0, bottom: '14%' as const },
+  backdrop: { borderRadius: 20, overflow: 'hidden' },
+  backdropFull: { borderRadius: 0 },
+  vnMapStage: {
+    position: 'absolute',
+    left: '7%',
+    right: '7%',
+    top: 92,
+    bottom: 48,
+    zIndex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   mascotBuddy: { position: 'absolute', top: '25%' as const, zIndex: 2 },
 });

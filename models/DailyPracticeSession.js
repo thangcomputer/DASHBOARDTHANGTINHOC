@@ -19,6 +19,7 @@ const dailyPracticeSessionSchema = new mongoose.Schema({
     correct: Boolean,
     hintUsed: Boolean,
     xp: Number,
+    wrongAttempts: { type: Number, default: 0 },
     answeredAt: Date,
   }],
   status: { type: String, enum: ['in_progress', 'finished', 'abandoned'], default: 'in_progress' },

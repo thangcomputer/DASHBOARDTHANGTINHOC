@@ -1790,6 +1790,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const showMobileFooter = mobileFooterVisible
     && !mobileFooterInputFocused
     && !isLessonPracticeCoursePage;
+  const mobileScrollChromeHidden = mobileFooterHiddenRouteKey === mobileFooterRouteKey
+    && !mobileFooterInputFocused
+    && !isLessonPracticeCoursePage;
 
   return (
     <FloatingMessengerProvider
@@ -1823,6 +1826,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
           <header className={`cms-topbar flex flex-col ${!isImmersivePage ? 'cms-shell-gutter' : ''
             } ${role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
+            } ${mobileScrollChromeHidden ? 'cms-topbar--scroll-away' : ''
             }`}>
             <div className="cms-topbar__row">
               <button

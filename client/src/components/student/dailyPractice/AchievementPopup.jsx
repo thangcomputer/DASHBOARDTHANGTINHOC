@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import {
-  Award, CheckCircle2, Eye, GraduationCap, Play, PlayCircle, RotateCcw, Star, Target, Timer, Trophy, X, Zap,
+  Award, Eye, Play, RotateCcw, Star, Timer, Trophy, X, Zap,
 } from 'lucide-react';
+import { formatPracticeScoreQuestions } from '../../../../../shared/dailyPractice/finishScoreLine.mjs';
 import { practiceFinishXpDisplay } from '../../../utils/dailyPractice';
 import { GameSoundManager } from '../../../utils/sound';
 import Mascot from './Mascot';
@@ -50,24 +51,23 @@ function LaurelIcon({ className = '' }) {
   );
 }
 
-function StatTile({ label, tone, icon: Icon, value, bodyClass, delay, onClick, disabled }) {
+function StatTile({ label, tone, icon: Icon, value, bodyClass, valueClassName = '', delay, onClick, disabled, labelTitle }) {
   const Tag = onClick && !disabled ? 'button' : 'div';
   return (
     <Tag
       type={Tag === 'button' ? 'button' : undefined}
       onClick={onClick && !disabled ? onClick : undefined}
       disabled={disabled}
-      className={`dp-card-in overflow-hidden rounded-2xl border border-slate-100 bg-white text-center shadow-sm${onClick && !disabled ? ' cursor-pointer transition hover:ring-2 hover:ring-emerald-200/80' : ''}${disabled ? ' opacity-70' : ''}`}
+      title={labelTitle || label}
+      aria-label={labelTitle || label}
+      className={`dp-achievement-stat-tile dp-card-in overflow-hidden rounded-2xl border border-slate-100 bg-white text-center shadow-sm${onClick && !disabled ? ' cursor-pointer transition hover:ring-2 hover:ring-emerald-200/80' : ''}${disabled ? ' opacity-70' : ''}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <p
-        className="flex items-center justify-center gap-1 px-1.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white sm:text-[11px]"
-        style={{ backgroundColor: tone }}
-      >
-        <Icon size={13} strokeWidth={2.5} aria-hidden="true" />
-        {label}
-      </p>
-      <p className={`flex min-h-[52px] items-center justify-center gap-1 px-2 py-2.5 text-base font-black tabular-nums sm:text-lg ${bodyClass}`} style={{ color: tone }}>
+      <div className="dp-achievement-stat-head" style={{ backgroundColor: tone }}>
+        <Icon size={12} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
+        <span className="dp-achievement-stat-label">{label}</span>
+      </div>
+      <p className={`flex min-h-[48px] items-center justify-center gap-1 px-1.5 py-2.5 text-base font-black tabular-nums sm:text-lg ${bodyClass} ${valueClassName}`} style={{ color: tone }}>
         {value}
       </p>
     </Tag>
@@ -84,7 +84,7 @@ export default function AchievementPopup({
   onReviewResults,
   onReplay,
   onDismiss,
-  onRelatedVideo,
+  onRelatedVideo: _onRelatedVideo,
 }) {
   const reducedMotion = useReducedMotion();
   const total = Math.max(1, Number(summary?.total) || 1);
@@ -94,16 +94,13 @@ export default function AchievementPopup({
     : Math.round((correctCount / total) * 100);
   const xpDisplay = practiceFinishXpDisplay(summary || {});
   const animatedXp = useAnimatedNumber(xpDisplay.amount, DEWSKILL_ANIMATION.XP_FLOAT_MS, true);
-  const animatedAccuracy = useAnimatedNumber(accuracy, DEWSKILL_ANIMATION.XP_FLOAT_MS, true);
   const stars = Number(summary?.stars) || (accuracy >= 90 ? 3 : accuracy >= 60 ? 2 : 1);
   const good = stars >= 2;
   const isPerfect = Boolean(
     summary && (summary.total || 0) >= 2 && (summary.correctCount === summary.total || summary.maxCombo === summary.total),
   );
   const mascotMood = good ? 'completed' : (summary?.passed ? 'graduate' : 'sad');
-  const maxCombo = Math.max(0, Number(summary?.maxCombo) || 0);
   const durationLabel = formatDuration(summary?.durationSeconds);
-  const hasRelatedVideo = Boolean(summary?.relatedLesson);
 
   useEffect(() => {
     const key = eventKey || summary?.sessionId || summary?.id || '';
@@ -188,64 +185,48 @@ export default function AchievementPopup({
           </p>
         ) : null}
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <StatTile label="Chính xác" tone="#22C55E" icon={CheckCircle2} value={`${animatedAccuracy}%`} bodyClass="dp-achievement-stat-body--green" delay={80} />
-          <StatTile label="Điểm số" tone="#3B82F6" icon={Award} value={`${correctCount}/${total}`} bodyClass="dp-achievement-stat-body--blue" delay={160} />
-          <StatTile label="Nhận về" tone="#F59E0B" icon={Zap} value={xpValueText} bodyClass="dp-achievement-stat-body--amber" delay={240} />
-        </div>
-
-        <div className="dp-achievement-actions mt-4">
-          {onReplay ? (
-            <GameButton variant="outline" onClick={onReplay} className="!py-2.5 text-[11px] sm:text-xs">
-              <RotateCcw size={14} />
-              <span>Làm lại</span>
-            </GameButton>
-          ) : null}
-          {onReviewResults ? (
-            <GameButton variant="outline" onClick={onReviewResults} className="!py-2.5 text-[11px] sm:text-xs">
-              <Eye size={14} />
-              <span className="truncate">Xem lại kết quả</span>
-            </GameButton>
-          ) : null}
-          <GameButton variant="primary" onClick={onContinue} className="!py-2.5 text-[11px] font-black uppercase sm:text-xs">
-            <Play size={14} fill="currentColor" />
-            <span className="truncate">Tiếp tục học</span>
-          </GameButton>
-        </div>
-
-        <div className="dp-achievement-divider mt-4" aria-hidden="true">
-          <span className="dp-achievement-divider__line" />
-          <GraduationCap size={16} className="text-emerald-600" />
-          <span className="dp-achievement-divider__line" />
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <StatTile
-            label="Video liên quan"
-            tone="#F59E0B"
-            icon={PlayCircle}
-            value={hasRelatedVideo ? <PlayCircle size={22} className="text-amber-500" /> : '—'}
-            bodyClass="dp-achievement-stat-body--amber"
-            delay={300}
-            onClick={hasRelatedVideo ? onRelatedVideo : undefined}
-            disabled={!hasRelatedVideo}
-          />
-          <StatTile
-            label="Combo"
-            tone="#3B82F6"
-            icon={Target}
-            value={`×${maxCombo}`}
-            bodyClass="dp-achievement-stat-body--blue"
-            delay={380}
-          />
+        <div className="dp-achievement-stats mt-4">
           <StatTile
             label="Thời gian"
             tone="#22C55E"
             icon={Timer}
             value={durationLabel}
             bodyClass="dp-achievement-stat-body--green"
-            delay={460}
+            delay={80}
           />
+          <StatTile
+            label="Số câu"
+            tone="#3B82F6"
+            icon={Award}
+            value={formatPracticeScoreQuestions(correctCount, total)}
+            valueClassName="!text-[11px] !leading-tight sm:!text-xs"
+            bodyClass="dp-achievement-stat-body--blue"
+            delay={160}
+          />
+          <StatTile label="Nhận về" tone="#F59E0B" icon={Zap} value={xpValueText} bodyClass="dp-achievement-stat-body--amber" delay={240} />
+        </div>
+
+        <div className="dp-achievement-actions mt-4">
+          {(onReplay || onReviewResults) ? (
+            <div className="dp-achievement-actions-secondary">
+              {onReplay ? (
+                <GameButton variant="outline" onClick={onReplay} className="w-full !py-2.5 text-xs">
+                  <RotateCcw size={14} />
+                  <span>Làm lại</span>
+                </GameButton>
+              ) : null}
+              {onReviewResults ? (
+                <GameButton variant="outline" onClick={onReviewResults} className="w-full !py-2.5 text-xs">
+                  <Eye size={14} />
+                  <span>Xem lại kết quả</span>
+                </GameButton>
+              ) : null}
+            </div>
+          ) : null}
+          <GameButton variant="primary" onClick={onContinue} className="w-full !py-3 text-sm font-black uppercase">
+            <Play size={15} fill="currentColor" />
+            <span>Tiếp tục học</span>
+          </GameButton>
         </div>
       </div>
     </div>

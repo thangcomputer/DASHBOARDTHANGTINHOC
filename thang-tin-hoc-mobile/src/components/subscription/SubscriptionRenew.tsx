@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CalendarClock, CalendarX2, ChevronDown, Crown, History, KeyRound, LogOut, Ticket, X } from 'lucide-react-native';
 import { useAuth } from '../../app/AuthContext';
 import { CoursePaymentModal, type CoursePaymentCheckout } from '../CoursePaymentModal';
@@ -14,6 +14,8 @@ import {
 import { DuoButton } from '../duo/DuoButton';
 import { isFreePortalMenu } from '../../utils/freePortalHelper';
 import { colors, radius, spacing } from '../../theme/tokens';
+import { DAILY_PRACTICE_STATS_EVENT, dailyPracticeApi, type DpStats } from '../../services/dailyPracticeApi';
+import { resolveTodayXpSidebar } from '../../../../shared/subscription/xpDailyLine.mjs';
 
 const PLAN_TONES: Record<string, [string, string]> = {
   '1m': ['#38BDF8', '#2563EB'],
@@ -191,6 +193,25 @@ export function SubscriptionStatusCard({
   const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || isLifetime || isBrandStudent;
   const isFree = !isBrandStudent && (sub.freeTier === true || (!hasActivePaid && !isLifetime));
   const isDrawer = variant === 'drawer';
+  const [dpStats, setDpStats] = useState<DpStats | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    dailyPracticeApi.overview()
+      .then((data) => {
+        if (alive && data?.stats) setDpStats(data.stats);
+      })
+      .catch(() => {});
+    const subEv = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats> }) => {
+      const patch = detail?.stats ? { ...detail.stats } : detail;
+      if (patch) setDpStats((prev) => ({ ...prev, ...patch } as DpStats));
+    });
+    return () => {
+      alive = false;
+      subEv.remove();
+    };
+  }, []);
+
   const daysLeftNum = sub.daysLeft != null ? Number(sub.daysLeft) : null;
   const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : expiring;
   const actionLabel = isFree ? 'Nâng cấp' : isNearExpiry ? 'Gia hạn' : 'Đổi gói';
@@ -205,7 +226,7 @@ export function SubscriptionStatusCard({
           ? rawPlanLabel
           : `Gói ${rawPlanLabel}`;
   const daysLine = isFree
-    ? 'Miễn phí hằng ngày'
+    ? resolveTodayXpSidebar(dpStats, sub).line
     : isBrandStudent
       ? 'Khóa chính thức'
       : isLifetime
@@ -227,60 +248,67 @@ export function SubscriptionStatusCard({
                   : styles.drawerSubCardActive,
           ]}
         >
-          <View
-            style={[
-              styles.drawerSubIconBox,
-              isLifetime
-                ? (isBrandStudent ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' } : styles.drawerSubIconLifetime)
-                : expiring
-                  ? styles.drawerSubIconExpiring
-                  : isBrandStudent
-                    ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' }
-                    : styles.drawerSubIconActive,
-            ]}
-          >
-            {isLifetime && !isBrandStudent ? (
-              <Crown size={13} color="#FBBF24" />
-            ) : (
-              <CalendarClock size={13} color={isBrandStudent ? '#EF4444' : (expiring ? '#FB923C' : '#34D399')} />
-            )}
-          </View>
-
-          <View style={styles.flex}>
-            <Text
-              numberOfLines={1}
+          <View style={styles.drawerSubMain}>
+            <View
               style={[
-                styles.drawerSubTitle,
-                isLifetime && !isBrandStudent && styles.drawerSubTextLifetime,
-                isBrandStudent && { color: '#FEE2E2' },
+                styles.drawerSubIconBox,
+                isLifetime
+                  ? (isBrandStudent ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' } : styles.drawerSubIconLifetime)
+                  : expiring
+                    ? styles.drawerSubIconExpiring
+                    : isBrandStudent
+                      ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' }
+                      : styles.drawerSubIconActive,
               ]}
             >
-              {planTitle}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.drawerSubDays,
-                isBrandStudent && { color: '#F87171' },
-              ]}
-            >
-              {daysLine}
-            </Text>
-          </View>
-
-          {isLifetime && !isBrandStudent ? (
-            <View style={styles.drawerSubTag}>
-              <Text style={styles.drawerSubTagText}>VĨNH VIỄN</Text>
+              {isLifetime && !isBrandStudent ? (
+                <Crown size={13} color="#FBBF24" />
+              ) : (
+                <CalendarClock size={13} color={isBrandStudent ? '#EF4444' : (expiring ? '#FB923C' : '#34D399')} />
+              )}
             </View>
-          ) : isBrandStudent ? null : (
-            <DuoButton
-              variant="primary"
-              size="sm"
-              text={actionLabel}
-              onPress={() => setOpen(true)}
-              accessibilityLabel={actionLabel}
-            />
-          )}
+            <View style={styles.drawerSubCopy}>
+              <Text
+                numberOfLines={2}
+                style={[
+                  styles.drawerSubTitle,
+                  isLifetime && !isBrandStudent && styles.drawerSubTextLifetime,
+                  isBrandStudent && { color: '#FEE2E2' },
+                ]}
+              >
+                {planTitle}
+              </Text>
+              <View style={styles.drawerSubMetaRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.drawerSubDays,
+                    styles.drawerSubDaysFlex,
+                    isBrandStudent && { color: '#F87171' },
+                  ]}
+                >
+                  {daysLine}
+                </Text>
+                {isLifetime && !isBrandStudent ? (
+                  <View style={styles.drawerSubTag}>
+                    <Text style={styles.drawerSubTagText}>VĨNH VIỄN</Text>
+                  </View>
+                ) : isBrandStudent ? null : (
+                  <Pressable
+                    onPress={() => setOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={actionLabel}
+                    style={({ pressed }) => [
+                      styles.drawerSubCta,
+                      pressed && { transform: [{ translateY: 1 }], borderBottomWidth: 1 },
+                    ]}
+                  >
+                    <Text style={styles.drawerSubCtaText}>{actionLabel}</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </View>
         </View>
 
         <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -585,14 +613,48 @@ const styles = StyleSheet.create({
 
   /* Drawer Glass Styles */
   drawerSubCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
     marginTop: 2,
+  },
+  drawerSubMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  drawerSubCopy: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'column',
+    gap: 2,
+  },
+  drawerSubMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 6,
+    minHeight: 24,
+    minWidth: 0,
+  },
+  drawerSubCta: {
+    minHeight: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    borderWidth: 1,
+    borderColor: '#34D399',
+    borderBottomWidth: 2,
+    borderBottomColor: '#059669',
+  },
+  drawerSubCtaText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   drawerSubCardLifetime: {
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
@@ -631,17 +693,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   drawerSubTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#F8FAFC',
-    lineHeight: 15,
+    lineHeight: 14,
+  },
+  drawerSubTitleFlex: {
+    flex: 1,
+    minWidth: 0,
   },
   drawerSubDays: {
     fontSize: 11,
     fontWeight: '700',
     color: '#34D399',
     lineHeight: 14,
-    marginTop: 1,
+    flexShrink: 0,
+  },
+  drawerSubDaysFlex: {
+    flex: 1,
+    minWidth: 0,
   },
   drawerSubTextLifetime: {
     color: '#FEF3C7',

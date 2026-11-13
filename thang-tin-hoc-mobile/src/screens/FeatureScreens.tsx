@@ -11,7 +11,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
 import {
-  AppHeader, AppScreen, AssignmentCard, Avatar, Card, EmptyState, ErrorState,
+  AppHeader, AppScreen, AssignmentCard, Avatar, Card, ChromeScrollView, EmptyState, ErrorState,
   LoadingSkeleton, MenuRow, PrimaryButton, ProgressBar, SearchField,
   SectionHeading, StatusBadge, uiStyles,
 } from '../components/ui';
@@ -3995,7 +3995,7 @@ export function AttendanceScreen() {
         <EmptyState title="Không tìm thấy thông tin học viên" message="Không thể xác định khóa học của buổi này. Hãy tải lại dữ liệu hoặc mở lại từ cuộc trò chuyện." />
       ) : null}
       {selectedSession && selectedStudent ? (
-        <ScrollView contentContainerStyle={styles.attendanceOverview} showsVerticalScrollIndicator={false}>
+        <ChromeScrollView contentContainerStyle={styles.attendanceOverview} showsVerticalScrollIndicator={false}>
           {pendingAttendance && !attendanceNoticeDismissed ? (
             <View style={styles.attendancePendingNotice}>
               <Text style={styles.attendancePendingText}>Đã ghi nhận - còn {confirmRemaining} giây để hủy điểm danh trước khi tính buổi.</Text>
@@ -4114,7 +4114,7 @@ export function AttendanceScreen() {
             <Text style={styles.attendanceSessionNote}>Admin đã điểm danh bù; buổi đã được ghi nhận vào tiến độ.</Text>
           ) : null}
           <Text style={styles.attendanceSessionNote}>{pendingAttendance?.note || note}</Text>
-        </ScrollView>
+        </ChromeScrollView>
       ) : null}
       <Modal visible={attendanceModalVisible} transparent animationType="fade" onRequestClose={closeAttendanceModal}>
         <View style={styles.attendanceModalBackdrop}>

@@ -80,6 +80,7 @@ export function UnitStageChest({
   unit,
   rewardXp = unit?.chestRewardXp ?? UNIT_CHEST_REWARD_XP,
   className = '',
+  variant = 'bar',
   onClaimed,
 }) {
   const { doneSteps, totalSteps } = unitStepProgress(unit);
@@ -169,6 +170,12 @@ export function UnitStageChest({
     </>
   );
 
+  const ariaLabel = toneClaimed
+    ? `Đã mở rương chặng, +${rewardXp} XP`
+    : toneDone
+      ? `Mở rương chặng, nhận ${rewardXp} XP`
+      : `Rương phần thưởng chặng ${doneSteps}/${totalSteps}`;
+
   const boxClass = `duo-unit-chest flex w-full max-w-[380px] items-center gap-3 rounded-[20px] border-[1.5px] px-4 py-3 ${
     toneClaimed
       ? 'border-emerald-200 bg-emerald-50'
@@ -177,15 +184,68 @@ export function UnitStageChest({
         : 'border-slate-200 bg-slate-50'
   } ${className}`;
 
+  const chipTone = toneClaimed
+    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+    : toneDone
+      ? 'border-amber-300 bg-amber-50 text-amber-900'
+      : 'border-slate-200 bg-white/95 text-slate-600';
+
+  const chipBody = (
+    <>
+      <span
+        className={`flex h-11 w-11 items-center justify-center rounded-[14px] border-b-[3px] shadow-sm ${
+          toneClaimed
+            ? 'border-b-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-500 text-white'
+            : toneDone
+              ? 'border-b-amber-600 bg-gradient-to-b from-amber-400 to-amber-500 text-white'
+              : 'border-b-slate-300 bg-slate-200 text-slate-500'
+        }`}
+      >
+        {toneClaimed ? (
+          <Check size={18} strokeWidth={3} aria-hidden="true" />
+        ) : toneDone && claiming ? (
+          <Loader2 size={18} className="animate-spin text-white" aria-hidden="true" />
+        ) : (
+          <Gift size={18} strokeWidth={2.5} aria-hidden="true" />
+        )}
+      </span>
+      <span className={`mt-1 rounded-lg px-1.5 py-0.5 text-[9px] font-black tabular-nums ${chipTone}`}>
+        {toneClaimed ? `+${rewardXp}` : `${doneSteps}/${totalSteps}`}
+      </span>
+      {claimError ? <span className="sr-only">{claimError}</span> : null}
+    </>
+  );
+
+  const chipClass = `duo-unit-chest-chip flex flex-col items-center gap-0.5 ${
+    toneDone && !toneClaimed ? 'duo-unit-chest-chip--ready' : ''
+  } ${className}`;
+
   return (
     <>
-      {claimable ? (
+      {variant === 'chip' ? (
+        claimable ? (
+          <button
+            type="button"
+            disabled={claiming}
+            onClick={handleClaim}
+            className={`${chipClass} duo-pressable cursor-pointer`}
+            aria-label={ariaLabel}
+            title={ariaLabel}
+          >
+            {chipBody}
+          </button>
+        ) : (
+          <div className={chipClass} aria-label={ariaLabel} title={ariaLabel}>
+            {chipBody}
+          </div>
+        )
+      ) : claimable ? (
         <button
           type="button"
           disabled={claiming}
           onClick={handleClaim}
           className={`${boxClass} duo-pressable cursor-pointer transition hover:brightness-[1.02] disabled:opacity-80`}
-          aria-label={`Mở rương chặng, nhận ${rewardXp} XP`}
+          aria-label={ariaLabel}
         >
           {body}
         </button>

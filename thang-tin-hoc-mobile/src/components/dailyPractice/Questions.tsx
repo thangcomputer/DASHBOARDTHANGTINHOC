@@ -104,11 +104,11 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
   return (
     <View style={[styles.mcqList, twoColumns && styles.mcqGrid]}>
       {(question.options || []).map((option, index) => {
-        const isCorrect = Boolean(result) && (
+        const isCorrect = Boolean(result?.correct) && (
           result?.correctAnswer?.correctIndex === index
           || (result?.correct && chosen === index)
         );
-        const isWrong = Boolean(result) && chosen === index && !isCorrect;
+        const isWrong = Boolean(result) && chosen === index && !result?.correct;
         const isChosen = chosen === index;
         const out = eliminated.has(index);
         return (
@@ -182,8 +182,8 @@ export function TrueFalseQuestion({ result, chosen, onSubmit, play }: {
   return (
     <View style={styles.row}>
       {[true, false].map((value) => {
-        const isCorrect = Boolean(result) && result?.correctAnswer.answerBool === value;
-        const isWrong = Boolean(result) && chosen === value && !isCorrect;
+        const isCorrect = Boolean(result?.correct) && result?.correctAnswer.answerBool === value;
+        const isWrong = Boolean(result) && chosen === value && !result?.correct;
         return (
           <Pressable
             key={String(value)}
@@ -210,10 +210,10 @@ export function TrueFalseQuestion({ result, chosen, onSubmit, play }: {
 
 // ── Sắp xếp ──────────────────────────────────────────────────────────────────
 export function OrderQuestion({ question, reveal, result, play, onChange }: QuestionProps) {
+  const locked = Boolean(result?.correct);
   const [list, setList] = useState<string[]>(() => question.items || []);
   const [selected, setSelected] = useState<string | null>(null);
   const lockedItem = reveal?.first || null;
-  const locked = Boolean(result);
 
   useEffect(() => {
     if (lockedItem) setList((prev) => [lockedItem, ...prev.filter((item) => item !== lockedItem)]);
@@ -234,7 +234,7 @@ export function OrderQuestion({ question, reveal, result, play, onChange }: Ques
     <View style={styles.gap}>
       {list.map((item, index) => {
         const isLocked = item === lockedItem;
-        const ok = locked && result?.correctAnswer.items?.[index] === item;
+        const ok = Boolean(result?.correct) && result?.correctAnswer.items?.[index] === item;
         return (
           <DropZone
             key={item}
@@ -257,7 +257,7 @@ export function OrderQuestion({ question, reveal, result, play, onChange }: Ques
               }}
               style={styles.flex}
             >
-              <View style={[styles.chip, styles.orderChip, selected === item && styles.chipSelected, isLocked && styles.chipLocked, locked && (ok ? styles.chipOk : styles.chipBad)]}>
+              <View style={[styles.chip, styles.orderChip, selected === item && styles.chipSelected, isLocked && styles.chipLocked, Boolean(result?.correct) && (ok ? styles.chipOk : styles.chipBad)]}>
                 {isLocked ? <Lock size={14} color="#F59E0B" /> : <GripVertical size={16} color="#CBD5E1" />}
                 <Text style={[styles.chipText, styles.flex]}>{item}</Text>
                 {locked ? <Mark ok={ok} /> : null}
@@ -275,7 +275,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
   const lefts = question.lefts || [];
   const [assign, setAssign] = useState<Array<string | null>>(() => lefts.map(() => null));
   const [selected, setSelected] = useState<string | null>(null);
-  const locked = Boolean(result);
+  const locked = Boolean(result?.correct);
   const lockedIndex = reveal?.pair ? lefts.indexOf(reveal.pair.left) : -1;
 
   useEffect(() => {
@@ -299,7 +299,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
       <View style={styles.gap}>
         {lefts.map((left, index) => {
           const value = assign[index];
-          const ok = locked && correct.get(left) === value;
+          const ok = Boolean(result?.correct) && correct.get(left) === value;
           return (
             <View key={left} style={styles.matchRow}>
               <View style={styles.matchLeft}><Text style={styles.matchLeftText}>{left}</Text></View>
@@ -313,7 +313,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
                       setAssign((prev) => prev.map((v, i) => (i === index ? null : v)));
                     }
                   }}
-                  style={[styles.slot, value ? styles.slotFilled : null, index === lockedIndex && styles.chipLocked, locked && (ok ? styles.chipOk : styles.chipBad)]}
+                  style={[styles.slot, value ? styles.slotFilled : null, index === lockedIndex && styles.chipLocked, Boolean(result?.correct) && (ok ? styles.chipOk : styles.chipBad)]}
                 >
                   {index === lockedIndex ? <Lock size={13} color="#F59E0B" /> : null}
                   <Text style={[styles.slotText, value ? styles.slotTextFilled : null]}>{value || 'Thả thẻ vào đây'}</Text>
@@ -345,12 +345,12 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
 
 // ── Điền vào chỗ trống ───────────────────────────────────────────────────────
 export function FillQuestion({ question, reveal, result, play, onChange }: QuestionProps) {
+  const locked = Boolean(result?.correct);
   const segments = question.segments || [];
   const bankWords = question.bank || [];
   const blankCount = segments.filter((s) => s.blank !== undefined).length;
   const [blanks, setBlanks] = useState<Array<number | null>>(() => Array(blankCount).fill(null));
   const [selected, setSelected] = useState<number | null>(null);
-  const locked = Boolean(result);
   const lockedBlank = reveal?.blank || null;
 
   useEffect(() => {
@@ -382,7 +382,7 @@ export function FillQuestion({ question, reveal, result, play, onChange }: Quest
           const chip = blanks[slot];
           const word = chip === null ? '' : bankWords[chip];
           const isLocked = lockedBlank?.index === slot;
-          const ok = locked && norm(answers[slot] || '') === norm(word);
+          const ok = Boolean(result?.correct) && norm(answers[slot] || '') === norm(word);
           return (
             <DropZone
               key={index}
@@ -394,10 +394,10 @@ export function FillQuestion({ question, reveal, result, play, onChange }: Quest
                   setBlanks((prev) => prev.map((v, i) => (i === slot ? null : v)));
                 }
               }}
-              style={[styles.blank, chip !== null && styles.slotFilled, isLocked && styles.chipLocked, locked && (ok ? styles.chipOk : styles.chipBad)]}
+              style={[styles.blank, chip !== null && styles.slotFilled, isLocked && styles.chipLocked, Boolean(result?.correct) && (ok ? styles.chipOk : styles.chipBad)]}
             >
               <Text style={styles.blankText}>{word || ' '}</Text>
-              {locked && !ok ? <Text style={styles.blankFix}>{`(${answers[slot]})`}</Text> : null}
+              {Boolean(result?.correct) && !ok ? <Text style={styles.blankFix}>{`(${answers[slot]})`}</Text> : null}
             </DropZone>
           );
         })}
@@ -429,7 +429,7 @@ export function SortQuestion({ question, reveal, result, play, onChange }: Quest
   const items = question.items || [];
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
-  const locked = Boolean(result);
+  const locked = Boolean(result?.correct);
   const lockedItem = reveal?.item || null;
 
   useEffect(() => {

@@ -15,7 +15,8 @@ import { hasLearningAccessEnrollment, isFreePortalSelfRegistrationStudent, isUnp
 import { visibleInboxUnread } from '../lib/inboxUnread';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
 import FreeFeatureLock, { useFreePortalLock, useFreePortalMenu, FREE_HIDDEN_KEYS } from './student/dailyPractice/FreeFeatureLock';
-import { hasFeedPostAccess, subscriptionShortLabel } from '../utils/subscription';
+import { hasFeedPostAccess, resolveTodayXpSidebar, subscriptionShortLabel } from '../utils/subscription';
+import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../services/dailyPracticeApi';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
@@ -294,6 +295,34 @@ const AppSidebar = ({
     students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations,
   } = useData();
   const studentSubscription = useStudentSubscription();
+  const [dpSidebarStats, setDpSidebarStats] = useState(null);
+
+  useEffect(() => {
+    if (session?.role !== 'student') return undefined;
+    let alive = true;
+    dailyPracticeApi.student.overview()
+      .then((data) => {
+        if (alive && data?.stats) setDpSidebarStats(data.stats);
+      })
+      .catch(() => {});
+    const onStats = (event) => {
+      if (event?.detail) setDpSidebarStats((prev) => ({ ...prev, ...event.detail }));
+    };
+    const refetchOverview = () => {
+      dailyPracticeApi.student.overview()
+        .then((data) => {
+          if (data?.stats) setDpSidebarStats(data.stats);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+    window.addEventListener('cms:subscription-updated', refetchOverview);
+    return () => {
+      alive = false;
+      window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+      window.removeEventListener('cms:subscription-updated', refetchOverview);
+    };
+  }, [session?.role]);
 
   // Session login/me có thể thiếu gender → bổ sung từ hồ sơ self (mọi role)
   const selfProfile = useMemo(() => {
@@ -801,8 +830,7 @@ const AppSidebar = ({
           const isFree = !hasActivePaid && !isLifetime;
           const expiring = sub.state === 'expiring';
           const shortLabel = subscriptionShortLabel(sub, { freePortal: freePortalAccount, isCourseStudent });
-          const cycleUnit = sub.resetCycle === 'monthly' ? '/tháng' : sub.resetCycle === 'never' ? '' : '/ngày';
-          const freeXpText = `${sub.dailyXpLimit || 60} XP${cycleUnit}`;
+          const freeXpText = resolveTodayXpSidebar(dpSidebarStats, sub).line;
           const daysLeftNum = sub.daysLeft != null ? Number(sub.daysLeft) : null;
           const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : expiring;
           const actionLabel = isFree ? 'Nâng cấp' : isNearExpiry ? 'Gia hạn' : 'Đổi gói';
@@ -825,10 +853,44 @@ const AppSidebar = ({
                 : `Còn ${sub.daysLeft ?? 0} ngày`;
 
           if (isStudentNav) {
+            const iconChip = (
+              <span
+                className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
+                  isCourseStudent
+                    ? 'bg-[#EF4444]/20'
+                    : isLifetime
+                      ? 'bg-[#F59E0B]/20'
+                      : expiring
+                        ? 'bg-[#FB923C]/20'
+                        : 'bg-[#34D399]/20'
+                }`}
+              >
+                {isCourseStudent ? (
+                  <CalendarClock size={13} className="text-[#F87171]" />
+                ) : isLifetime ? (
+                  <Crown size={13} className="text-[#FBBF24]" />
+                ) : (
+                  <CalendarClock size={13} className={expiring ? 'text-[#FB923C]' : 'text-[#34D399]'} />
+                )}
+              </span>
+            );
+            const actionChip = isCourseStudent ? null : isLifetime ? (
+              <span className="shrink-0 rounded-[6px] bg-[#F59E0B]/25 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-[#FDE68A]">
+                VĨNH VIỄN
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={studentSubscription.openRenew}
+                className="shrink-0 min-h-[24px] rounded-[8px] border px-2 py-0.5 text-[10px] font-extrabold leading-none text-white transition hover:brightness-105 active:translate-y-px !shadow-none cursor-pointer bg-[#10B981] border-[#34D399] border-b-2 border-b-[#059669]"
+              >
+                {actionLabel}
+              </button>
+            );
             return (
               <div
                 title={shortLabel}
-                className={`mt-2.5 flex items-center gap-2 rounded-[12px] border px-[10px] py-[7px] ${
+                className={`cms-sidebar-sub-chip mt-2.5 grid grid-cols-[22px_minmax(0,1fr)] grid-rows-[auto_auto] items-center gap-x-2 gap-y-0.5 rounded-[12px] border px-3 py-2 ${
                   isCourseStudent
                     ? 'border-[#EF4444]/35 bg-[#EF4444]/[0.12]'
                     : isLifetime
@@ -838,50 +900,22 @@ const AppSidebar = ({
                         : 'border-white/[0.14] bg-white/[0.08]'
                 }`}
               >
-                <span
-                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
-                    isCourseStudent
-                      ? 'bg-[#EF4444]/20'
-                      : isLifetime
-                        ? 'bg-[#F59E0B]/20'
-                        : expiring
-                          ? 'bg-[#FB923C]/20'
-                          : 'bg-[#34D399]/20'
-                  }`}
+                <div className="row-span-2 flex items-center justify-center self-center">{iconChip}</div>
+                <p className={`col-start-2 row-start-1 min-w-0 text-[11px] font-extrabold leading-[14px] ${
+                  isCourseStudent ? 'text-[#FEE2E2]' : isLifetime ? 'text-[#FEF3C7]' : 'text-[#F8FAFC]'
+                }`}
                 >
-                  {isCourseStudent ? (
-                    <CalendarClock size={13} className="text-[#F87171]" />
-                  ) : isLifetime ? (
-                    <Crown size={13} className="text-[#FBBF24]" />
-                  ) : (
-                    <CalendarClock size={13} className={expiring ? 'text-[#FB923C]' : 'text-[#34D399]'} />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className={`truncate text-[12px] font-extrabold leading-tight ${
-                    isCourseStudent ? 'text-[#FEE2E2]' : isLifetime ? 'text-[#FEF3C7]' : 'text-[#F8FAFC]'
-                  }`}>
-                    {planTitle}
-                  </p>
-                  <p className={`mt-0.5 truncate text-[11px] font-bold leading-tight ${
+                  {planTitle}
+                </p>
+                <div className="col-start-2 row-start-2 flex min-h-[24px] min-w-0 items-baseline justify-between gap-1.5">
+                  <p className={`min-w-0 text-[11px] font-bold leading-[14px] tabular-nums ${
                     isCourseStudent ? 'text-[#F87171]' : isLifetime ? 'text-[#FDE68A]' : 'text-[#34D399]'
-                  }`}>
+                  }`}
+                  >
                     {daysLine}
                   </p>
+                  {actionChip}
                 </div>
-                {isCourseStudent ? null : isLifetime ? (
-                  <span className="shrink-0 rounded-[6px] bg-[#F59E0B]/25 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-[#FDE68A]">
-                    VĨNH VIỄN
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={studentSubscription.openRenew}
-                    className="shrink-0 min-h-[36px] rounded-[12px] border px-[12px] py-[6px] text-[13px] font-extrabold text-white transition hover:brightness-105 active:translate-y-[1px] !shadow-none cursor-pointer bg-[#10B981] border-[#34D399] border-b-[4px] border-b-[#059669]"
-                  >
-                    {actionLabel}
-                  </button>
-                )}
               </div>
             );
           }
@@ -894,14 +928,14 @@ const AppSidebar = ({
                   <button
                     type="button"
                     onClick={studentSubscription.openRenew}
-                    className="shrink-0 rounded-md bg-emerald-600/90 hover:bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white transition cursor-pointer active:scale-95 !shadow-none"
+                    className="shrink-0 rounded-md bg-emerald-600/90 hover:bg-emerald-500 px-2 py-0.5 text-[9px] font-bold text-white transition cursor-pointer active:scale-95 !shadow-none"
                   >
                     {actionLabel}
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Sparkles size={11} className="shrink-0 text-emerald-400/70" />
-                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight">{daysLine}</p>
+                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight tabular-nums whitespace-nowrap">{daysLine}</p>
                 </div>
               </div>
             );

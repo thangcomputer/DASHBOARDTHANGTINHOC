@@ -13,6 +13,12 @@ export function formatVnd(value) {
   return `${Math.round(Number(value) || 0).toLocaleString('vi-VN')}đ`;
 }
 
+export {
+  formatDailyXpProgressLine,
+  formatDailyXpWalletLine,
+  resolveTodayXpSidebar,
+} from '../../../shared/subscription/xpDailyLine.mjs';
+
 export function formatExpiryDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' });

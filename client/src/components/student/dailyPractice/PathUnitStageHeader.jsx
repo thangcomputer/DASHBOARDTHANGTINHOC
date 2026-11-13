@@ -1,4 +1,5 @@
-import { BookOpen, FastForward } from 'lucide-react';
+import { BookOpen, FastForward, Play } from 'lucide-react';
+import { unitStageCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 
 function darken(hex, amount = 0.28) {
   const value = String(hex || '#B91C1C').replace('#', '');
@@ -30,13 +31,15 @@ export function UnitStageHeader({
   unit,
   color,
   onTestOut,
-  onWatch,
-  _highlight,
-  hasVideo,
+  highlight: isNextUnit = false,
+  hasVideo: _hasVideo,
   testOutButtonRef,
   isStarted = false,
   onStartUnit,
+  onStageAction,
+  onRoadmap,
 }) {
+  const hasRoadmap = (unit.pathNodes || []).length > 0;
   const locked = unit.state === 'locked';
   const done = unit.state === 'completed';
   const steps = Array.isArray(unit.steps) ? unit.steps : [];
@@ -58,6 +61,8 @@ export function UnitStageHeader({
   else if (activeAndStarted) statusLabel = 'Đang học';
   else if (locked) statusLabel = 'Chưa mở';
   else statusLabel = 'Chưa bắt đầu';
+
+  const ctaLabel = unitStageCtaLabel(unit, { isNextUnit });
 
   return (
     <div className="w-full">
@@ -85,17 +90,34 @@ export function UnitStageHeader({
             <span className="text-[10px] font-black tabular-nums text-white/90">{doneSteps}/{totalSteps}</span>
           </div>
         </div>
-        <div className="flex shrink-0 items-center border-l border-white/25 px-3 sm:px-4">
-          <button
-            type="button"
-            onClick={hasVideo ? onWatch : undefined}
-            disabled={!hasVideo}
-            title={hasVideo ? 'Xem video của chặng' : 'Chặng chưa có video'}
-            aria-label={hasVideo ? 'Xem video của chặng' : 'Chặng chưa có video'}
-            className="duo-stage-icon-btn flex h-11 w-11 items-center justify-center rounded-xl text-emerald-700 disabled:cursor-default disabled:opacity-45"
-          >
-            <BookOpen size={22} strokeWidth={2.4} aria-hidden="true" />
-          </button>
+        <div className="flex shrink-0 flex-col items-stretch justify-center gap-2 border-l border-white/25 px-3 py-3 sm:px-4">
+          {ctaLabel && onStageAction ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onStageAction();
+              }}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2.5 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+            >
+              <Play size={14} fill="currentColor" aria-hidden="true" />
+              {ctaLabel}
+            </button>
+          ) : null}
+          {hasRoadmap && onRoadmap ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRoadmap();
+              }}
+              title="Lộ trình mốc trong chặng"
+              aria-label="Lộ trình mốc trong chặng — mốc đã mở và đang khóa"
+              className="duo-stage-roadmap-btn flex h-11 w-11 items-center justify-center self-center rounded-xl text-emerald-800"
+            >
+              <BookOpen size={22} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </div>
       {locked && unit.canTestOut ? (

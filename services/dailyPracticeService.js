@@ -193,11 +193,13 @@ async function createQuestion(body, userId) {
   const topicId = requireId(body?.topicId, 'Chủ đề');
   if (!await DailyPracticeTopic.exists({ _id: topicId })) throw httpError(404, 'Không tìm thấy chủ đề');
   const doc = rules.validateQuestion(body);
+  const status = body?.status === 'draft' ? 'draft' : 'published';
+  rules.assertExplanationForPublish(doc, status);
   const question = await DailyPracticeQuestion.create({
     ...doc,
     topicId,
     unitId: await pathService.resolveQuestionUnit(topicId, body?.unitId),
-    status: body?.status === 'draft' ? 'draft' : 'published',
+    status,
     source: 'manual',
     createdBy: mongoose.Types.ObjectId.isValid(String(userId || '')) ? userId : null,
   });
@@ -211,6 +213,9 @@ async function updateQuestion(id, body) {
   const onlyStatus = body && Object.keys(body).length === 1 && 'status' in body;
   const set = onlyStatus ? {} : rules.validateQuestion({ ...existing, ...body });
   if (body?.status === 'draft' || body?.status === 'published') set.status = body.status;
+  const nextStatus = set.status || existing.status;
+  const merged = { ...existing, ...set };
+  rules.assertExplanationForPublish(merged, nextStatus);
   if (!onlyStatus && body?.topicId) {
     const topicId = requireId(body.topicId, 'Chủ đề');
     if (!await DailyPracticeTopic.exists({ _id: topicId })) throw httpError(404, 'Không tìm thấy chủ đề');
@@ -246,8 +251,22 @@ async function deleteQuestion(id) {
 }
 
 async function publishDrafts(topicId) {
+  const tid = requireId(topicId, 'Chủ đề');
+  const drafts = await DailyPracticeQuestion.find({ topicId: tid, status: 'draft' }).lean();
+  const missing = drafts.filter((q) => String(q.explanation || '').trim().length < rules.EXPLANATION_MIN_LEN);
+  if (missing.length) {
+    throw httpError(400, `${missing.length} câu nháp chưa có Giải thích chi tiết. Mở sửa và điền phần Giải thích (khác Gợi ý) trước khi xuất bản.`);
+  }
+  const dupHint = drafts.filter((q) => {
+    const explain = String(q.explanation || '').trim();
+    const hint = String(q.hint || '').trim();
+    return hint && explain.toLocaleLowerCase('vi') === hint.toLocaleLowerCase('vi');
+  });
+  if (dupHint.length) {
+    throw httpError(400, `${dupHint.length} câu nháp có Giải thích trùng Gợi ý. Hãy viết giải thích chi tiết riêng.`);
+  }
   const { modifiedCount } = await DailyPracticeQuestion.updateMany(
-    { topicId: requireId(topicId, 'Chủ đề'), status: 'draft' },
+    { topicId: tid, status: 'draft' },
     { $set: { status: 'published' } },
   );
   return { published: modifiedCount || 0 };
@@ -364,6 +383,17 @@ async function sumRecoveryXpEarnedToday(studentId, day = learningGoalService.vnD
   return rows.reduce((sum, row) => sum + Math.max(0, (Number(row.xp) || 0) + (Number(row.bonusXp) || 0)), 0);
 }
 
+/** XP luyện hôm nay (mọi lượt hoàn thành) — hero / quest, không dùng cho sidebar. */
+async function sumTodayPracticeDisplayXp(studentId, day = learningGoalService.vnDayKey()) {
+  const sid = requireId(studentId, 'Học viên');
+  const rows = await DailyPracticeSession.find({
+    studentId: sid,
+    status: 'finished',
+    day,
+  }).select('xp bonusXp stakeXp mode status recovery answers testOut review').lean();
+  return rows.reduce((sum, row) => sum + rules.sessionTodayDisplayXp(row), 0);
+}
+
 function profileView(profile, today, recoveryXpEarnedToday = 0) {
   const status = rules.streakStatus(profile, today);
   const xpTotal = rules.clampXp(profile?.xpTotal);
@@ -376,6 +406,8 @@ function profileView(profile, today, recoveryXpEarnedToday = 0) {
     recoveryDailyCapXp: rules.RECOVERY_DAILY_CAP_XP,
     dailyRefillXp: allowance,
     dailyAllowanceXp: allowance,
+    todayXpCap: allowance,
+    dailyXp: rules.clampXp(profile?.dailyXp),
     purchasedXp: rules.clampXp(profile?.purchasedXp),
     xpRefillsTomorrow: xpTotal < rules.SESSION_STAKE_XP && profile?.xpBrokeDay === today,
     streak: rules.liveStreak(profile, today),
@@ -480,10 +512,11 @@ async function getOverview(studentId) {
   const sid = requireId(studentId, 'Học viên');
   const today = learningGoalService.vnDayKey();
   const topics = await DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  const [freeCounts, profile, todaySessions, todayPlayers, recoveryEarned] = await Promise.all([
+  const [freeCounts, profile, todayXp, todaySessions, todayPlayers, recoveryEarned] = await Promise.all([
     questionCounts(topics.map((topic) => topic._id), { freeOnly: true }),
     getProfile(sid),
-    DailyPracticeSession.find({ studentId: sid, status: 'finished', mode: 'path', day: today }).select('xp bonusXp stakeXp mode status recovery answers testOut').lean(),
+    sumTodayPracticeDisplayXp(sid, today),
+    DailyPracticeSession.countDocuments({ studentId: sid, status: 'finished', day: today }),
     countTodayPlayers(today),
     sumRecoveryXpEarnedToday(sid, today),
   ]);
@@ -496,8 +529,8 @@ async function getOverview(studentId) {
     stats: {
       ...profileView(profile, today, recoveryEarned),
       xpPacks: await listXpPacks(),
-      todaySessions: todaySessions.length,
-      todayXp: todaySessions.reduce((sum, s) => sum + rules.sessionTodayDisplayXp(s), 0),
+      todaySessions,
+      todayXp,
       todayPlayers,
     },
   };
@@ -629,31 +662,77 @@ async function answerQuestion(studentId, sessionId, { questionId, answer } = {})
   if (session.status !== 'in_progress') throw httpError(409, 'Lượt chơi đã kết thúc');
   const question = await loadSessionQuestion(session, questionId);
   const existing = (session.answers || []).find((row) => String(row.questionId) === String(question._id));
-  if (existing) throw httpError(409, 'Câu này đã được trả lời');
+  if (existing?.correct) throw httpError(409, 'Câu này đã được trả lời đúng');
   const correct = rules.gradeAnswer(question, answer || {});
-  const hintUsed = (session.hintsUsed || []).some((id) => String(id) === String(question._id));
+  const hintUsed = (session.hintsUsed || []).some((id) => String(id) === String(question._id))
+    || Boolean(existing?.hintUsed);
   const perQuestion = rules.usesPerQuestionStake(session);
   let xpDelta = 0;
   if (perQuestion && !correct) {
-    xpDelta = -rules.QUESTION_STAKE_XP;
+    const before = await getProfile(session.studentId);
+    const cost = rules.QUESTION_STAKE_XP;
+    if (rules.clampXp(before?.xpTotal) < cost) {
+      const err = httpError(402, `Cần ${cost} XP để tiếp tục sau câu sai. Bạn chưa đủ XP.`);
+      err.currentXp = rules.clampXp(before?.xpTotal);
+      err.needXp = cost;
+      throw err;
+    }
+    xpDelta = -cost;
     await adjustProfileXp(session.studentId, xpDelta, { source: 'spend' });
   }
-  // Gợi ý đã trừ ngay lúc mở → chỉ ghi lại để tính XP ròng của lượt.
-  const hintPaid = perQuestion && hintUsed ? rules.hintCostXp() : 0;
-  const updated = await DailyPracticeSession.findOneAndUpdate(
-    { _id: session._id, status: 'in_progress', 'answers.questionId': { $ne: question._id } },
-    {
-      $push: { answers: { questionId: question._id, correct, hintUsed, xp: xpDelta - hintPaid, answeredAt: new Date() } },
-      $inc: { correctCount: correct ? 1 : 0 },
-    },
-    { new: true },
-  ).lean();
-  if (!updated) throw httpError(409, 'Câu này đã được trả lời');
+  const hintPaid = perQuestion && hintUsed && !existing ? rules.hintCostXp() : 0;
+  let updated;
+  if (existing && !existing.correct) {
+    updated = await DailyPracticeSession.findOneAndUpdate(
+      {
+        _id: session._id,
+        status: 'in_progress',
+        answers: { $elemMatch: { questionId: question._id, correct: false } },
+      },
+      {
+        $set: {
+          'answers.$.correct': correct,
+          ...(correct ? { 'answers.$.answeredAt': new Date() } : {}),
+        },
+        $inc: {
+          correctCount: correct ? 1 : 0,
+          'answers.$.xp': xpDelta,
+          'answers.$.wrongAttempts': correct ? 0 : 1,
+        },
+      },
+      { new: true },
+    ).lean();
+    if (!updated) throw httpError(409, 'Không thể cập nhật câu trả lời');
+  } else {
+    updated = await DailyPracticeSession.findOneAndUpdate(
+      { _id: session._id, status: 'in_progress', 'answers.questionId': { $ne: question._id } },
+      {
+        $push: {
+          answers: {
+            questionId: question._id,
+            correct,
+            hintUsed,
+            xp: xpDelta - hintPaid,
+            wrongAttempts: correct ? 0 : 1,
+            answeredAt: new Date(),
+          },
+        },
+        $inc: { correctCount: correct ? 1 : 0 },
+      },
+      { new: true },
+    ).lean();
+    if (!updated) throw httpError(409, 'Câu này đã được trả lời');
+  }
   const profile = await getProfile(session.studentId);
-  learningGoalService.trackStudyActivity(session.studentId, { questions: 1 });
+  if (!existing) learningGoalService.trackStudyActivity(session.studentId, { questions: 1 });
+  const answerRow = (updated.answers || []).find((row) => String(row.questionId) === String(question._id));
+  const wrongTryCount = correct ? 0 : Math.max(1, Number(answerRow?.wrongAttempts) || 1);
   return {
     correct,
     xp: xpDelta,
+    xpDelta,
+    wrongPenaltyXp: perQuestion && !correct ? rules.QUESTION_STAKE_XP : 0,
+    wrongTryCount,
     stakeXp: session.stakeXp || 0,
     sessionXp: updated.xp || 0,
     profileXp: rules.clampXp(profile?.xpTotal),
@@ -661,7 +740,7 @@ async function answerQuestion(studentId, sessionId, { questionId, answer } = {})
     dailyXp: rules.clampXp(profile?.dailyXp),
     xpEmpty: rules.clampXp(profile?.xpTotal) <= 0,
     correctCount: updated.correctCount,
-    answered: updated.answers.length,
+    answered: (updated.answers || []).filter((row) => row.correct).length,
     correctAnswer: rules.correctAnswerView(question),
     explanation: question.explanation || '',
   };
@@ -671,8 +750,8 @@ async function useHint(studentId, sessionId, { questionId } = {}) {
   const session = await loadOwnSession(studentId, sessionId);
   if (session.status !== 'in_progress') throw httpError(409, 'Lượt chơi đã kết thúc');
   const question = await loadSessionQuestion(session, questionId);
-  if ((session.answers || []).some((a) => String(a.questionId) === String(question._id))) {
-    throw httpError(409, 'Câu này đã được trả lời');
+  if ((session.answers || []).some((a) => String(a.questionId) === String(question._id) && a.correct)) {
+    throw httpError(409, 'Câu này đã được trả lời đúng');
   }
   const perQuestionHint = rules.usesPerQuestionStake(session);
   let chargedXp = 0;
@@ -841,8 +920,7 @@ async function finishSession(studentId, sessionId) {
   ).lean();
 
   const answered = new Map((finished.answers || []).map((a) => [String(a.questionId), a]));
-  const missedIds = finished.questionIds.filter((id) => !answered.get(String(id))?.correct);
-  const missed = await DailyPracticeQuestion.find({ _id: { $in: missedIds } }).lean();
+  const { review, reviewAll } = await buildFinishReview(finished, answered);
   const relatedLesson = await relatedLessonForTopic(session.studentId, session.topicId);
   const finishedAt = finished.finishedAt ? new Date(finished.finishedAt) : new Date();
   const durationSeconds = Math.max(1, Math.round((finishedAt - new Date(finished.createdAt || finishedAt)) / 1000));
@@ -870,24 +948,40 @@ async function finishSession(studentId, sessionId) {
     stats: {
       ...(await (async () => {
         const recoveryEarned = await sumRecoveryXpEarnedToday(session.studentId, day);
-        const todayRows = await DailyPracticeSession.find({
-          studentId: session.studentId, status: 'finished', mode: 'path', day,
-        }).select('xp bonusXp stakeXp mode status recovery answers testOut').lean();
+        const todayXpDone = await sumTodayPracticeDisplayXp(session.studentId, day);
         return {
           ...profileView(profile, day, recoveryEarned),
-          todayXp: todayRows.reduce((sum, row) => sum + rules.sessionTodayDisplayXp(row), 0),
+          todayXp: todayXpDone,
         };
       })()),
     },
-    review: missed.map((q) => ({
-      id: String(q._id),
+    review,
+    reviewAll,
+  };
+}
+
+/** review = câu chưa đúng; reviewAll = toàn bộ lượt (popup Xem lại). */
+async function buildFinishReview(finished, answered) {
+  const ids = (finished.questionIds || []).map(String);
+  if (!ids.length) return { review: [], reviewAll: [] };
+  const questions = await DailyPracticeQuestion.find({ _id: { $in: ids } }).lean();
+  const order = new Map(ids.map((id, i) => [id, i]));
+  questions.sort((a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0));
+  const reviewAll = questions.map((q) => {
+    const qid = String(q._id);
+    const ans = answered.get(qid);
+    return {
+      id: qid,
       type: q.type,
       prompt: q.prompt,
-      answered: answered.has(String(q._id)),
+      answered: answered.has(qid),
+      correct: Boolean(ans?.correct),
       correctAnswer: rules.correctAnswerView(q),
       explanation: q.explanation || '',
-    })),
-  };
+    };
+  });
+  const review = reviewAll.filter((item) => !item.correct);
+  return { review, reviewAll };
 }
 
 /** Thoát giữa chừng - mất stake đã trừ / còn lại (theo câu hoặc lump). */

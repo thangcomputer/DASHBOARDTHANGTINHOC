@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Award, BookOpen, Check, CheckCircle2, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Monitor, Play, Route, Sparkles, Star, Trophy, X,
+  Award, BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, Sparkles, Star, Trophy, X,
 } from 'lucide-react';
-import { resolveMediaUrl } from '../../../services/api';
 import {
-  pathTopicNextLinePrefix,
-  pathTopicPrimaryCtaLabel,
   pickActivePathTopic as pickActivePathTopicShared,
 } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
+import { pathNodeMapLabel, pathNodeStartBubbleLabel } from '../../../../../shared/dailyPractice/pathNodeNudge.mjs';
+import {
+  PATH_HUB_PROGRESS_RING,
+  pathHubNodeProgress,
+  pathHubProgressColor,
+} from '../../../../../shared/dailyPractice/pathHubProgressRing.mjs';
+import { pathNodeColor } from '../../../../../shared/dailyPractice/pathNodeColors.mjs';
+import { pathPlainStageMinHeightPx } from '../../../../../shared/dailyPractice/pathPlainJourney.mjs';
+import { PATH_HUB_DUO } from '../../../../../shared/dailyPractice/pathHubDuoVisual.mjs';
+import VietnamJourneyStage from './VietnamJourneyStage';
 import {
   persistLastPathTopicId,
   readStudentUserId,
@@ -19,10 +26,11 @@ import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import PathLessonModal from './PathLessonModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import PathVideoModal from './PathVideoModal';
+import PathUnitRoadmapModal from './PathUnitRoadmapModal';
 import { gameSounds } from '../../../utils/sound';
 import { QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon, unitColor } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
-import { DropletMark, PathITBackdrop, PathStageArt } from './PathDecor';
+import { DropletMark, PathITBackdrop } from './PathDecor';
 import FreeMeetPlanModal from './FreeMeetPlanModal';
 import { collectUnitVideos, UnitStageHeader } from './PathUnitStageHeader';
 import { UnitStageChest } from './UnitStageChest';
@@ -45,193 +53,128 @@ function buildUnitPathItems(unit) {
 }
 
 const NODE_ICONS = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
-/** Hai linh vật mỗi chặng. Mỗi mục là [bản màu, bản đen] đúng tên file trong cam-xuc-animation. */
-const STAGE_BUDDIES = [
-  ['suy nghĩ.webp', 'suy nghĩ đen.webp'],
-  ['khóc.webp', 'khóc đen.webp'],
-  ['khắc phục.webp', 'khắc phục đen.webp'],
-  ['học ngủ.webp', 'học ngủ đen.webp'],
-  ['dọc sách.webp', 'đọc sách đen.webp'],
-  ['được.webp', 'được đen.webp'],
-  ['checklish.webp', 'checklish đen.webp'],
-  ['buồn.webp', 'buồn đen.webp'],
-  ['trái tim.webp', 'trái tim đen.webp'],
-  ['động lực.webp', 'động lực đen.webp'],
-  ['word-excel-ppt.webp', 'word-excel-ppt đen.webp'],
-  ['ý tưởng.webp', 'ý tưởng đen.webp'],
-  ['vui tươi.webp', 'vui tươi den.webp'],
-  ['tức giận.webp', 'tức giận đen.webp'],
-];
 
-function stageBuddySrc(file) {
-  return `/cam-xuc-animation/${encodeURI(file)}`;
-}
-
-function stageBuddyPair(index, colored) {
-  const total = STAGE_BUDDIES.length;
-  const left = STAGE_BUDDIES[(index * 2) % total];
-  const right = STAGE_BUDDIES[(index * 2 + 1) % total];
-  return [left[colored ? 0 : 1], right[colored ? 0 : 1]];
-}
-/** Lệch ngang nút - lộ trình uốn lượn giữa màn hình (Duolingo). */
-const NODE_OFFSETS = [0, 58, 0, -58];
-
-/** Màu tối hơn cho "đế" nút 3D. */
-function darken(hex, amount = 0.28) {
-  const value = String(hex || '#B91C1C').replace('#', '');
-  const channel = (start) => Math.max(0, Math.round(parseInt(value.slice(start, start + 2), 16) * (1 - amount)));
-  return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
-}
-
-/** Hai giọt nước bóng, nằm giữa khoảng trống dưới nút. */
-function PathSnakeConnector({ previousOffset, offset, active, color }) {
-  const gradientId = `dpDrop${useId().replace(/:/g, '')}`;
-  const height = 46;
-  const from = { x: previousOffset - offset, y: 4 };
-  const to = { x: 0, y: height - 6 };
-  const travel = offset - previousOffset;
-  const lean = Math.sign(travel || 1);
-  const control = { x: from.x / 2 + lean * 20, y: height * 0.46 };
-  const fill = active ? color : '#8FA0B4';
-  const deep = active ? darken(color, 0.28) : '#5C6D82';
-  const steps = [0.36, 0.7];
-  const at = (t) => {
-    const u = 1 - t;
-    return {
-      x: u * u * from.x + 2 * u * t * control.x + t * t * to.x,
-      y: u * u * from.y + 2 * u * t * control.y + t * t * to.y,
-    };
-  };
-  return (
-    <svg
-      className="pointer-events-none absolute left-1/2 z-[4] overflow-visible"
-      style={{ top: -30, width: 240, height, transform: 'translateX(-120px)' }}
-      viewBox="-120 0 240 46"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-          <stop offset="38%" stopColor={fill} />
-          <stop offset="100%" stopColor={deep} />
-        </linearGradient>
-        <filter id={`${gradientId}s`} x="-40%" y="-40%" width="180%" height="180%">
-          <feDropShadow dx="0" dy="1.2" stdDeviation="0.8" floodColor={deep} floodOpacity="0.28" />
-        </filter>
-      </defs>
-      {steps.map((t, index) => {
-        const spot = at(t);
-        const size = index === 0 ? 13 : 18;
-        const tilt = lean * (index === 0 ? 16 : 28);
-        return (
-          <g key={t} transform={`translate(${spot.x} ${spot.y}) rotate(${tilt})`} filter={`url(#${gradientId}s)`}>
-            <g transform={`translate(${-size / 2} ${-size * 0.58}) scale(${size / 24})`}>
-              <path
-                d="M12 1.5 C12 1.5 3.2 13 3.2 18.2 a8.8 8.8 0 0 0 17.6 0 C20.8 13 12 1.5 12 1.5 Z"
-                fill={`url(#${gradientId})`}
-              />
-              <ellipse cx="8.6" cy="14.2" rx="2.3" ry="3.6" fill="#FFFFFF" opacity="0.78" transform="rotate(-22 8.6 14.2)" />
-              <circle cx="15.2" cy="18.4" r="1.15" fill="#FFFFFF" opacity="0.55" />
-            </g>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function ProgressRing({ size, progress, color }) {
-  const stroke = 7;
+function ProgressRing({ size, progress, progressColor, dimmed = false }) {
+  const stroke = PATH_HUB_PROGRESS_RING.stroke;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const visibleArc = clamped > 0 && clamped < 1 ? Math.max(clamped, 0.06) : clamped;
   return (
-    <svg width={size} height={size} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-90" aria-hidden="true">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#E2E8F0" strokeWidth={stroke} />
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className={`dp-path-progress-ring pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${dimmed ? 'opacity-55' : ''}`}
+      aria-hidden="true"
+    >
       <circle
         cx={size / 2}
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke={color}
+        stroke={PATH_HUB_PROGRESS_RING.track}
+        strokeWidth={stroke}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={progressColor}
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - progress)}
+        strokeDashoffset={circumference * (1 - visibleArc)}
         className="transition-[stroke-dashoffset] duration-700"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
     </svg>
   );
 }
 
-/** Một nút trên lộ trình - bên trong popover có 3 nấc Dễ / Vừa / Khó. */
-function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selected, onClick }) {
+/** Một nút trên lộ trình - nút tròn 3D vàng kim + icon trắng + 3 chấm + sao viền theo mẫu thiết kế. */
+function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selected, onClick, nodeIndex = 0 }) {
   const locked = node.state === 'locked';
-  const done = node.state === 'completed';
-  const size = 64;
+  const size = PATH_HUB_DUO.buttonSize.web;
   const levels = node.levels || [];
-  const doneCount = levels.filter((level) => level.state === 'completed').length;
-  const progress = levels.length ? doneCount / levels.length : 0;
+  const progress = pathHubNodeProgress(node);
+  const progressColor = pathHubProgressColor(node, progress, color);
   const HubIcon = NODE_ICONS[node.icon] || Dumbbell;
-  // Nút khóa màu xám; nút đã hoàn thành chuyển xanh lá có dấu tích; nút đang học phát sáng nhẹ
   const face = locked
-    ? '#E5E7EB'
-    : done
-      ? 'radial-gradient(circle at 50% 30%, #34D399 0%, #10B981 68%)'
-      : `radial-gradient(circle at 50% 30%, ${color.from} 0%, ${color.to} 60%)`;
-  const base = locked ? '#C4C9D1' : done ? '#047857' : darken(color.to, 0.15);
+    ? 'linear-gradient(180deg, #E8EDF2 0%, #D8DEE6 100%)'
+    : 'linear-gradient(180deg, #FFDE59 0%, #FBBF24 50%, #F59E0B 100%)';
+  const base = locked ? '#C4C9D1' : '#D97706';
+  const showRing =
+    PATH_HUB_DUO.showProgressRing && !locked && isNext && progress > 0 && progress < 1;
+  const ring = showRing ? size + PATH_HUB_PROGRESS_RING.pad : size;
+  const badgeCorner = nodeIndex % 2 === 0 ? 'top-right' : 'top-left';
   return (
     <div
-      className={`relative flex flex-col items-center ${isNewlyUnlocked ? 'dp-node-unlock-pop' : ''}`}
+      className={`dp-path-hub-root dp-path-hub-root--column relative ${isNewlyUnlocked ? 'dp-node-unlock-pop' : ''}`}
       data-path-hub=""
       data-node-state={node.state}
     >
-      {isNext && !selected && (
-        <span className="dp-bob absolute -top-11 z-30 whitespace-nowrap rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wide shadow-sm" style={{ color: color.to }}>
-          Bắt đầu
-          <span className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-slate-200 bg-white" />
+      {isNext && !selected ? (
+        <span className="dp-path-start-bubble" style={{ color: '#D97706' }}>
+          {pathNodeStartBubbleLabel(node)}
         </span>
-      )}
-      <div className="relative" style={{ width: size + 26, height: size + 26 }}>
-        {isNext && <ProgressRing size={size + 26} progress={progress} color={color.from} />}
+      ) : null}
+      <div className="dp-path-hub-ring relative" style={{ width: ring, height: ring }}>
+        {showRing ? (
+          <ProgressRing size={ring} progress={progress} progressColor={progressColor} />
+        ) : null}
         <button
           type="button"
           disabled={locked}
           onClick={onClick}
           aria-label={node.kind === 'study' || node.icon === 'book' ? `${node.label}. Bài 1, Bài 2…` : `${node.label}. 3 cấp Dễ, Vừa, Khó`}
           aria-expanded={selected}
-          className={`dp-node absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full disabled:cursor-not-allowed ${
+          className={`dp-node absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full disabled:cursor-not-allowed ${
             isNext ? 'dp-node-active-glow' : ''
           }`}
           style={{
             width: size,
-            height: size - 6,
+            height: size,
             background: face,
             '--dp-node-base': base,
             color: locked ? '#9CA3AF' : '#FFFFFF',
           }}
         >
-          <HubIcon size={22} strokeWidth={2.6} aria-hidden="true" className="drop-shadow-sm" />
-          <span className="flex gap-0.5" aria-hidden="true">
-            {levels.map((level) => (
-              <span
-                key={level.key}
-                className={`h-1.5 w-1.5 rounded-full ${level.state === 'completed' ? 'bg-white' : level.state === 'active' ? 'bg-white ring-1 ring-white/50' : 'bg-white/35'}`}
-              />
-            ))}
-          </span>
-          {/* Nút đã hoàn thành có dấu tích nổi bật */}
-          {done && (
+          <HubIcon size={26} strokeWidth={PATH_HUB_DUO.iconStroke} aria-hidden="true" className="drop-shadow-sm text-white" />
+          {!locked ? (
+            <span className="mt-1 flex items-center justify-center gap-1" aria-hidden="true">
+              {[0, 1, 2].map((i) => {
+                const lvl = levels[i];
+                const isDoneOrActive = lvl ? (lvl.state === 'completed' || lvl.state === 'active') : true;
+                return (
+                  <span
+                    key={i}
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      isDoneOrActive ? 'bg-white' : 'bg-white/40'
+                    } drop-shadow-xs`}
+                  />
+                );
+              })}
+            </span>
+          ) : null}
+          {/* Ngôi sao vàng nhỏ đính góc trên phải nút */}
+          {!locked && (
             <span
-              className="dp-pop absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs ring-2 ring-white"
+              className="pointer-events-none absolute -right-0.5 -top-1 z-10 select-none drop-shadow-sm"
               aria-hidden="true"
             >
-              <Check size={13} strokeWidth={3.5} />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#F59E0B" stroke="#D97706" strokeWidth="1.5">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
             </span>
           )}
           {/* Nút khóa hiển thị biểu tượng ổ khóa xám */}
           {locked && (
             <span
-              className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-300 text-slate-600 ring-2 ring-white"
+              className={`absolute -bottom-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-300 text-slate-600 ring-2 ring-white ${
+                badgeCorner === 'top-left' ? '-left-0.5' : '-right-0.5'
+              }`}
               aria-hidden="true"
             >
               <Lock size={11} strokeWidth={2.8} />
@@ -239,7 +182,16 @@ function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selecte
           )}
         </button>
       </div>
-      <span className={`mt-1 text-xs font-black ${locked ? 'text-slate-400' : done ? 'text-emerald-700' : 'text-slate-700'}`}>{node.label}</span>
+      <span
+        className={`dp-path-node-label dp-path-node-label--below ${
+          locked ? 'dp-path-node-label--locked' : ''
+        } ${isNext && !selected ? 'dp-path-node-label--current' : ''}`}
+        style={{
+          color: locked ? PATH_HUB_DUO.labelLockedColor : '#334155',
+        }}
+      >
+        {pathNodeMapLabel(node)}
+      </span>
     </div>
   );
 }
@@ -744,7 +696,7 @@ export function pickActivePathTopic(path, initialTopicId = '', savedTopicId = ''
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
   path, practiceStats, loading, error, starting, initialTopicId = '', activeTopicId = '',
-  onTopicChange, onStartStep, onPathChanged, layout = 'default', showSubjectBar = false,
+  onTopicChange, onStartStep, onPathChanged, layout = 'default', showSubjectBar = true,
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const topics = useMemo(() => path?.topics || [], [path]);
@@ -763,6 +715,7 @@ export default function PathView({
   }, [path?.activeTopicId]);
   const [popover, setPopover] = useState(null);
   const [videoOpen, setVideoOpen] = useState(null);
+  const [roadmapOpen, setRoadmapOpen] = useState(null);
   const [lessonOpen, setLessonOpen] = useState(null);
   const [welcomeLesson, setWelcomeLesson] = useState(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -907,7 +860,6 @@ export default function PathView({
     window.addEventListener('dp-focus-current-lesson', onFocus);
     return () => window.removeEventListener('dp-focus-current-lesson', onFocus);
   }, [markUnitStarted]);
-  const color = topicColor(current?.topic.color);
   const openHub = useMemo(() => {
     if (!popover || popover.testOut || !current) return null;
     const unit = current.units.find((item) => item.id === popover.unitId);
@@ -953,11 +905,22 @@ export default function PathView({
     if (unit?.id) markUnitStarted(unit.id);
     setPopover((prev) => (prev && prev.unitId === unit.id && prev.nodeKey === nodeKey && !prev.testOut ? null : { unitId: unit.id, nodeKey, testOut: false }));
   };
-  const nextUnit = current?.next ? current.units.find((unit) => unit.id === current.next.unitId) : null;
-  const percent = current?.totalUnits ? Math.round((current.completedUnits / current.totalUnits) * 100) : 0;
+  const openUnitStageAction = (unit, isNextUnit) => {
+    gameSounds.tap();
+    markUnitStarted(unit.id);
+    let nodeKey = 'study';
+    if (unit.state === 'completed') {
+      nodeKey = unit.pathNodes?.[0]?.key || 'study';
+    } else if (isNextUnit && current?.next?.unitId === unit.id && current.next.nodeKey) {
+      nodeKey = current.next.nodeKey;
+    } else {
+      const active = unit.pathNodes?.find((n) => n.state === 'active');
+      nodeKey = active?.key || unit.pathNodes?.[0]?.key || 'study';
+    }
+    setPopover({ unitId: unit.id, nodeKey, testOut: false });
+  };
   const wide = layout === 'wide';
-  const laneInner = wide ? 'w-full max-w-[280px] lg:max-w-[300px]' : 'w-full max-w-[240px]';
-  const offsetScale = wide ? 52 : 44;
+  const laneWidthPx = wide ? 520 : 420;
 
   return (
     <div className="space-y-4">
@@ -994,69 +957,11 @@ export default function PathView({
 
       {current && (
         <>
-          <section className="dp-dew-chapter-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
-            {current.completedUnits >= current.totalUnits && current.totalUnits > 0 ? (
-              <span className="dp-dew-chapter-card__badge" title="Đã hoàn thành chủ đề">
-                <CheckCircle2 size={22} className="text-white" strokeWidth={2.5} aria-hidden="true" />
-              </span>
-            ) : null}
-            <div className="dp-dew-chapter-card__icon flex h-14 w-14 shrink-0 items-center justify-center sm:h-16 sm:w-16">
-              <Monitor size={30} className="text-white" strokeWidth={2.2} aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-black uppercase tracking-widest text-white/85">
-                CHƯƠNG {nextUnit?.index || current.units?.[0]?.index || 1}
-                {' · '}
-                {current.completedUnits >= current.totalUnits && current.totalUnits > 0
-                  ? 'ĐÃ VƯỢT'
-                  : (current.completedUnits > 0 || current.next ? 'ĐANG HỌC' : 'BẮT ĐẦU')}
-              </p>
-              <h2 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">
-                {nextUnit?.title || current.units?.[0]?.title || current.topic.name}
-              </h2>
-              <p className="mt-1 text-xs font-medium leading-relaxed text-white/90">
-                {current.next
-                  ? `${pathTopicNextLinePrefix(current)}: ${current.next.nodeLabel || current.next.unitTitle} · ${current.next.stepLabel}`
-                  : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này. Luyện lại bất kỳ bước nào để giữ phong độ.'}
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/25">
-                  <div
-                    className="h-full rounded-full bg-white transition-all duration-500"
-                    style={{ width: `${Math.max(percent, current.completedUnits > 0 ? 6 : 0)}%` }}
-                  />
-                </div>
-                <span className="shrink-0 text-sm font-black tabular-nums text-white">
-                  {current.completedUnits}/{current.totalUnits}
-                </span>
-              </div>
-            </div>
-            {current.next && nextUnit ? (
-              <button
-                type="button"
-                data-path-hub=""
-                onClick={() => {
-                  if (current.next?.unitId) markUnitStarted(current.next.unitId);
-                  focusCurrentPathLesson();
-                }}
-                className="dp-dew-chapter-card__cta inline-flex shrink-0 items-center justify-center gap-2 px-5 py-3 text-sm !shadow-none"
-              >
-                <Play size={16} fill="currentColor" aria-hidden="true" />
-                {pathTopicPrimaryCtaLabel(current)}
-              </button>
-            ) : null}
-          </section>
-
           {newlyUnlockedUnit && (
             <LevelUnlockEffect unlockedUnit={newlyUnlockedUnit} active />
           )}
 
           <div className="dp-dew-path-lane relative overflow-hidden">
-            <PathITBackdrop
-              accentSoft={color.soft}
-              completedUnits={current.completedUnits}
-              totalUnits={current.totalUnits}
-            />
             {current.units.map((unit, unitIndex) => {
               const tone = unitColor(unit.index);
               const locked = unit.state === 'locked';
@@ -1064,6 +969,7 @@ export default function PathView({
               const testOutOpen = popover?.unitId === unit.id && popover.testOut;
               const isNextUnit = current.next?.unitId === unit.id;
               const pathItems = buildUnitPathItems(unit);
+              const stageMinH = pathPlainStageMinHeightPx(pathItems.length, laneWidthPx) + 48;
               const unitVideos = collectUnitVideos(unit);
               const hasVideo = Boolean(unit.lesson) || unitVideos.length > 0;
               const nextIdx = pathItems.findIndex((item) => (
@@ -1071,28 +977,18 @@ export default function PathView({
                 && (current.next.nodeKey ? current.next.nodeKey === item.node?.key : item.node?.key === 'study')
               ));
               const artAt = nextIdx >= 0 ? nextIdx : (unit.imageUrl ? 0 : -1);
-              const openUnitVideo = (videoId = '') => {
-                gameSounds.tap();
-                setPopover(null);
-                setVideoOpen({ unit, videoId });
-              };
-              const [buddyLeft, buddyRight] = stageBuddyPair(unitIndex, unit.state !== 'locked');
               const isLast = unitIndex === current.units.length - 1;
-              const leftHigh = unitIndex % 2 === 0;
-              const edge = '0.5cm';
               return (
-                <article key={unit.id} className="relative z-[2]">
-                  <img
-                    src={stageBuddySrc(buddyLeft)}
-                    alt=""
-                    className="pointer-events-none absolute z-[3] h-24 w-24 object-contain drop-shadow-md sm:h-28 sm:w-28"
-                    style={leftHigh ? { top: '0.35rem', left: edge } : { top: '42%', left: edge }}
-                  />
-                  <img
-                    src={stageBuddySrc(buddyRight)}
-                    alt=""
-                    className={`pointer-events-none absolute z-[3] object-contain drop-shadow-md ${leftHigh ? 'h-28 w-28 sm:h-32 sm:w-32' : 'h-24 w-24 sm:h-28 sm:w-28'}`}
-                    style={leftHigh ? { top: '42%', right: edge } : { top: '0.35rem', right: edge }}
+                <article key={unit.id} className="dp-path-unit-stage relative z-[2] w-full" style={{ minHeight: stageMinH }}>
+                  <PathITBackdrop
+                    accentSoft={tone.soft}
+                    hideMap
+                    fullBleed
+                    topicCompletedUnits={current.completedUnits}
+                    topicTotalUnits={current.totalUnits}
+                    unitIndex={unitIndex}
+                    unitTotal={current.units.length}
+                    unitState={unit.state}
                   />
                   <div className="relative px-3 py-2 sm:px-4">
                     <div className="relative z-20">
@@ -1102,74 +998,59 @@ export default function PathView({
                         highlight={isNextUnit}
                         hasVideo={hasVideo}
                         isStarted={startedUnitIds.includes(unit.id)}
-                        onStartUnit={() => {
-                          markUnitStarted(unit.id);
-                          const nextNodeKey = unit.pathNodes?.[0]?.key || 'study';
-                          setPopover({ unitId: unit.id, nodeKey: nextNodeKey, testOut: false });
-                        }}
+                        onStartUnit={() => openUnitStageAction(unit, isNextUnit)}
+                        onStageAction={() => openUnitStageAction(unit, isNextUnit)}
                         onTestOut={() => toggle(unit, 'challenge', true)}
-                        onWatch={() => openUnitVideo('')}
+                        onRoadmap={() => {
+                          gameSounds.tap();
+                          setPopover(null);
+                          setRoadmapOpen({ unit });
+                        }}
                         testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
                       />
                     </div>
-                    <div className="relative z-30 px-1 pb-4 pt-14 sm:px-2">
-                      <div className="relative flex flex-col items-center gap-5">
-                        <div className={`relative mx-auto flex flex-col items-center gap-7 ${laneInner}`}>
-                          {pathItems.map((item, index) => {
-                            const hubSelected = popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === item.node.key;
-                            const offset = (NODE_OFFSETS[index % NODE_OFFSETS.length] / 58) * offsetScale;
-                            const previous = index > 0 ? NODE_OFFSETS[(index - 1) % NODE_OFFSETS.length] : null;
-                            const hubNext = nextIdx === index;
-                            const linkActive = item.state !== 'locked';
-                            const artSide = offset >= 0 ? 'left' : 'right';
-                            return (
-                              <div
-                                key={item.key}
-                                ref={hubSelected ? hubAnchorRef : undefined}
-                                data-path-current={hubNext ? '1' : undefined}
-                                className={`relative flex w-full flex-col items-center gap-2 ${hubSelected || hubNext ? 'z-30' : 'z-0'}`}
-                                style={{ transform: `translateX(${offset}px)` }}
-                              >
-                                {index === artAt && !hasVideo && unit.imageUrl ? (
-                                  <PathStageArt
-                                    side={artSide}
-                                    imageUrl={unit.imageUrl}
-                                    mood={locked ? 'thinking' : hubNext ? 'determinedSoft' : 'studying'}
-                                    size={80}
-                                  />
-                                ) : null}
-                                {previous !== null && (
-                                  <PathSnakeConnector
-                                    previousOffset={(previous / 58) * offsetScale}
-                                    offset={offset}
-                                    active={linkActive}
-                                    color={tone.from}
-                                  />
-                                )}
-                                <PracticeHubNode
-                                  node={item.node}
-                                  color={tone}
-                                  isNext={hubNext}
-                                  isNewlyUnlocked={isUnitNewlyUnlocked && index === 0}
-                                  selected={Boolean(hubSelected)}
-                                  onClick={() => toggleHub(unit, item.node.key)}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {unit.imageUrl ? (
-                          <div className="relative z-[2] flex w-full flex-col items-center lg:w-auto lg:pt-6">
-                            <img
-                              src={resolveMediaUrl(unit.imageUrl) || unit.imageUrl}
-                              alt=""
-                              className="dp-float hidden h-20 w-20 object-contain drop-shadow-md lg:block"
-                              draggable={false}
+                    <div className="dp-path-unit-stage__journey relative z-30 w-full pb-0 pt-1 sm:pt-2">
+                      <div className="relative flex w-full flex-col items-stretch gap-2">
+                        <VietnamJourneyStage
+                          pathItems={pathItems}
+                          laneWidthPx={laneWidthPx}
+                          tone={tone}
+                          nextIdx={nextIdx}
+                          hubSelectedKey={popover && !popover.testOut && popover.unitId === unit.id ? popover.nodeKey : ''}
+                          unit={unit}
+                          locked={locked}
+                          isUnitNewlyUnlocked={isUnitNewlyUnlocked}
+                          artAt={artAt}
+                          hasVideo={hasVideo}
+                          unitImageUrl={unit.imageUrl}
+                          hubAnchorRef={hubAnchorRef}
+                          mapProps={{
+                            topicCompletedUnits: current.completedUnits,
+                            topicTotalUnits: current.totalUnits,
+                            unitIndex: unitIndex,
+                            unitTotal: current.units.length,
+                            unitState: unit.state,
+                          }}
+                          renderHub={(item, { hubNext, hubSelected, index }) => (
+                            <PracticeHubNode
+                              node={item.node}
+                              color={pathNodeColor(item.node, index, { mapDuo: true })}
+                              isNext={hubNext}
+                              isNewlyUnlocked={isUnitNewlyUnlocked && index === 0}
+                              selected={Boolean(hubSelected)}
+                              nodeIndex={index}
+                              onClick={() => toggleHub(unit, item.node.key)}
                             />
-                          </div>
-                        ) : null}
-                        <div className="relative z-[2] flex w-full flex-col items-center pt-2 pb-3">
-                          <UnitStageChest unit={unit} onClaimed={() => onPathChanged?.()} />
+                          )}
+                        />
+                        <div className="dp-path-unit-footer relative z-[2] mt-3 flex w-full justify-center px-1 pb-2">
+                          <UnitStageChest
+                            unit={unit}
+                            variant="chip"
+                            onClaimed={() => onPathChanged?.()}
+                          />
+                        </div>
+                        <div className="relative z-[2] mt-1 flex w-full flex-col items-center pb-2">
                           {isLast ? (
                             <CourseFinaleCup
                               courseDone={!current.next && current.totalUnits > 0 && current.completedUnits >= current.totalUnits}
@@ -1260,6 +1141,24 @@ export default function PathView({
           }}
         />
       )}
+      {roadmapOpen ? (
+        <PathUnitRoadmapModal
+          unit={roadmapOpen.unit}
+          color={unitColor(roadmapOpen.unit.index)}
+          onClose={() => setRoadmapOpen(null)}
+          onPickNode={(nodeKey) => {
+            setRoadmapOpen(null);
+            setPopover({ unitId: roadmapOpen.unit.id, nodeKey, testOut: false });
+          }}
+          onOpenVideo={() => {
+            const unit = roadmapOpen.unit;
+            const vids = collectUnitVideos(unit);
+            const preferred = vids.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id || vids[0]?.id || '';
+            setRoadmapOpen(null);
+            setVideoOpen({ unit, videoId: preferred });
+          }}
+        />
+      ) : null}
       {welcomeLesson && (
         <WelcomeBackModal
           unitIndex={welcomeLesson.unit?.index}

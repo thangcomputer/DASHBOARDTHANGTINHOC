@@ -1,0 +1,112 @@
+/* Khung bản đồ — căn giữa vùng nút học (dưới banner chặng, trên rương). */
+.vn-stage-backdrop {
+  isolation: isolate;
+}
+
+.vn-stage-backdrop--full {
+  border-radius: 0;
+}
+
+.vn-stage-backdrop--plain .vn-stage-backdrop__wash {
+  background: #fafcff !important;
+  opacity: 1;
+}
+
+.vn-stage-backdrop--full .vn-stage-backdrop__wash {
+  opacity: 1;
+}
+
+.vn-stage-backdrop__wash {
+  opacity: 0.97;
+}
+
+.vn-map-stage-frame {
+  position: absolute;
+  left: 50%;
+  top: 5.25rem;
+  bottom: 3.25rem;
+  width: min(88%, 21.5rem);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.vn-map-bg {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  opacity: 1;
+}
+
+.vn-map-bg--stage {
+  flex: 0 1 auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.vn-journey-spine {
+  filter: drop-shadow(0 0 1px rgba(16, 185, 129, 0.2));
+}
+
+.vn-journey-spine--soft {
+  opacity: 0.42;
+}
+
+.vn-deco-droop {
+  z-index: 2;
+  animation: vn-droplet-bob 4.2s ease-in-out infinite;
+}
+
+@keyframes vn-droplet-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@media (min-width: 640px) {
+  .vn-map-stage-frame {
+    top: 5.5rem;
+    bottom: 3.5rem;
+    width: min(82%, 23rem);
+  }
+}
+
+@media (max-width: 420px) {
+  .vn-map-stage-frame {
+    top: 4.85rem;
+    width: min(94%, 19rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vn-deco-droop {
+    animation: none;
+  }
+}
+
+/* Hành trình: nút + đường nối trùng viewBox bản đồ */
+.vn-journey-stage {
+  z-index: 8;
+}
+
+.vn-journey-stage__coord {
+  z-index: 1;
+}
+
+.vn-journey-node {
+  width: max-content;
+  max-width: 7.5rem;
+}
+
+.vn-journey-stage__map .vn-map-bg--stage {
+  opacity: 1;
+}
+
+@media (max-width: 420px) {
+  .vn-journey-node {
+    max-width: 6.75rem;
+  }
+}

@@ -13,28 +13,46 @@ export function PracticeReviewModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  if (!review?.length) return null;
+  const items = review || [];
+  if (!visible) return null;
+
+  if (!items.length) {
+    return (
+      <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+        <View style={styles.backdrop}>
+          <View style={[styles.card, { padding: 20, maxHeight: undefined }]}>
+            <Text style={styles.headTitle}>Chưa có dữ liệu xem lại cho lượt này.</Text>
+            <Pressable onPress={onClose} style={[styles.closeBtn, { alignSelf: 'center', marginTop: 12 }]}>
+              <Text style={styles.headTitle}>Đóng</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.head}>
             <View style={styles.headTitleRow}>
               <Sparkles size={16} color="#D97706" />
               <Text style={styles.headTitle}>Xem lại kết quả</Text>
-              <Text style={styles.headCount}>{`(${review.length})`}</Text>
+              <Text style={styles.headCount}>{`(${items.length})`}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Đóng">
               <X size={17} color="#64748B" />
             </Pressable>
           </View>
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-            {review.map((item, idx) => {
+            {items.map((item, idx) => {
               const answerText = String(item.correctAnswer?.text || '').trim();
               const followUp = reviewItemFollowUpLine(item);
+              const wrong = (item as { correct?: boolean }).correct === false;
               return (
-                <View key={item.id || idx} style={styles.item}>
+                <View key={item.id || idx} style={[styles.item, wrong && styles.itemWrong]}>
+                  {wrong ? <Text style={styles.itemWrongTag}>CHƯA ĐÚNG</Text> : null}
                   <Text style={styles.prompt}>{item.prompt}</Text>
                   {answerText ? (
                     <Text style={styles.answer}>{`✓ ${answerText}`}</Text>
@@ -96,6 +114,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#F1F5F9',
+  },
+  itemWrong: {
+    backgroundColor: '#FFF1F2',
+    borderColor: '#FECDD3',
+  },
+  itemWrongTag: {
+    marginBottom: 4,
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#E11D48',
+    letterSpacing: 0.4,
   },
   prompt: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
   answer: { marginTop: 6, fontSize: 13, fontWeight: '700', color: '#059669' },

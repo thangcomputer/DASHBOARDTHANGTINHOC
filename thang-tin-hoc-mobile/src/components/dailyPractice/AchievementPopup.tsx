@@ -10,11 +10,12 @@ import {
   View,
 } from 'react-native';
 import {
-  Award, CheckCircle2, Eye, GraduationCap, Play, PlayCircle, RotateCcw, Star, Target, Timer, Trophy, X, Zap,
+  Award, Eye, Play, RotateCcw, Star, Timer, Trophy, X, Zap,
 } from 'lucide-react-native';
 import { Mascot } from './Mascot';
 import { DuoButton } from '../duo/DuoButton';
 import type { GameSound } from './useGameSounds';
+import { formatPracticeScoreQuestions } from '../../../../shared/dailyPractice/finishScoreLine.mjs';
 import { practiceFinishXpDisplay, type DpSummary } from '../../services/dailyPracticeApi';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -84,7 +85,14 @@ function StatTile({
       </View>
       <View style={[styles.statBody, { backgroundColor: bodyBg }]}>
         {typeof value === 'string' || typeof value === 'number' ? (
-          <Text style={[styles.statValue, { color: tone }]}>{value}</Text>
+          <Text
+            style={[styles.statValue, { color: tone }]}
+            numberOfLines={3}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+          >
+            {value}
+          </Text>
         ) : (
           value
         )}
@@ -109,7 +117,7 @@ export function AchievementPopup({
   onReviewResults,
   onReplay,
   onDismiss,
-  onRelatedVideo,
+  onRelatedVideo: _onRelatedVideo,
 }: {
   summary: DpSummary;
   play?: (s: GameSound) => void;
@@ -120,7 +128,7 @@ export function AchievementPopup({
   onRelatedVideo?: () => void;
 }) {
   const { width } = useWindowDimensions();
-  const cardWidth = Math.min(width * 0.93, 380);
+  const cardWidth = Math.min(Math.max(width - 24, 280), 440);
 
   const total = Math.max(1, Number(summary?.total) || 1);
   const correctCount = Math.max(0, Number(summary?.correctCount) || 0);
@@ -129,7 +137,6 @@ export function AchievementPopup({
     : Math.round((correctCount / total) * 100);
   const xpDisplay = practiceFinishXpDisplay(summary);
   const animatedXp = useCountUp(xpDisplay.amount);
-  const animatedAccuracy = useCountUp(accuracy);
   const stars = Number(summary?.stars) || (accuracy >= 90 ? 3 : accuracy >= 60 ? 2 : 1);
   const good = stars >= 2;
   const isPerfect = Boolean(
@@ -138,9 +145,7 @@ export function AchievementPopup({
     (summary.correctCount === summary.total || summary.maxCombo === summary.total)
   );
   const mascotMood = good ? 'celebrate' : (summary?.passed ? 'graduate' : 'sad');
-  const maxCombo = Math.max(0, Number(summary?.maxCombo) || 0);
   const durationLabel = formatDuration(summary.durationSeconds);
-  const hasRelatedVideo = Boolean(summary.relatedLesson);
 
   const shell = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -214,8 +219,15 @@ export function AchievementPopup({
         ) : null}
 
         <View style={styles.statsRow}>
-          <StatTile label="CHÍNH XÁC" tone="#22C55E" Icon={CheckCircle2} value={`${animatedAccuracy}%`} bodyBg="#ECFDF5" delay={60} />
-          <StatTile label="ĐIỂM SỐ" tone="#3B82F6" Icon={Award} value={`${correctCount}/${total}`} bodyBg="#EFF6FF" delay={140} />
+          <StatTile label="THỜI GIAN" tone="#22C55E" Icon={Timer} value={durationLabel} bodyBg="#ECFDF5" delay={60} />
+          <StatTile
+            label="SỐ CÂU"
+            tone="#3B82F6"
+            Icon={Award}
+            value={formatPracticeScoreQuestions(correctCount, total)}
+            bodyBg="#EFF6FF"
+            delay={140}
+          />
           <StatTile label="NHẬN VỀ" tone="#F59E0B" Icon={Zap} value={xpValueText} bodyBg="#FFFBEB" delay={220} />
         </View>
 
@@ -263,27 +275,6 @@ export function AchievementPopup({
             onPress={onContinue}
             style={styles.actionPrimaryBtn}
           />
-        </View>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <GraduationCap size={16} color="#059669" />
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatTile
-            label="VIDEO LIÊN QUAN"
-            tone="#F59E0B"
-            Icon={PlayCircle}
-            value={hasRelatedVideo ? <PlayCircle size={22} color="#F59E0B" /> : '—'}
-            bodyBg="#FFFBEB"
-            delay={300}
-            onPress={hasRelatedVideo ? onRelatedVideo : undefined}
-            disabled={!hasRelatedVideo}
-          />
-          <StatTile label="COMBO" tone="#3B82F6" Icon={Target} value={`×${maxCombo}`} bodyBg="#EFF6FF" delay={380} />
-          <StatTile label="THỜI GIAN" tone="#22C55E" Icon={Timer} value={durationLabel} bodyBg="#ECFDF5" delay={460} />
         </View>
       </View>
     </Animated.View>
@@ -354,7 +345,7 @@ const styles = StyleSheet.create({
     borderColor: '#D1FAE5',
   },
   xpPillText: { color: '#065F46', fontSize: 11, fontWeight: '700', lineHeight: 15 },
-  statsRow: { flexDirection: 'row', gap: 5, marginTop: 12, width: '100%' },
+  statsRow: { flexDirection: 'row', gap: 6, marginTop: 12, width: '100%', alignItems: 'stretch' },
   statPressable: { flex: 1, minWidth: 0 },
   statTile: { flex: 1, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9' },
   statHead: {
@@ -362,9 +353,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingVertical: 5,
+    paddingVertical: 6,
     paddingHorizontal: 3,
-    minHeight: 30,
+    minHeight: 40,
   },
   statHeadIcon: { flexShrink: 0, width: 14, alignItems: 'center' },
   statHeadText: {
@@ -378,7 +369,7 @@ const styles = StyleSheet.create({
     lineHeight: 9,
   },
   statBody: { alignItems: 'center', justifyContent: 'center', paddingVertical: 8, minHeight: 42 },
-  statValue: { fontSize: 14, fontWeight: '900' },
+  statValue: { fontSize: 14, fontWeight: '900', textAlign: 'center' },
   actions: { marginTop: 12, width: '100%', gap: 8 },
   actionsSecondaryRow: { flexDirection: 'row', gap: 8, width: '100%' },
   actionHalf: { flex: 1, minWidth: 0 },
@@ -386,6 +377,4 @@ const styles = StyleSheet.create({
   actionBtnCompact: { paddingHorizontal: 6, minWidth: 0 },
   actionTextCompact: { fontSize: 12, flexShrink: 1 },
   actionPrimaryBtn: { width: '100%' },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#D1FAE5' },
 });

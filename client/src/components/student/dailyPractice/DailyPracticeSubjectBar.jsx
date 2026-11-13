@@ -95,7 +95,7 @@ export default function DailyPracticeSubjectBar({
     <div className={`dp-dew-subject-carousel ${className}`.trim()} data-has-overflow={overflow ? 'true' : 'false'}>
       <button
         type="button"
-        className="dp-dew-subject-arrow"
+        className="dp-dew-subject-arrow shrink-0"
         aria-label="Xem các môn bên trái"
         disabled={!canScrollLeft}
         onClick={() => nudge(-1)}
@@ -144,7 +144,7 @@ export default function DailyPracticeSubjectBar({
 
       <button
         type="button"
-        className="dp-dew-subject-arrow"
+        className="dp-dew-subject-arrow shrink-0"
         aria-label="Xem các môn bên phải"
         disabled={!canScrollRight}
         onClick={() => nudge(1)}
