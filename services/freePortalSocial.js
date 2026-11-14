@@ -291,8 +291,12 @@ async function findByProvider(profile) {
   if (!byEmail) return null;
   if (byEmail[field] && byEmail[field] !== profile.providerId) return null;
 
+  const hadSocialProvider = Boolean(byEmail.googleId || byEmail.facebookId);
   byEmail[field] = profile.providerId;
-  if (profile.avatar && !byEmail.avatar) byEmail.avatar = profile.avatar;
+  // Giữ nguyên tên và ảnh đại diện của tài khoản đăng ký đầu tiên
+  if (!hadSocialProvider && profile.avatar && !byEmail.avatar) {
+    byEmail.avatar = profile.avatar;
+  }
   await byEmail.save({ validateModifiedOnly: true });
   return byEmail;
 }
@@ -303,17 +307,40 @@ function ticketFor(profile) {
 
 async function exchangeTicket(token, fingerprint) {
   const profile = readTicket(token);
-  const student = await findByProvider(profile);
-  if (student && profileReady(student)) {
-    return { needsProfile: false, session: await issueSession(student, fingerprint) };
+  let student = await findByProvider(profile);
+  if (!student) {
+    const field = PROVIDERS[profile.provider];
+    const email = String(profile.email || '').trim().toLowerCase();
+    const displayName = String(profile.name || '').trim() || 'Học viên DewSkill';
+    student = await Student.create({
+      name: displayName,
+      email: email || undefined,
+      zalo: email ? undefined : `${profile.provider}_${profile.providerId}`,
+      avatar: profile.avatar || '',
+      password: crypto.randomBytes(24).toString('hex'),
+      [field]: profile.providerId,
+      course: FREE_COURSE_NAME,
+      price: 0,
+      paid: true,
+      paidAmount: 0,
+      status: 'Đang học',
+      learningMode: 'ONLINE',
+      freePortal: true,
+      freeUnlocked: false,
+      isFirstLogin: true,
+      enrollments: [{
+        courseName: FREE_COURSE_NAME,
+        price: 0,
+        paid: true,
+        status: 'active',
+        learningAccess: true,
+        isPrimary: true,
+        totalSessions: 0,
+        remainingSessions: 0,
+      }],
+    });
   }
-  return {
-    needsProfile: true,
-    ticket: token,
-    name: student?.name || profile.name || '',
-    email: student?.email || profile.email || '',
-    provider: profile.provider,
-  };
+  return { needsProfile: false, session: await issueSession(student, fingerprint) };
 }
 
 async function completeProfile({ token, name, age, phone, email, fingerprint }) {
