@@ -434,15 +434,13 @@ const StudentDashboard = () => {
     'materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores',
   ].includes(sectionHash);
 
-  useEffect(() => {
+  const fetchFreePortalTraining = useCallback(() => {
     if (!freeMenu || freePortalApiLocked) {
       setFreePortalTrainingData({ files: [], softwareLinks: [], assignments: [] });
-      return undefined;
+      return Promise.resolve();
     }
-    let cancelled = false;
-    api.settings.getFreePortalTrainingData()
+    return api.settings.getFreePortalTrainingData()
       .then((res) => {
-        if (cancelled) return;
         if (res?.success && res.data) {
           setFreePortalTrainingData({
             files: Array.isArray(res.data.files) ? res.data.files : [],
@@ -452,8 +450,18 @@ const StudentDashboard = () => {
         }
       })
       .catch(() => { });
-    return () => { cancelled = true; };
   }, [freeMenu, freePortalApiLocked]);
+
+  useEffect(() => {
+    fetchFreePortalTraining();
+  }, [fetchFreePortalTraining]);
+
+  useEffect(() => {
+    if (!freeMenu || freePortalApiLocked || !onDataRefresh) return undefined;
+    return onDataRefresh((data) => {
+      if (data?.type === 'settings') fetchFreePortalTraining();
+    });
+  }, [freeMenu, freePortalApiLocked, onDataRefresh, fetchFreePortalTraining]);
 
   // Rating state
   const [ratingCriteria, setRatingCriteria] = useState({ teaching: '', voice: '', guidance: '', support: '' });
