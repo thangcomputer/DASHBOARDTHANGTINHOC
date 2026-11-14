@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Ban, Copy, Download, Loader2, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Ticket, UserCog,
+  Ban, Copy, CreditCard, Download, Loader2, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Ticket, UserCog,
 } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -56,7 +56,7 @@ function PricesCard() {
       right={<button type="button" onClick={save} disabled={!plans || saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">{saving && <Loader2 size={14} className="animate-spin" />} Lưu giá</button>}
     >
       {!plans ? <Loader2 size={18} className="animate-spin text-slate-400" /> : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {plans.map((plan, index) => (
             <label key={plan.id} className="block text-xs font-bold text-slate-600">
               {plan.label}
@@ -622,20 +622,62 @@ function StudentRenewCard() {
 /** Admin: giá gói, phát hành mã kích hoạt theo lô, danh sách mã, gia hạn tay cho HV. */
 export default function AdminSubscriptionTab() {
   const [reloadKey, setReloadKey] = useState(0);
+  const [activeTab, setActiveTab] = useState('pricing'); // pricing | codes | students
+
+  const TABS = [
+    { key: 'pricing', icon: CreditCard, label: 'Bảng giá & Cấu hình XP' },
+    { key: 'codes', icon: Ticket, label: 'Mã kích hoạt' },
+    { key: 'students', icon: UserCog, label: 'Gia hạn học viên' },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl bg-gradient-to-r from-red-50 to-amber-50 p-4 ring-1 ring-red-100">
-        <h2 className="text-base font-black text-slate-900">Mã kích hoạt & gói tài khoản</h2>
-        <p className="mt-1 text-xs text-slate-600">
-          Cùng gói Meet học viên đăng ký: 1 tháng, 3 tháng, 6 tháng, 1 năm hoặc vĩnh viễn. Hết hạn thì học viên chỉ còn màn gia hạn. Gia hạn bằng mã hoặc thanh toán sẽ cộng tiếp từ ngày hết hạn hiện tại.
-        </p>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-red-50 to-amber-50 p-4 ring-1 ring-red-100">
+        <div>
+          <h2 className="text-base font-black text-slate-900">Mã kích hoạt &amp; gói tài khoản</h2>
+          <p className="mt-0.5 text-xs text-slate-600">
+            Quản lý giá gói Meet (SePay), giá gói XP luyện, mức XP theo tài khoản, mã kích hoạt và gia hạn thủ công.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5 rounded-xl bg-white p-1 ring-1 ring-red-100 shadow-xs">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition ${
+                activeTab === tab.key
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <tab.icon size={14} />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <PricesCard />
-      <XpPackPricesCard />
-      <XpConfigCard />
-      <GenerateCard onCreated={() => setReloadKey((n) => n + 1)} />
-      <CodesCard reloadKey={reloadKey} />
-      <StudentRenewCard />
+
+      {activeTab === 'pricing' && (
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <PricesCard />
+            <XpPackPricesCard />
+          </div>
+          <XpConfigCard />
+        </div>
+      )}
+
+      {activeTab === 'codes' && (
+        <div className="space-y-4">
+          <GenerateCard onCreated={() => setReloadKey((n) => n + 1)} />
+          <CodesCard reloadKey={reloadKey} />
+        </div>
+      )}
+
+      {activeTab === 'students' && (
+        <StudentRenewCard />
+      )}
     </div>
   );
 }
