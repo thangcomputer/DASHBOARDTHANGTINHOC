@@ -1447,62 +1447,76 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
         {/* FILES TAB */}
         {mainTab === 'files' && (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-3">
               <Download className="text-red-600" /> Tài liệu Đào tạo
             </h2>
-            <div className="space-y-3">
-              {visibleTraining?.files?.map((file, idx) => {
-                const rawUrl = file.fileUrl || file.url || file.link || '';
-                const displayName = file.fileOriginalName || file.title || 'tai-lieu';
-                const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
-                  || /^https?:\/\//i.test(String(rawUrl));
-                return (
-                  <div key={file.id || file._id || idx} className="p-4 rounded-xl border border-slate-100 hover:bg-red-50 hover:border-red-200 transition-all flex justify-between items-center gap-3">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-red-500' : 'bg-red-600')
-                        }`}>{isLink ? 'Link' : (file.fileType || 'FILE')}</div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-slate-800 truncate">{file.title}</h3>
-                        <p className="text-xs text-slate-400">{isLink ? 'Liên kết ngoài' : (file.fileSize || 'N/A')}</p>
-                      </div>
-                    </div>
-                    {rawUrl ? (
-                      isLink ? (
-                        <a
-                          href={resolveMediaUrl(rawUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-bold transition-all shrink-0 inline-flex items-center gap-1.5 no-underline"
-                        >
-                          <ExternalLink size={14} /> Mở link
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            try {
-                              await downloadMediaFile(rawUrl, displayName);
-                            } catch (err) {
-                              toast.error(err?.message || 'Không tải được tài liệu');
-                            }
-                          }}
-                          className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 text-sm' })}
-                        >
-                          Tải xuống
-                        </button>
-                      )
-                    ) : (
-                      <span className="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 cursor-not-allowed shrink-0">Chưa có file</span>
-                    )}
-                  </div>
-                );
-              })}
-              {(!visibleTraining?.files || visibleTraining.files.length === 0) && (
-                <p className="text-slate-400 text-sm">Chưa có tài liệu nào.</p>
-              )}
-            </div>
+            {!visibleTraining?.files || visibleTraining.files.length === 0 ? (
+              <p className="text-slate-400 text-sm">Chưa có tài liệu nào.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full min-w-[600px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 w-12 text-center">STT</th>
+                      <th className="px-4 py-3">Tài liệu</th>
+                      <th className="px-4 py-3">Định dạng</th>
+                      <th className="px-4 py-3 text-right">Tải xuống</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {visibleTraining.files.map((file, idx) => {
+                      const rawUrl = file.fileUrl || file.url || file.link || '';
+                      const displayName = file.fileOriginalName || file.title || 'tai-lieu';
+                      const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
+                        || /^https?:\/\//i.test(String(rawUrl));
+                      return (
+                        <tr key={file.id || file._id || idx} className="hover:bg-red-50/40 transition-colors">
+                          <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800">{file.title}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-black text-white ${isLink ? 'bg-sky-500' : 'bg-red-600'}`}>
+                              {isLink ? 'Link ngoài' : `${file.fileType || 'FILE'}${file.fileSize ? ` · ${file.fileSize}` : ''}`}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            {rawUrl ? (
+                              isLink ? (
+                                <a
+                                  href={resolveMediaUrl(rawUrl)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 no-underline"
+                                >
+                                  <ExternalLink size={14} /> Mở link
+                                </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    try {
+                                      await downloadMediaFile(rawUrl, displayName);
+                                    } catch (err) {
+                                      toast.error(err?.message || 'Không tải được tài liệu');
+                                    }
+                                  }}
+                                  className={lmsBtn('danger', { size: 'sm', className: 'text-xs' })}
+                                >
+                                  Tải xuống
+                                </button>
+                              )
+                            ) : (
+                              <span className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 border border-slate-100 bg-slate-50">Chưa có file</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

@@ -152,19 +152,21 @@ export default function SoftwareLinksTable({
             <table className="w-full text-left min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[28%]">Link / Phần mềm</th>
-                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[42%]">Mô tả</th>
-                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[30%]">Hướng dẫn cài đặt</th>
+                  <th className="px-4 py-3 text-[11px] font-black tracking-wide text-slate-500 w-12 text-center">STT</th>
+                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[26%]">Link / Phần mềm</th>
+                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[40%]">Mô tả</th>
+                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[28%]">Hướng dẫn cài đặt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((row) => {
+                {rows.map((row, idx) => {
                   const href = String(row.linkUrl || row.url || '').trim();
                   const name = String(row.title || row.name || 'Phần mềm').trim();
                   const guideRaw = String(row.installGuide || row.guide || '');
                   const canViewGuide = hasInstallGuide(guideRaw);
                   return (
                     <tr key={row.id || href || name} className="align-top hover:bg-slate-50/60">
+                      <td className="px-4 py-3.5 text-center text-sm font-bold text-slate-500">{idx + 1}</td>
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-bold text-slate-800 mb-2">{name}</p>
                         {href ? (
