@@ -77,17 +77,21 @@ function RefundHint({ amount }) {
 function DeviceAccountBadges({ student }) {
   const locked = !!student?.accountLocked;
   const count = Number(student?.knownDeviceCount) || 0;
+  const summary = String(student?.knownDeviceSummary || '').trim();
   if (!locked && count <= 2) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-1 mt-1">
       {locked && (
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold  tracking-wide bg-red-50 text-red-700 border border-red-100">
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-red-50 text-red-700 border border-red-100"
+          title={student?.accountLockReason || undefined}
+        >
           Khóa đăng nhập
         </span>
       )}
       {!locked && count > 2 && (
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold  tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
-          {count} trình duyệt
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
+          {count} thiết bị{summary ? ` (${summary})` : ''}
         </span>
       )}
     </span>
@@ -312,7 +316,7 @@ function StudentRowActions({
             setActionMenuId(null);
             const ok = await confirmAdminAction({
               title: 'Reset thiết bị',
-              content: `Xóa danh sách trình duyệt đã ghi của ${s.name || 'học viên'}? Học viên sẽ gắn lại tối đa 2 trình duyệt trước khi hệ thống báo Admin.`,
+              content: `Xóa danh sách thiết bị đã ghi của ${s.name || 'học viên'}? Học viên sẽ đăng nhập lại tối đa 3 thiết bị (Laptop, Điện thoại, Tablet) trước khi hệ thống báo Admin hoặc tự khóa nếu phát hiện bất thường ở vị trí khác.`,
               confirmText: 'Reset thiết bị',
               confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm',
             });
@@ -321,7 +325,11 @@ function StudentRowActions({
             try {
               const res = await api.students.resetDevices(s.id || s._id);
               if (!res?.success) throw new Error(res?.message || 'Không reset được thiết bị');
-              await ctxUpdateStudent(s.id || s._id, { knownDeviceCount: 0 }, { localOnly: true });
+              await ctxUpdateStudent(
+                s.id || s._id,
+                { knownDeviceCount: 0, knownDeviceSummary: '', accountLockReason: '' },
+                { localOnly: true },
+              );
               toast.success(res.message || 'Đã reset danh sách thiết bị');
             } catch (e) {
               toast.error(e?.message || 'Không reset được thiết bị');
@@ -358,7 +366,13 @@ function StudentRowActions({
                 ? await api.students.unlockAccount(s.id || s._id)
                 : await api.students.lockAccount(s.id || s._id);
               if (!res?.success) throw new Error(res?.message || 'Không cập nhật được khóa đăng nhập');
-              await ctxUpdateStudent(s.id || s._id, { accountLocked: !lockedAcc }, { localOnly: true });
+              await ctxUpdateStudent(
+                s.id || s._id,
+                lockedAcc
+                  ? { accountLocked: false, accountLockReason: '', knownDeviceCount: 0, knownDeviceSummary: '' }
+                  : { accountLocked: true },
+                { localOnly: true },
+              );
               toast.success(res.message || (lockedAcc ? 'Đã mở khóa đăng nhập' : 'Đã khóa đăng nhập'));
             } catch (e) {
               toast.error(e?.message || 'Không cập nhật được khóa đăng nhập');

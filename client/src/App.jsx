@@ -139,7 +139,7 @@ const Guard = ({ allowedRoles, session, children }) => {
   // Dọn phiên server khi bị kick - tránh báo “đăng nhập máy khác” khi vào lại
   useEffect(() => {
     if (!mustKick || !session) return;
-    const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
+    const deviceId = getDeviceFingerprint();
     const role = session.role;
     let reason = session.lockReason || 'Tài khoản của bạn đã bị khóa do vi phạm hoặc bài thi KHÔNG ĐẠT.';
     if (isInactive) reason = 'Tài khoản chưa được cấp quyền đăng nhập. Vui lòng đợi Admin thao tác hoặc liên hệ lại.';
@@ -675,7 +675,7 @@ function App() {
       navigate('/login');
       return;
     }
-    const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
+    const deviceId = getDeviceFingerprint();
     const role = session.role;
     try { await api.auth.logout(); } catch { /* ignore */ }
     clearTokens(role);

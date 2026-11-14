@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlarmClock, CalendarX2, Loader2, LogOut, X } from 'lucide-react';
+import { AlarmClock, CalendarX2, LogOut } from 'lucide-react';
 import api, { clearTokens } from '../../../services/api';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { clearStorageKeepingPreferences } from '../../../utils/logoutStorage';
@@ -8,6 +8,8 @@ import { hasBlockingLoginOverlay, setLoginOverlay, subscribeLoginOverlays } from
 import {
   SUBSCRIPTION_EXPIRED_EVENT, formatExpiryDate, reminderMilestoneKey, reminderStorageKey,
 } from '../../../utils/subscription';
+import { MEET_MODAL_SHELL_CLASS } from './meetPlanConstants';
+import { MeetModalHeader } from './MeetPlanShared';
 import SubscriptionRenewPanel from './SubscriptionRenewPanel';
 import { SubscriptionContext, useStudentSubscription } from './subscriptionContext';
 
@@ -19,16 +21,40 @@ async function logoutToLogin() {
 }
 
 function RenewModal({ overview, onClose, onRenewed, isCourseStudent }) {
+  const sub = overview?.subscription;
+  const headerBadge = sub?.expiresAt && sub.state !== 'expired' ? (
+    <span className="inline-flex items-center rounded-full bg-emerald-100/85 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-800">
+      Hạn đến {formatExpiryDate(sub.expiresAt)}
+    </span>
+  ) : !isCourseStudent ? (
+    <span className="inline-flex items-center rounded-full bg-emerald-100/85 px-2 py-0.5 text-[10.5px] font-bold text-emerald-800">
+      DewSkill
+    </span>
+  ) : null;
+
   return createPortal(
-    <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-slate-950/55 p-2.5 sm:p-4 backdrop-blur-[2px]" role="presentation">
-      <div className="flex max-h-[92dvh] w-full max-w-3xl lg:max-w-4xl flex-col overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white shadow-2xl border border-slate-100" role="dialog" aria-modal="true" aria-label="Gia hạn tài khoản">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 sm:px-5 sm:py-3">
-          <h2 className="text-sm sm:text-base font-black text-slate-900">
-            {isCourseStudent ? 'Gói Khóa học' : 'Gói học Meet'}
-          </h2>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1 sm:p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><X size={17} /></button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3.5 sm:p-5">
+    <div
+      className="fixed inset-0 z-[9500] flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-950/55 p-3 sm:p-5 backdrop-blur-xs"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        className={MEET_MODAL_SHELL_CLASS}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isCourseStudent ? 'Gói Khóa học' : 'Gói học Google Meet'}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <MeetModalHeader
+          title={isCourseStudent ? 'Gói Khóa học' : 'Gói học Google Meet'}
+          subtitle={isCourseStudent
+            ? 'Gia hạn gói để tiếp tục học tập và sử dụng đầy đủ tính năng'
+            : 'Gia hạn gói học cùng giảng viên & mở khóa luyện tập DewSkill'}
+          badge={headerBadge}
+          isCourseStudent={isCourseStudent}
+          onClose={onClose}
+        />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <SubscriptionRenewPanel overview={overview} onRenewed={onRenewed} />
         </div>
       </div>
@@ -163,10 +189,12 @@ export default function SubscriptionGate({ session, children }) {
     window.addEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
     window.addEventListener('free-portal-unlocked', onExpired);
     window.addEventListener('cms:subscription-updated', onExpired);
+    window.addEventListener('xp-config-updated', onExpired);
     return () => {
       window.removeEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
       window.removeEventListener('free-portal-unlocked', onExpired);
       window.removeEventListener('cms:subscription-updated', onExpired);
+      window.removeEventListener('xp-config-updated', onExpired);
     };
   }, [isStudent, refresh]);
 
@@ -174,6 +202,10 @@ export default function SubscriptionGate({ session, children }) {
     setRenewOpen(false);
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (renewOpen) refresh();
+  }, [renewOpen, refresh]);
 
   useEffect(() => {
     const handler = (e) => setRenewOpen(Boolean(e.detail));

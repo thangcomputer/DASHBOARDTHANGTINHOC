@@ -330,7 +330,7 @@ async function refillDailyXp(studentId) {
   const filter = next.sameDayUpgrade
     ? {
       studentId,
-      xpAllowanceDay: periodKey,
+      xpAllowanceDay: profile.xpAllowanceDay,
       $or: [
         { xpAllowanceAmount: { $lt: allowance } },
         { xpAllowanceAmount: null },
@@ -340,7 +340,7 @@ async function refillDailyXp(studentId) {
     : next.sameDayDowngrade
       ? {
         studentId,
-        xpAllowanceDay: periodKey,
+        xpAllowanceDay: profile.xpAllowanceDay,
         $or: [
           { xpAllowanceAmount: { $gt: allowance } },
           { xpAllowanceAmount: null },

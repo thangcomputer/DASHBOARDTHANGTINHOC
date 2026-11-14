@@ -315,11 +315,18 @@ const StudentSchema = new mongoose.Schema(
     lastAccessAt: { type: Date, default: null },
     refreshToken: { type: String, select: false }, // Refresh token rotation (server-side)
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
-    /** Lịch sử fingerprint (HV). Logout chỉ xóa deviceFingerprint phiên hiện tại, không xóa mảng này. */
+    /** Lịch sử thiết bị đăng nhập (HV). Logout chỉ xóa deviceFingerprint phiên hiện tại, không xóa mảng này. */
     knownDevices: {
       type: [{
         fingerprint: { type: String, default: '' },
+        fingerprints: { type: [String], default: [] },
         userAgent: { type: String, default: '' },
+        deviceType: { type: String, enum: ['laptop', 'phone', 'tablet'], default: 'laptop' },
+        deviceLabel: { type: String, default: '' },
+        osFamily: { type: String, default: '' },
+        ip: { type: String, default: '' },
+        networkKey: { type: String, default: '' },
+        locations: { type: [String], default: [] },
         firstSeenAt: { type: Date, default: Date.now },
         lastSeenAt: { type: Date, default: Date.now },
       }],
@@ -327,8 +334,10 @@ const StudentSchema = new mongoose.Schema(
       select: false,
     },
     knownDeviceCount: { type: Number, default: 0 },
+    knownDeviceSummary: { type: String, default: '' },
     /** Khóa đăng nhập HV - tách khỏi status học vụ (Đang học / Chờ xếp lớp). */
     accountLocked: { type: Boolean, default: false },
+    accountLockReason: { type: String, default: '' },
     /**
      * Gói tài khoản theo thời hạn. Thiếu trường (HV cũ) = vĩnh viễn.
      * expiresAt null = không hết hạn; quá hạn thì chỉ còn màn gia hạn.

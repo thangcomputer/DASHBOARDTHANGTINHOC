@@ -1,31 +1,53 @@
-import { useState } from 'react';
-import { Crown, KeyRound, Loader2, Sparkles, Ticket } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, CalendarClock, Loader2 } from 'lucide-react';
 import VideoCoursePayModal from '../../VideoCoursePayModal';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { useToast } from '../../../utils/useToast';
-import { formatActivationCodeInput, formatExpiryDate, formatVnd } from '../../../utils/subscription';
-
-const PLAN_TONES = {
-  '1m': 'from-sky-400 to-blue-600',
-  '3m': 'from-emerald-400 to-teal-600',
-  '6m': 'from-violet-400 to-purple-600',
-  '12m': 'from-amber-400 to-orange-600',
-  lifetime: 'from-emerald-500 to-emerald-700',
-};
+import { formatExpiryDate, formatVnd } from '../../../utils/subscription';
+import { resolveMeetXpSummary } from './meetPlanConstants';
+import {
+  ActivationCodeSection,
+  MeetBenefitsCard,
+  MeetPlanGrid,
+  MeetScheduleStrip,
+} from './MeetPlanShared';
 
 /** Chọn gói (thanh toán SePay) hoặc nhập mã kích hoạt - dùng ở màn khóa và popup gia hạn. */
 export default function SubscriptionRenewPanel({ overview, onRenewed }) {
   const toast = useToast();
+  const [selectedId, setSelectedId] = useState('3m');
   const [code, setCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState('');
   const [payment, setPayment] = useState(null);
-  const plans = overview?.plans || [];
+  const codeInputRef = useRef(null);
+
+  const plans = useMemo(() => overview?.plans || [], [overview?.plans]);
   const subscription = overview?.subscription;
   const isLifetime = subscription?.state === 'lifetime';
   const isFreePortal = (() => {
     try { return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true; } catch { return false; }
   })();
+
+  useEffect(() => {
+    if (!plans.length) return;
+    if (plans.some((p) => p.id === selectedId)) return;
+    const preferred = plans.find((p) => p.id === '3m') || plans.find((p) => Number(p.price) > 0) || plans[0];
+    if (preferred?.id) setSelectedId(preferred.id);
+  }, [plans, selectedId]);
+
+  const selected = plans.find((p) => p.id === selectedId) || plans.find((p) => p.id === '3m') || plans[0];
+  const selectedPrice = Number(selected?.price) || 0;
+  const xpSummary = resolveMeetXpSummary(overview);
+
+  const benefits = [
+    'Học qua Meet với giảng viên',
+    xpSummary.rangeText
+      ? `${xpSummary.rangeText} ${xpSummary.cycleText} khi gói còn hạn`
+      : 'Tăng hạn mức XP luyện tập mỗi kỳ',
+    `Hết hạn tài khoản Dewskill về ${xpSummary.freeXp} XP ${xpSummary.cycleText}`,
+    'Xem video và dùng tính năng tự học trong hạn gói',
+  ];
 
   const redeem = async (event) => {
     event.preventDefault();
@@ -35,6 +57,8 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
       const result = await subscriptionApi.student.redeem(code);
       toast.success(`Kích hoạt thành công gói ${result.redeemedPlanLabel || ''}!`);
       setCode('');
+      window.dispatchEvent(new CustomEvent('free-portal-unlocked'));
+      window.dispatchEvent(new CustomEvent('cms:subscription-updated'));
       onRenewed?.();
     } catch (err) {
       toast.error(err.message || 'Không kích hoạt được mã');
@@ -44,7 +68,12 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
   };
 
   const buy = async (plan) => {
-    if (checkoutPlan) return;
+    if (!plan || checkoutPlan) return;
+    if (!(Number(plan.price) > 0)) {
+      codeInputRef.current?.focus();
+      toast.info('Gói này kích hoạt bằng mã. Vui lòng nhập mã bên dưới.');
+      return;
+    }
     setCheckoutPlan(plan.id);
     try {
       const session = await subscriptionApi.student.checkout(plan.id);
@@ -57,96 +86,83 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-4">
       {!isLifetime && (
-        <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-800">
-            <Crown size={15} className="text-amber-500" aria-hidden="true" /> Chọn gói học Meet
-          </h3>
-          <div className="flex gap-2 overflow-x-auto pb-1.5 pt-1 sm:grid sm:grid-cols-3 md:grid-cols-5 sm:gap-2 sm:overflow-visible snap-x snap-mandatory">
-            {plans.map((plan) => {
-              const sellable = Number(plan.price) > 0;
-              return (
-                <div
-                  key={plan.id}
-                  className={`relative flex min-w-[125px] sm:min-w-0 shrink-0 snap-start flex-col overflow-hidden rounded-xl sm:rounded-2xl border bg-white text-center shadow-2xs transition-all hover:shadow-xs ${plan.id === 'lifetime' ? 'border-red-200 ring-1 ring-red-100' : 'border-slate-200'}`}
-                >
-                  <div className={`bg-gradient-to-br px-2 py-2 sm:px-2.5 sm:py-2.5 text-white ${PLAN_TONES[plan.id] || PLAN_TONES['1m']}`}>
-                    {plan.id === 'lifetime' && <Sparkles size={12} className="absolute right-1.5 top-1.5 opacity-80" aria-hidden="true" />}
-                    <p className="text-xs sm:text-sm lg:text-base font-black leading-tight">{plan.label}</p>
-                    <p className="text-[9.5px] sm:text-[10px] font-semibold opacity-90 leading-tight mt-0.5">Meet · {plan.dailyXp ?? 300} XP {plan.resetCycle === 'monthly' ? 'mỗi tháng' : plan.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'}</p>
-                  </div>
-                  <div className="flex flex-1 flex-col justify-between gap-1.5 p-2 sm:p-2.5">
-                    <p className={`text-xs sm:text-[13px] font-black ${sellable ? 'text-slate-900' : 'text-slate-400'}`}>
-                      {sellable ? formatVnd(plan.price) : 'Kích hoạt bằng mã'}
+        <>
+          {!plans.length ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-xs font-semibold text-slate-500">
+              <Loader2 size={16} className="animate-spin text-emerald-600" />
+              <span>Đang tải danh sách gói học...</span>
+            </div>
+          ) : (
+            <>
+              {/* Khối giới thiệu & Quyền lợi cân đối 2 cột đồng bộ với Popup Đăng ký học Meet */}
+              <div className="grid gap-3 md:grid-cols-[1.15fr_1fr]">
+                <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 sm:p-4">
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-200/75 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-700">
+                        <CalendarClock size={11} aria-hidden="true" /> Quy tắc cộng hạn
+                      </span>
+                      {subscription?.expiresAt && subscription.state !== 'expired' ? (
+                        <span className="text-[11px] font-bold text-emerald-700">
+                          Hạn hiện tại: {formatExpiryDate(subscription.expiresAt)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-xs font-medium leading-relaxed text-slate-600">
+                      Thanh toán hoặc nhập mã đều kích hoạt gói Meet ngay. Thời gian mới được cộng nối tiếp từ hạn hiện tại; XP đã mua riêng luôn được giữ nguyên.
                     </p>
-                    <button
-                      type="button"
-                      disabled={!sellable || Boolean(checkoutPlan)}
-                      onClick={() => buy(plan)}
-                      className="cms-btn cms-btn-primary cms-btn-brand w-full !py-1 sm:!py-1.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl disabled:opacity-50"
-                    >
-                      {checkoutPlan === plan.id ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : 'Gia hạn'}
-                    </button>
                   </div>
+                  <MeetScheduleStrip />
                 </div>
-              );
-            })}
-          </div>
-          {(() => {
-            const xpCfg = overview?.xpConfig;
-            const cycleText = xpCfg?.resetCycle === 'monthly' ? 'mỗi tháng' : xpCfg?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
-            const freeXp = xpCfg?.freeAccountXp ?? subscription?.dailyXpLimit ?? 60;
-            const planXps = plans.map((p) => Number(p.dailyXp)).filter((n) => Number.isFinite(n));
-            const minXp = planXps.length ? Math.min(...planXps) : 300;
-            const maxXp = planXps.length ? Math.max(...planXps) : 300;
-            const rangeText = minXp === maxXp ? `${minXp} XP` : `${minXp}–${maxXp} XP`;
-            const benefits = plans[0]?.benefits || [
-              'Học qua Meet với giảng viên',
-              `${rangeText} ${cycleText} khi gói còn hạn`,
-              `Hết hạn thì tài khoản Dewskill về ${freeXp} XP ${cycleText}`,
-              'Xem video và dùng tính năng tự học trong hạn gói',
-            ];
-            return (
-              <>
-                <ul className="mt-2.5 grid gap-1 text-[10px] sm:text-[10.5px] font-medium text-slate-600 sm:grid-cols-2">
-                  {benefits.map((item) => (
-                    <li key={item} className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1.5 text-[9.5px] sm:text-[10px] text-slate-500 leading-relaxed">
-                  Thanh toán hoặc nhập mã đều kích hoạt gói Meet. Thời gian mới được cộng tiếp từ hạn hiện tại. Trong hạn gói nhận {rangeText} {cycleText}. Hết hạn thì tài khoản Dewskill về {freeXp} XP {cycleText}. XP đã mua vẫn được giữ.
-                </p>
-              </>
-            );
-          })()}
-        </section>
+
+                <MeetBenefitsCard benefits={benefits} title="Quyền lợi & Mức XP" />
+              </div>
+
+              {/* Lưới 5 thẻ gói thống nhất với FreeMeetPlanModal */}
+              <MeetPlanGrid
+                plans={plans}
+                selectedId={selected?.id}
+                onSelect={setSelectedId}
+                xpSummary={xpSummary}
+                heading="Chọn gói học Meet"
+              />
+
+              {/* Nút CTA chính duy nhất bên dưới 5 gói */}
+              <div className="flex justify-center pt-0.5">
+                <button
+                  type="button"
+                  disabled={!selected || Boolean(checkoutPlan)}
+                  onClick={() => buy(selected)}
+                  className="inline-flex w-full sm:w-auto sm:min-w-[310px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm shadow-emerald-600/20 transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+                >
+                  {checkoutPlan === selected?.id ? (
+                    <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                  ) : selectedPrice > 0 ? (
+                    <>
+                      <span>Gia hạn gói {selected?.label}</span>
+                      <span className="text-emerald-100">·</span>
+                      <span className="tabular-nums">{formatVnd(selectedPrice)}</span>
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </>
+                  ) : (
+                    <span>Gói {selected?.label} kích hoạt bằng mã bên dưới</span>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </>
       )}
 
-      <section className="rounded-xl sm:rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-2.5 sm:p-3.5">
-        <h3 className="mb-1.5 flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-800">
-          <Ticket size={15} className="text-red-600" aria-hidden="true" /> Có mã kích hoạt?
-        </h3>
-        <form onSubmit={redeem} className="flex flex-col gap-1.5 sm:flex-row">
-          <label className="relative flex-1">
-            <KeyRound size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <input
-              value={code}
-              onChange={(e) => setCode(formatActivationCodeInput(e.target.value))}
-              placeholder="TTH-XXXX-XXXX"
-              aria-label="Mã kích hoạt"
-              className="w-full rounded-xl border border-slate-200 bg-white py-1.5 sm:py-2 pl-8 pr-2.5 font-mono text-xs sm:text-sm font-bold uppercase tracking-wider outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
-            />
-          </label>
-          <button type="submit" disabled={code.length < 13 || redeeming} className="cms-btn cms-btn-primary cms-btn-brand !py-1.5 sm:!py-2 text-xs sm:text-sm disabled:opacity-50">
-            {redeeming ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : 'Kích hoạt'}
-          </button>
-        </form>
-        <p className="mt-1 text-[9.5px] sm:text-[10px] text-slate-500">Mã do trung tâm cấp khi đăng ký gói Meet (1, 3, 6 tháng, 1 năm) hoặc gói vĩnh viễn.</p>
-      </section>
+      <ActivationCodeSection
+        code={code}
+        onChangeCode={setCode}
+        onSubmit={redeem}
+        redeeming={redeeming}
+        inputRef={codeInputRef}
+      />
 
       {payment && (
         <VideoCoursePayModal
@@ -169,12 +185,6 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
             onRenewed?.();
           }}
         />
-      )}
-
-      {subscription?.expiresAt && subscription.state !== 'expired' && (
-        <p className="text-center text-xs text-slate-500">
-          Hạn hiện tại: <strong className="text-slate-700">{formatExpiryDate(subscription.expiresAt)}</strong>
-        </p>
       )}
     </div>
   );

@@ -109,17 +109,15 @@ export default function SupportEntryPage() {
   return (
     <div className="mx-auto w-full max-w-5xl pt-4 pb-12 px-3 sm:px-6 space-y-6">
       {/* ─── Hero Header ─── */}
-      <section className={`rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm ${
-        isGreenTheme
+      <section className={`rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm ${isGreenTheme
           ? 'bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white border-emerald-200/80'
           : 'bg-gradient-to-br from-red-50/90 via-rose-50/40 to-white border-red-200/80'
-      }`}>
+        }`}>
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-          <div className={`w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${
-            isGreenTheme
+          <div className={`w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${isGreenTheme
               ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white'
               : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] text-white'
-          }`}>
+            }`}>
             <Headphones size={32} strokeWidth={2.3} />
           </div>
           <div className="flex-1 min-w-0">
@@ -188,11 +186,10 @@ export default function SupportEntryPage() {
           <button
             type="button"
             onClick={() => chooseSupport('ai')}
-            className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${
-              isGreenTheme
+            className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${isGreenTheme
                 ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105'
                 : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] hover:brightness-105'
-            }`}
+              }`}
           >
             <Bot size={18} strokeWidth={2.4} />
             <span>Hỏi Trợ lý AI ngay</span>
@@ -258,8 +255,8 @@ export default function SupportEntryPage() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-slate-500">Hotline / Zalo hỗ trợ</p>
-            <a href="tel:0932783869" className="text-sm font-extrabold text-slate-800 hover:text-red-600 transition">
-              0932 783 869
+            <a href="tel:0984623486" className="text-sm font-extrabold text-slate-800 hover:text-red-600 transition">
+              0984623486
             </a>
           </div>
         </div>
@@ -323,9 +320,8 @@ export default function SupportEntryPage() {
                   </span>
                   <ChevronDown
                     size={18}
-                    className={`text-slate-400 shrink-0 transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-slate-700' : ''
-                    }`}
+                    className={`text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-slate-700' : ''
+                      }`}
                   />
                 </button>
                 {isOpen && (

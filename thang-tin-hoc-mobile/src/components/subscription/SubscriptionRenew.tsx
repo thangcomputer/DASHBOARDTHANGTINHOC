@@ -66,37 +66,64 @@ export function SubscriptionRenewPanel({ overview, onRenewed }: { overview: Subs
   return (
     <View style={styles.gap}>
       {!isLifetime ? (
-        <View style={styles.gapSm}>
-          <View style={styles.headRow}><Crown size={16} color="#F59E0B" /><Text style={styles.sectionTitle}>Chọn gói gia hạn</Text></View>
-          <View style={styles.planGrid}>
-            {overview.plans.map((plan) => {
-              const sellable = Number(plan.price) > 0;
-              const [from, to] = PLAN_TONES[plan.id] || PLAN_TONES['1m'];
-              return (
-                <View key={plan.id} style={[styles.plan, plan.id === 'lifetime' && styles.planHighlight]}>
-                  <View style={[styles.planHead, gradient(from, to)]}>
-                    <Text style={styles.planLabel}>{plan.label}</Text>
-                    <Text style={styles.planSub}>{plan.months ? `${plan.months} tháng học` : 'Học mãi mãi'}</Text>
-                  </View>
-                  <View style={styles.planBody}>
-                    <Text style={[styles.planPrice, !sellable && styles.planPriceMuted]}>{sellable ? formatVnd(plan.price) : 'Kích hoạt bằng mã'}</Text>
-                    <DuoButton
-                      variant="primary"
-                      size="md"
-                      fullWidth
-                      text="Gia hạn"
-                      loading={busyPlan === plan.id}
-                      disabled={!sellable || Boolean(busyPlan)}
-                      onPress={() => { void buy(plan); }}
-                      accessibilityLabel={`Gia hạn gói ${plan.label}`}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-          <Text style={styles.muted}>Thời gian mới cộng tiếp từ ngày hết hạn hiện tại (hoặc từ hôm nay nếu đã hết hạn). Thanh toán xong hệ thống tự gia hạn.</Text>
-        </View>
+        (() => {
+          const extOverview = overview as SubscriptionOverview & {
+            xpConfig?: { freeAccountXp?: number; resetCycle?: string; planXp?: Record<string, number> };
+            subscription: SubscriptionOverview['subscription'] & { resetCycle?: string };
+          };
+          const extPlans = overview.plans as Array<SubscriptionPlan & { dailyXp?: number; resetCycle?: string }>;
+          const xpCfg = extOverview.xpConfig;
+          const resetCycle = xpCfg?.resetCycle || extPlans[0]?.resetCycle || extOverview.subscription?.resetCycle || 'daily';
+          const cycleText = resetCycle === 'monthly' ? 'mỗi tháng' : resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+          const freeXp = xpCfg?.freeAccountXp ?? 60;
+          const planXps = extPlans
+            .map((p) => Number(xpCfg?.planXp?.[p.id] ?? p.dailyXp))
+            .filter((n) => Number.isFinite(n) && n >= 0);
+          const minXp = planXps.length ? Math.min(...planXps) : 400;
+          const maxXp = planXps.length ? Math.max(...planXps) : 1000;
+          const rangeText = minXp === maxXp ? `${minXp} XP` : `${minXp}–${maxXp} XP`;
+          return (
+            <View style={styles.gapSm}>
+              <View style={styles.headRow}><Crown size={16} color="#F59E0B" /><Text style={styles.sectionTitle}>Chọn gói học Meet</Text></View>
+              <View style={styles.planGrid}>
+                {extPlans.map((plan) => {
+                  const sellable = Number(plan.price) > 0;
+                  const [from, to] = PLAN_TONES[plan.id] || PLAN_TONES['1m'];
+                  const planXp = xpCfg?.planXp?.[plan.id] ?? plan.dailyXp;
+                  const planCycleKey = xpCfg?.resetCycle || plan.resetCycle || resetCycle;
+                  const planCycle = planCycleKey === 'monthly' ? 'mỗi tháng' : planCycleKey === 'never' ? 'tặng kèm' : 'mỗi ngày';
+                  const subtitle = planXp != null
+                    ? `Meet · ${planXp} XP ${planCycle}`
+                    : (plan.months ? `${plan.months} tháng học` : 'Học mãi mãi');
+                  return (
+                    <View key={plan.id} style={[styles.plan, plan.id === 'lifetime' && styles.planHighlight]}>
+                      <View style={[styles.planHead, gradient(from, to)]}>
+                        <Text style={styles.planLabel}>{plan.label}</Text>
+                        <Text style={styles.planSub}>{subtitle}</Text>
+                      </View>
+                      <View style={styles.planBody}>
+                        <Text style={[styles.planPrice, !sellable && styles.planPriceMuted]}>{sellable ? formatVnd(plan.price) : 'Kích hoạt bằng mã'}</Text>
+                        <DuoButton
+                          variant="primary"
+                          size="md"
+                          fullWidth
+                          text="Gia hạn"
+                          loading={busyPlan === plan.id}
+                          disabled={!sellable || Boolean(busyPlan)}
+                          onPress={() => { void buy(plan); }}
+                          accessibilityLabel={`Gia hạn gói ${plan.label}`}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+              <Text style={styles.muted}>
+                {`Thanh toán hoặc nhập mã đều kích hoạt gói Meet. Thời gian mới cộng tiếp từ hạn hiện tại. Trong hạn gói, ${cycleText === 'tặng kèm' ? `nhận ${rangeText} tặng kèm` : `${cycleText} có ${rangeText}`}. Hết hạn thì tài khoản Dewskill về ${freeXp} XP ${cycleText}. XP đã mua vẫn được giữ.`}
+              </Text>
+            </View>
+          );
+        })()
       ) : null}
 
       <View style={styles.codeBox}>

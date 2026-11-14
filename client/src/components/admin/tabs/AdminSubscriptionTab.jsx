@@ -158,6 +158,7 @@ function XpConfigCard() {
     try {
       const updated = await subscriptionApi.admin.setXpConfig(config);
       setConfig(updated);
+      window.dispatchEvent(new CustomEvent('xp-config-updated', { detail: updated }));
       toast.success('Đã lưu cấu hình mức XP và chu kỳ đặt lại');
     } catch (err) {
       toast.error(err.message || 'Không lưu được cấu hình XP');
@@ -171,6 +172,7 @@ function XpConfigCard() {
     setResetting(true);
     try {
       const res = await subscriptionApi.admin.resetAllXp();
+      window.dispatchEvent(new CustomEvent('xp-config-updated'));
       toast.success(`Đã đặt lại ví XP cho ${res.modifiedCount} học viên thành công!`);
     } catch (err) {
       toast.error(err.message || 'Không đặt lại được ví XP');

@@ -1221,7 +1221,9 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     delete safeBody.paidNote;
     delete safeBody.knownDevices;
     delete safeBody.knownDeviceCount;
+    delete safeBody.knownDeviceSummary;
     delete safeBody.accountLocked;
+    delete safeBody.accountLockReason;
     delete safeBody.deviceFingerprint;
     delete safeBody.ageAsOf;
     const ageWasEdited = safeBody.ageWasEdited === true;
@@ -3920,7 +3922,14 @@ router.post('/:id/reset-devices', [
   try {
     const student = await Student.findByIdAndUpdate(
       req.params.id,
-      { $set: { knownDevices: [], knownDeviceCount: 0 } },
+      {
+        $set: {
+          knownDevices: [],
+          knownDeviceCount: 0,
+          knownDeviceSummary: '',
+          accountLockReason: '',
+        },
+      },
       { returnDocument: 'after' },
     );
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
@@ -3946,10 +3955,11 @@ router.post('/:id/reset-devices', [
     }
     return res.json({
       success: true,
-      message: 'Đã xóa danh sách thiết bị. Học viên có thể gắn lại tối đa 2 trình duyệt trước khi báo Admin.',
+      message: 'Đã xóa danh sách thiết bị. Học viên có thể đăng nhập lại tối đa 3 thiết bị (Laptop, Điện thoại, Tablet).',
       data: {
         _id: student._id,
         knownDeviceCount: 0,
+        knownDeviceSummary: '',
         accountLocked: !!student.accountLocked,
       },
     });
@@ -4014,7 +4024,15 @@ router.post('/:id/unlock-account', [
   try {
     const student = await Student.findByIdAndUpdate(
       req.params.id,
-      { $set: { accountLocked: false } },
+      {
+        $set: {
+          accountLocked: false,
+          accountLockReason: '',
+          knownDevices: [],
+          knownDeviceCount: 0,
+          knownDeviceSummary: '',
+        },
+      },
       { returnDocument: 'after' },
     );
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
@@ -4030,6 +4048,7 @@ router.post('/:id/unlock-account', [
         _id: student._id,
         accountLocked: false,
         knownDeviceCount: Number(student.knownDeviceCount) || 0,
+        knownDeviceSummary: String(student.knownDeviceSummary || ''),
       },
     });
   } catch (error) {

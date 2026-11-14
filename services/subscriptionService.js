@@ -184,7 +184,7 @@ async function applyRenewal(studentId, plan, { source, code = '', paymentSession
         console.error('[subscription] không cộng được mức 300 XP/ngày:', err.message);
       }
     }
-    return statusOf({ ...updated, freePortal: student.freePortal });
+    return statusOf({ ...updated, freePortal: student.freePortal }, now, await getXpConfig());
   }
   throw httpError(409, 'Đang có thao tác gia hạn khác, vui lòng thử lại');
 }
@@ -421,8 +421,19 @@ async function planCatalog() {
     getXpConfig(),
   ]);
   const cycleText = xpConfig.resetCycle === 'monthly' ? 'mỗi tháng' : xpConfig.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+  const resolvePlanXp = (plan) => {
+    const val = Number(xpConfig.planXp?.[plan]);
+    return Number.isFinite(val) && val >= 0 ? val : (DEFAULT_XP_CONFIG.planXp[plan] ?? 400);
+  };
+  const allXpValues = PLANS.map(resolvePlanXp);
+  const minXp = Math.min(...allXpValues);
+  const maxXp = Math.max(...allXpValues);
+  const xpRangeText = minXp === maxXp ? `${minXp}` : `${minXp}–${maxXp}`;
+  const freeXp = Number.isFinite(Number(xpConfig.freeAccountXp)) && Number(xpConfig.freeAccountXp) >= 0
+    ? Number(xpConfig.freeAccountXp)
+    : DEFAULT_XP_CONFIG.freeAccountXp;
   return PLANS.map((plan) => {
-    const xp = xpConfig.planXp[plan] || 400;
+    const xp = resolvePlanXp(plan);
     return {
       id: plan,
       label: PLAN_LABELS[plan],
@@ -432,8 +443,8 @@ async function planCatalog() {
       resetCycle: xpConfig.resetCycle,
       benefits: [
         'Học qua Meet với giảng viên',
-        `${xp} XP ${cycleText} khi gói còn hạn`,
-        `Hết hạn thì tài khoản miễn phí về ${xpConfig.freeAccountXp} XP ${cycleText}`,
+        `${xpRangeText} XP ${cycleText} khi gói còn hạn`,
+        `Hết hạn thì tài khoản Dewskill về ${freeXp} XP ${cycleText}`,
         'Xem video và dùng tính năng tự học trong hạn gói',
       ],
     };
@@ -720,7 +731,7 @@ async function adminSetSubscription(studentId, { mode = 'extend', plan = '', exp
     note: mode === 'free' ? (note ? `Về gói miễn phí · ${note}` : 'Về gói miễn phí') : (note || defaultNote),
   });
   await syncPlanAllowance(studentId);
-  return statusOf(updated);
+  return statusOf(updated, new Date(), await getXpConfig());
 }
 
 /** Admin tìm HV để gia hạn tay (tên / SĐT / mã HV), trong phạm vi chi nhánh được xem. */
@@ -728,11 +739,14 @@ const MAX_MEET_CLASS_STUDENTS = 100;
 
 async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLASS_STUDENTS } = {}) {
   const query = { accountLocked: { $ne: true }, freePortal: true, ...(scopeFilter || {}) };
-  const rows = await Student.find(query)
-    .select('name phone email studentCode subscription freePortal')
-    .sort({ name: 1 })
-    .limit(3000)
-    .lean();
+  const [rows, xpConfig] = await Promise.all([
+    Student.find(query)
+      .select('name phone email studentCode subscription freePortal')
+      .sort({ name: 1 })
+      .limit(3000)
+      .lean(),
+    getXpConfig(),
+  ]);
   const now = new Date();
   return rows
     .filter((row) => hasMeetAccess(row))
@@ -743,7 +757,7 @@ async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLA
       phone: row.phone || '',
       email: row.email || '',
       studentCode: row.studentCode || '',
-      subscription: statusOf(row, now),
+      subscription: statusOf(row, now, xpConfig),
     }));
 }
 
@@ -751,18 +765,22 @@ async function searchStudents(query, scopeFilter = {}) {
   const conditions = buildStudentSearchAndConditions(String(query || '').slice(0, 80));
   if (!conditions.length) return [];
   if (scopeFilter && Object.keys(scopeFilter).length) conditions.push(scopeFilter);
-  const rows = await Student.find({ $and: conditions })
-    .select('name phone studentCode subscription freePortal')
-    .sort({ createdAt: -1 })
-    .limit(10)
-    .lean();
+  const [rows, xpConfig] = await Promise.all([
+    Student.find({ $and: conditions })
+      .select('name phone studentCode subscription freePortal')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean(),
+    getXpConfig(),
+  ]);
+  const now = new Date();
   return rows.map((row) => ({
     id: String(row._id),
     name: row.name || '',
     phone: row.phone || '',
     studentCode: row.studentCode || '',
     freePortal: row.freePortal === true,
-    subscription: statusOf(row),
+    subscription: statusOf(row, now, xpConfig),
   }));
 }
 

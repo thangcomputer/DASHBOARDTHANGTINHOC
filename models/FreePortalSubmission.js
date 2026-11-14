@@ -15,3 +15,4 @@ freePortalSubmissionSchema.index({ studentId: 1, submittedAt: -1 });
 
 module.exports = mongoose.models.FreePortalSubmission
   || mongoose.model('FreePortalSubmission', freePortalSubmissionSchema);
+

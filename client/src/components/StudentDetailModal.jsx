@@ -788,7 +788,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     if (!sid) return;
     showModal({
       title: 'Reset thiết bị',
-      content: `Xóa danh sách trình duyệt đã ghi của ${data?.student?.name || 'học viên'}? Học viên sẽ gắn lại tối đa 2 trình duyệt trước khi hệ thống báo Admin.`,
+      content: `Xóa danh sách thiết bị đã ghi của ${data?.student?.name || 'học viên'}? Học viên sẽ đăng nhập lại tối đa 3 thiết bị (Laptop, Điện thoại, Tablet) trước khi hệ thống báo Admin hoặc tự khóa nếu phát hiện bất thường ở vị trí khác.`,
       type: 'warning',
       confirmText: 'Reset thiết bị',
       confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm',
@@ -800,7 +800,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             toast.error(res?.message || 'Không reset được thiết bị');
             return;
           }
-          patchStudentAccountFields(sid, { knownDeviceCount: 0 });
+          patchStudentAccountFields(sid, { knownDeviceCount: 0, knownDeviceSummary: '', accountLockReason: '' });
           toast.success(res.message || 'Đã reset danh sách thiết bị');
         } catch (e) {
           toast.error(e?.message || 'Không reset được thiết bị');
@@ -835,7 +835,12 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             toast.error(res?.message || 'Không cập nhật được khóa đăng nhập');
             return;
           }
-          patchStudentAccountFields(sid, { accountLocked: !lockedAcc });
+          patchStudentAccountFields(
+            sid,
+            lockedAcc
+              ? { accountLocked: false, accountLockReason: '', knownDeviceCount: 0, knownDeviceSummary: '' }
+              : { accountLocked: true },
+          );
           toast.success(res.message || (lockedAcc ? 'Đã mở khóa đăng nhập' : 'Đã khóa đăng nhập'));
         } catch (e) {
           toast.error(e?.message || 'Không cập nhật được khóa đăng nhập');
@@ -1497,13 +1502,16 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                   {canManageStudentAccount && (
                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                       {!!data.student.accountLocked && (
-                        <span className="px-2 py-1 rounded-lg text-[11px] font-bold  tracking-wide bg-red-50 text-red-700 border border-red-100">
-                          Đã khóa đăng nhập
+                        <span
+                          className="px-2 py-1 rounded-lg text-[11px] font-bold tracking-wide bg-red-50 text-red-700 border border-red-100"
+                          title={data.student.accountLockReason || undefined}
+                        >
+                          Đã khóa đăng nhập{data.student.accountLockReason ? ` · ${data.student.accountLockReason}` : ''}
                         </span>
                       )}
                       {!data.student.accountLocked && Number(data.student.knownDeviceCount) > 2 && (
-                        <span className="px-2 py-1 rounded-lg text-[11px] font-bold  tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
-                          {Number(data.student.knownDeviceCount)} trình duyệt đã dùng
+                        <span className="px-2 py-1 rounded-lg text-[11px] font-bold tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
+                          {Number(data.student.knownDeviceCount)} thiết bị ({data.student.knownDeviceSummary || 'Laptop, Điện thoại, Tablet'})
                         </span>
                       )}
                       <button

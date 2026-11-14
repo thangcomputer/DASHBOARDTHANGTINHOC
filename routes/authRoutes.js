@@ -27,9 +27,10 @@ const {
   recordStudentKnownDevice,
   notifyIfNewStudentDevice,
   isStudentAccountLocked,
+  buildStudentLockedResponse,
 } = require('../services/studentKnownDevices');
 const { socialOAuthDisabled } = require('../utils/googleOAuthDisabled');
-const { statusOf: subscriptionStatusOf } = require('../services/subscriptionService');
+const { statusOf: subscriptionStatusOf, getXpConfig: getSubscriptionXpConfig } = require('../services/subscriptionService');
 const { freePortalFlags, FREE_COURSE_NAME, saveFreeSurvey } = require('../services/freePortal');
 const freePortalSocial = require('../services/freePortalSocial');
 const freePortalOtp = require('../services/freePortalOtp');
@@ -239,15 +240,53 @@ async function checkDeviceConflict(Model, userId, fp, force, req) {
   };
 }
 
-/** HV: ghi nhận fingerprint lịch sử (không thay DEVICE_CONFLICT 1 phiên). GV không gọi. */
-function trackStudentKnownDevice(user, userRole, fingerprint, req) {
+/** HV: ghi nhận thiết bị & vị trí mạng lịch sử (không thay DEVICE_CONFLICT 1 phiên). GV không gọi. */
+function trackStudentKnownDevice(user, userRole, fingerprint, req, platformHint = '') {
   if (userRole !== 'student') return null;
-  return recordStudentKnownDevice(user, fingerprint, req.headers['user-agent']);
+  return recordStudentKnownDevice(user, fingerprint, {
+    userAgent: req?.headers?.['user-agent'] || '',
+    ip: req?.headers?.['x-forwarded-for'] || req?.ip || req?.socket?.remoteAddress || '',
+    platform: platformHint || req?.body?.platform || '',
+  });
 }
 
 function fireStudentDeviceAlert(req, user, userRole, record) {
   if (userRole !== 'student' || !record) return;
   notifyIfNewStudentDevice(req.app?.get?.('io'), user, record).catch(() => { });
+}
+
+/** Khóa tài khoản HV ngay lập tức nếu đăng nhập bất thường từ 3 thiết bị trở lên. */
+async function enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDevice) {
+  if (userRole !== 'student' || !knownDevice?.shouldLock) return false;
+  const io = req.app?.get?.('io');
+  user.accountLocked = true;
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  user.refreshToken = undefined;
+  user.deviceFingerprint = undefined;
+  user.markModified('tokenVersion');
+  await user.save({ validateModifiedOnly: true });
+
+  try {
+    await revokeMobileSessionsForUser({
+      userId: user._id,
+      role: 'student',
+      reason: 'account_locked',
+      io,
+    });
+  } catch (err) {
+    logger.warn('[AUTH] student auto-lock mobile revocation: %s', err.message);
+  }
+  disconnectUserSockets(io, user._id);
+  if (io) {
+    io.emit('auth:forceLogout', {
+      userId: String(user._id),
+      role: 'student',
+      reason: 'account_locked',
+    });
+  }
+  fireStudentDeviceAlert(req, user, userRole, knownDevice);
+  res.status(403).json(buildStudentLockedResponse(user));
+  return true;
 }
 
 function issueAdminMfaChallenge(sysSettings, audience = 'internal', deviceFingerprint = null) {
@@ -647,11 +686,13 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
         return res.status(403).json({ success: false, message: 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.' });
       }
     } else if (isStudentAccountLocked(user)) {
-      return res.status(403).json({ success: false, message: 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.' });
+      return res.status(403).json(buildStudentLockedResponse(user));
     }
 
     // Lần đăng nhập mới thay thế phiên cũ trên web và mobile.
     const { deviceFingerprint: fp1 } = req.body;
+    const knownDevice1 = trackStudentKnownDevice(user, userRole, fp1, req);
+    if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDevice1)) return;
     await revokePreviousMobileSessions({
       userId: user._id,
       role: userRole,
@@ -659,7 +700,6 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     });
     disconnectUserSockets(req.app.get('io'), user._id);
     if (fp1) user.deviceFingerprint = fp1;
-    const knownDevice1 = trackStudentKnownDevice(user, userRole, fp1, req);
 
     // ⭐ Fix 1: Increment tokenVersion → vô hiệu token cũ trên thiết bị khác
     const newTokenVersion = (user.tokenVersion || 0) + 1;
@@ -718,7 +758,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
           grade: user.grade,
           isFirstLogin: !!user.isFirstLogin,
           showWelcomeCelebration: user.welcomeCelebrationSeen === false,
-          subscription: subscriptionStatusOf(user),
+          subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
           ...freePortalFlags(user),
         }),
     };
@@ -827,9 +867,12 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     }
 
     const sStatus = String(user.status || '').toLowerCase();
+    if (userRole === 'student' && isStudentAccountLocked(user)) {
+      return res.status(403).json(buildStudentLockedResponse(user));
+    }
     if (
       (userRole === 'teacher' && (user.isLocked || ['inactive', 'suspended'].includes(sStatus)))
-      || (userRole === 'student' && (isStudentAccountLocked(user) || ['inactive', 'suspended'].includes(sStatus)))
+      || (userRole === 'student' && ['inactive', 'suspended'].includes(sStatus))
     ) {
       return res.status(403).json({
         success: false,
@@ -850,6 +893,8 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
 
     // Lần đăng nhập mới thay thế phiên cũ trên web và mobile.
     const { deviceFingerprint: fp2, force } = req.body;
+    const knownDevice2 = trackStudentKnownDevice(user, userRole, fp2, req);
+    if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDevice2)) return;
     const conflict = await checkDeviceConflict(userRole === 'student' ? Student : Teacher, user._id, fp2, force === true, req);
     if (conflict) return res.status(409).json(conflict);
     await revokePreviousMobileSessions({
@@ -859,7 +904,6 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     });
     disconnectUserSockets(req.app.get('io'), user._id);
     if (fp2) user.deviceFingerprint = fp2;
-    const knownDevice2 = trackStudentKnownDevice(user, userRole, fp2, req);
 
     // ⭐ Fix 1: tokenVersion
     const newTokenVersion = (user.tokenVersion || 0) + 1;
@@ -905,7 +949,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
             specialty: user.specialty,
             subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
           } : {
-            subscription: subscriptionStatusOf(user),
+            subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
             ...freePortalFlags(user),
           }),
         },
@@ -963,9 +1007,12 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
     }
 
     const status = String(user.status || '').toLowerCase();
+    if (userRole === 'student' && isStudentAccountLocked(user)) {
+      return res.status(403).json(buildStudentLockedResponse(user));
+    }
     if (
       (userRole === 'teacher' && (user.isLocked || ['inactive', 'suspended'].includes(status)))
-      || (userRole === 'student' && (isStudentAccountLocked(user) || ['inactive', 'suspended'].includes(status)))
+      || (userRole === 'student' && ['inactive', 'suspended'].includes(status))
     ) {
       return res.status(403).json({
         success: false,
@@ -982,6 +1029,12 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
       });
     }
 
+    const mobileFp = String(req.body?.deviceFingerprint || '').trim();
+    const knownDeviceMobile = mobileFp
+      ? trackStudentKnownDevice(user, userRole, mobileFp, req, platform)
+      : null;
+    if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDeviceMobile)) return;
+
     await revokePreviousMobileSessions({
       userId: user._id,
       role: userRole,
@@ -995,6 +1048,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
     user.loginAttempts = 0;
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
+    fireStudentDeviceAlert(req, user, userRole, knownDeviceMobile);
 
     const sessionId = crypto.randomUUID();
     const refreshJti = crypto.randomUUID();
@@ -1060,7 +1114,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
             specialty: user.specialty,
             subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
           } : {
-            subscription: subscriptionStatusOf(user),
+            subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
             ...freePortalFlags(user),
           }),
         },
@@ -1906,7 +1960,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
           grade: user.grade,
           learningAccess: studentHasLearningAccess(user),
           pendingCourseCelebration,
-          subscription: subscriptionStatusOf(user),
+          subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
           ...freePortalFlags(user),
         } : {}),
       },
@@ -2597,4 +2651,6 @@ module.exports._test = {
   findPhoneMatches,
   normalizeVNPhone,
   socialOAuthDisabled,
+  trackStudentKnownDevice,
+  enforceStudentDeviceLockIfNeeded,
 };

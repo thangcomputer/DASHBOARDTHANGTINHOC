@@ -63,7 +63,7 @@ export default function StudentLearningAccessGate({
     const sid = String(student?._id || student?.id || studentId || '').trim();
 
     (async () => {
-      const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
+      const deviceId = getDeviceFingerprint();
       try { await api.auth.logout(); } catch { /* ignore */ }
       clearTokens('student');
       localStorage.removeItem('student_user');
