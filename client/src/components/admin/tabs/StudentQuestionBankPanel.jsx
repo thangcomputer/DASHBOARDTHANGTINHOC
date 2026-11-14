@@ -352,11 +352,11 @@ export default function StudentQuestionBankPanel({
 
   return (
     <div className="space-y-4">
-      {/* Câu hỏi được quản lý theo môn; khóa học chỉ giới hạn các môn thuộc khóa. */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[12rem]">
-            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
+      {/* Câu hỏi & cấu hình phòng thi theo môn */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px_104px_148px] gap-3 items-start">
+          <div className="min-w-0">
+            <label className="text-[11px] font-bold tracking-wide text-slate-500 block mb-1.5">
               Khóa học
             </label>
             <CmsSelect
@@ -372,7 +372,7 @@ export default function StudentQuestionBankPanel({
                 if (nextSubjectId) setSqSection(nextSubjectId);
               }}
               disabled={coursesLoading || courses.length === 0}
-              className="w-full border-2 border-sky-200 rounded-xl px-3 py-2.5 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full h-[42px] border-2 border-sky-200 rounded-xl px-3 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
             >
               {!selectedCourse && <option value="">- Chọn khóa học -</option>}
               {courses.map((course) => (
@@ -380,56 +380,28 @@ export default function StudentQuestionBankPanel({
               ))}
             </CmsSelect>
           </div>
-          <div className="flex-1 min-w-[12rem]">
-            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
+
+          <div className="min-w-0">
+            <label className="text-[11px] font-bold tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
             <CmsSelect
               value={activeSection}
               onChange={(e) => setSqSection(e.target.value)}
               disabled={!subjectOpts.length}
-              className="w-full border-2 border-green-200 rounded-xl px-3 py-2.5 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500"
+              className="w-full h-[42px] border-2 border-green-200 rounded-xl px-3 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500"
             >
               {subjectOpts.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </CmsSelect>
-            {!coursesLoading && !courses.length && (
-              <p className="mt-1.5 text-xs font-medium text-amber-700">
-                Chưa có khóa học. Tạo khóa trước trong Quản lý Học phí Khóa học.
-              </p>
-            )}
-            {coursesError && <p className="mt-1.5 text-xs font-medium text-red-600">{coursesError}</p>}
-            {selectedCourse && !subjectOpts.length && (
-              <p className="mt-1.5 text-xs font-medium text-amber-700">
-                Khóa này chưa có môn gắn trong danh mục khóa học.
-              </p>
-            )}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700">
-                {examFileUploading ? 'Đang tải đề...' : (studentExamFiles?.[activeSection]?.fileUrl ? 'Thay file đề tự luận' : 'Tải file đề tự luận')}
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                  className="sr-only"
-                  disabled={examFileUploading || !activeSection}
-                  onChange={handleSubjectExamFileUpload}
-                />
-              </label>
-              {studentExamFiles?.[activeSection]?.fileUrl ? (
-                <span className="max-w-full truncate text-xs font-semibold text-emerald-700">
-                  {studentExamFiles[activeSection].fileName || 'Đã có file đề'}
-                </span>
-              ) : (
-                <span className="text-xs font-semibold text-amber-700">Chưa có file đề cho môn này</span>
-              )}
-            </div>
           </div>
-          <div className="w-28">
-            <label className="text-[11px] font-bold  tracking-wide text-amber-700 block mb-1.5">
+
+          <div>
+            <label className="text-[11px] font-bold tracking-wide text-amber-700 block mb-1.5">
               Phút TN
             </label>
-            <div className="flex items-center gap-1.5 border-2 border-amber-200 bg-amber-50/80 rounded-xl px-2.5 py-2">
+            <div className="h-[42px] flex items-center gap-1.5 border-2 border-amber-200 bg-amber-50/80 rounded-xl px-2.5">
               <Clock size={14} className="text-amber-700 shrink-0" />
               <input
                 type="number"
@@ -441,13 +413,14 @@ export default function StudentQuestionBankPanel({
               />
             </div>
           </div>
-          <div className="w-28">
-            <label className="text-[11px] font-bold  tracking-wide text-violet-700 block mb-1.5">
+
+          <div>
+            <label className="text-[11px] font-bold tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
-            <div className={`flex items-center gap-1.5 border-2 rounded-xl px-2.5 py-2 ${studentEssayRequired?.[activeSection] === false
+            <div className={`h-[42px] flex items-center gap-1.5 border-2 rounded-xl px-2.5 ${studentEssayRequired?.[activeSection] === false
               ? 'border-slate-200 bg-slate-50 opacity-60'
-              : 'border-violet-200 bg-red-50/80'
+              : 'border-violet-200 bg-violet-50/60'
               }`}>
               <Clock size={14} className="text-violet-700 shrink-0" />
               <input
@@ -461,8 +434,9 @@ export default function StudentQuestionBankPanel({
               />
             </div>
           </div>
-          <div className="min-w-[9.5rem]">
-            <label className="text-[11px] font-bold  tracking-wide text-slate-600 block mb-1.5">
+
+          <div>
+            <label className="text-[11px] font-bold tracking-wide text-slate-600 block mb-1.5">
               Bắt buộc TL
             </label>
             <button
@@ -472,7 +446,7 @@ export default function StudentQuestionBankPanel({
               onClick={() => updateStudentEssayRequired({
                 [activeSection]: studentEssayRequired?.[activeSection] === false,
               })}
-              className={`w-full min-h-[42px] px-3 rounded-xl border-2 text-xs font-black transition ${studentEssayRequired?.[activeSection] === false
+              className={`w-full h-[42px] px-3 rounded-xl border-2 text-xs font-black transition ${studentEssayRequired?.[activeSection] === false
                 ? 'border-slate-200 bg-slate-50 text-slate-500'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                 }`}
@@ -480,8 +454,100 @@ export default function StudentQuestionBankPanel({
               {studentEssayRequired?.[activeSection] === false ? 'Tắt - chỉ TN' : 'Bật - TN + TL'}
             </button>
           </div>
+        </div>
+
+        {((!coursesLoading && !courses.length) || coursesError || (selectedCourse && !subjectOpts.length)) && (
+          <div className="text-xs font-medium space-y-1">
+            {!coursesLoading && !courses.length && (
+              <p className="text-amber-700">Chưa có khóa học. Tạo khóa trước trong Quản lý Học phí Khóa học.</p>
+            )}
+            {coursesError && <p className="text-red-600">{coursesError}</p>}
+            {selectedCourse && !subjectOpts.length && (
+              <p className="text-amber-700">Khóa này chưa có môn gắn trong danh mục khóa học.</p>
+            )}
+          </div>
+        )}
+
+        <div className="border-t border-slate-100 pt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700">
+              <Upload size={13} />
+              {examFileUploading ? 'Đang tải đề...' : (studentExamFiles?.[activeSection]?.fileUrl ? 'Đổi file đề TL' : 'Tải file đề tự luận')}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                className="sr-only"
+                disabled={examFileUploading || !activeSection}
+                onChange={handleSubjectExamFileUpload}
+              />
+            </label>
+            {studentExamFiles?.[activeSection]?.fileUrl ? (
+              <span className="max-w-[14rem] truncate rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                {studentExamFiles[activeSection].fileName || 'Đã có file đề'}
+              </span>
+            ) : (
+              <span className="text-xs font-medium text-amber-700">Chưa có file đề TL</span>
+            )}
+
+            <span className="hidden sm:inline-block h-4 w-px bg-slate-200" aria-hidden="true" />
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
+                <Volume2 size={14} className="text-slate-400" />
+                Âm báo TN:
+              </span>
+              <span className={`text-xs font-semibold max-w-[11rem] truncate ${examWarningSoundUrl ? 'text-emerald-700' : 'text-slate-400'}`}>
+                {examWarningSoundUrl ? String(examWarningSoundUrl).split('/').pop() : 'Beep mặc định'}
+              </span>
+              <label className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-[11px] font-bold text-white hover:bg-emerald-700">
+                {soundUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                {soundUploading ? 'Đang tải...' : 'Tải âm'}
+                <input
+                  type="file"
+                  accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.webm"
+                  className="hidden"
+                  disabled={soundUploading}
+                  onChange={handleExamWarningSoundUpload}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  unlockAudio();
+                  playExamWarningSound(resolveMediaUrl(examWarningSoundUrl) || examWarningSoundUrl);
+                }}
+                className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-[11px] font-bold hover:bg-slate-50"
+              >
+                Nghe thử
+              </button>
+              {examWarningSoundUrl ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setExamWarningSoundUrl?.('');
+                      await api.settings.updateStudentExamConfig({
+                        studentExamMinutes,
+                        studentEssayExamMinutes,
+                        studentEssayRequired,
+                        studentExamFiles,
+                        examWarningSoundUrl: '',
+                      });
+                      toast.success('Đã gỡ âm thanh - dùng beep mặc định');
+                    } catch (err) {
+                      toast.error(err.message || 'Gỡ thất bại');
+                    }
+                  }}
+                  className="h-8 px-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100"
+                >
+                  Gỡ file
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs font-bold text-slate-500 hidden sm:inline">
+            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
               {mcQuestions.length} TN · {essayQuestions.length} TL
             </span>
             <button
@@ -496,75 +562,11 @@ export default function StudentQuestionBankPanel({
                   onConfirm: () => removeStudentQuestionsForSubject(activeSection),
                 });
               }}
-              className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center gap-1.5"
+              className="h-9 px-3 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 inline-flex items-center gap-1.5"
             >
-              <Trash2 size={14} /> Xóa môn này
+              <Trash2 size={13} /> Xóa môn này
             </button>
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[14rem]">
-            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
-              Âm thanh cảnh báo phòng thi (TN)
-            </label>
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Volume2 size={16} className="text-slate-500 shrink-0" />
-              {examWarningSoundUrl ? (
-                <span className="truncate text-emerald-700">
-                  Đã có file - {String(examWarningSoundUrl).split('/').pop()}
-                </span>
-              ) : (
-                <span className="text-slate-400">Chưa tải - dùng beep mặc định</span>
-              )}
-            </div>
-          </div>
-          <label className="px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5">
-            {soundUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            {soundUploading ? 'Đang tải...' : 'Tải âm thanh lên'}
-            <input
-              type="file"
-              accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.webm"
-              className="hidden"
-              disabled={soundUploading}
-              onChange={handleExamWarningSoundUpload}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              unlockAudio();
-              playExamWarningSound(resolveMediaUrl(examWarningSoundUrl) || examWarningSoundUrl);
-            }}
-            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50"
-          >
-            Nghe thử
-          </button>
-          {examWarningSoundUrl ? (
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  setExamWarningSoundUrl?.('');
-                  await api.settings.updateStudentExamConfig({
-                    studentExamMinutes,
-                    studentEssayExamMinutes,
-                    studentEssayRequired,
-                    studentExamFiles,
-                    examWarningSoundUrl: '',
-                  });
-                  toast.success('Đã gỡ âm thanh - dùng beep mặc định');
-                } catch (err) {
-                  toast.error(err.message || 'Gỡ thất bại');
-                }
-              }}
-              className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100"
-            >
-              Gỡ file
-            </button>
-          ) : null}
         </div>
       </div>
 

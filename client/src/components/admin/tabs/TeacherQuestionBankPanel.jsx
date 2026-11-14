@@ -408,10 +408,10 @@ export default function TeacherQuestionBankPanel() {
   return (
     <div className="space-y-4">
       {/* Dữ liệu và cấu hình dành riêng cho ngân hàng đề thi giảng viên. */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[12rem]">
-            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_104px_104px] gap-3 items-start">
+          <div className="min-w-0">
+            <label className="text-[11px] font-bold tracking-wide text-slate-500 block mb-1.5">
               Khóa học
             </label>
             <CmsSelect
@@ -426,45 +426,33 @@ export default function TeacherQuestionBankPanel() {
                 setQSection(nextSubjectId);
               }}
               disabled={courseCatalogLoading || !courseCatalog.length}
-              className="w-full border-2 border-sky-200 rounded-xl px-3 py-2.5 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full h-[42px] border-2 border-sky-200 rounded-xl px-3 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
             >
               {courseCatalog.map((course) => (
                 <option key={course._id || course.id} value={course._id || course.id}>{course.name}</option>
               ))}
             </CmsSelect>
           </div>
-          <div className="flex-1 min-w-[12rem]">
-            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
+          <div className="min-w-0">
+            <label className="text-[11px] font-bold tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
             <CmsSelect
               value={activeSectionId}
               onChange={(e) => setQSection(e.target.value)}
               disabled={!sectionOpts.length}
-              className="w-full border-2 border-green-200 rounded-xl px-3 py-2.5 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500 disabled:opacity-60"
+              className="w-full h-[42px] border-2 border-green-200 rounded-xl px-3 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500 disabled:opacity-60"
             >
               {sectionOpts.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </CmsSelect>
-            {courseCatalogLoading && (
-              <p className="mt-1.5 text-[11px] text-slate-500">Đang tải môn từ khóa học admin…</p>
-            )}
-            {courseCatalogError && (
-              <p className="mt-1.5 text-[11px] text-red-600">{courseCatalogError}</p>
-            )}
-            {!courseCatalogLoading && !courseCatalogError && selectedCourse && !sectionOpts.length && (
-              <p className="mt-1.5 text-[11px] text-amber-600">Khóa này chưa có môn trong danh mục admin.</p>
-            )}
-            {!courseCatalogLoading && !courseCatalogError && !courseCatalog.length && (
-              <p className="mt-1.5 text-[11px] text-amber-600">Chưa có khóa học trong danh mục admin.</p>
-            )}
           </div>
-          <div className="w-28">
-            <label className="text-[11px] font-bold  tracking-wide text-amber-700 block mb-1.5">
+          <div>
+            <label className="text-[11px] font-bold tracking-wide text-amber-700 block mb-1.5">
               Phút TN
             </label>
-            <div className="flex items-center gap-1.5 border-2 border-amber-200 bg-amber-50/80 rounded-xl px-2.5 py-2">
+            <div className="h-[42px] flex items-center gap-1.5 border-2 border-amber-200 bg-amber-50/80 rounded-xl px-2.5">
               <Clock size={14} className="text-amber-700 shrink-0" />
               <input
                 type="number"
@@ -491,11 +479,11 @@ export default function TeacherQuestionBankPanel() {
               />
             </div>
           </div>
-          <div className="w-28">
-            <label className="text-[11px] font-bold  tracking-wide text-violet-700 block mb-1.5">
+          <div>
+            <label className="text-[11px] font-bold tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
-            <div className="flex items-center gap-1.5 border-2 border-violet-200 bg-red-50/80 rounded-xl px-2.5 py-2">
+            <div className="h-[42px] flex items-center gap-1.5 border-2 border-violet-200 bg-violet-50/60 rounded-xl px-2.5">
               <Clock size={14} className="text-violet-700 shrink-0" />
               <input
                 type="number"
@@ -522,33 +510,49 @@ export default function TeacherQuestionBankPanel() {
               />
             </div>
           </div>
-          <div className="flex w-full flex-col min-[400px]:flex-row min-[400px]:items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">{mcQuestions.length} TN · {essayQuestions.length} TL</span>
-            <div className="flex flex-col min-[400px]:flex-row gap-2 min-[400px]:ml-auto">
-              <button
-                type="button"
-                onClick={() => persistExamMinutes(teacherExamMinutesRef.current, teacherEssayExamMinutesRef.current)}
-                className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100"
-              >
-                Lưu thời gian
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  showGlobalModal({
-                    title: 'Xóa toàn bộ ngân hàng?',
-                    content: 'Xóa mọi câu trắc nghiệm và tự luận của tất cả môn. Không thể hoàn tác.',
-                    type: 'warning',
-                    confirmText: 'Xóa toàn bộ',
-                    cancelText: 'Huỷ',
-                    onConfirm: () => resetQuestions(),
-                  });
-                }}
-                className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-1.5"
-              >
-                <Trash2 size={14} /> Xóa toàn bộ
-              </button>
-            </div>
+        </div>
+
+        {(courseCatalogLoading || courseCatalogError || (!courseCatalogLoading && !courseCatalogError && selectedCourse && !sectionOpts.length) || (!courseCatalogLoading && !courseCatalogError && !courseCatalog.length)) && (
+          <div className="text-[11px] space-y-1">
+            {courseCatalogLoading && <p className="text-slate-500">Đang tải môn từ khóa học admin…</p>}
+            {courseCatalogError && <p className="text-red-600">{courseCatalogError}</p>}
+            {!courseCatalogLoading && !courseCatalogError && selectedCourse && !sectionOpts.length && (
+              <p className="text-amber-600">Khóa này chưa có môn trong danh mục admin.</p>
+            )}
+            {!courseCatalogLoading && !courseCatalogError && !courseCatalog.length && (
+              <p className="text-amber-600">Chưa có khóa học trong danh mục admin.</p>
+            )}
+          </div>
+        )}
+
+        <div className="border-t border-slate-100 pt-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+            {mcQuestions.length} TN · {essayQuestions.length} TL
+          </span>
+          <div className="flex flex-wrap gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => persistExamMinutes(teacherExamMinutesRef.current, teacherEssayExamMinutesRef.current)}
+              className="h-9 px-3 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100"
+            >
+              Lưu thời gian
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                showGlobalModal({
+                  title: 'Xóa toàn bộ ngân hàng?',
+                  content: 'Xóa mọi câu trắc nghiệm và tự luận của tất cả môn. Không thể hoàn tác.',
+                  type: 'warning',
+                  confirmText: 'Xóa toàn bộ',
+                  cancelText: 'Huỷ',
+                  onConfirm: () => resetQuestions(),
+                });
+              }}
+              className="h-9 px-3 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 inline-flex items-center justify-center gap-1.5"
+            >
+              <Trash2 size={13} /> Xóa toàn bộ
+            </button>
           </div>
         </div>
       </div>
