@@ -272,7 +272,7 @@ async function issueSession(student, fingerprint) {
       course: fresh.course,
       avatar: fresh.avatar || '',
       gender: fresh.gender || '',
-      isFirstLogin: false,
+      isFirstLogin: Boolean(fresh.isFirstLogin),
       showWelcomeCelebration: fresh.welcomeCelebrationSeen === false,
       ...freePortalFlags(fresh),
     },
@@ -385,6 +385,7 @@ async function completeProfile({ token, name, age, phone, email, fingerprint }) 
     learningMode: 'ONLINE',
     freePortal: true,
     freeUnlocked: false,
+    isFirstLogin: true,
     enrollments: [{
       courseName: FREE_COURSE_NAME,
       price: 0,
