@@ -18,64 +18,6 @@ const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text
 const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
 const UNIT_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
 
-function XpPackPrices() {
-  const toast = useToast();
-  const [packs, setPacks] = useState([]);
-  const [prices, setPrices] = useState({});
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    dailyPracticeApi.admin.xpPacks()
-      .then((rows) => {
-        const list = Array.isArray(rows) ? rows : [];
-        setPacks(list);
-        setPrices(Object.fromEntries(list.map((pack) => [pack.id, String(pack.priceVnd)])));
-      })
-      .catch((err) => toast.error(err.message || 'Không tải được giá gói XP'));
-  }, []);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const next = await dailyPracticeApi.admin.saveXpPacks(
-        Object.fromEntries(packs.map((pack) => [pack.id, Number(String(prices[pack.id] || '').replace(/\D/g, ''))])),
-      );
-      const list = Array.isArray(next) ? next : [];
-      setPacks(list);
-      setPrices(Object.fromEntries(list.map((pack) => [pack.id, String(pack.priceVnd)])));
-      toast.success('Đã lưu giá gói XP');
-    } catch (err) {
-      toast.error(err.message || 'Chưa lưu được giá');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!packs.length) return null;
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-black text-slate-900">Giá gói XP luyện</h3>
-      <p className="mt-1 text-xs text-slate-500">Chỉ đổi số tiền. Mã gói và số XP giữ nguyên để đơn chuyển khoản cũ vẫn khớp.</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        {packs.map((pack) => (
-          <label key={pack.id} className="text-xs font-bold text-slate-600">
-            {pack.label}
-            <input
-              inputMode="numeric"
-              className={`${INPUT} mt-1`}
-              value={prices[pack.id] || ''}
-              onChange={(event) => setPrices((prev) => ({ ...prev, [pack.id]: event.target.value.replace(/[^\d]/g, '') }))}
-            />
-          </label>
-        ))}
-      </div>
-      <button type="button" onClick={save} disabled={saving} className="cms-btn cms-btn-primary mt-3">
-        {saving ? <Loader2 size={16} className="animate-spin" /> : null} Lưu giá
-      </button>
-    </section>
-  );
-}
-
 /** Ô ảnh chặng: dán URL hoặc tải từ máy → `/uploads/...`. */
 function UnitImageField({
   id = 'dp-unit-image',
@@ -1790,7 +1732,6 @@ export default function AdminDailyPracticeTab() {
         <AdminFreePortalMaterialsPanel topics={topics} />
       ) : (
         <>
-      <XpPackPrices />
 
       {loading ? (
         <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang tải…</p>

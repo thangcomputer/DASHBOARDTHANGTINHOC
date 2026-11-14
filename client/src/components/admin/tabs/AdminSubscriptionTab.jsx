@@ -3,6 +3,7 @@ import {
   Ban, Copy, Download, Loader2, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Ticket, UserCog,
 } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
+import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { useToast } from '../../../utils/useToast';
 import { PLAN_LABELS, formatExpiryDate } from '../../../utils/subscription';
 import AdminStudentSubscriptionPanel from '../subscription/AdminStudentSubscriptionPanel';
@@ -72,6 +73,71 @@ function PricesCard() {
         </div>
       )}
       <p className="mt-2 text-[11px] text-slate-500">Giá 0 = gói không bán qua thanh toán, học viên chỉ kích hoạt được bằng mã.</p>
+    </Card>
+  );
+}
+
+function XpPackPricesCard() {
+  const toast = useToast();
+  const [packs, setPacks] = useState(null);
+  const [prices, setPrices] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    dailyPracticeApi.admin.xpPacks()
+      .then((rows) => {
+        const list = Array.isArray(rows) ? rows : [];
+        setPacks(list);
+        setPrices(Object.fromEntries(list.map((pack) => [pack.id, String(pack.priceVnd)])));
+      })
+      .catch((err) => {
+        setPacks([]);
+        toast.error(err.message || 'Không tải được giá gói XP');
+      });
+  }, [toast]);
+
+  const save = async () => {
+    if (!packs?.length) return;
+    setSaving(true);
+    try {
+      const next = await dailyPracticeApi.admin.saveXpPacks(
+        Object.fromEntries(packs.map((pack) => [pack.id, Number(String(prices[pack.id] || '').replace(/\D/g, ''))])),
+      );
+      const list = Array.isArray(next) ? next : [];
+      setPacks(list);
+      setPrices(Object.fromEntries(list.map((pack) => [pack.id, String(pack.priceVnd)])));
+      toast.success('Đã lưu giá gói XP');
+    } catch (err) {
+      toast.error(err.message || 'Chưa lưu được giá');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (packs && !packs.length) return null;
+
+  return (
+    <Card
+      icon={Save}
+      title="Giá gói XP luyện"
+      right={<button type="button" onClick={save} disabled={!packs || saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">{saving && <Loader2 size={14} className="animate-spin" />} Lưu giá</button>}
+    >
+      {!packs ? <Loader2 size={18} className="animate-spin text-slate-400" /> : (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {packs.map((pack) => (
+            <label key={pack.id} className="block text-xs font-bold text-slate-600">
+              {pack.label}
+              <input
+                inputMode="numeric"
+                className={`${INPUT} mt-1`}
+                value={prices[pack.id] || ''}
+                onChange={(event) => setPrices((prev) => ({ ...prev, [pack.id]: event.target.value.replace(/[^\d]/g, '') }))}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-slate-500">Chỉ đổi số tiền. Mã gói và số XP giữ nguyên để đơn chuyển khoản cũ vẫn khớp.</p>
     </Card>
   );
 }
@@ -565,6 +631,7 @@ export default function AdminSubscriptionTab() {
         </p>
       </div>
       <PricesCard />
+      <XpPackPricesCard />
       <XpConfigCard />
       <GenerateCard onCreated={() => setReloadKey((n) => n + 1)} />
       <CodesCard reloadKey={reloadKey} />
