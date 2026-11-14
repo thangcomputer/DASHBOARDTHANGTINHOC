@@ -148,6 +148,11 @@ const authMiddleware = async (req, res, next) => {
         if (dbUser.branchCode) req.user.branchCode = dbUser.branchCode;
         if (dbUser.avatar !== undefined) req.user.avatar = dbUser.avatar || '';
         if (dbUser.gender !== undefined) req.user.gender = dbUser.gender || '';
+        if (decoded.role === 'student') {
+          req.user.freePortal = dbUser.freePortal === true;
+          req.user.freeUnlocked = dbUser.freeUnlocked === true;
+          req.user.enrollments = Array.isArray(dbUser.enrollments) ? dbUser.enrollments : [];
+        }
       }
 
       if (!dbUser) {
