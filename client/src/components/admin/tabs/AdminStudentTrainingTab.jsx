@@ -20,6 +20,8 @@ import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlConte
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { useData } from '../../../context/DataContext';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
+import AdminFreePortalMaterialsPanel from './AdminFreePortalMaterialsPanel';
+import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { getExamProgressDisplayStatus, summarizeExamProgress } from '../../../utils/examProgressStats';
 
 function mergeDocumentCourseOptions(dbCourses) {
@@ -125,6 +127,19 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
   const [learningGuideHtml, setLearningGuideHtml] = React.useState(DEFAULT_LEARNING_GUIDE_HTML);
   const [learningGuideVideoUrl, setLearningGuideVideoUrl] = React.useState('');
   const [learningGuideSaving, setLearningGuideSaving] = React.useState(false);
+  const [resourceAudience, setResourceAudience] = React.useState('course'); // course | free
+  const [freeTopics, setFreeTopics] = React.useState([]);
+
+  React.useEffect(() => {
+    if (!resourceOnly) return;
+    let cancelled = false;
+    dailyPracticeApi.admin.topics()
+      .then((rows) => {
+        if (!cancelled) setFreeTopics(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [resourceOnly]);
 
   React.useEffect(() => {
     if (sTrainingTab !== 'learning-guide') return;
@@ -306,6 +321,33 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 </div>
               )}
 
+              {resourceOnly && (
+                <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setResourceAudience('course')}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      resourceAudience === 'course' ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Học viên theo khóa (Tài liệu &amp; Phần mềm)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResourceAudience('free')}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      resourceAudience === 'free' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Tài khoản miễn phí (Tài liệu · Phần mềm · Bài tập)
+                  </button>
+                </div>
+              )}
+
+              {resourceOnly && resourceAudience === 'free' ? (
+                <AdminFreePortalMaterialsPanel topics={freeTopics} />
+              ) : (
+                <>
               {!videoCoursesOnly && ['files', 'softwareLinks'].includes(sTrainingTab) && (
                 <>
                   <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2 text-xs text-sky-900">
@@ -359,8 +401,10 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                   <Plus size={15} /> {sTrainingTab === 'videos' ? 'Gắn nội dung khóa đã tạo' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                 </button>
               )}
+                </>
+              )}
             </div>
-            {sTrainingTab === 'learning-guide' ? (
+            {!(resourceOnly && resourceAudience === 'free') && (sTrainingTab === 'learning-guide' ? (
               <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                 <div>
                   <h3 className="text-lg font-black text-slate-900">Hướng dẫn học viên</h3>
@@ -1358,7 +1402,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 )}
 
               </>
-            )}
+            ))}
           </>
         )}
       </div>
