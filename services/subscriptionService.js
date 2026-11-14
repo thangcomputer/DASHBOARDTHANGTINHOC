@@ -729,10 +729,11 @@ const MAX_MEET_CLASS_STUDENTS = 100;
 async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLASS_STUDENTS } = {}) {
   const query = { accountLocked: { $ne: true }, freePortal: true, ...(scopeFilter || {}) };
   const rows = await Student.find(query)
-    .select('name phone studentCode subscription freePortal')
+    .select('name phone email studentCode subscription freePortal')
     .sort({ name: 1 })
     .limit(3000)
     .lean();
+  const now = new Date();
   return rows
     .filter((row) => hasMeetAccess(row))
     .slice(0, Math.min(Math.max(1, limit), MAX_MEET_CLASS_STUDENTS))
@@ -740,7 +741,9 @@ async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLA
       id: String(row._id),
       name: row.name || '',
       phone: row.phone || '',
+      email: row.email || '',
       studentCode: row.studentCode || '',
+      subscription: statusOf(row, now),
     }));
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Video, X } from 'lucide-react';
+import { Loader2, RefreshCw, Search, UserPlus, Users, Video, X } from 'lucide-react';
 import meetClassApi from '../../../services/meetClassApi';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { useToast } from '../../../utils/useToast';
@@ -18,6 +18,7 @@ function formatDay(day) {
 
 export default function AdminMeetClassTab() {
   const toast = useToast();
+  const [subTab, setSubTab] = useState('schedule'); // 'schedule' | 'subscribers'
   const [rows, setRows] = useState([]);
   const [slots, setSlots] = useState({});
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,10 @@ export default function AdminMeetClassTab() {
   const [inviteMode, setInviteMode] = useState('manual');
   const [eligibleCount, setEligibleCount] = useState(null);
   const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [meetStudents, setMeetStudents] = useState([]);
+  const [meetStudentsLoading, setMeetStudentsLoading] = useState(false);
+  const [subscriberSearch, setSubscriberSearch] = useState('');
+  const [subscriberFilter, setSubscriberFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [found, setFound] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -46,23 +51,54 @@ export default function AdminMeetClassTab() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  const loadMeetStudents = () => {
+    setMeetStudentsLoading(true);
+    meetClassApi.eligibleStudents()
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setMeetStudents(list);
+        setEligibleCount(res?.count ?? list.length);
+      })
+      .catch((err) => toast.error(err.message || 'Không tải được danh sách học viên gói Meet'))
+      .finally(() => setMeetStudentsLoading(false));
+  };
 
   useEffect(() => {
-    if (inviteMode !== 'all') {
-      setEligibleCount(null);
-      return undefined;
-    }
+    load();
+    loadMeetStudents();
+  }, []);
+
+  useEffect(() => {
+    if (inviteMode !== 'all') return undefined;
     let cancelled = false;
     setEligibleLoading(true);
     meetClassApi.eligibleStudents()
       .then((res) => {
-        if (!cancelled) setEligibleCount(res.count ?? (res.data || []).length);
+        if (!cancelled) {
+          const list = Array.isArray(res?.data) ? res.data : [];
+          setMeetStudents(list);
+          setEligibleCount(res.count ?? list.length);
+        }
       })
       .catch(() => { if (!cancelled) setEligibleCount(null); })
       .finally(() => { if (!cancelled) setEligibleLoading(false); });
     return () => { cancelled = true; };
   }, [inviteMode]);
+
+  const filteredMeetStudents = useMemo(() => {
+    const q = subscriberSearch.trim().toLowerCase();
+    return meetStudents
+      .filter((st) => {
+        const sub = st.subscription || {};
+        if (subscriberFilter === 'lifetime' && sub.state !== 'lifetime' && !sub.meetLifetime) return false;
+        if (subscriberFilter === 'expiring' && sub.state !== 'expiring') return false;
+        if (subscriberFilter === 'active' && sub.state !== 'active') return false;
+        if (!q) return true;
+        return [st.name, st.phone, st.email, st.studentCode, sub.planLabel]
+          .some((val) => String(val || '').toLowerCase().includes(q));
+      })
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+  }, [meetStudents, subscriberSearch, subscriberFilter]);
 
   useEffect(() => {
     if (inviteMode !== 'manual') return undefined;
@@ -158,6 +194,180 @@ export default function AdminMeetClassTab() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSubTab('schedule')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+              subTab === 'schedule' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Video size={15} /> Xếp lịch &amp; Buổi Meet
+            <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-black ${
+              subTab === 'schedule' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {rows.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('subscribers')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+              subTab === 'subscribers' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Users size={15} /> Học viên gói Meet
+            <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-black ${
+              subTab === 'subscribers' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {meetStudents.length}
+            </span>
+          </button>
+        </div>
+        {subTab === 'subscribers' && (
+          <button
+            type="button"
+            onClick={loadMeetStudents}
+            disabled={meetStudentsLoading}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+          >
+            {meetStudentsLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            Làm mới
+          </button>
+        )}
+      </div>
+
+      {subTab === 'subscribers' ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                className={`${INPUT} pl-9`}
+                value={subscriberSearch}
+                onChange={(e) => setSubscriberSearch(e.target.value)}
+                placeholder="Tìm theo tên, SĐT, email, mã HV, tên gói..."
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { key: 'all', label: 'Tất cả' },
+                { key: 'lifetime', label: 'Vĩnh viễn' },
+                { key: 'active', label: 'Đang hoạt động' },
+                { key: 'expiring', label: 'Sắp hết hạn' },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setSubscriberFilter(opt.key)}
+                  className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                    subscriberFilter === opt.key
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {meetStudentsLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+              <Loader2 size={18} className="animate-spin" /> Đang tải danh sách học viên gói Meet…
+            </div>
+          ) : filteredMeetStudents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm font-semibold text-slate-400">
+              {meetStudents.length === 0
+                ? 'Chưa có học viên Dewskill nào đăng ký gói Meet.'
+                : 'Không tìm thấy học viên phù hợp với bộ lọc.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[700px] text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-black uppercase tracking-wider text-slate-600">
+                  <tr>
+                    <th className="w-12 px-3 py-3 text-center">STT</th>
+                    <th className="px-3 py-3">Học viên</th>
+                    <th className="px-3 py-3">Liên hệ</th>
+                    <th className="px-3 py-3">Gói Meet</th>
+                    <th className="px-3 py-3">Thời hạn</th>
+                    <th className="px-3 py-3">Trạng thái</th>
+                    <th className="w-36 px-3 py-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredMeetStudents.map((st, idx) => {
+                    const sub = st.subscription || {};
+                    const isLifetime = sub.state === 'lifetime' || sub.meetLifetime;
+                    const isExpiring = sub.state === 'expiring';
+                    const expDate = sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('vi-VN') : '';
+                    return (
+                      <tr key={st.id} className="align-middle transition hover:bg-emerald-50/30">
+                        <td className="px-3 py-3 text-center text-xs font-black text-slate-400">{idx + 1}</td>
+                        <td className="px-3 py-3">
+                          <p className="font-bold text-slate-900">{st.name || 'Học viên'}</p>
+                          {st.studentCode && (
+                            <p className="text-[11px] font-semibold text-slate-400">{st.studentCode}</p>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600">
+                          {st.phone && <p className="font-semibold text-slate-800">{st.phone}</p>}
+                          {st.email && <p className="text-slate-500">{st.email}</p>}
+                          {!st.phone && !st.email && <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                            {sub.planLabel || (isLifetime ? 'Vĩnh viễn' : 'Gói Meet')}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600">
+                          {isLifetime ? (
+                            <span className="font-bold text-amber-700">Không giới hạn</span>
+                          ) : (
+                            <span>
+                              {expDate ? `${expDate} · ` : ''}
+                              <strong>Còn {sub.daysLeft ?? 0} ngày</strong>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-black ${
+                            isLifetime
+                              ? 'bg-amber-100 text-amber-800'
+                              : isExpiring
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {isLifetime ? 'Vĩnh viễn' : isExpiring ? 'Sắp hết hạn' : 'Đang hoạt động'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInviteMode('manual');
+                              setSelected((prev) => (prev.some((x) => x.id === st.id)
+                                ? prev
+                                : [...prev, { id: st.id, name: st.name || 'Học viên', phone: st.phone || '' }]));
+                              setSubTab('schedule');
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                          >
+                            <UserPlus size={13} /> Mời học Meet
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : (
+        <>
       <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="mb-1 flex items-center gap-2 text-base font-black text-slate-900">
           <Video size={18} className="text-red-600" /> Xếp lịch Meet
@@ -290,6 +500,8 @@ export default function AdminMeetClassTab() {
           ))}
         </ul>
       </section>
+        </>
+      )}
     </div>
   );
 }
