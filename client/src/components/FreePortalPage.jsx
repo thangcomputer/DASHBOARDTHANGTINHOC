@@ -412,7 +412,9 @@ export default function FreePortalPage({ onLogin }) {
       setError(provider === 'google' ? 'Chưa cấu hình đăng nhập Google.' : 'Chưa cấu hình đăng nhập Facebook.');
       return;
     }
-    const origin = API_BASE.startsWith('http') ? API_BASE.replace(/\/api$/, '') : 'http://127.0.0.1:5000';
+    const origin = API_BASE.startsWith('http')
+      ? API_BASE.replace(/\/api$/, '')
+      : (window.location.port === '5173' ? 'http://127.0.0.1:5000' : window.location.origin);
     window.location.href = `${origin}/api/auth/free-portal/${provider}`;
   };
 
