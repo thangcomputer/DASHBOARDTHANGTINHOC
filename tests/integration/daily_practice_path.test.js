@@ -384,7 +384,7 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
 
   const soundUtil = read('client/src/utils/sound.js');
   assert.ok(soundUtil.includes('export const GameSoundManager'), 'GameSoundManager quản lý âm thanh');
-  assert.ok(soundUtil.includes('if (saved === null) return true;'), 'mặc định tắt âm thanh khi chưa cấu hình');
+  assert.ok(soundUtil.includes('if (saved === null) return false;'), 'mặc định bật âm thanh khi chưa cấu hình');
 
   // Kiểm tra giao diện trả lời trắc nghiệm DewSkill (Web + Mobile) theo hình tham chiếu
   const webQuestions = read('client/src/components/student/dailyPractice/Questions.jsx');

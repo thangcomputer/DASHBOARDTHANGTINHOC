@@ -126,11 +126,28 @@ function isLevelConfigComplete(node, diff, completedSections) {
   return order.every((secKey) => completedSections.has(`${node.key}:${diff}:${secKey}`));
 }
 
+function hasConfiguredLevelContent(node) {
+  if (!node?.levelConfigs) return false;
+  return DIFFICULTY_KEYS.some((diff) => {
+    const raw = node.levelConfigs[diff];
+    if (!raw || typeof raw !== 'object') return false;
+    return Boolean(
+      String(raw.content?.body || '').trim()
+      || String(raw.content?.title || '').trim()
+      || String(raw.content?.description || '').trim()
+      || (Array.isArray(raw.files) && raw.files.length > 0)
+      || String(raw.video?.url || '').trim()
+      || String(raw.practice?.title || '').trim()
+      || String(raw.practice?.description || '').trim(),
+    );
+  });
+}
+
 /** Nút Học bài (icon book): xong khi hoàn thành cả 3 mức Dễ → Vừa → Khó (hoặc hết bài legacy); nút khác: xong 3 nấc Dễ/Vừa/Khó. */
 function isNodeComplete(done, node, nodeIndex, unitCompleted, watched = null, completedSections = null) {
   if (unitCompleted) return true;
   if (isStudyNode(node)) {
-    const hasConfiguredLevels = Boolean(node?.levelConfigs && DIFFICULTY_KEYS.some((d) => node.levelConfigs[d]));
+    const hasConfiguredLevels = hasConfiguredLevelContent(node);
     const lessons = studyLessonVideos(node);
     if (!hasConfiguredLevels && !lessons.length) return true;
     if (hasConfiguredLevels) {
@@ -793,7 +810,7 @@ function buildNodeLevels(node, nodeIndex, nodes, done, unitUnlocked, unitComplet
         }],
       };
     });
-    const hasConfiguredLevels = Boolean(node?.levelConfigs && DIFFICULTY_KEYS.some((d) => node.levelConfigs[d]));
+    const hasConfiguredLevels = hasConfiguredLevelContent(node);
     const nodeComplete = hasConfiguredLevels
       ? DIFFICULTY_KEYS.every((diff) => isLevelConfigComplete(node, diff, completedSections))
       : (!lessons.length || levels.every((level) => level.state === 'completed'));

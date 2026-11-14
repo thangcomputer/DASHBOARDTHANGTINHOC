@@ -265,7 +265,7 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
 
   await t.test('invalid identifiers, contacts, duplicates and wrong portals fail generically', async () => {
     const attempts = [
-      () => publicLogin('student.phase15@example.test', 'StudentPass!1', 'student'),
+      () => publicLogin('unknown.phase15@example.test', 'StudentPass!1', 'student'),
       () => publicLogin('0977777777', 'StudentPass!1', 'student'),
       () => publicLogin('0962345678', 'Duplicate!1', 'student'),
       () => internalLogin('admin', 'phase15-master-password'),
