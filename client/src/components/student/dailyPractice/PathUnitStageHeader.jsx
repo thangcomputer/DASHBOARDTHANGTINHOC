@@ -7,6 +7,79 @@ function darken(hex, amount = 0.28) {
   return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
 }
 
+const DIFF_META = [
+  { key: 'easy', step: 'learn', label: 'Dễ' },
+  { key: 'medium', step: 'practice', label: 'Vừa' },
+  { key: 'hard', step: 'challenge', label: 'Khó' },
+];
+const DEFAULT_SEC_ORDER = ['content', 'file', 'video', 'practice'];
+
+/** Danh sách video của một mốc bài học (ưu tiên levelConfigs, tương thích ngược levels). */
+export function collectNodeVideos(unit, node) {
+  if (!unit || !node) return [];
+  const completedSet = new Set(unit.completedSections || []);
+  const watchedSet = new Set(unit.watchedVideoIds || []);
+  const nodeUnlocked = unit.state !== 'locked' && node.state !== 'locked';
+  const isLevelDone = (diff) => {
+    const cfg = node.levelConfigs?.[diff];
+    const hidden = new Set(cfg?.hiddenSections || []);
+    const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : DEFAULT_SEC_ORDER)
+      .filter((k) => !hidden.has(k));
+    return !order.length || order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
+  };
+  const easyDone = isLevelDone('easy');
+  const mediumDone = isLevelDone('medium');
+
+  const items = [];
+  const seenUrls = new Set();
+  const hasLevelConfigVideo = DIFF_META.some((d) => Boolean(node.levelConfigs?.[d.key]?.video?.url));
+
+  for (const d of DIFF_META) {
+    const cfg = node.levelConfigs?.[d.key];
+    const vid = cfg?.video;
+    if (!vid?.url) continue;
+    const hidden = new Set(cfg.hiddenSections || []);
+    if (hidden.has('video')) continue;
+    const diffUnlocked = unit.testedOut || d.key === 'easy'
+      || (d.key === 'medium' && easyDone)
+      || (d.key === 'hard' && easyDone && mediumDone);
+    const order = (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : DEFAULT_SEC_ORDER)
+      .filter((k) => !hidden.has(k));
+    const idx = order.indexOf('video');
+    const seqUnlocked = unit.testedOut || cfg.sequentialSections === false
+      || idx <= 0
+      || order.slice(0, idx).every((secKey) => completedSet.has(`${node.key}:${d.key}:${secKey}`));
+    const unlocked = nodeUnlocked && diffUnlocked && seqUnlocked;
+    const id = `${node.key}:level:${d.key}`;
+    const watched = completedSet.has(`${node.key}:${d.key}:video`) || watchedSet.has(id);
+    seenUrls.add(String(vid.url).trim());
+    items.push({
+      id,
+      title: vid.title || `${node.label} (${d.label})`,
+      url: unlocked ? vid.url : '',
+      stepLabel: d.label,
+      state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
+    });
+  }
+
+  for (const level of node.levels || []) {
+    if (hasLevelConfigVideo && (node.kind === 'study' || Boolean(node.levelConfigs?.[DIFF_META.find((d) => d.step === level.key)?.key]?.video?.url))) {
+      continue;
+    }
+    for (const video of level.videos || []) {
+      if (!video?.id) continue;
+      if (video.url && seenUrls.has(String(video.url).trim())) continue;
+      const unlocked = nodeUnlocked && level.state !== 'locked';
+      items.push({
+        ...video,
+        state: !unlocked ? 'locked' : video.state,
+        stepLabel: video.stepLabel || level.label || '',
+      });
+    }
+  }
+  return items;
+}
+
 /** Danh sách video của chặng (unit + từng cấp). */
 export function collectUnitVideos(unit) {
   const items = [];
@@ -18,10 +91,8 @@ export function collectUnitVideos(unit) {
   };
   for (const video of unit?.videos || []) push(video);
   for (const node of unit?.pathNodes || []) {
-    for (const level of node.levels || []) {
-      for (const video of level.videos || []) {
-        push({ ...video, stepLabel: video.stepLabel || level.label || '' });
-      }
+    for (const video of collectNodeVideos(unit, node)) {
+      push(video);
     }
   }
   return items;

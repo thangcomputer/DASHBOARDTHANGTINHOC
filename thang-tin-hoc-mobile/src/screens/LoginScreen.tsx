@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -18,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
   AlertCircle, Award, BookOpen, CheckCircle2, Eye, EyeOff, GraduationCap, Headphones, KeyRound, Lock, LogIn,
-  MessageCircle, Monitor, Phone, Share2, UserRound, X,
+  MessageCircle, Monitor, Phone, Share2, Sparkles, UserPlus, UserRound, X,
 } from 'lucide-react-native';
 import { useAuth } from '../app/AuthContext';
 import { mobileApiRequest } from '../services/apiClient';
@@ -54,6 +56,8 @@ const palette = {
   skyText: '#7DD3FC',
 };
 
+const EMAIL_RE = /^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/;
+
 /** Same rule as web validators.normalizePhone: 0… or +84…, mobile prefixes 3/5/7/8/9. */
 function normalizePhone(value: string) {
   const raw = String(value || '').trim();
@@ -76,11 +80,12 @@ function roleLabel(role: UserRole) {
   return role === 'teacher' ? 'Giảng viên' : 'Học viên';
 }
 
-function forgotPasswordMessage(role: UserRole, phone: string) {
+function forgotPasswordMessage(role: UserRole, contact: { type: 'phone' | 'email'; value: string }) {
+  const contactLine = contact.type === 'phone' ? `SĐT: ${contact.value}` : `Gmail: ${contact.value}`;
   return '[THẮNG TIN HỌC] Yêu cầu cấp lại mật khẩu\n\n'
     + `Vai trò: ${roleLabel(role)}\n`
     + 'Họ tên: (chưa rõ tên)\n'
-    + `SĐT: ${phone}\n\n`
+    + `${contactLine}\n\n`
     + 'Anh/chị Admin vui lòng cấp mật khẩu mới giúp em. Xin cảm ơn!';
 }
 
@@ -91,15 +96,41 @@ function openAdminZalo(message = '') {
 
 export function LoginScreen() {
   const { signIn, isSigningIn, authError } = useAuth();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [role, setRole] = useState<UserRole>('student');
+  const [fullName, setFullName] = useState('');
+  const [age, setAge] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
-  const [focused, setFocused] = useState<'phone' | 'password' | null>(null);
+  const [focused, setFocused] = useState<'name' | 'age' | 'phone' | 'password' | null>(null);
   const [logoUrl, setLogoUrl] = useState('');
   const [logoFailed, setLogoFailed] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
+
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 4200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 4200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [glowAnim]);
 
   useEffect(() => {
     let alive = true;
@@ -122,32 +153,96 @@ export function LoginScreen() {
     setError('');
   };
 
+  const switchMode = (nextMode: 'login' | 'register') => {
+    setMode(nextMode);
+    setError('');
+    if (nextMode === 'register') setRole('student');
+  };
+
   const submit = async () => {
     setError('');
-    const normalized = normalizePhone(phone);
-    if (!normalized) {
-      setError('Số điện thoại không hợp lệ (hỗ trợ 0... hoặc +84...)');
+    const rawContact = phone.trim();
+    const normalizedPhone = normalizePhone(rawContact);
+    const normalizedEmail = EMAIL_RE.test(rawContact.toLowerCase()) ? rawContact.toLowerCase() : '';
+    const contact = normalizedPhone
+      ? { type: 'phone' as const, value: normalizedPhone }
+      : normalizedEmail
+        ? { type: 'email' as const, value: normalizedEmail }
+        : null;
+
+    if (mode === 'register') {
+      const trimmedName = fullName.trim();
+      const parsedAge = Number.parseInt(age.trim(), 10);
+      if (trimmedName.length < 2) {
+        setError('Hãy nhập họ và tên (ít nhất 2 ký tự)');
+        return;
+      }
+      if (!Number.isFinite(parsedAge) || parsedAge < 10 || parsedAge > 80) {
+        setError('Tuổi hợp lệ từ 10 đến 80');
+        return;
+      }
+      if (!contact) {
+        setError('Vui lòng nhập số điện thoại hoặc Gmail hợp lệ');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Mật khẩu cần ít nhất 6 ký tự');
+        return;
+      }
+      setIsRegistering(true);
+      try {
+        await mobileApiRequest(
+          '/auth/register-free',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              name: trimmedName,
+              age: parsedAge,
+              ...(contact.type === 'phone' ? { phone: contact.value } : { email: contact.value }),
+              password,
+            }),
+          },
+          false,
+        );
+        await signIn('student', contact.value, password);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'Không thể tạo tài khoản mới.');
+      } finally {
+        setIsRegistering(false);
+      }
+      return;
+    }
+
+    if (!contact) {
+      setError('Vui lòng nhập số điện thoại hoặc Gmail hợp lệ');
       return;
     }
     try {
-      await signIn(role, normalized, password);
+      await signIn(role, contact.value, password);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập.');
     }
   };
 
+  const busy = isSigningIn || isRegistering;
   const message = error || authError;
+  const auraScale = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const auraOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <View style={styles.backdrop} pointerEvents="none">
-        <View style={[styles.aura, styles.auraRed]} />
-        <View style={[styles.aura, styles.auraBlue]} />
-        <GraduationCap size={64} color="rgba(255,255,255,0.05)" style={[styles.motif, { top: '8%', left: '6%', transform: [{ rotate: '-14deg' }] }]} />
-        <BookOpen size={52} color="rgba(255,255,255,0.045)" style={[styles.motif, { top: '30%', right: '5%', transform: [{ rotate: '12deg' }] }]} />
-        <Award size={48} color="rgba(255,255,255,0.04)" style={[styles.motif, { bottom: '20%', left: '4%', transform: [{ rotate: '10deg' }] }]} />
-        <Monitor size={56} color="rgba(255,255,255,0.04)" style={[styles.motif, { bottom: '6%', right: '8%', transform: [{ rotate: '-8deg' }] }]} />
+        <Animated.View style={[styles.aura, styles.auraRed, { opacity: auraOpacity, transform: [{ scale: auraScale }] }]} />
+        <Animated.View style={[styles.aura, styles.auraBlue, { opacity: auraOpacity }]} />
+        <View style={[styles.aura, styles.auraCenter]} />
+        <View style={styles.ringTopLeft} />
+        <View style={styles.ringBottomRight} />
+        <View style={styles.ringInner} />
+        <GraduationCap size={64} color="rgba(110,231,183,0.06)" style={[styles.motif, { top: '8%', left: '6%', transform: [{ rotate: '-14deg' }] }]} />
+        <BookOpen size={52} color="rgba(255,255,255,0.05)" style={[styles.motif, { top: '28%', right: '5%', transform: [{ rotate: '12deg' }] }]} />
+        <Award size={48} color="rgba(56,189,248,0.05)" style={[styles.motif, { bottom: '20%', left: '4%', transform: [{ rotate: '10deg' }] }]} />
+        <Monitor size={56} color="rgba(255,255,255,0.045)" style={[styles.motif, { bottom: '6%', right: '8%', transform: [{ rotate: '-8deg' }] }]} />
       </View>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -180,28 +275,34 @@ export function LoginScreen() {
               <GraduationCap size={14} color="#6EE7B7" />
               <Text style={styles.chipText}>Nền tảng học Tin học văn phòng</Text>
             </View>
-            <Text style={styles.title}>Đăng nhập tài khoản</Text>
-            <Text style={styles.subtitle}>Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</Text>
+            <Text style={styles.title}>{mode === 'register' ? 'Tạo tài khoản mới' : 'Đăng nhập tài khoản'}</Text>
+            <Text style={styles.subtitle}>
+              {mode === 'register'
+                ? 'Đăng ký miễn phí để bắt đầu học và luyện tập ngay.'
+                : 'Chào mừng trở lại! Vui lòng nhập thông tin của bạn.'}
+            </Text>
 
-            <View style={styles.roleTabs} accessibilityRole="tablist" accessibilityLabel="Chọn vai trò đăng nhập">
-              {(['student', 'teacher'] as const).map((value) => {
-                const active = role === value;
-                const Icon = value === 'teacher' ? UserRound : GraduationCap;
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => chooseRole(value)}
-                    style={[styles.roleTab, active && styles.roleTabActive]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: active }}
-                  >
-                    <Icon size={16} color={active ? palette.white : palette.muted} />
-                    <Text style={[styles.roleTabText, active && styles.roleTabTextActive]}>{roleLabel(value)}</Text>
-                    {active ? <View style={styles.dropletShine} pointerEvents="none" /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
+            {mode === 'login' ? (
+              <View style={styles.roleTabs} accessibilityRole="tablist" accessibilityLabel="Chọn vai trò đăng nhập">
+                {(['student', 'teacher'] as const).map((value) => {
+                  const active = role === value;
+                  const Icon = value === 'teacher' ? UserRound : GraduationCap;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => chooseRole(value)}
+                      style={[styles.roleTab, active && styles.roleTabActive]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Icon size={16} color={active ? palette.white : palette.muted} />
+                      <Text style={[styles.roleTabText, active && styles.roleTabTextActive]}>{roleLabel(value)}</Text>
+                      {active ? <View style={styles.dropletShine} pointerEvents="none" /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
 
             {message ? (
               <View style={styles.errorBox} accessibilityRole="alert">
@@ -210,29 +311,71 @@ export function LoginScreen() {
               </View>
             ) : null}
 
+            {mode === 'register' ? (
+              <View style={styles.rowFields}>
+                <View style={[styles.fieldGroup, styles.nameCol]}>
+                  <Text style={styles.label}>Họ và tên</Text>
+                  <View style={[styles.inputWrap, focused === 'name' && styles.inputWrapFocused]}>
+                    <UserRound size={17} color={focused === 'name' ? palette.brand : palette.muted} />
+                    <TextInput
+                      value={fullName}
+                      onChangeText={setFullName}
+                      placeholder="VD: Nguyễn Văn A"
+                      placeholderTextColor={palette.muted}
+                      autoComplete="name"
+                      textContentType="name"
+                      onFocus={() => setFocused('name')}
+                      onBlur={() => setFocused(null)}
+                      style={styles.input}
+                      accessibilityLabel="Họ và tên"
+                    />
+                  </View>
+                </View>
+                <View style={[styles.fieldGroup, styles.ageCol]}>
+                  <Text style={styles.label}>Tuổi</Text>
+                  <View style={[styles.inputWrap, focused === 'age' && styles.inputWrapFocused]}>
+                    <Sparkles size={16} color={focused === 'age' ? palette.brand : palette.muted} />
+                    <TextInput
+                      value={age}
+                      onChangeText={(value) => setAge(value.replace(/\D/g, '').slice(0, 2))}
+                      placeholder="18"
+                      placeholderTextColor={palette.muted}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      onFocus={() => setFocused('age')}
+                      onBlur={() => setFocused(null)}
+                      style={styles.input}
+                      accessibilityLabel="Tuổi"
+                    />
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Số điện thoại</Text>
+              <Text style={styles.label}>Số điện thoại hoặc Gmail</Text>
               <View style={[styles.inputWrap, focused === 'phone' && styles.inputWrapFocused]}>
                 <UserRound size={18} color={focused === 'phone' ? palette.brand : palette.muted} />
                 <TextInput
                   value={phone}
-                  onChangeText={(value) => setPhone(limitPhoneInput(value))}
-                  maxLength={PHONE_MAX_DIGITS + 1}
-                  placeholder="VD: 0912345678"
+                  onChangeText={setPhone}
+                  placeholder="VD: 0912345678 hoặc ten@gmail.com"
                   placeholderTextColor={palette.muted}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                  textContentType="telephoneNumber"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="username"
+                  textContentType="username"
                   onFocus={() => setFocused('phone')}
                   onBlur={() => setFocused(null)}
                   style={styles.input}
-                  accessibilityLabel="Số điện thoại"
+                  accessibilityLabel="Số điện thoại hoặc Gmail"
                 />
               </View>
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Mật khẩu</Text>
+              <Text style={styles.label}>{mode === 'register' ? 'Mật khẩu (tối thiểu 6 ký tự)' : 'Mật khẩu'}</Text>
               <View style={[styles.inputWrap, focused === 'password' && styles.inputWrapFocused]}>
                 <Lock size={18} color={focused === 'password' ? palette.brand : palette.muted} />
                 <TextInput
@@ -261,20 +404,29 @@ export function LoginScreen() {
               </View>
             </View>
 
-            <Pressable onPress={() => setForgotOpen(true)} style={styles.forgotLink} accessibilityRole="button">
-              <KeyRound size={12} color={palette.muted} />
-              <Text style={styles.forgotLinkText}>Quên mật khẩu?</Text>
-            </Pressable>
+            {mode === 'login' ? (
+              <Pressable onPress={() => setForgotOpen(true)} style={styles.forgotLink} accessibilityRole="button">
+                <KeyRound size={12} color={palette.muted} />
+                <Text style={styles.forgotLinkText}>Quên mật khẩu?</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.registerSpacer} />
+            )}
 
             <Pressable
               onPress={() => { void submit(); }}
-              disabled={isSigningIn}
-              style={({ pressed }) => [styles.submit, (pressed || isSigningIn) && styles.submitPressed]}
+              disabled={busy}
+              style={({ pressed }) => [styles.submit, (pressed || busy) && styles.submitPressed]}
               accessibilityRole="button"
-              accessibilityLabel="Đăng nhập ngay"
+              accessibilityLabel={mode === 'register' ? 'Tạo tài khoản ngay' : 'Đăng nhập ngay'}
             >
               <View style={styles.submitShine} pointerEvents="none" />
-              {isSigningIn ? <ActivityIndicator color={palette.white} /> : (
+              {busy ? <ActivityIndicator color={palette.white} /> : mode === 'register' ? (
+                <>
+                  <UserPlus size={18} color={palette.white} />
+                  <Text style={styles.submitText}>Tạo tài khoản ngay</Text>
+                </>
+              ) : (
                 <>
                   <LogIn size={18} color={palette.white} />
                   <Text style={styles.submitText}>Đăng nhập ngay</Text>
@@ -297,8 +449,23 @@ export function LoginScreen() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Chưa có tài khoản?{' '}
+            {mode === 'login' ? (
+              <Text style={styles.footerText}>
+                Chưa có tài khoản?{' '}
+                <Text style={styles.footerCreateLink} onPress={() => switchMode('register')} accessibilityRole="button">
+                  Tạo tài khoản mới
+                </Text>
+              </Text>
+            ) : (
+              <Text style={styles.footerText}>
+                Đã có tài khoản?{' '}
+                <Text style={styles.footerCreateLink} onPress={() => switchMode('login')} accessibilityRole="button">
+                  Đăng nhập ngay
+                </Text>
+              </Text>
+            )}
+            <Text style={styles.footerSubText}>
+              Cần hỗ trợ?{' '}
               <Text style={styles.footerLink} onPress={() => openAdminZalo()} accessibilityRole="link">Liên hệ Admin</Text>
             </Text>
             <Text style={styles.supportTitle}>Hỗ trợ kỹ thuật</Text>
@@ -326,11 +493,18 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
     setSentMessage('');
   }, [initialRole, visible]);
 
-  const normalized = normalizePhone(phone);
+  const rawContact = phone.trim();
+  const normalizedPhone = normalizePhone(rawContact);
+  const normalizedEmail = EMAIL_RE.test(rawContact.toLowerCase()) ? rawContact.toLowerCase() : '';
+  const contact = normalizedPhone
+    ? { type: 'phone' as const, value: normalizedPhone }
+    : normalizedEmail
+      ? { type: 'email' as const, value: normalizedEmail }
+      : null;
 
   const confirm = async () => {
-    if (!normalized) {
-      setError('Số điện thoại không hợp lệ');
+    if (!contact) {
+      setError('Số điện thoại hoặc Gmail không hợp lệ');
       return;
     }
     setLoading(true);
@@ -339,9 +513,13 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
       await mobileApiRequest('/auth/forgot-password/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalized, role }),
+        body: JSON.stringify({
+          identifier: contact.value,
+          ...(contact.type === 'phone' ? { phone: contact.value } : { email: contact.value }),
+          role,
+        }),
       }, false);
-      setSentMessage(forgotPasswordMessage(role, normalized));
+      setSentMessage(forgotPasswordMessage(role, contact));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không gửi được yêu cầu. Thử lại sau.');
     } finally {
@@ -357,7 +535,7 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
             <View style={styles.modalHeaderIcon}><KeyRound size={20} color={palette.white} /></View>
             <View style={styles.flex}>
               <Text style={styles.modalTitle}>Quên mật khẩu</Text>
-              <Text style={styles.modalSubtitle}>{sentMessage ? 'Tin nhắn đã sẵn - chỉ việc gửi' : 'Nhập SĐT › xác nhận'}</Text>
+              <Text style={styles.modalSubtitle}>{sentMessage ? 'Tin nhắn đã sẵn - chỉ việc gửi' : 'Nhập SĐT hoặc Gmail › xác nhận'}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose} accessibilityRole="button" accessibilityLabel="Đóng">
               <X size={16} color={palette.white} />
@@ -384,28 +562,29 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
                     );
                   })}
                 </View>
-                <Text style={styles.modalLabel}>Số điện thoại đăng ký</Text>
+                <Text style={styles.modalLabel}>Số điện thoại hoặc Gmail đăng ký</Text>
                 <View style={styles.modalInputWrap}>
                   <Phone size={16} color={palette.subtle} />
                   <TextInput
                     value={phone}
-                    onChangeText={(value) => { setPhone(limitPhoneInput(value)); setError(''); }}
-                    maxLength={PHONE_MAX_DIGITS + 1}
-                    placeholder="VD: 0912345678"
+                    onChangeText={(value) => { setPhone(value); setError(''); }}
+                    placeholder="VD: 0912345678 hoặc ten@gmail.com"
                     placeholderTextColor={palette.muted}
-                    keyboardType="phone-pad"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     style={styles.input}
-                    accessibilityLabel="Số điện thoại đăng ký"
+                    accessibilityLabel="Số điện thoại hoặc Gmail đăng ký"
                   />
                 </View>
-                {normalized ? (
+                {contact ? (
                   <View style={styles.confirmBox}>
                     <Text style={styles.confirmLabel}>Dòng xác nhận</Text>
-                    <Text style={styles.confirmText}>{`Xác nhận: ${roleLabel(role)} · SĐT ${normalized}`}</Text>
+                    <Text style={styles.confirmText}>{`Xác nhận: ${roleLabel(role)} · ${contact.type === 'phone' ? 'SĐT' : 'Gmail'} ${contact.value}`}</Text>
                   </View>
                 ) : (
                   <View style={styles.hintBox}>
-                    <Text style={styles.hintText}>Nhập SĐT đăng ký - sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.</Text>
+                    <Text style={styles.hintText}>Nhập SĐT hoặc Gmail đăng ký - sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.</Text>
                   </View>
                 )}
                 {error ? (
@@ -416,8 +595,8 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
                 ) : null}
                 <Pressable
                   onPress={() => { void confirm(); }}
-                  disabled={loading || !normalized}
-                  style={[styles.modalPrimary, (loading || !normalized) && styles.modalPrimaryDisabled]}
+                  disabled={loading || !contact}
+                  style={[styles.modalPrimary, (loading || !contact) && styles.modalPrimaryDisabled]}
                   accessibilityRole="button"
                 >
                   {loading ? <ActivityIndicator color={palette.white} /> : (
@@ -433,7 +612,7 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
                 <View style={styles.sentHeader}>
                   <View style={styles.sentIcon}><CheckCircle2 size={28} color="#34D399" /></View>
                   <Text style={styles.sentTitle}>Đã ghi nhận yêu cầu</Text>
-                  <Text style={styles.sentSubtitle}>{`${roleLabel(role)}: ${normalized}`}</Text>
+                  <Text style={styles.sentSubtitle}>{`${roleLabel(role)}: ${contact?.value || ''}`}</Text>
                 </View>
                 <View style={styles.messageBox}>
                   <Text style={styles.modalLabel}>Nội dung tin nhắn</Text>
@@ -475,19 +654,62 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     overflow: 'hidden',
-    backgroundImage: 'linear-gradient(165deg, #0B1224 0%, #0F172A 48%, #1B1230 100%)',
+    backgroundColor: '#091122',
+    backgroundImage: 'linear-gradient(160deg, #07121E 0%, #0D192F 46%, #0B1F24 100%)',
   } as never,
   aura: { position: 'absolute', width: 420, height: 420, borderRadius: 210 },
   auraRed: {
-    top: -170,
-    right: -170,
-    backgroundImage: 'radial-gradient(circle, rgba(5, 150, 105, 0.35) 0%, rgba(5, 150, 105, 0) 68%)',
+    top: -160,
+    right: -140,
+    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+    backgroundImage: 'radial-gradient(circle, rgba(16, 185, 129, 0.36) 0%, rgba(16, 185, 129, 0) 68%)',
   } as never,
   auraBlue: {
-    bottom: -190,
-    left: -190,
-    backgroundImage: 'radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 68%)',
+    bottom: -180,
+    left: -160,
+    backgroundColor: 'rgba(14, 165, 233, 0.12)',
+    backgroundImage: 'radial-gradient(circle, rgba(14, 165, 233, 0.28) 0%, rgba(14, 165, 233, 0) 68%)',
   } as never,
+  auraCenter: {
+    top: '10%',
+    left: '50%',
+    marginLeft: -210,
+    width: 420,
+    height: 420,
+    borderRadius: 210,
+    backgroundColor: 'rgba(5, 150, 105, 0.06)',
+    backgroundImage: 'radial-gradient(circle, rgba(52, 211, 153, 0.14) 0%, rgba(52, 211, 153, 0) 65%)',
+  } as never,
+  ringTopLeft: {
+    position: 'absolute',
+    top: -90,
+    left: -90,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    borderWidth: 1,
+    borderColor: 'rgba(110, 231, 183, 0.08)',
+  },
+  ringBottomRight: {
+    position: 'absolute',
+    bottom: -110,
+    right: -80,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.08)',
+  },
+  ringInner: {
+    position: 'absolute',
+    top: '18%',
+    right: -130,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
   motif: { position: 'absolute' },
   scroll: {
     flexGrow: 1,
@@ -586,6 +808,10 @@ const styles = StyleSheet.create({
   },
   errorText: { flex: 1, color: palette.redText, fontSize: 13, fontWeight: '700', lineHeight: 18 },
   fieldGroup: { marginBottom: 14, gap: 6 },
+  rowFields: { flexDirection: 'row', gap: 10 },
+  nameCol: { flex: 1, minWidth: 0 },
+  ageCol: { width: 92 },
+  registerSpacer: { height: 6 },
   label: { color: palette.muted, fontSize: 12, fontWeight: '700', marginLeft: 4 },
   inputWrap: {
     flexDirection: 'row',
@@ -654,6 +880,8 @@ const styles = StyleSheet.create({
   highlightText: { color: palette.text, fontSize: 11, fontWeight: '700' },
   footer: { alignItems: 'center', marginTop: 22, gap: 6 },
   footerText: { color: palette.muted, fontSize: 14, fontWeight: '500' },
+  footerCreateLink: { color: '#34D399', fontWeight: '900' },
+  footerSubText: { color: palette.subtle, fontSize: 13, fontWeight: '500', marginTop: 2 },
   footerLink: { color: palette.white, fontWeight: '900' },
   supportTitle: { color: palette.subtle, fontSize: 12, fontWeight: '900', letterSpacing: 1.4, marginTop: 18 },
   supportText: { color: palette.muted, fontSize: 12, fontWeight: '700' },

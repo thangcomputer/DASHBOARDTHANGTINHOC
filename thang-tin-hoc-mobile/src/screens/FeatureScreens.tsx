@@ -4679,9 +4679,17 @@ function StudentProfileEditModal({
 }) {
   const { width } = useWindowDimensions();
   const name = typeof profile?.name === 'string' ? profile.name : user?.name || '';
-  const phone = typeof profile?.phone === 'string' ? profile.phone : user?.phone || '';
-  const [email, setEmail] = useState(typeof profile?.email === 'string' ? profile.email : '');
-  const [zalo, setZalo] = useState(typeof profile?.zalo === 'string' ? profile.zalo : user?.zalo || '');
+  const rawPhone = typeof profile?.phone === 'string' ? profile.phone : user?.phone || '';
+  const phone = rawPhone.includes('@') ? '' : rawPhone;
+  const rawEmail =
+    typeof profile?.email === 'string'
+      ? profile.email
+      : typeof (user as { email?: string } | null)?.email === 'string'
+        ? (user as { email?: string }).email || ''
+        : '';
+  const [email, setEmail] = useState(rawEmail.includes('@') ? rawEmail : '');
+  const rawZalo = typeof profile?.zalo === 'string' ? profile.zalo : user?.zalo || '';
+  const [zalo, setZalo] = useState(rawZalo.includes('@') ? '' : rawZalo);
   const [address, setAddress] = useState(typeof profile?.address === 'string' ? profile.address : '');
   const [gender, setGender] = useState<'male' | 'female'>(profile?.gender === 'female' || profile?.gender === 'Nữ' ? 'female' : 'male');
   const [saving, setSaving] = useState(false);
@@ -4767,7 +4775,7 @@ function StudentProfileEditModal({
                 <Text style={styles.studentProfileModalLabel}>Số điện thoại</Text>
                 <View style={styles.studentProfileInputWithIcon}>
                   <Phone size={15} color="#94A3B8" />
-                  <TextInput value={phone} editable={false} style={[styles.studentProfileIconInput, styles.studentProfileReadOnlyInput]} accessibilityLabel="Số điện thoại đăng nhập, không thể chỉnh sửa" />
+                  <TextInput value={phone} placeholder="Chưa có" placeholderTextColor="#94A3B8" editable={false} autoComplete="off" style={[styles.studentProfileIconInput, styles.studentProfileReadOnlyInput]} accessibilityLabel="Số điện thoại đăng nhập, không thể chỉnh sửa" />
                 </View>
                 <Text style={styles.studentProfileReadonlyNote}>* Liên hệ Admin để đổi SĐT.</Text>
               </View>
@@ -4775,7 +4783,7 @@ function StudentProfileEditModal({
                 <Text style={styles.studentProfileModalLabel}>SĐT liên hệ 2</Text>
                 <View style={styles.studentProfileInputWithIcon}>
                   <Phone size={15} color="#3B82F6" />
-                  <TextInput value={zalo} onChangeText={setZalo} placeholder="Số điện thoại" keyboardType="phone-pad" style={styles.studentProfileIconInput} accessibilityLabel="Số điện thoại liên hệ thứ hai" />
+                  <TextInput value={zalo} onChangeText={setZalo} placeholder="Số điện thoại" keyboardType="phone-pad" autoComplete="off" style={styles.studentProfileIconInput} accessibilityLabel="Số điện thoại liên hệ thứ hai" />
                 </View>
               </View>
             </View>
@@ -4783,14 +4791,14 @@ function StudentProfileEditModal({
               <Text style={styles.studentProfileModalLabel}>Email</Text>
               <View style={styles.studentProfileInputWithIcon}>
                 <Mail size={15} color="#94A3B8" />
-                <TextInput value={email} onChangeText={setEmail} placeholder="Ví dụ: nguyenvan@gmail.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={styles.studentProfileIconInput} accessibilityLabel="Email" />
+                <TextInput value={email} onChangeText={setEmail} placeholder="Ví dụ: nguyenvan@gmail.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="off" style={styles.studentProfileIconInput} accessibilityLabel="Email" />
               </View>
             </View>
             <View style={styles.studentProfileModalField}>
               <Text style={styles.studentProfileModalLabel}>Địa chỉ</Text>
               <View style={styles.studentProfileInputWithIcon}>
                 <MapPin size={15} color="#94A3B8" />
-                <TextInput value={address} onChangeText={setAddress} placeholder="Nhập địa chỉ của bạn" style={styles.studentProfileIconInput} accessibilityLabel="Địa chỉ" />
+                <TextInput value={address} onChangeText={setAddress} placeholder="Nhập địa chỉ của bạn" autoComplete="off" style={styles.studentProfileIconInput} accessibilityLabel="Địa chỉ" />
               </View>
             </View>
             <View style={{ marginTop: spacing.sm }}>

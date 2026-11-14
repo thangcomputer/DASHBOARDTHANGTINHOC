@@ -429,3 +429,137 @@ test('luyện tập tới đâu xem video tới đó: web + mobile đồng bộ 
   // Mobile DailyPracticeScreen ưu tiên topicId đang mở
   assert.ok(mobileScreen.includes('currentTopic ? continueStageTarget(currentTopic) : null'));
 });
+
+test('bài học theo mốc: 3 mức Dễ/Vừa/Khó độc lập, thứ tự 4 phần, tương thích ngược & tiến độ phần', () => {
+  const unit = {
+    id: 'u1',
+    title: 'Windows',
+    videos: [],
+    pathNodes: [
+      {
+        key: 'bai-1',
+        label: 'Màn hình nền Windows',
+        icon: 'book',
+        sortOrder: 0,
+        active: true,
+        stepVideos: {
+          learn: [{ id: 'v1', title: 'Màn hình nền Windows', content: 'Nội dung cũ', fileUrl: '/uploads/doc.pdf', fileName: 'doc.pdf', url: 'https://youtu.be/abc', checks: [] }],
+          practice: [],
+          challenge: [],
+        },
+        levelConfigs: {
+          easy: {
+            sectionOrder: ['video', 'content', 'file', 'practice'],
+            hiddenSections: ['file'],
+            content: { title: 'Dễ', description: 'Mô tả dễ', body: 'Nội dung dễ' },
+            files: [{ id: 'f1', title: 'Bai1.pdf', url: '/uploads/bai1.pdf', name: 'Bai1.pdf' }],
+            video: { title: 'Video dễ', url: 'https://youtu.be/easy', checks: [] },
+            practice: { title: 'Luyện dễ', description: '' },
+          },
+          medium: {
+            sectionOrder: ['content', 'file', 'video', 'practice'],
+            hiddenSections: [],
+            content: { title: 'Vừa', description: '', body: 'Nội dung vừa' },
+            files: [],
+            video: { title: '', url: '', checks: [] },
+            practice: { title: '', description: '' },
+          },
+          hard: {
+            sectionOrder: ['practice', 'content', 'file', 'video'],
+            hiddenSections: [],
+            content: { title: '', description: '', body: '' },
+            files: [],
+            video: { title: '', url: '', checks: [] },
+            practice: { title: '', description: '' },
+          },
+        },
+      },
+      {
+        key: 'bai-legacy',
+        label: 'Bài cũ',
+        icon: 'book',
+        sortOrder: 1,
+        active: true,
+        stepVideos: {
+          learn: [{ id: 'v2', title: 'Bài cũ', content: 'Lý thuyết cũ', fileUrl: '/uploads/old.pdf', fileName: 'old.pdf', url: '', checks: [] }],
+          practice: [],
+          challenge: [],
+        },
+      },
+    ],
+  };
+
+  const progress = new Map([
+    ['u1', { completedSteps: [], watchedVideoIds: [], completedSections: ['bai-1:easy:content'] }],
+  ]);
+  const [computed] = pathService.computeUnits([unit], progress);
+  assert.deepEqual(computed.completedSections, ['bai-1:easy:content']);
+
+  const node1 = computed.pathNodes[0];
+  assert.deepEqual(node1.levelConfigs.easy.sectionOrder, ['video', 'content', 'file', 'practice']);
+  assert.deepEqual(node1.levelConfigs.easy.hiddenSections, ['file']);
+  assert.equal(node1.levelConfigs.easy.content.body, 'Nội dung dễ');
+  assert.equal(node1.levelConfigs.medium.content.body, 'Nội dung vừa');
+  assert.notEqual(node1.levelConfigs.easy.content.body, node1.levelConfigs.medium.content.body);
+  assert.deepEqual(node1.levelConfigs.hard.sectionOrder, ['practice', 'content', 'file', 'video']);
+
+  // Tương thích ngược: bài cũ tự map vào mức easy
+  const nodeLegacy = computed.pathNodes[1];
+  assert.equal(nodeLegacy.levelConfigs.easy.content.body, 'Lý thuyết cũ');
+  assert.equal(nodeLegacy.levelConfigs.easy.files[0].url, '/uploads/old.pdf');
+
+  // Admin + Web + Mobile UI đủ các cấu phần
+  const adminEditor = read('client/src/components/admin/tabs/AdminMilestoneEditor.jsx');
+  assert.ok(adminEditor.includes('onDragStart') && adminEditor.includes('onDrop'), 'Admin hỗ trợ kéo thả');
+  assert.ok(adminEditor.includes('moveSection'), 'Admin hỗ trợ mũi tên lên/xuống');
+  assert.ok(adminEditor.includes('StudentPreviewModal'), 'Admin có xem trước học viên');
+
+  const webModal = read('client/src/components/student/dailyPractice/MilestoneHubModal.jsx');
+  assert.ok(webModal.includes('visibleSections') && webModal.includes('completeSection'), 'Web hiện theo thứ tự và lưu tiến độ');
+  assert.ok(webModal.includes('isDiffUnlocked') && webModal.includes('#10B981'), 'Web mở khóa tuần tự Dễ → Vừa → Khó và nút 3D xanh');
+
+  const mobileModal = read('thang-tin-hoc-mobile/src/components/dailyPractice/MilestoneHubModal.tsx');
+  assert.ok(mobileModal.includes('visibleSections') && mobileModal.includes('completeSection'), 'Mobile hiện theo thứ tự và lưu tiến độ');
+  assert.ok(mobileModal.includes('isDiffUnlocked') && mobileModal.includes('#10B981'), 'Mobile mở khóa tuần tự Dễ → Vừa → Khó và nút 3D xanh');
+
+  // Chưa hoàn thành cả 3 mức (Dễ + Vừa + Khó) thì mốc vẫn ở trạng thái active
+  assert.equal(node1.state, 'active');
+
+  const fullSections = [
+    'bai-1:easy:video', 'bai-1:easy:content', 'bai-1:easy:practice',
+    'bai-1:medium:content', 'bai-1:medium:file', 'bai-1:medium:video', 'bai-1:medium:practice',
+    'bai-1:hard:practice', 'bai-1:hard:content', 'bai-1:hard:file', 'bai-1:hard:video',
+  ];
+  const [completedUnit] = pathService.computeUnits([unit], new Map([
+    ['u1', { completedSteps: [], watchedVideoIds: [], completedSections: fullSections }],
+  ]));
+  assert.equal(completedUnit.pathNodes[0].state, 'completed', 'Hoàn thành cả 3 mức mới tính là hoàn thành bài học');
+
+  // Kiểm tra chế độ khóa/mở khóa từng bài (lockMode) và chống tua video (antiSeek)
+  const lockUnit = {
+    id: 'u-lock',
+    title: 'Chặng kiểm tra khóa',
+    pathNodes: [
+      { key: 'b1', label: 'Bài 1', icon: 'book', sortOrder: 0, lockMode: 'sequential', levelConfigs: { easy: { video: { url: 'https://youtu.be/abc123456', antiSeek: false }, sequentialSections: false } } },
+      { key: 'b2', label: 'Bài 2', icon: 'book', sortOrder: 1, lockMode: 'unlocked', levelConfigs: { easy: { content: { body: 'Nội dung 2' } } } },
+      { key: 'b3', label: 'Bài 3', icon: 'book', sortOrder: 2, lockMode: 'locked', levelConfigs: { easy: { content: { body: 'Nội dung 3' } } } },
+    ],
+  };
+  const [lockComputed] = pathService.computeUnits([lockUnit], new Map());
+  assert.equal(lockComputed.pathNodes[0].levelConfigs.easy.video.antiSeek, false);
+  assert.equal(lockComputed.pathNodes[0].levelConfigs.easy.sequentialSections, false);
+  assert.equal(lockComputed.pathNodes[1].state, 'active', 'lockMode=unlocked mở sẵn dù bài trước chưa xong');
+  assert.equal(lockComputed.pathNodes[2].state, 'locked', 'lockMode=locked luôn khóa');
+
+  const webVideoModal = read('client/src/components/student/dailyPractice/PathVideoModal.jsx');
+  assert.ok(webVideoModal.includes('current.antiSeek !== false'), 'Web hỗ trợ bật/tắt chống tua');
+  const mobileVideoModal = read('thang-tin-hoc-mobile/src/components/dailyPractice/PathVideoModal.tsx');
+  assert.ok(mobileVideoModal.includes('current.antiSeek !== false'), 'Mobile hỗ trợ bật/tắt chống tua');
+  assert.ok(webModal.includes('isSectionUnlocked'), 'Web hỗ trợ khóa tuần tự từng phần');
+  assert.ok(mobileModal.includes('isSectionUnlocked'), 'Mobile hỗ trợ khóa tuần tự từng phần');
+
+  const pathServiceSrc = read('services/dailyPracticePathService.js');
+  assert.ok(pathServiceSrc.includes("const nodeUnlocked = view.state !== 'locked' && node.state !== 'locked';"), 'Hiển thị danh sách video theo bài nhưng giữ trạng thái khóa theo bài');
+  assert.ok(pathServiceSrc.includes('isDiffUnlockedInNode(node, diff)') && pathServiceSrc.includes('isVideoSectionUnlockedInNode(node, diff)'), 'Chỉ mở khóa xem video của mức độ và phần đã mở');
+  assert.ok(pathServiceSrc.includes("throw httpError(403, 'Bài học này chưa mở')"), 'Chặn đánh dấu đã xem video của bài đang khóa');
+});

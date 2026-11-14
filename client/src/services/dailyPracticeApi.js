@@ -48,6 +48,7 @@ const dailyPracticeApi = {
     })),
     unitVideos: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${unitId}/videos`, { cache: 'no-store' })),
     videoWatched: async (unitId, videoId) => parse(await apiFetch('/daily-practice/my/path/videos/watched', json('POST', { unitId, videoId }))),
+    completeSection: async (unitId, body) => parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/sections/complete`, json('POST', body))),
     claimUnitChest: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/chest/claim`, json('POST', {})), true),
     answerVideoCheck: async (unitId, videoId, checkId, body) => parse(await apiFetch(
       `/daily-practice/my/path/units/${unitId}/videos/${encodeURIComponent(videoId)}/checks/${checkId}/answer`,

@@ -139,6 +139,26 @@ export type DpPathStep = {
   videos?: DpPathVideo[];
 };
 
+export type DpSectionKey = 'content' | 'file' | 'video' | 'practice';
+
+export type DpLevelFile = {
+  id: string;
+  title?: string;
+  url: string;
+  name: string;
+  size?: number;
+};
+
+export type DpLevelSectionConfig = {
+  sectionOrder: DpSectionKey[];
+  hiddenSections?: DpSectionKey[];
+  sequentialSections?: boolean;
+  content: { title?: string; description?: string; body?: string };
+  files: DpLevelFile[];
+  video: { id?: string; title?: string; url?: string; antiSeek?: boolean; checks?: DpVideoCheck[] };
+  practice: { title?: string; description?: string };
+};
+
 export type DpPathNode = {
   key: string;
   label: string;
@@ -147,6 +167,7 @@ export type DpPathNode = {
   sortOrder: number;
   state: DpNodeState;
   levels: DpPathStep[];
+  levelConfigs?: Record<DpDifficulty, DpLevelSectionConfig>;
 };
 
 export type DpPathUnit = {
@@ -158,6 +179,7 @@ export type DpPathUnit = {
   state: DpNodeState;
   testedOut: boolean;
   canTestOut: boolean;
+  completedSections?: string[];
   pathNodes: DpPathNode[];
   steps: DpPathStep[];
   videos?: DpPathVideo[];
@@ -168,6 +190,7 @@ export type DpPathVideo = {
   id: string;
   title: string;
   url: string;
+  antiSeek?: boolean;
   content?: string;
   state: DpNodeState;
   source?: 'unit' | 'step';
@@ -355,6 +378,13 @@ export const dailyPracticeApi = {
   }),
   unitVideos: (unitId: string) => call<DpUnitVideos>(`/path/units/${encodeURIComponent(unitId)}/videos`),
   videoWatched: (unitId: string, videoId: string) => call<{ watched: boolean }>('/path/videos/watched', { unitId, videoId }),
+  completeSection: (
+    unitId: string,
+    payload: { nodeKey: string; difficulty: DpDifficulty; sectionKey: DpSectionKey; completed?: boolean },
+  ) => call<{ unitId: string; completedSections: string[] }>(
+    `/path/units/${encodeURIComponent(unitId)}/sections/complete`,
+    payload,
+  ),
   answerVideoCheck: (
     unitId: string,
     videoId: string,

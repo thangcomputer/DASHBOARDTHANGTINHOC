@@ -8409,14 +8409,14 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
   animation: ray-spin 25s linear infinite;
 }
 
-/* Đẩy tiêu đề YouTube (hiện khi tạm dừng) ra ngoài khung trình phát học viên. */
+/* Khung iframe YouTube ở kích thước gốc (không zoom). */
 .lms-yt-crop iframe {
   position: absolute !important;
   top: 50% !important;
   left: 50% !important;
-  width: 130% !important;
-  height: 130% !important;
-  transform: translate(-50%, -60.5%) !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform: translate(-50%, -50%) !important;
   border: 0 !important;
   pointer-events: none !important;
 }

@@ -106,17 +106,17 @@ function HeroDecorations() {
 /* Compact reusable input field */
 function CompactField({ label, icon: Icon, type = 'text', value, onChange, placeholder, inputMode, children }) {
   return (
-    <div className="space-y-0.5 sm:space-y-1">
-      <label className="block text-[10px] sm:text-[11px] font-bold tracking-wider text-slate-500 uppercase">{label}</label>
+    <div className="space-y-1">
+      <label className="block text-[10.5px] sm:text-[11px] font-bold tracking-wider text-slate-400 uppercase">{label}</label>
       <div className="group relative flex items-center">
-        <Icon size={14} className="pointer-events-none absolute left-3 text-slate-400 transition group-focus-within:text-emerald-500" />
+        <Icon size={15} className="pointer-events-none absolute left-3.5 text-slate-500 transition group-focus-within:text-emerald-400" />
         <input
           type={type}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
           inputMode={inputMode}
-          className="w-full rounded-xl border border-slate-200 bg-white py-2 sm:py-2.5 pl-8 sm:pl-9 pr-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-300 outline-none ring-0 transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          className="dewskill-input w-full rounded-xl border border-white/10 bg-[#0B1322]/90 py-2.5 pl-10 pr-10 text-xs sm:text-sm font-medium text-white placeholder:text-slate-500 outline-none ring-0 transition-all duration-150 focus:border-emerald-500 focus:bg-[#0E1729] focus:ring-4 focus:ring-emerald-500/15"
         />
         {children}
       </div>
@@ -242,20 +242,25 @@ export default function FreePortalPage({ onLogin }) {
 
   const login = async (forceDevice = false) => {
     const isForce = forceDevice === true;
-    const id = normalizePhone(phone);
-    if (!id || !isValidVNPhone(id)) { setError('Số điện thoại không hợp lệ'); return; }
+    const rawContact = String(phone || '').trim();
+    const normalized = normalizePhone(rawContact);
+    const trimmedEmail = rawContact.toLowerCase();
+    const isPhoneOk = Boolean(normalized && isValidVNPhone(normalized));
+    const isEmailOk = isValidEmail(trimmedEmail);
+    if (!isPhoneOk && !isEmailOk) { setError('Số điện thoại hoặc Gmail không hợp lệ'); return; }
     if (!password) { setError('Hãy nhập mật khẩu'); return; }
+    const loginId = isPhoneOk ? normalized : trimmedEmail;
     setLoading(true); setError('');
     try {
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/login/public`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ phone: id, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: isForce }),
+        body: JSON.stringify({ identifier: loginId, phone: loginId, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: isForce }),
       });
       const data = await response.json();
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') { setDeviceConflict(true); return; }
-      if (!data.success) { setError(data.message || 'Số điện thoại hoặc mật khẩu không đúng'); return; }
+      if (!data.success) { setError(data.message || 'Số điện thoại/Gmail hoặc mật khẩu không đúng'); return; }
       acceptSession(data.data);
     } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
   };
@@ -292,27 +297,56 @@ export default function FreePortalPage({ onLogin }) {
     if (event) event.preventDefault();
     if (pending) { await finishSocial(event); return; }
     if (mode === 'login') { await login(false); return; }
-    const id = normalizePhone(phone);
-    const trimmedEmail = email.trim().toLowerCase();
+
+    const rawContact = String(phone || '').trim();
+    const id = normalizePhone(rawContact);
+    const isPhoneOk = Boolean(id && isValidVNPhone(id));
+    const trimmedEmail = rawContact.toLowerCase();
+    const isEmailOk = isValidEmail(trimmedEmail);
+
     if (name.trim().length < 2) { setError('Hãy nhập họ và tên'); return; }
-    if (!trimmedEmail) { setError('Hãy nhập địa chỉ Gmail / Email'); return; }
-    if (!isValidEmail(trimmedEmail)) { setError('Địa chỉ Gmail / Email không đúng định dạng (VD: example@gmail.com)'); return; }
-    if (!id || !isValidVNPhone(id)) { setError('Số điện thoại không hợp lệ'); return; }
+    if (!isPhoneOk && !isEmailOk) {
+      setError('Hãy nhập số điện thoại hoặc Gmail hợp lệ (VD: 0912345678 hoặc vidu@gmail.com)');
+      return;
+    }
     if (password.length < 6) { setError('Mật khẩu cần ít nhất 6 ký tự'); return; }
+
     setLoading(true); setError(''); setDevOtpNotice(''); setOtpSuccessMsg('');
     try {
       const csrf = await ensureCsrfToken();
-      const response = await fetch(`${API_BASE}/auth/free-portal/send-otp`, {
+
+      if (isEmailOk) {
+        setEmail(trimmedEmail);
+        const response = await fetch(`${API_BASE}/auth/free-portal/send-otp`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+          body: JSON.stringify({ name: name.trim(), email: trimmedEmail, password }),
+        });
+        const data = await response.json();
+        if (!data.success) { setError(data.message || 'Chưa gửi được mã xác thực'); return; }
+        setOtpStep(true);
+        setCountdown(45);
+        if (data.devOtp) setDevOtpNotice(data.devOtp);
+        setOtpSuccessMsg(data.message || `Mã xác thực đã được gửi tới ${trimmedEmail}`);
+        return;
+      }
+
+      const regRes = await fetch(`${API_BASE}/auth/register-free`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ name: name.trim(), email: trimmedEmail, phone: id, password }),
+        body: JSON.stringify({ name: name.trim(), age: 18, phone: id, password }),
       });
-      const data = await response.json();
-      if (!data.success) { setError(data.message || 'Chưa gửi được mã xác thực'); setLoading(false); return; }
-      setOtpStep(true);
-      setCountdown(45);
-      if (data.devOtp) setDevOtpNotice(data.devOtp);
-      setOtpSuccessMsg(data.message || `Mã xác thực đã được gửi tới ${trimmedEmail}`);
+      const regData = await regRes.json();
+      if (!regData.success) { setError(regData.message || 'Không thể tạo tài khoản'); return; }
+
+      const loginRes = await fetch(`${API_BASE}/auth/login/public`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+        body: JSON.stringify({ identifier: id, phone: id, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: false }),
+      });
+      const loginData = await loginRes.json();
+      if (!loginData.success) { setError(loginData.message || 'Đăng ký thành công, vui lòng đăng nhập.'); return; }
+      acceptSession(loginData.data);
     } catch {
       setError('Không kết nối được máy chủ');
     } finally {
@@ -401,200 +435,139 @@ export default function FreePortalPage({ onLogin }) {
         .btn-shimmer:not(:disabled):hover {
           box-shadow: 0 10px 28px -4px rgba(16,185,129,0.5);
         }
+        .dewskill-input:-webkit-autofill,
+        .dewskill-input:-webkit-autofill:hover,
+        .dewskill-input:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 1000px #0b1322 inset !important;
+          -webkit-text-fill-color: #ffffff !important;
+          transition: background-color 5000s ease-in-out 0s;
+        }
+        .dewskill-tab:focus,
+        .dewskill-tab:focus-visible {
+          outline: none !important;
+        }
       `}</style>
 
-      {/* Main container: Exactly 100vh on desktop with NO scrollbar */}
-      <div className="relative h-screen max-h-screen w-full overflow-hidden font-sans text-slate-900 selection:bg-emerald-400/20">
+      {/* Main container: Unified deep navy + emerald aurora canvas, fit 100dvh */}
+      <div
+        className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden font-sans text-white selection:bg-emerald-400/20"
+        style={{
+          background:
+            'radial-gradient(circle at 18% 20%, rgba(16, 185, 129, 0.20) 0%, transparent 45%), radial-gradient(circle at 85% 82%, rgba(14, 165, 233, 0.16) 0%, transparent 45%), linear-gradient(155deg, #09111E 0%, #0F172A 55%, #0B192C 100%)',
+        }}
+      >
+        {/* Subtle unified tech dot grid */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          style={{
+            backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.26) 1px, transparent 1px)',
+            backgroundSize: '26px 26px',
+          }}
+          aria-hidden="true"
+        />
+        {/* Subtle orbital rings */}
+        <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full border border-emerald-400/10" aria-hidden="true" />
+        <div className="pointer-events-none absolute -right-32 -bottom-32 h-[28rem] w-[28rem] rounded-full border border-cyan-400/10" aria-hidden="true" />
 
-        {/* Two-panel split layout: 50% / 50% (or 52% / 48%) */}
-        <div className="flex min-h-screen flex-col lg:h-full lg:flex-row">
+        {/* Global top-left Back to Home button */}
+        <a
+          href={landingUrl}
+          className="absolute left-4 top-4 sm:left-6 sm:top-6 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-bold text-emerald-200 backdrop-blur-md transition hover:bg-white/15 hover:text-white active:scale-95 cursor-pointer outline-none"
+        >
+          <ArrowLeft size={13} />
+          <span>Trang chủ</span>
+        </a>
+
+        {/* Two-panel split layout: 50% / 50% */}
+        <div className="relative z-10 flex h-full flex-col lg:flex-row">
 
           {/* ═══════════════════════════════════════════════════
-              LEFT HERO PANEL (Emerald DewSkill theme)
+              LEFT HERO PANEL (Minimal, clean, desktop only)
           ═══════════════════════════════════════════════════ */}
           <div
-            className={`panel-slide relative flex flex-col justify-between overflow-hidden px-6 py-5 sm:px-8 lg:h-full lg:w-[52%] lg:px-12 lg:py-8 ${flyInReady ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
+            className={`panel-slide relative hidden lg:flex flex-col justify-between overflow-hidden lg:h-full lg:w-[50%] lg:px-12 xl:px-16 lg:py-8 ${flyInReady ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
               }`}
-            style={{
-              background:
-                'radial-gradient(circle at 12% 10%, rgba(167, 243, 208, 0.35) 0%, transparent 50%), linear-gradient(140deg, #059669 0%, #10b981 35%, #059669 70%, #047857 100%)',
-            }}
           >
-            <HeroDecorations />
+            {/* Spacer for top-left Back to Home button */}
+            <div className="h-8" />
 
-            {/* Pattern overlay */}
-            <div
-              className="pointer-events-none absolute inset-0 opacity-15"
-              style={{
-                backgroundImage: 'radial-gradient(circle at 20% 50%, #ffffff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #ffffff 1px, transparent 1px)',
-                backgroundSize: '40px 40px, 60px 60px',
-              }}
-              aria-hidden="true"
-            />
+            {/* 2. Clean Hero Content (Center) */}
+            <div className="relative z-10 my-auto max-w-lg py-4 free-portal-autoscale-left">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                DewSkill • Học thử miễn phí
+              </div>
 
-            {/* 1. Header inside Left Panel */}
-            <div className="relative z-10 flex items-center justify-between">
+              <h1 className="mb-4 text-[34px] xl:text-[40px] font-black leading-[1.24] tracking-tight text-white">
+                Luyện tin học mỗi ngày,{' '}
+                <span className="text-emerald-400">nâng trình vượt bậc.</span>
+              </h1>
+
+              <p className="mb-7 text-sm font-medium leading-relaxed text-slate-300">
+                Chỉ 5–10 phút mỗi ngày với bài tập tình huống Word, Excel, PowerPoint thực tế để tích lũy XP và làm chủ kỹ năng văn phòng.
+              </p>
+
+              <div className="space-y-3">
+                {[
+                  'Bài tập tình huống thực tế chuẩn văn phòng',
+                  'Tích lũy XP, giữ chuỗi Streak & thi thử chứng chỉ',
+                  'Miễn phí 100%, bắt đầu học ngay trong 60 giây',
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-3 text-sm font-medium text-slate-200">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-400/30">
+                      <CheckCircle2 size={14} />
+                    </span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Footer inside Left Panel */}
+            <div className="relative z-10 pt-2 text-[11px] text-slate-400/80">
+              © 2026 DewSkill • Phát triển bởi Thắng Tin Học
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════
+              RIGHT FORM PANEL (Sleek dark glass card)
+          ═══════════════════════════════════════════════════ */}
+          <div
+            className={`panel-slide relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-3 sm:px-6 sm:py-5 lg:h-full lg:w-[50%] lg:px-8 xl:px-12 ${flyInReady ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+              }`}
+          >
+            {/* Anchored DewSkill Logo directly above the Form Card (Desktop & Mobile) */}
+            <div className="relative z-10 mb-3 flex w-full max-w-[420px] items-center justify-center">
               <a
                 href={landingUrl}
-                className="dew-mirror-logo group"
+                className="inline-flex items-center rounded-2xl bg-white px-5 py-2 shadow-lg shadow-black/30 transition hover:scale-[1.02]"
                 title="Về trang chủ DewSkill"
               >
                 <img
                   src="/brand/logo.webp"
                   alt="DewSkill"
-                  className="relative z-10 h-7 sm:h-8 md:h-8.5 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-                  style={{
-                    filter: 'drop-shadow(0 1px 2px rgba(255, 255, 255, 0.9)) drop-shadow(0 2px 4px rgba(0, 40, 15, 0.25))',
-                  }}
+                  className="h-8 sm:h-9 w-auto object-contain"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = '/brand/favicon.png';
                   }}
                 />
               </a>
-
-              <a
-                href={landingUrl}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-md transition hover:bg-white/20 hover:text-white active:scale-95 cursor-pointer shadow-sm"
-              >
-                <ArrowLeft size={13} />
-                <span>Trang chủ</span>
-              </a>
             </div>
-
-            {/* 2. Hero Content (Center) */}
-            <div className="relative z-10 my-auto py-6 sm:py-8 lg:py-2 free-portal-autoscale-left">
-              {/* Live Status Pill */}
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-white/10 px-3.5 py-1 text-xs font-bold text-emerald-100 backdrop-blur-sm">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
-                </span>
-                Đang mở cổng đăng ký miễn phí
-              </div>
-
-              {/* Main Headline (Cố định đúng 2 dòng, hở dòng thoáng đãng) */}
-              <h1 className="mb-3.5 max-w-xl text-[24px] xs:text-[28px] sm:text-[32px] lg:text-[35px] xl:text-[38px] font-black leading-[1.32] sm:leading-[1.35] tracking-tight text-white">
-                <span className="block whitespace-nowrap">
-                  Luyện tin học <span className="text-emerald-300">mỗi ngày,</span>
-                </span>
-                <span className="block whitespace-nowrap">
-                  <span className="text-amber-300">nâng trình</span> vượt bậc
-                </span>
-              </h1>
-
-              {/* Description */}
-              <p className="mb-5 max-w-lg text-xs sm:text-sm font-medium leading-relaxed text-emerald-50/85">
-                Chỉ 5–10 phút mỗi ngày với bài tập tình huống văn phòng thực tế, tích lũy XP, giữ chuỗi Streak và nhận chứng chỉ kỹ năng số.
-              </p>
-
-              {/* 3 Stats Row */}
-              <div className="mb-5 flex flex-wrap gap-2.5 sm:gap-3">
-                {[
-                  { icon: Star, value: '10,000+', label: 'Học viên', color: 'text-yellow-300' },
-                  { icon: Zap, value: '60 XP', label: 'Chào mừng', color: 'text-amber-300' },
-                  { icon: BookOpen, value: '3 khóa', label: 'Miễn phí', color: 'text-emerald-200' },
-                ].map((s) => (
-                  <div
-                    key={s.label}
-                    className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 backdrop-blur-sm shadow-xs"
-                  >
-                    <s.icon size={16} className={s.color} />
-                    <div>
-                      <p className="text-xs font-black text-white leading-tight">{s.value}</p>
-                      <p className="text-[10px] font-semibold text-emerald-200/75 leading-none">{s.label}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Mascot Dewy Box */}
-              <div className="flex items-center gap-3.5 rounded-2xl border border-white/20 bg-white/12 p-3 sm:p-3.5 backdrop-blur-md max-w-md shadow-md">
-                {/* Linh vật GIF trong suốt (không nền) kèm bóng đổ đen sàn chân thực bên dưới */}
-                <div className="relative flex flex-col items-center justify-center shrink-0">
-                  <img
-                    src="/mascot/tot-nghiep-vui-ve.gif"
-                    alt="Dewy Mascot"
-                    className="relative z-10 h-12 w-12 sm:h-13 sm:w-13 shrink-0 object-contain transition-transform duration-300 hover:scale-105"
-                    style={{
-                      filter:
-                        'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.75)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.85))',
-                    }}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = '/brand/favicon.png';
-                    }}
-                  />
-                  {/* Bóng đổ đen sàn bên dưới linh vật */}
-                  <span
-                    className="pointer-events-none absolute -bottom-1 h-2 w-9 rounded-full blur-[2px] opacity-85"
-                    style={{
-                      background:
-                        'radial-gradient(ellipse at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 75%)',
-                    }}
-                    aria-hidden="true"
-                  />
-                </div>
-                <div>
-                  <p className="flex items-center gap-1.5 text-xs font-black text-white">
-                    <Sparkles size={13} className="text-amber-300" />
-                    Trợ lý Dewy đồng hành
-                  </p>
-                  <p className="mt-0.5 text-[11px] font-medium leading-snug text-emerald-100/90">
-                    Đăng ký ngay nhận liền <span className="font-black text-yellow-300">+60 XP</span> bonus để mở khóa các chặng bài tập đầu tiên!
-                  </p>
-                </div>
-              </div>
-
-              {/* Assurances */}
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-semibold text-emerald-200/80">
-                {['Miễn phí trọn đời', 'Không cần thẻ tín dụng'].map((item) => (
-                  <span key={item} className="flex items-center gap-1">
-                    <CheckCircle2 size={12} className="text-emerald-300" />
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* 3. Footer inside Left Panel */}
-            <div className="relative z-10 pt-2 text-[11px] text-emerald-200/50">
-              © 2026 DewSkill • Phát triển bởi Thắng Tin Học
-            </div>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════
-              RIGHT FORM PANEL (Clean, compact, no scrollbar)
-          ═══════════════════════════════════════════════════ */}
-          <div
-            className={`panel-slide relative flex flex-1 flex-col items-center justify-center bg-slate-50/80 px-4 py-4 sm:px-6 lg:h-full lg:w-[48%] lg:px-6 xl:px-10 overflow-y-auto lg:overflow-hidden ${flyInReady ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
-              }`}
-          >
-            {/* Subtle background glow */}
-            <div
-              className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full opacity-60"
-              style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)' }}
-              aria-hidden="true"
-            />
-            <div
-              className="pointer-events-none absolute left-0 bottom-0 h-64 w-64 rounded-full opacity-40"
-              style={{ background: 'radial-gradient(circle, rgba(52,211,153,0.08) 0%, transparent 70%)' }}
-              aria-hidden="true"
-            />
 
             {/* Form Card Container */}
             <div
               ref={formRef}
-              className={`free-portal-autoscale-right relative z-10 w-full max-w-sm rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-5 lg:p-5 xl:p-6 shadow-xl shadow-slate-200/50 transition-all duration-700 ease-out delay-100 ${flyInReady ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-4 scale-95 opacity-0'
+              className={`free-portal-autoscale-right relative z-10 w-full max-w-[420px] rounded-3xl border border-white/10 bg-[#131E33]/90 backdrop-blur-xl p-4 sm:p-6 shadow-[0_25px_65px_-15px_rgba(0,0,0,0.55)] transition-all duration-700 ease-out delay-100 ${flyInReady ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-4 scale-95 opacity-0'
                 }`}
             >
               {/* Header */}
-              <div className="mb-2.5 sm:mb-3 text-center">
-                <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200/70">
-                  <Sparkles size={11} className="text-emerald-600" />
+              <div className="mb-3 text-center">
+                <div className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-300 ring-1 ring-emerald-400/25">
+                  <Sparkles size={11} className="text-emerald-400" />
                   {otpStep ? 'Bảo mật tài khoản' : pending ? 'Bước cuối cùng' : 'Tài khoản học thử miễn phí'}
                 </div>
-                <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900">
+                <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
                   {otpStep
                     ? 'Nhập mã xác thực'
                     : pending
@@ -603,7 +576,7 @@ export default function FreePortalPage({ onLogin }) {
                         ? 'Tạo tài khoản ngay'
                         : 'Đăng nhập học tập'}
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-slate-400">
                   {otpStep
                     ? 'Mã bảo mật 6 chữ số đã được gửi về Gmail của bạn'
                     : pending
@@ -616,12 +589,12 @@ export default function FreePortalPage({ onLogin }) {
 
               {/* Social Login Buttons (Google / Facebook) - Ẩn khi đang xác thực OTP */}
               {!pending && !otpStep && (
-                <div className="mb-2.5 space-y-2">
+                <div className="mb-3 space-y-2.5">
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => startSocial('google')}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-1.5 px-3 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-2 px-3 text-xs font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/10 active:scale-[0.98] cursor-pointer outline-none"
                     >
                       <GoogleIcon />
                       <span>Google</span>
@@ -629,24 +602,24 @@ export default function FreePortalPage({ onLogin }) {
                     <button
                       type="button"
                       onClick={() => startSocial('facebook')}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-1.5 px-3 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-2 px-3 text-xs font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/10 active:scale-[0.98] cursor-pointer outline-none"
                     >
                       <FacebookIcon />
                       <span>Facebook</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 text-[10.5px] text-slate-400">
-                    <div className="h-px flex-1 bg-slate-200" />
-                    <span className="font-semibold">hoặc dùng số điện thoại</span>
-                    <div className="h-px flex-1 bg-slate-200" />
+                  <div className="flex items-center gap-2 text-[10.5px] text-slate-500">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span className="font-semibold">hoặc dùng số điện thoại / Gmail</span>
+                    <div className="h-px flex-1 bg-white/10" />
                   </div>
                 </div>
               )}
 
               {/* Mode switch tabs: Đăng ký / Đăng nhập - Ẩn khi đang xác thực OTP */}
               {!pending && !otpStep && (
-                <div className="mb-2.5 sm:mb-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-xl bg-[#0B1322] p-1 border border-white/10">
                   {[
                     { id: 'register', label: 'Đăng ký mới' },
                     { id: 'login', label: 'Đăng nhập' },
@@ -655,9 +628,9 @@ export default function FreePortalPage({ onLogin }) {
                       key={tab.id}
                       type="button"
                       onClick={() => { setMode(tab.id); setError(''); }}
-                      className={`rounded-lg py-1 text-xs font-bold transition-all cursor-pointer ${mode === tab.id
-                          ? 'bg-white text-emerald-700 shadow-xs'
-                          : 'text-slate-500 hover:text-slate-700'
+                      className={`dewskill-tab rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${mode === tab.id
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
                         }`}
                     >
                       {tab.label}
@@ -672,14 +645,14 @@ export default function FreePortalPage({ onLogin }) {
               {otpStep ? (
                 <form onSubmit={handleVerifyOtp} className="space-y-3">
                   {/* Hộp thông báo email nhận mã */}
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-center">
-                    <div className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 shadow-xs">
+                  <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-center">
+                    <div className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
                       <Mail size={18} />
                     </div>
-                    <p className="text-[11px] font-semibold text-slate-600">
+                    <p className="text-[11px] font-semibold text-slate-300">
                       Mã xác thực 6 chữ số đã được gửi tới:
                     </p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-black text-emerald-800 break-all">
+                    <p className="mt-0.5 text-xs sm:text-sm font-black text-emerald-300 break-all">
                       {email}
                     </p>
                   </div>
@@ -688,21 +661,21 @@ export default function FreePortalPage({ onLogin }) {
                   {devOtpNotice && (
                     <div
                       onClick={() => setOtpCode(devOtpNotice)}
-                      className="group flex items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 cursor-pointer transition hover:bg-amber-100"
+                      className="group flex items-center justify-between gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200 cursor-pointer transition hover:bg-amber-500/15"
                       title="Nhấn để tự động điền mã thử nghiệm"
                     >
-                      <span>Mã thử nghiệm (Dev): <strong className="font-mono text-sm tracking-widest text-amber-700">{devOtpNotice}</strong></span>
-                      <span className="text-[10px] font-bold text-amber-600 underline group-hover:text-amber-800">Điền nhanh</span>
+                      <span>Mã thử nghiệm (Dev): <strong className="font-mono text-sm tracking-widest text-amber-300">{devOtpNotice}</strong></span>
+                      <span className="text-[10px] font-bold text-amber-300 underline group-hover:text-amber-200">Điền nhanh</span>
                     </div>
                   )}
 
                   {/* Ô nhập mã OTP 6 số */}
                   <div className="space-y-1">
-                    <label className="block text-center text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <label className="block text-center text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
                       Nhập mã 6 chữ số
                     </label>
                     <div className="relative flex items-center">
-                      <KeyRound size={16} className="pointer-events-none absolute left-3.5 text-slate-400" />
+                      <KeyRound size={16} className="pointer-events-none absolute left-3.5 text-slate-500" />
                       <input
                         type="text"
                         inputMode="numeric"
@@ -712,23 +685,23 @@ export default function FreePortalPage({ onLogin }) {
                         value={otpCode}
                         onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="••••••"
-                        className="w-full rounded-2xl border-2 border-emerald-300 bg-emerald-50/30 py-2 pl-9 pr-3 text-center font-mono text-2xl font-black tracking-[0.4em] text-emerald-950 outline-none ring-0 transition placeholder:text-slate-300 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-500/15"
+                        className="w-full rounded-2xl border-2 border-emerald-500/40 bg-[#0B1322] py-2 pl-9 pr-3 text-center font-mono text-2xl font-black tracking-[0.4em] text-white outline-none ring-0 transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
                       />
                     </div>
                   </div>
 
                   {/* Thông báo thành công khi gửi lại mã */}
                   {otpSuccessMsg && !error && (
-                    <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
-                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    <div className="flex items-center gap-1.5 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                      <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
                       <span>{otpSuccessMsg}</span>
                     </div>
                   )}
 
                   {/* Thông báo lỗi */}
                   {error && (
-                    <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
-                      <span className="shrink-0 text-rose-500 font-bold">⚠</span>
+                    <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
+                      <span className="shrink-0 text-rose-400 font-bold">⚠</span>
                       <span>{error}</span>
                     </div>
                   )}
@@ -786,9 +759,9 @@ export default function FreePortalPage({ onLogin }) {
                     />
                   )}
 
-                  {(isRegister || pending) && (
+                  {pending && (
                     <CompactField
-                      label="Gmail / Email (Nhận mã xác thực)"
+                      label="Gmail / Email"
                       icon={Mail}
                       type="email"
                       value={email}
@@ -798,12 +771,12 @@ export default function FreePortalPage({ onLogin }) {
                   )}
 
                   <CompactField
-                    label="Số điện thoại"
+                    label={pending ? 'Số điện thoại' : 'Số điện thoại hoặc Gmail'}
                     icon={Phone}
-                    inputMode="numeric"
+                    inputMode={pending ? 'numeric' : 'email'}
                     value={phone}
-                    onChange={(e) => setPhone(limitPhoneInput(e.target.value))}
-                    placeholder="0912 345 678"
+                    onChange={(e) => setPhone(pending ? limitPhoneInput(e.target.value) : e.target.value)}
+                    placeholder={pending ? '0912 345 678' : '0912345678 hoặc vidu@gmail.com'}
                   />
 
                   {!pending && (
@@ -818,7 +791,7 @@ export default function FreePortalPage({ onLogin }) {
                       <button
                         type="button"
                         onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-3 text-slate-400 transition hover:text-slate-600 cursor-pointer"
+                        className="absolute right-3 text-slate-400 transition hover:text-white cursor-pointer"
                         aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -828,8 +801,8 @@ export default function FreePortalPage({ onLogin }) {
 
                   {/* Error message */}
                   {error && (
-                    <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
-                      <span className="shrink-0 text-rose-500 font-bold">⚠</span>
+                    <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
+                      <span className="shrink-0 text-rose-400 font-bold">⚠</span>
                       <span>{error}</span>
                     </div>
                   )}
@@ -839,7 +812,7 @@ export default function FreePortalPage({ onLogin }) {
                     <button
                       type="button"
                       onClick={() => login(true)}
-                      className="w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 cursor-pointer"
+                      className="w-full rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 cursor-pointer"
                     >
                       Tài khoản mở ở máy khác — đăng nhập tại đây
                     </button>
@@ -885,14 +858,17 @@ export default function FreePortalPage({ onLogin }) {
             </div>
 
             {/* Lối tắt dành cho học viên đăng ký theo khóa chính thức */}
-            <div className="relative z-10 mt-2.5 text-center text-xs text-slate-500">
+            <div className="relative z-10 mt-2.5 text-center text-xs text-slate-300">
               <span>Học viên học theo khóa? </span>
               <a
                 href="/login"
-                className="font-extrabold text-emerald-700 hover:text-emerald-800 hover:underline transition inline-flex items-center gap-1"
+                className="font-extrabold text-emerald-400 hover:text-emerald-300 hover:underline transition inline-flex items-center gap-1"
               >
                 Đăng nhập LMS tại đây →
               </a>
+            </div>
+            <div className="relative z-10 mt-1 text-center text-[11px] text-slate-400/80 lg:hidden">
+              © 2026 DewSkill • Phát triển bởi Thắng Tin Học
             </div>
           </div>
         </div>

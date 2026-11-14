@@ -12,9 +12,9 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
   const isBrandStudent = !isFreePortal;
   const [formData, setFormData] = useState({
     name: student.name || '',
-    phone: student.phone || '',
-    zalo: student.zalo || '',
-    email: student.email || '',
+    phone: student.phone && !String(student.phone).includes('@') ? student.phone : '',
+    zalo: student.zalo && !String(student.zalo).includes('@') ? student.zalo : '',
+    email: student.email && String(student.email).includes('@') ? student.email : '',
     address: student.address || '',
     gender: student.gender || 'male',
   });
@@ -62,11 +62,13 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
             <X size={16} />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="p-6 space-y-4">
           <div>
             <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Họ và Tên</label>
             <input
               type="text"
+              name="profile_full_name"
+              autoComplete="off"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none transition ${
@@ -109,9 +111,12 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Số điện thoại</label>
               <div className="relative">
                 <input
-                  type="text"
+                  type="tel"
+                  name="profile_phone_readonly"
+                  autoComplete="off"
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="Chưa có"
                   className={`w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
                     isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
                   }`}
@@ -125,9 +130,12 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">SĐT Liên hệ 2</label>
               <div className="relative">
                 <input
-                  type="text"
+                  type="tel"
+                  name="profile_zalo_contact"
+                  autoComplete="off"
                   value={formData.zalo}
                   onChange={e => setFormData({ ...formData, zalo: e.target.value })}
+                  placeholder="Số điện thoại"
                   className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
                     isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
                   }`}
@@ -141,6 +149,8 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
             <div className="relative">
               <input
                 type="email"
+                name="profile_email_contact"
+                autoComplete="off"
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${

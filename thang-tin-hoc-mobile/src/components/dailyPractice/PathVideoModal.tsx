@@ -1,6 +1,6 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
@@ -34,7 +34,7 @@ type VideoCheck = {
 
 type PlaylistItem =
   | (DpPathVideo & { source: 'unit' | 'step'; locked: boolean })
-  | { id: string; title: string; url: string; source: 'lesson'; locked: boolean; state: DpNodeState };
+  | { id: string; title: string; url: string; antiSeek?: boolean; source: 'lesson'; locked: boolean; state: DpNodeState };
 
 function checkId(check: VideoCheck) {
   return String(check._id || check.id || '');
@@ -48,6 +48,7 @@ export function PathVideoModal({
   initialVideoId = '',
   color,
   userId,
+  singleVideoOnly = false,
   play,
   onClose,
   onWatched,
@@ -57,6 +58,7 @@ export function PathVideoModal({
   initialVideoId?: string;
   color: { from: string; to: string };
   userId: string;
+  singleVideoOnly?: boolean;
   play: (s: GameSound) => void;
   onClose: () => void;
   onWatched: (videoId: string) => Promise<void>;
@@ -78,12 +80,17 @@ export function PathVideoModal({
   const [missed, setMissed] = useState(false);
   const [cheer, setCheer] = useState(false);
   const [grading, setGrading] = useState(false);
+  const [markingWatched, setMarkingWatched] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 480;
+  const isLandscape = width > height;
 
   const playerApiRef = useRef<VideoPlayerApi | null>(null);
   const gateRef = useRef<VideoCheck | null>(null);
   const passedRef = useRef(passedKeys);
   const currentRef = useRef<PlaylistItem | null>(null);
   const eligibleRef = useRef(false);
+  const syncedSectionRef = useRef<Set<string>>(new Set());
 
   useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
 
@@ -102,21 +109,30 @@ export function PathVideoModal({
     return () => { alive = false; };
   }, [unit.id]);
 
-  const playlist = useMemo<PlaylistItem[]>(() => [
-    ...(data?.videos || []).map((video) => ({
-      ...video,
-      source: (video.source === 'step' ? 'step' : 'unit') as 'unit' | 'step',
-      locked: video.state === 'locked',
-    })),
-    ...(data?.lesson?.videos || []).map((video) => ({
-      id: video.id,
-      title: video.title,
-      url: video.url,
-      state: 'active' as const,
-      source: 'lesson' as const,
-      locked: false,
-    })),
-  ], [data]);
+  const isSingleMode = Boolean(singleVideoOnly || /:level:(easy|medium|hard)$/.test(String(initialVideoId || '')));
+
+  const playlist = useMemo<PlaylistItem[]>(() => {
+    const all: PlaylistItem[] = [
+      ...(data?.videos || []).map((video) => ({
+        ...video,
+        source: (video.source === 'step' ? 'step' : 'unit') as 'unit' | 'step',
+        locked: video.state === 'locked',
+      })),
+      ...(data?.lesson?.videos || []).map((video) => ({
+        id: video.id,
+        title: video.title,
+        url: video.url,
+        state: 'active' as const,
+        source: 'lesson' as const,
+        locked: false,
+      })),
+    ];
+    if (isSingleMode && initialVideoId) {
+      const matched = all.find((item) => item.id === initialVideoId);
+      if (matched) return [matched];
+    }
+    return all;
+  }, [data, isSingleMode, initialVideoId]);
 
   const current = playlist.find((video) => video.id === currentId && !video.locked)
     || playlist.find((video) => !video.locked)
@@ -178,10 +194,19 @@ export function PathVideoModal({
     setGate(null);
   }, [current?.id]);
 
+  useEffect(() => {
+    if (!current || !watchedIds.has(current.id)) return;
+    if (!/:level:(easy|medium|hard)$/.test(current.id)) return;
+    if (syncedSectionRef.current.has(current.id)) return;
+    if (pendingOf(current).length > 0) return;
+    syncedSectionRef.current.add(current.id);
+    void Promise.resolve(onWatched(current.id)).catch(() => {});
+  }, [current, watchedIds, onWatched]);
+
   const markWatched = async () => {
     eligibleRef.current = true;
     const cur = currentRef.current;
-    if (!cur || (cur.source !== 'unit' && cur.source !== 'step') || watchedIds.has(cur.id)) return true;
+    if (!cur || (cur.source !== 'unit' && cur.source !== 'step')) return true;
     if (pendingOf(cur).length) {
       const pending = pendingOf(cur).slice().sort((a, b) => (Number(a.atSec) || 0) - (Number(b.atSec) || 0));
       if (pending[0]) {
@@ -190,11 +215,28 @@ export function PathVideoModal({
       }
     }
     const videoId = cur.id;
-    setWatchedIds((prev) => new Set(prev).add(videoId));
-    play('correct');
+    if (watchedIds.has(videoId)) {
+      if (/:level:(easy|medium|hard)$/.test(videoId) && !syncedSectionRef.current.has(videoId)) {
+        syncedSectionRef.current.add(videoId);
+        try {
+          await onWatched(videoId);
+        } catch { /* ignore */ }
+      }
+      return true;
+    }
+    syncedSectionRef.current.add(videoId);
+    setMarkingWatched(true);
     try {
       await onWatched(videoId);
-    } catch { /* ignore */ }
+      setWatchedIds((prev) => new Set(prev).add(videoId));
+      play('correct');
+    } catch (err: unknown) {
+      syncedSectionRef.current.delete(videoId);
+      setCheckError(err instanceof Error ? err.message : 'Chưa lưu được tiến độ xem video');
+      return false;
+    } finally {
+      setMarkingWatched(false);
+    }
     const next = playlist.find((video) => (
       video.id !== videoId
       && !video.locked
@@ -315,28 +357,46 @@ export function PathVideoModal({
 
   const unitChipLabel = `Chặng ${unit.index} · ${unit.title}`;
 
+  const watchStatusControl = current && (current.source === 'unit' || current.source === 'step') ? (
+    isSingleMode && currentWatched ? (
+      <View style={styles.watchedPill}>
+        <CheckCircle2 size={13} color="#6EE7B7" />
+        <Text style={styles.watchedText}>Đã xem</Text>
+      </View>
+    ) : !currentWatched && pendingOf(current).length === 0 ? (
+      <Pressable
+        onPress={() => { void markWatched(); }}
+        disabled={markingWatched}
+        style={[styles.markWatchedBtn, markingWatched && { opacity: 0.6 }]}
+      >
+        <CheckCircle2 size={13} color="#FFFFFF" />
+        <Text style={styles.markWatchedText}>{markingWatched ? 'Đang lưu…' : 'Đánh dấu đã xem'}</Text>
+      </Pressable>
+    ) : null
+  ) : null;
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['portrait', 'landscape']}>
       <View style={styles.backdrop}>
         <BlurView intensity={Platform.OS === 'android' ? 56 : 48} tint="light" pointerEvents="none" style={StyleSheet.absoluteFill} />
         <View pointerEvents="none" style={styles.backdropTint} />
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <View style={[styles.unitChipWrap, { backgroundColor: color.from }]}>
+        <View style={[styles.card, { maxHeight: Math.round(height * 0.94) }]}>
+          <View style={[styles.header, isCompact && styles.headerCompact]}>
+            <View style={[styles.unitChipWrap, isCompact && styles.unitChipWrapCompact, { backgroundColor: color.from }]}>
               <View style={[styles.unitChipGradient, { backgroundColor: color.to, opacity: 0.55 }]} />
-              <Text numberOfLines={1} style={styles.unitChip}>
+              <Text numberOfLines={1} style={[styles.unitChip, isCompact && styles.unitChipCompact]}>
                 {unitChipLabel}
               </Text>
             </View>
             <View style={styles.headerTitleWrap}>
-              <Clapperboard size={16} color="#F87171" />
-              <Text numberOfLines={2} style={styles.headerVideoTitle}>{current?.title || 'Video của chặng'}</Text>
+              <Clapperboard size={isCompact ? 14 : 16} color="#F87171" />
+              <Text numberOfLines={isCompact ? 1 : 2} style={[styles.headerVideoTitle, isCompact && styles.headerVideoTitleCompact]}>{current?.title || 'Video của chặng'}</Text>
             </View>
             <DuoButton variant="danger" size="sm" text="Đóng" onPress={onClose} accessibilityLabel="Đóng video" />
           </View>
 
           <ScrollView style={styles.scroll} bounces={false} contentContainerStyle={styles.scrollContent}>
-            <View style={styles.frame}>
+            <View style={[styles.frame, { maxHeight: isLandscape ? Math.round(height * 0.56) : Math.round(height * 0.62) }]}>
               {!data && !error ? (
                 <View style={styles.startOverlay}>
                   <ActivityIndicator color="#FFFFFF" />
@@ -356,11 +416,12 @@ export function PathVideoModal({
                   embeddedUrl={embedded}
                   title={current.title}
                   lessonId={`dp-${userId || 'anon'}-${unit.id}-${current.id}`}
-                  antiSeekEnabled={!currentWatched && (current.source === 'unit' || current.source === 'step')}
+                  antiSeekEnabled={!currentWatched && current.antiSeek !== false && (current.source === 'unit' || current.source === 'step')}
                   done={currentWatched}
                   brandedChrome
                   appearance="window"
                   chromeBg={PATH_VIDEO_MODAL_LAYOUT.videoAreaBg}
+                  chromeRightSlot={watchStatusControl}
                   playerApiRef={playerApiRef}
                   onProgress={(progress) => {
                     noteStudyMediaProgress(progress.playing);
@@ -456,7 +517,7 @@ export function PathVideoModal({
               ) : null}
             </View>
 
-            {playlist.length > 0 ? (
+            {!isSingleMode && playlist.length > 0 ? (
               <View style={styles.listBlock}>
                 <Text style={styles.listTitle}>{`DANH SÁCH VIDEO (${playlist.length})`}</Text>
                 {playlist.map((video, index) => {
@@ -496,23 +557,20 @@ export function PathVideoModal({
             ) : null}
           </ScrollView>
 
-          <View style={styles.footer}>
-            {current && (current.source === 'unit' || current.source === 'step') && currentWatched ? (
-              <View style={styles.watchedPill}>
-                <CheckCircle2 size={14} color="#6EE7B7" />
-                <Text style={styles.watchedText}>Đã xem video này</Text>
-              </View>
-            ) : <View style={styles.flex} />}
-            {lesson ? (
-              <Pressable
-                onPress={() => { onClose(); onOpenLesson({ subjectId: lesson.subjectId, unitId: lesson.unitId }); }}
-                style={styles.lessonButton}
-              >
-                <ExternalLink size={15} color="#FFFFFF" />
-                <Text style={styles.lessonButtonText}>Mở trang bài giảng</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          {lesson || (!playable && watchStatusControl) ? (
+            <View style={styles.footer}>
+              {!playable ? (watchStatusControl || <View style={styles.flex} />) : <View style={styles.flex} />}
+              {lesson ? (
+                <Pressable
+                  onPress={() => { onClose(); onOpenLesson({ subjectId: lesson.subjectId, unitId: lesson.unitId }); }}
+                  style={styles.lessonButton}
+                >
+                  <ExternalLink size={15} color="#FFFFFF" />
+                  <Text style={styles.lessonButtonText}>Mở trang bài giảng</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -524,6 +582,9 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'center', padding: spacing.sm },
   backdropTint: { ...StyleSheet.absoluteFill, backgroundColor: PATH_VIDEO_MODAL_LAYOUT.backdrop },
   card: {
+    width: '100%',
+    maxWidth: 896,
+    alignSelf: 'center',
     maxHeight: '94%',
     borderRadius: 22,
     overflow: 'hidden',
@@ -546,6 +607,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: PATH_VIDEO_MODAL_LAYOUT.headerBorder,
   },
+  headerCompact: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    gap: 6,
+  },
   unitChipWrap: {
     maxWidth: '42%',
     borderRadius: 8,
@@ -553,6 +619,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     position: 'relative',
+  },
+  unitChipWrapCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   unitChipGradient: {
     ...StyleSheet.absoluteFillObject,
@@ -564,11 +634,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
+  unitChipCompact: {
+    fontSize: 10,
+    letterSpacing: 0.4,
+  },
   headerTitleWrap: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 6,
   },
   headerVideoTitle: {
@@ -577,6 +651,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     lineHeight: 20,
+  },
+  headerVideoTitleCompact: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   scroll: { maxHeight: '100%' },
   scrollContent: { paddingBottom: 4 },
@@ -650,6 +728,7 @@ const styles = StyleSheet.create({
   itemMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: spacing.md,
@@ -658,6 +737,16 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.06)',
     backgroundColor: '#16181E',
   },
+  markWatchedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#059669',
+  },
+  markWatchedText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   watchedPill: {
     flexDirection: 'row',
     alignItems: 'center',
