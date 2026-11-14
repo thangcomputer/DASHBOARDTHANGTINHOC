@@ -281,7 +281,20 @@ async function issueSession(student, fingerprint) {
 
 async function findByProvider(profile) {
   const field = PROVIDERS[profile.provider];
-  return Student.findOne({ [field]: profile.providerId });
+  const byProvider = await Student.findOne({ [field]: profile.providerId });
+  if (byProvider) return byProvider;
+
+  const email = String(profile.email || '').trim().toLowerCase();
+  if (!email) return null;
+
+  const byEmail = await Student.findOne({ email, freePortal: true });
+  if (!byEmail) return null;
+  if (byEmail[field] && byEmail[field] !== profile.providerId) return null;
+
+  byEmail[field] = profile.providerId;
+  if (profile.avatar && !byEmail.avatar) byEmail.avatar = profile.avatar;
+  await byEmail.save({ validateModifiedOnly: true });
+  return byEmail;
 }
 
 function ticketFor(profile) {
