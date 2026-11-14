@@ -106,23 +106,6 @@ export default function TeacherScheduleTab({
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full min-w-0 bg-[#F5F8FC] py-3 sm:py-6 animate-in fade-in duration-500">
-      {/* Top Banner Toolbar & Quick Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex w-11 h-11 sm:w-12 sm:h-12 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
-            <CalendarDays size={22} strokeWidth={2.3} />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-              Quản lý Lịch dạy &amp; Điểm danh
-            </h2>
-            <p className="text-xs text-slate-500 font-medium">
-              Xếp lịch theo tuần và xem nhật ký giảng dạy
-            </p>
-          </div>
-        </div>
-      </div>
-
       {scheduleView === 'month' && SHOW_TEACHER_MONTHLY_CALENDAR && (
         <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
