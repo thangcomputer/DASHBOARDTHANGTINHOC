@@ -125,9 +125,9 @@ const MENU_CONFIG = {
       { key: 'student-training', section: 'HỌC VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'cert-prep', section: 'HỌC VIÊN', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
 
-      { key: 'daily-practice', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Gamepad2, label: 'Luyện tập & Tài nguyên', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-      { key: 'subscription-codes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Ticket, label: 'Mã kích hoạt & Gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
-      { key: 'meet-classes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'daily-practice', section: 'DEWSKILL', icon: Gamepad2, label: 'Luyện tập & Tài nguyên', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'subscription-codes', section: 'DEWSKILL', icon: Ticket, label: 'Mã kích hoạt & Gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'meet-classes', section: 'DEWSKILL', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
 
       { key: 'teachers', section: 'GIẢNG VIÊN', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
       { key: 'training-videos', section: 'GIẢNG VIÊN', icon: Video, label: 'Video đào tạo', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
@@ -810,7 +810,7 @@ const AppSidebar = ({
             >
               {(() => {
                 if (role === 'teacher') return 'GIẢNG VIÊN';
-                if (role === 'student') return 'HỌC VIÊN';
+                if (role === 'student') return session?.freePortal === true ? 'DEWSKILL' : 'THANGTINHOC';
                 if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
                 if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
                 if (session?.adminRole === 'SUPPORT') return 'CHUYÊN VIÊN HỖ TRỢ';

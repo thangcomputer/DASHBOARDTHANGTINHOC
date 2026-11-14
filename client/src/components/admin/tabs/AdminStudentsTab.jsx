@@ -982,7 +982,10 @@ export default function AdminStudentsTab() {
 
                   <div className="mt-2 space-y-1.5">
                     <p className={`text-sm font-semibold leading-snug break-words ${locked ? 'text-slate-500 line-through' : 'text-sky-700'}`}>
-                      {primaryEnr?.courseName || primaryEnr?.name || s.course}
+                      {(() => {
+                        const rawCourse = primaryEnr?.courseName || primaryEnr?.name || s.course;
+                        return isFreePortalCourseName(rawCourse) ? 'Dewskill' : rawCourse;
+                      })()}
                     </p>
                     {enrollments.length > 1 && (
                       <p className="text-xs font-semibold text-sky-600">
@@ -1168,7 +1171,10 @@ export default function AdminStudentsTab() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-sm font-medium leading-tight block truncate max-w-[180px] ${locked ? 'text-slate-500 line-through' : 'text-slate-700'}`}>
-                      {primaryEnr?.courseName || primaryEnr?.name || s.course}
+                      {(() => {
+                        const rawCourse = primaryEnr?.courseName || primaryEnr?.name || s.course;
+                        return isFreePortalCourseName(rawCourse) ? 'Dewskill' : rawCourse;
+                      })()}
                     </span>
                     {enrollments.length > 1 && (
                       <span className="text-xs font-semibold text-sky-600 mt-0.5 block">

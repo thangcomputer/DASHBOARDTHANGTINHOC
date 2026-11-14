@@ -253,7 +253,7 @@ function XpConfigCard() {
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                Tài khoản miễn phí (Cổng học thử)
+                Dewskill (Cổng học thử)
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="number"
@@ -265,11 +265,11 @@ function XpConfigCard() {
                   />
                   <span className="text-xs font-semibold text-slate-500 shrink-0">XP</span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1 font-normal">Học viên tự do đăng ký qua web, chưa đăng ký khóa học hay gói Meet.</p>
+                <p className="text-[10px] text-slate-400 mt-1 font-normal">Học viên Dewskill đăng ký qua web, chưa đăng ký khóa học hay gói Meet.</p>
               </label>
 
               <label className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                Tài khoản theo khóa học (Học viên chính thức)
+                THANGTINHOC (Học viên theo khóa)
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="number"

@@ -326,7 +326,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       </button>
                     ))}
                     <span className="hidden md:inline-flex items-center rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-800">
-                      Dành riêng cho Học viên theo khóa
+                      Dành riêng cho THANGTINHOC
                     </span>
                   </div>
                   <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
