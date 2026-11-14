@@ -95,33 +95,33 @@ export default function DailyPracticeHero({
           </div>
         </div>
 
-        <dl className="dp-dew-stat-grid grid grid-cols-3 gap-1.5 sm:gap-2.5 lg:max-w-md lg:shrink-0">
-          <div className="dp-dew-stat-capsule flex min-w-0 flex-col gap-0.5 px-2 py-2 sm:gap-1 sm:px-3 sm:py-2.5">
-            <dt className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+        <dl className="dp-dew-stat-grid grid w-full grid-cols-3 gap-2 sm:gap-2.5 lg:w-auto lg:max-w-md lg:shrink-0">
+          <div className="dp-dew-stat-capsule flex min-w-0 flex-col items-center justify-center gap-0.5 px-2 py-2 text-center sm:gap-1 sm:px-3 sm:py-2.5">
+            <dt className="flex items-center justify-center gap-1 text-[10px] font-bold text-slate-500">
               <Star size={12} className="text-amber-500 fill-amber-400" aria-hidden="true" />
               Tích lũy
             </dt>
-            <dd className="text-sm font-black tabular-nums text-slate-900 sm:text-base">
+            <dd className="flex items-baseline justify-center text-sm font-black tabular-nums text-slate-900 sm:text-base">
               <AnimatedXpCounter value={stats?.xpTotal || 0} formatLocale />
               <span className="ml-0.5 text-[11px] font-extrabold text-emerald-600">XP</span>
             </dd>
           </div>
-          <div className="dp-dew-stat-capsule flex min-w-0 flex-col gap-0.5 px-2 py-2 sm:gap-1 sm:px-3 sm:py-2.5">
-            <dt className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+          <div className="dp-dew-stat-capsule flex min-w-0 flex-col items-center justify-center gap-0.5 px-2 py-2 text-center sm:gap-1 sm:px-3 sm:py-2.5">
+            <dt className="flex items-center justify-center gap-1 text-[10px] font-bold text-slate-500">
               <Flame size={12} className="text-orange-500" aria-hidden="true" />
               Chuỗi học
             </dt>
-            <dd className="flex items-center gap-1 text-sm font-black text-orange-600 sm:text-base">
+            <dd className="flex items-center justify-center gap-1 text-sm font-black text-orange-600 sm:text-base">
               <ReactiveStreakFlame streak={streak} streakIncreased={playedToday} size={16} />
               {streak} ngày
             </dd>
           </div>
-          <div className="dp-dew-stat-capsule flex min-w-0 flex-col gap-0.5 px-2 py-2 sm:gap-1 sm:px-3 sm:py-2.5">
-            <dt className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+          <div className="dp-dew-stat-capsule flex min-w-0 flex-col items-center justify-center gap-0.5 px-2 py-2 text-center sm:gap-1 sm:px-3 sm:py-2.5">
+            <dt className="flex items-center justify-center gap-1 text-[10px] font-bold text-slate-500">
               <Layers size={12} className="text-violet-500" aria-hidden="true" />
               Chương
             </dt>
-            <dd className="text-sm font-black tabular-nums text-slate-900 sm:text-base">
+            <dd className="flex items-center justify-center text-sm font-black tabular-nums text-slate-900 sm:text-base">
               {pathMode ? `${chapterCompleted}/${chapterTotal || '—'}` : '—'}
             </dd>
           </div>

@@ -10,6 +10,18 @@ import { ToastProvider } from './utils/toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './components/LoginPage';
 import FreePortalPage from './components/FreePortalPage';
+
+const DEWSKILL_PORTAL_HOSTS = new Set(
+  String(import.meta.env.VITE_DEWSKILL_HOSTS || 'giasutinhoc.com,www.giasutinhoc.com,giasutinhoc24h.com,www.giasutinhoc24h.com')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+function isDewSkillPortalHost() {
+  if (typeof window === 'undefined') return false;
+  return DEWSKILL_PORTAL_HOSTS.has(String(window.location.hostname || '').toLowerCase());
+}
 import AdminLoginPage from './components/AdminLoginPage';
 import RegistrationForm from './components/RegistrationForm';
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
@@ -268,7 +280,10 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
   return (
     <Suspense fallback={<LoadingScreen message="Đang tải dữ liệu trang…" />}><Routes>
       {/* ═══ Public ═══ */}
-      <Route path="/" element={<LoginPage onLogin={onLogin} />} />
+      <Route
+        path="/"
+        element={isDewSkillPortalHost() ? <FreePortalPage onLogin={onLogin} /> : <LoginPage onLogin={onLogin} />}
+      />
       <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
       <Route path="/DANGNHAPMIENPHI" element={<FreePortalPage onLogin={onLogin} />} />
       <Route path="/admin/login" element={<AdminLoginPage onLogin={onLogin} />} />
