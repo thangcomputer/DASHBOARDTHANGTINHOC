@@ -18,9 +18,9 @@ import {
 } from '../utils/adminZaloContact';
 
 const LOGIN_HIGHLIGHTS = [
-  { label: 'Học mọi lúc', icon: BookOpen },
-  { label: 'Thi chứng nhận', icon: Award },
-  { label: 'Hỗ trợ tận tâm', icon: Headphones },
+  { label: 'Học mọi lúc', desc: 'Lộ trình 1-1 & Video', icon: BookOpen },
+  { label: 'Thi chứng nhận', desc: 'Chuẩn MOS / IC3', icon: Award },
+  { label: 'Hỗ trợ tận tâm', desc: 'Giảng viên đồng hành', icon: Headphones },
 ];
 
 const LoginPage = ({ onLogin }) => {
@@ -207,35 +207,56 @@ const LoginPage = ({ onLogin }) => {
     : '';
 
   return (
-    <div className="cms-login-bg relative h-screen max-h-screen md:h-screen md:max-h-screen flex items-center justify-center p-0 font-sans overflow-x-hidden overflow-y-auto md:overflow-hidden">
-      <div className="cms-login-aura cms-login-aura--red" aria-hidden="true" />
-      <div className="cms-login-aura cms-login-aura--blue" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-0 overflow-hidden text-white/[0.05]" aria-hidden="true">
-        <GraduationCap size={88} className="absolute left-[5%] top-[9%] -rotate-12" />
-        <BookOpen size={72} className="absolute right-[6%] top-[28%] rotate-12" />
-        <Award size={64} className="absolute bottom-[18%] left-[4%] rotate-6" />
-        <Monitor size={76} className="absolute bottom-[6%] right-[9%] -rotate-6" />
+    <div className="cms-login-bg relative min-h-[100dvh] md:h-[100dvh] md:max-h-[100dvh] flex items-center justify-center p-0 font-sans overflow-x-hidden md:overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="cms-login-aura cms-login-aura--red" />
+        <div className="cms-login-aura cms-login-aura--blue" />
+        <div
+          className="absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage: 'radial-gradient(rgba(52, 211, 153, 0.35) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+        <div className="absolute inset-0 text-emerald-400/[0.06]">
+          <GraduationCap size={96} className="cms-login-float absolute left-[5%] top-[9%]" style={{ '--cms-rot': '-12deg', animationDelay: '0s' }} />
+          <BookOpen size={76} className="cms-login-float absolute right-[6%] top-[28%]" style={{ '--cms-rot': '12deg', animationDelay: '-2s' }} />
+          <Award size={68} className="cms-login-float absolute bottom-[18%] left-[4%]" style={{ '--cms-rot': '6deg', animationDelay: '-4s' }} />
+          <Monitor size={80} className="cms-login-float absolute bottom-[6%] right-[9%]" style={{ '--cms-rot': '-6deg', animationDelay: '-1.2s' }} />
+        </div>
       </div>
-      <div className="relative z-10 w-full h-full min-h-[100dvh] md:min-h-0 md:h-full flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
+      <div className="relative z-10 w-full flex-1 md:h-full flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
 
         {/* CỘT TRÁI */}
         <div className="hidden md:flex md:w-1/2 p-8 lg:p-12 xl:p-16 flex-col justify-center relative min-w-0">
           <div className="absolute top-6 left-8 lg:top-10 lg:left-12">
-            <div className="cms-login-chip">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
-              <span>Hệ thống quản lý trực tuyến</span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-bold text-emerald-300 backdrop-blur-md">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+              <span>Hệ thống đào tạo trực tuyến</span>
             </div>
           </div>
-          <div className="relative z-10 space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000 cms-login-autoscale-left">
-            <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-white leading-tight break-anywhere">
-              Nền tảng <span className="text-red-500 block md:inline">Học Tin Học</span> <br />Văn Phòng Chuyên Nghiệp
+          <div className="relative z-10 space-y-6 lg:space-y-7 animate-in fade-in slide-in-from-left-10 duration-1000 cms-login-autoscale-left">
+            <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-white leading-[1.15] tracking-tight break-anywhere">
+              Nền tảng{' '}
+              <span className="cms-login-text-shimmer bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-400 bg-clip-text text-transparent block md:inline">
+                Học Tin Học
+              </span>{' '}
+              <br />Văn Phòng Chuyên Nghiệp
             </h1>
-            <p className="text-slate-400 text-base lg:text-lg leading-relaxed max-w-lg">Tổ chức đào tạo, thi cử và cấp chứng nhận tin học văn phòng với công nghệ hiện đại.</p>
-            <div className="grid max-w-lg grid-cols-3 gap-2.5 sm:gap-3 pt-2">
+            <p className="text-slate-300/85 text-base lg:text-lg leading-relaxed max-w-lg">
+              Tổ chức đào tạo, luyện thi và cấp chứng nhận tin học văn phòng thực chiến với lộ trình cá nhân hóa.
+            </p>
+            <div className="grid max-w-xl grid-cols-3 gap-3 pt-1">
               {LOGIN_HIGHLIGHTS.map((item) => (
-                <div key={item.label} className="cms-login-highlight">
-                  <span className="cms-login-highlight__icon"><item.icon size={16} aria-hidden="true" /></span>
-                  <span>{item.label}</span>
+                <div
+                  key={item.label}
+                  className="group rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-emerald-400/40 hover:bg-emerald-500/[0.08] hover:shadow-[0_12px_30px_rgba(16,185,129,0.16)]"
+                >
+                  <span className="mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/25 bg-emerald-500/15 text-emerald-300 transition-transform duration-300 group-hover:scale-110 group-hover:bg-emerald-500/25">
+                    <item.icon size={17} aria-hidden="true" />
+                  </span>
+                  <div className="text-xs font-extrabold text-white">{item.label}</div>
+                  <div className="mt-0.5 text-[11px] font-medium text-slate-400">{item.desc}</div>
                 </div>
               ))}
             </div>
@@ -243,26 +264,28 @@ const LoginPage = ({ onLogin }) => {
         </div>
 
         {/* CỘT PHẢI */}
-        <div className="w-full md:w-1/2 flex-1 flex flex-col px-4 py-4 sm:px-8 sm:py-6 lg:px-12 lg:py-6 xl:px-16 xl:py-6 justify-center relative min-w-0 overflow-y-auto md:overflow-hidden">
+        <div className="w-full md:w-1/2 flex-1 flex flex-col px-4 py-5 sm:px-8 md:py-4 lg:px-12 xl:px-16 justify-center relative min-w-0">
           <div className="w-full max-w-md space-y-3 sm:space-y-3.5 z-10 my-auto mx-auto cms-login-autoscale-right">
             <div className="flex justify-center animate-in fade-in zoom-in duration-700">
-              <div className="cms-login-logo !py-1 !px-4 sm:!py-1.5 sm:!px-5 !rounded-2xl">
-                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-7 sm:h-8 md:h-8.5 max-w-[170px] object-contain" />
-                <span className="cms-login-shine" aria-hidden="true" />
+              <div className="inline-flex items-center justify-center rounded-2xl bg-white/95 px-5 py-2 shadow-[0_10px_30px_rgba(16,185,129,0.22)] ring-1 ring-emerald-400/30 transition-transform duration-300 hover:-translate-y-0.5">
+                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-7 sm:h-8 max-w-[170px] object-contain" />
               </div>
             </div>
 
-            <div className="cms-login-card px-5 py-4 sm:px-6 sm:py-4.5 space-y-3 sm:space-y-3.5 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+            <div className="relative overflow-hidden rounded-3xl border border-white/15 border-t-emerald-400/40 bg-slate-900/75 px-5 py-5 sm:px-7 sm:py-6 space-y-4 shadow-[0_24px_60px_rgba(2,6,23,0.65),0_0_50px_rgba(16,185,129,0.10)] backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-10 duration-1000">
+              <div className="pointer-events-none absolute inset-x-10 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent" aria-hidden="true" />
               <div className="text-center space-y-1">
-                <div className="cms-login-chip mx-auto !py-0.5 !px-2.5 !text-[10px]">
-                  <GraduationCap size={13} aria-hidden="true" />
-                  <span>Nền tảng học Tin học văn phòng</span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white">Đăng nhập tài khoản</h2>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">Đăng nhập tài khoản</h2>
                 <p className="text-xs sm:text-sm text-slate-400 font-medium">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
               </div>
 
-              <div className="cms-login-roles" role="tablist" aria-label="Chọn vai trò đăng nhập">
+              <div className="relative grid grid-cols-2 gap-1.5 rounded-2xl border border-white/10 bg-slate-950/60 p-1" role="tablist" aria-label="Chọn vai trò đăng nhập">
+                <div
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute top-1 bottom-1 left-1 w-[calc(50%-7px)] rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-[0_6px_20px_rgba(16,185,129,0.38)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    role === 'teacher' ? 'translate-x-[calc(100%+6px)]' : 'translate-x-0'
+                  }`}
+                />
                 {[
                   { value: 'student', label: 'Học viên', icon: GraduationCap },
                   { value: 'teacher', label: 'Giảng viên', icon: User },
@@ -273,11 +296,14 @@ const LoginPage = ({ onLogin }) => {
                     role="tab"
                     aria-selected={role === item.value}
                     onClick={() => setRole(item.value)}
-                    className={`cms-login-role !py-2 text-xs sm:text-sm ${role === item.value ? 'is-active' : ''}`}
+                    className={`relative z-10 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs sm:text-sm font-extrabold transition-colors duration-200 cursor-pointer ${
+                      role === item.value
+                        ? 'text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
                     <item.icon size={15} aria-hidden="true" />
                     {item.label}
-                    {role === item.value && <span className="cms-login-shine" aria-hidden="true" />}
                   </button>
                 ))}
               </div>
@@ -314,7 +340,7 @@ const LoginPage = ({ onLogin }) => {
                   <div className="space-y-1">
                     <label htmlFor="login-identifier" className="text-[11px] font-bold text-slate-400 block ml-1">Số điện thoại</label>
                     <div className="cms-login-field !min-h-[44px] sm:!min-h-[46px] !px-3.5 !rounded-xl group">
-                      <User size={16} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                      <User size={16} className="shrink-0 text-slate-400 group-focus-within:text-emerald-400 transition-colors" aria-hidden="true" />
                       <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(limitPhoneInput(e.target.value))} autoComplete="tel" maxLength={PHONE_MAX_DIGITS + 1}
                         className="cms-login-input !py-2 text-sm"
                         placeholder="VD: 0912345678" />
@@ -323,7 +349,7 @@ const LoginPage = ({ onLogin }) => {
                   <div className="space-y-1">
                     <label htmlFor="login-password" className="text-[11px] font-bold text-slate-400 block ml-1">Mật khẩu</label>
                     <div className="cms-login-field !min-h-[44px] sm:!min-h-[46px] !px-3.5 !rounded-xl group">
-                      <Lock size={16} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                      <Lock size={16} className="shrink-0 text-slate-400 group-focus-within:text-emerald-400 transition-colors" aria-hidden="true" />
                       <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
                         className="cms-login-input !py-2 text-sm"
                         placeholder="••••••••" />
@@ -335,12 +361,15 @@ const LoginPage = ({ onLogin }) => {
                 </div>
                 <div className="flex justify-end -mt-1">
                   <button type="button" onClick={() => { setShowForgot(true); setForgotRole(role); setForgotStep(1); }}
-                    className="text-[11px] font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1">
+                    className="text-[11px] font-bold text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1 cursor-pointer">
                     <KeyRound size={12} aria-hidden="true" /> Quên mật khẩu?
                   </button>
                 </div>
-                <button type="submit" disabled={loading} className="cms-login-submit !min-h-[44px] sm:!min-h-[48px] !rounded-xl text-sm font-black">
-                  <span className="cms-login-shine" aria-hidden="true" />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="cms-login-btn-sheen relative overflow-hidden mx-auto min-w-[200px] px-8 min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-600 text-white text-sm font-black shadow-[0_5px_0_#065f46,0_12px_26px_rgba(16,185,129,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.45)] hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_7px_0_#065f46,0_16px_32px_rgba(16,185,129,0.5),inset_0_1.5px_1px_rgba(255,255,255,0.5)] active:translate-y-[4px] active:shadow-[0_1px_0_#065f46,0_4px_12px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.35)] transition-all duration-150 disabled:opacity-60 cursor-pointer"
+                >
                   {loading
                     ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
                     : <><LogIn size={16} aria-hidden="true" /> Đăng nhập ngay</>}
@@ -358,14 +387,7 @@ const LoginPage = ({ onLogin }) => {
             </div>
 
             <div className="text-center animate-in fade-in duration-1000 delay-500 pt-0.5">
-              <p className="text-slate-400 text-xs sm:text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open(`https://zalo.me/${ADMIN_ZALO_PHONE}`, '_blank', 'noopener,noreferrer')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
-              <div className="mt-1 flex items-center justify-center gap-1 text-[11px] text-slate-400">
-                <span>Học viên tự học DewSkill?</span>
-                <a href="/DANGNHAPMIENPHI?mode=login" className="text-emerald-400 font-bold hover:underline transition">
-                  Đăng nhập tại đây →
-                </a>
-              </div>
-              <div className="mt-1 flex items-center justify-center gap-2 text-slate-400 text-[11px]">
+              <div className="flex items-center justify-center gap-2 text-slate-400 text-[11px]">
                 <span className="font-black text-slate-500 tracking-wider">Hỗ trợ kỹ thuật:</span>
                 <span className="font-bold">Hotline 093 5758 462</span>
               </div>
@@ -378,7 +400,7 @@ const LoginPage = ({ onLogin }) => {
       {showForgot && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#1e293b] rounded-3xl w-full max-w-md border border-white/10 shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-600 to-orange-600 px-6 py-5 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><KeyRound size={20} className="text-white" /></div>
                 <div>

@@ -734,6 +734,9 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
       return doc?._id || null;
     };
 
+    const { assertUniqueContact, normalizeEmail } = require('../utils/uniqueContact');
+    const seenPhones = new Set();
+    const seenEmails = new Set();
     const studentsToInsert = [];
     for (const s of rawStudents) {
       if (!s) continue;
@@ -754,7 +757,29 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
       const { normalizeVNPhone } = require('../utils/phoneIdentity');
       const phone = normalizeVNPhone(s.phone) || String(s.phone || '').trim();
       const zalo = String(s.zalo || phone || '').trim();
+      const emailNorm = normalizeEmail(s.email);
       if (!name || (!phone && !zalo)) continue;
+
+      if (phone && seenPhones.has(phone)) {
+        return res.status(409).json({ success: false, message: `Số điện thoại "${phone}" bị trùng trong danh sách nhập.` });
+      }
+      if (emailNorm && seenEmails.has(emailNorm)) {
+        return res.status(409).json({ success: false, message: `Email "${emailNorm}" bị trùng trong danh sách nhập.` });
+      }
+      try {
+        await assertUniqueContact({
+          phone,
+          zalo,
+          ...(emailNorm ? { email: emailNorm } : {}),
+        });
+      } catch (dupErr) {
+        if (dupErr.status === 409) {
+          return res.status(409).json({ success: false, message: dupErr.message });
+        }
+        throw dupErr;
+      }
+      if (phone) seenPhones.add(phone);
+      if (emailNorm) seenEmails.add(emailNorm);
 
       let branchId = forcedBranchId;
       let branchCode = forcedBranchCode;

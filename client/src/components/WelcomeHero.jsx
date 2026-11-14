@@ -164,25 +164,15 @@ export default function WelcomeHero({
       </div>
 
       <div className="absolute bottom-0 right-3 flex flex-col items-center sm:right-6">
-        {showJoin && (onJoin || joinUrl || joinHint) && <div className="mb-1.5">
-          {onJoin || joinUrl ? (
-            onJoin ? (
-              <button type="button" onClick={onJoin} className={joinClass}>
-                <Video size={15} aria-hidden="true" /> {variant.joinLabel}
-              </button>
-            ) : (
-              <a href={joinUrl} target="_blank" rel="noopener noreferrer" className={joinClass}>
-                <Video size={15} aria-hidden="true" /> {variant.joinLabel}
-              </a>
-            )
+        {showJoin && (onJoin || joinUrl) && <div className="mb-1.5">
+          {onJoin ? (
+            <button type="button" onClick={onJoin} className={joinClass}>
+              <Video size={15} aria-hidden="true" /> {variant.joinLabel}
+            </button>
           ) : (
-            <span
-              aria-disabled="true"
-              title={joinHint}
-              className="flex cursor-default items-center gap-1.5 whitespace-nowrap rounded-xl bg-white border border-slate-200 border-b-2 border-b-slate-200 px-3.5 py-1.5 text-xs font-extrabold text-slate-700 shadow-xs"
-            >
-              <Video size={14} className="text-slate-500" aria-hidden="true" /> {joinHint}
-            </span>
+            <a href={joinUrl} target="_blank" rel="noopener noreferrer" className={joinClass}>
+              <Video size={15} aria-hidden="true" /> {variant.joinLabel}
+            </a>
           )}
         </div>}
         <div className="relative">

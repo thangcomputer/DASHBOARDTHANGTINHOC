@@ -109,6 +109,9 @@ async function settingsResponseFor(req, settings) {
   const data = typeof settings?.toObject === 'function'
     ? settings.toObject()
     : { ...(settings || {}) };
+  delete data.adminPasswordHash;
+  delete data.adminMfaSecret;
+  delete data.adminMfaPendingSecret;
   const [canManageStudentBank, canManageTeacherBank] = await Promise.all([
     canManageExamBank(req, PERMISSIONS.MANAGE_STUDENT_TRAINING),
     canManageExamBank(req, PERMISSIONS.MANAGE_TRAINING),
@@ -165,25 +168,38 @@ function normalizeTrainingDataUrls(data) {
   return out;
 }
 
-// ── Multer config cho upload banner popup ─────────────────────────────────────
-const uploadDir = path.join(__dirname, '..', 'uploads', 'popup');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// ── Multer config cho upload ảnh an toàn (chặn SVG/HTML XSS) ──────────────────
+const ALLOWED_IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+const ALLOWED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `popup_${Date.now()}${ext}`);
-  },
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Chỉ cho phép file ảnh'));
-  },
-});
+function createSafeImageUpload(dir, prefix, maxSizeBytes) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const diskStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, dir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      if (!ALLOWED_IMAGE_EXT.has(ext)) {
+        return cb(new Error('Chỉ cho phép ảnh PNG, JPG, JPEG, WEBP hoặc GIF'));
+      }
+      return cb(null, `${prefix}_${Date.now()}${ext}`);
+    },
+  });
+  return multer({
+    storage: diskStorage,
+    limits: { fileSize: maxSizeBytes },
+    fileFilter: (req, file, cb) => {
+      const mime = String(file.mimetype || '').toLowerCase();
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      if (ALLOWED_IMAGE_MIMES.has(mime) && ALLOWED_IMAGE_EXT.has(ext)) {
+        return cb(null, true);
+      }
+      return cb(new Error('Chỉ cho phép ảnh PNG, JPG, JPEG, WEBP hoặc GIF'));
+    },
+  });
+}
+
+const uploadDir = path.join(__dirname, '..', 'uploads', 'popup');
+const upload = createSafeImageUpload(uploadDir, 'popup', 5 * 1024 * 1024);
 
 // Helper: get or create singleton settings (lean, không secret) - có cache
 async function getSettings() {
@@ -195,7 +211,7 @@ async function updateMainSettings(update, options = {}) {
     { _key: 'main' },
     update,
     { upsert: true, returnDocument: 'after', ...options },
-  );
+  ).select('-adminPasswordHash -adminMfaSecret -adminMfaPendingSecret');
   await invalidateSettingsCache();
   return settings;
 }
@@ -293,23 +309,7 @@ router.post('/upload-teacher-banner', authMiddleware, ...settingsGuard('system_w
 
 // ── POST /api/settings/upload-invoice-signature ── Upload chữ ký hóa đơn ─────────
 const sigDir = path.join(__dirname, '..', 'uploads', 'signature');
-if (!fs.existsSync(sigDir)) fs.mkdirSync(sigDir, { recursive: true });
-
-const sigStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, sigDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `signature_${Date.now()}${ext}`);
-  },
-});
-const uploadSig = multer({
-  storage: sigStorage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Chỉ cho phép file ảnh'));
-  },
-});
+const uploadSig = createSafeImageUpload(sigDir, 'signature', 2 * 1024 * 1024);
 
 router.post('/upload-invoice-signature', authMiddleware, ...settingsGuard('system_write'), uploadSig.single('image'), async (req, res) => {
   try {
@@ -428,15 +428,19 @@ router.put('/web', authMiddleware, ...settingsGuard('system_write'), async (req,
 
     const settings = await updateMainSettings({ $set: updates });
 
-    return res.json({ success: true, data: settings, message: 'Đã lưu cấu hình Web' });
+    return res.json({ success: true, data: await settingsResponseFor(req, settings), message: 'Đã lưu cấu hình Web' });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server: ' + err.message });
   }
 });
 
-// ── GET /api/settings/training-data ── Lấy training data (Cho mọi user) ───────────
+// ── GET /api/settings/training-data ── Lấy training data (Chỉ GV / Admin / Staff) ───────────
 router.get('/training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
+    const role = String(req.user?.role || '').toLowerCase();
+    if (!['teacher', 'admin', 'staff'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền truy cập tài liệu đào tạo giảng viên' });
+    }
     const settings = await getSettings();
     const data = normalizeTrainingDataUrls(settings.trainingRawData || { videos: [], guides: [], files: [], softwareLinks: [] });
     return res.json({ success: true, data });

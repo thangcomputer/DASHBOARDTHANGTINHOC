@@ -44,13 +44,97 @@ async function verifySessionAccount(decoded) {
   return true;
 }
 
+const HANDSHAKE_WINDOW_MS = 10_000;
+const socketHandshakeMap = new Map();
+const activeSocketsByIp = new Map();
+const activeSocketsByUser = new Map();
+
+function positiveLimit(envKey, fallback) {
+  const n = parseInt(process.env[envKey] || String(fallback), 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function socketRateLimitEnabled() {
+  return process.env.NODE_ENV !== 'test' || process.env.SOCKET_RATE_LIMIT_FORCE === '1';
+}
+
+function getSocketClientIp(socket) {
+  const xff = socket?.handshake?.headers?.['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.trim()) {
+    return xff.split(',')[0].trim();
+  }
+  return String(socket?.handshake?.address || socket?.conn?.remoteAddress || '127.0.0.1').replace(/^::ffff:/, '');
+}
+
+function consumeHandshakeQuota(ip) {
+  const now = Date.now();
+  if (socketHandshakeMap.size > 5000) {
+    for (const [k, v] of socketHandshakeMap.entries()) {
+      if (now >= v.resetAt) socketHandshakeMap.delete(k);
+    }
+  }
+  let entry = socketHandshakeMap.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + HANDSHAKE_WINDOW_MS };
+  }
+  entry.count += 1;
+  socketHandshakeMap.set(ip, entry);
+  return entry.count <= positiveLimit('SOCKET_HANDSHAKE_MAX_PER_10S', 30);
+}
+
+function incrementCounter(map, key) {
+  const nextCount = (map.get(key) || 0) + 1;
+  map.set(key, nextCount);
+  return nextCount;
+}
+
+function decrementCounter(map, key) {
+  const cur = map.get(key) || 0;
+  if (cur <= 1) map.delete(key);
+  else map.set(key, cur - 1);
+}
+
+function resetSocketGuards() {
+  socketHandshakeMap.clear();
+  activeSocketsByIp.clear();
+  activeSocketsByUser.clear();
+}
+
 async function socketAuthMiddleware(socket, next) {
+  const enforceFloodGuards = socketRateLimitEnabled();
+  const clientIp = getSocketClientIp(socket);
+
+  if (enforceFloodGuards && !consumeHandshakeQuota(clientIp)) {
+    logger.warn({ ip: clientIp, socketId: socket.id }, 'Socket handshake flood blocked');
+    return next(new Error('Rate limit exceeded: Too many connection attempts'));
+  }
+
+  let ipSlotAcquired = false;
+  if (enforceFloodGuards) {
+    const maxPerIp = positiveLimit('SOCKET_MAX_CONNS_PER_IP', 40);
+    if ((activeSocketsByIp.get(clientIp) || 0) >= maxPerIp) {
+      logger.warn({ ip: clientIp, maxPerIp }, 'Socket max concurrent connections per IP reached');
+      return next(new Error('Connection limit exceeded for network'));
+    }
+    incrementCounter(activeSocketsByIp, clientIp);
+    ipSlotAcquired = true;
+  }
+
+  const releaseIpSlot = () => {
+    if (ipSlotAcquired) {
+      decrementCounter(activeSocketsByIp, clientIp);
+      ipSlotAcquired = false;
+    }
+  };
+
   const token = socket.handshake.auth?.token;
   if (!token) {
+    releaseIpSlot();
     return next(new Error('Authentication error: Token missing'));
   }
 
   if (await blacklist.isBlacklisted(token)) {
+    releaseIpSlot();
     return next(new Error('Authentication error: Token revoked'));
   }
 
@@ -59,6 +143,7 @@ async function socketAuthMiddleware(socket, next) {
 
     if (decoded.sid) {
       if (decoded.aud !== 'mobile' || !isMobileMultiSessionAuthEnabled()) {
+        releaseIpSlot();
         return next(new Error('Authentication error: Mobile sessions disabled'));
       }
       const session = await require('../services/mobileAuthSessionService').validateSession({
@@ -67,25 +152,55 @@ async function socketAuthMiddleware(socket, next) {
         role: decoded.role,
       });
       if (!session) {
+        releaseIpSlot();
         return next(new Error('Authentication error: Session revoked'));
       }
       if (!(await verifySessionAccount(decoded))) {
+        releaseIpSlot();
         return next(new Error('Authentication error: Account unavailable'));
       }
       socket.sessionId = decoded.sid;
     }
 
     if (!decoded.sid && !(await verifyTokenVersion(decoded))) {
+      releaseIpSlot();
       return next(new Error('Authentication error: Token version mismatch'));
     }
+
+    const userKey = `${decoded.role || 'unknown'}:${decoded.id || ''}`;
+    let userSlotAcquired = false;
+    if (enforceFloodGuards && decoded.id) {
+      const maxPerUser = positiveLimit('SOCKET_MAX_CONNS_PER_USER', 5);
+      if ((activeSocketsByUser.get(userKey) || 0) >= maxPerUser) {
+        releaseIpSlot();
+        logger.warn({ userKey, maxPerUser }, 'Socket max concurrent connections per user reached');
+        return next(new Error('Connection limit exceeded for account'));
+      }
+      incrementCounter(activeSocketsByUser, userKey);
+      userSlotAcquired = true;
+    }
+
+    socket.once('disconnect', () => {
+      releaseIpSlot();
+      if (userSlotAcquired) {
+        decrementCounter(activeSocketsByUser, userKey);
+        userSlotAcquired = false;
+      }
+    });
 
     socket.user = decoded;
     socket.accessToken = token;
     next();
   } catch (err) {
+    releaseIpSlot();
     logger.warn({ err: err.message, socketId: socket.id }, 'Socket auth failed');
     next(new Error('Authentication error: Invalid token'));
   }
 }
 
-module.exports = { socketAuthMiddleware, verifyTokenVersion, verifySessionAccount };
+module.exports = {
+  socketAuthMiddleware,
+  verifyTokenVersion,
+  verifySessionAccount,
+  resetSocketGuards,
+};

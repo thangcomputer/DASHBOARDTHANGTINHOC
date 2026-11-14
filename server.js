@@ -376,8 +376,38 @@ function broadcastOnlinePresence() {
   }
 }
 
+let presenceBroadcastTimer = null;
+let lastSeenBroadcastTimer = null;
+const PRESENCE_DEBOUNCE_MS = 250;
+
+/** Gộp nhiều thay đổi kết nối/ngắt kết nối trong 250ms thành 1 lần phát users:online để tránh bão sự kiện. */
+function scheduleBroadcastOnlinePresence() {
+  if (presenceBroadcastTimer) return;
+  presenceBroadcastTimer = setTimeout(() => {
+    presenceBroadcastTimer = null;
+    try { broadcastOnlinePresence(); } catch (err) {
+      logger.warn({ err: err.message }, 'broadcastOnlinePresence failed');
+    }
+  }, PRESENCE_DEBOUNCE_MS);
+  if (typeof presenceBroadcastTimer.unref === 'function') presenceBroadcastTimer.unref();
+}
+
+function scheduleBroadcastLastSeen() {
+  if (lastSeenBroadcastTimer) return;
+  lastSeenBroadcastTimer = setTimeout(() => {
+    lastSeenBroadcastTimer = null;
+    try {
+      io.to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').to('ALL_TEACHER').to('ALL_STUDENT')
+        .emit('users:lastSeen', Object.fromEntries(lastSeenMap));
+    } catch (err) {
+      logger.warn({ err: err.message }, 'broadcast lastSeen failed');
+    }
+  }, PRESENCE_DEBOUNCE_MS);
+  if (typeof lastSeenBroadcastTimer.unref === 'function') lastSeenBroadcastTimer.unref();
+}
+
 presenceStore.onPresenceChange(() => {
-  try { broadcastOnlinePresence(); } catch { /* ignore */ }
+  scheduleBroadcastOnlinePresence();
 });
 
 const activeCallSessions = new Map();
@@ -528,38 +558,33 @@ io.on('connection', (socket) => {
       }).catch(() => { });
     } catch (_) { /* ignore */ }
 
-    // Broadcast danh sách online (scoped)
-    broadcastOnlinePresence();
+    // Broadcast danh sách online (scoped, gộp nhịp chống bão kết nối)
+    scheduleBroadcastOnlinePresence();
     // Gửi lại lịch sử truy cập gần nhất cho socket mới sau khi reload trang.
     socket.emit('users:lastSeen', Object.fromEntries(lastSeenMap));
   });
 
   // ── Nhắn tin 1-1 - luôn lấy người gửi từ JWT (socket.user), không tin client ──
-  // BUG-13: Simple rate limiting cho socket events
+  // BUG-13: Simple rate limiting cho socket events (dọn dẹp nội bộ, không tạo setInterval mỗi socket)
   const socketRateMap = new Map();
   const SOCKET_MSG_LIMIT = 30; // max messages per window
   const SOCKET_MSG_WINDOW = 10_000; // 10 seconds
 
   function checkSocketRate(key) {
     const now = Date.now();
+    if (socketRateMap.size > 50) {
+      for (const [k, v] of socketRateMap) {
+        if (now - v.start > SOCKET_MSG_WINDOW * 2) socketRateMap.delete(k);
+      }
+    }
     let entry = socketRateMap.get(key);
     if (!entry || now - entry.start > SOCKET_MSG_WINDOW) {
       entry = { start: now, count: 0 };
-      socketRateMap.set(key);
     }
     entry.count++;
     socketRateMap.set(key, entry);
     return entry.count <= SOCKET_MSG_LIMIT;
   }
-
-  // Cleanup rate map mỗi 30 giây
-  const rateCleanup = setInterval(() => {
-    const now = Date.now();
-    for (const [k, v] of socketRateMap) {
-      if (now - v.start > SOCKET_MSG_WINDOW * 2) socketRateMap.delete(k);
-    }
-  }, 30_000);
-  socket.on('disconnect', () => { /* cleanup handled below */ });
 
   const callInviteAttempts = [];
   function getCallPeer(conversationId) {
@@ -1222,11 +1247,9 @@ io.on('connection', (socket) => {
     }
     // Cleanup socket rate map
     socketRateMap.clear();
-    clearInterval(rateCleanup);
-    broadcastOnlinePresence();
-    // Presence last-seen: role rooms only - không io.emit toàn cục
-    io.to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').to('ALL_TEACHER').to('ALL_STUDENT')
-      .emit('users:lastSeen', Object.fromEntries(lastSeenMap));
+    scheduleBroadcastOnlinePresence();
+    // Presence last-seen: role rooms only (gộp nhịp) - không io.emit toàn cục
+    scheduleBroadcastLastSeen();
     console.log(`❌ Socket disconnected: ${socket.id}`);
   });
 });
@@ -1638,6 +1661,8 @@ const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
   try {
+    if (presenceBroadcastTimer) { clearTimeout(presenceBroadcastTimer); presenceBroadcastTimer = null; }
+    if (lastSeenBroadcastTimer) { clearTimeout(lastSeenBroadcastTimer); lastSeenBroadcastTimer = null; }
     try { outboxWorker.stop(); } catch (_) { /* ignore */ }
     try {
       const { stopAiIdleWatcher } = require('./services/aiSupportService');

@@ -2,7 +2,7 @@
  * Rate limiting cho /api/auth - chống brute-force và lạm dụng CAPTCHA.
  * Giá trị có thể chỉnh qua biến môi trường (xem README).
  */
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 function parseMax(envKey, defaultVal) {
   const raw = process.env[envKey];
@@ -15,15 +15,56 @@ const jsonMessage = (message) => ({ success: false, code: 'RATE_LIMITED', messag
 
 const skipInDev = () => process.env.NODE_ENV === 'development';
 
-/** Đăng nhập (mọi cổng login) */
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: parseMax('RATE_LIMIT_LOGIN_MAX', 25),
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipInDev,
-  message: jsonMessage('Đăng nhập quá nhiều lần từ địa chỉ này. Vui lòng thử lại sau ít phút.'),
+function clientIpKey(req) {
+  const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  return ipKeyGenerator(rawIp);
+}
+
+function loginAccountIdentifier(req) {
+  const raw = req.body?.identifier || req.body?.phone || req.body?.deviceFingerprint || 'anon';
+  return String(raw).trim().toLowerCase().slice(0, 80) || 'anon';
+}
+
+function buildLoginLimiter({ windowMs, max, keyGenerator, skipSuccessfulRequests = false, message }) {
+  return rateLimit({
+    windowMs,
+    max,
+    keyGenerator,
+    skipSuccessfulRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: skipInDev,
+    message: jsonMessage(message),
+  });
+}
+
+/** Chống spam đăng nhập hàng loạt nhiều tài khoản từ 1 mạng trong thời gian ngắn (10 giây) */
+const loginBurstLimiter = buildLoginLimiter({
+  windowMs: 10 * 1000,
+  max: () => parseMax('RATE_LIMIT_LOGIN_BURST_MAX', 8),
+  keyGenerator: (req) => `burst:${clientIpKey(req)}`,
+  message: 'Phát hiện đăng nhập dồn dập từ mạng này. Vui lòng đợi vài giây rồi thử lại.',
 });
+
+/** Giới hạn tổng lượt đăng nhập từ 1 IP mạng trong 15 phút */
+const loginIpLimiter = buildLoginLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: () => parseMax('RATE_LIMIT_LOGIN_MAX', 25),
+  keyGenerator: (req) => `ip:${clientIpKey(req)}`,
+  message: 'Đăng nhập quá nhiều lần từ địa chỉ này. Vui lòng thử lại sau ít phút.',
+});
+
+/** Chống dò mật khẩu theo từng tài khoản/thiết bị cụ thể (chỉ đếm lần thất bại) */
+const loginAccountLimiter = buildLoginLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: () => parseMax('RATE_LIMIT_LOGIN_ACCOUNT_MAX', 8),
+  keyGenerator: (req) => `acct:${clientIpKey(req)}:${loginAccountIdentifier(req)}`,
+  skipSuccessfulRequests: true,
+  message: 'Tài khoản này thử đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.',
+});
+
+/** Đăng nhập (mọi cổng login) - bảo vệ 3 tầng: Burst IP -> IP 15p -> Tài khoản 15p */
+const loginLimiter = [loginBurstLimiter, loginIpLimiter, loginAccountLimiter];
 
 /** Lấy CAPTCHA SVG */
 const captchaLimiter = rateLimit({

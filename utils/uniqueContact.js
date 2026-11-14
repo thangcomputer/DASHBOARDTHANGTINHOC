@@ -34,6 +34,17 @@ function contactConflictError(message) {
   return err;
 }
 
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function teacherRoleLabel(doc) {
+  const role = String(doc?.role || '').toLowerCase();
+  if (role === 'admin') return 'quản trị viên';
+  if (role === 'staff') return 'nhân viên';
+  return 'giảng viên';
+}
+
 /**
  * @param {{ phone?: string, zalo?: string, email?: string, excludeRole?: 'student'|'teacher'|null, excludeId?: string|null }} opts
  */
@@ -59,6 +70,13 @@ async function assertUniqueContact({
     : null;
 
   if (phones.length) {
+    const masterAdminPhone = normalizePhone(process.env.MASTER_ADMIN_PHONE);
+    if (masterAdminPhone && phoneVariants(masterAdminPhone).some((v) => phoneSet.has(v))) {
+      throw contactConflictError(
+        'Số điện thoại đã được tài khoản Admin sử dụng - không thể đăng ký trùng',
+      );
+    }
+
     const phoneClause = {
       $or: phones.flatMap((p) => [{ phone: p }, { zalo: p }]),
     };
@@ -76,16 +94,23 @@ async function assertUniqueContact({
     const teacherPhoneQ = excludeTeacher
       ? { $and: [phoneClause, excludeTeacher] }
       : phoneClause;
-    const hitTeacher = await Teacher.findOne(teacherPhoneQ).select('name phone zalo').lean();
+    const hitTeacher = await Teacher.findOne(teacherPhoneQ).select('name phone zalo role').lean();
     if (hitTeacher) {
       throw contactConflictError(
-        `Số điện thoại đã được giảng viên "${hitTeacher.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
+        `Số điện thoại đã được ${teacherRoleLabel(hitTeacher)} "${hitTeacher.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
       );
     }
   }
 
   if (emailNorm) {
-    const emailClause = { email: emailNorm };
+    const masterAdminEmail = normalizeEmail(process.env.MASTER_ADMIN_EMAIL);
+    if (masterAdminEmail && emailNorm === masterAdminEmail) {
+      throw contactConflictError(
+        'Email đã được tài khoản Admin sử dụng - không thể đăng ký trùng',
+      );
+    }
+
+    const emailClause = { email: new RegExp(`^${escapeRegex(emailNorm)}$`, 'i') };
     const studentEmailQ = excludeStudent
       ? { $and: [emailClause, excludeStudent] }
       : emailClause;
@@ -99,10 +124,10 @@ async function assertUniqueContact({
     const teacherEmailQ = excludeTeacher
       ? { $and: [emailClause, excludeTeacher] }
       : emailClause;
-    const hitTeacherEmail = await Teacher.findOne(teacherEmailQ).select('name email').lean();
+    const hitTeacherEmail = await Teacher.findOne(teacherEmailQ).select('name email role').lean();
     if (hitTeacherEmail) {
       throw contactConflictError(
-        `Email đã được giảng viên "${hitTeacherEmail.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
+        `Email đã được ${teacherRoleLabel(hitTeacherEmail)} "${hitTeacherEmail.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
       );
     }
   }

@@ -151,7 +151,11 @@ export default function AdminOverviewTab({ session }) {
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm sm:text-[15px] font-bold text-slate-900 truncate leading-snug">{s.name}</p>
-                    <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate mt-0.5">{s.course || 'Chưa chọn khóa'}</p>
+                    <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate mt-0.5">
+                      {String(s.course || '').trim().toLowerCase() === 'tài khoản miễn phí'
+                        ? 'Dewskill'
+                        : (s.course || (s.freePortal ? 'Dewskill' : 'Chưa chọn khóa'))}
+                    </p>
                   </div>
                   <span className={`cms-dash-badge flex-shrink-0 ${badgeClass}`}>
                     {badgeText}

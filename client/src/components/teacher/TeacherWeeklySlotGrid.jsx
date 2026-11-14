@@ -407,7 +407,7 @@ export default function TeacherWeeklySlotGrid({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl">
       <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-3 sm:px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-red-50 text-red-600">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
           <Table2 size={18} />
         </div>
         <h3 className="text-sm font-black tracking-tight text-slate-900 sm:text-base">
@@ -415,62 +415,68 @@ export default function TeacherWeeklySlotGrid({
         </h3>
       </div>
 
-      <div className="m-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:m-4 sm:p-3">
-        <div className="flex items-center gap-1.5">
-          <Users size={14} className="shrink-0 text-slate-500" />
-          <span className="text-xs font-black tracking-wide text-slate-500">Lọc học viên</span>
-          <span className="ml-auto text-xs font-extrabold text-red-700">{rows.length} học viên</span>
+      <div className="m-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 sm:m-4 sm:p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Users size={14} className="shrink-0 text-emerald-600" />
+            <span className="text-xs font-black tracking-wide text-slate-600">Lọc học viên</span>
+          </div>
+          <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-extrabold text-emerald-700">
+            {rows.length} học viên
+          </span>
         </div>
-        <div className="flex w-full items-center gap-1">
-          {[
-            { id: 'studying', label: 'Đang học' },
-            { id: 'finished', label: 'Học xong' },
-            { id: 'all', label: 'Tất cả' },
-          ].map((opt) => (
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-2">
+          <div className="flex flex-1 min-w-0 items-center gap-1">
             <button
-              key={opt.id}
               type="button"
-              onClick={() => setRosterFilter(opt.id)}
-              className={`flex min-h-[34px] min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 text-xs font-extrabold transition sm:text-xs ${rosterFilter === opt.id
-                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-500 hover:text-emerald-700'
-                }`}
-              aria-pressed={rosterFilter === opt.id}
+              onClick={() => {
+                if (searchOpen) setNameQuery('');
+                setSearchOpen((open) => !open);
+              }}
+              className={`flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border ${searchOpen ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50'
+                } text-emerald-600`}
+              aria-label={searchOpen ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
+              aria-expanded={searchOpen}
             >
-              <span className="truncate">{opt.label}</span>
-              <span className={rosterFilter === opt.id ? 'text-emerald-100' : 'text-slate-400'}>
-                {rosterCounts[opt.id]}
-              </span>
+              {searchOpen ? <X size={15} /> : <Search size={15} />}
             </button>
-          ))}
+            {[
+              { id: 'studying', label: 'Đang học' },
+              { id: 'finished', label: 'Học xong' },
+              { id: 'all', label: 'Tất cả' },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setRosterFilter(opt.id)}
+                className={`flex min-h-[36px] min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-2 text-xs font-extrabold transition ${rosterFilter === opt.id
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-500 hover:text-emerald-700'
+                  }`}
+                aria-pressed={rosterFilter === opt.id}
+              >
+                <span className="truncate">{opt.label}</span>
+                <span className={rosterFilter === opt.id ? 'text-emerald-100' : 'text-slate-400'}>
+                  {rosterCounts[opt.id]}
+                </span>
+              </button>
+            ))}
+          </div>
           <button
             type="button"
-            onClick={() => {
-              if (searchOpen) setNameQuery('');
-              setSearchOpen((open) => !open);
-            }}
-            className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border ${searchOpen ? 'border-emerald-200 bg-emerald-50' : 'border-blue-100 bg-blue-50'
-              } text-emerald-600`}
-            aria-label={searchOpen ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
-            aria-expanded={searchOpen}
+            onClick={() => setCoursePickerOpen(true)}
+            aria-label={`Chọn khóa học, hiện tại ${courseFilter || 'Tất cả khóa học'}`}
+            aria-haspopup="dialog"
+            aria-expanded={coursePickerOpen}
+            className="flex min-h-[36px] w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left lg:w-[280px] xl:w-[320px] lg:shrink-0 hover:border-emerald-300 transition"
           >
-            {searchOpen ? <X size={15} /> : <Search size={15} />}
+            <span className="shrink-0 text-xs font-bold text-slate-500">Khóa học</span>
+            <span className="min-w-0 flex-1 truncate text-center text-xs font-extrabold text-emerald-700">
+              {courseFilter || 'Tất cả khóa học'}
+            </span>
+            <ChevronDown size={16} className="shrink-0 text-emerald-600" aria-hidden="true" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setCoursePickerOpen(true)}
-          aria-label={`Chọn khóa học, hiện tại ${courseFilter || 'Tất cả khóa học'}`}
-          aria-haspopup="dialog"
-          aria-expanded={coursePickerOpen}
-          className="flex min-h-[38px] w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-left"
-        >
-          <span className="shrink-0 text-xs font-bold text-slate-500">Khóa học</span>
-          <span className="min-w-0 flex-1 truncate text-center text-xs font-extrabold text-emerald-700">
-            {courseFilter || 'Tất cả khóa học'}
-          </span>
-          <ChevronDown size={16} className="shrink-0 text-emerald-600" aria-hidden="true" />
-        </button>
         {searchOpen ? (
           <input
             type="search"

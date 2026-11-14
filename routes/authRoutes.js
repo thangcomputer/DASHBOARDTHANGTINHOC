@@ -74,6 +74,11 @@ async function findPhoneMatches(value) {
 async function lookupUserByPhone(value, requestedRole = null) {
   const phone = normalizeVNPhone(value);
   if (!phone) return null;
+  const masterPhone = normalizeVNPhone(process.env.MASTER_ADMIN_PHONE);
+  if (masterPhone && phone === masterPhone) {
+    logger.warn({ phone: maskPhone(phone) }, '[AUTH] MASTER_ADMIN_PHONE cannot log in as another role');
+    return null;
+  }
   const matches = await findPhoneMatches(phone);
   if (matches.length !== 1) {
     if (matches.length > 1) {
@@ -748,18 +753,43 @@ async function lookupUser(rawId, requestedRole = null) {
 
 const LOGIN_EMAIL_RE = /^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/;
 
+async function findEmailMatches(value) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!LOGIN_EMAIL_RE.test(email)) return [];
+  const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const emailQuery = { email: new RegExp(`^${escaped}$`, 'i') };
+  const [teachers, students] = await Promise.all([
+    Teacher.find(emailQuery)
+      .select('+password +refreshToken +mfaSecret')
+      .limit(2),
+    Student.find(emailQuery)
+      .select('+password +knownDevices')
+      .limit(2),
+  ]);
+  return [
+    ...teachers.map((user) => ({ type: 'teacher', user, role: user.role })),
+    ...students.map((user) => ({ type: 'student', user, role: 'student' })),
+  ];
+}
+
 async function lookupUserByEmail(value, requestedRole = null) {
   const email = String(value || '').trim().toLowerCase();
   if (!LOGIN_EMAIL_RE.test(email)) return null;
-  if (requestedRole === 'student') {
-    const user = await Student.findOne({ email }).select('+password');
-    return user ? { user, role: 'student' } : null;
+  const masterEmail = String(process.env.MASTER_ADMIN_EMAIL || '').trim().toLowerCase();
+  if (masterEmail && email === masterEmail) {
+    logger.warn('[AUTH] MASTER_ADMIN_EMAIL cannot log in as another role');
+    return null;
   }
-  if (requestedRole === 'teacher') {
-    const user = await Teacher.findOne({ email }).select('+password');
-    return user ? { user, role: 'teacher' } : null;
+  const matches = await findEmailMatches(email);
+  if (matches.length !== 1) {
+    if (matches.length > 1) {
+      logger.warn({ count: matches.length }, '[AUTH] ambiguous email identity');
+    }
+    return null;
   }
-  return null;
+  const found = matches[0];
+  if (requestedRole && found.role !== requestedRole) return null;
+  return found;
 }
 
 // ─── POST /api/auth/login/public ─────────────────────────────────────────────
@@ -1548,6 +1578,7 @@ router.post('/register-teacher', sensitiveFlowLimiter, policyShadowAuth('registe
     const teacher = await Teacher.create({
       name,
       phone: canonicalPhone,
+      ...(rawEmail ? { email: rawEmail } : {}),
       password, // sẽ được hash bởi pre-save hook
       specialty: specialty || '',
       status: 'pending',
@@ -2562,6 +2593,7 @@ router.get('/free-portal/:provider/callback', async (req, res) => {
 module.exports = router;
 module.exports._test = {
   lookupUserByPhone,
+  lookupUserByEmail,
   findPhoneMatches,
   normalizeVNPhone,
   socialOAuthDisabled,

@@ -249,8 +249,8 @@ export default function TeacherTeachingLog({
           </div>
         </header>
 
-        <div className="space-y-2 border-b border-slate-200 bg-slate-50/70 px-4 py-2 sm:px-5">
-          <div className="grid grid-cols-4 gap-1.5" role="tablist" aria-label="Lọc nhật ký theo thời gian">
+        <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-2 sm:px-5">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5" role="tablist" aria-label="Lọc nhật ký giảng dạy">
             {dateFilters.map(({ id, label, count }) => {
               const selected = tab === id;
               const cancelled = id === 'cancelled';
@@ -261,26 +261,24 @@ export default function TeacherTeachingLog({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setTab(selected ? 'all' : id)}
-                  className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition-all cursor-pointer sm:text-xs ${selected
+                  className={`flex min-h-9 flex-1 min-w-[72px] items-center justify-center gap-1 rounded-xl border px-2.5 text-xs font-extrabold transition-colors cursor-pointer whitespace-nowrap ${selected
                       ? cancelled
-                        ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm border-b-4 border-b-emerald-800'
-                        : 'border-[#34D399] bg-[#10B981] text-white shadow-sm border-b-4 border-b-[#059669]'
+                        ? 'border-rose-600 bg-rose-600 text-white shadow-sm'
+                        : 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
                       : cancelled
-                        ? 'border-rose-200 bg-rose-50 text-rose-700 border-b-2'
-                        : 'border-slate-200 bg-white text-slate-600 border-b-4 border-b-slate-300 hover:bg-slate-50'
+                        ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100/70'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-emerald-700'
                     }`}
                 >
                   <span>{label}</span>
                   {count !== undefined ? (
-                    <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : cancelled ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
                       {count}
                     </span>
                   ) : null}
                 </button>
               );
             })}
-          </div>
-          <div className="grid grid-cols-2 gap-1.5" role="tablist" aria-label="Lọc trạng thái điểm danh">
             {[
               { id: 'pending', label: 'Chưa điểm danh', count: pendingCount, tone: 'orange' },
               { id: 'confirmation', label: 'Chờ xác nhận', count: confirmationCount, tone: 'emerald' },
@@ -294,12 +292,12 @@ export default function TeacherTeachingLog({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setTab(selected ? 'all' : id)}
-                  className={`flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-extrabold transition-all cursor-pointer sm:text-xs ${selected
-                      ? orange ? 'border-orange-400 bg-orange-600 text-white border-b-4 border-b-orange-800' : 'border-[#34D399] bg-[#10B981] text-white border-b-4 border-b-[#059669]'
-                      : orange ? 'border-orange-200 bg-orange-50 text-orange-800 border-b-2' : 'border-emerald-200 bg-emerald-50 text-emerald-700 border-b-2'
+                  className={`flex min-h-9 flex-1 min-w-[130px] items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-extrabold transition-colors cursor-pointer whitespace-nowrap ${selected
+                      ? orange ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                      : orange ? 'border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100/70' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100/70'
                     }`}
                 >
-                  <span className="truncate">{label}</span>
+                  <span>{label}</span>
                   <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : orange ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>
                     {count}
                   </span>
@@ -309,105 +307,104 @@ export default function TeacherTeachingLog({
           </div>
         </div>
 
-        <div className="px-3 py-2 sm:px-4 sm:py-3">
+        <div>
           {list.length === 0 ? (
             <p className="py-8 text-center text-sm font-medium text-slate-400">{emptyText}</p>
           ) : (
-            <ol className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-              {list.map((sch) => {
-                const kind = getScheduleDisplayKind(sch, now);
-                const meta = getScheduleDisplayMeta(sch, now);
-                const tone = KIND_TONE[kind] || KIND_TONE.upcoming;
-                const cancelled = isCancelledSchedule(sch);
-                const awaitingConfirmation = isAwaitingStudentConfirmation(sch);
-                const dateKey = normalizeScheduleDate(sch.date);
-                const validDate = /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
-                const date = validDate ? new Date(`${dateKey}T00:00:00`) : null;
-                const course = String(sch.course || sch.courseName || '').trim();
-                const title = course || String(sch.topic || sch.title || 'Ca dạy').trim();
-                const startTime = String(sch.startTime || '').trim();
-                const time = sch.endTime
-                  ? `${startTime} – ${sch.endTime}`
-                  : startTime;
-                const studentName = sch.studentName || sch.student?.name || '-';
-                const makeupRequestSent = variant === 'teacher'
-                  && Boolean(getMakeupPending(getMakeupKey(sch)));
-                const canOpenAttendance = !awaitingConfirmation
-                  && PENDING_KINDS.has(kind)
-                  && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
-                const actionLabel = makeupRequestSent
-                  ? 'Đã gửi Admin'
-                  : kind === 'overdue_attendance' ? 'Điểm danh bù' : 'Điểm danh';
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-12 px-3 py-2.5 text-center">STT</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">Ngày</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">Giờ học</th>
+                    <th className="px-3 py-2.5">Khóa học / Buổi dạy</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">Học viên</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">Trạng thái</th>
+                    <th className="px-3 py-2.5 text-right whitespace-nowrap">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {list.map((sch, idx) => {
+                    const kind = getScheduleDisplayKind(sch, now);
+                    const meta = getScheduleDisplayMeta(sch, now);
+                    const tone = KIND_TONE[kind] || KIND_TONE.upcoming;
+                    const cancelled = isCancelledSchedule(sch);
+                    const awaitingConfirmation = isAwaitingStudentConfirmation(sch);
+                    const course = String(sch.course || sch.courseName || '').trim();
+                    const title = course || String(sch.topic || sch.title || 'Ca dạy').trim();
+                    const startTime = String(sch.startTime || '').trim();
+                    const time = sch.endTime
+                      ? `${startTime} – ${sch.endTime}`
+                      : startTime;
+                    const studentName = sch.studentName || sch.student?.name || '-';
+                    const makeupRequestSent = variant === 'teacher'
+                      && Boolean(getMakeupPending(getMakeupKey(sch)));
+                    const canOpenAttendance = !awaitingConfirmation
+                      && !makeupRequestSent
+                      && PENDING_KINDS.has(kind)
+                      && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
+                    const actionLabel = kind === 'overdue_attendance' ? 'Điểm danh bù' : 'Điểm danh';
 
-                return (
-                  <li
-                    key={scheduleKey(sch)}
-                    className={`rounded-2xl border p-2.5 sm:p-3 ${cancelled ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200 bg-white'
-                      }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className={`flex min-h-12 w-[42px] shrink-0 flex-col items-center justify-center rounded-xl ${cancelled ? 'bg-rose-50' : 'bg-blue-50'
-                        }`}>
-                        {date ? (
-                          <>
-                            <span className={`text-xs font-extrabold leading-3 ${cancelled ? 'text-rose-700' : 'text-blue-600'}`}>
-                              T{date.getMonth() + 1}
+                    return (
+                      <tr
+                        key={scheduleKey(sch)}
+                        className={`transition-colors ${cancelled ? 'bg-rose-50/30 hover:bg-rose-50/50' : 'hover:bg-emerald-50/30'}`}
+                      >
+                        <td className="px-3 py-2.5 text-center font-bold text-slate-400 tabular-nums">
+                          {idx + 1}
+                        </td>
+                        <td className="px-3 py-2.5 font-bold text-slate-700 whitespace-nowrap tabular-nums">
+                          {formatScheduleDateVi(sch.date) || '-'}
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-600 whitespace-nowrap tabular-nums">
+                          {time || '-'}
+                        </td>
+                        <td className="px-3 py-2.5 font-extrabold text-slate-900">
+                          <div className="max-w-[320px] truncate" title={title}>{title}</div>
+                          {course && course !== title ? (
+                            <span className="mt-0.5 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                              {course}
                             </span>
-                            <span className={`text-lg font-black leading-[22px] ${cancelled ? 'text-rose-800' : 'text-blue-800'}`}>
-                              {date.getDate()}
-                            </span>
-                          </>
-                        ) : <CalendarDays size={19} className={cancelled ? 'text-rose-600' : 'text-blue-600'} />}
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <p className="text-xs font-black leading-[17px] text-slate-900 sm:text-sm">{title}</p>
-                        <div className="flex items-center gap-1 text-xs leading-[15px] text-slate-500 sm:text-xs">
-                          <Clock3 size={13} className="shrink-0" />
-                          <span>{formatScheduleDateVi(sch.date) || '-'} · {time || '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs leading-[15px] text-slate-500 sm:text-xs">
-                          <Users size={13} className="shrink-0" />
-                          <span>Học viên: {studentName}</span>
-                        </div>
-                        {course ? (
-                          <span className="max-w-full self-start truncate rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 sm:text-xs">
-                            {course}
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2.5 font-bold text-slate-700 whitespace-nowrap">
+                          {studentName}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${makeupRequestSent ? 'bg-slate-100 text-slate-600 border border-slate-200' : tone}`}>
+                            {makeupRequestSent ? <CheckCircle size={12} className="text-emerald-600" /> : null}
+                            {awaitingConfirmation
+                              ? 'Chờ học viên xác nhận'
+                              : makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
                           </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${tone}`}>
-                        {awaitingConfirmation
-                          ? 'Chờ học viên xác nhận'
-                          : makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
-                      </span>
-                      {canOpenAttendance ? (
-                        <button
-                          type="button"
-                          onClick={() => openAttendanceFor(sch)}
-                          disabled={makeupRequestSent}
-                          className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${makeupRequestSent
-                              ? 'cursor-not-allowed bg-slate-100 text-slate-500 border border-slate-200'
-                              : kind === 'overdue_attendance'
-                                ? 'bg-amber-500 border border-amber-400 border-b-4 border-b-amber-700 text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
-                                : 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105 active:translate-y-[2px] active:border-b-2'
-                            }`}
-                          title={makeupRequestSent
-                            ? 'Yêu cầu đã gửi Admin'
-                            : kind === 'overdue_attendance' ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
-                        >
-                          {makeupRequestSent || kind !== 'overdue_attendance'
-                            ? <CheckCircle size={12} />
-                            : <UserCheck size={12} />}
-                          {actionLabel}
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+                        </td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          {canOpenAttendance ? (
+                            <button
+                              type="button"
+                              onClick={() => openAttendanceFor(sch)}
+                              className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-extrabold transition-colors cursor-pointer ${kind === 'overdue_attendance'
+                                  ? 'border-amber-600 bg-amber-500 text-white hover:bg-amber-600'
+                                  : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'
+                                }`}
+                              title={kind === 'overdue_attendance' ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
+                            >
+                              {kind !== 'overdue_attendance'
+                                ? <CheckCircle size={12} />
+                                : <UserCheck size={12} />}
+                              {actionLabel}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </section>

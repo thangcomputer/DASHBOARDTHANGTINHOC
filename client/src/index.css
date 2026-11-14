@@ -742,9 +742,9 @@
     background: linear-gradient(145deg, #10b981, #047857);
     border-color: rgba(255, 255, 255, 0.8);
     box-shadow:
-      inset 2px 2px 5px rgba(127, 29, 29, 0.32),
+      inset 2px 2px 5px rgba(6, 78, 59, 0.32),
       inset -2px -2px 5px rgba(255, 255, 255, 0.22),
-      0 2px 6px rgba(185, 28, 28, 0.18);
+      0 2px 6px rgba(4, 120, 87, 0.18);
   }
 
   .cms-topbar__title {
@@ -822,7 +822,7 @@
 
   .cms-fm-support-button__icon {
     box-shadow:
-      inset 2px 2px 4px rgba(127, 29, 29, 0.28),
+      inset 2px 2px 4px rgba(6, 78, 59, 0.28),
       inset -1px -1px 3px rgba(255, 255, 255, 0.2);
   }
 
@@ -6953,7 +6953,7 @@ body [role='button'][class*='bg-transparent'] {
   box-shadow:
     0 3px 8px rgba(5, 150, 105, 0.35),
     inset 0 1px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -2px 4px rgba(153, 27, 27, 0.5) !important;
+    inset 0 -2px 4px rgba(6, 95, 70, 0.5) !important;
 }
 
 /* navTileHome */
@@ -6980,10 +6980,10 @@ body [role='button'][class*='bg-transparent'] {
   border-bottom-width: 5px;
   background-image: linear-gradient(160deg, #34d399 0%, var(--cms-mnav-accent) 55%, var(--cms-mnav-accent-dark) 100%);
   box-shadow:
-    0 6px 18px rgba(185, 28, 28, 0.35),
+    0 6px 18px rgba(4, 120, 87, 0.35),
     0 0 0 3px rgba(167, 243, 208, 0.75),
     inset 0 3px 5px rgba(255, 255, 255, 0.5),
-    inset 0 -5px 8px rgba(153, 27, 27, 0.5) !important;
+    inset 0 -5px 8px rgba(6, 95, 70, 0.5) !important;
 }
 
 .cms-mobile-bottom-nav__label {
@@ -7108,7 +7108,8 @@ body [role='button'][class*='bg-transparent'] {
   height: 560px;
   top: -240px;
   right: -220px;
-  background: radial-gradient(circle, rgba(5, 150, 105, 0.32) 0%, rgba(5, 150, 105, 0) 68%);
+  background: radial-gradient(circle, rgba(5, 150, 105, 0.36) 0%, rgba(5, 150, 105, 0) 68%);
+  animation: cmsAuraFloatA 14s ease-in-out infinite alternate;
 }
 
 .cms-login-aura--blue {
@@ -7116,7 +7117,8 @@ body [role='button'][class*='bg-transparent'] {
   height: 560px;
   bottom: -260px;
   left: -240px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 68%);
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.24) 0%, rgba(20, 184, 166, 0) 68%);
+  animation: cmsAuraFloatB 16s ease-in-out infinite alternate;
 }
 
 .cms-login-shine {
@@ -7201,8 +7203,8 @@ body .cms-login-role:hover {
 body .cms-login-role.is-active {
   color: #fff;
   background: linear-gradient(180deg, #34d399 0%, #059669 55%, #047857 100%);
-  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.45), inset 0 2px 3px rgba(255, 255, 255, 0.4),
-    inset 0 -3px 6px rgba(127, 29, 29, 0.55) !important;
+  box-shadow: 0 8px 18px rgba(4, 120, 87, 0.45), inset 0 2px 3px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 6px rgba(6, 78, 59, 0.55) !important;
 }
 
 .cms-login-field {
@@ -7269,8 +7271,8 @@ body .cms-login-submit {
   font-weight: 900;
   letter-spacing: 0.04em;
   background: linear-gradient(180deg, #34d399 0%, #059669 55%, #047857 100%);
-  box-shadow: 0 14px 28px rgba(185, 28, 28, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.4),
-    inset 0 -4px 8px rgba(127, 29, 29, 0.55) !important;
+  box-shadow: 0 14px 28px rgba(4, 120, 87, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.4),
+    inset 0 -4px 8px rgba(6, 78, 59, 0.55) !important;
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 
@@ -7333,9 +7335,93 @@ body .cms-login-icon-btn:active {
   width: 30px;
   height: 30px;
   border-radius: 9999px;
-  color: #fca5a5;
+  color: #6ee7b7;
   background: rgba(5, 150, 105, 0.16);
   box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.12), inset 0 -2px 4px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes cmsAuraFloatA {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(-45px, 35px, 0) scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes cmsAuraFloatB {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate3d(45px, -35px, 0) scale(1.14);
+    opacity: 1;
+  }
+}
+
+@keyframes cmsFloatSlow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(var(--cms-rot, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(calc(var(--cms-rot, 0deg) + 4deg));
+  }
+}
+
+@keyframes cmsTextShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes cmsBtnSheen {
+  0% {
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  45%, 100% {
+    transform: translateX(260%) skewX(-20deg);
+  }
+}
+
+.cms-login-float {
+  animation: cmsFloatSlow 7s ease-in-out infinite;
+}
+
+.cms-login-text-shimmer {
+  background-size: 200% auto;
+  animation: cmsTextShimmer 5s linear infinite;
+}
+
+.cms-login-btn-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 100%
+  );
+  transform: translateX(-120%) skewX(-20deg);
+  animation: cmsBtnSheen 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cms-login-aura--red,
+  .cms-login-aura--blue,
+  .cms-login-float,
+  .cms-login-text-shimmer,
+  .cms-login-btn-sheen::after {
+    animation: none !important;
+  }
 }
 
 /* Tự động co giãn mượt mà theo chiều cao viewport (Auto-scale for high DPI / high zoom / short screens)
@@ -7350,7 +7436,7 @@ body .cms-login-icon-btn:active {
 
   .cms-login-autoscale-right {
     transform-origin: center center;
-    transform: scale(min(1, calc((100vh - 32px) / 540px)));
+    transform: scale(min(1, calc((100vh - 32px) / 610px)));
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }

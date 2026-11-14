@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const Student = require('../models/Student');
 const { FREE_COURSE_NAME, freePortalFlags } = require('./freePortal');
 const { normalizeVNPhone } = require('../utils/phoneIdentity');
+const { assertUniqueContact } = require('../utils/uniqueContact');
 
 const PROVIDERS = {
   google: 'googleId',
@@ -311,6 +312,9 @@ async function exchangeTicket(token, fingerprint) {
   if (!student) {
     const field = PROVIDERS[profile.provider];
     const email = String(profile.email || '').trim().toLowerCase();
+    if (email) {
+      await assertUniqueContact({ email });
+    }
     const displayName = String(profile.name || '').trim() || 'Học viên DewSkill';
     student = await Student.create({
       name: displayName,
@@ -383,6 +387,12 @@ async function completeProfile({ token, name, age, phone, email, fingerprint }) 
     }
     student = byPhone;
   }
+  await assertUniqueContact({
+    phone: canonicalPhone,
+    zalo: canonicalPhone,
+    ...(rawEmail ? { email: rawEmail } : {}),
+    ...(student?._id ? { excludeRole: 'student', excludeId: student._id } : {}),
+  });
   if (student) {
     student.name = displayName;
     student.phone = canonicalPhone;
