@@ -294,6 +294,26 @@ const AdminProgressPanel = ({ courseId }) => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+const FREE_DIFF_ORDER = { easy: 1, medium: 2, hard: 3 };
+
+function extractStageOrder(unitTitle) {
+  const m = String(unitTitle || '').match(/chặng\s*(\d+)/i);
+  return m ? Number(m[1]) : 0;
+}
+
+function sortFreePortalItems(list = []) {
+  return [...list].sort((a, b) => {
+    const topicCmp = String(a?.topicName || '').localeCompare(String(b?.topicName || ''), 'vi');
+    if (topicCmp !== 0) return topicCmp;
+    const stageDiff = extractStageOrder(a?.unitTitle) - extractStageOrder(b?.unitTitle);
+    if (stageDiff !== 0) return stageDiff;
+    const diffA = FREE_DIFF_ORDER[String(a?.difficulty || '').toLowerCase()] || 0;
+    const diffB = FREE_DIFF_ORDER[String(b?.difficulty || '').toLowerCase()] || 0;
+    if (diffA !== diffB) return diffA - diffB;
+    return String(a?.title || '').localeCompare(String(b?.title || ''), 'vi');
+  });
+}
+
 const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, hideTabBar = true, focusAssignmentId = '' }) => {
   const toast = useToast();
   const trainingData = trainingDataProp || { videos: [], guides: [], files: [] };
@@ -357,24 +377,27 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
   const visibleFiles = useMemo(() => {
     const list = trainingData?.files || [];
-    if (!isFreePortalOnly || fpTopicFilter === 'all') return list;
-    return list.filter((f) => String(f?.topicId || '') === fpTopicFilter);
+    if (!isFreePortalOnly) return list;
+    const filtered = fpTopicFilter === 'all' ? list : list.filter((f) => String(f?.topicId || '') === fpTopicFilter);
+    return sortFreePortalItems(filtered);
   }, [trainingData?.files, isFreePortalOnly, fpTopicFilter]);
 
   const visibleSoftwareLinks = useMemo(() => {
     const list = trainingData?.softwareLinks || [];
-    if (!isFreePortalOnly || fpTopicFilter === 'all') return list;
-    return list.filter((s) => String(s?.topicId || '') === fpTopicFilter);
+    if (!isFreePortalOnly) return list;
+    const filtered = fpTopicFilter === 'all' ? list : list.filter((s) => String(s?.topicId || '') === fpTopicFilter);
+    return sortFreePortalItems(filtered);
   }, [trainingData?.softwareLinks, isFreePortalOnly, fpTopicFilter]);
 
   const visibleAssignments = useMemo(() => {
     const list = trainingData?.assignments || [];
     if (!isFreePortalOnly) return list;
-    return list.filter((a) => {
+    const filtered = list.filter((a) => {
       if (fpTopicFilter !== 'all' && String(a?.topicId || '') !== fpTopicFilter) return false;
       if (fpDifficultyFilter !== 'all' && String(a?.difficulty || 'easy') !== fpDifficultyFilter) return false;
       return true;
     });
+    return sortFreePortalItems(filtered);
   }, [trainingData?.assignments, isFreePortalOnly, fpTopicFilter, fpDifficultyFilter]);
 
   // Mở thẳng một bài tập từ trang Tổng quan (#materials-assignments?assignmentId=…).
@@ -1477,6 +1500,89 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   ))}
                 </div>
               )}
+              {isFreePortalOnly ? (
+                visibleFiles.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <FileBox size={40} className="mx-auto mb-3 opacity-40" />
+                    <p className="font-bold">Chưa có tài liệu</p>
+                    <p className="text-xs mt-1">Chưa có tài liệu cho môn này.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full min-w-[680px] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600 border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 w-12 text-center">STT</th>
+                          <th className="px-4 py-3">Môn học</th>
+                          <th className="px-4 py-3">Chủ đề / Chặng</th>
+                          <th className="px-4 py-3">Tài liệu</th>
+                          <th className="px-4 py-3 text-right">Tải xuống</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {visibleFiles.map((file, idx) => {
+                          const fKey = file.id ?? `f-${idx}`;
+                          const rawUrl = file.fileUrl || file.url || file.link || '';
+                          const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
+                            || /^https?:\/\//i.test(String(rawUrl));
+                          return (
+                            <tr key={fKey} className="hover:bg-emerald-50/40 transition-colors">
+                              <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                                  {file.topicName || 'Chung'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-block rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                  {file.unitTitle || 'Cả môn'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-bold text-slate-800">{file.title}</div>
+                                {file.desc ? (
+                                  <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{htmlToPlainText(file.desc)}</div>
+                                ) : null}
+                                <div className="mt-1 text-[11px] font-semibold text-slate-400">
+                                  {isLink ? 'Liên kết ngoài' : `${file.fileType || 'FILE'}${file.fileSize ? ` · ${file.fileSize}` : ''}`}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right whitespace-nowrap">
+                                {!rawUrl ? (
+                                  <span className="text-xs text-slate-400">Chưa có file</span>
+                                ) : isLink ? (
+                                  <a
+                                    href={resolveMediaUrl(rawUrl)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-sky-700 no-underline"
+                                  >
+                                    <ExternalLink size={14} /> Mở link
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                                    onClick={async () => {
+                                      try {
+                                        await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
+                                      } catch (err) {
+                                        toast.error(err?.message || 'Không tải được tài liệu');
+                                      }
+                                    }}
+                                  >
+                                    <Download size={14} /> Tải xuống
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
               <div className="space-y-3">
                 {visibleFiles.map((file, idx) => {
                   const fKey = file.id ?? `f-${idx}`;
@@ -1579,42 +1685,105 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   <div className="col-span-full py-16 text-center text-slate-400">
                     <FileBox size={40} className="mx-auto mb-3 opacity-40" />
                     <p className="font-bold">Chưa có tài liệu</p>
-                    <p className="text-xs mt-1">{isFreePortalOnly ? 'Chưa có tài liệu cho môn này.' : 'Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.'}</p>
+                    <p className="text-xs mt-1">Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 
           {/* SOFTWARE LINKS TAB */}
           {mainTab === 'software' && (
-            <div className="space-y-4">
-              {isFreePortalOnly && fpTopicOptions.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 rounded-2xl border border-slate-200 bg-white p-3">
-                  <button
-                    type="button"
-                    onClick={() => setFpTopicFilter('all')}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    Tất cả môn
-                  </button>
-                  {fpTopicOptions.map((tp) => (
+            isFreePortalOnly ? (
+              <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-3">
+                  <LinkIcon className="text-emerald-600" /> Phần mềm hỗ trợ học tập
+                </h2>
+                {fpTopicOptions.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-1.5">
                     <button
-                      key={tp.id}
                       type="button"
-                      onClick={() => setFpTopicFilter(tp.id)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                      onClick={() => setFpTopicFilter('all')}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                     >
-                      {tp.name}
+                      Tất cả môn
                     </button>
-                  ))}
-                </div>
-              )}
+                    {fpTopicOptions.map((tp) => (
+                      <button
+                        key={tp.id}
+                        type="button"
+                        onClick={() => setFpTopicFilter(tp.id)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        {tp.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {visibleSoftwareLinks.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <LinkIcon size={36} className="mx-auto mb-2 opacity-40" />
+                    <p className="font-bold">Chưa có link phần mềm cho môn này.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full min-w-[680px] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600 border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 w-12 text-center">STT</th>
+                          <th className="px-4 py-3">Môn học</th>
+                          <th className="px-4 py-3">Chủ đề / Chặng</th>
+                          <th className="px-4 py-3">Phần mềm &amp; Hướng dẫn</th>
+                          <th className="px-4 py-3 text-right">Tải xuống</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {visibleSoftwareLinks.map((sw, idx) => (
+                          <tr key={sw.id || `sw-${idx}`} className="hover:bg-emerald-50/40 transition-colors">
+                            <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                                {sw.topicName || 'Chung'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-block rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                {sw.unitTitle || 'Cả môn'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{sw.title}</div>
+                              {sw.description ? <div className="text-xs text-slate-500 mt-0.5">{sw.description}</div> : null}
+                              {sw.installGuide ? <div className="text-xs text-emerald-700 mt-1 whitespace-pre-wrap">Hướng dẫn: {sw.installGuide}</div> : null}
+                            </td>
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              {sw.linkUrl ? (
+                                <a
+                                  href={sw.linkUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 no-underline"
+                                >
+                                  <Download size={14} /> Tải / Mở link
+                                </a>
+                              ) : (
+                                <span className="text-xs text-slate-400">Chưa có link</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : (
               <SoftwareLinksTable
                 items={visibleSoftwareLinks}
                 title=""
               />
-            </div>
+            )
           )}
 
           {/* ASSIGNMENTS TAB */}
@@ -1665,6 +1834,122 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   </div>
                 </div>
               )}
+              {isFreePortalOnly ? (
+                visibleAssignments.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <CheckCircle2 size={32} className="mx-auto mb-2 text-slate-200" />
+                    <p className="text-sm">Chưa có bài tập phù hợp với bộ lọc hiện tại.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full min-w-[780px] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600 border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 w-12 text-center">STT</th>
+                          <th className="px-4 py-3">Môn học</th>
+                          <th className="px-4 py-3">Chủ đề / Chặng</th>
+                          <th className="px-4 py-3">Mức độ</th>
+                          <th className="px-4 py-3">Bài tập &amp; Yêu cầu</th>
+                          <th className="px-4 py-3 text-right">Tải xuống &amp; Nộp bài</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {visibleAssignments.map((a, idx) => {
+                          const submission = a.mySubmission || localSubmissions[idx];
+                          const d = String(a.difficulty || 'easy').toLowerCase();
+                          const meta = d === 'hard'
+                            ? { label: 'Khó', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
+                            : d === 'medium'
+                              ? { label: 'Vừa', cls: 'bg-amber-100 text-amber-700 border-amber-200' }
+                              : { label: 'Dễ', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+                          const aKey = a._id || a.id || `a-${idx}`;
+                          const aDesc = htmlToPlainText(a.description || '');
+                          const isExternal = /^https?:\/\//i.test(String(a.fileUrl || ''));
+                          return (
+                            <tr key={aKey} id={`lms-assignment-${aKey}`} className="hover:bg-emerald-50/40 transition-colors">
+                              <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                                  {a.topicName || 'Chung'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-block rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                  {a.unitTitle || 'Cả môn'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className={`inline-block rounded-lg border px-2.5 py-1 text-xs font-black ${meta.cls}`}>
+                                  {meta.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-bold text-slate-800">{a.title}</div>
+                                <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                                  {aDesc || 'Tải đề bài về thực hành và nộp lại file bài làm (.zip, .rar, .pdf, .docx, .xlsx).'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right whitespace-nowrap">
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  {a.fileUrl ? (
+                                    isExternal ? (
+                                      <a
+                                        href={resolveMediaUrl(a.fileUrl)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 no-underline"
+                                      >
+                                        <ExternalLink size={13} /> Tải đề
+                                      </a>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          try {
+                                            await downloadMediaFile(a.fileUrl, a.fileOriginalName || a.title);
+                                          } catch (err) {
+                                            toast.error(err?.message || 'Không tải được đề bài');
+                                          }
+                                        }}
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                      >
+                                        <Download size={13} /> Tải đề
+                                      </button>
+                                    )
+                                  ) : null}
+                                  <label className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold text-white cursor-pointer transition ${
+                                    uploadingAssignId === idx
+                                      ? 'bg-emerald-400 cursor-not-allowed'
+                                      : submission
+                                        ? 'bg-amber-500 hover:bg-amber-600'
+                                        : 'bg-emerald-600 hover:bg-emerald-700'
+                                  }`}>
+                                    {uploadingAssignId === idx ? (
+                                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : submission ? (
+                                      <CheckCircle2 size={14} />
+                                    ) : (
+                                      <UploadCloud size={14} />
+                                    )}
+                                    <span>{uploadingAssignId === idx ? 'Đang tải...' : submission ? 'Đã nộp · Nộp lại' : 'Nộp bài'}</span>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx"
+                                      onChange={(e) => handleFileChange(a, idx, e.target.files[0])}
+                                      disabled={uploadingAssignId === idx}
+                                    />
+                                  </label>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {visibleAssignments.map((a, idx) => {
                   const submission = a.mySubmission || localSubmissions[idx];
@@ -1818,10 +2103,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 {visibleAssignments.length === 0 && (
                   <div className="text-center py-12 text-slate-400 col-span-full">
                     <CheckCircle2 size={32} className="mx-auto mb-2 text-slate-200" />
-                    <p className="text-sm">{isFreePortalOnly ? 'Chưa có bài tập phù hợp với bộ lọc hiện tại.' : 'Hiện tại bạn không có bài tập nào cần nộp.'}</p>
+                    <p className="text-sm">Hiện tại bạn không có bài tập nào cần nộp.</p>
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 
