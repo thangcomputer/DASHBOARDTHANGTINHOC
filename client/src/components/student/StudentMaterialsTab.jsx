@@ -8,6 +8,8 @@ export default function StudentMaterialsTab({
   studentTrainingForLms,
   myAssignments,
   studentTrainingData,
+  freePortalTrainingData = null,
+  isFreePortalOnly = false,
   enrollments = [],
   activeCourseName,
   setActiveCourseName,
@@ -28,22 +30,36 @@ export default function StudentMaterialsTab({
     if (activeEnrollment !== preferredCourse) setActiveCourseName(preferredName);
   }, [activeCourseName, enrollments, initialMainTab, preferredCourse, setActiveCourseName]);
 
+  const resolvedTrainingProp = isFreePortalOnly
+    ? {
+        videos: [],
+        files: freePortalTrainingData?.files || [],
+        softwareLinks: freePortalTrainingData?.softwareLinks || [],
+        assignments: freePortalTrainingData?.assignments || [],
+        exams: [],
+        isFreePortalOnly: true,
+      }
+    : {
+        videos: studentTrainingForLms.videos,
+        files: studentTrainingForLms.files,
+        softwareLinks: studentTrainingData?.softwareLinks || [],
+        assignments: myAssignments || [],
+        exams: viewStudent?.exams || studentTrainingData?.exams || [],
+        isFreePortalOnly: false,
+      };
+
   return (
           <div className="cms-sd cms-sd-page bg-slate-50 min-h-full">
-            <CourseSwitcher
-              courses={initialMainTab === 'courses' ? [] : enrollments}
-              activeCourseName={activeCourseName || viewStudent?.course}
-              onChange={setActiveCourseName}
-            />
+            {!isFreePortalOnly && (
+              <CourseSwitcher
+                courses={initialMainTab === 'courses' ? [] : enrollments}
+                activeCourseName={activeCourseName || viewStudent?.course}
+                onChange={setActiveCourseName}
+              />
+            )}
             <StudentTrainingLMS 
               key={initialMainTab || 'materials'}
-              trainingDataProp={{
-                 videos: studentTrainingForLms.videos,
-                 files: studentTrainingForLms.files,
-                 softwareLinks: studentTrainingData?.softwareLinks || [],
-                 assignments: myAssignments || [],
-                 exams: viewStudent?.exams || studentTrainingData?.exams || []
-              }}
+              trainingDataProp={resolvedTrainingProp}
               onBack={undefined}
               initialMainTab={initialMainTab}
               hideTabBar={hideTabBar}

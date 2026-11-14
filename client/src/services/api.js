@@ -1807,6 +1807,28 @@ export const settingsAPI = {
     }
     return data;
   },
+  getFreePortalTrainingData: async () => {
+    const res = await apiFetch('/settings/free-portal-training-data');
+    return res.json();
+  },
+  updateFreePortalTrainingData: async (freePortalTrainingData) => {
+    const res = await apiFetch('/settings/free-portal-training-data', {
+      method: 'PUT',
+      body: JSON.stringify({ freePortalTrainingData }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || `Lưu tài nguyên miễn phí thất bại (${res.status})`);
+    }
+    return data;
+  },
+  submitFreePortalAssignment: async (assignmentId, payload) => {
+    const res = await apiFetch(`/settings/free-portal-training-data/assignments/${encodeURIComponent(assignmentId)}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
   getTeacherExamConfig: async () => {
     const res = await apiFetch('/settings/teacher-exam-config');
     return res.json();

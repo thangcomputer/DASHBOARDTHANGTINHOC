@@ -77,6 +77,12 @@ const systemSettingsSchema = new mongoose.Schema({
     default: { videos: [], guides: [], files: [] }
   },
 
+  // ── Free Portal Training Data Raw (Tài liệu, Phần mềm, Bài tập riêng cho tài khoản miễn phí) ──
+  freePortalTrainingRawData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: { files: [], softwareLinks: [], assignments: [] }
+  },
+
   // ── Ngân hàng câu hỏi thi + thời gian làm bài (HV) - đồng bộ mọi máy ───
   // Chỉ ghi khi admin PUT; undefined = chưa cấu hình trên server (client dùng local seed cũ)
   studentExamBankRawData: { type: mongoose.Schema.Types.Mixed },

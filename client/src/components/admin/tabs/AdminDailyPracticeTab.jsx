@@ -11,6 +11,7 @@ import {
   DIFFICULTIES, QUESTION_TYPES, TOPIC_COLORS, TOPIC_ICONS, difficultyMeta, topicColor, topicIcon,
 } from '../../../utils/dailyPractice';
 import AdminMilestoneEditor, { VideoChecksEditor, normalizeLevelConfigs } from './AdminMilestoneEditor';
+import AdminFreePortalMaterialsPanel from './AdminFreePortalMaterialsPanel';
 
 const TYPE_IDS = Object.keys(QUESTION_TYPES);
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
@@ -1644,6 +1645,7 @@ export default function AdminDailyPracticeTab() {
   const [questionModal, setQuestionModal] = useState(null);
   const [aiOpen, setAiOpen] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [sectionTab, setSectionTab] = useState('practice'); // practice | free-materials
   const topic = topics.find((t) => t.id === topicId) || null;
 
   const loadTopics = useCallback(async () => {
@@ -1753,14 +1755,41 @@ export default function AdminDailyPracticeTab() {
             <p className="text-xs text-slate-500">Ngân hàng câu hỏi trò chơi theo chủ đề và độ khó cho học viên</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={installStarter} disabled={busy} className="cms-btn cms-btn-outline">
-            {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Thêm bộ câu hỏi mẫu
-          </button>
-          <button type="button" onClick={() => setTopicModal({})} className="cms-btn cms-btn-primary"><Plus size={16} /> Thêm chủ đề</button>
-        </div>
+        {sectionTab === 'practice' && (
+          <div className="flex gap-2">
+            <button type="button" onClick={installStarter} disabled={busy} className="cms-btn cms-btn-outline">
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Thêm bộ câu hỏi mẫu
+            </button>
+            <button type="button" onClick={() => setTopicModal({})} className="cms-btn cms-btn-primary"><Plus size={16} /> Thêm chủ đề</button>
+          </div>
+        )}
       </div>
 
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-1.5">
+        <button
+          type="button"
+          onClick={() => setSectionTab('practice')}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+            sectionTab === 'practice' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Gamepad2 size={15} /> Lộ trình &amp; Câu hỏi theo chặng
+        </button>
+        <button
+          type="button"
+          onClick={() => setSectionTab('free-materials')}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+            sectionTab === 'free-materials' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <BookOpen size={15} /> Tài nguyên miễn phí (Tài liệu · Phần mềm · Bài tập)
+        </button>
+      </div>
+
+      {sectionTab === 'free-materials' ? (
+        <AdminFreePortalMaterialsPanel topics={topics} />
+      ) : (
+        <>
       <XpPackPrices />
 
       {loading ? (
@@ -1930,6 +1959,8 @@ export default function AdminDailyPracticeTab() {
             </section>
           )}
         </div>
+      )}
+        </>
       )}
 
       {topicModal && (

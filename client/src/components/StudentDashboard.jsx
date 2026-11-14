@@ -310,6 +310,7 @@ const StudentDashboard = () => {
 
   // ─── Assignments State ───
   const [myAssignments, setMyAssignments] = useState([]);
+  const [freePortalTrainingData, setFreePortalTrainingData] = useState({ files: [], softwareLinks: [], assignments: [] });
   const [activeAssignment, setActiveAssignment] = useState(null);
   const [submissionLink, setSubmissionLink] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -432,6 +433,27 @@ const StudentDashboard = () => {
   const freeHashLocked = freeLocked && freeMenu && [
     'materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores',
   ].includes(sectionHash);
+
+  useEffect(() => {
+    if (!freeMenu || freePortalApiLocked) {
+      setFreePortalTrainingData({ files: [], softwareLinks: [], assignments: [] });
+      return undefined;
+    }
+    let cancelled = false;
+    api.settings.getFreePortalTrainingData()
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.success && res.data) {
+          setFreePortalTrainingData({
+            files: Array.isArray(res.data.files) ? res.data.files : [],
+            softwareLinks: Array.isArray(res.data.softwareLinks) ? res.data.softwareLinks : [],
+            assignments: Array.isArray(res.data.assignments) ? res.data.assignments : [],
+          });
+        }
+      })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [freeMenu, freePortalApiLocked]);
 
   // Rating state
   const [ratingCriteria, setRatingCriteria] = useState({ teaching: '', voice: '', guidance: '', support: '' });
@@ -808,6 +830,8 @@ const StudentDashboard = () => {
             studentTrainingForLms={studentTrainingForLms}
             myAssignments={activeAssignments}
             studentTrainingData={studentTrainingData}
+            freePortalTrainingData={freePortalTrainingData}
+            isFreePortalOnly={freeMenu}
             enrollments={enrollments}
             activeCourseName={activeCourseName}
             setActiveCourseName={setActiveCourseName}

@@ -15,6 +15,7 @@ const { normalizeMulterFile } = require('../utils/escapeRegex');
 const { emitDataRefresh } = require('../utils/realtimeEmit');
 const { pickAssignmentCreate, pickAssignmentUpdate } = require('../utils/assignmentDto');
 const { studentMatchesTeacher } = require('../services/enrollmentService');
+const { hasRealCourseEnrollment } = require('../services/freePortal');
 const { policyShadowAssignment } = require('../middleware/policyShadowAssignment');
 const { assignmentsCutoverGate } = require('../middleware/assignmentsCutoverGate');
 const { validateUploadedFileMagic } = require('../utils/uploadSniff');
@@ -206,6 +207,9 @@ router.get('/student/:studentId/course/:courseId', [authMiddleware, ...assignmen
     // Authorization: Học viên chỉ xem bài của mình
     if (req.user.role === 'student' && String(req.user.id || req.user._id) !== String(req.params.studentId)) {
       return res.status(403).json({ success: false, message: 'Không có quyền xem bài tập của học viên khác' });
+    }
+    if (req.user.role === 'student' && req.user.freePortal === true && !hasRealCourseEnrollment(req.user)) {
+      return res.json({ success: true, data: [] });
     }
 
     // Khớp đúng tên khóa (không phân biệt hoa thường / khoảng trắng thừa).

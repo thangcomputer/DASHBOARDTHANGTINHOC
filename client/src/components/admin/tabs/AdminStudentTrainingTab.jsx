@@ -307,7 +307,11 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
               )}
 
               {!videoCoursesOnly && ['files', 'softwareLinks'].includes(sTrainingTab) && (
-                <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
+                <>
+                  <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2 text-xs text-sky-900">
+                    Mục này dành riêng cho <strong>Học viên theo khóa</strong>. Tài liệu, Phần mềm và Bài tập cho <strong>Tài khoản miễn phí</strong> được quản lý riêng tại <strong>Luyện tập hằng ngày → Tài nguyên miễn phí</strong>.
+                  </div>
+                  <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
                   {[
                     { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
                     { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
@@ -324,7 +328,8 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       <span className="text-xs opacity-80">({tab.count})</span>
                     </button>
                   ))}
-                </div>
+                  </div>
+                </>
               )}
 
               {!videoCoursesOnly && ['questions', 'exam-results'].includes(sTrainingTab) && (

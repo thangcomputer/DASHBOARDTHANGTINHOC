@@ -336,6 +336,46 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const [courseFilterPrice, setCourseFilterPrice] = useState('all'); // all | paid | free
   const [courseFilterSubject, setCourseFilterSubject] = useState('all');
   const [catalogInfoTab, setCatalogInfoTab] = useState('content'); // content | desc | info
+  const [fpTopicFilter, setFpTopicFilter] = useState('all');
+  const [fpDifficultyFilter, setFpDifficultyFilter] = useState('all'); // all | easy | medium | hard
+  const isFreePortalOnly = Boolean(trainingData?.isFreePortalOnly);
+
+  const fpTopicOptions = useMemo(() => {
+    if (!isFreePortalOnly) return [];
+    const seen = new Map();
+    [
+      ...(trainingData?.files || []),
+      ...(trainingData?.softwareLinks || []),
+      ...(trainingData?.assignments || []),
+    ].forEach((item) => {
+      const tid = String(item?.topicId || '').trim();
+      const tname = String(item?.topicName || '').trim();
+      if (tid && !seen.has(tid)) seen.set(tid, tname || 'Môn học');
+    });
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [isFreePortalOnly, trainingData?.files, trainingData?.softwareLinks, trainingData?.assignments]);
+
+  const visibleFiles = useMemo(() => {
+    const list = trainingData?.files || [];
+    if (!isFreePortalOnly || fpTopicFilter === 'all') return list;
+    return list.filter((f) => String(f?.topicId || '') === fpTopicFilter);
+  }, [trainingData?.files, isFreePortalOnly, fpTopicFilter]);
+
+  const visibleSoftwareLinks = useMemo(() => {
+    const list = trainingData?.softwareLinks || [];
+    if (!isFreePortalOnly || fpTopicFilter === 'all') return list;
+    return list.filter((s) => String(s?.topicId || '') === fpTopicFilter);
+  }, [trainingData?.softwareLinks, isFreePortalOnly, fpTopicFilter]);
+
+  const visibleAssignments = useMemo(() => {
+    const list = trainingData?.assignments || [];
+    if (!isFreePortalOnly) return list;
+    return list.filter((a) => {
+      if (fpTopicFilter !== 'all' && String(a?.topicId || '') !== fpTopicFilter) return false;
+      if (fpDifficultyFilter !== 'all' && String(a?.difficulty || 'easy') !== fpDifficultyFilter) return false;
+      return true;
+    });
+  }, [trainingData?.assignments, isFreePortalOnly, fpTopicFilter, fpDifficultyFilter]);
 
   // Mở thẳng một bài tập từ trang Tổng quan (#materials-assignments?assignmentId=…).
   useEffect(() => {
@@ -398,11 +438,16 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       const res = await api.assignments.uploadFile(file);
       if (res.success) {
         const fileUrl = res.fileUrl;
-        const submitRes = await api.assignments.submit(assignmentObj._id, {
-          studentId: student?.id || session?.id,
-          teacherId: assignmentObj.teacherId || student?.teacherId || undefined,
-          submittedFileUrl: fileUrl
-        });
+        const submitRes = assignmentObj.isFreePortal
+          ? await api.settings.submitFreePortalAssignment(assignmentObj.id, {
+              submittedFileUrl: fileUrl,
+              fileName: file.name,
+            })
+          : await api.assignments.submit(assignmentObj._id, {
+              studentId: student?.id || session?.id,
+              teacherId: assignmentObj.teacherId || student?.teacherId || undefined,
+              submittedFileUrl: fileUrl
+            });
 
         if (submitRes.success) {
           setLocalSubmissions(prev => ({
@@ -1408,11 +1453,32 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           {/* FILES TAB */}
           {mainTab === 'files' && (
             <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                <Download className="text-green-600" /> Tài liệu Khóa học
+              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-3">
+                <Download className="text-green-600" /> {isFreePortalOnly ? 'Tài liệu luyện tập miễn phí' : 'Tài liệu Khóa học'}
               </h2>
+              {isFreePortalOnly && fpTopicOptions.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setFpTopicFilter('all')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Tất cả môn
+                  </button>
+                  {fpTopicOptions.map((tp) => (
+                    <button
+                      key={tp.id}
+                      type="button"
+                      onClick={() => setFpTopicFilter(tp.id)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {tp.name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="space-y-3">
-                {trainingData?.files?.map((file, idx) => {
+                {visibleFiles.map((file, idx) => {
                   const fKey = file.id ?? `f-${idx}`;
                   const descHtml = file.desc || '';
                   const plain = htmlToPlainText(descHtml);
@@ -1431,7 +1497,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                           {isLink ? 'Link' : (file.fileType || 'FILE')}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-bold text-slate-800 text-base leading-tight group-hover:text-green-700 transition-colors">{file.title}</h3>
+                          <h3 className="font-bold text-slate-800 text-base leading-tight group-hover:text-green-700 transition-colors flex flex-wrap items-center gap-2">
+                            <span>{file.title}</span>
+                            {file.topicName && (
+                              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                                {file.topicName}{file.unitTitle ? ` · ${file.unitTitle}` : ''}
+                              </span>
+                            )}
+                          </h3>
                           {!descHtml && !plain ? (
                             <p className="text-[12px] text-slate-500 mt-1 mb-1">{defaultNote}</p>
                           ) : expanded && hasHtml ? (
@@ -1502,11 +1575,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                     </div>
                   );
                 })}
-                {(!trainingData?.files || trainingData.files.length === 0) && (
+                {visibleFiles.length === 0 && (
                   <div className="col-span-full py-16 text-center text-slate-400">
                     <FileBox size={40} className="mx-auto mb-3 opacity-40" />
                     <p className="font-bold">Chưa có tài liệu</p>
-                    <p className="text-xs mt-1">Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
+                    <p className="text-xs mt-1">{isFreePortalOnly ? 'Chưa có tài liệu cho môn này.' : 'Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.'}</p>
                   </div>
                 )}
               </div>
@@ -1515,20 +1588,85 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           {/* SOFTWARE LINKS TAB */}
           {mainTab === 'software' && (
-            <SoftwareLinksTable
-              items={trainingData?.softwareLinks || []}
-              title=""
-            />
+            <div className="space-y-4">
+              {isFreePortalOnly && fpTopicOptions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 rounded-2xl border border-slate-200 bg-white p-3">
+                  <button
+                    type="button"
+                    onClick={() => setFpTopicFilter('all')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Tất cả môn
+                  </button>
+                  {fpTopicOptions.map((tp) => (
+                    <button
+                      key={tp.id}
+                      type="button"
+                      onClick={() => setFpTopicFilter(tp.id)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {tp.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <SoftwareLinksTable
+                items={visibleSoftwareLinks}
+                title=""
+              />
+            </div>
           )}
 
           {/* ASSIGNMENTS TAB */}
           {mainTab === 'assignments' && (
             <div className="cms-card !p-4 sm:!p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
-                <BookOpen className="text-green-600" /> Bài tập được giao
+                <BookOpen className="text-green-600" /> {isFreePortalOnly ? 'Bài tập luyện tập (3 mức độ)' : 'Bài tập được giao'}
               </h2>
+              {isFreePortalOnly && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  {fpTopicOptions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setFpTopicFilter('all')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        Tất cả môn
+                      </button>
+                      {fpTopicOptions.map((tp) => (
+                        <button
+                          key={tp.id}
+                          type="button"
+                          onClick={() => setFpTopicFilter(tp.id)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                          {tp.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: 'all', label: 'Mọi mức' },
+                      { id: 'easy', label: 'Dễ' },
+                      { id: 'medium', label: 'Vừa' },
+                      { id: 'hard', label: 'Khó' },
+                    ].map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setFpDifficultyFilter(d.id)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpDifficultyFilter === d.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-                {trainingData?.assignments?.map((a, idx) => {
+                {visibleAssignments.map((a, idx) => {
                   const submission = a.mySubmission || localSubmissions[idx];
                   let targetDate = null;
                   let isLate = false;
@@ -1574,6 +1712,24 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                               }`}>
                               {assignerLabel}
                             </span>
+                            {a.isFreePortal && (() => {
+                              const d = String(a.difficulty || 'easy').toLowerCase();
+                              const meta = d === 'hard'
+                                ? { label: 'Khó', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
+                                : d === 'medium'
+                                  ? { label: 'Vừa', cls: 'bg-amber-100 text-amber-700 border-amber-200' }
+                                  : { label: 'Dễ', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+                              return (
+                                <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-black border ${meta.cls}`}>
+                                  Mức: {meta.label}
+                                </span>
+                              );
+                            })()}
+                            {a.topicName && (
+                              <span className="shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {a.topicName}{a.unitTitle ? ` · ${a.unitTitle}` : ''}
+                              </span>
+                            )}
                           </h3>
                           {!isAdminAssign && teacherName && teacherName.toLowerCase() !== 'giảng viên' && (
                             <p className="text-[11px] text-slate-500 font-medium -mt-1">
@@ -1659,10 +1815,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                     </div>
                   );
                 })}
-                {(!trainingData?.assignments || trainingData.assignments.length === 0) && (
-                  <div className="text-center py-12 text-slate-400">
+                {visibleAssignments.length === 0 && (
+                  <div className="text-center py-12 text-slate-400 col-span-full">
                     <CheckCircle2 size={32} className="mx-auto mb-2 text-slate-200" />
-                    <p className="text-sm">Hiện tại bạn không có bài tập nào cần nộp.</p>
+                    <p className="text-sm">{isFreePortalOnly ? 'Chưa có bài tập phù hợp với bộ lọc hiện tại.' : 'Hiện tại bạn không có bài tập nào cần nộp.'}</p>
                   </div>
                 )}
               </div>

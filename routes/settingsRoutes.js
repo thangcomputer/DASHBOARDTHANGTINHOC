@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 
 const SystemSettings = require('../models/SystemSettings');
+const FreePortalSubmission = require('../models/FreePortalSubmission');
+const { hasRealCourseEnrollment } = require('../services/freePortal');
 const { verifyAdminPassword } = require('../utils/adminPassword');
 const { authMiddleware, userHasPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
@@ -39,6 +41,70 @@ async function canManageExamBank(req, permission) {
   return userHasPermission(req.user, permission);
 }
 
+function isFreePortalOnlyStudent(user) {
+  return String(user?.role || '').toLowerCase() === 'student'
+    && user?.freePortal === true
+    && !hasRealCourseEnrollment(user);
+}
+
+const FREE_PORTAL_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+
+function sanitizeFreePortalTrainingData(raw = {}) {
+  const safeStr = (v, max = 500) => String(v || '').trim().slice(0, max);
+  const sanitizeList = (list, mapFn) => (Array.isArray(list) ? list : [])
+    .filter((item) => item && typeof item === 'object')
+    .map((item, idx) => mapFn(item, idx))
+    .filter((item) => item.title);
+
+  const files = sanitizeList(raw.files, (item, idx) => ({
+    id: safeStr(item.id || `fp-file-${Date.now()}-${idx}`, 120),
+    title: safeStr(item.title, 200),
+    desc: safeStr(item.desc, 4000),
+    fileUrl: safeStr(item.fileUrl || item.url || item.link, 1000),
+    fileType: safeStr(item.fileType || item.type || 'FILE', 24).toUpperCase(),
+    fileSize: safeStr(item.fileSize, 40),
+    fileOriginalName: safeStr(item.fileOriginalName, 260),
+    topicId: safeStr(item.topicId, 80),
+    topicName: safeStr(item.topicName, 120),
+    unitId: safeStr(item.unitId, 80),
+    unitTitle: safeStr(item.unitTitle, 160),
+    createdAt: safeStr(item.createdAt || new Date().toISOString().slice(0, 10), 40),
+  }));
+
+  const softwareLinks = sanitizeList(raw.softwareLinks, (item, idx) => ({
+    id: safeStr(item.id || `fp-sw-${Date.now()}-${idx}`, 120),
+    title: safeStr(item.title, 200),
+    linkUrl: safeStr(item.linkUrl || item.url, 1000),
+    description: safeStr(item.description, 2000),
+    installGuide: safeStr(item.installGuide, 4000),
+    topicId: safeStr(item.topicId, 80),
+    topicName: safeStr(item.topicName, 120),
+    unitId: safeStr(item.unitId, 80),
+    unitTitle: safeStr(item.unitTitle, 160),
+    createdAt: safeStr(item.createdAt || new Date().toISOString().slice(0, 10), 40),
+  }));
+
+  const assignments = sanitizeList(raw.assignments, (item, idx) => {
+    const rawDiff = String(item.difficulty || 'easy').trim().toLowerCase();
+    return {
+      id: safeStr(item.id || `fp-assign-${Date.now()}-${idx}`, 120),
+      title: safeStr(item.title, 200),
+      description: safeStr(item.description, 4000),
+      fileUrl: safeStr(item.fileUrl, 1000),
+      fileOriginalName: safeStr(item.fileOriginalName, 260),
+      difficulty: FREE_PORTAL_DIFFICULTIES.has(rawDiff) ? rawDiff : 'easy',
+      deadline: safeStr(item.deadline, 40),
+      topicId: safeStr(item.topicId, 80),
+      topicName: safeStr(item.topicName, 120),
+      unitId: safeStr(item.unitId, 80),
+      unitTitle: safeStr(item.unitTitle, 160),
+      createdAt: safeStr(item.createdAt || new Date().toISOString().slice(0, 10), 40),
+    };
+  });
+
+  return { files, softwareLinks, assignments };
+}
+
 async function settingsResponseFor(req, settings) {
   const data = typeof settings?.toObject === 'function'
     ? settings.toObject()
@@ -49,6 +115,13 @@ async function settingsResponseFor(req, settings) {
   ]);
   if (!canManageStudentBank) delete data.studentExamBankRawData;
   if (!canManageTeacherBank) delete data.teacherExamBankRawData;
+  if (String(req.user?.role || '').toLowerCase() === 'student') {
+    if (isFreePortalOnlyStudent(req.user)) {
+      delete data.studentTrainingRawData;
+    } else {
+      delete data.freePortalTrainingRawData;
+    }
+  }
   data.destructiveResetEnabled = isDestructiveResetAllowed(process.env);
   return data;
 }
@@ -401,9 +474,12 @@ router.put('/training-data', authMiddleware, ...settingsGuard('training_write'),
   }
 });
 
-// ── GET /api/settings/student-training-data ── Lấy student training data (Cho mọi user) ───────────
+// ── GET /api/settings/student-training-data ── Lấy student training data (Tách biệt: không trả cho tài khoản miễn phí) ───────────
 router.get('/student-training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
+    if (isFreePortalOnlyStudent(req.user)) {
+      return res.json({ success: true, data: { videos: [], guides: [], files: [], softwareLinks: [] } });
+    }
     const settings = await getSettings();
     const data = normalizeTrainingDataUrls(settings.studentTrainingRawData || { videos: [], guides: [], files: [], softwareLinks: [] });
     return res.json({ success: true, data });
@@ -438,6 +514,85 @@ router.put('/student-training-data', authMiddleware, ...settingsGuard('student_t
     return res.json({ success: true, message: 'Đã cập nhật dữ liệu học viên' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── GET /api/settings/free-portal-training-data ── Tài liệu, Phần mềm, Bài tập riêng cho tài khoản miễn phí ───
+router.get('/free-portal-training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
+  try {
+    const role = String(req.user?.role || '').toLowerCase();
+    if (role === 'student' && !isFreePortalOnlyStudent(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản theo khóa không thể truy cập tài nguyên tài khoản miễn phí',
+      });
+    }
+    if (!['admin', 'staff', 'student'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+    }
+    const settings = await getSettings();
+    const raw = sanitizeFreePortalTrainingData(settings.freePortalTrainingRawData || {});
+    const data = normalizeTrainingDataUrls(raw);
+
+    if (role === 'student') {
+      const studentId = req.user.id || req.user._id;
+      const submissions = await FreePortalSubmission.find({ studentId }).lean();
+      const subMap = new Map(submissions.map((s) => [String(s.assignmentId), s]));
+      data.assignments = (data.assignments || []).map((item) => ({
+        ...item,
+        isFreePortal: true,
+        mySubmission: subMap.get(String(item.id)) || null,
+      }));
+    }
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ── PUT /api/settings/free-portal-training-data ── Cập nhật tài nguyên tài khoản miễn phí (Admin) ───
+router.put('/free-portal-training-data', authMiddleware, ...settingsGuard('student_training_write'), async (req, res) => {
+  try {
+    const nextData = sanitizeFreePortalTrainingData(req.body?.freePortalTrainingData || req.body || {});
+    await updateMainSettings({ $set: { freePortalTrainingRawData: nextData } });
+    const io = req.app.get('io');
+    if (io) emitSettingsRefresh(io);
+    return res.json({ success: true, data: normalizeTrainingDataUrls(nextData), message: 'Đã cập nhật tài nguyên tài khoản miễn phí' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── POST /api/settings/free-portal-training-data/assignments/:assignmentId/submit ── HV miễn phí nộp bài ───
+router.post('/free-portal-training-data/assignments/:assignmentId/submit', authMiddleware, async (req, res) => {
+  try {
+    if (!isFreePortalOnlyStudent(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ tài khoản miễn phí mới nộp bài tại mục này',
+      });
+    }
+    const assignmentId = String(req.params.assignmentId || '').trim();
+    const submittedFileUrl = String(req.body?.submittedFileUrl || '').trim();
+    const fileName = String(req.body?.fileName || '').trim().slice(0, 260);
+    if (!assignmentId || !submittedFileUrl) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin bài tập hoặc file nộp' });
+    }
+    const settings = await getSettings();
+    const assignments = settings.freePortalTrainingRawData?.assignments || [];
+    if (!assignments.some((a) => String(a?.id) === assignmentId)) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy bài tập miễn phí' });
+    }
+    const studentId = req.user.id || req.user._id;
+    const submission = await FreePortalSubmission.findOneAndUpdate(
+      { assignmentId, studentId },
+      { submittedFileUrl, fileName, status: 'submitted', submittedAt: new Date() },
+      { returnDocument: 'after', upsert: true },
+    ).lean();
+    return res.json({ success: true, data: submission, message: 'Nộp bài thành công!' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
 
