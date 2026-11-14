@@ -181,15 +181,15 @@ export default function FormReportBuilderPage() {
       </div>
 
       <div className="flex gap-2 shrink-0">
-        <button type="button" onClick={() => setTab('forms')} className={`px-3 py-2 rounded-xl text-xs font-bold border ${tab === 'forms' ? 'bg-red-600 text-white border-sky-600' : 'bg-white border-gray-200'}`}>Forms</button>
-        <button type="button" onClick={() => setTab('reports')} className={`px-3 py-2 rounded-xl text-xs font-bold border ${tab === 'reports' ? 'bg-red-600 text-white border-sky-600' : 'bg-white border-gray-200'}`}>Reports</button>
+        <button type="button" onClick={() => setTab('forms')} className={`px-3 py-2 rounded-xl text-xs font-bold border ${tab === 'forms' ? 'bg-emerald-600 text-white border-sky-600' : 'bg-white border-gray-200'}`}>Forms</button>
+        <button type="button" onClick={() => setTab('reports')} className={`px-3 py-2 rounded-xl text-xs font-bold border ${tab === 'reports' ? 'bg-emerald-600 text-white border-sky-600' : 'bg-white border-gray-200'}`}>Reports</button>
       </div>
 
       <div className="cms-viewport-scroll space-y-4">
       {tab === 'forms' && (
         <div className="grid lg:grid-cols-2 gap-4">
           <div className="space-y-3">
-            <button type="button" onClick={startNewForm} className="w-full py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+            <button type="button" onClick={startNewForm} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold flex items-center justify-center gap-2">
               <Plus size={16} /> Form mới
             </button>
             <ul className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50 overflow-hidden">
@@ -312,7 +312,7 @@ export default function FormReportBuilderPage() {
                   key={col}
                   type="button"
                   onClick={() => toggleCol(col)}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${repColumns.includes(col) ? 'bg-red-600 text-white border-sky-600' : 'bg-white border-gray-200 text-gray-600'}`}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${repColumns.includes(col) ? 'bg-emerald-600 text-white border-sky-600' : 'bg-white border-gray-200 text-gray-600'}`}
                 >
                   {col}
                 </button>

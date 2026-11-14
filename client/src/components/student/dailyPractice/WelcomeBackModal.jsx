@@ -65,7 +65,7 @@ export default function WelcomeBackModal({
           <span className="absolute inset-2 animate-ping rounded-full bg-amber-200/50" aria-hidden="true" />
           <Mascot mood="energy" size={156} className="relative" />
         </div>
-        <p className="relative mt-2 inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white">
+        <p className="relative mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white">
           <Sparkles size={12} aria-hidden="true" /> Quay lại luyện tập
         </p>
         <h2 id="dp-welcome-title" className="relative mt-2 text-2xl font-black leading-tight text-slate-900">Chào mừng bạn quay lại</h2>

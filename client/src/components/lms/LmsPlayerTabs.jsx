@@ -198,7 +198,7 @@ export function LmsTabBar({
             className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${t.mobileOnly ? 'lg:hidden' : ''
               } ${courseTab === t.key
                 ? light
-                  ? 'text-red-700 border-red-600 bg-red-50'
+                  ? 'text-red-700 border-emerald-600 bg-red-50'
                   : 'text-white border-emerald-500 bg-white/[0.03]'
                 : light
                   ? 'text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-800'
@@ -210,7 +210,7 @@ export function LmsTabBar({
               {t.key === 'qa' && unreadQaCount > 0 ? (
                 <span
                   aria-label={`${unreadQaCount} tin nhắn mới chưa đọc`}
-                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white"
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-black leading-none text-white"
                 >
                   {unreadQaCount}
                 </span>
@@ -799,7 +799,7 @@ function QaPanel({
                     }}
                     className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${isRead
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                        : 'border-red-700 bg-red-600 text-white hover:bg-red-700'
+                        : 'border-red-700 bg-emerald-600 text-white hover:bg-emerald-700'
                       }`}
                   >
                     <MessageSquare size={14} />

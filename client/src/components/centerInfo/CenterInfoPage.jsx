@@ -183,7 +183,7 @@ function ItemCard({ item, section }) {
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold"
+            className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
           >
             {section === 'social' ? 'Mở trang' : 'Mở link'}
             <ExternalLink size={12} />
@@ -286,7 +286,7 @@ export default function CenterInfoPage({ session, role = 'student' }) {
                   type="button"
                   onClick={() => setSection(s.key)}
                   className={`w-full flex items-center gap-2.5 px-3 min-h-11 rounded-xl text-sm font-bold transition-colors text-left ${active
-                      ? 'bg-red-600 text-white shadow-sm'
+                      ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50'
                     }`}
                 >
@@ -305,7 +305,7 @@ export default function CenterInfoPage({ session, role = 'student' }) {
               key={s.key}
               type="button"
               onClick={() => setSection(s.key)}
-              className={`shrink-0 min-h-10 px-3 rounded-xl text-xs font-bold ${section === s.key ? 'bg-red-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
+              className={`shrink-0 min-h-10 px-3 rounded-xl text-xs font-bold ${section === s.key ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
                 }`}
             >
               {s.label}

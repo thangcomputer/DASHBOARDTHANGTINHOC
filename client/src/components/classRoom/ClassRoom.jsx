@@ -301,7 +301,7 @@ function Room({ scheduleId, onClose }) {
         ) : null}
       </div>
       <div className="flex shrink-0 justify-center border-t border-white/10 p-4">
-        <button type="button" onClick={share} className="inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2.5 text-sm font-black">
+        <button type="button" onClick={share} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-black">
           <MonitorUp size={16} /> {sharing ? 'Chia sẻ lại màn hình' : 'Chia sẻ màn hình'}
         </button>
       </div>

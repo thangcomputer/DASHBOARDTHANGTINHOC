@@ -5,7 +5,7 @@ import { useToast } from '../../../utils/useToast';
 import { PLAN_LABELS, formatExpiryDate, formatVnd, subscriptionShortLabel } from '../../../utils/subscription';
 
 const SOURCE_LABELS = { code: 'Mã kích hoạt', payment: 'Thanh toán', admin: 'Admin' };
-const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 
 /** Admin xem + đặt/gia hạn gói tài khoản cho 1 học viên (dùng ở tab Mã kích hoạt và chi tiết HV). */
 export default function AdminStudentSubscriptionPanel({ studentId, compact = false }) {

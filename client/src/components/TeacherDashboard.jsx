@@ -553,7 +553,7 @@ const TeacherDashboard = () => {
                 onClick={() => navigate('/teacher/test')}
                 className={`w-full py-4 rounded-2xl font-black text-base transition-all flex items-center justify-center gap-3 shadow-lg ${(currentTeacher?.testScore != null && !!currentTeacher?.practicalFile)
                     ? 'bg-gradient-to-r from-slate-700 to-slate-800 text-white hover:from-black'
-                    : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 shadow-red-500/30'
+                    : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-red-700 shadow-emerald-500/30'
                   }`}
               >
                 <BookOpen size={20} />
@@ -806,7 +806,7 @@ const TeacherDashboard = () => {
                         value={noShowReason}
                         onChange={(e) => setNoShowReason(e.target.value)}
                         placeholder="Bắt buộc nhập lý do (VD: HS xin nghỉ, GV bận đột xuất...)"
-                        className="w-full border-2 border-red-200 focus:border-red-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white mb-3"
+                        className="w-full border-2 border-red-200 focus:border-emerald-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white mb-3"
                       />
                       <button
                         type="button"

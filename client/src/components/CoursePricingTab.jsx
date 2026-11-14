@@ -450,7 +450,7 @@ function CourseModal({
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[min(92vh,920px)]">
         {/* Header lớn - cùng kiểu modal học viên */}
-        <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between flex-shrink-0">
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-8 py-6 flex items-center justify-between flex-shrink-0">
           <h3 className="text-white font-black text-xl sm:text-2xl flex items-center gap-4">
             <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
               <BookOpen size={28} />
@@ -743,7 +743,7 @@ function CourseModal({
             {/* Cột phải: Môn thi */}
             <div className="space-y-5 md:pl-2">
               <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2  tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">2</span>
+                <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">2</span>
                 Môn thi trong Phòng Thi ({selectedCount})
               </h4>
 

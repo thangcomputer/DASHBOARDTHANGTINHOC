@@ -39,7 +39,7 @@ export default function FreeUnlockGuide({ open, onClose }) {
           <button type="button" onClick={onClose} className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-800 !shadow-none">
             Để sau
           </button>
-          <button type="button" onClick={goPractice} className="flex items-center gap-2 rounded-2xl bg-gradient-to-b from-red-500 to-red-700 px-4 py-3 text-sm font-black text-white !shadow-none">
+          <button type="button" onClick={goPractice} className="flex items-center gap-2 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-4 py-3 text-sm font-black text-white !shadow-none">
             <Gamepad2 size={16} aria-hidden="true" />
             Vào luyện tập
           </button>

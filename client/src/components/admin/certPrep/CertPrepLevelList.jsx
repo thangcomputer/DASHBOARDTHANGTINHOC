@@ -49,7 +49,7 @@ export default function CertPrepLevelList({
                 </button>
               </>
             ) : null}
-            <button type="button" onClick={() => onOpen(lv)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-red-600 text-white inline-flex items-center gap-1">
+            <button type="button" onClick={() => onOpen(lv)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white inline-flex items-center gap-1">
               Xem đề thi <ChevronRight size={14} aria-hidden="true" />
             </button>
             <button type="button" onClick={() => onEdit(lv)} aria-label={`Sửa ${lv.title}`} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-slate-100">

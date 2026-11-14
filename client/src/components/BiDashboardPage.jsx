@@ -146,7 +146,7 @@ export default function BiDashboardPage() {
           <button
             type="button"
             onClick={onExport}
-            className="cms-m-btn shrink-0 !min-h-9 !px-2.5 !text-[11px] sm:!min-h-11 sm:!px-3.5 sm:!text-sm bg-red-600 text-white"
+            className="cms-m-btn shrink-0 !min-h-9 !px-2.5 !text-[11px] sm:!min-h-11 sm:!px-3.5 sm:!text-sm bg-emerald-600 text-white"
           >
             <Download size={13} /> CSV
           </button>

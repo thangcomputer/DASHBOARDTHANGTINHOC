@@ -192,7 +192,7 @@ export default function FreeSurveyModal({ open, onDone }) {
                   maxLength={80}
                   onChange={(event) => setSourceNote(event.target.value)}
                   placeholder="Bạn biết trung tâm qua đâu?"
-                  className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
+                  className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-300"
                 />
               )}
             </section>
@@ -240,7 +240,7 @@ export default function FreeSurveyModal({ open, onDone }) {
               <button
                 type="button"
                 onClick={goNext}
-                className="min-w-36 rounded-2xl bg-gradient-to-b from-red-500 to-red-700 px-6 py-3 text-sm font-black text-white"
+                className="min-w-36 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-6 py-3 text-sm font-black text-white"
               >
                 Tiếp
               </button>

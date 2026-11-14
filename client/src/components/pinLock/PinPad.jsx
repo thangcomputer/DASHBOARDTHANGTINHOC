@@ -57,7 +57,7 @@ export default function PinPad({ onComplete, error = '', disabled = false, reset
           <span
             key={index}
             className={`h-3.5 w-3.5 rounded-full border-2 transition-all duration-150 ${index < value.length
-              ? 'scale-110 border-red-600 bg-red-600'
+              ? 'scale-110 border-emerald-600 bg-emerald-600'
               : dark ? 'border-white/60 bg-transparent' : 'border-slate-300 bg-white'}`}
           />
         ))}

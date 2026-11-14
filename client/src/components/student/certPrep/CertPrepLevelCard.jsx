@@ -20,7 +20,7 @@ export default function CertPrepLevelCard({ level, onOpen }) {
           <button
             type="button"
             onClick={() => onOpen(level)}
-            className="mt-auto min-h-11 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold w-full"
+            className="mt-auto min-h-11 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold w-full"
           >
             Xem Level
           </button>

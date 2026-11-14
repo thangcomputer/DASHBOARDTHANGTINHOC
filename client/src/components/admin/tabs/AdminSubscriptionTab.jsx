@@ -8,7 +8,7 @@ import { useToast } from '../../../utils/useToast';
 import { PLAN_LABELS, formatExpiryDate } from '../../../utils/subscription';
 import AdminStudentSubscriptionPanel from '../subscription/AdminStudentSubscriptionPanel';
 
-const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const STATUS_META = {
   unused: { label: 'Chưa dùng', tone: 'bg-emerald-50 text-emerald-700' },
   used: { label: 'Đã dùng', tone: 'bg-slate-100 text-slate-600' },
@@ -235,7 +235,7 @@ function XpConfigCard() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-extrabold">{item.label}</span>
-                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${active ? 'border-red-600 bg-red-600' : 'border-slate-300'}`}>
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${active ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'}`}>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </span>
                     </div>
@@ -555,7 +555,7 @@ function StudentRenewCard() {
       {selectedId ? (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/50 p-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-sm font-black text-white">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-rose-600 text-sm font-black text-white">
               {String(selected?.name || 'H').trim().charAt(0).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
@@ -647,7 +647,7 @@ export default function AdminSubscriptionTab() {
               onClick={() => setActiveTab(tab.key)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition ${
                 activeTab === tab.key
-                  ? 'bg-red-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >

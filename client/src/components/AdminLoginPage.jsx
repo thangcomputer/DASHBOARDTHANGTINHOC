@@ -237,7 +237,7 @@ const AdminLoginPage = ({ onLogin }) => {
             <div className="space-y-4">
               <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
                 LMS <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-400 to-red-700">Central</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-rose-400 to-emerald-700">Central</span>
               </h1>
               <p className="text-slate-400 text-lg lg:text-xl font-medium max-w-xl leading-relaxed">
                 Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng.

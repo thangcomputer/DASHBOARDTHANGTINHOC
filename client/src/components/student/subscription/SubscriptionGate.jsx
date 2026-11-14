@@ -51,7 +51,7 @@ function ExpiredScreen({ overview, onRenewed }) {
     <div className="min-h-[100dvh] bg-gradient-to-br from-red-50 via-white to-amber-50 px-4 py-8">
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="flex flex-col items-center gap-3 rounded-[28px] bg-white p-6 text-center shadow-sm ring-1 ring-red-100">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-b from-red-500 to-red-700 text-white shadow-lg">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-lg">
             <CalendarX2 size={30} aria-hidden="true" />
           </span>
           <h1 className="text-xl font-black text-slate-900 sm:text-2xl">

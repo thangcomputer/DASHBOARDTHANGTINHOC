@@ -372,7 +372,7 @@ export default function SystemSettingsTab() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-lg shadow-red-200">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 flex items-center justify-center shadow-lg shadow-red-200">
             <Settings size={20} className="text-white" />
           </div>
           <div className="min-w-0">
@@ -390,7 +390,7 @@ export default function SystemSettingsTab() {
             : 'Danger Zone: xóa toàn bộ dữ liệu hệ thống'}
           className={`font-bold px-4 py-2.5 rounded-xl text-xs tracking-widest flex items-center justify-center gap-2 shadow-sm relative group overflow-hidden w-full sm:w-auto transition ${settings.destructiveResetEnabled === false
               ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-              : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white'
+              : 'bg-red-50 text-red-600 border border-red-200 hover:bg-emerald-600 hover:text-white'
             }`}
         >
           {settings.destructiveResetEnabled !== false && (
@@ -600,7 +600,7 @@ export default function SystemSettingsTab() {
                     type="text"
                     value={settings.popupTitle}
                     onChange={e => setSettings(prev => ({ ...prev, popupTitle: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] focus:border-red-400 outline-none transition"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] focus:border-emerald-400 outline-none transition"
                     placeholder="VD: Thông báo lịch học tháng 4"
                   />
                 </div>
@@ -610,7 +610,7 @@ export default function SystemSettingsTab() {
                     value={settings.popupContent}
                     onChange={e => setSettings(prev => ({ ...prev, popupContent: e.target.value }))}
                     rows={3}
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] focus:border-red-400 outline-none resize-none transition"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] focus:border-emerald-400 outline-none resize-none transition"
                     placeholder="Nội dung thông báo…"
                   />
                 </div>
@@ -639,7 +639,7 @@ export default function SystemSettingsTab() {
                     type="url"
                     value={settings.popupImageUrl}
                     onChange={e => setSettings(prev => ({ ...prev, popupImageUrl: e.target.value }))}
-                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:border-red-400 outline-none transition"
+                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:border-emerald-400 outline-none transition"
                     placeholder="Hoặc URL ảnh…"
                   />
                 </div>
@@ -753,7 +753,7 @@ export default function SystemSettingsTab() {
                   type="text"
                   value={settings.invoiceStampText}
                   onChange={e => setSettings(prev => ({ ...prev, invoiceStampText: e.target.value.toUpperCase() }))}
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-red-600 focus:border-red-400 outline-none transition"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-red-600 focus:border-emerald-400 outline-none transition"
                   placeholder="Vd: đã thanh toán"
                 />
               </div>
@@ -957,7 +957,7 @@ export default function SystemSettingsTab() {
                         inputMode="numeric"
                         value={mfaCode}
                         onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-center tracking-widest outline-none focus:border-red-300"
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-center tracking-widest outline-none focus:border-emerald-300"
                         placeholder="OTP hiện tại"
                       />
                       <button

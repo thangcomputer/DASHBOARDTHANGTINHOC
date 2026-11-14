@@ -103,7 +103,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                 return (
                   <span
                     key={label}
-                    className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${active ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'
+                    className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${active ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
                       }`}
                   >
                     {i + 1}. {label}

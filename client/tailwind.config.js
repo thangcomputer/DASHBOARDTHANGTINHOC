@@ -57,8 +57,8 @@ export default {
       },
       colors: {
         brand: {
-          red: '#d32f2f',
-          darkRed: '#b71c1c',
+          red: '#059669',
+          darkRed: '#047857',
           blue: '#1565c0',
           navy: '#203DB5',
           zalo: '#0068FF',

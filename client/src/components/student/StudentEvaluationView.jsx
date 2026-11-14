@@ -195,7 +195,7 @@ export const EvaluationView = ({
                                        key={v.val} 
                                        onClick={() => setPrivateForm(prev => ({ ...prev, satisfied: v.val }))}
                                        className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all  ${
-                                         privateForm.satisfied === v.val ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
+                                         privateForm.satisfied === v.val ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
                                        }`}
                                      >
                                        {v.label}
@@ -214,7 +214,7 @@ export const EvaluationView = ({
                                        key={v.val} 
                                        onClick={() => setPrivateForm(prev => ({ ...prev, lessonClear: v.val }))}
                                        className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all  ${
-                                         privateForm.lessonClear === v.val ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
+                                         privateForm.lessonClear === v.val ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
                                        }`}
                                      >
                                        {v.label}
@@ -230,7 +230,7 @@ export const EvaluationView = ({
                                  value={privateForm.comment}
                                  onChange={e => setPrivateForm(prev => ({ ...prev, comment: e.target.value }))}
                                  placeholder="Nhập điều bạn chưa hài lòng hoặc muốn trung tâm cải thiện..."
-                                 className="w-full bg-white border border-slate-100 rounded-xl p-3 text-xs font-medium outline-none focus:border-red-500 transition-all h-[60px] shadow-inner resize-none"
+                                 className="w-full bg-white border border-slate-100 rounded-xl p-3 text-xs font-medium outline-none focus:border-emerald-500 transition-all h-[60px] shadow-inner resize-none"
                                />
                              </div>
 
@@ -251,7 +251,7 @@ export const EvaluationView = ({
                                      type: 'success' 
                                  });
                                }}
-                               className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
+                               className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-red-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
                              >
                                <Star size={14} className="fill-white" /> {existingEval ? 'Cập nhật phản hồi' : 'Gửi phản hồi cho trung tâm'}
                              </button>

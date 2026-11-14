@@ -72,7 +72,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none transition ${
-                isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
               }`}
               readOnly
             />
@@ -118,7 +118,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="Chưa có"
                   className={`w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                    isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                    isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
                   }`}
                   readOnly
                 />
@@ -137,7 +137,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                   onChange={e => setFormData({ ...formData, zalo: e.target.value })}
                   placeholder="Số điện thoại"
                   className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                    isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                    isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
                   }`}
                 />
                 <Phone size={14} className="absolute left-3 top-3.5 text-blue-400" />
@@ -154,7 +154,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                  isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                  isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
                 }`}
                 placeholder="Ví dụ: nguyenvan@gmail.com"
               />
@@ -170,7 +170,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 value={formData.address}
                 onChange={e => setFormData({ ...formData, address: e.target.value })}
                 className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                  isBrandStudent ? 'focus:ring-2 focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
+                  isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
                 }`}
                 placeholder="Nhập địa chỉ của bạn"
               />

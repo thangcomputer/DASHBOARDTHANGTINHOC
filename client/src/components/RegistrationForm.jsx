@@ -77,7 +77,7 @@ function ExpiredOverlay({ onBack }) {
         </p>
         <button
           onClick={onBack}
-          className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3.5 rounded-2xl hover:from-red-700 transition shadow-lg inline-flex items-center justify-center gap-1"
+          className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold py-3.5 rounded-2xl hover:from-red-700 transition shadow-lg inline-flex items-center justify-center gap-1"
         >
           <NavArrow size={18} direction="back" className="text-white" />
           Quay lại nhập thông tin
@@ -303,7 +303,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       <button
                         type="button"
                         onClick={() => printInvoice()}
-                        className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                        className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                       >
                         <Printer size={18} />  In (print)
                       </button>
@@ -462,7 +462,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
         <div className="bg-white shadow-2xl rounded-2xl border border-gray-100 overflow-hidden">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-8 py-5">
+          <div className="bg-gradient-to-r from-red-700 via-red-600 to-emerald-500 px-8 py-5">
             <div className="flex items-center gap-3">
               <img src="/logo-thang-tin-hoc.svg" alt="Thắng Tin Học" className="h-10 brightness-0 invert" />
               <div>
@@ -477,7 +477,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             <div className="flex items-center gap-2">
               {['Thông tin', 'Thanh toán', 'Hoàn tất'].map((label, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div className={`h-2 w-full rounded-full transition-all duration-500 ${step > i + 1 ? 'bg-green-500' : step === i + 1 ? 'bg-red-600' : 'bg-gray-200'
+                  <div className={`h-2 w-full rounded-full transition-all duration-500 ${step > i + 1 ? 'bg-green-500' : step === i + 1 ? 'bg-emerald-600' : 'bg-gray-200'
                     }`} />
                   <span className={`text-xs font-medium ${step >= i + 1 ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
                 </div>
@@ -506,7 +506,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     <User size={14} /> Họ và tên học viên
                   </label>
                   <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nguyễn văn a"
-                    className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none  font-semibold text-gray-800 placeholder:font-normal placeholder:text-gray-400 placeholder: transition-all" />
+                    className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none  font-semibold text-gray-800 placeholder:font-normal placeholder:text-gray-400 placeholder: transition-all" />
                 </div>
 
                 <div>
@@ -540,14 +540,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-1.5 block">Tuổi</label>
                     <input type="number" name="age" value={formData.age} onChange={handleChange} placeholder="20" min="10" max="80"
-                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none transition-all" />
+                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none transition-all" />
                   </div>
                   <div>
                     <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
                       <Phone size={14} /> Số Zalo
                     </label>
                     <input type="text" name="zalo" value={formData.zalo} onChange={handleChange} placeholder="093xxxxxxx"
-                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none transition-all" />
+                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none transition-all" />
                   </div>
                 </div>
 
@@ -562,7 +562,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     </div>
                   ) : (
                     <CmsSelect name="courseId" value={formData.courseId} onChange={handleChange}
-                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-blue-800 bg-white transition-all">
+                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none font-bold text-blue-800 bg-white transition-all">
                       {dbCourses.map(c => {
                         const ep = getEffectiveCoursePrice(c);
                         const pct = isCourseDiscountActive(c) ? c.discountPercent || 0 : 0;
@@ -593,7 +593,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                           branchCode: b?.code || '',
                         }));
                       }}
-                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-gray-800 bg-white transition-all">
+                      className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none font-bold text-gray-800 bg-white transition-all">
                       <option value="">Chọn chi nhánh</option>
                       {branches.map(b => {
                         const id = toBranchId(b._id || b.id);
@@ -611,7 +611,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 {formData.course && (
                   <div className="rounded-2xl overflow-hidden border-2 border-red-200 shadow-sm">
                     {formData.discountPercent > 0 ? (
-                      <div className="bg-gradient-to-r from-red-600 to-red-500 px-5 py-4">
+                      <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-4">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="bg-yellow-400 text-red-800 text-xs font-black px-2.5 py-1 rounded-full animate-pulse">
                             ⚡ Giảm {formData.discountPercent}%
@@ -650,7 +650,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             {step === 2 && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <button onClick={handleBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-red-600 transition-colors">
+                  <button onClick={handleBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-emerald-600 transition-colors">
                     <ArrowLeft size={16} /> Quay lại
                   </button>
 
@@ -711,7 +711,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     onClick={() => {
                       printInvoice();
                     }}
-                    className="py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                    className="py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                   >
                     <Printer size={20} /> In
                   </button>

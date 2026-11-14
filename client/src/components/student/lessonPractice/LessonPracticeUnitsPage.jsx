@@ -271,7 +271,7 @@ function VideoPane({
                 key={video.id}
                 type="button"
                 onClick={() => onSelectVideo(video.id)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${selectedVideo?.id === video.id ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200'}`}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${selectedVideo?.id === video.id ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200'}`}
               >
                 {video.title || `Video ${index + 1}`}
                 {unit.videoDoneIds?.includes(video.id) && <CheckCircle2 size={13} />}
@@ -614,7 +614,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
           <button type="button" onClick={onClose} className="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl bg-red-600 px-8 text-sm font-black text-white shadow-md transition hover:bg-red-700">Tiếp tục</button>
         </div>
         <div className="h-1.5 bg-slate-100">
-          <div className="h-full bg-gradient-to-r from-amber-400 to-red-500" style={{ animation: `lp-cele-bar ${CELEBRATION_MS}ms linear forwards` }} />
+          <div className="h-full bg-gradient-to-r from-amber-400 to-emerald-500" style={{ animation: `lp-cele-bar ${CELEBRATION_MS}ms linear forwards` }} />
         </div>
       </div>
     </div>
@@ -975,7 +975,7 @@ export default function LessonPracticeUnitsPage() {
                           aria-label={`${unit.title}, ${lessonStatus.label}`}
                           className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                         >
-                          <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
+                          <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
                           <span className="min-w-0 flex-1">
                             <span className={`block truncate font-bold ${opened ? 'text-red-700' : 'text-slate-900'}`}>{unit.title}</span>
                             <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${lessonStatus.className}`}>
@@ -1020,7 +1020,7 @@ export default function LessonPracticeUnitsPage() {
                                   setLessonListOpen(false);
                                 }}
                                 title={item.label}
-                                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'}`}
+                                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'}`}
                               >
                                 <Icon size={15} />
                                 <span className="min-w-0 flex-1 text-left">{item.label}</span>

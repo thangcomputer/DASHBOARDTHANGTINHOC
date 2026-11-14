@@ -378,7 +378,7 @@ const LoginPage = ({ onLogin }) => {
       {showForgot && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#1e293b] rounded-3xl w-full max-w-md border border-white/10 shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-red-600 to-orange-600 px-6 py-5 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-emerald-600 to-orange-600 px-6 py-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><KeyRound size={20} className="text-white" /></div>
                 <div>
@@ -479,7 +479,7 @@ const LoginPage = ({ onLogin }) => {
                     <button
                       type="button"
                       onClick={handleOpenForgotZalo}
-                      className="py-3.5 bg-gradient-to-r from-red-600 to-orange-600 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2"
+                      className="py-3.5 bg-gradient-to-r from-emerald-600 to-orange-600 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2"
                     >
                       <MessageCircle size={16} /> Zalo Admin
                     </button>

@@ -75,7 +75,7 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
           </div>
         )}
         {post.isNew && (
-          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black tracking-wide shadow-sm">
+          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black tracking-wide shadow-sm">
             New
           </span>
         )}
@@ -91,7 +91,7 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
         ) : null}
       </div>
       <div className={`flex flex-col flex-1 gap-1.5 min-w-0 ${isList ? 'p-3' : 'p-3.5 sm:p-4 gap-2'}`}>
-        <h3 className={`font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-red-600 transition-colors ${isList ? 'text-sm' : 'text-sm sm:text-base'}`}>
+        <h3 className={`font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-emerald-600 transition-colors ${isList ? 'text-sm' : 'text-sm sm:text-base'}`}>
           {post.title}
         </h3>
         {post.excerpt ? (
@@ -336,7 +336,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Tiêu đề bài viết / thông báo"
-            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-red-300"
+            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-emerald-300"
           />
 
           {/* ── BỘ CHỌN ĐỐI TƯỢNG NHẬN TIN ── */}
@@ -395,7 +395,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
                 value={newTopicName}
                 onChange={(e) => setNewTopicName(e.target.value)}
                 placeholder="Tên chủ đề mới…"
-                className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-300 bg-white"
+                className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-emerald-300 bg-white"
               />
               <button
                 type="button"
@@ -429,7 +429,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
             onChange={(e) => setExcerpt(e.target.value)}
             placeholder="Mô tả ngắn (hiện trên card danh sách)"
             rows={2}
-            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-300 resize-y"
+            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-300 resize-y"
           />
 
           <div className="space-y-2">
@@ -792,13 +792,13 @@ export default function NewsPage({ session, role = 'admin' }) {
           <button
             type="button"
             onClick={() => navigate(base)}
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-red-600"
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-emerald-600"
           >
             <ChevronLeft size={16} /> Tin tức
           </button>
           <div>
             {detail.isNew && (
-              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">New</span>
+              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black">New</span>
             )}
             {detail.topicName ? (
               <span className="inline-block mb-2 ml-2 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black">
@@ -870,7 +870,7 @@ export default function NewsPage({ session, role = 'admin' }) {
               {detail.status !== 'published' && (
                 <button
                   type="button"
-                  className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold"
+                  className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
                   onClick={async () => {
                     const res = await blogAPI.publish(detail.id);
                     if (res.success) {
@@ -952,7 +952,7 @@ export default function NewsPage({ session, role = 'admin' }) {
               <button
                 type="button"
                 onClick={() => navigate(`${base}?mode=edit`)}
-                className="px-3.5 py-2.5 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5 shadow-sm transition-all"
+                className="px-3.5 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm transition-all"
               >
                 <Plus size={14} /> Viết bài
               </button>
@@ -1011,7 +1011,7 @@ export default function NewsPage({ session, role = 'admin' }) {
               className={`w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-white transition-all ${
                 role === 'teacher'
                   ? 'focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
-                  : 'focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                  : 'focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
               }`}
             />
           </div>
@@ -1089,7 +1089,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                 }
               }}
               placeholder="Tạo chủ đề…"
-              className="w-full min-w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-red-500 bg-white"
+              className="w-full min-w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-emerald-500 bg-white"
             />
             <button
               type="button"
@@ -1150,7 +1150,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                 </span>
                 <button
                   type="button"
-                  className="text-xs font-bold text-slate-600 hover:text-red-600"
+                  className="text-xs font-bold text-slate-600 hover:text-emerald-600"
                   onClick={() => navigate(`${base}?mode=edit&id=${p.id}`, { state: { post: p } })}
                 >
                   Sửa

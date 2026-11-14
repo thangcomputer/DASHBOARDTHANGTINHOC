@@ -4,7 +4,7 @@ import meetClassApi from '../../../services/meetClassApi';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { useToast } from '../../../utils/useToast';
 
-const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 
 function todayKey() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -200,7 +200,7 @@ export default function AdminMeetClassTab() {
             type="button"
             onClick={() => setSubTab('schedule')}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-              subTab === 'schedule' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+              subTab === 'schedule' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Video size={15} /> Xếp lịch &amp; Buổi Meet

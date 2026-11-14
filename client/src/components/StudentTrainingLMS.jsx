@@ -1136,10 +1136,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
   const renderVideoCourseCard = (course, idx) => {
     const gradients = [
-      'from-red-600 to-red-800',
+      'from-emerald-600 to-red-800',
       'from-emerald-500 to-teal-600',
       'from-violet-600 to-fuchsia-600',
-      'from-red-500 to-red-700',
+      'from-emerald-500 to-emerald-700',
     ];
     const bgClass = gradients[idx % gradients.length];
     const progress = courseProgressOf(course);
@@ -1196,7 +1196,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-[1]">
             {price > 0 ? (
-              <span className={`backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-black shadow-sm ${owned ? 'bg-emerald-600/90' : 'bg-red-600/95'}`}>
+              <span className={`backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-black shadow-sm ${owned ? 'bg-emerald-600/90' : 'bg-emerald-600/95'}`}>
                 {owned ? 'Đã mua' : `${price.toLocaleString('vi-VN')}đ`}
               </span>
             ) : null}
@@ -1211,7 +1211,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         <div className="p-4 sm:p-5 flex-1 flex flex-col">
           <div className="flex items-start gap-3 mb-2">
             <div className="flex-1 min-w-0">
-              <h3 className={`font-bold text-slate-800 text-base sm:text-lg ${isFreeStudent ? 'group-hover:text-emerald-600' : 'group-hover:text-red-600'} transition-colors line-clamp-2 leading-snug`}>
+              <h3 className={`font-bold text-slate-800 text-base sm:text-lg ${isFreeStudent ? 'group-hover:text-emerald-600' : 'group-hover:text-emerald-600'} transition-colors line-clamp-2 leading-snug`}>
                 {course.title}
               </h3>
             </div>
@@ -1221,7 +1221,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           </div>
           <div className="flex items-center gap-2 mb-3">
             <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
-              <div className={`h-full rounded-full ${isFreeStudent ? 'bg-emerald-600' : 'bg-red-600'} border border-white/60 transition-all`} style={{ width: `${progress}%` }} />
+              <div className={`h-full rounded-full ${isFreeStudent ? 'bg-emerald-600' : 'bg-emerald-600'} border border-white/60 transition-all`} style={{ width: `${progress}%` }} />
             </div>
           </div>
           <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -2305,7 +2305,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                     type="button"
                     onClick={() => setCatalogInfoTab(t.key)}
                     className={`flex-1 min-w-[7.5rem] min-h-11 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${catalogInfoTab === t.key
-                        ? (isFreeStudent ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40' : 'text-red-600 border-b-2 border-red-600 bg-red-50/40')
+                        ? (isFreeStudent ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40' : 'text-red-600 border-b-2 border-emerald-600 bg-red-50/40')
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                       }`}
                   >
@@ -2346,7 +2346,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                             </span>
                             {lesson.isPreview || playable ? (
                               <span className={`text-[10px] font-black  px-2.5 py-1 rounded-full border shrink-0 ${isActive
-                                  ? (isFreeStudent ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600')
+                                  ? (isFreeStudent ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-600 text-white border-emerald-600')
                                   : 'bg-pink-50 text-pink-700 border-pink-200'
                                 }`}>
                                 {isActive ? 'Đang xem' : 'Xem thử'}

@@ -31,7 +31,7 @@ import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { useToast } from '../../../utils/useToast';
 import { QUESTION_TYPES } from '../../../utils/dailyPractice';
 
-const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
 const BAI_FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.png,.jpg,.jpeg,.webp,.gif';
 export const DEFAULT_SECTION_ORDER = ['content', 'file', 'video', 'practice'];
@@ -640,7 +640,7 @@ export default function AdminMilestoneEditor({
               disabled={saving || !dirty}
               onClick={handleSave}
               className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black text-white transition !shadow-none ${
-                dirty ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-300 cursor-not-allowed'
+                dirty ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-300 cursor-not-allowed'
               }`}
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

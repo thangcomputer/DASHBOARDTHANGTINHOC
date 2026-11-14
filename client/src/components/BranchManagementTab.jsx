@@ -92,7 +92,7 @@ function BranchModal({ branch, onClose, onSaved }) {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-gradient-to-r from-red-700 to-red-600 px-6 py-5 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-red-700 to-emerald-600 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
               <Building2 size={18} />
@@ -214,7 +214,7 @@ export default function BranchManagementTab() {
         <button
           type="button"
           onClick={() => setModal(null)}
-          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition shrink-0 w-full sm:w-auto"
+          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shrink-0 w-full sm:w-auto"
         >
           <Plus size={15} /> Thêm chi nhánh
         </button>
@@ -252,7 +252,7 @@ export default function BranchManagementTab() {
                 }`}
             >
               <div className="flex items-start gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${b.isActive ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-500'
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${b.isActive ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-500'
                   }`}>
                   <Building2 size={18} />
                 </div>

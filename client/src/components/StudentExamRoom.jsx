@@ -251,7 +251,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               <button
                 type="button"
                 onClick={() => onStart(subject.id)}
-                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-red-600 hover:bg-red-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
+                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
               >
                 {(subject.attemptCount || 0) > 0 ? <><Play size={15} /> Thi lại</> : 'Vào thi ngay'}
               </button>
@@ -260,7 +260,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               <button
                 type="button"
                 onClick={() => onStart(subject.id)}
-                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-red-600 hover:bg-red-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
+                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
               >
                 <Play size={15} /> Thi lại
               </button>
@@ -324,7 +324,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
       onClick={(e) => e.stopPropagation()}
     >
       <div className="px-4 sm:px-5 pt-4 pb-2 flex items-center justify-between gap-3">
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl ${typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600' : 'bg-red-600'} text-white shadow-sm`}>
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl ${typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600' : 'bg-emerald-600'} text-white shadow-sm`}>
           <Trophy size={15} className="shrink-0" aria-hidden="true" />
           <h2 className="font-black text-xs sm:text-sm whitespace-nowrap">Nhật ký điểm số</h2>
         </div>
@@ -665,11 +665,11 @@ const StudentExamRoom = ({
             onClick={() => setRoomTab('quiz')}
             className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'quiz'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
-                : 'bg-white border-slate-100 hover:border-red-300'
+                : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 via-rose-600 to-red-800 text-white shadow-lg shadow-red-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-rose-600 to-red-800 text-white shadow-lg shadow-red-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
                 <span className="absolute -right-5 -top-5 h-10 w-10 rounded-full bg-white/35 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" />
                 <Trophy size={32} strokeWidth={2.1} className="relative drop-shadow-md" aria-hidden="true" />
               </span>
@@ -684,7 +684,7 @@ const StudentExamRoom = ({
             onClick={() => setRoomTab('cert')}
             className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'cert'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
-                : 'bg-white border-slate-100 hover:border-red-300'
+                : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
@@ -703,11 +703,11 @@ const StudentExamRoom = ({
             onClick={() => setRoomTab('scores')}
             className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'scores'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
-                : 'bg-white border-slate-100 hover:border-red-300'
+                : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-red-700 text-white shadow-lg shadow-orange-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-emerald-700 text-white shadow-lg shadow-orange-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
                 <span className="absolute -right-5 -top-5 h-10 w-10 rounded-full bg-white/35 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" />
                 <Award size={32} strokeWidth={2.1} className="relative drop-shadow-md" aria-hidden="true" />
               </span>
@@ -722,7 +722,7 @@ const StudentExamRoom = ({
             onClick={() => setRoomTab('mos-ic3')}
             className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'mos-ic3'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
-                : 'bg-white border-slate-100 hover:border-red-300'
+                : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
@@ -819,7 +819,7 @@ const StudentExamRoom = ({
                           ? 'bg-red-600 text-white border-red-600'
                           : f.value === 'da_thi'
                             ? 'bg-emerald-600 text-white border-emerald-600'
-                            : (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600')
+                            : (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-600 text-white border-emerald-600')
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                       }`}
                   >

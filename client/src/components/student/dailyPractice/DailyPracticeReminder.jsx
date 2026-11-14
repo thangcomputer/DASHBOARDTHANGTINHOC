@@ -44,7 +44,7 @@ export default function DailyPracticeReminder({ stats, topicCount, onStart, onCl
             <X size={18} />
           </button>
           <Mascot mood={copy.mood} size={104} className="relative mx-auto" />
-          <p className={`relative mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white ${lost ? 'bg-slate-700' : 'bg-red-600'}`}>
+          <p className={`relative mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white ${lost ? 'bg-slate-700' : 'bg-emerald-600'}`}>
             <Gamepad2 size={13} aria-hidden="true" /> {copy.badge}
           </p>
           <h2 id="daily-reminder-title" className="relative mt-2 text-xl font-black text-slate-900">{copy.title}</h2>

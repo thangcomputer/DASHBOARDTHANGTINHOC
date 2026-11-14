@@ -80,7 +80,7 @@ const MENU_CONFIG = {
       { key: 'profile', icon: UserRound, label: 'Hồ sơ', path: '/student', hash: 'profile' },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
-    accentColor: 'bg-red-600',
+    accentColor: 'bg-emerald-600',
     activeClass: 'cms-sidebar-glass__nav-active',
   },
   teacher: {
@@ -166,7 +166,7 @@ const MENU_CONFIG = {
       { key: 'pin-lock', icon: KeyRound, label: 'Khóa mã PIN', isPinLock: true },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
-    accentColor: 'bg-red-600',
+    accentColor: 'bg-emerald-600',
     activeClass: 'cms-sidebar-glass__nav-active font-bold',
   },
 };
@@ -502,7 +502,7 @@ const AppSidebar = ({
       return (isStudentNav || isTeacherNav) ? 'bg-white/[0.06] text-[#A8B6CC]' : '';
     }
     if (isCourseStudent) {
-      return '!bg-[#EF4444] !text-white !shadow-none';
+      return '!bg-[#10B981] !text-white !shadow-none';
     }
     if (isFreeStudent || isTeacherNav) {
       return '!bg-[#10B981] !text-white !shadow-none';
@@ -858,7 +858,7 @@ const AppSidebar = ({
               <span
                 className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
                   isCourseStudent
-                    ? 'bg-[#EF4444]/20'
+                    ? 'bg-[#10B981]/20'
                     : isLifetime
                       ? 'bg-[#F59E0B]/20'
                       : expiring
@@ -867,7 +867,7 @@ const AppSidebar = ({
                 }`}
               >
                 {isCourseStudent ? (
-                  <CalendarClock size={13} className="text-[#F87171]" />
+                  <CalendarClock size={13} className="text-[#34D399]" />
                 ) : isLifetime ? (
                   <Crown size={13} className="text-[#FBBF24]" />
                 ) : (
@@ -889,7 +889,7 @@ const AppSidebar = ({
                 title={shortLabel}
                 className={`cms-sidebar-sub-chip mt-2.5 grid grid-cols-[22px_minmax(0,1fr)] grid-rows-[auto_auto] items-center gap-x-2 gap-y-0.5 rounded-[12px] border px-3 py-2 ${
                   isCourseStudent
-                    ? 'border-[#EF4444]/35 bg-[#EF4444]/[0.12]'
+                    ? 'border-[#10B981]/35 bg-[#10B981]/[0.12]'
                     : isLifetime
                       ? 'border-[#F59E0B]/40 bg-[#F59E0B]/[0.14]'
                       : expiring
@@ -899,14 +899,14 @@ const AppSidebar = ({
               >
                 <div className="row-span-2 flex items-center justify-center self-center">{iconChip}</div>
                 <p className={`col-start-2 row-start-1 min-w-0 text-[11px] font-extrabold leading-[14px] ${
-                  isCourseStudent ? 'text-[#FEE2E2]' : isLifetime ? 'text-[#FEF3C7]' : 'text-[#F8FAFC]'
+                  isCourseStudent ? 'text-[#D1FAE5]' : isLifetime ? 'text-[#FEF3C7]' : 'text-[#F8FAFC]'
                 }`}
                 >
                   {planTitle}
                 </p>
                 <div className="col-start-2 row-start-2 flex min-h-[24px] min-w-0 items-baseline justify-between gap-1.5">
                   <p className={`min-w-0 text-[11px] font-bold leading-[14px] tabular-nums ${
-                    isCourseStudent ? 'text-[#F87171]' : isLifetime ? 'text-[#FDE68A]' : 'text-[#34D399]'
+                    isCourseStudent ? 'text-[#34D399]' : isLifetime ? 'text-[#FDE68A]' : 'text-[#34D399]'
                   }`}
                   >
                     {daysLine}
@@ -963,7 +963,7 @@ const AppSidebar = ({
                   <button
                     type="button"
                     onClick={studentSubscription.openRenew}
-                    className="shrink-0 rounded-md bg-gradient-to-r from-orange-500 to-red-500 px-2 py-0.5 text-[10px] font-bold text-white transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
+                    className="shrink-0 rounded-md bg-gradient-to-r from-orange-500 to-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
                   >
                     {actionLabel}
                   </button>
@@ -1056,12 +1056,12 @@ const AppSidebar = ({
                       <Lock size={isStudentNav ? 14 : 13} className={`ml-auto flex-shrink-0 ${isStudentNav ? 'text-[#FBBF24]' : 'text-amber-200'}`} aria-label="Đang khóa" />
                     )}
                     {!isLocked && getBadgeCount(navItem.key) > 0 && (
-                      <span className={`ml-auto px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none drop-shadow-md ${isCourseStudent ? 'bg-[#EF4444] shadow-red-500/50' : (isFreeStudent || isTeacherNav) ? 'bg-[#059669] shadow-emerald-500/50' : 'bg-red-500 shadow-red-500/50'}`} aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
+                      <span className={`ml-auto px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none drop-shadow-md ${isCourseStudent ? 'bg-[#10B981] shadow-emerald-500/50' : (isFreeStudent || isTeacherNav) ? 'bg-[#059669] shadow-emerald-500/50' : 'bg-emerald-500 shadow-emerald-500/50'}`} aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
                         {getBadgeCount(navItem.key) > 99 ? '99+' : getBadgeCount(navItem.key)}
                       </span>
                     )}
                     {isStudentNav && active && !isLocked && !showFreeLock && getBadgeCount(navItem.key) === 0 && (
-                      <span className={`ml-auto h-[7px] w-[7px] shrink-0 rounded-full ${isCourseStudent ? 'bg-[#F87171]' : 'bg-[#34D399]'}`} aria-hidden="true" />
+                      <span className={`ml-auto h-[7px] w-[7px] shrink-0 rounded-full ${isCourseStudent ? 'bg-[#34D399]' : 'bg-[#34D399]'}`} aria-hidden="true" />
                     )}
                   </button>
                 </div>
@@ -1094,7 +1094,7 @@ const AppSidebar = ({
                       </span>
                       <span className="text-[13px] font-semibold flex-1 text-left truncate">{hub.label}</span>
                       {hubBadge > 0 && (
-                        <span className={`px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none ${isTeacherNav ? 'bg-[#059669]' : 'bg-red-500'}`}>
+                        <span className={`px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none ${isTeacherNav ? 'bg-[#059669]' : 'bg-emerald-500'}`}>
                           {hubBadge > 99 ? '99+' : hubBadge}
                         </span>
                       )}
@@ -1133,7 +1133,7 @@ const AppSidebar = ({
                     </span>
                     <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
                     {groupBadge > 0 && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none ${isTeacherNav ? 'bg-[#059669]' : 'bg-red-500'}`}>
+                      <span className={`px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none ${isTeacherNav ? 'bg-[#059669]' : 'bg-emerald-500'}`}>
                         {groupBadge > 99 ? '99+' : groupBadge}
                       </span>
                     )}
@@ -1175,7 +1175,7 @@ const AppSidebar = ({
             ? `flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[12px] ${item.isLogout
               ? 'bg-white/[0.06] text-[#FCA5A5]'
               : active
-                ? (isCourseStudent ? '!bg-[#EF4444] !text-white !shadow-none' : '!bg-[#10B981] !text-white !shadow-none')
+                ? '!bg-[#10B981] !text-white !shadow-none'
                 : 'bg-white/[0.06] text-[#A8B6CC]'
             }`
             : `flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${navIconShellClass(active)}`;
@@ -1196,7 +1196,7 @@ const AppSidebar = ({
               </span>
               <span className={`truncate ${isStudentNav ? `text-[15px] ${active ? 'font-black text-white' : 'font-bold'}` : 'text-sm font-medium'}`}>{item.label}</span>
               {isStudentNav && active && (
-                <span className={`ml-auto h-[7px] w-[7px] shrink-0 rounded-full ${isCourseStudent ? 'bg-[#F87171]' : 'bg-[#34D399]'}`} aria-hidden="true" />
+                <span className="ml-auto h-[7px] w-[7px] shrink-0 rounded-full bg-[#34D399]" aria-hidden="true" />
               )}
             </button>
           );
@@ -1357,7 +1357,7 @@ const AppSidebar = ({
           onClick={revealInboxFooter}
           aria-label="Hiện thanh điều hướng"
           title="Hiện thanh điều hướng"
-          className={`${isTabletOrLarger ? '' : 'md:hidden'} cms-inbox-footer-peek fixed bottom-0 left-1/2 z-40 flex h-8 w-32 -translate-x-1/2 items-center justify-center rounded-t-2xl border border-b-0 border-white/80 bg-white/85 text-slate-500 backdrop-blur-xl transition-colors hover:text-red-600`}
+          className={`${isTabletOrLarger ? '' : 'md:hidden'} cms-inbox-footer-peek fixed bottom-0 left-1/2 z-40 flex h-8 w-32 -translate-x-1/2 items-center justify-center rounded-t-2xl border border-b-0 border-white/80 bg-white/85 text-slate-500 backdrop-blur-xl transition-colors hover:text-emerald-600`}
           style={{
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             boxShadow: '0 -6px 18px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.95)',

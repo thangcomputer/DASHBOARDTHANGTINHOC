@@ -215,7 +215,7 @@ export function MilestoneEvaluationModal({
                   value={feedback.comment}
                   onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })}
                   placeholder="Góp ý cho trung tâm (bắt buộc)..."
-                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 text-sm outline-none focus:border-red-400 focus:bg-white transition-all h-24 italic"
+                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 text-sm outline-none focus:border-emerald-400 focus:bg-white transition-all h-24 italic"
                 />
               </div>
               <button
@@ -254,7 +254,7 @@ export function MilestoneEvaluationModal({
                   value={feedback.comment}
                   onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })}
                   placeholder="Lời nhắn riêng cho Admin (bắt buộc)..."
-                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 text-sm outline-none focus:border-red-400 focus:bg-white transition-all h-24 italic"
+                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 text-sm outline-none focus:border-emerald-400 focus:bg-white transition-all h-24 italic"
                 />
               </div>
               <button
@@ -293,7 +293,7 @@ export function MilestoneEvaluationModal({
                           onClick={() => setRatingCriteria((prev) => ({ ...prev, [catKey]: opt.key }))}
                           className={`min-h-[30px] px-1 py-1.5 rounded-lg text-[10px] font-black leading-tight transition-all ${ratingCriteria[catKey] === opt.key
                               ? 'bg-red-500 text-white shadow-sm'
-                              : 'bg-white text-gray-500 border border-gray-200 hover:border-red-200 hover:text-red-600'
+                              : 'bg-white text-gray-500 border border-gray-200 hover:border-red-200 hover:text-emerald-600'
                             }`}
                         >
                           {opt.label}
@@ -308,7 +308,7 @@ export function MilestoneEvaluationModal({
                 onChange={(e) => setRatingComment(e.target.value)}
                 placeholder="Lời nhắn (tùy chọn)..."
                 rows={2}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-400 focus:bg-white transition-all resize-none italic"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs outline-none focus:border-emerald-400 focus:bg-white transition-all resize-none italic"
               />
               <button
                 type="button"

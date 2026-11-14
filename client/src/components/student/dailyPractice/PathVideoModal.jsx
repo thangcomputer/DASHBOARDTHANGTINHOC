@@ -82,7 +82,7 @@ function FallbackPlayer({ url, onWatched, onTick }) {
     return (
       <video
         src={url}
-        className="h-full w-full bg-black object-contain accent-red-500"
+        className="h-full w-full bg-black object-contain accent-emerald-500"
         controls
         autoPlay
         playsInline

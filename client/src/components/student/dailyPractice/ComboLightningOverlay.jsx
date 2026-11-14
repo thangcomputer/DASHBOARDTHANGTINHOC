@@ -97,10 +97,10 @@ export default function ComboLightningOverlay({ combo = 3, onDone }) {
       <div className="relative z-20 flex flex-col items-center text-center px-4 animate-combo-pop">
         {/* Vòng hào quang năng lượng điện */}
         <div className="relative flex items-center justify-center">
-          <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 opacity-75 blur-xl animate-spin [animation-duration:3s]" />
+          <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-600 opacity-75 blur-xl animate-spin [animation-duration:3s]" />
           
           {/* Biểu tượng tia sét 3D lớn */}
-          <div className="relative flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-400 via-orange-500 to-red-600 shadow-[0_0_40px_rgba(245,158,11,0.8),inset_0_2px_4px_rgba(255,255,255,0.6)] border-2 border-amber-200">
+          <div className="relative flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-400 via-orange-500 to-emerald-600 shadow-[0_0_40px_rgba(245,158,11,0.8),inset_0_2px_4px_rgba(255,255,255,0.6)] border-2 border-amber-200">
             <Zap size={48} className="text-white fill-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] animate-bounce" />
           </div>
         </div>

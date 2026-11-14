@@ -6,7 +6,7 @@ export default function CertPrepErrorState({ message, onRetry }) {
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold"
+          className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold"
         >
           Thử lại
         </button>

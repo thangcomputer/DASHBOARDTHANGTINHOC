@@ -670,7 +670,7 @@ export default function AddStudentModal({
               </div>
 
               <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 md:mt-auto">
-                <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0" />
+                <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-emerald-500 shrink-0" />
                 <span className="min-w-0">
                   <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
                   <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp - hoặc dùng &quot;Lưu chưa thanh toán&quot; nếu thu sau</span>

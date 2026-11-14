@@ -420,7 +420,7 @@ export default function WebSettingsTab() {
             <div key={index} className="relative rounded-xl border border-gray-200 bg-gray-50 p-2 group">
               <button
                 type="button"
-                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-red-600 hover:text-white z-10"
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-emerald-600 hover:text-white z-10"
                 onClick={() => setConfig((prev) => ({
                   ...prev,
                   studentBanners: prev.studentBanners.filter((_, i) => i !== index),
@@ -571,7 +571,7 @@ export default function WebSettingsTab() {
                 }`}
             >
               {config.loadingStyle === ls.id && (
-                <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center">
+                <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-emerald-600 rounded-full flex items-center justify-center">
                   <Check size={10} className="text-white" />
                 </div>
               )}

@@ -293,7 +293,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                             : t.key === 'exam-room'
                               ? ['questions', 'exam-results'].includes(sTrainingTab)
                               : sTrainingTab === 'learning-guide')
-                            ? 'bg-red-600 text-white shadow-md'
+                            ? 'bg-emerald-600 text-white shadow-md'
                             : 'text-gray-500 hover:bg-gray-100'
                           }`}
                       >
@@ -317,7 +317,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                         key={tab.key}
                         type="button"
                         onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
-                        className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                        className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
                           }`}
                       >
                         <tab.icon size={15} aria-hidden="true" />
@@ -330,7 +330,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                     </span>
                   </div>
                   <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
-                    className="inline-flex min-h-10 justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                    className="inline-flex min-h-10 justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
                     <Plus size={15} /> {sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                   </button>
                 </div>
@@ -347,7 +347,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                         key={tab.key}
                         type="button"
                         onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
-                        className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                        className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
                           }`}
                       >
                         <tab.icon size={15} aria-hidden="true" />
@@ -392,7 +392,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                     value={learningGuideVideoUrl}
                     onChange={(event) => setLearningGuideVideoUrl(event.target.value)}
                     placeholder="HTTPS://youtu.be/... hoặc HTTPS://vimeo.com/..."
-                    className="min-h-11 w-full rounded-xl border-2 border-slate-200 px-3 text-sm outline-none focus:border-red-400"
+                    className="min-h-11 w-full rounded-xl border-2 border-slate-200 px-3 text-sm outline-none focus:border-emerald-400"
                   />
                   {learningGuideVideoUrl.trim() && !getLearningGuideVideoEmbedUrl(learningGuideVideoUrl) && (
                     <p className="mt-1 text-xs font-medium text-red-600">Liên kết video không hợp lệ. Hãy dùng URL YouTube hoặc Vimeo.</p>
@@ -864,7 +864,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                         addStudentTrainingItem(sTrainingTab, { ...sTrainingPayload, createdAt: new Date().toISOString().split('T')[0] });
                       }
                       setSTrainingForm(null);
-                    }} className="w-full sm:w-auto min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
+                    }} className="w-full sm:w-auto min-h-11 justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
                       <Save size={15} /> {sTrainingForm.id ? 'Cập nhật' : 'Thêm mới'}
                     </button>
                   </div>
@@ -1110,7 +1110,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                                                     saveEssayScore(r.studentId, r.subjectId, Math.min(10, Math.max(0, Number(gradingValue))));
                                                     setGradingRow(null); setGradingValue('');
                                                   }
-                                                }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition" title="Lưu điểm">
+                                                }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition" title="Lưu điểm">
                                                   <CheckCircle2 size={16} />
                                                 </button>
                                                 <button type="button" onClick={() => { setGradingRow(null); setGradingValue(''); }}
@@ -1396,7 +1396,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                           {sTrainingTab === 'videos' && (
-                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition overflow-hidden" onClick={() => setSCourseBuilderMode(item)}>
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition overflow-hidden" onClick={() => setSCourseBuilderMode(item)}>
                               {item.coverImage ? (
                                 <img src={resolveMediaUrl(item.coverImage)} alt="" className="w-full h-full object-cover" />
                               ) : (
@@ -1613,7 +1613,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       }`}>Đạt</button>
                   <button onClick={() => setErForm({ ...erForm, passed: false })}
                     className={`flex-1 px-8 py-3 rounded-2xl text-[13px] font-black transition-all duration-300 border-2 ${!erForm.passed
-                        ? 'bg-red-600 border-transparent text-white shadow-md scale-[1.02]'
+                        ? 'bg-emerald-600 border-transparent text-white shadow-md scale-[1.02]'
                         : 'bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 hover:bg-red-50/50 hover:scale-[1.02]'
                       }`}>Chưa đạt</button>
                 </div>

@@ -211,7 +211,7 @@ export default function CertPrepAccessManager({ courses, rows, loading, onRefres
                   </td>
                   <td className="px-4 py-3 text-slate-500">{row.grantedBy || '-'}</td>
                   <td className="px-4 py-3 text-right space-x-2">
-                    <button type="button" onClick={() => openExtend(row, false)} className="text-xs font-bold text-slate-600 hover:text-red-600">Gia hạn</button>
+                    <button type="button" onClick={() => openExtend(row, false)} className="text-xs font-bold text-slate-600 hover:text-emerald-600">Gia hạn</button>
                     {row.isActive === false ? (
                       <button type="button" onClick={() => openExtend(row, true)} className="text-xs font-bold text-emerald-600">Bật lại</button>
                     ) : (

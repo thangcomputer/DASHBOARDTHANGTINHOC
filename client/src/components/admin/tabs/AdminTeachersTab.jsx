@@ -198,7 +198,7 @@ export default function AdminTeachersTab() {
   }, [filteredTeachers, filterStatus]);
 
   const selectFilterClass =
-    'h-11 w-full bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none transition-all';
+    'h-11 w-full bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 outline-none transition-all';
 
   const menuProps = {
     openId: menuId,
@@ -262,7 +262,7 @@ export default function AdminTeachersTab() {
                 placeholder="Tìm tên / SĐT giảng viên..."
                 value={teacherSearch}
                 onChange={(e) => setTeacherSearch(e.target.value)}
-                className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
+                className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 outline-none w-full transition-all"
                 aria-label="Tìm giảng viên"
               />
             </div>

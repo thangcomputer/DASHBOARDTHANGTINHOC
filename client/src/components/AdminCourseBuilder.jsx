@@ -416,7 +416,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                       <button
                         type="button"
                         onClick={() => { setEditingChapterId(chapter.id); setTempTitle(chapter.title); }}
-                        className="shrink-0 inline-flex items-center justify-center min-w-9 min-h-9 text-slate-400 hover:text-red-600 rounded-lg"
+                        className="shrink-0 inline-flex items-center justify-center min-w-9 min-h-9 text-slate-400 hover:text-emerald-600 rounded-lg"
                         aria-label="Sửa chương"
                       >
                         <Edit3 size={14} />
@@ -528,7 +528,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                     id={`earlyAccess_${lesson.id}`}
                                     checked={tempAllowEarlyAccess}
                                     onChange={(e) => setTempAllowEarlyAccess(e.target.checked)}
-                                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer"
+                                    className="w-4 h-4 text-red-600 rounded focus:ring-emerald-500 cursor-pointer"
                                   />
                                   <label htmlFor={`earlyAccess_${lesson.id}`} className="text-xs font-bold text-slate-800 cursor-pointer select-none">
                                     Cho phép mở bài sớm (allowEarlyAccess)
@@ -655,7 +655,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
           <button
             type="button"
             onClick={addChapter}
-            className="w-full min-h-12 py-3.5 border-2 border-dashed border-red-200 text-red-600 font-bold rounded-2xl hover:bg-red-50 hover:border-red-300 transition inline-flex items-center justify-center gap-2 text-sm sm:text-base"
+            className="w-full min-h-12 py-3.5 border-2 border-dashed border-red-200 text-red-600 font-bold rounded-2xl hover:bg-red-50 hover:border-emerald-300 transition inline-flex items-center justify-center gap-2 text-sm sm:text-base"
           >
             <Plus size={18} /> Thêm Phần/Chương mới
           </button>

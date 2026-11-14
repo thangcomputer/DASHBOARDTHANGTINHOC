@@ -92,7 +92,7 @@ export default function TenantManagementPage() {
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={load} className="p-2.5 rounded-xl bg-gray-50 text-gray-500"><RefreshCw size={16} /></button>
-          <button type="button" onClick={() => setShowCreate(true)} className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold flex items-center gap-1.5">
+          <button type="button" onClick={() => setShowCreate(true)} className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5">
             <Plus size={14} /> Tenant mới
           </button>
         </div>

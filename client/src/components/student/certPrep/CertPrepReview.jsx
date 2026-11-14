@@ -38,7 +38,7 @@ export default function CertPrepReview({ questions = [] }) {
             key={f.id}
             type="button"
             onClick={() => { setFilter(f.id); setCurrent(0); }}
-            className={`min-h-11 px-3 rounded-xl text-sm font-bold border ${filter === f.id ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200'
+            className={`min-h-11 px-3 rounded-xl text-sm font-bold border ${filter === f.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'
               }`}
           >
             {f.label}

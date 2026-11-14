@@ -971,7 +971,7 @@ function ChatWindow({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
             {tab.user?.isGroup ? (
-              <span className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-white ring-1 ring-red-200">
+              <span className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-700 text-white ring-1 ring-red-200">
                 <Users size={19} strokeWidth={2.4} />
               </span>
             ) : isAiPeer ? (
@@ -1154,7 +1154,7 @@ function ChatWindow({
                           e.stopPropagation();
                           setActiveMsgOptions(showOptions ? null : msgId);
                         }}
-                        className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
+                        className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-red-50 transition"
                         title="Tùy chọn tin nhắn"
                       >
                         <MoreVertical size={14} />
@@ -2741,7 +2741,7 @@ export default function FloatingMessenger({ session, role }) {
                               user={c.user}
                               className={`w-9 h-9 rounded-full object-cover ${isRealAvatar(c.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
                             />
-                            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
+                            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-emerald-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
                               {c.unread > 99 ? '99+' : c.unread}
                             </span>
                           </span>
@@ -2798,7 +2798,7 @@ export default function FloatingMessenger({ session, role }) {
                                 />
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span className="block text-[13px] font-bold text-slate-800 truncate group-hover:text-red-600">
+                                <span className="block text-[13px] font-bold text-slate-800 truncate group-hover:text-emerald-600">
                                   {p.name}
                                 </span>
                                 <span className="block text-[11px] text-slate-500 font-medium">
@@ -2808,7 +2808,7 @@ export default function FloatingMessenger({ session, role }) {
                                 </span>
                               </span>
                               {peerUnread > 0 ? (
-                                <span className="min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-red-600 text-[10px] font-black text-white flex items-center justify-center">
+                                <span className="min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-emerald-600 text-[10px] font-black text-white flex items-center justify-center">
                                   {peerUnread > 99 ? '99+' : peerUnread}
                                 </span>
                               ) : (

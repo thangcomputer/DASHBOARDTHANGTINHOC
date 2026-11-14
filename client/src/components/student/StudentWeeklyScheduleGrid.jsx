@@ -258,7 +258,7 @@ export default function StudentWeeklyScheduleGrid({
                     >
                       {hasNote && (
                         <span
-                          className="absolute -top-1 -right-1 z-[1] w-3.5 h-3.5 rounded-full bg-red-600 text-white flex items-center justify-center shadow-sm pointer-events-none"
+                          className="absolute -top-1 -right-1 z-[1] w-3.5 h-3.5 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-sm pointer-events-none"
                           aria-hidden="true"
                         >
                           <StickyNote size={8} strokeWidth={2.5} />

@@ -921,7 +921,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
         <div className="max-w-md text-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <p className="text-lg font-bold text-slate-900">Phiên đăng nhập không hợp lệ</p>
           <p className="text-sm text-slate-500 mt-2">Vui lòng đăng xuất và đăng nhập lại trước khi làm bài thi.</p>
-          <button type="button" onClick={onBack} className="mt-4 px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-sm">
+          <button type="button" onClick={onBack} className="mt-4 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-sm">
             Quay lại Phòng thi
           </button>
         </div>
@@ -1033,7 +1033,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                 disabled={!canStartExam}
                 onClick={() => beginOrResumeExam()}
                 className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${canStartExam
-                  ? 'bg-red-500 text-white shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-[1.02] active:scale-95'
+                  ? 'bg-red-500 text-white shadow-xl shadow-emerald-500/30 hover:bg-emerald-600 hover:scale-[1.02] active:scale-95'
                   : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
                   }`}>
                 {questionsLoading
@@ -1274,7 +1274,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                     }`}
                 >
                   {tab === 'trac_nghiem' && (
-                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
+                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-emerald-600" />
                   )}
                   Trắc nghiệm
                   {isTracNghiemSubmitted && <CheckCircle size={16} className="text-emerald-500" />}
@@ -1293,7 +1293,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                     }`}
                 >
                   {tab === 'tu_luan' && isTracNghiemSubmitted && meta.essayRequired && (
-                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
+                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-emerald-600" />
                   )}
                   Thực hành / Tự luận
                   {!meta.essayRequired
@@ -1347,7 +1347,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                         >
                           <span
                             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black md:h-8 md:w-8 md:text-xs ${answers[currentQ] === i
-                              ? 'bg-red-600 text-white'
+                              ? 'bg-emerald-600 text-white'
                               : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
                               }`}
                           >
@@ -1541,7 +1541,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                         disabled={isTracNghiemSubmitted || tab !== 'trac_nghiem'}
                         onClick={() => setCurrentQ(i)}
                         className={`flex aspect-square items-center justify-center rounded-lg text-xs font-black transition sm:rounded-xl sm:text-sm md:text-[0.95rem] ${active
-                          ? 'bg-red-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
                           : done
                             ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
                             : 'border border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white'
@@ -1554,7 +1554,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                 </div>
                 <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-600 md:text-xs">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded bg-red-600" />
+                    <span className="h-2.5 w-2.5 rounded bg-emerald-600" />
                     Đang xem
                   </span>
                   <span className="flex items-center gap-1.5">

@@ -249,7 +249,7 @@ export default function EditableAvatar({
                   step="0.01"
                   value={cropZoom}
                   onChange={(event) => setCropZoom(Number(event.target.value))}
-                  className="mt-2 w-full accent-red-600"
+                  className="mt-2 w-full accent-emerald-600"
                   aria-label="Mức phóng ảnh"
                 />
               </div>

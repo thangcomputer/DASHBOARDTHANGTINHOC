@@ -540,7 +540,7 @@ export default function StudentOverviewTab({
     tasks.push({
       key: 'quiz',
       icon: Trophy,
-      tone: freePortalUi ? 'bg-[#059669]' : 'bg-gradient-to-b from-red-500 to-red-700',
+      tone: freePortalUi ? 'bg-[#059669]' : 'bg-gradient-to-b from-emerald-500 to-emerald-700',
       title: `Trắc nghiệm chưa làm (${pendingQuizzes.length})`,
       sub: `${nearestQuiz?.title || 'Bài trắc nghiệm'}${nearestQuiz?.deadline ? ` · hạn ${formatDeadline(nearestQuiz.deadline)}` : ''}`,
       cta: 'Làm bài',
@@ -722,7 +722,7 @@ export default function StudentOverviewTab({
                       className={`h-full rounded-full transition-all duration-500 ${
                         isVideoCourse
                           ? 'bg-blue-500'
-                          : 'bg-gradient-to-r from-red-500 to-orange-400'
+                          : 'bg-gradient-to-r from-emerald-500 to-orange-400'
                       }`}
                       style={{ width: `${pct}%` }}
                     />

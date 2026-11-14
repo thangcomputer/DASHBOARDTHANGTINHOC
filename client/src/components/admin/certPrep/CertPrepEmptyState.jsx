@@ -9,7 +9,7 @@ export default function CertPrepEmptyState({ title, hint, actionLabel, onAction 
         <button
           type="button"
           onClick={onAction}
-          className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md"
+          className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md"
         >
           <Plus size={15} aria-hidden="true" />
           {actionLabel}

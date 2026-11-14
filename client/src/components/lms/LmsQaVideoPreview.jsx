@@ -193,7 +193,7 @@ export default function LmsQaVideoPreview({
             aria-label="Phát video bài học"
             className="absolute inset-0 z-10 grid place-items-center bg-black/10 transition hover:bg-black/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-300"
           >
-            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-red-600 text-white shadow-xl transition hover:scale-105">
+            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-emerald-600 text-white shadow-xl transition hover:scale-105">
               <Play size={30} fill="currentColor" aria-hidden="true" />
             </span>
           </button>

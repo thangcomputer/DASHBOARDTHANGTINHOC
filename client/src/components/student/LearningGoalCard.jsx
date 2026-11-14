@@ -82,7 +82,7 @@ export default function LearningGoalCard() {
       }`}>
         <div className="flex items-center gap-3">
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-xs ${
-            isFree ? 'bg-emerald-600' : 'bg-red-600'
+            isFree ? 'bg-emerald-600' : 'bg-emerald-600'
           }`}>
             <Target size={20} />
           </span>
@@ -158,7 +158,7 @@ export default function LearningGoalCard() {
         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
-              todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-red-500'
+              todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-emerald-500'
             }`}
             style={{ width: `${todayPct}%` }}
           />

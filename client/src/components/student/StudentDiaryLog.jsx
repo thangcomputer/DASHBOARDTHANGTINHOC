@@ -144,7 +144,7 @@ export default function StudentDiaryLog({
                   onClick={() => setFilter(tab.value)}
                   className={`min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
                     active
-                      ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-red-600 text-white border border-red-600')
+                      ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-emerald-600 text-white border border-emerald-600')
                       : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-red-500 hover:bg-red-50/60')
                   }`}
                 >
@@ -160,7 +160,7 @@ export default function StudentDiaryLog({
               onClick={() => setFilter('Chưa điểm danh')}
               className={`w-full min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
                 filter === 'Chưa điểm danh'
-                  ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-red-600 text-white border border-red-600')
+                  ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-emerald-600 text-white border border-emerald-600')
                   : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-red-500 hover:bg-red-50/60')
               }`}
             >
@@ -231,7 +231,7 @@ export default function StudentDiaryLog({
                           target="_blank"
                           rel="noreferrer"
                           className={`inline-flex min-h-[34px] items-center justify-center rounded-xl active:scale-95 px-4 py-1.5 text-xs font-black text-white transition ${
-                            isFree ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                            isFree ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'
                           }`}
                         >
                           Vào lớp
@@ -245,7 +245,7 @@ export default function StudentDiaryLog({
                           className={`inline-flex min-h-[34px] items-center justify-center rounded-xl border bg-white active:scale-95 px-4 py-1.5 text-xs font-black transition ${
                             isFree
                               ? 'border-emerald-600 text-emerald-600 hover:bg-emerald-50'
-                              : 'border-red-600 text-red-600 hover:bg-red-50'
+                              : 'border-emerald-600 text-red-600 hover:bg-red-50'
                           }`}
                         >
                           Ghi chú / Đổi lịch

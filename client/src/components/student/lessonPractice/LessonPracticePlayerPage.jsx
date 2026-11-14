@@ -57,7 +57,7 @@ function LessonFigure({ imageUrl, caption, region, point, onPick, compact = fals
         )}
         {point && (
           <span
-            className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-red-600 pointer-events-none"
+            className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-600 pointer-events-none"
             style={{ left: `${point.x}%`, top: `${point.y}%` }}
           />
         )}
@@ -208,7 +208,7 @@ function QuizClock({ remaining, warning }) {
       <span className="relative h-8 w-8" aria-hidden>
         <Clock size={32} />
         <span
-          className="absolute bottom-1/2 left-1/2 h-2.5 w-0.5 origin-bottom rounded-full bg-red-600"
+          className="absolute bottom-1/2 left-1/2 h-2.5 w-0.5 origin-bottom rounded-full bg-emerald-600"
           style={{ transform: `translateX(-50%) rotate(${hand}deg)` }}
         />
       </span>
@@ -223,7 +223,7 @@ function PracticeModalIcon({ timeout = false }) {
     <div
       aria-hidden="true"
       className={`relative mx-auto mb-4 grid h-[76px] w-[76px] place-items-center rounded-[26px] bg-gradient-to-br ${
-        timeout ? 'from-orange-500 to-red-600 shadow-orange-200' : 'from-red-500 to-rose-600 shadow-red-200'
+        timeout ? 'from-orange-500 to-emerald-600 shadow-orange-200' : 'from-emerald-500 to-rose-600 shadow-red-200'
       } text-white shadow-lg`}
     >
       <span className="absolute inset-[5px] rounded-[22px] border border-white/35" />
@@ -522,7 +522,7 @@ function QuestionCard({
                   checked={selected}
                   onChange={() => setChoiceId(opt.id)}
                 />
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
                   {isKey ? '✓' : optIndex + 1}
                 </span>
                 <span className="leading-relaxed text-slate-800">{opt.text}</span>
@@ -546,7 +546,7 @@ function QuestionCard({
                   checked={selected}
                   onChange={() => setChoiceIds((current) => (current.includes(opt.id) ? current.filter((id) => id !== opt.id) : [...current, opt.id]))}
                 />
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
                   {isKey ? '✓' : selected ? '✓' : String(optIndex + 1)}
                 </span>
                 <span className="leading-relaxed text-slate-800">{opt.text}</span>
@@ -586,7 +586,7 @@ function QuestionCard({
               onPointerDown={frozen ? undefined : (event) => beginDrag(event, opt, optIndex + 1)}
               className={`group flex select-none items-center gap-2 rounded-xl border px-2 py-1.5 text-sm ${dropId === opt.id && dragGhost ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'} ${dragGhost?.id === opt.id ? 'opacity-50' : ''} ${frozen ? '' : 'cursor-grab touch-none'}`}
             >
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${frozen ? 'border-transparent text-transparent' : 'border-slate-200 bg-white text-slate-500 group-hover:border-red-600 group-hover:bg-red-600 group-hover:text-white'}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${frozen ? 'border-transparent text-transparent' : 'border-slate-200 bg-white text-slate-500 group-hover:border-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
                 <Move size={16} />
               </span>
               <span className="shrink-0 text-xs font-black  tracking-wide text-slate-500">Bước {optIndex + 1}:</span>
@@ -595,7 +595,7 @@ function QuestionCard({
           ))}
           {dragGhost && (
             <div
-              className="pointer-events-none fixed z-[80] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-xl border border-red-700 bg-red-600 px-3 py-2 text-sm font-bold text-white shadow-xl"
+              className="pointer-events-none fixed z-[80] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-xl border border-red-700 bg-emerald-600 px-3 py-2 text-sm font-bold text-white shadow-xl"
               style={{ left: dragGhost.x, top: dragGhost.y }}
             >
               <Move size={16} />
@@ -1210,7 +1210,7 @@ export default function LessonPracticePlayerPage({
                           : needsRetry
                             ? 'bg-amber-400 text-amber-950'
                             : current
-                              ? 'border-2 border-red-600 bg-white text-red-700'
+                              ? 'border-2 border-emerald-600 bg-white text-red-700'
                               : 'border border-slate-300 bg-white text-slate-500';
                         return (
                           <button
@@ -1437,7 +1437,7 @@ export default function LessonPracticePlayerPage({
                           setStarted(true);
                           setClockTry(0);
                         }}
-                        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white transition-colors hover:bg-red-700"
+                        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white transition-colors hover:bg-emerald-700"
                       >
                         <Play size={16} fill="currentColor" /> {hasResumableAttempt ? 'Tiếp tục làm' : 'Bắt đầu luyện tập'}
                       </button>

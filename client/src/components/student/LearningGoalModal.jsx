@@ -123,7 +123,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
           <div className="relative mx-auto h-11 w-11 sm:h-13 sm:w-13">
             {!celebrate && <span className="cms-goal-ring" aria-hidden="true" />}
             {!celebrate && <span className="cms-goal-ring cms-goal-ring--late" aria-hidden="true" />}
-            <div className={`relative flex h-11 w-11 sm:h-13 sm:w-13 items-center justify-center rounded-full text-white ${celebrate ? 'cms-goal-pop bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_8px_18px_rgba(5,150,105,0.35),inset_0_2px_3px_rgba(255,255,255,0.45),inset_0_-3px_5px_rgba(6,78,59,0.45)]' : 'bg-gradient-to-b from-red-500 to-red-700 shadow-[0_8px_18px_rgba(185,28,28,0.35),inset_0_2px_3px_rgba(255,255,255,0.4),inset_0_-3px_5px_rgba(127,29,29,0.5)]'}`}>
+            <div className={`relative flex h-11 w-11 sm:h-13 sm:w-13 items-center justify-center rounded-full text-white ${celebrate ? 'cms-goal-pop bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_8px_18px_rgba(5,150,105,0.35),inset_0_2px_3px_rgba(255,255,255,0.45),inset_0_-3px_5px_rgba(6,78,59,0.45)]' : 'bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_8px_18px_rgba(185,28,28,0.35),inset_0_2px_3px_rgba(255,255,255,0.4),inset_0_-3px_5px_rgba(127,29,29,0.5)]'}`}>
               {celebrate ? <Check size={22} strokeWidth={3} aria-hidden="true" /> : <Target size={22} className="sm:scale-110" aria-hidden="true" />}
             </div>
           </div>
@@ -159,7 +159,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
             {resume ? (
               <>
                 <div className="cms-goal-pop mt-3.5 flex w-full items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/70 p-2.5 text-left">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
                     <PlayCircle size={20} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -203,7 +203,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
                         className={`relative rounded-xl border-2 px-1.5 py-1.5 sm:py-2 text-center transition ${active ? 'border-red-500 bg-red-50/80 text-red-700 shadow-2xs' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
                       >
                         {option.popular && (
-                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-b from-red-500 to-red-600 px-1.5 py-0.2 text-[8px] sm:text-[8.5px] font-black uppercase tracking-wide text-white shadow-2xs">
+                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-b from-emerald-500 to-emerald-600 px-1.5 py-0.2 text-[8px] sm:text-[8.5px] font-black uppercase tracking-wide text-white shadow-2xs">
                             Phổ biến
                           </span>
                         )}

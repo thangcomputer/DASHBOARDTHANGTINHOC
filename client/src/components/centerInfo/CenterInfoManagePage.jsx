@@ -19,7 +19,7 @@ function Field({ label, children }) {
 }
 
 const inputClass =
-  'w-full border-2 border-slate-200 rounded-xl p-3 text-sm focus:border-red-400 outline-none bg-white';
+  'w-full border-2 border-slate-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none bg-white';
 
 function snapshotOf(obj) {
   try {
@@ -365,7 +365,7 @@ export default function CenterInfoManagePage() {
         <div>
           <Link
             to="/admin/center-info"
-            className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-red-600 mb-1"
+            className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-emerald-600 mb-1"
             onClick={async (e) => {
               if (!hasUnsaved) return;
               e.preventDefault();
@@ -403,7 +403,7 @@ export default function CenterInfoManagePage() {
                 key={s.key}
                 type="button"
                 onClick={() => requestSectionChange(s.key)}
-                className={`w-full text-left px-3 min-h-10 rounded-xl text-sm font-bold ${section === s.key ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                className={`w-full text-left px-3 min-h-10 rounded-xl text-sm font-bold ${section === s.key ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 {s.label}
@@ -550,7 +550,7 @@ export default function CenterInfoManagePage() {
                     }
                     openItemForm(blankItem(section));
                   }}
-                  className="inline-flex items-center gap-2 min-h-10 px-4 rounded-2xl bg-red-600 text-white text-sm font-bold"
+                  className="inline-flex items-center gap-2 min-h-10 px-4 rounded-2xl bg-emerald-600 text-white text-sm font-bold"
                 >
                   <Plus size={15} /> Thêm mới
                 </button>

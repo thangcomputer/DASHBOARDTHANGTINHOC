@@ -138,7 +138,7 @@ export default function PinLockSettingsModal({ userKey }) {
                     onClick={() => changeTimeout(option.minutes)}
                     aria-pressed={timeout === option.minutes}
                     className={`cms-pin-press rounded-xl border px-3 py-2 text-sm font-bold ${timeout === option.minutes
-                      ? 'border-red-600 bg-red-600 text-white'
+                      ? 'border-emerald-600 bg-emerald-600 text-white'
                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                   >
                     {option.label}
@@ -159,7 +159,7 @@ export default function PinLockSettingsModal({ userKey }) {
                 <button type="button" onClick={() => goStep('verify-remove')} className="cms-pin-press rounded-xl border border-red-200 bg-white px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">Tắt khóa</button>
               </div>
             ) : (
-              <button type="button" onClick={() => goStep('create')} className="cms-pin-press w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-extrabold text-white">
+              <button type="button" onClick={() => goStep('create')} className="cms-pin-press w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white">
                 Tạo mã PIN
               </button>
             )}

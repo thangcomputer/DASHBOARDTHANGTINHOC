@@ -55,7 +55,7 @@ export default function SoftwareLinksTable({
           <button
             type="button"
             onClick={() => setArticle(null)}
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-red-600 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
           >
             <ChevronLeft size={16} aria-hidden="true" />
             Quay lại danh sách
@@ -78,7 +78,7 @@ export default function SoftwareLinksTable({
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 min-h-11 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors"
+                className="inline-flex items-center gap-2 min-h-11 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors"
               >
                 <Download size={16} aria-hidden="true" />
                 Tải / Mở phần mềm
@@ -108,7 +108,7 @@ export default function SoftwareLinksTable({
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 min-h-11 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors"
+                className="inline-flex items-center gap-2 min-h-11 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors"
               >
                 <Download size={16} aria-hidden="true" />
                 Tải / Mở link
@@ -174,7 +174,7 @@ export default function SoftwareLinksTable({
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors"
+                            className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
                           >
                             <Download size={14} aria-hidden="true" />
                             Tải / Mở link

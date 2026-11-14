@@ -335,7 +335,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                       X
                     </span>
                     {/* PowerPoint */}
-                    <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 via-amber-600 to-red-600 text-white font-black text-[11px] sm:text-xs shadow-xs">
+                    <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 via-amber-600 to-emerald-600 text-white font-black text-[11px] sm:text-xs shadow-xs">
                       P
                     </span>
                   </div>

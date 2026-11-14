@@ -14,7 +14,7 @@ import AdminMilestoneEditor, { VideoChecksEditor, normalizeLevelConfigs } from '
 import AdminFreePortalMaterialsPanel from './AdminFreePortalMaterialsPanel';
 
 const TYPE_IDS = Object.keys(QUESTION_TYPES);
-const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
 const UNIT_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
 
@@ -221,7 +221,7 @@ function TopicModal({ topic, onClose, onSaved }) {
             <input id="dp-topic-order" type="number" className={INPUT} value={form.sortOrder} onChange={(e) => set({ sortOrder: Number(e.target.value) })} />
           </div>
           <label className="mt-6 flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <input type="checkbox" checked={form.active} onChange={(e) => set({ active: e.target.checked })} className="h-4 w-4 accent-red-600" />
+            <input type="checkbox" checked={form.active} onChange={(e) => set({ active: e.target.checked })} className="h-4 w-4 accent-emerald-600" />
             Hiển thị cho học viên
           </label>
         </div>
@@ -259,7 +259,7 @@ function TopicModal({ topic, onClose, onSaved }) {
                         type="checkbox"
                         checked={form.lessonUnitIds.includes(unit.id)}
                         onChange={() => toggleUnit(unit.id)}
-                        className="h-4 w-4 accent-red-600"
+                        className="h-4 w-4 accent-emerald-600"
                       />
                       <span className="min-w-0 flex-1 truncate">{index + 1}. {unit.title}</span>
                       <span className="shrink-0 text-[11px] text-slate-400">{(unit.videos || []).length} video</span>
@@ -673,7 +673,7 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {TYPE_IDS.map((type) => (
               <label key={type} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
-                <input type="checkbox" className="h-4 w-4 accent-red-600" checked={types.includes(type)} onChange={(e) => setTypes((prev) => (e.target.checked ? [...prev, type] : prev.filter((t) => t !== type)))} />
+                <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={types.includes(type)} onChange={(e) => setTypes((prev) => (e.target.checked ? [...prev, type] : prev.filter((t) => t !== type)))} />
                 {QUESTION_TYPES[type].label}
               </label>
             ))}
@@ -786,7 +786,7 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <input type="checkbox" className="h-4 w-4 accent-red-600" checked={form.active} onChange={(e) => set({ active: e.target.checked })} />
+          <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={form.active} onChange={(e) => set({ active: e.target.checked })} />
           Hiện chặng này trên lộ trình
         </label>
       </div>
@@ -1212,7 +1212,7 @@ function UnitVideosPanel({ unit, onSaved }) {
         <ol className="space-y-1.5">
           {videos.map((video, index) => (
             <li key={video.id || `new-${index}`} className="flex items-start gap-2 rounded-lg bg-white p-2 ring-1 ring-slate-100">
-              <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white">{index + 1}</span>
+              <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-black text-white">{index + 1}</span>
               <div className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
                 <input className={`${INPUT} !py-1.5`} value={video.title} maxLength={120} onChange={(e) => update(index, { title: e.target.value })} placeholder="Tên video" aria-label={`Tên video ${index + 1}`} />
                 <input className={`${INPUT} !py-1.5`} value={video.url} maxLength={500} onChange={(e) => update(index, { url: e.target.value })} placeholder="Link YouTube / Vimeo / .mp4" aria-label={`Link video ${index + 1}`} />
@@ -1475,7 +1475,7 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
             return (
               <li key={unit.id} className={`space-y-2 rounded-xl bg-white p-2.5 ring-1 ${active || videosOpen ? 'ring-red-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
                 <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-red-500 to-red-700 text-xs font-black text-white">{index + 1}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 text-xs font-black text-white">{index + 1}</span>
                   <button type="button" onClick={() => onFilterUnit(active ? '' : unit.id)} className="min-w-0 flex-1 text-left !shadow-none" title="Lọc câu hỏi của chặng">
                     <p className="truncate text-sm font-black text-slate-900">
                       {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
@@ -1492,7 +1492,7 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                     onClick={() => setOpenVideosId(videosOpen ? '' : unit.id)}
                     aria-expanded={videosOpen}
                     title="Video, nội dung và luyện tập của chặng"
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}
                   >
                     {videosOpen ? 'Đóng' : 'Soạn'}
                   </button>
@@ -1695,7 +1695,7 @@ export default function AdminDailyPracticeTab() {
             type="button"
             onClick={() => setSectionTab('practice')}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-              sectionTab === 'practice' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+              sectionTab === 'practice' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Gamepad2 size={15} /> Lộ trình &amp; Câu hỏi theo chặng

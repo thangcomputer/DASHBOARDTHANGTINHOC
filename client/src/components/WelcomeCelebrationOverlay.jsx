@@ -331,7 +331,7 @@ export default function WelcomeCelebrationOverlay({
         />
 
         <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-red-200/35 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
-          <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-rose-600 to-indigo-700 px-6 pt-10 pb-12 text-center text-white">
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-rose-600 to-indigo-700 px-6 pt-10 pb-12 text-center text-white">
             <div className="pointer-events-none absolute -top-16 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-white/20 blur-3xl" aria-hidden="true" />
             <button
               type="button"

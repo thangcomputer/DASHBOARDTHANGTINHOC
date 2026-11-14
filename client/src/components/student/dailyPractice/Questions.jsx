@@ -245,7 +245,7 @@ export function TrueFalseQuestion({ result, chosen, onSubmit }) {
                 <Check size={14} strokeWidth={3.2} />
               </span>
             )}
-            <span className={`flex h-12 w-12 items-center justify-center rounded-full text-white ${tone === 'emerald' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-gradient-to-b from-red-400 to-red-600'}`}>
+            <span className={`flex h-12 w-12 items-center justify-center rounded-full text-white ${tone === 'emerald' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-gradient-to-b from-red-400 to-emerald-600'}`}>
               <Icon size={26} strokeWidth={3} aria-hidden="true" />
             </span>
             {label}

@@ -113,7 +113,7 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
             <button
               type="button"
               onClick={() => markEvaluationRead(ev.id)}
-              className="flex-1 inline-flex justify-center items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"
+              className="flex-1 inline-flex justify-center items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"
             >
               <CheckCircle2 size={14} /> Đã xem
             </button>

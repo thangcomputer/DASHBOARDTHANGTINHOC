@@ -2731,7 +2731,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           )
                         )}
                         {conv.unread > 0 && (
-                          <span className="ml-1 min-w-[16px] h-4 px-1 bg-red-600 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-sm">
+                          <span className="ml-1 min-w-[16px] h-4 px-1 bg-emerald-600 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-sm">
                             {conv.unread > 99 ? '99+' : conv.unread}
                           </span>
                         )}
@@ -3570,7 +3570,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
                                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
                                   role === 'staff' ? 'bg-amber-600 text-white' :
-                                    role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                                    role === 'teacher' ? 'bg-emerald-600 text-white' : 'bg-green-600 text-white'
                                   }`}>
                                   {badgeLabel}
                                 </span>
@@ -3950,7 +3950,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <button
                             type="button"
                             onClick={() => setPendingImage(null)}
-                            className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition shrink-0"
+                            className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-emerald-600 hover:bg-red-50 flex items-center justify-center transition shrink-0"
                             title="Bỏ chọn ảnh"
                           >
                             <X size={14} />
@@ -4017,7 +4017,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   value={groupName}
                   onChange={e => setGroupName(e.target.value)}
                   placeholder="Ví dụ: Nhóm học Tiếng Anh Giao Tiếp..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 focus:bg-white transition-all font-medium text-sm text-slate-800"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/10 focus:bg-white transition-all font-medium text-sm text-slate-800"
                 />
               </div>
 
@@ -4030,7 +4030,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     value={memberSearch}
                     onChange={e => setMemberSearch(e.target.value)}
                     placeholder="Tìm họ, tên, SĐT..."
-                    className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-300 focus:bg-white transition-all font-medium text-slate-700"
+                    className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-300 focus:bg-white transition-all font-medium text-slate-700"
                   />
                 </div>
                 <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -4055,7 +4055,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <div className="relative">
                             <input
                               type="checkbox"
-                              className="w-5 h-5 rounded-md border-2 border-slate-200 text-red-600 focus:ring-red-500 transition-all cursor-pointer"
+                              className="w-5 h-5 rounded-md border-2 border-slate-200 text-red-600 focus:ring-emerald-500 transition-all cursor-pointer"
                               checked={isSelected}
                               onChange={(e) => {
                                 if (e.target.checked) setSelectedParticipants([...selectedParticipants, { userId: u.id, name: u.name, role: u.role }]);
@@ -4166,7 +4166,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {broadcastConfig && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-8 duration-500">
-            <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-8 py-6 flex items-center justify-between">
               <div>
                 <h3 className="text-white font-black text-lg flex items-center gap-2">
                   <Megaphone size={20} /> Gửi tin nhắn hàng loạt

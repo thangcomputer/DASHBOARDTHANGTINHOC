@@ -92,7 +92,7 @@ export default function CertPrepQuestionNavigator({
               : 'border-red-400 bg-red-50 text-red-700';
           }
           if (current) {
-            tone = 'border-red-600 bg-white text-red-700 ring-2 ring-red-600 shadow-sm';
+            tone = 'border-emerald-600 bg-white text-red-700 ring-2 ring-red-600 shadow-sm';
           }
           return (
             <button
@@ -109,7 +109,7 @@ export default function CertPrepQuestionNavigator({
       </div>
       <ul className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-[10px] font-bold text-slate-400">
         <li className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded border-2 border-red-600 bg-white shrink-0" /> Đang xem
+          <span className="w-3.5 h-3.5 rounded border-2 border-emerald-600 bg-white shrink-0" /> Đang xem
         </li>
         <li className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded bg-slate-800 shrink-0" /> Đã trả lời

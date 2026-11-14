@@ -349,7 +349,7 @@ function StudentRowActions({
               confirmText: lockedAcc ? 'Mở khóa' : 'Khóa đăng nhập',
               confirmButtonClass: lockedAcc
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                : 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
             });
             if (!ok) return;
             setSubmittingAction(s.id + '-lock-acc');
@@ -659,7 +659,7 @@ export default function AdminStudentsTab() {
   };
 
   const selectFilterClass =
-    'w-full h-11 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 outline-none cursor-pointer transition-all';
+    'w-full h-11 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 outline-none cursor-pointer transition-all';
 
   const teacherSelectClass =
     'w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-sky-400 cursor-pointer';
@@ -799,7 +799,7 @@ export default function AdminStudentsTab() {
               onBlur={() => {
                 window.setTimeout(() => setSearchFocused(false), 180);
               }}
-              className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
+              className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 outline-none w-full transition-all"
               placeholder="Tìm họ, tên đệm, tên, SĐT..."
               aria-label="Tìm học viên"
               autoComplete="off"
@@ -1253,7 +1253,7 @@ export default function AdminStudentsTab() {
                   type="button"
                   onClick={() => setCurrentPage(p)}
                   className={`w-9 h-9 shrink-0 rounded-lg text-sm font-semibold transition-all ${p === cp
-                      ? 'bg-red-600 text-white shadow-sm'
+                      ? 'bg-emerald-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                 >{p}</button>
@@ -1328,7 +1328,7 @@ export default function AdminStudentsTab() {
                           return { ...p, refundAmount: amt, refundPercent: pct };
                         });
                       }}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none min-w-0"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-300 outline-none min-w-0"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
                       Tối đa {Number(refundModal.maxRefund).toLocaleString('vi-VN')}đ
@@ -1351,7 +1351,7 @@ export default function AdminStudentsTab() {
                             return { ...p, refundPercent: pct, refundAmount: amt };
                           });
                         }}
-                        className="w-full border border-slate-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                        className="w-full border border-slate-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-300 outline-none"
                       />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">%</span>
                     </div>

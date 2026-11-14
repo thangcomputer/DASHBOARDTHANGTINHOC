@@ -824,7 +824,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       confirmText: lockedAcc ? 'Mở khóa' : 'Khóa đăng nhập',
       confirmButtonClass: lockedAcc
         ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-        : 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
+        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
       onConfirm: async () => {
         setDeviceBusy('lock');
         try {
@@ -1385,7 +1385,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             <div className="relative">
               <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 bg-red-600 rounded-lg transform rotate-45 animate-pulse" />
+                <div className="w-8 h-8 bg-emerald-600 rounded-lg transform rotate-45 animate-pulse" />
               </div>
             </div>
             <p className="text-sm font-semibold text-indigo-900/50">Đang tải hồ sơ...</p>
@@ -1564,7 +1564,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       <tab.icon size={14} className="shrink-0" />
                       <span className="min-w-0">{tab.label}</span>
                       {activeTab === tab.id && !locked && (
-                        <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-600 rounded-full" />
+                        <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-emerald-600 rounded-full" />
                       )}
                     </button>
                   );
@@ -1612,7 +1612,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       label="Tiến độ học tập"
                       value={summaryMetrics.noClassSessions ? '-' : `${summaryMetrics.progressPercent}%`}
                       icon={TrendingUp}
-                      color="bg-red-600"
+                      color="bg-emerald-600"
                       sub={summaryMetrics.noClassSessions ? 'Chưa có buổi học' : `${summaryMetrics.completedSessions}/${summaryMetrics.totalSessions || 0} buổi`}
                     />
                     <StatBox
@@ -2177,7 +2177,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     <button
                       type="button"
                       onClick={() => setShowAddAssign(!showAddAssign)}
-                      className="w-full sm:w-auto justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-3 min-h-11 rounded-xl text-[11px] font-black  tracking-wider shadow-sm transition-all inline-flex items-center gap-1.5 shrink-0"
+                      className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 min-h-11 rounded-xl text-[11px] font-black  tracking-wider shadow-sm transition-all inline-flex items-center gap-1.5 shrink-0"
                     >
                       <Plus size={14} /> Giao bài tập mới
                     </button>
@@ -2257,7 +2257,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       <button
                         type="button"
                         onClick={handleAddAssignment}
-                        className="w-full py-3 bg-red-600 text-white rounded-xl text-xs font-black  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100"
+                        className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black  tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-red-100"
                       >
                         Xác nhận giao bài
                       </button>
@@ -2871,7 +2871,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             return { ...p, refundAmount: amt, refundPercent: pct };
                           });
                         }}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-300 outline-none"
                       />
                     </div>
                     <div className="w-[96px] shrink-0">
@@ -2893,7 +2893,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                               return { ...p, refundPercent: pct, refundAmount: amt };
                             });
                           }}
-                          className="w-full border border-slate-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                          className="w-full border border-slate-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-300 outline-none"
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
                           %

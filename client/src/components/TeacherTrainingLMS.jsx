@@ -1262,7 +1262,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             {isAdmin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-emerald-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
               >
                 <BarChart2 size={16} /> Xem tiến độ
               </button>
@@ -1300,7 +1300,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                   {t.count} mục đang có
                 </span>
               </span>
-              <span className={`absolute right-1 top-1 min-w-[18px] rounded-full px-1 py-0.5 text-center text-[9px] font-black leading-none sm:right-3 sm:top-3 sm:min-w-[24px] sm:px-1.5 sm:py-1 sm:text-[10px] ${mainTab === t.key ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`absolute right-1 top-1 min-w-[18px] rounded-full px-1 py-0.5 text-center text-[9px] font-black leading-none sm:right-3 sm:top-3 sm:min-w-[24px] sm:px-1.5 sm:py-1 sm:text-[10px] ${mainTab === t.key ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                 {t.count}
               </span>
             </button>
@@ -1324,10 +1324,10 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                 const gradients = [
-                  "from-red-600 to-red-800",
+                  "from-emerald-600 to-red-800",
                   "from-teal-500 to-emerald-600",
                   "from-violet-600 to-fuchsia-600",
-                  "from-red-500 to-red-700"
+                  "from-emerald-500 to-emerald-700"
                 ];
                 const bgClass = gradients[idx % gradients.length];
                 const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
@@ -1353,7 +1353,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                     <div className="p-5 flex-1 flex flex-col">
                       <div className="flex items-start gap-3 mb-2">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-slate-800 text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
+                          <h3 className="font-bold text-slate-800 text-lg group-hover:text-emerald-600 transition-colors line-clamp-2 leading-snug">
                             {course.title}
                           </h3>
                         </div>
@@ -1363,7 +1363,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                       </div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
-                          <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
+                          <div className="h-full rounded-full bg-emerald-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -1474,7 +1474,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                           <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
                           <td className="px-4 py-3 font-bold text-slate-800">{file.title}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-black text-white ${isLink ? 'bg-sky-500' : 'bg-red-600'}`}>
+                            <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-black text-white ${isLink ? 'bg-sky-500' : 'bg-emerald-600'}`}>
                               {isLink ? 'Link ngoài' : `${file.fileType || 'FILE'}${file.fileSize ? ` · ${file.fileSize}` : ''}`}
                             </span>
                           </td>

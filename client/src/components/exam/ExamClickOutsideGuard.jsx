@@ -174,7 +174,7 @@ export default function ExamClickOutsideGuard({
             <button
               type="button"
               onClick={dismiss}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-black text-sm tracking-wide shadow-lg shadow-red-500/25 hover:from-orange-400 hover:to-red-500 transition active:scale-[0.98]"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-emerald-600 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-500/25 hover:from-orange-400 hover:to-emerald-500 transition active:scale-[0.98]"
             >
               Tôi đã hiểu, tiếp tục thi
             </button>

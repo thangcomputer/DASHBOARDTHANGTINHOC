@@ -7,7 +7,7 @@ import React from 'react';
 export default function StatCard({ icon: Icon, label, value, sub, color, trend }) {
   return (
     <div className="cms-kpi-card group">
-      <div className={`cms-kpi-icon ${color || 'bg-red-600'}`}>
+      <div className={`cms-kpi-icon ${color || 'bg-emerald-600'}`}>
         <Icon size={22} className="text-white" strokeWidth={2.25} aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">

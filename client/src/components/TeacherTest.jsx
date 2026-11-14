@@ -125,7 +125,7 @@ const EvaluationStepper = ({ currentStep = 1, results = {}, practicalSubmitted =
         {steps.map((step, i) => (
           <div key={step.id} className="relative z-10 flex flex-col items-center group">
             <div className={`${dot} rounded-full flex items-center justify-center transition-all duration-500 shadow-lg ${(i + 1 < currentStep || results.quiz?.passed && i === 0) ? 'bg-green-500 text-white' :
-                (i + 1 === currentStep) ? 'bg-red-600 text-white scale-110' : 'bg-white border-2 border-slate-200 text-slate-300'
+                (i + 1 === currentStep) ? 'bg-emerald-600 text-white scale-110' : 'bg-white border-2 border-slate-200 text-slate-300'
               }`}>
               {i + 1 < currentStep || (results.quiz?.passed && i === 0) ? <CheckCircle size={iconSz} /> :
                 i + 1 === currentStep ? (i === 2 ? <User size={iconSz} /> : <FileText size={iconSz} />) :
@@ -166,12 +166,12 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
   if (!passed) {
     return (
       <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
-        <div className="bg-white rounded-[40px] p-8 sm:p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600 animate-in zoom-in duration-300">
+        <div className="bg-white rounded-[40px] p-8 sm:p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-emerald-600 animate-in zoom-in duration-300">
           <div className="text-6xl sm:text-7xl mb-3 leading-none select-none" role="img" aria-label="Buồn">😢</div>
           <h2 className="text-2xl sm:text-3xl font-black text-red-600  italic">Chưa đạt</h2>
 
           <div className="relative mx-auto mt-6 mb-2">
-            <div className="mx-auto w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center border-[6px] border-red-600 bg-red-50 shadow-inner">
+            <div className="mx-auto w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center border-[6px] border-emerald-600 bg-red-50 shadow-inner">
               <span className="text-5xl sm:text-6xl font-black tracking-tighter text-red-600">{total}</span>
             </div>
             <p className="text-[10px] sm:text-xs font-black text-slate-400  tracking-[0.2em] mt-2">Điểm / 100</p>
@@ -1112,7 +1112,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
 
           {/* Hướng dẫn Box (Mô phỏng Dialog Chrome) */}
           <div className="relative mb-3 sm:mb-0 sm:row-span-2 sm:col-start-2 sm:row-start-1">
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs cms-min-text-xs font-black px-2 py-0.5 rounded-full z-20 shadow-sm animate-bounce">Hướng dẫn</div>
+            <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs cms-min-text-xs font-black px-2 py-0.5 rounded-full z-20 shadow-sm animate-bounce">Hướng dẫn</div>
             <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 relative text-left bg-[#F4F7F6] shadow-inner select-none pointer-events-none">
               <div className="flex items-center justify-between mb-2">
                 <div>
@@ -1192,7 +1192,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
               disabled={!cameraReady || questions.length === 0 || startingExam}
               onClick={handleStartMcExam}
               className={`w-full py-2.5 font-black rounded-[14px] transition-all text-xs flex items-center justify-center gap-2 ${cameraReady && questions.length > 0 && !startingExam
-                  ? 'bg-[#E13B35] text-white shadow-xl shadow-red-500/30 hover:bg-black hover:scale-[1.02] active:scale-95'
+                  ? 'bg-[#E13B35] text-white shadow-xl shadow-emerald-500/30 hover:bg-black hover:scale-[1.02] active:scale-95'
                   : 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-70'
                 }`}>
               {startingExam ? 'Đang tải thời gian thi…' : 'Tôi đã hiểu và bắt đầu thi'}
@@ -1812,7 +1812,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
                     <div className="shrink-0 pb-2">
                       <div className="flex items-start gap-2">
                         <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${isQDone(currentQ) ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-400'
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${isQDone(currentQ) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'
                             }`}
                         >
                           {currentQ + 1}
@@ -1868,7 +1868,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
                               }`}
                           >
                             <span
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black ${answers[currentQ] === i ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black ${answers[currentQ] === i ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
                                 }`}
                             >
                               {['A', 'B', 'C', 'D', 'E', 'F'][i] ?? i + 1}
@@ -1980,7 +1980,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
                               type="button"
                               onClick={() => setCurrentQ(i)}
                               className={`flex aspect-square items-center justify-center rounded-md text-[11px] font-black transition ${active
-                                  ? 'bg-red-600 text-white shadow-sm ring-1 ring-indigo-300'
+                                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-indigo-300'
                                   : done
                                     ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
                                     : 'border border-slate-200 bg-slate-50 text-slate-500 hover:bg-white'
@@ -1996,7 +1996,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
                 ))}
               </div>
               <div className="mt-2 flex shrink-0 flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-1.5 text-[10px] font-semibold text-slate-500">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-red-600" /> Đang xem</span>
+                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-emerald-600" /> Đang xem</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-emerald-400" /> Đã trả lời</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded border border-slate-300 bg-slate-100" /> Chưa làm</span>
               </div>

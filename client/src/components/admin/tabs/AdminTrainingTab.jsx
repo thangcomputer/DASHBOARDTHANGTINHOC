@@ -211,7 +211,7 @@ export default function AdminTrainingTab({ section }) {
                       aria-label={`${t.label} (${t.count})`}
                       onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
                       className={`cms-hscroll-tab ${trainingTab === t.key
-                          ? t.key === 'exam-results-gv' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
+                          ? t.key === 'exam-results-gv' ? 'bg-amber-600 text-white shadow-md' : 'bg-emerald-600 text-white shadow-md'
                           : 'text-gray-500 hover:bg-gray-100'
                         }`}
                     >
@@ -234,7 +234,7 @@ export default function AdminTrainingTab({ section }) {
                       key={tab.key}
                       type="button"
                       onClick={() => { setTrainingTab(tab.key); setTrainingForm(null); }}
-                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${trainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${trainingTab === tab.key ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                       <tab.icon size={15} aria-hidden="true" />
                       <span>{tab.label}</span>
@@ -243,7 +243,7 @@ export default function AdminTrainingTab({ section }) {
                   ))}
                 </div>
                 <button type="button" onClick={() => setTrainingForm(trainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [], courseId: '' })}
-                  className="inline-flex min-h-10 justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                  className="inline-flex min-h-10 justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
                   <Plus size={15} /> {trainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                 </button>
               </div>
@@ -259,7 +259,7 @@ export default function AdminTrainingTab({ section }) {
                       key={tab.key}
                       type="button"
                       onClick={() => { setTrainingTab(tab.key); setTrainingForm(null); }}
-                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${trainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${trainingTab === tab.key ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                       <tab.icon size={15} aria-hidden="true" />
                       <span>{tab.label}</span>
@@ -278,7 +278,7 @@ export default function AdminTrainingTab({ section }) {
 
             {!section && trainingTab !== 'questions' && trainingTab !== 'exam-results-gv' && trainingTab !== 'videos' && (
               <button type="button" onClick={() => setTrainingForm(trainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [], courseId: '' })}
-                className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
+                className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
                 <Plus size={15} /> {trainingTab === 'guides' ? 'Thêm quy trình' : trainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
               </button>
             )}
@@ -585,7 +585,7 @@ export default function AdminTrainingTab({ section }) {
                   addTrainingItem(trainingTab, { ...trainingPayload, createdAt: new Date().toISOString().split('T')[0] });
                 }
                 setTrainingForm(null);
-              }} className="w-full sm:w-auto min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
+              }} className="w-full sm:w-auto min-h-11 justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
                 <Save size={15} /> {trainingForm.id ? 'Cập nhật' : 'Thêm mới'}
               </button>
             </div>
@@ -957,7 +957,7 @@ export default function AdminTrainingTab({ section }) {
                   <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition">
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                       {trainingTab === 'videos' && (
-                        <button type="button" aria-label={`Mở giáo trình ${item.title}`} className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setCourseBuilderMode(item)}>
+                        <button type="button" aria-label={`Mở giáo trình ${item.title}`} className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setCourseBuilderMode(item)}>
                           <BookOpen size={20} className="text-white" />
                         </button>
                       )}
@@ -1049,7 +1049,7 @@ export default function AdminTrainingTab({ section }) {
       {erGvForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-            <div className="bg-gradient-to-r from-red-700 to-red-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
+            <div className="bg-gradient-to-r from-red-700 to-emerald-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
               <h3 className="font-bold text-lg sm:text-xl flex items-center gap-2 sm:gap-3 min-w-0">
                 <GraduationCap size={22} className="shrink-0" /> {erGvForm.id ? 'Chỉnh sửa kết quả' : 'Thêm kết quả thi Giảng viên'}
               </h3>
@@ -1133,7 +1133,7 @@ export default function AdminTrainingTab({ section }) {
       {gvReviewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="bg-gradient-to-r from-red-600 to-red-500 px-4 sm:px-6 py-4 rounded-t-2xl">
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 sm:px-6 py-4 rounded-t-2xl">
               <h3 className="text-white font-bold text-lg sm:text-xl flex items-center gap-2">
                 <FileSpreadsheet size={20} /> Kiểm Tra Bài Thực Hành
               </h3>

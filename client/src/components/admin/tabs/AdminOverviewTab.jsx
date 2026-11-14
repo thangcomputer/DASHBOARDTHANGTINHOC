@@ -66,7 +66,7 @@ export default function AdminOverviewTab({ session }) {
           label="Tổng học viên"
           value={statTotalStudents}
           sub={`${statPaidStudents} đã hoàn tất học phí`}
-          color="bg-red-600"
+          color="bg-emerald-600"
         />
         <StatCard
           icon={GraduationCap}
@@ -198,7 +198,7 @@ export default function AdminOverviewTab({ session }) {
                       role="teacher"
                       src={t.avatar}
                       gender={t.gender}
-                      color={active ? 'bg-red-600' : 'bg-amber-500'}
+                      color={active ? 'bg-emerald-600' : 'bg-amber-500'}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm sm:text-[15px] font-bold text-slate-900 truncate leading-snug">{t.name}</p>

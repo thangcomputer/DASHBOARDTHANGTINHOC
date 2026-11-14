@@ -66,15 +66,15 @@ export default function ScreenCaptureGuideModal({
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600 font-semibold">
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
               Window
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
               Bấm màn / cửa sổ
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
               {isRegion ? 'Share, rồi kéo vùng' : 'Bấm Share'}
             </span>
           </div>
@@ -84,7 +84,7 @@ export default function ScreenCaptureGuideModal({
               type="checkbox"
               checked={!!skipNext}
               onChange={(e) => onSkipNextChange?.(e.target.checked)}
-              className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+              className="rounded border-slate-300 text-red-600 focus:ring-emerald-500"
             />
             <span className="text-xs font-semibold text-slate-600">Không hiện hướng dẫn lần sau</span>
           </label>
@@ -100,7 +100,7 @@ export default function ScreenCaptureGuideModal({
             <button
               type="button"
               onClick={onContinue}
-              className="flex-[1.4] min-h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold shadow-md shadow-red-600/25 transition"
+              className="flex-[1.4] min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-md shadow-emerald-600/25 transition"
             >
               Tiếp tục chụp
             </button>

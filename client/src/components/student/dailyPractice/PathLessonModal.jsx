@@ -410,7 +410,7 @@ export default function PathLessonModal({
                 ) : null}
                 {!yt && vimeo && !started && (
                   <button type="button" onClick={() => setStarted(true)} aria-label="Phát video" className="flex h-full w-full items-center justify-center !shadow-none">
-                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-red-600"><Play size={36} className="ml-1 text-white" fill="white" /></span>
+                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600"><Play size={36} className="ml-1 text-white" fill="white" /></span>
                   </button>
                 )}
                 {!yt && vimeo && started && (

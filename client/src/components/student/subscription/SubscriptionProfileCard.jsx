@@ -35,7 +35,7 @@ export default function SubscriptionProfileCard() {
           isBrandStudent ? 'bg-red-50/50 ring-1 ring-red-100' : (expiring ? 'bg-amber-50 ring-1 ring-amber-200' : 'bg-slate-50 ring-1 ring-slate-100')
         }`}>
           <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${
-            isBrandStudent ? 'bg-gradient-to-br from-red-500 to-red-600' : (expiring ? 'bg-gradient-to-br from-amber-400 to-orange-600' : 'cms-profile-mark')
+            isBrandStudent ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : (expiring ? 'bg-gradient-to-br from-amber-400 to-orange-600' : 'cms-profile-mark')
           }`}>
             <CalendarClock size={22} aria-hidden="true" />
           </span>

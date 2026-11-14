@@ -20,7 +20,7 @@ export default function AdminTeacherWorkflowModule() {
               onClick={() => setActiveSection(tab.key)}
               className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
                 activeSection === tab.key
-                  ? 'bg-red-600 text-white shadow-md'
+                  ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >

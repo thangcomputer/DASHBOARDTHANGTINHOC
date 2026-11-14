@@ -470,14 +470,14 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             value={bcTitle}
             onChange={(e) => setBcTitle(e.target.value)}
             placeholder="Tiêu đề"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-red-300"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-emerald-300"
           />
           <textarea
             value={bcContent}
             onChange={(e) => setBcContent(e.target.value)}
             placeholder="Nội dung"
             rows={3}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-300"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-300"
           />
           <CmsSelect
             value={bcReceivers}
@@ -820,7 +820,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                           placeholder={qaDetail.answer || (qaDetail.thread || []).length
                             ? 'Tiếp tục đối thoại với học viên...'
                             : 'Nhập câu trả lời cho học viên/giảng viên...'}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-300"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-300"
                         />
                         <button
                           type="button"
@@ -845,7 +845,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                   onClick={() => {
                     window.location.assign(String(selectedNotif.payload.linkHoc).trim());
                   }}
-                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5"
                 >
                   <ExternalLink size={14} /> Vào lớp ngay
                 </button>
@@ -857,7 +857,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                     setSelectedNotif(null);
                     if (path) navigate(path);
                   }}
-                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5"
                 >
                   <ExternalLink size={14} /> Đi tới liên kết
                 </button>

@@ -791,7 +791,7 @@ function RelatedLessonCard({ lesson }) {
       isFree ? 'bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-100' : 'bg-gradient-to-r from-red-50 to-amber-50 ring-1 ring-red-100'
     }`}>
       <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
-        isFree ? 'bg-emerald-600' : 'bg-red-600'
+        isFree ? 'bg-emerald-600' : 'bg-emerald-600'
       }`}>
         <PlayCircle size={26} aria-hidden="true" />
       </span>

@@ -240,9 +240,9 @@ const getNotifStyle = (type) => {
     case 'GRADE':
       return { icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', label: 'Đánh giá' };
     case 'ADMIN':
-      return { icon: Zap, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', label: 'Admin' };
+      return { icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'Admin' };
     case 'SYSTEM':
-      return { icon: Zap, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', label: 'Hệ thống' };
+      return { icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'Hệ thống' };
     case 'NEWS':
       return { icon: Bell, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', label: 'Tin tức' };
     case 'TRAINING':
@@ -1878,7 +1878,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   >
                     <Bell size={18} aria-hidden="true" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}
@@ -2077,7 +2077,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   type="button"
                   onClick={() => setShowNotif(false)}
                   aria-label="Đóng thông báo"
-                  className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
+                  className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors duration-200"
                 >
                   <X size={16} aria-hidden="true" />
                 </button>
@@ -2454,7 +2454,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 )}
               </div>
               <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
-                <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-red-600 transition-colors duration-200">Đọc tất cả</button>
+                <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-emerald-600 transition-colors duration-200">Đọc tất cả</button>
                 <button
                   type="button"
                   onClick={() => {
@@ -2462,10 +2462,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                     const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
                     navigate(`${base}/notifications`);
                   }}
-                  className="text-[12px] font-semibold text-red-600 hover:underline inline-flex items-center gap-0.5"
+                  className="text-[12px] font-semibold text-emerald-600 hover:underline inline-flex items-center gap-0.5"
                 >
                   Xem tất cả
-                  <NavArrow size={14} className="text-red-600" />
+                  <NavArrow size={14} className="text-emerald-600" />
                 </button>
               </div>
             </div>
@@ -2748,7 +2748,7 @@ const ChangePasswordModal = ({ session, role }) => {
       aria-labelledby="change-password-title"
     >
       <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-sm max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden shadow-xl">
-        <div className="bg-gradient-to-r from-red-600 to-red-600 px-6 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-600 px-6 py-5 flex items-center justify-between">
           <h3 id="change-password-title" className="text-white font-black text-lg flex items-center gap-2">
             <Lock size={20} aria-hidden="true" /> {session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
           </h3>

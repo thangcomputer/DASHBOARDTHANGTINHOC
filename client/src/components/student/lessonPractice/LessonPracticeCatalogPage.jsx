@@ -771,14 +771,14 @@ export default function LessonPracticeCatalogPage() {
                   aria-selected={filter === filterOption.id}
                   onClick={() => { setFilter(filterOption.id); setSelectedCourseId(''); }}
                   className={`relative flex min-h-[68px] min-w-0 flex-1 flex-col items-center justify-center gap-1 border-b-2 border-transparent px-0.5 py-2 text-center text-[10px] font-bold leading-tight transition-colors md:min-h-0 md:flex-row md:shrink-0 md:flex-initial md:gap-2 md:rounded-xl md:border-0 md:px-3.5 md:py-2.5 md:text-sm md:text-left md:transition md:px-4 ${filter === filterOption.id
-                    ? 'border-b-red-600 text-red-700 md:bg-red-600 md:text-white md:shadow-sm'
+                    ? 'border-b-red-600 text-red-700 md:bg-emerald-600 md:text-white md:shadow-sm'
                     : 'text-slate-500 hover:text-slate-900 md:text-slate-600 md:hover:bg-slate-100'
                     }`}
                 >
                   <span className="relative flex h-6 items-center justify-center md:h-auto">
                     <filterOption.icon size={17} className="shrink-0 md:h-4 md:w-4" aria-hidden="true" />
                     {filterOption.count !== undefined && (
-                      <span className={`absolute -right-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black leading-4 md:hidden ${filter === filterOption.id ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                      <span className={`absolute -right-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black leading-4 md:hidden ${filter === filterOption.id ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                         {filterOption.count}
                       </span>
                     )}

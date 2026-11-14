@@ -251,7 +251,7 @@ export default function StudentQuizInviteHost() {
           <button
             type="button"
             onClick={handleStart}
-            className="flex-1 min-h-[44px] rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 shadow-lg shadow-red-200 transition"
+            className="flex-1 min-h-[44px] rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 shadow-lg shadow-red-200 transition"
           >
             Làm bài ngay
           </button>

@@ -505,7 +505,7 @@ export default function MilestoneHubModal({
                   <button
                     type="button"
                     onClick={() => onOpenVideo?.(unit, cfg.video.id || `${node.key}:level:${activeDiff}`)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white hover:bg-red-700 !shadow-none"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white hover:bg-emerald-700 !shadow-none"
                   >
                     <Play size={16} fill="currentColor" /> Mở trình phát video
                   </button>

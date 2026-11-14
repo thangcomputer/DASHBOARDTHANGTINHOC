@@ -56,7 +56,7 @@ export default function AdminTeacherQuizHistoryPanel() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo GV, tiêu đề, môn..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-red-500"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
             />
           </div>
           <button
@@ -147,7 +147,7 @@ export default function AdminTeacherQuizHistoryPanel() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-slate-900 p-5 text-white flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black  bg-red-600 text-white px-2 py-0.5 rounded">
+                <span className="text-[10px] font-black  bg-emerald-600 text-white px-2 py-0.5 rounded">
                   {selectedQuiz.courseName || 'Trắc nghiệm'}
                 </span>
                 <h3 className="font-bold text-base mt-1">{selectedQuiz.title}</h3>

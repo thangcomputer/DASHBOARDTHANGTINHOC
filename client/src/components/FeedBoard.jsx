@@ -95,7 +95,7 @@ function FeedYouTubePreviews({ text, onOpen, compact = false }) {
             e.stopPropagation();
             onOpen?.({ id, url });
           }}
-          className={`group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left shadow-sm hover:border-red-300 hover:shadow-md transition-all ${compact ? 'aspect-video max-h-36' : 'aspect-video max-h-64'
+          className={`group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left shadow-sm hover:border-emerald-300 hover:shadow-md transition-all ${compact ? 'aspect-video max-h-36' : 'aspect-video max-h-64'
             }`}
           title="Xem video YouTube"
         >
@@ -107,12 +107,12 @@ function FeedYouTubePreviews({ text, onOpen, compact = false }) {
           />
           <span className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
           <span className="absolute inset-0 flex items-center justify-center">
-            <span className="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 text-white shadow-lg group-hover:scale-105 transition-transform">
+            <span className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-600 text-white shadow-lg group-hover:scale-105 transition-transform">
               <Play size={compact ? 18 : 22} className="ml-0.5 fill-white" aria-hidden="true" />
             </span>
           </span>
           <span className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 text-white text-[11px] font-bold drop-shadow">
-            <span className="px-1.5 py-0.5 rounded bg-red-600/90">YouTube</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-600/90">YouTube</span>
             <span className="truncate opacity-90">Bấm để xem</span>
           </span>
         </button>
@@ -1706,7 +1706,7 @@ export default function FeedBoard({ session, role }) {
                         setEditPendingFiles((prev) => prev.filter((_, idx) => idx !== i));
                         setEditPreviews((prev) => prev.filter((_, idx) => idx !== i));
                       }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-emerald-600 text-white flex items-center justify-center transition-colors"
                       title="Bỏ ảnh mới này"
                     >
                       <X size={11} />

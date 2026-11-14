@@ -340,7 +340,7 @@ export default function LoginInboxAlertPopup({ role, userId, adminRole = '', blo
                 <button
                   type="button"
                   onClick={() => confirmView(inboxPath(role))}
-                  className="h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold"
+                  className="h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold"
                 >
                   Xem tin nhắn
                 </button>
@@ -356,7 +356,7 @@ export default function LoginInboxAlertPopup({ role, userId, adminRole = '', blo
               <button
                 type="button"
                 onClick={() => confirmView(hasMsg ? inboxPath(role) : '/student#schedule')}
-                className="h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold"
+                className="h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold"
               >
                 Xem ngay
               </button>

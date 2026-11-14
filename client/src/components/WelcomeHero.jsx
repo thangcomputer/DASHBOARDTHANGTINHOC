@@ -47,7 +47,7 @@ const VARIANTS = {
 const ACCENT = {
   brand: {
     section: 'bg-gradient-to-br from-white via-red-50/80 to-amber-50 shadow-[0_10px_30px_rgba(185,28,28,0.08)] ring-red-100',
-    blob: 'bg-gradient-to-br from-red-500/20 via-orange-400/15 to-amber-300/25',
+    blob: 'bg-gradient-to-br from-emerald-500/20 via-orange-400/15 to-amber-300/25',
     glow: 'bg-red-200/30',
     dotGrid: 'rgba(220,38,38,0.25)',
     eyebrow: 'text-red-700 bg-red-50 border border-red-200',

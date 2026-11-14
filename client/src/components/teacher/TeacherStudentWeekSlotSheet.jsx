@@ -358,13 +358,13 @@ export default function TeacherStudentWeekSlotSheet({
             </select>
           )}
           <div className="flex items-center justify-center gap-1.5 mt-3">
-            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), -7))} className="w-9 h-9 rounded-xl border-2 border-red-600 text-red-600 hover:bg-red-50 flex items-center justify-center" aria-label="Tuần trước">
+            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), -7))} className="w-9 h-9 rounded-xl border-2 border-emerald-600 text-red-600 hover:bg-red-50 flex items-center justify-center" aria-label="Tuần trước">
               <ChevronLeft size={16} />
             </button>
-            <button type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))} className="px-3 h-9 rounded-xl border-2 border-red-600 text-xs font-bold text-red-600 hover:bg-red-50 min-w-[9.5rem]">
+            <button type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))} className="px-3 h-9 rounded-xl border-2 border-emerald-600 text-xs font-bold text-red-600 hover:bg-red-50 min-w-[9.5rem]">
               {formatWeekRangeLabel(weekStart)}
             </button>
-            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), 7))} className="w-9 h-9 rounded-xl border-2 border-red-600 text-red-600 hover:bg-red-50 flex items-center justify-center" aria-label="Tuần sau">
+            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), 7))} className="w-9 h-9 rounded-xl border-2 border-emerald-600 text-red-600 hover:bg-red-50 flex items-center justify-center" aria-label="Tuần sau">
               <ChevronRight size={16} />
             </button>
           </div>

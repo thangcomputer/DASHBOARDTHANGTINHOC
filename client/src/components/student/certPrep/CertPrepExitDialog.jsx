@@ -74,7 +74,7 @@ export default function CertPrepExitDialog({
           <button type="button" onClick={onCancel} className="min-h-11 px-4 rounded-xl font-bold text-sm text-slate-600">
             Ở lại
           </button>
-          <button type="button" onClick={onConfirm} className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white">
+          <button type="button" onClick={onConfirm} className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white">
             Thoát
           </button>
         </div>

@@ -53,7 +53,7 @@ export default function CertPrepStartDialog({
                 disabled={starting}
                 onClick={() => onFeedbackModeChange?.(immediate ? 'after_submit' : 'immediate')}
                 className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${
-                  immediate ? 'bg-red-600' : 'bg-slate-300'
+                  immediate ? 'bg-emerald-600' : 'bg-slate-300'
                 }`}
               >
                 <span

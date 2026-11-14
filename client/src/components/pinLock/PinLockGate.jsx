@@ -140,7 +140,7 @@ export default function PinLockGate({ userKey, userName = '', onLogout }) {
       aria-label="Màn hình khóa mã PIN"
     >
       <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-[28px] border border-white/10 bg-gradient-to-b from-slate-900/95 to-slate-950/95 px-6 py-8 text-white shadow-2xl">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600 shadow-[0_8px_24px_rgba(220,38,38,0.45)]">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 shadow-[0_8px_24px_rgba(220,38,38,0.45)]">
           <LockKeyhole size={28} aria-hidden="true" />
         </span>
         <div className="text-center">

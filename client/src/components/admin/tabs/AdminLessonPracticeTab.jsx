@@ -614,14 +614,14 @@ export default function AdminLessonPracticeTab() {
           <button
             type="button"
             onClick={() => setModuleTab('lessons')}
-            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'lessons' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'lessons' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
           >
             Bài học học viên
           </button>
           <button
             type="button"
             onClick={() => setModuleTab('guide')}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'guide' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'guide' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
           >
             <CircleHelp size={16} />
             Hướng dẫn học
@@ -629,7 +629,7 @@ export default function AdminLessonPracticeTab() {
           <button
             type="button"
             onClick={() => setModuleTab('xp')}
-            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'xp' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'xp' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
           >
             Điểm XP học bài
           </button>
@@ -749,7 +749,7 @@ export default function AdminLessonPracticeTab() {
                                 key={`${course.id}-${row.id}`}
                                 type="button"
                                 onClick={() => setSubjectId(row.id)}
-                                className={`w-full rounded-xl px-3 py-2 text-left text-xs font-bold ${row.id === subjectId ? 'bg-red-600 text-white' : 'bg-white border border-slate-100 text-slate-700'}`}
+                                className={`w-full rounded-xl px-3 py-2 text-left text-xs font-bold ${row.id === subjectId ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-100 text-slate-700'}`}
                               >
                                 {row.name}
                               </button>
@@ -1124,7 +1124,7 @@ export default function AdminLessonPracticeTab() {
                             }}>
                               <div className="flex flex-wrap gap-1">
                                 {TYPES.map((type) => (
-                                  <button key={type.id} type="button" onClick={() => setDraft((current) => ({ ...current, type: type.id }))} className={`rounded-lg px-2 py-1 text-[11px] font-bold ${draft.type === type.id ? 'bg-red-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>{type.label}</button>
+                                  <button key={type.id} type="button" onClick={() => setDraft((current) => ({ ...current, type: type.id }))} className={`rounded-lg px-2 py-1 text-[11px] font-bold ${draft.type === type.id ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>{type.label}</button>
                                 ))}
                               </div>
                               <textarea value={draft.prompt} onChange={(e) => setDraft({ ...draft, prompt: e.target.value })} rows={2} placeholder="Nội dung câu hỏi" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm" />
