@@ -514,7 +514,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const markRead = useCallback((notificationId) => {
     setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)));
     if (userId) {
-      apiFetch(`/notifications/${notificationId}/read`, { method: 'PUT' }).catch(() => {});
+      apiFetch('/notifications/mark-read', {
+        method: 'PUT',
+        body: JSON.stringify({ notificationId }),
+      }).catch(() => {});
     }
   }, [userId]);
 

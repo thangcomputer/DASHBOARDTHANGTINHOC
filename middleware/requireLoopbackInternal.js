@@ -18,13 +18,23 @@ function resolveClientIp(req) {
   return req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip || '';
 }
 
+function hasExternalProxyHeader(req) {
+  const xff = String(req.get?.('x-forwarded-for') || req.headers?.['x-forwarded-for'] || '').trim();
+  const xRealIp = String(req.get?.('x-real-ip') || req.headers?.['x-real-ip'] || '').trim();
+  const candidates = [
+    ...xff.split(',').map((s) => s.trim()).filter(Boolean),
+    ...(xRealIp ? [xRealIp] : []),
+  ];
+  return candidates.some((addr) => !isLoopbackAddress(addr));
+}
+
 /**
- * Express middleware: allow only loopback clients.
- * If RBAC_RUNTIME_EVIDENCE_TOKEN is set, require matching x-rbac-evidence-token header.
+ * Express middleware: allow only direct loopback clients (not external proxied requests).
+ * In production, RBAC_RUNTIME_EVIDENCE_TOKEN must be configured and matched.
  */
 function requireLoopbackInternal(req, res, next) {
   const ip = resolveClientIp(req);
-  if (!isLoopbackAddress(ip)) {
+  if (!isLoopbackAddress(ip) || hasExternalProxyHeader(req)) {
     return res.status(403).json({
       success: false,
       code: 'INTERNAL_ONLY',
@@ -33,6 +43,14 @@ function requireLoopbackInternal(req, res, next) {
   }
 
   const expected = String(process.env.RBAC_RUNTIME_EVIDENCE_TOKEN || '').trim();
+  const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+  if (isProd && !expected) {
+    return res.status(403).json({
+      success: false,
+      code: 'EVIDENCE_TOKEN_REQUIRED',
+      message: 'RBAC_RUNTIME_EVIDENCE_TOKEN must be configured in production',
+    });
+  }
   if (expected) {
     const got = String(req.get('x-rbac-evidence-token') || '').trim();
     if (!got || got !== expected) {

@@ -18,26 +18,32 @@ function parseMax(name, fallback) {
 }
 
 /**
- * Lấy userId từ Bearer token (decode nhanh, không verify)
- * để mỗi người dùng có quota riêng - tránh share theo IP.
+ * Xác thực Bearer token (verify chữ ký JWT) để lấy userId cho rate-limit.
+ * Token giả mạo / hết hạn sẽ fallback về rate-limit theo IP ẩn danh.
  */
-function resolveKey(req) {
+function extractVerifiedTokenUserId(req) {
   try {
     const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (token) {
-      const decoded = jwt.decode(token); // Không verify, chỉ lấy payload
-      const uid = decoded && (decoded._id || decoded.id || decoded.sub);
-      if (uid) return `u:${String(uid)}`;
-    }
-  } catch (_) { /* ignore */ }
-  // Fallback: IP (request chưa đăng nhập) - ipKeyGenerator bắt buộc với express-rate-limit v8 + IPv6
+    const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+    const secret = process.env.JWT_SECRET;
+    if (!token || !secret) return '';
+    const decoded = jwt.verify(token, secret);
+    const uid = decoded && (decoded._id || decoded.id || decoded.sub);
+    return uid ? String(uid) : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function resolveKey(req) {
+  const uid = extractVerifiedTokenUserId(req);
+  if (uid) return `u:${uid}`;
+  // Fallback: IP (request chưa đăng nhập hoặc token không hợp lệ) - ipKeyGenerator bắt buộc với express-rate-limit v8 + IPv6
   return `ip:${ipKeyGenerator(req.ip)}`;
 }
 
 function isAuthenticated(req) {
-  const auth = req.headers.authorization || '';
-  return auth.startsWith('Bearer ') && auth.length > 20;
+  return Boolean(extractVerifiedTokenUserId(req));
 }
 
 const generalApiLimiter = rateLimit({

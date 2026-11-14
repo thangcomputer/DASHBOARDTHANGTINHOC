@@ -2067,21 +2067,44 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
  * @desc    Admin sinh OTP 120s cho học viên/giảng viên. Admin tự gửi qua Zalo.
  * @access  Admin only
  */
-router.post('/admin/generate-otp', authMiddleware, policyShadowAuth('admin_generate_otp'), async (req, res) => {
+function hasAdminResetPermission(actor, targetRole) {
+  if (!actor) return false;
+  if (actor.role === 'admin') return true;
+  if (actor.role !== 'staff') return false;
+  const perms = Array.isArray(actor.permissions) ? actor.permissions : [];
+  const requiredPerm = targetRole === 'student' ? 'students' : 'teachers';
+  return perms.includes(requiredPerm) || perms.includes('settings') || perms.includes('users');
+}
+
+function isProtectedAdminAccount(targetUser) {
+  if (!targetUser) return false;
+  return targetUser.role === 'admin'
+    || targetUser.adminRole === 'SUPER_ADMIN'
+    || targetUser.adminRole === 'HIGH_ADMIN';
+}
+
+function isRequesterSuperAdmin(actor) {
+  return Boolean(actor && (actor.id === 'admin' || actor.adminRole === 'SUPER_ADMIN'));
+}
+
+router.post('/admin/generate-otp', authMiddleware, sensitiveFlowLimiter, policyShadowAuth('admin_generate_otp'), async (req, res) => {
   try {
-    if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+    const { userId, userRole } = req.body;
+    if (!hasAdminResetPermission(req.user, userRole)) {
       return res.status(403).json({ success: false, message: 'Không có quyền' });
     }
-    const { userId, userRole } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'Thiếu userId' });
 
     let user = null;
     if (userRole === 'teacher') {
-      user = await Teacher.findById(userId).select('name phone zalo email');
+      user = await Teacher.findById(userId).select('name phone zalo email role adminRole');
     } else {
-      user = await Student.findById(userId).select('name phone zalo email');
+      user = await Student.findById(userId).select('name phone zalo email role');
     }
     if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    if (isProtectedAdminAccount(user) && !isRequesterSuperAdmin(req.user)) {
+      return res.status(403).json({ success: false, message: 'Chỉ Super Admin mới có quyền thao tác tài khoản quản trị' });
+    }
 
     const phone = normalizeVNPhone(user.phone);
     if (!phone) return res.status(400).json({ success: false, message: 'Người dùng chưa có số điện thoại' });
@@ -2146,13 +2169,12 @@ router.post('/reset-password-request', sensitiveFlowLimiter, policyShadowAuth('r
  * @desc    Admin cấp lại mật khẩu cho giảng viên/học viên
  * @access  Admin only
  */
-router.post('/admin/reset-password', authMiddleware, policyShadowAuth('admin_reset_password'), async (req, res) => {
+router.post('/admin/reset-password', authMiddleware, sensitiveFlowLimiter, policyShadowAuth('admin_reset_password'), async (req, res) => {
   try {
-    if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+    const { userId, userRole, newPassword } = req.body;
+    if (!hasAdminResetPermission(req.user, userRole)) {
       return res.status(403).json({ success: false, message: 'Không có quyền thực hiện' });
     }
-
-    const { userId, userRole, newPassword } = req.body;
 
     if (!userId || !newPassword) {
       return res.status(400).json({ success: false, message: 'Thiếu userId hoặc mật khẩu mới' });
@@ -2167,6 +2189,9 @@ router.post('/admin/reset-password', authMiddleware, policyShadowAuth('admin_res
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    }
+    if (isProtectedAdminAccount(user) && !isRequesterSuperAdmin(req.user)) {
+      return res.status(403).json({ success: false, message: 'Chỉ Super Admin mới có quyền cấp lại mật khẩu tài khoản quản trị' });
     }
 
     user.password = newPassword;
@@ -2283,7 +2308,7 @@ router.put('/admin/profile', authMiddleware, policyShadowAuth('admin_profile'), 
     if (name && name.trim()) {
       const newName = name.trim();
       user.name = newName;
-      if (user.role === 'admin' || user.adminRole === 'SUPER_ADMIN') {
+      if (user.adminRole === 'SUPER_ADMIN') {
         await SystemSettings.findOneAndUpdate({ _key: 'main' }, { $set: { adminName: newName } }, { upsert: true });
         await invalidateSettingsCache();
       }
