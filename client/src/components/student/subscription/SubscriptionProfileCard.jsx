@@ -18,6 +18,8 @@ export default function SubscriptionProfileCard() {
   const isBrandStudent = !freePortalAccount;
   const freeTier = subscription.freeTier === true || (freePortalAccount && isLifetime && !subscription.meetLifetime);
   const expiring = subscription.state === 'expiring';
+  const cycleLabel = subscription.resetCycle === 'monthly' ? 'mỗi tháng' : subscription.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+  const xpText = `${subscription.dailyXpLimit ?? (freeTier ? 60 : 200)} XP ${cycleLabel}`;
   const history = ctx.overview?.history || [];
   const xpPurchases = ctx.overview?.xpPurchases || [];
   const heading = freeTier ? 'Gói miễn phí' : (isBrandStudent ? 'Gói Khóa học' : (subscription.meetLifetime || !isLifetime ? 'Gói học Meet' : 'Gói tài khoản'));
@@ -42,7 +44,13 @@ export default function SubscriptionProfileCard() {
               {freeTier ? 'Miễn phí' : (isBrandStudent ? 'Gói Khóa học' : `Gói ${subscription.planLabel}`)}
             </p>
             <p className={`text-xs font-semibold ${isBrandStudent ? 'text-red-600' : (expiring ? 'text-orange-600' : 'text-slate-500')}`}>
-              {freeTier ? '60 XP mỗi ngày' : (isBrandStudent ? 'Khóa chính thức' : (isLifetime ? 'Không giới hạn thời gian' : `Hết hạn ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày`))}
+              {freeTier
+                ? xpText
+                : isBrandStudent
+                  ? `${xpText} · THANGTINHOC`
+                  : isLifetime
+                    ? `${xpText} · Không giới hạn thời gian`
+                    : `${xpText} · Hết hạn ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày`}
             </p>
           </div>
         </div>

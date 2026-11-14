@@ -70,8 +70,8 @@ function statusOf(student, now = new Date(), xpConfig = null) {
     const boughtLifetime = plan === 'lifetime' && Boolean(sub.activatedAt);
     const freeTier = student?.freePortal === true && !boughtLifetime;
     const dailyXpLimit = freeTier
-      ? (cfg.freeAccountXp || 60)
-      : (student?.freePortal === true && boughtLifetime ? (cfg.planXp?.lifetime || 1000) : (cfg.courseAccountXp || 200));
+      ? (cfg.freeAccountXp ?? 60)
+      : (student?.freePortal === true && boughtLifetime ? (cfg.planXp?.lifetime ?? 1000) : (cfg.courseAccountXp ?? 200));
     return {
       plan: freeTier ? 'free' : 'lifetime',
       planLabel: freeTier ? 'Miễn phí' : PLAN_LABELS.lifetime,
@@ -92,8 +92,8 @@ function statusOf(student, now = new Date(), xpConfig = null) {
   else if (daysLeft <= EXPIRING_DAYS) state = 'expiring';
   const freeTier = student?.freePortal === true && state === 'expired';
   const dailyXpLimit = freeTier
-    ? (cfg.freeAccountXp || 60)
-    : (cfg.planXp?.[plan] || 400);
+    ? (cfg.freeAccountXp ?? 60)
+    : (cfg.planXp?.[plan] ?? 400);
   return {
     plan,
     planLabel: student?.freePortal === true && state === 'expired' ? 'Miễn phí' : PLAN_LABELS[plan],

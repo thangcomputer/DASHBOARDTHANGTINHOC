@@ -74,7 +74,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
                   <div className={`bg-gradient-to-br px-2 py-2 sm:px-2.5 sm:py-2.5 text-white ${PLAN_TONES[plan.id] || PLAN_TONES['1m']}`}>
                     {plan.id === 'lifetime' && <Sparkles size={12} className="absolute right-1.5 top-1.5 opacity-80" aria-hidden="true" />}
                     <p className="text-xs sm:text-sm lg:text-base font-black leading-tight">{plan.label}</p>
-                    <p className="text-[9.5px] sm:text-[10px] font-semibold opacity-90 leading-tight mt-0.5">Meet · {plan.dailyXp || 300} XP {plan.resetCycle === 'monthly' ? 'mỗi tháng' : plan.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'}</p>
+                    <p className="text-[9.5px] sm:text-[10px] font-semibold opacity-90 leading-tight mt-0.5">Meet · {plan.dailyXp ?? 300} XP {plan.resetCycle === 'monthly' ? 'mỗi tháng' : plan.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'}</p>
                   </div>
                   <div className="flex flex-1 flex-col justify-between gap-1.5 p-2 sm:p-2.5">
                     <p className={`text-xs sm:text-[13px] font-black ${sellable ? 'text-slate-900' : 'text-slate-400'}`}>
@@ -93,22 +93,36 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
               );
             })}
           </div>
-          <ul className="mt-2.5 grid gap-1 text-[10px] sm:text-[10.5px] font-medium text-slate-600 sm:grid-cols-2">
-            {(plans[0]?.benefits || [
+          {(() => {
+            const xpCfg = overview?.xpConfig;
+            const cycleText = xpCfg?.resetCycle === 'monthly' ? 'mỗi tháng' : xpCfg?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+            const freeXp = xpCfg?.freeAccountXp ?? subscription?.dailyXpLimit ?? 60;
+            const planXps = plans.map((p) => Number(p.dailyXp)).filter((n) => Number.isFinite(n));
+            const minXp = planXps.length ? Math.min(...planXps) : 300;
+            const maxXp = planXps.length ? Math.max(...planXps) : 300;
+            const rangeText = minXp === maxXp ? `${minXp} XP` : `${minXp}–${maxXp} XP`;
+            const benefits = plans[0]?.benefits || [
               'Học qua Meet với giảng viên',
-              '300 XP mỗi ngày khi gói còn hạn',
-              'Hết hạn thì tài khoản miễn phí về 60 XP mỗi ngày',
+              `${rangeText} ${cycleText} khi gói còn hạn`,
+              `Hết hạn thì tài khoản Dewskill về ${freeXp} XP ${cycleText}`,
               'Xem video và dùng tính năng tự học trong hạn gói',
-            ]).map((item) => (
-              <li key={item} className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1.5 text-[9.5px] sm:text-[10px] text-slate-500 leading-relaxed">
-            Thanh toán hoặc nhập mã đều kích hoạt gói Meet. Thời gian mới được cộng tiếp từ hạn hiện tại. Trong hạn gói, mỗi ngày có 300 XP. Hết hạn thì tài khoản miễn phí về 60 XP mỗi ngày. XP đã mua vẫn được giữ.
-          </p>
+            ];
+            return (
+              <>
+                <ul className="mt-2.5 grid gap-1 text-[10px] sm:text-[10.5px] font-medium text-slate-600 sm:grid-cols-2">
+                  {benefits.map((item) => (
+                    <li key={item} className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[9.5px] sm:text-[10px] text-slate-500 leading-relaxed">
+                  Thanh toán hoặc nhập mã đều kích hoạt gói Meet. Thời gian mới được cộng tiếp từ hạn hiện tại. Trong hạn gói nhận {rangeText} {cycleText}. Hết hạn thì tài khoản Dewskill về {freeXp} XP {cycleText}. XP đã mua vẫn được giữ.
+                </p>
+              </>
+            );
+          })()}
         </section>
       )}
 

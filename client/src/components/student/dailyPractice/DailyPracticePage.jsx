@@ -904,10 +904,10 @@ function StakeSessionConfirm({
   let body = '';
   if (isBlockedFreeTestOut) {
     title = 'Đặc quyền học viên gói Meet';
-    body = 'Kiểm tra vượt chặng là tính năng chỉ dành riêng cho học viên đã mua khóa / gói Google Meet. Vui lòng nâng cấp gói để mở khóa đặc quyền này và nhận +300 XP mỗi ngày!';
+    body = 'Kiểm tra vượt chặng là tính năng chỉ dành riêng cho học viên đã mua khóa / gói Google Meet. Vui lòng nâng cấp gói để mở khóa đặc quyền này và nhận thêm XP theo gói!';
   } else if (notEnoughXp) {
     title = 'Không đủ XP để làm bài';
-    body = `Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet (+300 XP/ngày) để tiếp tục!`;
+    body = `Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet hoặc mua thêm XP để tiếp tục!`;
   } else if (isStart) {
     title = testOut ? 'Cược để vượt chặng?' : 'Chuẩn bị vào luyện tập';
     body = testOut

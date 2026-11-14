@@ -247,14 +247,16 @@ export default function StudentProfileTab({
   const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : subscription?.state === 'expiring';
   const subActionLabel = freeTier ? 'Nâng cấp' : (isNearExpiry ? 'Gia hạn' : 'Đổi gói');
 
+  const cycleText = subscription?.resetCycle === 'monthly' ? 'mỗi tháng' : subscription?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+  const xpLimitText = `${subscription?.dailyXpLimit ?? (freeTier ? 60 : 200)} XP ${cycleText}`;
   const daysLine = freeTier
-    ? `${subscription?.dailyXpLimit || 60} XP ${subscription?.resetCycle === 'monthly' ? 'mỗi tháng' : subscription?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'}`
+    ? xpLimitText
     : isBrandStudent
-      ? 'Khóa chính thức'
+      ? `${xpLimitText} · THANGTINHOC`
       : isLifetime
-        ? 'Không giới hạn'
+        ? `${xpLimitText} · Không giới hạn`
         : subscription
-          ? `Còn ${subscription.daysLeft ?? 0} ngày`
+          ? `${xpLimitText} · Còn ${subscription.daysLeft ?? 0} ngày`
           : 'Kích hoạt hoặc gia hạn để học tiếp';
 
   return (
