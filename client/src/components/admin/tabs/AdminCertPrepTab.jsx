@@ -313,15 +313,30 @@ export default function AdminCertPrepTab() {
 
   return (
     <div className="space-y-4">
-      <div className="cms-toolbar">
-        <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
-            <BookOpen size={20} className="text-red-600" aria-hidden="true" /> Ôn thi MOS/IC3
-          </h2>
-          <p className="text-sm text-slate-500 mt-0.5">Quản lý chương trình ôn thi</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <nav aria-label="Đường dẫn ôn thi" className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
+          <button type="button" className="font-bold text-red-600 hover:underline" onClick={() => goSection('courses')}>Khóa học MOS/IC3</button>
+          {course ? (
+            <>
+              <ChevronRight size={14} aria-hidden="true" />
+              <button type="button" className="font-semibold hover:underline" onClick={() => openCourse(course)}>{course.name}</button>
+            </>
+          ) : null}
+          {level ? (
+            <>
+              <ChevronRight size={14} aria-hidden="true" />
+              <button type="button" className="font-semibold hover:underline" onClick={() => openLevel(level)}>{level.title}</button>
+            </>
+          ) : null}
+          {test ? (
+            <>
+              <ChevronRight size={14} aria-hidden="true" />
+              <button type="button" className="font-semibold hover:underline" onClick={() => openTest(test)}>{test.name}</button>
+            </>
+          ) : null}
+        </nav>
         {section !== 'access' && section !== 'enrollment' ? (
-          <button type="button" onClick={primaryAdd} className="inline-flex min-h-11 items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md">
+          <button type="button" onClick={primaryAdd} className="inline-flex min-h-10 items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">
             <Plus size={15} aria-hidden="true" /> {
               section === 'courses' ? 'Thêm khóa học'
                 : section === 'levels' ? 'Thêm level'
@@ -331,28 +346,6 @@ export default function AdminCertPrepTab() {
           </button>
         ) : null}
       </div>
-
-      <nav aria-label="Đường dẫn ôn thi" className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
-        <button type="button" className="font-bold text-red-600 hover:underline" onClick={() => goSection('courses')}>Ôn thi MOS/IC3</button>
-        {course ? (
-          <>
-            <ChevronRight size={14} aria-hidden="true" />
-            <button type="button" className="font-semibold hover:underline" onClick={() => openCourse(course)}>{course.name}</button>
-          </>
-        ) : null}
-        {level ? (
-          <>
-            <ChevronRight size={14} aria-hidden="true" />
-            <button type="button" className="font-semibold hover:underline" onClick={() => openLevel(level)}>{level.title}</button>
-          </>
-        ) : null}
-        {test ? (
-          <>
-            <ChevronRight size={14} aria-hidden="true" />
-            <button type="button" className="font-semibold hover:underline" onClick={() => openTest(test)}>{test.name}</button>
-          </>
-        ) : null}
-      </nav>
 
       <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
         <div className="cms-hscroll-tabs__track">

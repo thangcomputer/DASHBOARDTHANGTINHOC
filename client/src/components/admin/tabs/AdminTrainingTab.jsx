@@ -171,12 +171,14 @@ export default function AdminTrainingTab({ section }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="cms-toolbar">
-        <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
-          <BookOpen size={20} className="text-red-600" /> Quản lý Đào tạo Giảng viên
-        </h2>
-      </div>
+    <div className="space-y-4">
+      {!section && (
+        <div className="cms-toolbar">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
+            <BookOpen size={20} className="text-red-600" /> Quản lý Đào tạo Giảng viên
+          </h2>
+        </div>
+      )}
 
       {courseBuilderMode && trainingTab === 'videos' ? (
         <AdminCourseBuilder course={courseBuilderMode} onBack={() => setCourseBuilderMode(null)}
@@ -190,39 +192,40 @@ export default function AdminTrainingTab({ section }) {
         />
       ) : (
         <>
-          {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}
-          <div className="flex flex-col gap-3 lg:gap-4">
-            {!section && <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
-              <div className="cms-hscroll-tabs__track">
-                {[
-                  { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: trainingData?.videos?.length || 0 },
-                  { key: 'guides', icon: FileText, label: 'Quy trình', count: trainingData?.guides?.length || 0 },
-                  { key: 'files', icon: Download, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
-                  { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: trainingData?.softwareLinks?.length || 0 },
-                  { key: 'questions', icon: ClipboardList, label: 'Ngân hàng câu hỏi', count: questions?.length || 0 },
-                  { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: teachersForExamResults.filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
-                ].map(t => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    title={`${t.label} (${t.count})`}
-                    aria-label={`${t.label} (${t.count})`}
-                    onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
-                    className={`cms-hscroll-tab ${trainingTab === t.key
-                        ? t.key === 'exam-results-gv' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
-                        : 'text-gray-500 hover:bg-gray-100'
-                      }`}
-                  >
-                    <t.icon size={16} className="shrink-0" aria-hidden="true" />
-                    <span className="cms-hscroll-tab__label">{t.label}</span>
-                    <span className="cms-hscroll-tab__count">({t.count})</span>
-                  </button>
-                ))}
-              </div>
-            </div>}
-            {section === 'resources' && (
+          <div className="flex flex-col gap-3">
+            {!section && (
               <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                 <div className="cms-hscroll-tabs__track">
+                  {[
+                    { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: trainingData?.videos?.length || 0 },
+                    { key: 'guides', icon: FileText, label: 'Quy trình', count: trainingData?.guides?.length || 0 },
+                    { key: 'files', icon: Download, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
+                    { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: trainingData?.softwareLinks?.length || 0 },
+                    { key: 'questions', icon: ClipboardList, label: 'Ngân hàng câu hỏi', count: questions?.length || 0 },
+                    { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: teachersForExamResults.filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
+                  ].map(t => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      title={`${t.label} (${t.count})`}
+                      aria-label={`${t.label} (${t.count})`}
+                      onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
+                      className={`cms-hscroll-tab ${trainingTab === t.key
+                          ? t.key === 'exam-results-gv' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
+                          : 'text-gray-500 hover:bg-gray-100'
+                        }`}
+                    >
+                      <t.icon size={16} className="shrink-0" aria-hidden="true" />
+                      <span className="cms-hscroll-tab__label">{t.label}</span>
+                      <span className="cms-hscroll-tab__count">({t.count})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {section === 'resources' && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+                <div className="flex flex-wrap gap-1.5">
                   {[
                     { key: 'files', icon: Download, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
                     { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: trainingData?.softwareLinks?.length || 0 },
@@ -230,22 +233,24 @@ export default function AdminTrainingTab({ section }) {
                     <button
                       key={tab.key}
                       type="button"
-                      title={`${tab.label} (${tab.count})`}
-                      aria-label={`${tab.label} (${tab.count})`}
                       onClick={() => { setTrainingTab(tab.key); setTrainingForm(null); }}
-                      className={`cms-hscroll-tab ${trainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${trainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                      <tab.icon size={16} className="shrink-0" aria-hidden="true" />
-                      <span className="cms-hscroll-tab__label">{tab.label}</span>
-                      <span className="cms-hscroll-tab__count">({tab.count})</span>
+                      <tab.icon size={15} aria-hidden="true" />
+                      <span>{tab.label}</span>
+                      <span className="text-xs opacity-80">({tab.count})</span>
                     </button>
                   ))}
                 </div>
+                <button type="button" onClick={() => setTrainingForm(trainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [], courseId: '' })}
+                  className="inline-flex min-h-10 justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                  <Plus size={15} /> {trainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
+                </button>
               </div>
             )}
             {section === 'exam-room' && (
-              <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
-                <div className="cms-hscroll-tabs__track">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+                <div className="flex flex-wrap gap-1.5">
                   {[
                     { key: 'questions', icon: ClipboardList, label: 'Ngân hàng câu hỏi', count: questions?.length || 0 },
                     { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: teachersForExamResults.filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
@@ -253,27 +258,31 @@ export default function AdminTrainingTab({ section }) {
                     <button
                       key={tab.key}
                       type="button"
-                      title={`${tab.label} (${tab.count})`}
-                      aria-label={`${tab.label} (${tab.count})`}
                       onClick={() => { setTrainingTab(tab.key); setTrainingForm(null); }}
-                      className={`cms-hscroll-tab ${trainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${trainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                      <tab.icon size={16} className="shrink-0" aria-hidden="true" />
-                      <span className="cms-hscroll-tab__label">{tab.label}</span>
-                      <span className="cms-hscroll-tab__count">({tab.count})</span>
+                      <tab.icon size={15} aria-hidden="true" />
+                      <span>{tab.label}</span>
+                      <span className="text-xs opacity-80">({tab.count})</span>
                     </button>
                   ))}
                 </div>
+                {trainingTab === 'exam-results-gv' && (
+                  <button type="button" onClick={() => setErGvForm({ ...BLANK_ER_GV })}
+                    className="inline-flex min-h-10 justify-center bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                    <Plus size={15} /> Thêm kết quả thi
+                  </button>
+                )}
               </div>
             )}
 
-            {trainingTab !== 'questions' && trainingTab !== 'exam-results-gv' && trainingTab !== 'videos' && (
+            {!section && trainingTab !== 'questions' && trainingTab !== 'exam-results-gv' && trainingTab !== 'videos' && (
               <button type="button" onClick={() => setTrainingForm(trainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [], courseId: '' })}
                 className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
-                <Plus size={15} /> {trainingTab === 'videos' ? 'Thêm Khóa học' : trainingTab === 'guides' ? 'Thêm quy trình' : trainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
+                <Plus size={15} /> {trainingTab === 'guides' ? 'Thêm quy trình' : trainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
               </button>
             )}
-            {trainingTab === 'exam-results-gv' && (
+            {!section && trainingTab === 'exam-results-gv' && (
               <button type="button" onClick={() => setErGvForm({ ...BLANK_ER_GV })}
                 className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
                 <Plus size={15} /> Thêm kết quả thi

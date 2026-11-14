@@ -260,21 +260,21 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
           />
         ) : (
           <>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {!videoCoursesOnly && !learningGuideOnly && (
+            {!videoCoursesOnly && !resourceOnly && !examRoomOnly && !learningGuideOnly && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
-                  <BookOpen size={20} className="text-sky-700 shrink-0" /> {resourceOnly ? 'Tài liệu & link phần mềm' : examRoomOnly ? 'Phòng thi' : 'Quản lý Đào tạo Học viên'}
+                  <BookOpen size={20} className="text-sky-700 shrink-0" /> Quản lý Đào tạo Học viên
                 </h2>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}
-            <div className="flex flex-col gap-3 lg:gap-4">
+            {/* Sub-tabs + primary action */}
+            <div className="flex flex-col gap-3">
               {!videoCoursesOnly && !resourceOnly && !examRoomOnly && !learningGuideOnly && (
                 <div className="cms-hscroll-tabs w-full rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                   <div className="cms-hscroll-tabs__track">
                     {[
-                      { key: 'files', icon: Download, label: 'Tài liệu & link phần mềm', count: (studentTrainingData?.files?.length || 0) + (studentTrainingData?.softwareLinks?.length || 0) },
+                      { key: 'files', icon: Download, label: 'Tài liệu & Phần mềm', count: (studentTrainingData?.files?.length || 0) + (studentTrainingData?.softwareLinks?.length || 0) },
                       { key: 'exam-room', icon: Trophy, label: 'Phòng thi', count: (studentQuestions?.length || 0) + summarizeExamProgress(students).total },
                       { key: 'learning-guide', icon: BookOpen, label: 'Hướng dẫn học' },
                     ].map(t => (
@@ -307,57 +307,65 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
               )}
 
               {!videoCoursesOnly && ['files', 'softwareLinks'].includes(sTrainingTab) && (
-                <>
-                  <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2 text-xs text-sky-900">
-                    Mục này dành riêng cho <strong>Học viên theo khóa</strong>. Tài liệu, Phần mềm và Bài tập cho <strong>Tài khoản miễn phí</strong> được quản lý riêng tại <strong>Luyện tập hằng ngày → Tài nguyên miễn phí</strong>.
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
+                      { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
+                        className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                      >
+                        <tab.icon size={15} aria-hidden="true" />
+                        <span>{tab.label}</span>
+                        <span className="text-xs opacity-80">({tab.count})</span>
+                      </button>
+                    ))}
+                    <span className="hidden md:inline-flex items-center rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-800">
+                      Dành riêng cho Học viên theo khóa
+                    </span>
                   </div>
-                  <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
-                  {[
-                    { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
-                    { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
-                  ].map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
-                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                    >
-                      <tab.icon size={15} aria-hidden="true" />
-                      <span>{tab.label}</span>
-                      <span className="text-xs opacity-80">({tab.count})</span>
-                    </button>
-                  ))}
-                  </div>
-                </>
-              )}
-
-              {!videoCoursesOnly && ['questions', 'exam-results'].includes(sTrainingTab) && (
-                <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
-                  {[
-                    { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
-                    { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: summarizeExamProgress(students).total },
-                  ].map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
-                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                    >
-                      <tab.icon size={15} aria-hidden="true" />
-                      <span>{tab.label}</span>
-                      <span className="text-xs opacity-80">({tab.count})</span>
-                    </button>
-                  ))}
+                  <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
+                    className="inline-flex min-h-10 justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                    <Plus size={15} /> {sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
+                  </button>
                 </div>
               )}
 
-              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && sTrainingTab !== 'learning-guide' && (
-                <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
-                  className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
-                  <Plus size={15} /> {sTrainingTab === 'videos' ? 'Gắn nội dung khóa đã tạo' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
-                </button>
+              {!videoCoursesOnly && ['questions', 'exam-results'].includes(sTrainingTab) && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
+                      { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: summarizeExamProgress(students).total },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
+                        className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                      >
+                        <tab.icon size={15} aria-hidden="true" />
+                        <span>{tab.label}</span>
+                        <span className="text-xs opacity-80">({tab.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sTrainingTab === 'videos' && (
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
+                    className="inline-flex min-h-10 justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                    <Plus size={15} /> Gắn nội dung khóa đã tạo
+                  </button>
+                </div>
               )}
             </div>
             {sTrainingTab === 'learning-guide' ? (

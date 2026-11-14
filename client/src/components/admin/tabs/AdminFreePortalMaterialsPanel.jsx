@@ -281,15 +281,8 @@ export default function AdminFreePortalMaterialsPanel({ topics = [] }) {
   const modalUnits = modal?.form?.topicId ? (unitsByTopic[String(modal.form.topicId)] || []) : [];
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-900">
-        <p className="font-bold">Khu vực riêng cho Tài khoản miễn phí (tách biệt hoàn toàn với Tài khoản theo khóa)</p>
-        <p className="mt-1 text-emerald-800">
-          Tài liệu, Phần mềm và Bài tập thêm tại đây được gắn với các môn theo chặng của Luyện tập hằng ngày. Học viên đăng ký khóa học trả phí sẽ không thấy mục này, và tài khoản miễn phí không thấy tài nguyên của khóa trả phí.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-2">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="flex flex-wrap gap-1.5">
           {[
             { key: 'files', icon: FileBox, label: 'Tài liệu', count: data.files.length },

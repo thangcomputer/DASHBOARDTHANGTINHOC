@@ -1688,44 +1688,36 @@ export default function AdminDailyPracticeTab() {
   };
 
   return (
-    <div className="space-y-4 p-1">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-red-500 to-red-700 text-white"><Gamepad2 size={22} /></span>
-          <div>
-            <h2 className="text-lg font-black text-slate-900">Luyện tập hằng ngày</h2>
-            <p className="text-xs text-slate-500">Ngân hàng câu hỏi trò chơi theo chủ đề và độ khó cho học viên</p>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSectionTab('practice')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+              sectionTab === 'practice' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Gamepad2 size={15} /> Lộ trình &amp; Câu hỏi theo chặng
+          </button>
+          <button
+            type="button"
+            onClick={() => setSectionTab('free-materials')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+              sectionTab === 'free-materials' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <BookOpen size={15} /> Tài nguyên miễn phí
+          </button>
         </div>
         {sectionTab === 'practice' && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" onClick={installStarter} disabled={busy} className="cms-btn cms-btn-outline">
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Thêm bộ câu hỏi mẫu
             </button>
             <button type="button" onClick={() => setTopicModal({})} className="cms-btn cms-btn-primary"><Plus size={16} /> Thêm chủ đề</button>
           </div>
         )}
-      </div>
-
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-1.5">
-        <button
-          type="button"
-          onClick={() => setSectionTab('practice')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-            sectionTab === 'practice' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Gamepad2 size={15} /> Lộ trình &amp; Câu hỏi theo chặng
-        </button>
-        <button
-          type="button"
-          onClick={() => setSectionTab('free-materials')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-            sectionTab === 'free-materials' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <BookOpen size={15} /> Tài nguyên miễn phí (Tài liệu · Phần mềm · Bài tập)
-        </button>
       </div>
 
       {sectionTab === 'free-materials' ? (
