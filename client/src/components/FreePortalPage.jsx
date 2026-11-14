@@ -416,7 +416,7 @@ export default function FreePortalPage({ onLogin }) {
     window.location.href = `${origin}/api/auth/free-portal/${provider}`;
   };
 
-  const landingUrl = window.location.port === '5173' ? 'http://localhost:3100' : '/';
+  const landingUrl = window.location.port === '5173' ? 'http://localhost:3100' : 'https://giasutinhoc24h.com';
   const isRegister = mode === 'register';
 
   return (
