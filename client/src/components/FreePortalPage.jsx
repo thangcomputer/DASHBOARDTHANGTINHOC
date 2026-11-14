@@ -323,7 +323,15 @@ export default function FreePortalPage({ onLogin }) {
           body: JSON.stringify({ name: name.trim(), email: trimmedEmail, password }),
         });
         const data = await response.json();
-        if (!data.success) { setError(data.message || 'Chưa gửi được mã xác thực'); return; }
+        if (!data.success) {
+          if (response.status === 409) {
+            setMode('login');
+            setPhone(trimmedEmail);
+            setOtpStep(false);
+          }
+          setError(data.message || 'Chưa gửi được mã xác thực');
+          return;
+        }
         setOtpStep(true);
         setCountdown(45);
         if (data.devOtp) setDevOtpNotice(data.devOtp);
@@ -337,7 +345,15 @@ export default function FreePortalPage({ onLogin }) {
         body: JSON.stringify({ name: name.trim(), age: 18, phone: id, password }),
       });
       const regData = await regRes.json();
-      if (!regData.success) { setError(regData.message || 'Không thể tạo tài khoản'); return; }
+      if (!regData.success) {
+        if (regRes.status === 409) {
+          setMode('login');
+          setPhone(id);
+          setOtpStep(false);
+        }
+        setError(regData.message || 'Không thể tạo tài khoản');
+        return;
+      }
 
       const loginRes = await fetch(`${API_BASE}/auth/login/public`, {
         method: 'POST', credentials: 'include',
