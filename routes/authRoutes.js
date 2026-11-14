@@ -2486,6 +2486,7 @@ router.post('/free-portal/social/exchange', loginLimiter, policyShadowAuth('logi
         needsProfile: true,
         ticket: result.ticket,
         name: result.name,
+        email: result.email,
         provider: result.provider,
       });
     }
