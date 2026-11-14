@@ -832,7 +832,119 @@ export default function AdminTrainingTab({ section }) {
           {trainingTab !== 'exam-results-gv' && trainingTab !== 'questions' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="divide-y divide-gray-50">
-                {trainingItems.map(item => (
+                {['files', 'softwareLinks'].includes(trainingTab) ? (
+                  trainingItems.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-left text-sm">
+                        <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-black uppercase tracking-wider text-slate-600">
+                          <tr>
+                            <th className="w-12 px-4 py-3 text-center">STT</th>
+                            <th className="w-24 px-4 py-3">Loại</th>
+                            {trainingTab === 'files' && <th className="px-4 py-3">Khóa học</th>}
+                            <th className="px-4 py-3">Tiêu đề &amp; Mô tả</th>
+                            <th className="w-36 px-4 py-3">{trainingTab === 'softwareLinks' ? 'Link tải' : 'Dung lượng'}</th>
+                            <th className="w-28 px-4 py-3 text-right">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {[...trainingItems]
+                            .sort((a, b) => {
+                              const ca = String(a.courseName || '').trim();
+                              const cb = String(b.courseName || '').trim();
+                              if (ca !== cb) return ca.localeCompare(cb, 'vi');
+                              return String(a.title || '').localeCompare(String(b.title || ''), 'vi');
+                            })
+                            .map((item, idx) => (
+                              <tr key={item.id} className="align-middle transition hover:bg-slate-50/70">
+                                <td className="px-4 py-3 text-center text-xs font-black text-slate-400">
+                                  {idx + 1}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {trainingTab === 'files' ? (
+                                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black text-white shadow-xs ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'}`}>
+                                      {item.fileType || 'File'}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-lg bg-sky-100 px-2.5 py-1 text-[11px] font-black text-sky-700">
+                                      <Link2 size={12} aria-hidden="true" /> LINK
+                                    </span>
+                                  )}
+                                </td>
+                                {trainingTab === 'files' && (
+                                  <td className="px-4 py-3">
+                                    {item.courseName ? (
+                                      <span className="inline-block rounded-md bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-700">
+                                        {item.courseName}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-slate-400">Chưa gắn khóa</span>
+                                    )}
+                                    {item.courseId && !courseCatalog.some((course) => String(course._id || course.id) === String(item.courseId)) && (
+                                      <p className="mt-1 text-[11px] font-semibold text-amber-700">Khóa đã gỡ khỏi danh mục</p>
+                                    )}
+                                  </td>
+                                )}
+                                <td className="px-4 py-3">
+                                  <p className="font-bold text-slate-900">{item.title}</p>
+                                  {(trainingTab === 'softwareLinks'
+                                    ? (item.description || (item.installGuide || '').replace(/<[^>]*>/g, ''))
+                                    : (item.desc?.replace(/<[^>]*>/g, '') || '')) && (
+                                    <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
+                                      {(trainingTab === 'softwareLinks'
+                                        ? (item.description || (item.installGuide || '').replace(/<[^>]*>/g, ''))
+                                        : (item.desc?.replace(/<[^>]*>/g, '') || '')).slice(0, 90)}
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-slate-500">
+                                  {trainingTab === 'softwareLinks' ? (
+                                    item.linkUrl ? (
+                                      <a
+                                        href={resolveMediaUrl(item.linkUrl)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-block max-w-[160px] truncate font-semibold text-sky-700 hover:underline"
+                                        title={item.linkUrl}
+                                      >
+                                        {item.linkUrl}
+                                      </a>
+                                    ) : (
+                                      <span className="text-slate-400">—</span>
+                                    )
+                                  ) : (
+                                    <span>{item.fileSize || '—'}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setTrainingForm({ ...item })}
+                                      className="cms-btn cms-btn-outline cms-btn-icon text-sky-600"
+                                      aria-label="Chỉnh sửa"
+                                      title="Chỉnh sửa"
+                                    >
+                                      <Edit3 size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeleteConfirm({ category: trainingTab, id: item.id, title: item.title })}
+                                      className="cms-btn cms-btn-outline cms-btn-icon text-red-600"
+                                      aria-label="Xóa"
+                                      title="Xóa"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
+                trainingItems.map(item => (
                   <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition">
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                       {trainingTab === 'videos' && (
@@ -896,7 +1008,8 @@ export default function AdminTrainingTab({ section }) {
                       }
                     </div>
                   </div>
-                ))}
+                ))
+                )}
                 {trainingTab === 'videos' && courseCatalogLoading && (
                   <div className="p-8 text-center text-sm text-slate-500">Đang đồng bộ danh mục khóa học…</div>
                 )}

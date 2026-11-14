@@ -20,8 +20,6 @@ import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlConte
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { useData } from '../../../context/DataContext';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
-import AdminFreePortalMaterialsPanel from './AdminFreePortalMaterialsPanel';
-import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { getExamProgressDisplayStatus, summarizeExamProgress } from '../../../utils/examProgressStats';
 
 function mergeDocumentCourseOptions(dbCourses) {
@@ -127,19 +125,6 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
   const [learningGuideHtml, setLearningGuideHtml] = React.useState(DEFAULT_LEARNING_GUIDE_HTML);
   const [learningGuideVideoUrl, setLearningGuideVideoUrl] = React.useState('');
   const [learningGuideSaving, setLearningGuideSaving] = React.useState(false);
-  const [resourceAudience, setResourceAudience] = React.useState('course'); // course | free
-  const [freeTopics, setFreeTopics] = React.useState([]);
-
-  React.useEffect(() => {
-    if (!resourceOnly) return;
-    let cancelled = false;
-    dailyPracticeApi.admin.topics()
-      .then((rows) => {
-        if (!cancelled) setFreeTopics(Array.isArray(rows) ? rows : []);
-      })
-      .catch(() => { });
-    return () => { cancelled = true; };
-  }, [resourceOnly]);
 
   React.useEffect(() => {
     if (sTrainingTab !== 'learning-guide') return;
@@ -321,33 +306,6 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 </div>
               )}
 
-              {resourceOnly && (
-                <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setResourceAudience('course')}
-                    className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-                      resourceAudience === 'course' ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Học viên theo khóa (Tài liệu &amp; Phần mềm)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResourceAudience('free')}
-                    className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-                      resourceAudience === 'free' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Tài khoản miễn phí (Tài liệu · Phần mềm · Bài tập)
-                  </button>
-                </div>
-              )}
-
-              {resourceOnly && resourceAudience === 'free' ? (
-                <AdminFreePortalMaterialsPanel topics={freeTopics} />
-              ) : (
-                <>
               {!videoCoursesOnly && ['files', 'softwareLinks'].includes(sTrainingTab) && (
                 <>
                   <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2 text-xs text-sky-900">
@@ -401,10 +359,8 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                   <Plus size={15} /> {sTrainingTab === 'videos' ? 'Gắn nội dung khóa đã tạo' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                 </button>
               )}
-                </>
-              )}
             </div>
-            {!(resourceOnly && resourceAudience === 'free') && (sTrainingTab === 'learning-guide' ? (
+            {sTrainingTab === 'learning-guide' ? (
               <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                 <div>
                   <h3 className="text-lg font-black text-slate-900">Hướng dẫn học viên</h3>
@@ -1295,7 +1251,140 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                         Có {unlinkedVideoItems.length} nội dung cũ chưa khớp khóa trong danh mục. Mở chỉnh sửa và liên kết với khóa đã tạo để đồng bộ.
                       </div>
                     )}
-                    {trainingItems.map(item => (
+                    {['files', 'softwareLinks'].includes(sTrainingTab) ? (
+                      trainingItems.length > 0 && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[720px] text-left text-sm">
+                            <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-black uppercase tracking-wider text-slate-600">
+                              <tr>
+                                <th className="w-12 px-4 py-3 text-center">STT</th>
+                                <th className="w-24 px-4 py-3">Loại</th>
+                                {sTrainingTab === 'files' && <th className="px-4 py-3">Khóa học</th>}
+                                <th className="px-4 py-3">Tiêu đề &amp; Mô tả</th>
+                                <th className="w-36 px-4 py-3">{sTrainingTab === 'softwareLinks' ? 'Link tải' : 'Dung lượng'}</th>
+                                <th className="w-28 px-4 py-3 text-right">Thao tác</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {[...trainingItems]
+                                .sort((a, b) => {
+                                  const ca = String(a.courseName || '').trim();
+                                  const cb = String(b.courseName || '').trim();
+                                  if (ca !== cb) return ca.localeCompare(cb, 'vi');
+                                  return String(a.title || '').localeCompare(String(b.title || ''), 'vi');
+                                })
+                                .map((item, idx) => (
+                                  <tr key={item.id} className="align-middle transition hover:bg-slate-50/70">
+                                    <td className="px-4 py-3 text-center text-xs font-black text-slate-400">
+                                      {idx + 1}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {sTrainingTab === 'files' ? (
+                                        <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black text-white shadow-xs ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'}`}>
+                                          {item.fileType || 'File'}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-lg bg-sky-100 px-2.5 py-1 text-[11px] font-black text-sky-700">
+                                          <Link2 size={12} aria-hidden="true" /> LINK
+                                        </span>
+                                      )}
+                                    </td>
+                                    {sTrainingTab === 'files' && (
+                                      <td className="px-4 py-3">
+                                        {item.courseName ? (
+                                          <span className="inline-block rounded-md bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-700">
+                                            {item.courseName}
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs font-semibold text-amber-700">Chưa gắn khóa</span>
+                                        )}
+                                        {!item.courseId && !findDocumentCourse(dbCourses, item) && (
+                                          <p className="mt-1 text-[11px] font-semibold text-amber-700">Chưa liên kết danh mục</p>
+                                        )}
+                                      </td>
+                                    )}
+                                    <td className="px-4 py-3">
+                                      <p className="font-bold text-slate-900">{item.title}</p>
+                                      {(sTrainingTab === 'softwareLinks'
+                                        ? (item.description || (item.installGuide || '').replace(/<[^>]*>/g, ''))
+                                        : (item.desc?.replace(/<[^>]*>/g, '') || '')) && (
+                                        <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
+                                          {(sTrainingTab === 'softwareLinks'
+                                            ? (item.description || (item.installGuide || '').replace(/<[^>]*>/g, ''))
+                                            : (item.desc?.replace(/<[^>]*>/g, '') || '')).slice(0, 90)}
+                                        </p>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-slate-500">
+                                      {sTrainingTab === 'softwareLinks' ? (
+                                        item.linkUrl ? (
+                                          <a
+                                            href={resolveMediaUrl(item.linkUrl)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-block max-w-[160px] truncate font-semibold text-sky-700 hover:underline"
+                                            title={item.linkUrl}
+                                          >
+                                            {item.linkUrl}
+                                          </a>
+                                        ) : (
+                                          <span className="text-slate-400">—</span>
+                                        )
+                                      ) : (
+                                        <span>{item.fileSize || '—'}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      <div className="inline-flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const linkedCourse = sTrainingTab === 'files'
+                                              ? findDocumentCourse(dbCourses, item)
+                                              : null;
+                                            setSTrainingForm({
+                                              ...item,
+                                              ...(linkedCourse ? {
+                                                courseId: String(linkedCourse._id || linkedCourse.id),
+                                                courseName: linkedCourse.name,
+                                                examSubjects: Array.isArray(linkedCourse.examSubjects) ? linkedCourse.examSubjects : [],
+                                              } : {}),
+                                            });
+                                          }}
+                                          className="cms-btn cms-btn-outline cms-btn-icon text-sky-600"
+                                          aria-label="Chỉnh sửa"
+                                          title="Chỉnh sửa"
+                                        >
+                                          <Edit3 size={15} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            showGlobalModal({
+                                              title: 'Xác nhận xoá tài liệu',
+                                              content: `Bạn có chắc muốn xoá tài liệu "${item.title}" dành cho học viên không?`,
+                                              type: 'warning',
+                                              confirmText: 'Xoá vĩnh viễn',
+                                              cancelText: 'Huỷ bỏ',
+                                              onConfirm: () => removeStudentTrainingItem(sTrainingTab, item.id)
+                                            });
+                                          }}
+                                          className="cms-btn cms-btn-outline cms-btn-icon text-red-600"
+                                          aria-label="Xóa"
+                                          title="Xóa"
+                                        >
+                                          <Trash2 size={15} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    ) : (
+                      trainingItems.map(item => (
                       <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                           {sTrainingTab === 'videos' && (
@@ -1380,7 +1469,8 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                           }} className="cms-btn cms-btn-outline cms-btn-icon text-red-600" aria-label="Xóa" title="Xóa"><Trash2 size={16} /></button>}
                         </div>
                       </div>
-                    ))}
+                    ))
+                    )}
                     {trainingItems.length === 0 && (
                       <div className="p-12 text-center text-gray-400">
                         <BookOpen size={40} className="mx-auto mb-3 text-gray-300" />
@@ -1402,7 +1492,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 )}
 
               </>
-            ))}
+            )}
           </>
         )}
       </div>

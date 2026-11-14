@@ -20,6 +20,13 @@ function diffMeta(difficulty) {
   return FREE_ASSIGNMENT_DIFFICULTIES.find((d) => d.id === difficulty) || FREE_ASSIGNMENT_DIFFICULTIES[0];
 }
 
+const DIFFICULTY_ORDER = { easy: 1, medium: 2, hard: 3 };
+
+function extractStageOrder(unitTitle) {
+  const m = String(unitTitle || '').match(/(\d+)/);
+  return m ? Number(m[1]) : 9999;
+}
+
 function formatBytes(bytes) {
   const n = Number(bytes) || 0;
   if (!n) return '';
@@ -248,13 +255,27 @@ export default function AdminFreePortalMaterialsPanel({ topics = [] }) {
 
   const filteredItems = useMemo(() => {
     const list = Array.isArray(data[subTab]) ? data[subTab] : [];
-    return list.filter((item) => {
-      if (filterTopicId && String(item.topicId) !== String(filterTopicId)) return false;
-      if (filterUnitId && String(item.unitId) !== String(filterUnitId)) return false;
-      if (subTab === 'assignments' && filterDifficulty && String(item.difficulty || 'easy') !== filterDifficulty) return false;
-      return true;
-    });
-  }, [data, subTab, filterTopicId, filterUnitId, filterDifficulty]);
+    return list
+      .filter((item) => {
+        if (filterTopicId && String(item.topicId) !== String(filterTopicId)) return false;
+        if (filterUnitId && String(item.unitId) !== String(filterUnitId)) return false;
+        if (subTab === 'assignments' && filterDifficulty && String(item.difficulty || 'easy') !== filterDifficulty) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const topicA = topicMap.get(String(a.topicId))?.name || a.topicName || '';
+        const topicB = topicMap.get(String(b.topicId))?.name || b.topicName || '';
+        if (topicA !== topicB) return topicA.localeCompare(topicB, 'vi');
+        const stageDiff = extractStageOrder(a.unitTitle) - extractStageOrder(b.unitTitle);
+        if (stageDiff !== 0) return stageDiff;
+        if (subTab === 'assignments') {
+          const diffA = DIFFICULTY_ORDER[a.difficulty || 'easy'] || 99;
+          const diffB = DIFFICULTY_ORDER[b.difficulty || 'easy'] || 99;
+          if (diffA !== diffB) return diffA - diffB;
+        }
+        return String(a.title || '').localeCompare(String(b.title || ''), 'vi');
+      });
+  }, [data, subTab, filterTopicId, filterUnitId, filterDifficulty, topicMap]);
 
   const filterUnits = filterTopicId ? (unitsByTopic[filterTopicId] || []) : [];
   const modalUnits = modal?.form?.topicId ? (unitsByTopic[String(modal.form.topicId)] || []) : [];
@@ -371,82 +392,111 @@ export default function AdminFreePortalMaterialsPanel({ topics = [] }) {
           <p className="mt-1 text-xs text-slate-500">Bấm nút thêm ở góc phải để gắn {subTab === 'files' ? 'tài liệu' : subTab === 'softwareLinks' ? 'phần mềm' : 'bài tập'} cho tài khoản miễn phí.</p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {filteredItems.map((item) => {
-            const topicLabel = topicMap.get(String(item.topicId))?.name || item.topicName || 'Chưa gắn môn';
-            const dm = subTab === 'assignments' ? diffMeta(item.difficulty) : null;
-            const rawUrl = subTab === 'softwareLinks' ? item.linkUrl : item.fileUrl;
-            return (
-              <div key={item.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">
-                      {topicLabel}
-                    </span>
-                    {item.unitTitle && (
-                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                        {item.unitTitle}
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-black uppercase tracking-wider text-slate-600">
+              <tr>
+                <th className="w-12 px-4 py-3 text-center">STT</th>
+                <th className="px-4 py-3">Môn học</th>
+                <th className="px-4 py-3">Chủ đề / Chặng</th>
+                {subTab === 'assignments' && <th className="w-24 px-4 py-3">Mức độ</th>}
+                <th className="px-4 py-3">Tiêu đề &amp; Mô tả</th>
+                <th className="w-36 px-4 py-3">File / Link</th>
+                <th className="w-24 px-4 py-3 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredItems.map((item, idx) => {
+                const topicLabel = topicMap.get(String(item.topicId))?.name || item.topicName || 'Chưa gắn môn';
+                const dm = subTab === 'assignments' ? diffMeta(item.difficulty) : null;
+                const rawUrl = subTab === 'softwareLinks' ? item.linkUrl : item.fileUrl;
+                return (
+                  <tr key={item.id} className="align-middle transition hover:bg-emerald-50/30">
+                    <td className="px-4 py-3 text-center text-xs font-black text-slate-400">
+                      {idx + 1}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                        {topicLabel}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.unitTitle ? (
+                        <span className="inline-block rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                          {item.unitTitle}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Chung toàn môn</span>
+                      )}
+                    </td>
+                    {subTab === 'assignments' && (
+                      <td className="px-4 py-3">
+                        {dm && (
+                          <span className={`inline-block rounded-md border px-2 py-0.5 text-[11px] font-black ${dm.badgeClass}`}>
+                            {dm.label}
+                          </span>
+                        )}
+                      </td>
                     )}
-                    {dm && (
-                      <span className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${dm.badgeClass}`}>
-                        Mức: {dm.label}
-                      </span>
-                    )}
-                    {subTab === 'files' && item.fileType && (
-                      <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-black text-sky-700">
-                        {item.fileType}{item.fileSize ? ` · ${item.fileSize}` : ''}
-                      </span>
-                    )}
-                  </div>
-                  <h4 className="text-sm font-black text-slate-900">{item.title}</h4>
-                  {(item.desc || item.description) && (
-                    <p className="line-clamp-2 whitespace-pre-wrap text-xs text-slate-500">{item.desc || item.description}</p>
-                  )}
-                  {subTab === 'softwareLinks' && item.installGuide && (
-                    <p className="line-clamp-1 text-[11px] font-medium text-slate-500">Hướng dẫn: {item.installGuide}</p>
-                  )}
-                  {subTab === 'assignments' && item.deadline && (
-                    <p className="text-[11px] font-semibold text-amber-700">Hạn gợi ý: {item.deadline}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
-                  {rawUrl ? (
-                    <a
-                      href={resolveMediaUrl(rawUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"
-                    >
-                      {subTab === 'softwareLinks' ? <ExternalLink size={13} /> : <Download size={13} />}
-                      {subTab === 'softwareLinks' ? 'Mở link phần mềm' : 'Xem / Tải file'}
-                    </a>
-                  ) : (
-                    <span className="text-xs text-slate-400">Chưa gắn file/link</span>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(subTab, item)}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                      title="Sửa"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteItem(subTab, item)}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
-                      title="Xóa"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-bold text-slate-900">{item.title}</span>
+                        {subTab === 'files' && item.fileType && (
+                          <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-black text-sky-700">
+                            {item.fileType}{item.fileSize ? ` · ${item.fileSize}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {(item.desc || item.description) && (
+                        <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{item.desc || item.description}</p>
+                      )}
+                      {subTab === 'softwareLinks' && item.installGuide && (
+                        <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-500">Hướng dẫn: {item.installGuide}</p>
+                      )}
+                      {subTab === 'assignments' && item.deadline && (
+                        <p className="mt-0.5 text-[11px] font-semibold text-amber-700">Hạn gợi ý: {item.deadline}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {rawUrl ? (
+                        <a
+                          href={resolveMediaUrl(rawUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"
+                        >
+                          {subTab === 'softwareLinks' ? <ExternalLink size={13} /> : <Download size={13} />}
+                          {subTab === 'softwareLinks' ? 'Mở link' : 'Tải file'}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">Chưa gắn</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(subTab, item)}
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                          title="Sửa"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(subTab, item)}
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                          title="Xóa"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -641,3 +691,4 @@ export default function AdminFreePortalMaterialsPanel({ topics = [] }) {
     </div>
   );
 }
+
