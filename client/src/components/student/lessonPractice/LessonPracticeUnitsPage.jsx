@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clapperboard, Gamepad2, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clapperboard, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
-import dailyPracticeApi from '../../../services/dailyPracticeApi';
-import { topicColor, topicIcon } from '../../../utils/dailyPractice';
 import { resolveMediaUrl } from '../../../services/api';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlContent';
@@ -799,19 +797,6 @@ export default function LessonPracticeUnitsPage() {
     return undefined;
   }, [payload, subjectId, openUnitId, units, resumeStorageKey, requestedUnitId, requestedSectionId, searchParams, setSearchParams]);
 
-  const [relatedTopics, setRelatedTopics] = useState({ key: '', rows: [] });
-  const relatedKey = openUnit && !openUnit.isPreview ? `${subjectId}|${openUnit.id}` : '';
-  useEffect(() => {
-    if (!relatedKey) return undefined;
-    let alive = true;
-    const [relatedSubjectId, relatedUnitId] = relatedKey.split('|');
-    dailyPracticeApi.student.relatedTopics(relatedSubjectId, relatedUnitId)
-      .then((rows) => { if (alive) setRelatedTopics({ key: relatedKey, rows: Array.isArray(rows) ? rows : [] }); })
-      .catch(() => { if (alive) setRelatedTopics({ key: relatedKey, rows: [] }); });
-    return () => { alive = false; };
-  }, [relatedKey]);
-  const unitRelatedTopics = relatedTopics.key === relatedKey ? relatedTopics.rows : [];
-
   const activeSectionId = activeSection?.id || '';
   const lastSyncedPosition = useRef('');
   useEffect(() => {
@@ -910,11 +895,11 @@ export default function LessonPracticeUnitsPage() {
             tabIndex={lessonListOpen ? 0 : -1}
             aria-label="Đóng danh sách bài học"
             onClick={() => setLessonListOpen(false)}
-            className={`absolute inset-0 z-20 bg-slate-950/35 transition-opacity duration-300 lg:hidden ${lessonListOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            className={`absolute inset-0 z-[45] bg-slate-950/35 transition-opacity duration-300 lg:hidden ${lessonListOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
           />
           <aside
             id="lesson-list"
-            className={`absolute inset-y-0 right-0 z-30 flex min-h-0 w-[min(72vw,380px)] max-w-[90vw] flex-col overflow-hidden rounded-l-2xl border border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${lessonListOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'} lg:pointer-events-auto lg:translate-x-0 lg:relative lg:inset-auto lg:z-auto lg:col-start-1 lg:row-start-1 lg:w-auto lg:max-w-none lg:rounded-2xl lg:shadow-none`}
+            className={`absolute inset-y-0 right-0 z-[50] flex min-h-0 w-[min(72vw,380px)] max-w-[90vw] flex-col overflow-hidden rounded-l-2xl border border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${lessonListOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'} lg:pointer-events-auto lg:translate-x-0 lg:relative lg:inset-auto lg:z-auto lg:col-start-1 lg:row-start-1 lg:w-auto lg:max-w-none lg:rounded-2xl lg:shadow-none`}
           >
             <style>{`
               .lesson-unlock-burst {
@@ -1118,30 +1103,6 @@ export default function LessonPracticeUnitsPage() {
                         }
                       }}
                     />
-                  </div>
-                )}
-                {unitRelatedTopics.length > 0 && (
-                  <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2">
-                    <span className="flex items-center gap-1.5 text-xs font-black text-amber-800">
-                      <Gamepad2 size={15} aria-hidden="true" /> Luyện tập chủ đề liên quan:
-                    </span>
-                    {unitRelatedTopics.map((topic) => {
-                      const TopicIcon = topicIcon(topic.icon);
-                      const color = topicColor(topic.color);
-                      return (
-                        <button
-                          key={topic.id}
-                          type="button"
-                          onClick={() => navigate(`/student/daily-practice?topicId=${encodeURIComponent(topic.id)}`)}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-800 ring-1 ring-amber-200 transition hover:ring-amber-400 !shadow-none"
-                        >
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full text-white" style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}>
-                            <TopicIcon size={11} aria-hidden="true" />
-                          </span>
-                          {topic.name}
-                        </button>
-                      );
-                    })}
                   </div>
                 )}
                 <LessonNavigationBar

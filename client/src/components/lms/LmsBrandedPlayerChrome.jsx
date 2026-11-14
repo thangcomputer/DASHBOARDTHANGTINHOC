@@ -119,13 +119,14 @@ export default function LmsBrandedPlayerChrome({
   onToggleMute,
   isFullscreen = false,
   onToggleFullscreen = null,
-  brandLabel = 'THẮNG TIN HỌC',
   /** () => YT.Player | null - để chọn độ phân giải */
   getPlayer = null,
   /** Chất lượng thực tế từ onPlaybackQualityChange */
   actualPlaybackQuality = null,
   /** 'window': màn chờ nền xám đậm + nút phát đỏ lớn, không nhãn thương hiệu (popup video lộ trình). */
   overlayVariant = 'default',
+  /** Slot hiển thị ngang hàng trên thanh điều khiển (vd: Đánh dấu đã xem). */
+  rightSlot = null,
 }) {
   const windowLook = overlayVariant === 'window';
   const [dragging, setDragging] = useState(false);
@@ -256,13 +257,6 @@ export default function LmsBrandedPlayerChrome({
           }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          {!windowLook && (
-            <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
-              <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest  shadow-lg">
-                {brandLabel}
-              </div>
-            </div>
-          )}
           {typeof onToggleFullscreen === 'function' ? (
             <button
               type="button"
@@ -308,7 +302,13 @@ export default function LmsBrandedPlayerChrome({
       )}
 
       {!overlayVisible && !isPlaying && !hasEnded && (
-        <div className="pointer-events-none absolute inset-0 z-[17] flex items-center justify-center" aria-hidden="true">
+        <div
+          className="pointer-events-none absolute inset-0 z-[17] flex items-center justify-center backdrop-blur-[2px]"
+          style={{
+            background: 'radial-gradient(circle at 50% 50%, rgba(15,23,42,0.75) 0%, rgba(15,23,42,0.52) 55%, rgba(15,23,42,0.35) 100%)',
+          }}
+          aria-hidden="true"
+        >
           <span
             className={`flex items-center justify-center rounded-full shadow-2xl ${windowLook ? 'h-16 w-16 sm:h-20 sm:w-20' : 'h-14 w-14 sm:h-16 sm:w-16'}`}
             style={{
@@ -316,7 +316,7 @@ export default function LmsBrandedPlayerChrome({
               boxShadow: '0 0 28px rgba(220,38,38,0.5), 0 6px 20px rgba(0,0,0,0.35)',
             }}
           >
-            <Play size={windowLook ? 32 : 26} className="ml-1.5 text-white drop-shadow-lg" fill="white" />
+            <Play size={windowLook ? 32 : 26} className="ml-1 text-white drop-shadow-lg" fill="white" />
           </span>
         </div>
       )}
@@ -335,7 +335,7 @@ export default function LmsBrandedPlayerChrome({
 
       {!overlayVisible && (
         <div
-          className="absolute inset-x-0 bottom-0 z-[30] px-3 sm:px-4 pt-8 pb-3"
+          className="absolute inset-x-0 bottom-0 z-[30] px-2.5 sm:px-4 pt-6 sm:pt-8 pb-2 sm:pb-3"
           style={{ background: 'linear-gradient(to top, rgba(8,15,28,0.95) 0%, rgba(8,15,28,0.65) 60%, transparent 100%)' }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
@@ -349,7 +349,7 @@ export default function LmsBrandedPlayerChrome({
             aria-valuenow={Math.floor(displayTime)}
             aria-label="Tiến độ video"
             tabIndex={0}
-            className="relative h-8 flex items-center cursor-pointer touch-none select-none mb-2"
+            className="relative h-6 sm:h-8 flex items-center cursor-pointer touch-none select-none mb-1 sm:mb-2"
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -397,14 +397,14 @@ export default function LmsBrandedPlayerChrome({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 isPlaying ? onPause?.() : onPlay?.();
               }}
-              className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white transition hover:scale-105 active:scale-95"
+              className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white transition hover:scale-105 active:scale-95"
               style={{
                 background: 'linear-gradient(135deg, #f87171 0%, #b91c1c 100%)',
                 boxShadow: '0 4px 14px rgba(220,38,38,0.35)',
@@ -412,11 +412,11 @@ export default function LmsBrandedPlayerChrome({
               aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}
             >
               {isPlaying
-                ? <Pause size={16} fill="white" className="text-white" />
-                : <Play size={16} fill="white" className="text-white ml-0.5" />}
+                ? <Pause size={15} fill="white" className="text-white" />
+                : <Play size={15} fill="white" className="text-white ml-0.5" />}
             </button>
 
-            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-white shrink-0 min-w-[2.5rem]">
+            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-white shrink-0">
               {formatClock(displayTime)}
             </span>
             <span className="text-[11px] sm:text-xs font-bold tabular-nums text-slate-400 shrink-0">
@@ -425,8 +425,10 @@ export default function LmsBrandedPlayerChrome({
 
             <div className="flex-1" />
 
+            {rightSlot}
+
             <span
-              className="h-9 min-w-[2.75rem] px-2 rounded-full inline-flex items-center justify-center bg-white/10 text-white border border-white/20 text-[10px] sm:text-[11px] font-bold tabular-nums shrink-0"
+              className="h-8 sm:h-9 min-w-[2.5rem] px-2 rounded-full inline-flex items-center justify-center bg-white/10 text-white border border-white/20 text-[10px] sm:text-[11px] font-bold tabular-nums shrink-0"
               title={liveLabel ? `Auto · đang phát ${liveLabel}` : 'Auto (YouTube chọn mức)'}
               aria-label={`Độ phân giải ${qualityBtnLabel}`}
             >
@@ -440,11 +442,11 @@ export default function LmsBrandedPlayerChrome({
                   e.stopPropagation();
                   onToggleFullscreen();
                 }}
-                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
+                className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
                 aria-label={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
                 title={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
               >
-                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
               </button>
             ) : null}
 
@@ -459,10 +461,10 @@ export default function LmsBrandedPlayerChrome({
                   e.stopPropagation();
                   onToggleMute?.();
                 }}
-                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
+                className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
                 aria-label={muted ? 'Bật tiếng' : 'Tắt tiếng'}
               >
-                <VolIcon size={16} />
+                <VolIcon size={15} />
               </button>
               <div className={`overflow-hidden transition-all duration-200 ${showVol ? 'w-20 sm:w-24 opacity-100' : 'w-0 opacity-0 sm:w-20 sm:opacity-100'}`}>
                 <input

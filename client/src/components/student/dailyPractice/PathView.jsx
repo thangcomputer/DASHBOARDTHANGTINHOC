@@ -24,6 +24,7 @@ import {
 } from '../../../utils/lastPathTopic';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import PathLessonModal from './PathLessonModal';
+import MilestoneHubModal from './MilestoneHubModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import PathVideoModal from './PathVideoModal';
 import PathUnitRoadmapModal from './PathUnitRoadmapModal';
@@ -32,7 +33,7 @@ import { QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon
 import Mascot from './Mascot';
 import { DropletMark, PathITBackdrop } from './PathDecor';
 import FreeMeetPlanModal from './FreeMeetPlanModal';
-import { collectUnitVideos, UnitStageHeader } from './PathUnitStageHeader';
+import { collectNodeVideos, collectUnitVideos, UnitStageHeader } from './PathUnitStageHeader';
 import { UnitStageChest } from './UnitStageChest';
 import LevelUnlockEffect, { useNewlyUnlockedUnit } from './LevelUnlockEffect';
 
@@ -94,10 +95,30 @@ function ProgressRing({ size, progress, progressColor, dimmed = false }) {
 }
 
 /** Một nút trên lộ trình - nút tròn 3D vàng kim + icon trắng + 3 chấm + sao viền theo mẫu thiết kế. */
-function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selected, onClick, nodeIndex = 0 }) {
+function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selected, onClick, nodeIndex = 0, completedSections = [] }) {
   const locked = node.state === 'locked';
   const size = PATH_HUB_DUO.buttonSize.web;
   const levels = node.levels || [];
+  const completedSet = new Set(completedSections || []);
+  const LEVEL_DOTS = [
+    { diff: 'easy', color: '#22C55E', label: 'Dễ' },
+    { diff: 'medium', color: '#F97316', label: 'Vừa' },
+    { diff: 'hard', color: '#EF4444', label: 'Khó' },
+  ];
+  const isDotDone = (i) => {
+    if (node.state === 'completed') return true;
+    const isStudy = node.kind === 'study' || node.icon === 'book';
+    if (isStudy) {
+      const diff = LEVEL_DOTS[i].diff;
+      const cfg = node.levelConfigs?.[diff];
+      const hidden = new Set(cfg?.hiddenSections || []);
+      const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length
+        ? cfg.sectionOrder
+        : ['content', 'file', 'video', 'practice']).filter((k) => !hidden.has(k));
+      return order.length > 0 && order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
+    }
+    return levels[i]?.state === 'completed';
+  };
   const progress = pathHubNodeProgress(node);
   const progressColor = pathHubProgressColor(node, progress, color);
   const HubIcon = NODE_ICONS[node.icon] || Dumbbell;
@@ -116,9 +137,15 @@ function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selecte
       data-node-state={node.state}
     >
       {isNext && !selected ? (
-        <span className="dp-path-start-bubble" style={{ color: '#D97706' }}>
+        <button
+          type="button"
+          disabled={locked}
+          onClick={onClick}
+          className="dp-path-start-bubble cursor-pointer border-0"
+          style={{ color: '#D97706' }}
+        >
           {pathNodeStartBubbleLabel(node)}
-        </span>
+        </button>
       ) : null}
       <div className="dp-path-hub-ring relative" style={{ width: ring, height: ring }}>
         {showRing ? (
@@ -144,15 +171,14 @@ function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selecte
           <HubIcon size={26} strokeWidth={PATH_HUB_DUO.iconStroke} aria-hidden="true" className="drop-shadow-sm text-white" />
           {!locked ? (
             <span className="mt-1 flex items-center justify-center gap-1" aria-hidden="true">
-              {[0, 1, 2].map((i) => {
-                const lvl = levels[i];
-                const isDoneOrActive = lvl ? (lvl.state === 'completed' || lvl.state === 'active') : true;
+              {LEVEL_DOTS.map((dot, i) => {
+                const done = isDotDone(i);
                 return (
                   <span
-                    key={i}
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      isDoneOrActive ? 'bg-white' : 'bg-white/40'
-                    } drop-shadow-xs`}
+                    key={dot.diff}
+                    title={`${dot.label}: ${done ? 'Đã hoàn thành' : 'Chưa hoàn thành'}`}
+                    className="h-2 w-2 rounded-full ring-1 ring-white/95 shadow-xs"
+                    style={{ background: done ? dot.color : '#94A3B8' }}
                   />
                 );
               })}
@@ -763,18 +789,15 @@ export function continueStageTarget(topic) {
   const resolveUnitVideo = (unit, preferNodeKey = '') => {
     if (!unit || unit.state === 'locked') return null;
 
-    if (preferNodeKey && Array.isArray(unit.pathNodes)) {
-      const activeNode = unit.pathNodes.find((n) => n.key === preferNodeKey);
+    if (Array.isArray(unit.pathNodes)) {
+      const activeNode = (preferNodeKey && unit.pathNodes.find((n) => n.key === preferNodeKey))
+        || unit.pathNodes.find((n) => n.state === 'active');
       if (activeNode) {
-        const nodeVideos = [];
-        for (const level of activeNode.levels || []) {
-          for (const v of level.videos || []) {
-            if (v && v.id) nodeVideos.push({ ...v, stepLabel: v.stepLabel || level.label || '' });
-          }
-        }
+        const nodeVideos = collectNodeVideos(unit, activeNode);
         const pendingInNode = nodeVideos.find((v) => v.state !== 'completed' && v.state !== 'locked');
         if (pendingInNode) return { unit, videoId: pendingInNode.id };
-        if (nodeVideos.length > 0) return { unit, videoId: nodeVideos[0].id };
+        const unlockedInNode = nodeVideos.find((v) => v.state !== 'locked');
+        if (unlockedInNode) return { unit, videoId: unlockedInNode.id };
       }
     }
 
@@ -782,7 +805,8 @@ export function continueStageTarget(topic) {
     const pending = videos.find((v) => v.state !== 'completed' && v.state !== 'locked');
     if (pending) return { unit, videoId: pending.id };
     if (unit.lesson) return { unit, videoId: '' };
-    if (videos.length > 0) return { unit, videoId: videos[0].id };
+    const firstUnlocked = videos.find((v) => v.state !== 'locked');
+    if (firstUnlocked) return { unit, videoId: firstUnlocked.id };
     return null;
   };
 
@@ -845,6 +869,7 @@ export default function PathView({
   const [videoOpen, setVideoOpen] = useState(null);
   const [roadmapOpen, setRoadmapOpen] = useState(null);
   const [lessonOpen, setLessonOpen] = useState(null);
+  const [milestoneOpen, setMilestoneOpen] = useState(null);
   const [welcomeLesson, setWelcomeLesson] = useState(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [trophyModalOpen, setTrophyModalOpen] = useState(false);
@@ -982,7 +1007,15 @@ export default function PathView({
       if (!topic || !next) return;
       if (next.unitId) markUnitStarted(next.unitId);
       if (topic.topic.id !== currentRef.current?.topic?.id) setTopicId(topic.topic.id);
-      setPopover({ unitId: next.unitId, nodeKey: next.nodeKey || 'study', testOut: false });
+      const targetKey = next.nodeKey || 'study';
+      const targetUnit = (topic.units || []).find((u) => u.id === next.unitId);
+      const targetNode = (targetUnit?.pathNodes || []).find((n) => n.key === targetKey);
+      if (targetNode && (targetNode.kind === 'study' || targetNode.icon === 'book')) {
+        setPopover(null);
+        setMilestoneOpen({ unitId: next.unitId, nodeKey: targetKey });
+      } else {
+        setPopover({ unitId: next.unitId, nodeKey: targetKey, testOut: false });
+      }
       window.setTimeout(() => {
         document.querySelector('[data-path-current]')?.scrollIntoView({
           behavior: 'smooth',
@@ -1037,6 +1070,12 @@ export default function PathView({
   const toggleHub = (unit, nodeKey) => {
     gameSounds.tap();
     if (unit?.id) markUnitStarted(unit.id);
+    const node = (unit?.pathNodes || []).find((n) => n.key === nodeKey);
+    if (node && (node.kind === 'study' || node.icon === 'book')) {
+      setPopover(null);
+      setMilestoneOpen({ unitId: unit.id, nodeKey });
+      return;
+    }
     setPopover((prev) => (prev && prev.unitId === unit.id && prev.nodeKey === nodeKey && !prev.testOut ? null : { unitId: unit.id, nodeKey, testOut: false }));
   };
   const openUnitStageAction = (unit, isNextUnit) => {
@@ -1050,6 +1089,12 @@ export default function PathView({
     } else {
       const active = unit.pathNodes?.find((n) => n.state === 'active');
       nodeKey = active?.key || unit.pathNodes?.[0]?.key || 'study';
+    }
+    const node = (unit.pathNodes || []).find((n) => n.key === nodeKey);
+    if (node && (node.kind === 'study' || node.icon === 'book')) {
+      setPopover(null);
+      setMilestoneOpen({ unitId: unit.id, nodeKey });
+      return;
     }
     setPopover({ unitId: unit.id, nodeKey, testOut: false });
   };
@@ -1173,6 +1218,7 @@ export default function PathView({
                               isNewlyUnlocked={isUnitNewlyUnlocked && index === 0}
                               selected={Boolean(hubSelected)}
                               nodeIndex={index}
+                              completedSections={unit.completedSections}
                               onClick={() => toggleHub(unit, item.node.key)}
                             />
                           )}
@@ -1274,6 +1320,7 @@ export default function PathView({
         <PathVideoModal
           unit={videoOpen.unit}
           initialVideoId={videoOpen.videoId}
+          singleVideoOnly={Boolean(videoOpen.singleVideoOnly)}
           color={unitColor(videoOpen.unit.index)}
           onClose={closeVideo}
           onWatched={async (videoId) => {
@@ -1288,8 +1335,14 @@ export default function PathView({
           color={unitColor(roadmapOpen.unit.index)}
           onClose={() => setRoadmapOpen(null)}
           onPickNode={(nodeKey) => {
+            const pickedUnit = roadmapOpen.unit;
+            const pickedNode = (pickedUnit?.pathNodes || []).find((n) => n.key === nodeKey);
             setRoadmapOpen(null);
-            setPopover({ unitId: roadmapOpen.unit.id, nodeKey, testOut: false });
+            if (pickedNode && (pickedNode.kind === 'study' || pickedNode.icon === 'book')) {
+              setMilestoneOpen({ unitId: pickedUnit.id, nodeKey });
+            } else {
+              setPopover({ unitId: pickedUnit.id, nodeKey, testOut: false });
+            }
           }}
           onOpenVideo={() => {
             const unit = roadmapOpen.unit;
@@ -1311,6 +1364,28 @@ export default function PathView({
           }}
         />
       )}
+      {milestoneOpen && (() => {
+        const mUnit = (current?.units || []).find((u) => u.id === milestoneOpen.unitId);
+        const mNodes = mUnit?.pathNodes || [];
+        const mIdx = mNodes.findIndex((n) => n.key === milestoneOpen.nodeKey);
+        const mNode = mIdx >= 0 ? mNodes[mIdx] : null;
+        if (!mUnit || !mNode) return null;
+        return (
+          <MilestoneHubModal
+            unit={mUnit}
+            node={mNode}
+            milestoneIndex={mIdx}
+            onClose={() => setMilestoneOpen(null)}
+            onProgressChanged={onPathChanged}
+            onOpenVideo={(targetUnit, videoId) => setVideoOpen({ unit: targetUnit, videoId, singleVideoOnly: true })}
+            onStartPractice={(stepKey) => {
+              const practiceNodeKey = mNode.key || 'study';
+              setMilestoneOpen(null);
+              onStartStep(mUnit.id, practiceNodeKey, stepKey || 'learn', false);
+            }}
+          />
+        );
+      })()}
       {lessonOpen && (
         <PathLessonModal
           lesson={lessonOpen.lesson}

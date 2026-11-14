@@ -1,6 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  LayoutChangeEvent, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  LayoutChangeEvent, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import {
   Maximize2, Minimize2, Pause, Play, Volume1, Volume2, VolumeX,
@@ -41,6 +41,7 @@ export function MobileLmsPlayerChrome({
   onToggleFullscreen,
   overlayVariant = 'default',
   startOverlayVisible = false,
+  rightSlot = null,
 }: {
   isPlaying: boolean;
   currentTime: number;
@@ -66,11 +67,27 @@ export function MobileLmsPlayerChrome({
   overlayVariant?: 'default' | 'window';
   /** Màn chờ trước lần phát đầu (popup lộ trình — giống web overlayVisible). */
   startOverlayVisible?: boolean;
+  rightSlot?: React.ReactNode;
 }) {
   const windowLook = overlayVariant === 'window';
+  const { width: windowWidth } = useWindowDimensions();
+  const showInlineVolSlider = windowWidth >= 520;
   const [barWidth, setBarWidth] = useState(0);
   const [volBarWidth, setVolBarWidth] = useState(0);
+  const [volPopoverOpen, setVolPopoverOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
+  const [seekingDrag, setSeekingDrag] = useState(false);
+
+  useEffect(() => {
+    if (!seekingDrag || Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    const onUp = () => setSeekingDrag(false);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [seekingDrag]);
   const safeDur = Math.max(0, duration);
   const displayTime = safeDur > 0 ? Math.min(currentTime, safeDur) : currentTime;
   const progressPct = safeDur > 0 ? Math.min(100, (displayTime / safeDur) * 100) : 0;
@@ -146,9 +163,29 @@ export function MobileLmsPlayerChrome({
       ) : null}
 
       {!startOverlayVisible ? (
-      <View style={styles.bottomChrome} pointerEvents="box-none">
+      <View
+        style={[
+          styles.bottomChrome,
+          Platform.OS === 'web'
+            ? ({
+                backgroundColor: 'transparent',
+                backgroundImage: 'linear-gradient(to top, rgba(8,15,28,0.95) 0%, rgba(8,15,28,0.65) 60%, transparent 100%)',
+              } as never)
+            : null,
+        ]}
+        pointerEvents="box-none"
+      >
         <Pressable
           onLayout={onBarLayout}
+          onPressIn={(e) => {
+            setSeekingDrag(true);
+            if (lockSeek) {
+              onBlockedSeek?.();
+              return;
+            }
+            seekFromX(e.nativeEvent.locationX);
+          }}
+          onPressOut={() => setSeekingDrag(false)}
           onPress={(e) => {
             if (lockSeek) {
               onBlockedSeek?.();
@@ -156,6 +193,26 @@ export function MobileLmsPlayerChrome({
             }
             seekFromX(e.nativeEvent.locationX);
           }}
+          onTouchMove={(e) => {
+            if (lockSeek) {
+              onBlockedSeek?.();
+              return;
+            }
+            if (e.nativeEvent?.locationX != null) {
+              seekFromX(e.nativeEvent.locationX);
+            }
+          }}
+          {...(Platform.OS === 'web'
+            ? {
+                onMouseDown: () => {
+                  setSeekingDrag(true);
+                  if (lockSeek) onBlockedSeek?.();
+                },
+                onMouseMove: () => {
+                  if (seekingDrag && lockSeek) onBlockedSeek?.();
+                },
+              }
+            : {})}
           style={styles.progressTrack}
           accessibilityRole="adjustable"
           accessibilityLabel="Tiến độ video"
@@ -184,6 +241,8 @@ export function MobileLmsPlayerChrome({
 
           <View style={styles.flexSpacer} />
 
+          {rightSlot}
+
           {showQuality ? (
             <Pressable
               onPress={() => {
@@ -210,17 +269,47 @@ export function MobileLmsPlayerChrome({
           ) : null}
 
           {onToggleMute ? (
-            <Pressable
-              onPress={onToggleMute}
-              style={styles.roundIconBtn}
-              accessibilityRole="button"
-              accessibilityLabel={muted ? 'Bật tiếng' : 'Tắt tiếng'}
+            <View
+              style={styles.volWrap}
+              {...(Platform.OS === 'web'
+                ? {
+                    onMouseEnter: () => onVolumeChange && setVolPopoverOpen(true),
+                    onMouseLeave: () => setVolPopoverOpen(false),
+                  }
+                : {})}
             >
-              <VolIcon size={16} color="#FFFFFF" />
-            </Pressable>
+              {!showInlineVolSlider && onVolumeChange && volPopoverOpen ? (
+                <View style={styles.volPopover}>
+                  <Pressable
+                    onLayout={onVolBarLayout}
+                    onPress={(e) => volumeFromX(e.nativeEvent.locationX)}
+                    style={styles.volumeTrack}
+                    accessibilityRole="adjustable"
+                    accessibilityLabel="Âm lượng"
+                  >
+                    <View style={styles.volumeBg} />
+                    <View style={[styles.volumeFill, { width: `${volPct}%` }]} />
+                    <View style={[styles.volumeThumb, { left: `${volPct}%` }]} />
+                  </Pressable>
+                </View>
+              ) : null}
+              <Pressable
+                onPress={onToggleMute}
+                onLongPress={() => {
+                  if (!showInlineVolSlider && onVolumeChange) {
+                    setVolPopoverOpen((prev) => !prev);
+                  }
+                }}
+                style={styles.roundIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel={muted ? 'Bật tiếng' : 'Tắt tiếng'}
+              >
+                <VolIcon size={15} color="#FFFFFF" />
+              </Pressable>
+            </View>
           ) : null}
 
-          {onVolumeChange ? (
+          {onVolumeChange && showInlineVolSlider ? (
             <Pressable
               onLayout={onVolBarLayout}
               onPress={(e) => volumeFromX(e.nativeEvent.locationX)}
@@ -313,7 +402,7 @@ const styles = StyleSheet.create({
   },
   tapLayer: {
     ...StyleSheet.absoluteFillObject,
-    bottom: 88,
+    bottom: 64,
     zIndex: 12,
   },
   centerPlayWrap: {
@@ -353,15 +442,15 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 20,
-    paddingHorizontal: 12,
-    paddingTop: 28,
-    paddingBottom: Platform.OS === 'ios' ? 14 : 10,
-    backgroundColor: 'rgba(8,15,28,0.94)',
+    paddingHorizontal: 10,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    backgroundColor: 'rgba(8,15,28,0.72)',
   },
   progressTrack: {
-    height: 24,
+    height: 18,
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   progressBg: {
     height: 4,
@@ -383,18 +472,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#FECACA',
-    top: 5,
+    top: 2,
     transform: [{ translateX: -7 }],
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   playBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#DC2626',
@@ -413,10 +502,10 @@ const styles = StyleSheet.create({
   },
   flexSpacer: { flex: 1, minWidth: 4 },
   qualityPill: {
-    height: 36,
-    minWidth: 72,
+    height: 32,
+    minWidth: 52,
     paddingHorizontal: 10,
-    borderRadius: 18,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -429,14 +518,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   roundIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
+  },
+  volWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  volPopover: {
+    position: 'absolute',
+    bottom: 40,
+    right: 0,
+    backgroundColor: 'rgba(15,23,42,0.94)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    zIndex: 30,
   },
   volumeTrack: {
     width: 72,

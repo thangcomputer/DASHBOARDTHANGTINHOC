@@ -93,6 +93,7 @@ function FallbackPlayer({ url, onWatched, onTick }) {
           onTickRef.current?.(currentTime, e.currentTarget);
           if (duration > 0 && currentTime / duration >= WATCH_REQUIRED_RATIO) markOnce();
         }}
+        onEnded={markOnce}
       />
     );
   }
@@ -108,7 +109,7 @@ function FallbackPlayer({ url, onWatched, onTick }) {
  * Popup video của chặng - mở ngay trên trang lộ trình, đóng lại là về đúng chỗ đang xem.
  * Danh sách phát: video riêng của chặng + video buổi bài giảng đã gắn (vẫn có liên kết mở trang bài giảng).
  */
-export default function PathVideoModal({ unit, initialVideoId = '', color, onClose, onWatched }) {
+export default function PathVideoModal({ unit, initialVideoId = '', singleVideoOnly = false, color, onClose, onWatched }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -129,11 +130,13 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
   const [uploadPct, setUploadPct] = useState(null);
   const [grading, setGrading] = useState(false);
   const [hintStep, setHintStep] = useState(false);
+  const [markingWatched, setMarkingWatched] = useState(false);
   const playerApiRef = useRef(null);
   const passedRef = useRef(passedKeys);
   const gateRef = useRef(null);
   const currentRef = useRef(null);
   const eligibleRef = useRef(false);
+  const syncedSectionRef = useRef(new Set());
   useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
 
   useEffect(() => {
@@ -160,10 +163,16 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
     };
   }, [onClose]);
 
-  const playlist = useMemo(() => [
+  const isSingleMode = Boolean(singleVideoOnly || /:level:(easy|medium|hard)$/.test(String(initialVideoId || '')));
+  const allPlaylist = useMemo(() => [
     ...(data?.videos || []).map((video) => ({ ...video, source: video.source || 'unit' })),
     ...(data?.lesson?.videos || []).map((video) => ({ ...video, source: 'lesson', state: 'active' })),
   ], [data]);
+  const playlist = useMemo(() => {
+    if (!isSingleMode || !initialVideoId) return allPlaylist;
+    const matched = allPlaylist.find((v) => v.id === initialVideoId);
+    return matched ? [matched] : allPlaylist;
+  }, [allPlaylist, isSingleMode, initialVideoId]);
   const playable = playlist.filter((video) => video.state !== 'locked');
   const current = playable.find((video) => video.id === currentId) || playable[0] || null;
   const currentWatched = current ? ((current.source === 'unit' || current.source === 'step') ? watchedIds.has(current.id) : false) : false;
@@ -218,6 +227,16 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
     setGate(null);
   }, [current?.id]);
 
+  // Nếu video đã được đánh dấu watched từ trước nhưng chưa đồng bộ completedSections của bài học theo cấp độ
+  useEffect(() => {
+    if (!current || !watchedIds.has(current.id)) return;
+    if (!/:level:(easy|medium|hard)$/.test(current.id)) return;
+    if (syncedSectionRef.current.has(current.id)) return;
+    if (pendingOf(current).length > 0) return;
+    syncedSectionRef.current.add(current.id);
+    Promise.resolve(onWatched(current.id)).catch(() => {});
+  }, [current, watchedIds, onWatched]);
+
   useEffect(() => {
     if (!current || !extractYouTubeId(current.url) || current.source === 'lesson') return undefined;
     const timer = window.setInterval(() => {
@@ -229,19 +248,38 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
 
   const markWatched = async () => {
     eligibleRef.current = true;
-    if (!current || (current.source !== 'unit' && current.source !== 'step') || watchedIds.has(current.id)) return true;
-    if (pendingOf(current).length) {
-      if (!extractYouTubeId(current.url) && !isDirectVideo(current.url)) {
-        openGate(pendingOf(current).slice().sort((a, b) => a.atSec - b.atSec)[0], null);
+    const target = currentRef.current || current;
+    if (!target || (target.source !== 'unit' && target.source !== 'step')) return true;
+    if (pendingOf(target).length) {
+      if (!extractYouTubeId(target.url) && !isDirectVideo(target.url)) {
+        openGate(pendingOf(target).slice().sort((a, b) => a.atSec - b.atSec)[0], null);
       }
       return false;
     }
-    const videoId = current.id;
-    setWatchedIds((prev) => new Set(prev).add(videoId));
-    gameSounds.correct();
+    const videoId = target.id;
+    const alreadyWatched = watchedIds.has(videoId);
+    if (alreadyWatched) {
+      if (/:level:(easy|medium|hard)$/.test(videoId) && !syncedSectionRef.current.has(videoId)) {
+        syncedSectionRef.current.add(videoId);
+        try {
+          await onWatched(videoId);
+        } catch { /* ignore */ }
+      }
+      return true;
+    }
+    syncedSectionRef.current.add(videoId);
+    setMarkingWatched(true);
     try {
       await onWatched(videoId);
-    } catch { /* lần sau xem lại sẽ ghi tiếp */ }
+      setWatchedIds((prev) => new Set(prev).add(videoId));
+      gameSounds.correct();
+    } catch (err) {
+      syncedSectionRef.current.delete(videoId);
+      setCheckError(err?.message || 'Chưa lưu được tiến độ xem video');
+      return false;
+    } finally {
+      setMarkingWatched(false);
+    }
     const nextVideo = playable.find((video) => (
       video.id !== videoId
       && video.state !== 'locked'
@@ -356,34 +394,56 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
     navigate(lessonResumeUrl({ subjectId: lesson.subjectId, unitId: lesson.unitId }));
   };
 
+  const isCurrentYouTube = Boolean(current && extractYouTubeId(current.url));
+  const watchStatusControl = (current?.source === 'unit' || current?.source === 'step') ? (
+    isSingleMode && currentWatched ? (
+      <span className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black text-emerald-300 border border-emerald-400/30 whitespace-nowrap">
+        <CheckCircle2 size={13} /> Đã xem
+      </span>
+    ) : !currentWatched && pendingOf(current).length === 0 ? (
+      <button
+        type="button"
+        disabled={markingWatched}
+        onClick={(e) => {
+          e.stopPropagation();
+          void markWatched();
+        }}
+        className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black text-white hover:bg-emerald-500 disabled:opacity-60 !shadow-none whitespace-nowrap"
+      >
+        <CheckCircle2 size={13} /> {markingWatched ? 'Đang lưu…' : 'Đánh dấu đã xem'}
+      </button>
+    ) : null
+  ) : null;
+  const showFooterBar = Boolean(lesson || (!isCurrentYouTube && watchStatusControl));
+
   return createPortal(
-    <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-3 sm:p-6" role="presentation" onClick={onClose}>
+    <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation" onClick={onClose}>
       <div
-        className="dp-pop flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-[#1C1F26] shadow-[0_30px_80px_rgba(69,10,10,0.55)] ring-1 ring-white/10"
+        className="dp-pop flex max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-[22px] bg-[#1C1F26] shadow-[0_30px_80px_rgba(69,10,10,0.55)] ring-1 ring-white/10"
         role="dialog"
         aria-modal="true"
         aria-label={`Video chặng ${unit.index}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center gap-3 border-b border-white/5 bg-[#16181E] px-4 py-3">
+        <div className="flex items-center gap-2 sm:gap-3 border-b border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
           <span
-            className="max-w-[42%] shrink-0 truncate rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white"
+            className="max-w-[44%] sm:max-w-[38%] shrink-0 truncate rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white"
             style={{ background: `linear-gradient(135deg, ${color.from}, ${color.to})` }}
             title={`Chặng ${unit.index} · ${unit.title}`}
           >
             Chặng {unit.index} · {unit.title}
           </span>
-          <h2 className="flex min-w-0 flex-1 items-center justify-start gap-1.5 text-left text-base font-black text-white" title={current?.title || ''}>
-            <Clapperboard size={16} className="shrink-0 text-red-400" aria-hidden="true" />
-            <span className="line-clamp-2 break-words">{current?.title || 'Video của chặng'}</span>
+          <h2 className="flex min-w-0 flex-1 items-center justify-start gap-1.5 text-left text-xs sm:text-base font-black text-white" title={current?.title || ''}>
+            <Clapperboard size={15} className="shrink-0 text-red-400" aria-hidden="true" />
+            <span className="line-clamp-1 sm:line-clamp-2 break-words">{current?.title || 'Video của chặng'}</span>
           </h2>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="cms-btn cms-btn-primary cms-btn-brand shrink-0 !py-2 !px-4 text-sm font-black">
+          <button type="button" onClick={onClose} aria-label="Đóng" className="cms-btn cms-btn-primary cms-btn-brand shrink-0 !min-h-0 !h-auto !rounded-lg !py-1 !px-2.5 sm:!py-1.5 sm:!px-3 text-[11px] sm:text-xs font-black">
             Đóng
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="relative aspect-video w-full overflow-hidden bg-[#23262E]">
+          <div className="relative aspect-video max-h-[58dvh] sm:max-h-[68dvh] w-full overflow-hidden bg-[#23262E]">
             {!data && !error && (
               <p className="flex h-full items-center justify-center gap-2 text-sm font-semibold text-white/70"><Loader2 size={18} className="animate-spin" /> Đang tải video…</p>
             )}
@@ -394,18 +454,20 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
                 {lesson?.locked ? lesson.message : 'Chặng này chưa có video.'}
               </div>
             )}
-            {current && (extractYouTubeId(current.url) ? (
+            {current && (isCurrentYouTube ? (
               <StudentVideoPlayer
                 key={`${unit.id}-${current.id}`}
                 videoId={current.url}
                 lessonId={`dp-${unit.id}-${current.id}`}
                 courseId="daily-practice"
-                antiSeekEnabled={!currentWatched}
+                antiSeekEnabled={!currentWatched && current.antiSeek !== false}
                 lessonCompleted={currentWatched}
                 requiredRatio={WATCH_REQUIRED_RATIO}
                 onEligibilityReached={markWatched}
+                onVideoEnded={markWatched}
                 playerApiRef={playerApiRef}
                 appearance="window"
+                chromeRightSlot={watchStatusControl}
               />
             ) : (
               <FallbackPlayer key={`${unit.id}-${current.id}`} url={current.url} onWatched={markWatched} onTick={onMediaTick} />
@@ -481,7 +543,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
             )}
           </div>
 
-          {playlist.length > 0 && (
+          {!isSingleMode && playlist.length > 0 && (
             <div className="space-y-1.5 px-4 pt-3">
               <p className="text-[11px] font-black uppercase tracking-wider text-white/50">Danh sách video ({playlist.length})</p>
               {playlist.map((video, index) => {
@@ -513,20 +575,18 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-          {current?.source === 'unit' || current?.source === 'step' ? (currentWatched ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-black text-emerald-300">
-              <CheckCircle2 size={14} /> Đã xem video này
-            </span>
-          ) : null) : <span />}
-          <div className={`flex flex-wrap gap-2 ${lesson ? 'ml-auto' : 'w-full justify-end'}`}>
-            {lesson && (
-              <button type="button" onClick={openLessonPage} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/20 !shadow-none">
-                <ExternalLink size={15} /> Mở trang bài giảng
-              </button>
-            )}
+        {showFooterBar && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
+            {!isCurrentYouTube ? (watchStatusControl || <span />) : <span />}
+            <div className={`flex flex-wrap gap-2 ${lesson ? 'ml-auto' : ''}`}>
+              {lesson && (
+                <button type="button" onClick={openLessonPage} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white transition hover:bg-white/20 !shadow-none">
+                  <ExternalLink size={14} /> Mở trang bài giảng
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
       {buyXpOpen && (
         <BuyXpModal packs={xpPacks} onClose={() => setBuyXpOpen(false)} onPaid={() => setBuyXpOpen(false)} />

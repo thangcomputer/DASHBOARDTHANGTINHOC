@@ -3,13 +3,13 @@ export const SOUND_MUTE_CHANGED_EVENT = 'thvp-sound-muted-changed';
 
 const readInitialMuted = () => {
   try {
-    if (typeof localStorage === 'undefined') return true;
+    if (typeof localStorage === 'undefined') return false;
     const saved = localStorage.getItem(SOUND_MUTE_STORAGE_KEY);
-    // Mặc định tắt âm thanh nếu người dùng chưa bật rõ ràng
-    if (saved === null) return true;
+    // Mặc định bật âm thanh trừ khi người dùng tự tắt
+    if (saved === null) return false;
     return saved === 'true';
   } catch {
-    return true;
+    return false;
   }
 };
 
@@ -403,7 +403,7 @@ export const gameSounds = {
 
 /**
  * Quản lý âm thanh Game Hóa DewSkill:
- * - Mặc định tắt âm thanh nếu chưa cấu hình.
+ * - Mặc định bật âm thanh trừ khi người dùng tắt ('thvp_muted' === 'true').
  * - Lưu tùy chọn qua localStorage ('thvp_muted').
  * - Không tự phát trước khi người dùng tương tác.
  */

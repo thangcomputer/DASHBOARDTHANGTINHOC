@@ -36,7 +36,7 @@ const StudentSchema = new mongoose.Schema(
     },
     zalo: {
       type: String,
-      required: [true, 'Số Zalo là bắt buộc'],
+      required: [function () { return !this.email; }, 'Số Zalo là bắt buộc'],
       trim: true,
     },
     address: { type: String, trim: true },

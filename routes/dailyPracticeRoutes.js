@@ -116,6 +116,13 @@ router.post('/my/path/videos/watched', ...requireStudent, handle((req) => pathSe
   unitId: req.body?.unitId,
   videoId: String(req.body?.videoId || ''),
 })));
+router.post('/my/path/units/:unitId/sections/complete', ...requireStudent, handle((req) => pathService.toggleSectionProgress(userId(req), {
+  unitId: req.params.unitId,
+  nodeKey: String(req.body?.nodeKey || ''),
+  difficulty: String(req.body?.difficulty || ''),
+  sectionKey: String(req.body?.sectionKey || ''),
+  completed: req.body?.completed !== false,
+})));
 router.post('/my/path/units/:unitId/chest/claim', ...requireStudent, handle((req) => pathService.claimUnitChest(userId(req), req.params.unitId)));
 router.post('/my/sessions', ...requireStudent, handle((req) => service.startSession(userId(req), {
   topicId: req.body?.topicId,

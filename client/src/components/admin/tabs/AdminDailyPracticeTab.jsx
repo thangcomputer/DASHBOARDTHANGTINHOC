@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDown, ArrowUp, BookOpen, Bot, CheckCircle2, Clapperboard, Eye, EyeOff, FileText, Gamepad2, ImagePlus, Loader2, Paperclip, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, X,
+  ArrowDown, ArrowUp, BookOpen, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, X,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -10,6 +10,7 @@ import { useToast } from '../../../utils/useToast';
 import {
   DIFFICULTIES, QUESTION_TYPES, TOPIC_COLORS, TOPIC_ICONS, difficultyMeta, topicColor, topicIcon,
 } from '../../../utils/dailyPractice';
+import AdminMilestoneEditor, { VideoChecksEditor, normalizeLevelConfigs } from './AdminMilestoneEditor';
 
 const TYPE_IDS = Object.keys(QUESTION_TYPES);
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
@@ -901,15 +902,14 @@ function pathNodesFromUnit(unit) {
       sortOrder: node.sortOrder ?? index,
       active: node.active !== false,
       stepVideos: mapNodeStepVideos(node.stepVideos),
+      levelConfigs: node.levelConfigs || null,
     }));
   }
   return defaultPathNodes(unit);
 }
 
-const BAI_FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.png,.jpg,.jpeg,.webp,.gif';
-
 function blankBai(title) {
-  return { title, url: '', content: '', fileUrl: '', fileName: '', checks: [], nodeKey: '' };
+  return { title, active: true, url: '', content: '', fileUrl: '', fileName: '', checks: [], nodeKey: '', levelConfigs: null };
 }
 
 function lessonsFromUnit(unit) {
@@ -920,19 +920,26 @@ function lessonsFromUnit(unit) {
     if (node.icon !== 'book') return;
     const learn = node.stepVideos?.learn || [];
     if (!learn.length) {
-      lessons.push({ ...blankBai(node.label), nodeKey: node.key });
+      lessons.push({
+        ...blankBai(node.label),
+        active: node.active !== false,
+        nodeKey: node.key,
+        levelConfigs: node.levelConfigs || null,
+      });
       return;
     }
-    learn.forEach((item) => {
+    learn.forEach((item, idx) => {
       lessons.push({
         id: item.id,
         title: item.title || node.label,
+        active: node.active !== false,
         url: item.url || '',
         content: item.content || '',
         fileUrl: item.fileUrl || '',
         fileName: item.fileName || '',
         checks: item.checks || [],
         nodeKey: learn.length === 1 ? node.key : '',
+        levelConfigs: idx === 0 ? (node.levelConfigs || null) : null,
       });
     });
   });
@@ -957,131 +964,35 @@ function _uniqueNodeKey(nodes, base) {
   return `${base}-${index}`;
 }
 
-function baiIssues(lesson, index) {
-  const name = `Bài ${index + 1}`;
-  const title = String(lesson.title || '').trim();
-  const url = String(lesson.url || '').trim();
-  const content = String(lesson.content || '').trim();
-  const fileUrl = String(lesson.fileUrl || '').trim();
-  const issues = [];
-  if (!title) issues.push(`${name}: chưa có tên`);
-  if (title && !url && !content && !fileUrl) issues.push(`${name}: thêm nội dung, file hoặc video`);
-  if (url && !/^https?:\/\/\S+$/i.test(url) && !/^\/uploads\/\S+$/.test(url)) issues.push(`${name}: link video cần bắt đầu bằng http hoặc /uploads`);
-  if (fileUrl && !/^https?:\/\/\S+$/i.test(fileUrl) && !/^\/uploads\/\S+$/.test(fileUrl)) issues.push(`${name}: file chưa được tải lên`);
-  return issues;
-}
-
 function stageItemSummary(unit) {
   const count = lessonsFromUnit(unit).length;
   if (!count) return 'Chưa có bài';
   return `${count} bài · mỗi bài có nội dung, file, video, luyện tập`;
 }
 
-function BaiEditor({ lesson, unit, onChange, onComposeQuestion, onAiDraft }) {
-  const toast = useToast();
-  const [uploading, setUploading] = useState(false);
-  const [checksOn, setChecksOn] = useState(Boolean(lesson.checks?.length));
-
-  const uploadFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setUploading(true);
-    try {
-      const data = await api.settings.uploadTrainingFile(file);
-      if (!data?.success || !data.fileUrl) throw new Error(data?.message || 'Upload thất bại');
-      onChange({ fileUrl: data.fileUrl, fileName: data.fileOriginalName || file.name });
-      toast.success('Đã tải file');
-    } catch (err) {
-      toast.error(err.message || 'Không tải được file');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <label className="block">
-        <span className={LABEL}>Tên bài</span>
-        <input className={INPUT} value={lesson.title} maxLength={120} onChange={(e) => onChange({ title: e.target.value })} placeholder="Ví dụ: Định dạng đoạn văn" />
-      </label>
-      <section className="space-y-1.5 rounded-xl bg-sky-50/70 p-2.5 ring-1 ring-sky-100">
-        <p className="flex items-center gap-1.5 text-xs font-black text-sky-800"><FileText size={14} /> Nội dung</p>
-        <textarea className={`${INPUT} !min-h-[88px]`} value={lesson.content || ''} maxLength={5000} onChange={(e) => onChange({ content: e.target.value })} placeholder="Phần chữ học viên đọc" />
-      </section>
-      <section className="space-y-1.5 rounded-xl bg-amber-50/70 p-2.5 ring-1 ring-amber-100">
-        <p className="flex items-center gap-1.5 text-xs font-black text-amber-900"><Paperclip size={14} /> File</p>
-        {lesson.fileUrl ? (
-          <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-amber-100">
-            <span className="min-w-0 flex-1 truncate">{lesson.fileName || 'Tài liệu đính kèm'}</span>
-            <button type="button" onClick={() => onChange({ fileUrl: '', fileName: '' })} className="font-bold text-red-600 !shadow-none">Gỡ</button>
-          </div>
-        ) : null}
-        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-black text-amber-800 ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
-          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
-          {uploading ? 'Đang tải…' : 'Tải file'}
-          <input type="file" className="hidden" accept={BAI_FILE_ACCEPT} disabled={uploading} onChange={uploadFile} />
-        </label>
-        <p className="text-[11px] text-slate-500">PDF, Word, Excel, PowerPoint, ZIP hoặc ảnh. Tối đa 25MB.</p>
-      </section>
-      <section className="space-y-1.5 rounded-xl bg-red-50/60 p-2.5 ring-1 ring-red-100">
-        <p className="flex items-center gap-1.5 text-xs font-black text-red-800"><Clapperboard size={14} /> Video</p>
-        <input className={INPUT} value={lesson.url || ''} maxLength={500} onChange={(e) => onChange({ url: e.target.value })} placeholder="Link YouTube, Vimeo hoặc file .mp4" aria-label="Link video" />
-        {String(lesson.url || '').trim() ? (
-          <div>
-            <button type="button" onClick={() => setChecksOn((open) => !open)} className="text-[11px] font-black text-amber-800 !shadow-none">
-              {checksOn ? 'Ẩn câu hỏi trong video' : `Câu hỏi trong video (${lesson.checks?.length || 0})`}
-            </button>
-            {checksOn ? <div className="mt-1.5"><VideoChecksEditor checks={lesson.checks || []} onChange={(checks) => onChange({ checks })} /></div> : null}
-          </div>
-        ) : null}
-      </section>
-      <section className="space-y-1.5">
-        <p className="flex items-center gap-1.5 text-xs font-black text-emerald-800"><Gamepad2 size={14} /> Luyện tập</p>
-        <QuizNodeConfig unit={unit} onComposeQuestion={onComposeQuestion} onAiDraft={onAiDraft} />
-      </section>
-    </div>
-  );
+function milestoneLevelSummary(lesson) {
+  const cfg = normalizeLevelConfigs(lesson);
+  const ready = ['easy', 'medium', 'hard'].filter((k) => {
+    const c = cfg[k];
+    return Boolean(c.content?.body || c.files?.length || c.video?.url);
+  });
+  if (!ready.length) return 'Chưa có nội dung · Bấm Quản lý để soạn 3 mức';
+  const labels = { easy: 'Dễ', medium: 'Vừa', hard: 'Khó' };
+  return `Đã soạn: ${ready.map((k) => labels[k]).join(', ')} · 4 phần độc lập`;
 }
 
-/** Danh sách bài trong một chặng. Mỗi bài gồm nội dung, file, video và luyện tập. */
-function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
+/** Danh sách mốc bài học trong một chặng. Bấm Quản lý để mở trang chỉnh sửa 3 mức Dễ/Vừa/Khó. */
+function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEditQuestion, questionsVersion = 0 }) {
   const toast = useToast();
   const initial = lessonsFromUnit(unit);
   const [lessons, setLessons] = useState(initial);
-  const [openIndex, setOpenIndex] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(null);
   const [saving, setSaving] = useState(false);
   const dirty = JSON.stringify(lessons) !== JSON.stringify(initial);
-  const problems = lessons.flatMap((lesson, index) => baiIssues(lesson, index));
 
-  const patchLesson = (index, patch) => setLessons((list) => list.map((lesson, i) => (i === index ? { ...lesson, ...patch } : lesson)));
-
-  const moveLesson = (index, delta) => {
-    setLessons((list) => {
-      const target = index + delta;
-      if (target < 0 || target >= list.length) return list;
-      const next = [...list];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-    setOpenIndex((current) => (current === index ? index + delta : current));
-  };
-
-  const addLesson = () => {
-    if (lessons.length >= 12) return;
-    setLessons((list) => [...list, blankBai(`Bài ${list.length + 1}`)]);
-    setOpenIndex(lessons.length);
-  };
-
-  const removeLesson = (index) => {
-    setLessons((list) => list.filter((_, i) => i !== index));
-    setOpenIndex((current) => (current === index ? null : current > index ? current - 1 : current));
-  };
-
-  const save = async () => {
-    if (!lessons.length || problems.length) return;
+  const buildNodesPayload = (list) => {
     const used = new Set();
-    const nodes = lessons.map((lesson, index) => {
+    const nodes = list.map((lesson, index) => {
       const base = String(lesson.nodeKey || `bai-${index + 1}`).replace(/[^a-z0-9-_]/gi, '').slice(0, 40) || `bai-${index + 1}`;
       let key = base;
       let n = 2;
@@ -1090,22 +1001,26 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
         n += 1;
       }
       used.add(key);
+      const levelConfigs = normalizeLevelConfigs(lesson);
+      const easy = levelConfigs.easy;
+      const hasEasy = Boolean(easy.content?.body || easy.files?.length || easy.video?.url);
       return {
         key,
         label: String(lesson.title || '').trim().slice(0, 40) || `Bài ${index + 1}`,
         icon: 'book',
         sortOrder: index,
-        active: true,
+        active: lesson.active !== false,
+        levelConfigs,
         stepVideos: {
-          learn: [{
+          learn: hasEasy ? [{
             id: lesson.id,
-            title: String(lesson.title || '').trim(),
-            url: String(lesson.url || '').trim(),
-            content: String(lesson.content || '').trim(),
-            fileUrl: String(lesson.fileUrl || '').trim(),
-            fileName: String(lesson.fileName || '').trim(),
-            checks: (lesson.checks || []).filter((check) => String(check.prompt || '').trim()),
-          }],
+            title: String(lesson.title || '').trim() || `Bài ${index + 1}`,
+            url: String(easy.video?.url || '').trim(),
+            content: String(easy.content?.body || '').trim(),
+            fileUrl: String(easy.files?.[0]?.url || '').trim(),
+            fileName: String(easy.files?.[0]?.name || '').trim(),
+            checks: (easy.video?.checks || []).filter((check) => String(check.prompt || '').trim()),
+          }] : [],
           practice: [],
           challenge: [],
         },
@@ -1125,6 +1040,10 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
       active: true,
       stepVideos: emptyNodeStepVideos(),
     });
+    return nodes;
+  };
+
+  const persistList = async (nextList, message = 'Đã lưu bài học') => {
     setSaving(true);
     try {
       await dailyPracticeApi.admin.updateUnit(unit.id, {
@@ -1133,35 +1052,85 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
         active: unit.active,
         lessonUnitId: unit.lessonUnitId || '',
         videos: unit.videos || [],
-        pathNodes: nodes,
+        pathNodes: buildNodesPayload(nextList),
       });
-      toast.success('Đã lưu các bài trong chặng');
+      toast.success(message);
       onSaved();
+      return true;
     } catch (err) {
       toast.error(err.message);
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const moveLesson = (index, delta) => {
+    setLessons((list) => {
+      const target = index + delta;
+      if (target < 0 || target >= list.length) return list;
+      const next = [...list];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const addLesson = () => {
+    if (lessons.length >= 12) return;
+    const nextIndex = lessons.length;
+    setLessons((list) => [...list, blankBai(`Bài ${list.length + 1}`)]);
+    setEditingIndex(nextIndex);
+  };
+
+  const removeLesson = (index) => {
+    if (!window.confirm(`Xóa mốc "${lessons[index]?.title || `Bài ${index + 1}`}"?`)) return;
+    setLessons((list) => list.filter((_, i) => i !== index));
+    setEditingIndex((current) => (current === index ? null : current > index ? current - 1 : current));
+  };
+
+  const editingLesson = editingIndex !== null ? lessons[editingIndex] : null;
+
   return (
-    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5">
-      <p className="text-[11px] font-semibold text-slate-500">Mỗi bài gồm nội dung, file, video và luyện tập. Học viên học lần lượt từng bài.</p>
+    <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-slate-500">
+          Mỗi mốc tương ứng một bài học gồm 3 mức (Dễ – Vừa – Khó) với 4 phần độc lập. Bấm <b>Quản lý</b> để chỉnh sửa.
+        </p>
+      </div>
       {lessons.length === 0 ? (
-        <p className="rounded-xl bg-white px-3 py-4 text-center text-xs font-semibold text-slate-500">Chưa có bài. Bấm Thêm bài để soạn nội dung, file, video và luyện tập.</p>
+        <p className="rounded-xl bg-white px-3 py-4 text-center text-xs font-semibold text-slate-500">
+          Chưa có bài học nào. Bấm <b>Thêm bài</b> để tạo mốc mới.
+        </p>
       ) : (
-        <ol className="space-y-1.5">
+        <ol className="space-y-2">
           {lessons.map((lesson, index) => {
-            const open = openIndex === index;
-            const issues = baiIssues(lesson, index);
+            const isActive = lesson.active !== false;
             return (
-              <li key={lesson.id || lesson.nodeKey || index} className="rounded-xl bg-white ring-1 ring-slate-200">
-                <div className="flex items-center gap-2 px-2 py-1.5">
-                  <button type="button" onClick={() => setOpenIndex(open ? null : index)} className="flex min-w-0 flex-1 items-center gap-2 text-left !shadow-none">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-black text-white">{index + 1}</span>
-                    <BookOpen size={14} className="shrink-0 text-sky-700" aria-hidden="true" />
-                    <span className="truncate text-sm font-black text-slate-900">{lesson.title || `Bài ${index + 1}`}</span>
-                    {issues.length > 0 && <span className="shrink-0 text-[10px] font-bold text-amber-600">Chưa đủ</span>}
+              <li key={lesson.id || lesson.nodeKey || index} className={`rounded-xl bg-white p-2.5 ring-1 ring-slate-200 ${isActive ? '' : 'opacity-65'}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-black text-white">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <BookOpen size={15} className="shrink-0 text-sky-700" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={() => setEditingIndex(index)}
+                    className="min-w-0 flex-1 text-left !shadow-none"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-black text-slate-900">{lesson.title || `Bài ${index + 1}`}</span>
+                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {isActive ? 'Đang hiển thị' : 'Đang ẩn'}
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] font-medium text-slate-500">{milestoneLevelSummary(lesson)}</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingIndex(index)}
+                    className="shrink-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-slate-800 !shadow-none"
+                  >
+                    Quản lý
                   </button>
                   <span className="flex shrink-0 flex-col">
                     <button type="button" disabled={index === 0} onClick={() => moveLesson(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
@@ -1169,18 +1138,6 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
                   </span>
                   <button type="button" onClick={() => removeLesson(index)} aria-label="Xóa bài" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
                 </div>
-                {open && (
-                  <div className="border-t border-slate-100 px-3 py-2.5">
-                    <BaiEditor
-                      lesson={lesson}
-                      unit={unit}
-                      onChange={(patch) => patchLesson(index, patch)}
-                      onComposeQuestion={onComposeQuestion}
-                      onAiDraft={onAiDraft}
-                    />
-                    {issues.length > 0 && <p className="mt-2 text-[11px] font-bold text-amber-700">{issues[0]}</p>}
-                  </div>
-                )}
               </li>
             );
           })}
@@ -1188,11 +1145,33 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" onClick={addLesson} disabled={lessons.length >= 12} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm bài</button>
-        <button type="button" onClick={save} disabled={!dirty || saving || !lessons.length || problems.length > 0} className="cms-btn cms-btn-primary ml-auto !py-1.5 text-xs">
-          {saving && <Loader2 size={13} className="animate-spin" />} Lưu chặng
-        </button>
+        {dirty && (
+          <button type="button" onClick={() => persistList(lessons, 'Đã lưu thứ tự và danh sách bài')} disabled={saving || !lessons.length} className="cms-btn cms-btn-primary ml-auto !py-1.5 text-xs">
+            {saving && <Loader2 size={13} className="animate-spin" />} Lưu thay đổi thứ tự
+          </button>
+        )}
       </div>
-      {problems.length > 0 && <p className="text-[11px] font-bold text-amber-700">{problems[0]}</p>}
+
+      {editingLesson && (
+        <AdminMilestoneEditor
+          unit={unit}
+          lesson={editingLesson}
+          lessonIndex={editingIndex}
+          questionsVersion={questionsVersion}
+          onClose={() => setEditingIndex(null)}
+          onComposeQuestion={(uId, diff) => onComposeQuestion?.(uId, diff)}
+          onAiDraft={(uId, diff) => onAiDraft?.(uId, diff)}
+          onEditQuestion={(q) => onEditQuestion?.(q)}
+          onSaveLesson={async (updatedLesson) => {
+            const nextList = lessons.map((item, i) => (i === editingIndex ? updatedLesson : item));
+            const ok = await persistList(nextList, `Đã lưu "${updatedLesson.title}"`);
+            if (ok) {
+              setLessons(nextList);
+              setEditingIndex(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1232,75 +1211,6 @@ function UnitImagePanel({ unit, onSaved }) {
           {saving && <Loader2 size={13} className="animate-spin" />} Lưu ảnh chặng
         </button>
       </div>
-    </div>
-  );
-}
-
-function emptyVideoCheck() {
-  return { kind: 'choice', atSec: 30, prompt: '', choices: ['', ''], answer: '0', criteria: '', shortHint: '', paidHint: '', hintCostXp: 5 };
-}
-
-/** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-function VideoChecksEditor({ checks, onChange }) {
-  const list = checks || [];
-  const patch = (index, next) => onChange(list.map((item, i) => (i === index ? { ...item, ...next } : item)));
-  return (
-    <div className="space-y-1.5 rounded-lg bg-amber-50/80 p-2 ring-1 ring-amber-100 sm:col-span-2">
-      <p className="text-[11px] font-black text-amber-900">Mốc câu hỏi trong video</p>
-      {list.map((check, index) => (
-        <div key={check.id || `check-${index}`} className="space-y-1.5 rounded-lg bg-white p-2 ring-1 ring-amber-100">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <label className="text-[11px] font-bold text-slate-600">
-              Giây
-              <input
-                type="number"
-                min={0}
-                className={`${INPUT} ml-1 !w-20 !py-1`}
-                value={check.atSec}
-                onChange={(e) => patch(index, { atSec: e.target.value })}
-              />
-            </label>
-            <select className={`${INPUT} !w-auto !py-1`} value={check.kind} onChange={(e) => patch(index, { kind: e.target.value })}>
-              <option value="choice">Chọn đáp án</option>
-              <option value="text">Nhập đáp án</option>
-              <option value="screen">Chụp màn hình, AI chấm</option>
-            </select>
-            <button type="button" onClick={() => onChange(list.filter((_, i) => i !== index))} className="ml-auto text-[11px] font-bold text-red-600 !shadow-none">Xóa mốc</button>
-          </div>
-          <input className={`${INPUT} !py-1.5`} maxLength={300} value={check.prompt} placeholder="Câu hỏi hiện lúc dừng video" onChange={(e) => patch(index, { prompt: e.target.value })} />
-          {check.kind === 'choice' && (
-            <div className="space-y-1">
-              {(check.choices || ['', '']).map((choice, choiceIndex) => (
-                <label key={choiceIndex} className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
-                  <input type="radio" name={`check-${check.id || index}`} checked={String(check.answer) === String(choiceIndex)} onChange={() => patch(index, { answer: String(choiceIndex) })} />
-                  <input className={`${INPUT} !py-1`} maxLength={120} value={choice} placeholder={`Đáp án ${choiceIndex + 1}`} onChange={(e) => {
-                    const choices = [...(check.choices || [])];
-                    choices[choiceIndex] = e.target.value;
-                    patch(index, { choices });
-                  }} />
-                </label>
-              ))}
-              {(check.choices || []).length < 4 && (
-                <button type="button" className="text-[11px] font-bold text-sky-700 !shadow-none" onClick={() => patch(index, { choices: [...(check.choices || []), ''] })}>Thêm đáp án</button>
-              )}
-            </div>
-          )}
-          {check.kind === 'text' && (
-            <input className={`${INPUT} !py-1.5`} maxLength={200} value={check.answer || ''} placeholder="Đáp án đúng (không phân biệt hoa thường)" onChange={(e) => patch(index, { answer: e.target.value })} />
-          )}
-          {check.kind === 'screen' && (
-            <textarea className={`${INPUT} !py-1.5`} rows={2} maxLength={500} value={check.criteria || ''} placeholder="Tiêu chí AI chấm. Học viên không thấy dòng này." onChange={(e) => patch(index, { criteria: e.target.value })} />
-          )}
-          <input className={`${INPUT} !py-1.5`} maxLength={160} value={check.shortHint || ''} placeholder="Gợi ý ngắn khi sai. Không viết đáp án." onChange={(e) => patch(index, { shortHint: e.target.value })} />
-          <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_6rem]">
-            <input className={`${INPUT} !py-1.5`} maxLength={300} value={check.paidHint || ''} placeholder="Gợi ý rõ hơn, học viên phải đổi XP" onChange={(e) => patch(index, { paidHint: e.target.value })} />
-            <input type="number" min={0} max={50} className={`${INPUT} !py-1.5`} value={check.hintCostXp ?? 5} aria-label="XP gợi ý" onChange={(e) => patch(index, { hintCostXp: e.target.value })} />
-          </div>
-        </div>
-      ))}
-      {list.length < 6 && (
-        <button type="button" onClick={() => onChange([...list, emptyVideoCheck()])} className="text-[11px] font-black text-amber-800 !shadow-none">+ Thêm mốc</button>
-      )}
     </div>
   );
 }
@@ -1395,39 +1305,6 @@ function UnitVideosPanel({ unit, onSaved }) {
         {dirty && <span className="mr-auto text-[11px] font-bold text-amber-600">Có thay đổi chưa lưu</span>}
         <button type="button" onClick={save} disabled={!dirty || invalid || saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">
           {saving && <Loader2 size={13} className="animate-spin" />} Lưu danh sách video
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Bước luyện tập: câu hỏi của chặng, chia Dễ / Vừa / Khó khi học viên làm. */
-function QuizNodeConfig({ unit, onComposeQuestion, onAiDraft }) {
-  const counts = unit.counts || { easy: 0, medium: 0, hard: 0, total: 0 };
-  return (
-    <div className="space-y-2 rounded-xl bg-emerald-50/70 p-2.5 ring-1 ring-emerald-100">
-      <p className="text-[11px] font-semibold text-slate-600">Câu hỏi đã xếp vào chặng này. Học viên làm lần lượt Dễ, Vừa, Khó.</p>
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { key: 'easy', label: 'Dễ', n: counts.easy },
-          { key: 'medium', label: 'Vừa', n: counts.medium },
-          { key: 'hard', label: 'Khó', n: counts.hard },
-        ].map((row) => (
-          <div key={row.key} className="rounded-xl bg-white px-2 py-2 text-center ring-1 ring-emerald-100">
-            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{row.label}</p>
-            <p className="text-sm font-black text-slate-900">{row.n} câu</p>
-          </div>
-        ))}
-      </div>
-      {counts.total < MIN_UNIT_QUESTIONS && (
-        <p className="text-[11px] font-bold text-amber-700">Cần ít nhất {MIN_UNIT_QUESTIONS} câu đã xuất bản thì chặng hiện trên lộ trình.</p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => onAiDraft?.(unit.id)} className="cms-btn cms-btn-outline !py-1.5 text-xs">
-          <Bot size={14} /> AI tạo nháp
-        </button>
-        <button type="button" onClick={() => onComposeQuestion?.(unit.id)} className="cms-btn cms-btn-primary !py-1.5 text-xs">
-          <Plus size={14} /> Soạn câu hỏi
         </button>
       </div>
     </div>
@@ -1590,7 +1467,7 @@ function UnitStepVideosPanel({
 }
 
 /** Danh sách chặng của chủ đề: thứ tự mở khóa, số câu theo độ khó, gắn video. */
-function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, onChanged, onComposeQuestion, onAiDraft }) {
+function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, onChanged, onComposeQuestion, onAiDraft, onEditQuestion, questionsVersion = 0 }) {
   const toast = useToast();
   const [modal, setModal] = useState(null);
   const [targetUnitId, setTargetUnitId] = useState('');
@@ -1688,9 +1565,11 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                     <UnitPathNodesPanel
                       key={`${unit.id}-nodes-${JSON.stringify(unit.pathNodes || [])}`}
                       unit={unit}
+                      questionsVersion={questionsVersion}
                       onSaved={onChanged}
                       onComposeQuestion={onComposeQuestion}
                       onAiDraft={onAiDraft}
+                      onEditQuestion={onEditQuestion}
                     />
                     <details className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs">
                       <summary className="cursor-pointer font-bold text-slate-600">Ảnh chặng và video danh sách (tuỳ chọn)</summary>
@@ -1943,16 +1822,18 @@ export default function AdminDailyPracticeTab() {
                 units={units}
                 unassigned={unitData.topicId === topicId ? unitData.unassigned : 0}
                 filterUnitId={filters.unitId}
+                questionsVersion={questions.length}
                 onFilterUnit={(unitId) => setFilters((f) => ({ ...f, unitId }))}
                 onChanged={refreshAll}
-                onComposeQuestion={(unitId) => {
+                onComposeQuestion={(unitId, difficulty) => {
                   setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
-                  setQuestionModal({ defaultUnitId: unitId || '', lockUnit: Boolean(unitId) });
+                  setQuestionModal({ defaultUnitId: unitId || '', defaultDifficulty: difficulty || '', lockUnit: Boolean(unitId) });
                 }}
-                onAiDraft={(unitId) => {
+                onAiDraft={(unitId, difficulty) => {
                   setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
-                  setAiOpen({ defaultUnitId: unitId || '', lockUnit: Boolean(unitId) });
+                  setAiOpen({ defaultUnitId: unitId || '', defaultDifficulty: difficulty || '', lockUnit: Boolean(unitId) });
                 }}
+                onEditQuestion={(q) => setQuestionModal(q)}
               />
               <div className="space-y-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -2062,7 +1943,7 @@ export default function AdminDailyPracticeTab() {
         <QuestionModal
           topicId={topic.id}
           question={questionModal.id ? questionModal : null}
-          defaultDifficulty={filters.difficulty}
+          defaultDifficulty={questionModal.defaultDifficulty || filters.difficulty}
           units={units}
           defaultUnitId={questionModal.defaultUnitId ?? defaultUnitId}
           lockUnit={Boolean(questionModal.lockUnit)}
@@ -2073,12 +1954,12 @@ export default function AdminDailyPracticeTab() {
       {aiOpen && topic && (
         <AiModal
           topic={topic}
-          defaultDifficulty={filters.difficulty}
+          defaultDifficulty={aiOpen.defaultDifficulty || filters.difficulty}
           units={units}
           defaultUnitId={aiOpen.defaultUnitId ?? defaultUnitId}
           lockUnit={Boolean(aiOpen.lockUnit)}
           onClose={() => setAiOpen(null)}
-          onDone={() => { setAiOpen(null); setFilters((f) => ({ ...f, status: 'draft' })); loadTopics(); }}
+          onDone={() => { setAiOpen(null); setFilters((f) => ({ ...f, status: 'draft' })); refreshAll(); }}
         />
       )}
     </div>

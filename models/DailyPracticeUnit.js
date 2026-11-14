@@ -1,5 +1,50 @@
 const mongoose = require('mongoose');
 
+const videoCheckSchema = new mongoose.Schema({
+  atSec: { type: Number, default: 0 },
+  kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+  prompt: { type: String, default: '', trim: true, maxlength: 300 },
+  choices: { type: [String], default: [] },
+  answer: { type: String, default: '', trim: true, maxlength: 200 },
+  criteria: { type: String, default: '', trim: true, maxlength: 500 },
+  shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+  paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+  hintCostXp: { type: Number, default: 5 },
+}, { _id: true });
+
+const lessonFileSchema = new mongoose.Schema({
+  id: { type: String, default: '', trim: true, maxlength: 80 },
+  title: { type: String, default: '', trim: true, maxlength: 180 },
+  url: { type: String, default: '', trim: true, maxlength: 500 },
+  name: { type: String, default: '', trim: true, maxlength: 180 },
+  size: { type: Number, default: 0 },
+}, { _id: false });
+
+const levelSectionConfigSchema = new mongoose.Schema({
+  sectionOrder: {
+    type: [String],
+    default: () => ['content', 'file', 'video', 'practice'],
+  },
+  hiddenSections: { type: [String], default: [] },
+  sequentialSections: { type: Boolean, default: true },
+  content: {
+    title: { type: String, default: '', trim: true, maxlength: 160 },
+    description: { type: String, default: '', trim: true, maxlength: 320 },
+    body: { type: String, default: '', trim: true, maxlength: 15000 },
+  },
+  files: { type: [lessonFileSchema], default: [] },
+  video: {
+    title: { type: String, default: '', trim: true, maxlength: 160 },
+    url: { type: String, default: '', trim: true, maxlength: 500 },
+    antiSeek: { type: Boolean, default: true },
+    checks: { type: [videoCheckSchema], default: [] },
+  },
+  practice: {
+    title: { type: String, default: '', trim: true, maxlength: 160 },
+    description: { type: String, default: '', trim: true, maxlength: 320 },
+  },
+}, { _id: false });
+
 /** Chặng trong lộ trình luyện tập của một chủ đề (Học → Luyện → Thử thách → Kiểm tra chặng). */
 const dailyPracticeUnitSchema = new mongoose.Schema({
   topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeTopic', required: true },
@@ -50,6 +95,7 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
       icon: { type: String, default: 'dumbbell', trim: true, maxlength: 24 },
       sortOrder: { type: Number, default: 0 },
       active: { type: Boolean, default: true },
+      lockMode: { type: String, enum: ['sequential', 'unlocked', 'locked'], default: 'sequential' },
       stepVideos: {
         learn: {
           type: [{
@@ -126,6 +172,12 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
           }],
           default: [],
         },
+      },
+      /** Cấu hình 3 mức độ độc lập (Dễ, Vừa, Khó) với thứ tự 4 phần (Nội dung, File, Video, Luyện tập). */
+      levelConfigs: {
+        easy: { type: levelSectionConfigSchema, default: undefined },
+        medium: { type: levelSectionConfigSchema, default: undefined },
+        hard: { type: levelSectionConfigSchema, default: undefined },
       },
     }],
     default: undefined,

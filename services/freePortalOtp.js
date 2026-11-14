@@ -58,7 +58,8 @@ function renderOtpHtml(name, otp) {
 async function sendRegisterOtp({ name, email, phone, password }) {
   const displayName = String(name || '').trim();
   const rawEmail = String(email || '').trim().toLowerCase();
-  const canonicalPhone = normalizeVNPhone(phone);
+  const rawPhone = String(phone || '').trim();
+  const canonicalPhone = rawPhone ? normalizeVNPhone(rawPhone) : '';
 
   if (displayName.length < 2) {
     const err = new Error('Hãy nhập họ và tên');
@@ -70,7 +71,7 @@ async function sendRegisterOtp({ name, email, phone, password }) {
     err.status = 400;
     throw err;
   }
-  if (!canonicalPhone) {
+  if (rawPhone && !canonicalPhone) {
     const err = new Error('Số điện thoại không hợp lệ');
     err.status = 400;
     throw err;
@@ -81,16 +82,18 @@ async function sendRegisterOtp({ name, email, phone, password }) {
     throw err;
   }
 
-  // Kiểm tra trùng lặp số điện thoại
-  const existingPhone = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
-  if (existingPhone) {
-    const err = new Error(
-      existingPhone.freePortal === true
-        ? 'Số điện thoại này đã có tài khoản DewSkill. Hãy đăng nhập.'
-        : 'Số này thuộc học viên khóa học trung tâm. Hãy đăng nhập ở trang LMS.'
-    );
-    err.status = 409;
-    throw err;
+  // Kiểm tra trùng lặp số điện thoại (nếu có nhập SĐT)
+  if (canonicalPhone) {
+    const existingPhone = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
+    if (existingPhone) {
+      const err = new Error(
+        existingPhone.freePortal === true
+          ? 'Số điện thoại này đã có tài khoản DewSkill. Hãy đăng nhập.'
+          : 'Số này thuộc học viên khóa học trung tâm. Hãy đăng nhập ở trang LMS.'
+      );
+      err.status = 409;
+      throw err;
+    }
   }
 
   // Kiểm tra trùng lặp email
@@ -101,7 +104,10 @@ async function sendRegisterOtp({ name, email, phone, password }) {
     throw err;
   }
 
-  await assertUniqueContact({ phone: canonicalPhone, email: rawEmail });
+  await assertUniqueContact({
+    ...(canonicalPhone ? { phone: canonicalPhone } : {}),
+    email: rawEmail,
+  });
 
   // Kiểm tra tần suất gửi (cooldown 45 giây)
   const current = pendingRegistrations.get(rawEmail);
@@ -254,8 +260,7 @@ async function verifyOtpAndRegister({ email, otp, deviceFingerprint }) {
   // OTP chính xác! Tạo học viên chính thức trong DB
   const student = await Student.create({
     name: pending.name,
-    phone: pending.phone,
-    zalo: pending.phone,
+    ...(pending.phone ? { phone: pending.phone, zalo: pending.phone } : {}),
     email: pending.email,
     age: 18,
     password: pending.password,

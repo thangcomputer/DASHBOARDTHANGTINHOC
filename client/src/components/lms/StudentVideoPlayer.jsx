@@ -8,7 +8,6 @@ import {
   writeLmsMuted,
   writeLmsVolume,
 } from '../../utils/lmsPlayerPrefs';
-import { getPlayerCompletionBadgeText, LMS_PLAYER_PROGRESS_BADGE_CLASS } from '../../utils/lmsLessonUi';
 import { resolveEffectiveDuration } from '../../utils/antiSeekPolicy';
 import {
   readYouTubeDuration,
@@ -17,7 +16,11 @@ import {
 } from '../../utils/youtubeDuration';
 import { describeYouTubePlayerError } from '../../utils/youtubePlayerError';
 import { setStudyMediaPlaying } from '../../utils/learningGoal';
-import { buildYtBrandedPlayerVars, YT_IFRAME_CROP } from '../../../../shared/dailyPractice/lmsBrandedVideoPlayer.mjs';
+import {
+  buildYtBrandedPlayerVars,
+  disableYouTubeCaptions,
+  YT_IFRAME_CROP,
+} from '../../../../shared/dailyPractice/lmsBrandedVideoPlayer.mjs';
 // ─── Helper: Extract YouTube ID ──────────────────────────────────────────────
 export const extractYouTubeId = (url = '') => {
   if (!url) return '';
@@ -50,6 +53,7 @@ export const StudentVideoPlayer = ({
   playerApiRef = null,
   /** 'window': giao diện popup video lộ trình (màn chờ xám + nút đỏ lớn, ẩn nhãn tua/mở bài). */
   appearance = 'default',
+  chromeRightSlot = null,
 }) => {
   const requiredSecs = (d) => {
     const n = Number(d) || 0;
@@ -119,14 +123,6 @@ export const StudentVideoPlayer = ({
   const seekUnlocked = !antiSeekEnabled
     || lessonCompleted
     || (effectiveDuration > 0 && displayWatched >= requiredSecs(effectiveDuration) && displayWatched > 0);
-  const gateSatisfied = lessonCompleted
-    || (effectiveDuration > 0 && displayWatched >= requiredSecs(effectiveDuration));
-  const showPlayerHints = !isFullscreen
-    && appearance !== 'window'
-    && !overlayVisible
-    && !hasEnded
-    && effectiveDuration > 0
-    && !gateSatisfied;
   seekUnlockedRef.current = seekUnlocked;
 
   // Chỉ reset overlay khi đổi bài - không bật lại nút Play khi parent cập nhật tiến độ
@@ -288,6 +284,7 @@ export const StudentVideoPlayer = ({
               onWatchProgress?.(lessonId, actualWatchedRef.current, dur);
             }
             preferMaxYouTubeQuality(event.target);
+            disableYouTubeCaptions(event.target);
             applyLmsVolumeToPlayer(event.target, volumeRef.current, mutedRef.current);
             const iframe = event.target.getIframe?.();
             if (iframe) {
@@ -310,6 +307,10 @@ export const StudentVideoPlayer = ({
           },
           onStateChange: (event) => {
             handleStateChangeRef.current?.(event);
+          },
+          onApiChange: (event) => {
+            if (cancelled) return;
+            disableYouTubeCaptions(event?.target);
           },
           onPlaybackQualityChange: (event) => {
             if (cancelled) return;
@@ -455,6 +456,7 @@ export const StudentVideoPlayer = ({
   const handleStateChange = useCallback((event) => {
     const state = event.data;
     if (state === window.YT.PlayerState.PLAYING) {
+      disableYouTubeCaptions(event.target);
       setOverlayVisible(false);
       setIsPaused(false);
       setIsPlaying(true);
@@ -592,6 +594,7 @@ export const StudentVideoPlayer = ({
           maxSeekable={maxSeekableUi}
           antiSeekEnabled={antiSeekEnabled}
           seekUnlocked={seekUnlocked}
+          rightSlot={chromeRightSlot}
           volume={volume}
           muted={muted}
           onPlay={handlePlayClick}
@@ -672,28 +675,6 @@ export const StudentVideoPlayer = ({
           </div>
         ) : null}
       </div>
-      {showPlayerHints ? (
-        <div
-          className={`shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-slate-950 px-3 py-2 ${appearance === 'window' || isFullscreen ? '' : 'lg:rounded-b-2xl'
-            }`}
-        >
-          <span className={`text-[11px] px-2.5 py-1 rounded-md border font-bold ${antiSeekEnabled
-              ? 'bg-amber-500/15 text-amber-200 border-amber-500/30'
-              : 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
-            }`}
-          >
-            {antiSeekEnabled ? 'Chống tua đang bật' : 'Tua tự do'}
-          </span>
-          <span className={`text-[11px] px-2.5 py-1 rounded-md border font-bold ${LMS_PLAYER_PROGRESS_BADGE_CLASS}`}>
-            {getPlayerCompletionBadgeText({
-              lessonCompleted,
-              displayWatched,
-              effectiveDuration,
-              requiredWatchSecondsFn: requiredSecs,
-            })}
-          </span>
-        </div>
-      ) : null}
     </div>
   );
 };

@@ -746,6 +746,22 @@ async function lookupUser(rawId, requestedRole = null) {
   return lookupUserByPhone(rawId, requestedRole);
 }
 
+const LOGIN_EMAIL_RE = /^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/;
+
+async function lookupUserByEmail(value, requestedRole = null) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!LOGIN_EMAIL_RE.test(email)) return null;
+  if (requestedRole === 'student') {
+    const user = await Student.findOne({ email }).select('+password');
+    return user ? { user, role: 'student' } : null;
+  }
+  if (requestedRole === 'teacher') {
+    const user = await Teacher.findOne({ email }).select('+password');
+    return user ? { user, role: 'teacher' } : null;
+  }
+  return null;
+}
+
 // ─── POST /api/auth/login/public ─────────────────────────────────────────────
 // Cổng đăng nhập bằng số điện thoại cho HỌC VIÊN & GIẢNG VIÊN.
 router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), async (req, res) => {
@@ -755,11 +771,18 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     if (!rawId || !password) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại và mật khẩu' });
     }
-    const phone = normalizeVNPhone(rawId);
-    if (!phone || !['student', 'teacher'].includes(role)) {
+    const trimmedRawId = String(rawId || '').trim();
+    if (!['student', 'teacher'].includes(role)) {
       return res.status(401).json(INVALID_CREDENTIALS);
     }
-    const found = await lookupUser(phone, role);
+    let found = null;
+    if (LOGIN_EMAIL_RE.test(trimmedRawId)) {
+      found = await lookupUserByEmail(trimmedRawId, role);
+    } else {
+      const phone = normalizeVNPhone(trimmedRawId);
+      if (!phone) return res.status(401).json(INVALID_CREDENTIALS);
+      found = await lookupUser(phone, role);
+    }
     if (!found || ['admin', 'staff'].includes(found.role)) {
       return res.status(401).json(INVALID_CREDENTIALS);
     }
@@ -790,7 +813,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
         success: false,
         code: 'NEEDS_RE_ENROLL',
         redirect: '/dangkykhoahoc',
-        phone: normalizeVNPhone(user.phone) || phone,
+        phone: normalizeVNPhone(user.phone) || user.phone || '',
         message: 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.',
       });
     }
@@ -834,6 +857,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
           name: user.name,
           role: userRole,
           phone: normalizeVNPhone(user.phone) || user.phone || '',
+          email: user.email || '',
           status: user.status,
           course: user.course,
           remainingSessions: user.remainingSessions,
@@ -888,9 +912,15 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
       return res.status(400).json({ success: false, message: 'platform phải là android, ios hoặc web' });
     }
 
-    const phone = normalizeVNPhone(rawId);
-    if (!phone) return res.status(401).json(INVALID_CREDENTIALS);
-    const found = await lookupUser(phone, role);
+    const trimmedRawId = String(rawId || '').trim();
+    let found = null;
+    if (LOGIN_EMAIL_RE.test(trimmedRawId)) {
+      found = await lookupUserByEmail(trimmedRawId, role);
+    } else {
+      const phone = normalizeVNPhone(trimmedRawId);
+      if (!phone) return res.status(401).json(INVALID_CREDENTIALS);
+      found = await lookupUser(phone, role);
+    }
     if (!found || !['student', 'teacher'].includes(found.role)) {
       return res.status(401).json(INVALID_CREDENTIALS);
     }
@@ -917,7 +947,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
         success: false,
         code: 'NEEDS_RE_ENROLL',
         redirect: '/dangkykhoahoc',
-        phone: normalizeVNPhone(user.phone) || phone,
+        phone: normalizeVNPhone(user.phone) || user.phone || '',
         message: 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.',
       });
     }
@@ -983,6 +1013,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
           name: user.name,
           role: userRole,
           phone: normalizeVNPhone(user.phone) || user.phone || '',
+          email: user.email || '',
           status: user.status,
           course: user.course,
           remainingSessions: user.remainingSessions,
@@ -1912,13 +1943,21 @@ const otpStore = new Map(); // "phone:role" → { otp, expiresAt, userId, userNa
  */
 router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('forgot_password_request'), async (req, res) => {
   try {
-    const { phone, role } = req.body;
-    const canonicalPhone = normalizeVNPhone(phone);
-    if (!canonicalPhone || !['student', 'teacher'].includes(role)) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+    const { identifier, phone, email, role } = req.body || {};
+    const rawContact = String(identifier ?? phone ?? email ?? '').trim();
+    if (!['student', 'teacher'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Vai trò không hợp lệ' });
     }
-    const found = await lookupUser(canonicalPhone, role);
+    const isEmail = LOGIN_EMAIL_RE.test(rawContact);
+    const canonicalPhone = isEmail ? '' : normalizeVNPhone(rawContact);
+    if (!isEmail && !canonicalPhone) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại hoặc Gmail không hợp lệ' });
+    }
+    const found = isEmail
+      ? await lookupUserByEmail(rawContact, role)
+      : await lookupUser(canonicalPhone, role);
     const user = found?.user || null;
+    const contactDisplay = isEmail ? rawContact.toLowerCase() : maskPhone(canonicalPhone);
 
     // Tạo thông báo cho Admin
     if (user) try {
@@ -1926,7 +1965,7 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('
       await Notification.create({
         type: 'SYSTEM',
         title: 'Yêu cầu cấp lại mật khẩu',
-        content: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${maskPhone(canonicalPhone)}) đang yêu cầu cấp lại mật khẩu. Vui lòng xử lý qua quy trình OTP.`,
+        content: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${contactDisplay}) đang yêu cầu cấp lại mật khẩu. Vui lòng xử lý qua quy trình OTP.`,
         receivers: ['ALL_ADMIN'], // Chỉ admin nhận được
         payload: { userId: user._id, role: role, action: 'RESET_PASSWORD', userName: user.name }
       });
@@ -1934,7 +1973,7 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('
         global.io.to('ALL_ADMIN').emit('RECEIVE_NOTIFICATION', {
           type: 'system',
           title: 'Yêu cầu cấp lại mật khẩu',
-          message: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${maskPhone(canonicalPhone)}) đang yêu cầu cấp lại mật khẩu.`,
+          message: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${contactDisplay}) đang yêu cầu cấp lại mật khẩu.`,
           time: new Date(),
           read: false,
         });
@@ -1946,7 +1985,7 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('
 
     return res.status(202).json({
       success: true,
-      message: 'Nếu số điện thoại hợp lệ và đã đăng ký, yêu cầu sẽ được chuyển đến quản trị viên.',
+      message: 'Nếu thông tin hợp lệ và đã đăng ký, yêu cầu sẽ được chuyển đến quản trị viên.',
     });
   } catch (error) {
     logger.error('[AUTH] forgot-password/request error:', error);
@@ -2287,7 +2326,8 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     const { name, age, phone, password, email } = req.body || {};
     const displayName = String(name || '').trim();
     const parsedAge = freePortalSocial.parseAge(age);
-    const canonicalPhone = normalizeVNPhone(phone);
+    const rawPhone = String(phone || '').trim();
+    const canonicalPhone = rawPhone ? normalizeVNPhone(rawPhone) : '';
     const rawEmail = String(email || '').trim().toLowerCase();
     if (displayName.length < 2) {
       return res.status(400).json({ success: false, message: 'Hãy nhập họ tên' });
@@ -2295,25 +2335,42 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     if (!parsedAge) {
       return res.status(400).json({ success: false, message: 'Tuổi từ 10 đến 80' });
     }
-    if (!canonicalPhone) {
+    if (!rawPhone && !rawEmail) {
+      return res.status(400).json({ success: false, message: 'Hãy nhập số điện thoại hoặc email' });
+    }
+    if (rawPhone && !canonicalPhone) {
       return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
     }
     if (!password || String(password).length < 6) {
       return res.status(400).json({ success: false, message: 'Mật khẩu cần ít nhất 6 ký tự' });
     }
-    if (rawEmail && !/^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(rawEmail)) {
+    if (rawEmail && !LOGIN_EMAIL_RE.test(rawEmail)) {
       return res.status(400).json({ success: false, message: 'Địa chỉ email không hợp lệ' });
     }
-    const existing = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
-    if (existing) {
-      if (existing.freePortal === true) {
-        return res.status(409).json({ success: false, message: 'Số điện thoại đã có tài khoản miễn phí. Hãy đăng nhập.' });
+    if (canonicalPhone) {
+      const existing = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
+      if (existing) {
+        if (existing.freePortal === true) {
+          return res.status(409).json({ success: false, message: 'Số điện thoại đã có tài khoản miễn phí. Hãy đăng nhập.' });
+        }
+        return res.status(409).json({ success: false, message: 'Số này đã thuộc học viên trung tâm. Hãy đăng nhập ở trang trung tâm.' });
       }
-      return res.status(409).json({ success: false, message: 'Số này đã thuộc học viên trung tâm. Hãy đăng nhập ở trang trung tâm.' });
+    }
+    if (rawEmail) {
+      const existingByEmail = await Student.findOne({ email: rawEmail });
+      if (existingByEmail) {
+        if (existingByEmail.freePortal === true) {
+          return res.status(409).json({ success: false, message: 'Email đã có tài khoản miễn phí. Hãy đăng nhập.' });
+        }
+        return res.status(409).json({ success: false, message: 'Email này đã thuộc học viên trung tâm. Hãy đăng nhập.' });
+      }
     }
     try {
       const { assertUniqueContact } = require('../utils/uniqueContact');
-      await assertUniqueContact({ phone: canonicalPhone, ...(rawEmail ? { email: rawEmail } : {}) });
+      await assertUniqueContact({
+        ...(canonicalPhone ? { phone: canonicalPhone } : {}),
+        ...(rawEmail ? { email: rawEmail } : {}),
+      });
     } catch (dupErr) {
       if (dupErr.status === 409) {
         return res.status(409).json({ success: false, message: dupErr.message });
@@ -2322,8 +2379,7 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     }
     await Student.create({
       name: displayName,
-      phone: canonicalPhone,
-      zalo: canonicalPhone,
+      ...(canonicalPhone ? { phone: canonicalPhone, zalo: canonicalPhone } : {}),
       ...(rawEmail ? { email: rawEmail } : {}),
       age: parsedAge,
       password,

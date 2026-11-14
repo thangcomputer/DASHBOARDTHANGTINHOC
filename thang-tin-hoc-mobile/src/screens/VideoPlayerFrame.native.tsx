@@ -128,6 +128,13 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
     try{const q=player.getPlaybackQuality();if(q&&q!=='unknown')return String(q);}catch(_){}
     return 'default';
   }
+  function disableCaptions(){
+    if(!player)return;
+    try{player.unloadModule&&player.unloadModule('captions');}catch(_){}
+    try{player.unloadModule&&player.unloadModule('cc');}catch(_){}
+    try{player.setOption&&player.setOption('captions','track',{});}catch(_){}
+    try{player.setOption&&player.setOption('cc','track',{});}catch(_){}
+  }
   function preferMaxQuality(){
     if(!player||preferredMaxOnce) return;
     preferredMaxOnce=true;
@@ -275,11 +282,25 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
           applyVolume(initialVolume,initialMuted);
           if(!completed&&initialMaxPosition>0)event.target.seekTo(initialMaxPosition,true);
           preferMaxQuality();
+          disableCaptions();
           poll();
+        },
+        onApiChange:function(){
+          disableCaptions();
         },
         onStateChange:function(event){
           playing=event.data===window.YT.PlayerState.PLAYING;
-          if(playing) preferMaxQuality();
+          if(playing){
+            preferMaxQuality();
+            disableCaptions();
+          }
+          if(event.data===window.YT.PlayerState.ENDED&&!completed&&!pending){
+            thresholdReached=true;
+            pending=true;
+            send({type:'progress',currentTime:player.getDuration()||0,duration:player.getDuration()||0,watchedSeconds:player.getDuration()||0,completed:false,playing:false,eligible:true});
+            retryAt=Date.now()+5000;
+            setTimeout(function(){pending=false;},5000);
+          }
         },
         onError:function(event){send({type:'error',message:Number(event&&event.data)===153?'YouTube không nhận được địa chỉ tham chiếu để phát video. Hãy cập nhật ứng dụng hoặc mở video trên YouTube.':'Không thể phát video YouTube này.'});}
       }});
@@ -351,6 +372,7 @@ export function VideoPlayerFrame({
   brandedChrome = true,
   appearance = 'default',
   chromeBg,
+  chromeRightSlot = null,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -366,6 +388,7 @@ export function VideoPlayerFrame({
   appearance?: 'default' | 'window';
   /** Nền vùng video (popup #23262E) — veil khớp màu, không lộ viền YT. */
   chromeBg?: string;
+  chromeRightSlot?: React.ReactNode;
 }) {
   const surfaceBg = chromeBg || YT_IFRAME_CROP.playerBg;
   const webViewRef = useRef<WebView>(null);
@@ -651,6 +674,7 @@ export function VideoPlayerFrame({
           showQuality={isYouTube}
           isFullscreen={isFullscreen}
           onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
+          rightSlot={chromeRightSlot}
         />
       ) : null}
       {playerError ? (

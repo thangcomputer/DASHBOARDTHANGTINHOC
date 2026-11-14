@@ -6,6 +6,8 @@ const dailyPracticePathProgressSchema = new mongoose.Schema({
   topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeTopic', required: true },
   unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeUnit', required: true },
   completedSteps: { type: [String], default: [] },
+  /** Tiến độ từng phần học: `${nodeKey}:${difficulty}:${sectionKey}` (ví dụ bai-1:easy:content). */
+  completedSections: { type: [String], default: [] },
   watchedVideoIds: { type: [String], default: [] },
   /** Mốc video đã qua: `${videoId}:${checkId}`. */
   passedVideoChecks: { type: [String], default: [] },

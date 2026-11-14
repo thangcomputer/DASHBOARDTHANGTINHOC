@@ -638,27 +638,8 @@ export function CourseVideosScreen() {
     return () => { alive = false; };
   }, [relatedKey]);
   const unitRelatedTopics = relatedTopics.key === relatedKey ? relatedTopics.rows : [];
-  // Cùng vị trí với web: dải gợi ý luôn nằm ngay trên thanh điều hướng đáy bài học.
-  const relatedStrip = unitRelatedTopics.length ? (
-    <View style={styles.relatedTopics}>
-      <Gamepad2 size={15} color="#92400E" />
-      <Text style={styles.relatedTopicsTitle}>Luyện tập chủ đề liên quan:</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedTopicsRow}>
-        {unitRelatedTopics.map((topic) => (
-          <Pressable
-            key={topic.id}
-            onPress={() => openRelatedTopic(topic.id)}
-            style={styles.relatedTopicChip}
-            accessibilityRole="button"
-            accessibilityLabel={`Luyện tập ${topic.name}`}
-          >
-            <Gamepad2 size={13} color={theme.brand} />
-            <Text numberOfLines={1} style={styles.relatedTopicText}>{topic.name}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
-  ) : null;
+  // Đã ẩn dải "Luyện tập chủ đề liên quan" theo yêu cầu.
+  const relatedStrip = null;
   const openRelatedTopic = (topicId: string) => {
     // Modal bài học nằm trên mọi màn hình - đóng trước khi chuyển sang luyện tập.
     setSelectedCourse(null);
@@ -2012,7 +1993,6 @@ function VideoLessonPane({
           />
         ) : (
           <View style={styles.videoStartOverlay}>
-            <View style={styles.videoBrandBadge}><Text style={styles.videoBrandText}>Thắng Tin Học</Text></View>
             <Pressable
               onPress={startVideo}
               disabled={!url}

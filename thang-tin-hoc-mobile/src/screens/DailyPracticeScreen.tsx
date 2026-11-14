@@ -66,6 +66,7 @@ import { PLAY_QUESTION_CHROME } from '../../../shared/dailyPractice/playQuestion
 import { VietnamJourneyStage } from '../components/dailyPractice/VietnamJourneyStage';
 import { LevelUnlockBanner } from '../components/dailyPractice/LevelUnlockBanner';
 import { useNewlyUnlockedUnit } from '../components/dailyPractice/useNewlyUnlockedUnit';
+import MilestoneHubModal from '../components/dailyPractice/MilestoneHubModal';
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
@@ -767,6 +768,78 @@ const STEP_HINTS: Partial<Record<DpStepKey, string>> = {
   challenge: 'Câu hỏi mức khó - qua cấp này để mở chặng tiếp theo',
 };
 
+const VIDEO_DIFF_META: Array<{ key: 'easy' | 'medium' | 'hard'; step: string; label: string }> = [
+  { key: 'easy', step: 'learn', label: 'Dễ' },
+  { key: 'medium', step: 'practice', label: 'Vừa' },
+  { key: 'hard', step: 'challenge', label: 'Khó' },
+];
+const VIDEO_DEFAULT_ORDER: DpSectionKey[] = ['content', 'file', 'video', 'practice'];
+
+function collectNodeVideos(unit: DpPathUnit, node: DpPathNode): DpPathVideo[] {
+  const completedSet = new Set(unit.completedSections || []);
+  const watchedSet = new Set(unit.watchedVideoIds || []);
+  const nodeUnlocked = unit.state !== 'locked' && node.state !== 'locked';
+  const isLevelDone = (diff: 'easy' | 'medium' | 'hard') => {
+    const cfg = node.levelConfigs?.[diff];
+    const hidden = new Set(cfg?.hiddenSections || []);
+    const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : VIDEO_DEFAULT_ORDER)
+      .filter((k) => !hidden.has(k));
+    return !order.length || order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
+  };
+  const easyDone = isLevelDone('easy');
+  const mediumDone = isLevelDone('medium');
+
+  const items: DpPathVideo[] = [];
+  const seenUrls = new Set<string>();
+  const hasLevelConfigVideo = VIDEO_DIFF_META.some((d) => Boolean(node.levelConfigs?.[d.key]?.video?.url));
+
+  for (const d of VIDEO_DIFF_META) {
+    const cfg = node.levelConfigs?.[d.key];
+    const vid = cfg?.video;
+    if (!vid?.url) continue;
+    const hidden = new Set(cfg?.hiddenSections || []);
+    if (hidden.has('video')) continue;
+    const diffUnlocked = Boolean(unit.testedOut) || d.key === 'easy'
+      || (d.key === 'medium' && easyDone)
+      || (d.key === 'hard' && easyDone && mediumDone);
+    const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : VIDEO_DEFAULT_ORDER)
+      .filter((k) => !hidden.has(k));
+    const idx = order.indexOf('video');
+    const seqUnlocked = Boolean(unit.testedOut) || cfg?.sequentialSections === false
+      || idx <= 0
+      || order.slice(0, idx).every((secKey) => completedSet.has(`${node.key}:${d.key}:${secKey}`));
+    const unlocked = nodeUnlocked && diffUnlocked && seqUnlocked;
+    const id = `${node.key}:level:${d.key}`;
+    const watched = completedSet.has(`${node.key}:${d.key}:video`) || watchedSet.has(id);
+    seenUrls.add(String(vid.url).trim());
+    items.push({
+      id,
+      title: vid.title || `${node.label} (${d.label})`,
+      url: unlocked ? vid.url : '',
+      stepLabel: d.label,
+      state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
+    });
+  }
+
+  for (const level of node.levels || []) {
+    const mappedDiff = VIDEO_DIFF_META.find((d) => d.step === level.key)?.key;
+    if (hasLevelConfigVideo && (node.kind === 'study' || Boolean(mappedDiff && node.levelConfigs?.[mappedDiff]?.video?.url))) {
+      continue;
+    }
+    for (const video of level.videos || []) {
+      if (!video?.id) continue;
+      if (video.url && seenUrls.has(String(video.url).trim())) continue;
+      const unlocked = nodeUnlocked && level.state !== 'locked';
+      items.push({
+        ...video,
+        state: !unlocked ? 'locked' : video.state,
+        stepLabel: video.stepLabel || level.label || '',
+      });
+    }
+  }
+  return items;
+}
+
 /** Danh sách video của chặng (unit + từng cấp) để hiện & mở video. */
 export function collectUnitVideos(unit: DpPathUnit): DpPathVideo[] {
   const items: DpPathVideo[] = [];
@@ -778,10 +851,8 @@ export function collectUnitVideos(unit: DpPathUnit): DpPathVideo[] {
   };
   for (const video of unit.videos || []) push(video);
   for (const node of unit.pathNodes || []) {
-    for (const level of node.levels || []) {
-      for (const video of level.videos || []) {
-        push({ ...video, stepLabel: video.stepLabel || level.label || '' });
-      }
+    for (const video of collectNodeVideos(unit, node)) {
+      push(video);
     }
   }
   return items;
@@ -823,18 +894,15 @@ export function continueStageTarget(topic?: DpTopicPath | null): { topicId: stri
   const resolveUnitVideo = (unit: DpPathUnit, preferNodeKey = '') => {
     if (!unit || unit.state === 'locked') return null;
 
-    if (preferNodeKey && Array.isArray(unit.pathNodes)) {
-      const activeNode = unit.pathNodes.find((n) => n.key === preferNodeKey);
+    if (Array.isArray(unit.pathNodes)) {
+      const activeNode = (preferNodeKey && unit.pathNodes.find((n) => n.key === preferNodeKey))
+        || unit.pathNodes.find((n) => n.state === 'active');
       if (activeNode) {
-        const nodeVideos: DpUnitVideo[] = [];
-        for (const level of activeNode.levels || []) {
-          for (const v of level.videos || []) {
-            if (v && v.id) nodeVideos.push({ ...v, stepLabel: v.stepLabel || level.label || '' });
-          }
-        }
+        const nodeVideos = collectNodeVideos(unit, activeNode);
         const pendingInNode = nodeVideos.find((v) => v.state !== 'completed' && v.state !== 'locked');
         if (pendingInNode) return { unit, videoId: pendingInNode.id };
-        if (nodeVideos.length > 0) return { unit, videoId: nodeVideos[0].id };
+        const unlockedInNode = nodeVideos.find((v) => v.state !== 'locked');
+        if (unlockedInNode) return { unit, videoId: unlockedInNode.id };
       }
     }
 
@@ -842,7 +910,8 @@ export function continueStageTarget(topic?: DpTopicPath | null): { topicId: stri
     const pending = videos.find((v) => v.state !== 'completed' && v.state !== 'locked');
     if (pending) return { unit, videoId: pending.id };
     if (unit.lesson) return { unit, videoId: '' };
-    if (videos.length > 0) return { unit, videoId: videos[0].id };
+    const firstUnlocked = videos.find((v) => v.state !== 'locked');
+    if (firstUnlocked) return { unit, videoId: firstUnlocked.id };
     return null;
   };
 
@@ -1030,17 +1099,38 @@ function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { fro
 }
 
 /** Một nút trên lộ trình - nút tròn 3D vàng kim + icon trắng + 3 chấm + sao viền theo mẫu thiết kế. */
-function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0 }: {
+function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0, completedSections = [] }: {
   node: DpPathNode;
   color: { from: string; to: string };
   isNext: boolean;
   selected: boolean;
   onPress: () => void;
   nodeIndex?: number;
+  completedSections?: string[];
 }) {
   const locked = node.state === 'locked';
   const done = node.state === 'completed';
   const levels = node.levels || [];
+  const completedSet = new Set(completedSections || []);
+  const LEVEL_DOTS: Array<{ diff: 'easy' | 'medium' | 'hard'; color: string }> = [
+    { diff: 'easy', color: '#22C55E' },
+    { diff: 'medium', color: '#F97316' },
+    { diff: 'hard', color: '#EF4444' },
+  ];
+  const isDotDone = (i: number) => {
+    if (done) return true;
+    const isStudy = node.kind === 'study' || node.icon === 'book';
+    if (isStudy) {
+      const diff = LEVEL_DOTS[i].diff;
+      const cfg = node.levelConfigs?.[diff];
+      const hidden = new Set(cfg?.hiddenSections || []);
+      const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length
+        ? cfg.sectionOrder
+        : ['content', 'file', 'video', 'practice']).filter((k) => !hidden.has(k));
+      return order.length > 0 && order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
+    }
+    return levels[i]?.state === 'completed';
+  };
   const size = PATH_HUB_DUO.buttonSize.mobile;
   const progress = pathHubNodeProgress(node);
   const progressColor = pathHubProgressColor(node, progress, color);
@@ -1086,17 +1176,18 @@ function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0
           <HubIcon size={26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={PATH_HUB_DUO.iconStroke} />
           {!locked ? (
             <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
-              {[0, 1, 2].map((i) => {
-                const lvl = levels[i];
-                const isDoneOrActive = lvl ? (lvl.state === 'completed' || lvl.state === 'active') : true;
+              {LEVEL_DOTS.map((dot, i) => {
+                const dotDone = isDotDone(i);
                 return (
                   <View
-                    key={i}
+                    key={dot.diff}
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: isDoneOrActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.95)',
+                      backgroundColor: dotDone ? dot.color : '#94A3B8',
                     }}
                   />
                 );
@@ -2282,9 +2373,10 @@ function PathView({
   const { user } = useAuth();
   const [topicId, setTopicId] = useState('');
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  const [videoOpen, setVideoOpen] = useState<{ unit: DpPathUnit; videoId: string } | null>(null);
+  const [videoOpen, setVideoOpen] = useState<{ unit: DpPathUnit; videoId: string; singleVideoOnly?: boolean } | null>(null);
   const [roadmapOpen, setRoadmapOpen] = useState<DpPathUnit | null>(null);
   const [lessonOpen, setLessonOpen] = useState<{ unit: DpPathUnit; step: DpPathStep } | null>(null);
+  const [milestoneOpen, setMilestoneOpen] = useState<{ unitId: string; nodeKey: string } | null>(null);
   const [trophyCeremonyOpen, setTrophyCeremonyOpen] = useState(false);
   const targetAppliedRef = useRef(false);
 
@@ -2379,6 +2471,12 @@ function PathView({
   };
   const toggleHub = (unit: DpPathUnit, nodeKey: string) => {
     play('tap');
+    const node = unit.pathNodes?.find((n) => n.key === nodeKey);
+    if (node && (node.kind === 'study' || node.icon === 'book')) {
+      setPopover(null);
+      setMilestoneOpen({ unitId: unit.id, nodeKey });
+      return;
+    }
     setPopover((prev) => (prev && prev.unitId === unit.id && !prev.testOut && prev.nodeKey === nodeKey ? null : { unitId: unit.id, nodeKey, testOut: false }));
   };
   const openUnitStageAction = (unit: DpPathUnit, isNextUnit: boolean) => {
@@ -2391,6 +2489,12 @@ function PathView({
     } else {
       const active = unit.pathNodes?.find((n) => n.state === 'active');
       nodeKey = active?.key || unit.pathNodes?.[0]?.key || 'study';
+    }
+    const node = unit.pathNodes?.find((n) => n.key === nodeKey);
+    if (node && (node.kind === 'study' || node.icon === 'book')) {
+      setPopover(null);
+      setMilestoneOpen({ unitId: unit.id, nodeKey });
+      return;
     }
     setPopover({ unitId: unit.id, nodeKey, testOut: false });
   };
@@ -2491,6 +2595,7 @@ function PathView({
                               isNext={hubNext}
                               selected={Boolean(hubSelected)}
                               nodeIndex={index}
+                              completedSections={unit.completedSections}
                               onPress={() => toggleHub(unit, item.node.key)}
                             />
                           </View>
@@ -2552,6 +2657,31 @@ function PathView({
         ) : null
       }
       {
+        milestoneOpen && current ? (() => {
+          const mUnit = current.units.find((u) => u.id === milestoneOpen.unitId) || null;
+          const mNodes = mUnit?.pathNodes || [];
+          const mIdx = mNodes.findIndex((n) => n.key === milestoneOpen.nodeKey);
+          const mNode = mIdx >= 0 ? mNodes[mIdx] : null;
+          return (
+            <MilestoneHubModal
+              visible={Boolean(mUnit && mNode)}
+              unit={mUnit}
+              node={mNode}
+              milestoneIndex={mIdx >= 0 ? mIdx : 0}
+              onClose={() => setMilestoneOpen(null)}
+              onProgressChanged={onPathChanged}
+              onOpenVideo={(targetUnit, videoId) => setVideoOpen({ unit: targetUnit, videoId, singleVideoOnly: true })}
+              onStartPractice={(stepKey) => {
+                if (!mUnit || !mNode) return;
+                const practiceNodeKey = mNode.key || 'study';
+                setMilestoneOpen(null);
+                onStartStep(mUnit.id, practiceNodeKey, stepKey || 'learn', false);
+              }}
+            />
+          );
+        })() : null
+      }
+      {
         lessonOpen ? (
           <PathLessonModal
             unit={lessonOpen.unit}
@@ -2573,8 +2703,13 @@ function PathView({
             onClose={() => setRoadmapOpen(null)}
             onPickNode={(nodeKey) => {
               const unit = roadmapOpen;
+              const pickedNode = unit.pathNodes?.find((n) => n.key === nodeKey);
               setRoadmapOpen(null);
-              setPopover({ unitId: unit.id, nodeKey, testOut: false });
+              if (pickedNode && (pickedNode.kind === 'study' || pickedNode.icon === 'book')) {
+                setMilestoneOpen({ unitId: unit.id, nodeKey });
+              } else {
+                setPopover({ unitId: unit.id, nodeKey, testOut: false });
+              }
             }}
             onOpenVideo={() => {
               const unit = roadmapOpen;
@@ -2591,6 +2726,7 @@ function PathView({
           <PathVideoModal
             unit={videoOpen.unit}
             initialVideoId={videoOpen.videoId}
+            singleVideoOnly={Boolean(videoOpen.singleVideoOnly)}
             color={unitColor(videoOpen.unit.index)}
             userId={String(user?.id || '')}
             play={play}
@@ -2881,14 +3017,40 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
   const { user } = useAuth();
   const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const notEnough = xpTotal < stakeXp;
+  const COUNTDOWN_MS = 3000;
+  const [remainingMs, setRemainingMs] = useState(COUNTDOWN_MS);
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
+  const triggeredRef = useRef(false);
+
+  useEffect(() => {
+    if (notEnough || busy) return undefined;
+    triggeredRef.current = false;
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      const left = Math.max(0, COUNTDOWN_MS - (Date.now() - startedAt));
+      setRemainingMs(left);
+      if (left <= 0 && !triggeredRef.current) {
+        triggeredRef.current = true;
+        clearInterval(timer);
+        play('win');
+        onConfirmRef.current();
+      }
+    }, 50);
+    return () => clearInterval(timer);
+  }, [notEnough, busy, play]);
+
+  const pct = Math.max(0, Math.min(100, (remainingMs / COUNTDOWN_MS) * 100));
+  const secLeft = Math.max(1, Math.ceil(remainingMs / 1000));
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.quitBackdrop}>
-        <View style={[styles.quitCard, { maxWidth: 400 }]}>
-          <View style={[styles.quitHero, { backgroundColor: '#FFFBEB' }]}>
-            <Mascot mood={notEnough ? 'thinking' : 'happy'} size={86} />
+        <View style={[styles.quitCard, { maxWidth: 380, borderRadius: 26, borderWidth: 1, borderColor: '#D1FAE5' }]}>
+          <View style={[styles.quitHero, { backgroundColor: '#ECFDF5', paddingBottom: 14 }]}>
+            <Mascot mood={notEnough ? 'thinking' : 'determined'} size={86} />
             <Text style={styles.quitTitle}>
-              {notEnough ? 'Không đủ XP để làm bài' : testOut ? 'Kiểm tra vượt chặng' : 'Sẵn sàng vào bài tập?'}
+              {notEnough ? 'Không đủ XP để làm bài' : testOut ? 'Kiểm tra vượt chặng' : 'Chuẩn bị vào luyện tập'}
             </Text>
             {notEnough ? (
               <>
@@ -2901,16 +3063,15 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
                 </View>
               </>
             ) : (
-              <View style={styles.stakeGrid2Col}>
-                <View style={styles.stakeColBox}>
-                  <Text style={styles.statLabel}>Mức cược lượt này</Text>
-                  <Text style={styles.stakeColValue}>{`5 XP/câu · tối đa ${stakeXp}`}</Text>
+              <>
+                <Text style={[styles.quitText, { marginTop: 4 }]}>
+                  {`Mỗi câu 5 XP: sai trừ ngay. Đạt % yêu cầu mới nhận +5 XP/câu đúng.`}
+                </Text>
+                <View style={[styles.quitProgress, { marginTop: 10 }]}>
+                  <Zap size={13} color="#D97706" fill="#FCD34D" />
+                  <Text style={styles.quitProgressText}>{`5 XP/câu · tối đa ${stakeXp} XP · đang có ${xpTotal}`}</Text>
                 </View>
-                <View style={styles.stakeColBox}>
-                  <Text style={styles.statLabel}>Ví XP hiện có</Text>
-                  <Text style={styles.stakeColValue}>{`${xpTotal} XP`}</Text>
-                </View>
-              </View>
+              </>
             )}
           </View>
           {notEnough ? (
@@ -2932,29 +3093,30 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
               />
             </View>
           ) : (
-            <View style={[styles.row, { padding: spacing.lg, gap: 12 }]}>
-              <View style={styles.flex}>
-                <DuoButton
-                  variant="secondary"
-                  size="md"
-                  fullWidth
-                  text="Để sau"
-                  disabled={busy}
-                  onPress={onCancel}
-                />
+            <View style={{ padding: spacing.lg, gap: 12 }}>
+              <View style={{ backgroundColor: '#ECFDF5', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#D1FAE5', gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#065F46' }}>
+                    {busy || remainingMs <= 0 ? 'Đang vào bài luyện…' : 'Tự động vào luyện sau'}
+                  </Text>
+                  <View style={{ backgroundColor: isBrandStudent ? '#EF4444' : '#059669', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF' }}>
+                      {remainingMs <= 0 ? '0s' : `${secLeft}s`}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ height: 10, borderRadius: 999, backgroundColor: '#D1FAE5', overflow: 'hidden' }}>
+                  <View style={{ height: '100%', width: `${pct}%`, borderRadius: 999, backgroundColor: '#10B981' }} />
+                </View>
               </View>
-              <View style={styles.flex}>
-                <DuoButton
-                  variant={isBrandStudent ? 'danger' : 'primary'}
-                  size="md"
-                  fullWidth
-                  text="Bắt đầu"
-                  icon={busy ? undefined : <Play size={16} color="#FFFFFF" />}
-                  loading={busy}
-                  disabled={busy}
-                  onPress={onConfirm}
-                />
-              </View>
+              <DuoButton
+                variant="secondary"
+                size="md"
+                fullWidth
+                text="Để sau"
+                disabled={busy}
+                onPress={onCancel}
+              />
             </View>
           )}
         </View>

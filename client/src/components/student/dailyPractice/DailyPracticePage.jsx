@@ -867,22 +867,38 @@ function StakeSessionConfirm({
   const isStart = variant === 'start';
   const notEnoughXp = typeof xpTotal === 'number' && xpTotal < stakeXp;
   const isBlockedFreeTestOut = testOut && testOutLocked;
-  const [burst, setBurst] = useState(false);
+  const canAutoStart = !isBlockedFreeTestOut && !notEnoughXp;
+  const COUNTDOWN_MS = 3000;
+  const [remainingMs, setRemainingMs] = useState(COUNTDOWN_MS);
+  const onGoRef = useRef(onGo);
+  onGoRef.current = onGo;
+  const triggeredRef = useRef(false);
   const titleId = isStart ? 'dp-stake-start-title' : 'dp-rematch-title';
   useEffect(() => { gameSounds.pick(); }, []);
   useEffect(() => {
-    if (!burst) return undefined;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const timer = window.setTimeout(() => onGo(), reduce ? 60 : 880);
-    return () => window.clearTimeout(timer);
-  }, [burst, onGo]);
+    if (!canAutoStart || starting) return undefined;
+    triggeredRef.current = false;
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const left = Math.max(0, COUNTDOWN_MS - elapsed);
+      setRemainingMs(left);
+      if (left <= 0 && !triggeredRef.current) {
+        triggeredRef.current = true;
+        window.clearInterval(timer);
+        gameSounds.win();
+        onGoRef.current?.();
+      }
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [canAutoStart, starting]);
   useEffect(() => {
     const onKey = (event) => {
-      if (event.key === 'Escape' && !starting && !burst) onStay();
+      if (event.key === 'Escape' && !starting) onStay();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onStay, starting, burst]);
+  }, [onStay, starting]);
 
   let title = 'Bắt đầu lượt luyện?';
   let body = '';
@@ -893,70 +909,80 @@ function StakeSessionConfirm({
     title = 'Không đủ XP để làm bài';
     body = `Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet (+300 XP/ngày) để tiếp tục!`;
   } else if (isStart) {
-    title = testOut ? 'Cược để vượt chặng?' : 'Cược XP trước khi làm?';
+    title = testOut ? 'Cược để vượt chặng?' : 'Chuẩn bị vào luyện tập';
     body = testOut
       ? `Đặt ${stakeXp} XP. Đạt đủ điểm thì vượt chặng và nhận lại XP. Không đạt hoặc thoát giữa chừng thì mất trắng.`
-      : `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay. Đạt % yêu cầu mới nhận +${QUESTION_STAKE_XP}/câu đúng; không đạt thì không nhận XP câu đúng.`;
+      : `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay. Đạt % yêu cầu mới nhận +${QUESTION_STAKE_XP} XP/câu đúng.`;
   } else {
     title = 'Cược lại một lần nữa?';
-    body = `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay. Đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`;
+    body = `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay. Đạt % yêu cầu mới nhận +${QUESTION_STAKE_XP} XP/câu đúng.`;
   }
 
-  const primaryLabel = isStart
-    ? (testOut ? `Cược ${stakeXp} XP` : 'Bắt đầu')
-    : 'Làm lại';
-  const PrimaryIcon = isStart ? Play : RotateCcw;
+  const pct = Math.max(0, Math.min(100, (remainingMs / COUNTDOWN_MS) * 100));
+  const secLeft = Math.max(1, Math.ceil(remainingMs / 1000));
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden bg-slate-950/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden bg-slate-950/60 p-4 backdrop-blur-[3px]"
       role="presentation"
-      onPointerDown={(event) => { if (event.target === event.currentTarget && !starting && !burst) onStay(); }}
+      onPointerDown={(event) => { if (event.target === event.currentTarget && !starting) onStay(); }}
     >
-      {burst && <FireworkBurst />}
-      <div className="cms-goal-in relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white text-center shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="relative bg-gradient-to-br from-amber-50 via-white to-orange-50 px-6 pb-5 pt-6">
-          <span className="dp-twinkle absolute left-8 top-8 text-lg" aria-hidden="true">✦</span>
-          <span className="dp-twinkle dp-twinkle-late absolute right-10 top-12 text-sm text-orange-400" aria-hidden="true">✦</span>
-          <span className="dp-flame absolute right-7 top-6 text-orange-500" aria-hidden="true"><Flame size={22} className="fill-orange-400" /></span>
-          <Mascot mood={isBlockedFreeTestOut || notEnoughXp ? 'thinking' : 'determined'} size={132} className="relative mx-auto" />
-          <h2 id={titleId} className="mt-1 text-xl font-black text-slate-900">{title}</h2>
-          <p className="mt-1.5 text-sm text-slate-600">{body}</p>
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-800 ring-1 ring-amber-200">
-            <Zap size={13} className="fill-amber-300 text-amber-500" aria-hidden="true" />
-            {testOut ? `Cược ${stakeXp} XP` : `${QUESTION_STAKE_XP} XP/câu · tối đa ${stakeXp} XP`}
-            {typeof xpTotal === 'number' ? ` · đang có ${xpTotal}` : ''}
-          </p>
+      <div className="cms-goal-in relative w-full max-w-[380px] overflow-hidden rounded-[28px] border border-emerald-100 bg-white text-center shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="relative bg-gradient-to-b from-emerald-50/90 via-white to-white px-6 pb-4 pt-6">
+          <span className="dp-twinkle absolute left-7 top-7 text-base text-emerald-500" aria-hidden="true">✦</span>
+          <span className="dp-flame absolute right-7 top-6 text-amber-500" aria-hidden="true"><Flame size={20} className="fill-amber-400" /></span>
+          <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-emerald-100">
+            <Mascot mood={isBlockedFreeTestOut || notEnoughXp ? 'thinking' : 'determined'} size={104} className="relative" />
+          </div>
+          <h2 id={titleId} className="mt-3 text-xl font-black tracking-tight text-slate-900">{title}</h2>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{body}</p>
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-1.5 text-xs font-extrabold text-amber-800 ring-1 ring-amber-200/80">
+            <Zap size={13} className="fill-amber-400 text-amber-500" aria-hidden="true" />
+            <span>{testOut ? `Cược ${stakeXp} XP` : `${QUESTION_STAKE_XP} XP/câu · tối đa ${stakeXp} XP`}</span>
+            {typeof xpTotal === 'number' && <span className="text-amber-600">· đang có {xpTotal}</span>}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2.5 p-4">
-          <button type="button" onClick={onStay} disabled={starting || burst} className="cms-btn cms-btn-outline w-full !py-2.5 text-sm">
+
+        {canAutoStart && (
+          <div className="mx-5 mb-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-left">
+            <div className="mb-2 flex items-center justify-between text-xs font-extrabold">
+              <span className="flex items-center gap-1.5 text-emerald-800">
+                {starting || remainingMs <= 0 ? <Loader2 size={13} className="animate-spin text-emerald-600" /> : <Play size={12} className="fill-emerald-600 text-emerald-600" />}
+                {starting || remainingMs <= 0 ? 'Đang vào bài luyện…' : 'Tự động vào luyện sau'}
+              </span>
+              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-black tabular-nums text-white">
+                {remainingMs <= 0 ? '0s' : `${secLeft}s`}
+              </span>
+            </div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-[width] duration-75 ease-linear"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className={`px-5 pb-5 pt-2 ${isBlockedFreeTestOut || notEnoughXp ? 'grid grid-cols-2 gap-2.5' : ''}`}>
+          <button
+            type="button"
+            onClick={onStay}
+            disabled={starting}
+            className="cms-btn cms-btn-outline w-full !rounded-2xl !py-3 text-sm font-extrabold"
+          >
             Để sau
           </button>
-          {isBlockedFreeTestOut || notEnoughXp ? (
+          {(isBlockedFreeTestOut || notEnoughXp) && (
             <button
               type="button"
               onClick={() => {
                 onStay();
                 onOpenMeet?.();
               }}
-              className="cms-btn cms-btn-primary w-full !py-2.5 text-sm"
+              className="cms-btn cms-btn-primary w-full !rounded-2xl !py-3 text-sm font-extrabold"
             >
               <Crown size={16} className="text-amber-300" />
               Nâng cấp gói
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                if (starting || burst) return;
-                setBurst(true);
-                gameSounds.win();
-              }}
-              disabled={starting || burst}
-              className="cms-btn cms-btn-primary w-full !py-2.5 text-sm"
-            >
-              {starting || burst ? <Loader2 size={16} className="animate-spin" /> : <PrimaryIcon size={16} />}
-              {primaryLabel}
             </button>
           )}
         </div>

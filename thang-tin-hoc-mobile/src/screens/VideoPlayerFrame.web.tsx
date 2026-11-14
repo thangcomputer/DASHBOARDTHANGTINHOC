@@ -1,11 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { MobileLmsPlayerChrome } from '../components/dailyPractice/MobileLmsPlayerChrome';
 import { typography } from '../theme/tokens';
 import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
 import { isDirectVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
+import { readLmsMuted, readLmsVolume, writeLmsMuted, writeLmsVolume } from '../utils/lmsPlayerPrefs';
+import { orderYouTubeQualities } from '../utils/youtubeQuality';
 import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
+import {
+  buildYtBrandedPlayerVars,
+  disableYouTubeCaptions,
+  YT_IFRAME_CROP,
+} from '../../../shared/dailyPractice/lmsBrandedVideoPlayer.mjs';
 
 type YouTubePlayer = {
   getCurrentTime: () => number;
@@ -15,6 +22,15 @@ type YouTubePlayer = {
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   playVideo?: () => void;
   pauseVideo?: () => void;
+  setVolume?: (volume: number) => void;
+  mute?: () => void;
+  unMute?: () => void;
+  getPlaybackQuality?: () => string;
+  setPlaybackQuality?: (suggestedQuality: string) => void;
+  setPlaybackQualityRange?: (min: string, max: string) => void;
+  getAvailableQualityLevels?: () => string[];
+  unloadModule?: (moduleName: string) => void;
+  setOption?: (moduleName: string, option: string, value: unknown) => void;
   destroy: () => void;
 };
 
@@ -27,6 +43,9 @@ type YouTubeNamespace = {
       events: {
         onReady: (event: { target: YouTubePlayer }) => void;
         onError: (event: { data?: number }) => void;
+        onStateChange?: () => void;
+        onPlaybackQualityChange?: (event: { data?: string }) => void;
+        onApiChange?: () => void;
       };
     },
   ) => YouTubePlayer;
@@ -77,6 +96,9 @@ export function VideoPlayerFrame({
   onWatched,
   playerApiRef,
   brandedChrome = true,
+  chromeRightSlot = null,
+  appearance = 'default',
+  chromeBg = '#080D19',
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -89,7 +111,11 @@ export function VideoPlayerFrame({
   playerApiRef?: { current: VideoPlayerApi | null };
   /** Thanh điều khiển Thắng Tin Học, ẩn chrome YouTube (controls:0). */
   brandedChrome?: boolean;
+  chromeRightSlot?: React.ReactNode;
+  appearance?: 'default' | 'window';
+  chromeBg?: string;
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -107,6 +133,14 @@ export function VideoPlayerFrame({
   const antiSeekRef = useRef(antiSeekEnabled);
   const [playerError, setPlayerError] = useState('');
   const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
+  const [volume, setVolume] = useState(50);
+  const [muted, setMuted] = useState(false);
+  const [liveQuality, setLiveQuality] = useState<string | null>(null);
+  const [qualityOptions, setQualityOptions] = useState<string[]>(['default']);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [awaitingStart, setAwaitingStart] = useState(appearance === 'window');
+  const volumeRef = useRef(50);
+  const mutedRef = useRef(false);
   const [uiProgress, setUiProgress] = useState<VideoPlayerProgress>({
     currentTime: 0,
     duration: 0,
@@ -115,6 +149,73 @@ export function VideoPlayerFrame({
     playing: false,
   });
   const antiSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncPlayerVolume = useCallback((vol: number, isMuted: boolean) => {
+    const n = Math.max(0, Math.min(100, Math.round(vol)));
+    const effectiveMuted = isMuted || n === 0;
+    if (videoRef.current) {
+      videoRef.current.volume = n / 100;
+      videoRef.current.muted = effectiveMuted;
+    }
+    if (youtubePlayerRef.current) {
+      try {
+        youtubePlayerRef.current.setVolume?.(n);
+        if (effectiveMuted) youtubePlayerRef.current.mute?.();
+        else youtubePlayerRef.current.unMute?.();
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  const applyVolume = useCallback((nextVol: number, nextMuted: boolean) => {
+    const n = Math.max(0, Math.min(100, Math.round(nextVol)));
+    setVolume(n);
+    setMuted(nextMuted);
+    volumeRef.current = n;
+    mutedRef.current = nextMuted;
+    syncPlayerVolume(n, nextMuted);
+    void writeLmsVolume(n);
+    void writeLmsMuted(nextMuted);
+  }, [syncPlayerVolume]);
+
+  const toggleMute = useCallback(() => {
+    if (mutedRef.current || volumeRef.current === 0) {
+      const nextVol = volumeRef.current > 0 ? volumeRef.current : 50;
+      applyVolume(nextVol, false);
+    } else {
+      applyVolume(volumeRef.current, true);
+    }
+  }, [applyVolume]);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([readLmsVolume(50), readLmsMuted(false)]).then(([v, m]) => {
+      if (!alive) return;
+      setVolume(v);
+      setMuted(m);
+      volumeRef.current = v;
+      mutedRef.current = m;
+      syncPlayerVolume(v, m);
+    });
+    return () => { alive = false; };
+  }, [syncPlayerVolume]);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.().catch(() => {});
+    } else if (el.requestFullscreen) {
+      void el.requestFullscreen().catch(() => {});
+    }
+  }, []);
 
   const triggerAntiSeekNotice = () => {
     setShowAntiSeekNotice(true);
@@ -263,7 +364,9 @@ export function VideoPlayerFrame({
     if (directVideo) {
       const video = videoRef.current;
       if (!video) return undefined;
+      syncPlayerVolume(volumeRef.current, mutedRef.current);
       const onMetadata = () => {
+        syncPlayerVolume(volumeRef.current, mutedRef.current);
         if (!doneRef.current && initialMaxPosition > 0 && video.currentTime < initialMaxPosition) {
           video.currentTime = Math.min(initialMaxPosition, Math.max(0, video.duration - 1));
           return;
@@ -296,9 +399,9 @@ export function VideoPlayerFrame({
       mountStyle.textContent = [
         '.mobile-youtube-player { overflow: hidden !important; background: #080D19 !important; }',
         '.mobile-youtube-player iframe {',
-        '  width: 100% !important; height: 100% !important; border: 0 !important;',
-        '  pointer-events: none !important;',
-        brandedChrome ? '  transform: translate(-50%,-50%) scale(1.14); transform-origin: center center; position:absolute;top:50%;left:50%;width:120%;height:120%;' : '',
+        brandedChrome
+          ? `  position: absolute !important; top: 50% !important; left: 50% !important; width: ${YT_IFRAME_CROP.webSizePercent}% !important; height: ${YT_IFRAME_CROP.webSizePercent}% !important; transform: translate(-50%, ${YT_IFRAME_CROP.webTranslateYPercent}%) !important; border: 0 !important; pointer-events: none !important;`
+          : '  width: 100% !important; height: 100% !important; border: 0 !important;',
         '}',
       ].filter(Boolean).join('\n');
       mountRef.current.classList.add('mobile-youtube-player');
@@ -310,22 +413,20 @@ export function VideoPlayerFrame({
         playerFrame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
         playerFrame.allowFullscreen = true;
         playerFrame.title = title;
-        playerFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=${brandedChrome ? 0 : 1}&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+        playerFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=${brandedChrome ? 0 : 1}&rel=0&modestbranding=1&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
         mountRef.current.replaceChildren(playerFrame);
+        const baseVars = buildYtBrandedPlayerVars({
+          origin: window.location.origin,
+          start: Math.floor(initialMaxPosition),
+        });
         youtubePlayer = new youtube.Player(playerFrame, {
           videoId: youtubeId,
           playerVars: {
-            autoplay: 1,
+            ...baseVars,
+            autoplay: appearance === 'window' ? 0 : 1,
             controls: brandedChrome ? 0 : 1,
             disablekb: brandedChrome ? 1 : 0,
-            rel: 0,
-            modestbranding: 1,
-            iv_load_policy: 3,
             fs: brandedChrome ? 0 : 1,
-            playsinline: 1,
-            enablejsapi: 1,
-            origin: window.location.origin,
-            start: Math.floor(initialMaxPosition),
           },
           events: {
             onReady: () => {
@@ -333,14 +434,37 @@ export function VideoPlayerFrame({
               youtubePlayerRef.current = youtubePlayer;
               const iframe = youtubePlayer.getIframe();
               iframe.referrerPolicy = 'origin';
-              iframe.style.width = '100%';
-              iframe.style.height = '100%';
               iframe.style.border = '0';
-              if (brandedChrome) iframe.style.pointerEvents = 'none';
+              if (brandedChrome) {
+                iframe.style.position = 'absolute';
+                iframe.style.top = '50%';
+                iframe.style.left = '50%';
+                iframe.style.width = `${YT_IFRAME_CROP.webSizePercent}%`;
+                iframe.style.height = `${YT_IFRAME_CROP.webSizePercent}%`;
+                iframe.style.transform = `translate(-50%, ${YT_IFRAME_CROP.webTranslateYPercent}%)`;
+                iframe.style.pointerEvents = 'none';
+              } else {
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+              }
+              disableYouTubeCaptions(youtubePlayer);
+              syncPlayerVolume(volumeRef.current, mutedRef.current);
+              const rawLevels = youtubePlayer.getAvailableQualityLevels?.() || [];
+              const ordered = orderYouTubeQualities(rawLevels);
+              setQualityOptions(ordered);
+              const best = ordered.find((q) => q !== 'default');
+              if (best) {
+                try { youtubePlayer.setPlaybackQualityRange?.(best, best); } catch { /* ignore */ }
+                try { youtubePlayer.setPlaybackQuality?.(best); } catch { /* ignore */ }
+              }
+              const curQ = youtubePlayer.getPlaybackQuality?.();
+              if (curQ && curQ !== 'unknown' && curQ !== 'default') setLiveQuality(curQ);
               if (!doneRef.current && initialMaxPosition > 0) {
                 youtubePlayer.seekTo(initialMaxPosition, true);
               }
-              youtubePlayer.playVideo?.();
+              if (appearance !== 'window') {
+                youtubePlayer.playVideo?.();
+              }
               startPolling(
                 () => ({
                   time: youtubePlayer?.getCurrentTime() || 0,
@@ -355,9 +479,38 @@ export function VideoPlayerFrame({
                 ? 'YouTube không nhận được địa chỉ tham chiếu để phát video. Hãy mở video trên YouTube.'
                 : 'Không thể phát video YouTube này.',
             ),
+            onApiChange: () => {
+              if (youtubePlayer) disableYouTubeCaptions(youtubePlayer);
+            },
+            onPlaybackQualityChange: (event: { data?: string }) => {
+              const q = event?.data;
+              if (q && q !== 'unknown' && q !== 'default') setLiveQuality(q);
+            },
             onStateChange: () => {
               if (!youtubePlayer) return;
-              const playing = youtubePlayer.getPlayerState() === 1;
+              const state = youtubePlayer.getPlayerState();
+              const playing = state === 1;
+              if (playing) {
+                setAwaitingStart(false);
+                disableYouTubeCaptions(youtubePlayer);
+                const rawLevels = youtubePlayer.getAvailableQualityLevels?.() || [];
+                if (rawLevels.length) setQualityOptions(orderYouTubeQualities(rawLevels));
+                const curQ = youtubePlayer.getPlaybackQuality?.();
+                if (curQ && curQ !== 'unknown' && curQ !== 'default') setLiveQuality(curQ);
+              }
+              if (state === 0 && !doneRef.current && !completionPending) {
+                thresholdReached = true;
+                completionPending = true;
+                void watchedCallbackRef.current()
+                  .then((saved) => {
+                    if (saved) {
+                      doneRef.current = true;
+                      progressRef.current = { ...progressRef.current, completed: true };
+                      callbackRef.current(progressRef.current);
+                    }
+                  })
+                  .finally(() => { completionPending = false; });
+              }
               setUiProgress((prev) => ({ ...prev, playing }));
             },
           },
@@ -419,6 +572,7 @@ export function VideoPlayerFrame({
   }, [brandedChrome, embeddedUrl, lessonId, videoUrl, playerApiRef]);
 
   const togglePlay = () => {
+    setAwaitingStart(false);
     if (uiProgress.playing) playerApiRef?.current?.pause?.();
     else playerApiRef?.current?.play?.();
   };
@@ -428,24 +582,58 @@ export function VideoPlayerFrame({
     setUiProgress((prev) => ({ ...prev, currentTime: position }));
   };
 
+  const refreshQualities = useCallback(() => {
+    const p = youtubePlayerRef.current;
+    if (!p) return;
+    const rawLevels = p.getAvailableQualityLevels?.() || [];
+    if (rawLevels.length) setQualityOptions(orderYouTubeQualities(rawLevels));
+    const curQ = p.getPlaybackQuality?.();
+    if (curQ && curQ !== 'unknown' && curQ !== 'default') setLiveQuality(curQ);
+  }, []);
+
+  const selectQuality = useCallback((level: string) => {
+    const p = youtubePlayerRef.current;
+    if (!p) return;
+    try {
+      if (level === 'default') {
+        p.setPlaybackQualityRange?.('tiny', 'highres');
+      } else {
+        p.setPlaybackQualityRange?.(level, level);
+        p.setPlaybackQuality?.(level);
+        setLiveQuality(level);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const directVideo = isDirectVideoUrl(videoUrl);
+  const youtubeId = youtubeIdFromUrl(videoUrl);
   const vimeoId = vimeoIdFromUrl(videoUrl);
   const vimeoSrc = vimeoId
     ? `${embeddedUrl}${embeddedUrl.includes('?') ? '&' : '?'}api=1&player_id=mobile-course-video`
     : '';
 
   return (
-    <View style={{ flex: 1, position: 'relative', backgroundColor: '#080D19' }}>
+    <div
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        backgroundColor: chromeBg,
+        overflow: 'hidden',
+      }}
+    >
       {directVideo ? (
         React.createElement('video', {
           ref: videoRef,
           src: videoUrl,
           controls: !brandedChrome,
-          autoPlay: true,
+          autoPlay: appearance !== 'window',
           playsInline: true,
           controlsList: 'nodownload noplaybackrate',
           'aria-label': title,
-          style: { position: 'absolute', inset: 0, width: '100%', height: '100%', backgroundColor: '#080D19' },
+          style: { position: 'absolute', inset: 0, width: '100%', height: '100%', backgroundColor: chromeBg },
         })
       ) : vimeoSrc ? (
         React.createElement('iframe', {
@@ -462,6 +650,8 @@ export function VideoPlayerFrame({
       )}
       {brandedChrome && !playerError ? (
         <MobileLmsPlayerChrome
+          overlayVariant={appearance === 'window' ? 'window' : 'default'}
+          startOverlayVisible={appearance === 'window' && awaitingStart && !uiProgress.playing}
           isPlaying={uiProgress.playing}
           currentTime={uiProgress.currentTime}
           duration={uiProgress.duration}
@@ -471,6 +661,18 @@ export function VideoPlayerFrame({
           lockSeek={antiSeekEnabled && !done}
           onBlockedSeek={triggerAntiSeekNotice}
           showAntiSeekNotice={showAntiSeekNotice}
+          volume={volume}
+          muted={muted}
+          onVolumeChange={(v) => applyVolume(v, v === 0)}
+          onToggleMute={toggleMute}
+          liveQuality={liveQuality}
+          qualityOptions={qualityOptions}
+          onSelectQuality={selectQuality}
+          onOpenQualityMenu={refreshQualities}
+          showQuality={Boolean(youtubeId)}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          rightSlot={chromeRightSlot}
         />
       ) : null}
       {playerError ? (
@@ -478,6 +680,6 @@ export function VideoPlayerFrame({
           <Text style={{ color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700', textAlign: 'center' }}>{playerError}</Text>
         </View>
       ) : null}
-    </View>
+    </div>
   );
 }

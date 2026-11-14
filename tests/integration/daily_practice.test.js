@@ -254,7 +254,7 @@ test('popup nhắc luyện tập: một lần mỗi ngày, sau popup mục tiêu
   assert.ok(reminder.includes("navigationRef.navigate('DailyPractice')"));
 });
 
-test('lối vào luyện tập hằng ngày từ Tổng quan (web + mobile)', () => {
+test('lối vào 1 từ Tổng quan (web + mobile)', () => {
   const web = read('client/src/components/student/StudentOverviewTab.jsx');
   assert.ok(web.includes("navigate('/student/daily-practice')"));
   assert.ok(web.includes('<DuoHeroCard') && web.includes('<DuoDailyQuestsCard'));

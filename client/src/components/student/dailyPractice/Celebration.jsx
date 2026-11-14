@@ -38,13 +38,15 @@ function StageShell({ children, button, onNext, autoAdvanceMs = 0 }) {
   }, [autoAdvanceMs, onNext]);
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-6 px-2 py-6 text-center">
-      {children}
-      {button && !autoAdvanceMs ? (
-        <button type="button" onClick={onNext} className="dp-3d-btn mt-2 w-full rounded-2xl bg-emerald-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-[0_5px_0_#047857]">
-          {button}
-        </button>
-      ) : null}
+    <div className="mx-auto flex min-h-[70vh] max-w-md items-center justify-center px-2 py-4">
+      <div className="cms-goal-in flex w-full flex-col items-center justify-center gap-5 rounded-[28px] border border-orange-100 bg-white px-6 py-7 text-center shadow-2xl">
+        {children}
+        {button && !autoAdvanceMs ? (
+          <button type="button" onClick={onNext} className="dp-3d-btn mt-2 w-full rounded-2xl bg-emerald-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-[0_5px_0_#047857]">
+            {button}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -100,7 +100,7 @@ test('nối chủ đề ↔ video có mặt ở admin, web và mobile', () => {
   const webResult = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
   assert.ok(webResult.includes('summary.relatedLesson && <RelatedLessonCard'));
   assert.ok(webResult.includes("searchParams.get('topicId')"));
-  assert.ok(read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx').includes('dailyPracticeApi.student.relatedTopics('));
+  assert.ok(read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx').includes('<LessonNavigationBar'));
 
   const mobileResult = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
   assert.ok(mobileResult.includes('summary.relatedLesson ? <RelatedLessonCard'));
@@ -118,5 +118,5 @@ test('trang bài học web và mobile giống nhau: gợi ý luyện tập ở �
 
   const mobile = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
   assert.match(mobile, /\{relatedStrip\}\s*\{lessonNavigation\}/, 'mobile đặt gợi ý luyện tập ngay trên thanh điều hướng đáy');
-  assert.ok(mobile.includes('Luyện tập chủ đề liên quan:'));
+  assert.ok(mobile.includes('const relatedStrip = null;'));
 });
