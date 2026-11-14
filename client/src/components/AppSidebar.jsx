@@ -120,20 +120,20 @@ const MENU_CONFIG = {
       { key: 'inbox', section: 'KHÔNG GIAN LÀM VIỆC', icon: MessageSquare, label: 'Hộp thư', path: '/admin/inbox', permission: PERMISSIONS.MANAGE_MESSAGES },
 
       { key: 'students', section: 'HỌC VIÊN', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
-      { key: 'student-training', section: 'HỌC VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-      { key: 'student-resources', section: 'HỌC VIÊN', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'lesson-practice', section: 'HỌC VIÊN', icon: BookOpen, label: 'Bài giảng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'student-resources', section: 'HỌC VIÊN', icon: FileText, label: 'Tài liệu & Phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'student-training', section: 'HỌC VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'cert-prep', section: 'HỌC VIÊN', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
 
       { key: 'daily-practice', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Gamepad2, label: 'Luyện tập & Tài nguyên', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-      { key: 'subscription-codes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Ticket, label: 'Mã kích hoạt & gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'subscription-codes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Ticket, label: 'Mã kích hoạt & Gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
       { key: 'meet-classes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
 
       { key: 'teachers', section: 'GIẢNG VIÊN', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-      { key: 'training-videos', section: 'GIẢNG VIÊN', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
-      { key: 'training-guides-evaluations', section: 'GIẢNG VIÊN', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
-      { key: 'training-resources', section: 'GIẢNG VIÊN', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
+      { key: 'training-videos', section: 'GIẢNG VIÊN', icon: Video, label: 'Video đào tạo', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
+      { key: 'training-resources', section: 'GIẢNG VIÊN', icon: FileText, label: 'Tài liệu & Phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
       { key: 'training-exam-room', section: 'GIẢNG VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },
+      { key: 'training-guides-evaluations', section: 'GIẢNG VIÊN', icon: FileText, label: 'Quy trình & Đánh giá', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
 
       { key: 'staff', section: 'NHÂN SỰ', icon: Users, label: 'Phân quyền NV', path: '/admin', hash: 'staff', permission: PERMISSIONS.MANAGE_STAFF },
       { key: 'hr', section: 'NHÂN SỰ', icon: ClipboardList, label: 'Nhân sự & Lương', path: '/admin', hash: 'hr', permission: PERMISSIONS.MANAGE_HR },
@@ -142,14 +142,15 @@ const MENU_CONFIG = {
       { key: 'analytics', section: 'TÀI CHÍNH', icon: BarChart3, label: 'Báo cáo doanh thu', path: '/admin', hash: 'analytics', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
       { key: 'bi', section: 'TÀI CHÍNH', icon: BarChart3, label: 'BI Dashboard', path: '/admin/bi', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
 
+      { key: 'settings', section: 'HỆ THỐNG', icon: Settings, label: 'Cài đặt hệ thống', path: '/admin', hash: 'settings', permission: PERMISSIONS.SYSTEM_SETTINGS },
+      { key: 'center-info', section: 'HỆ THỐNG', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
       {
         key: 'system-group',
         section: 'HỆ THỐNG',
-        label: 'Cài đặt & vận hành',
-        icon: Settings,
+        label: 'Công cụ & Vận hành',
+        icon: HardDrive,
         isGroup: true,
         children: [
-          { key: 'settings', icon: Settings, label: 'Cài đặt hệ thống', path: '/admin', hash: 'settings', permission: PERMISSIONS.SYSTEM_SETTINGS },
           { key: 'logs', icon: Lock, label: 'Nhật ký hệ thống', path: '/admin', hash: 'logs', permission: PERMISSIONS.VIEW_LOGS },
           { key: 'files', icon: HardDrive, label: 'Quản lý file', path: '/admin/files', permission: PERMISSIONS.SYSTEM_SETTINGS },
           { key: 'backups', icon: Archive, label: 'Sao lưu dữ liệu', path: '/admin/backups', superAdminOnly: true },
@@ -160,7 +161,6 @@ const MENU_CONFIG = {
           { key: 'tenants', icon: Building2, label: 'Multi-tenant', path: '/admin/tenants', superAdminOnly: true },
         ],
       },
-      { key: 'center-info', section: 'HỆ THỐNG', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
     ],
     bottomItems: [
       { key: 'pin-lock', icon: KeyRound, label: 'Khóa mã PIN', isPinLock: true },
