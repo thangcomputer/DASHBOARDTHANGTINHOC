@@ -144,7 +144,7 @@ export function QuizAnswerOption({
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect
             ? 'bg-emerald-500 text-white shadow-2xs'
             : isWrongPick
-              ? 'bg-red-500 text-white shadow-2xs'
+              ? 'bg-emerald-500 text-white shadow-2xs'
               : eliminated
                 ? 'bg-slate-100 text-slate-300'
                 : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 group-hover:border-emerald-500 group-hover:bg-emerald-500 group-hover:text-white'
@@ -167,7 +167,7 @@ export function QuizAnswerOption({
       )}
       {isWrongPick && (
         <span
-          className="dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500 text-white shadow-xs"
+          className="dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs"
           aria-label="Sai"
         >
           <X size={16} strokeWidth={3} />
@@ -245,7 +245,7 @@ export function TrueFalseQuestion({ result, chosen, onSubmit }) {
                 <Check size={14} strokeWidth={3.2} />
               </span>
             )}
-            <span className={`flex h-12 w-12 items-center justify-center rounded-full text-white ${tone === 'emerald' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-gradient-to-b from-red-400 to-emerald-600'}`}>
+            <span className={`flex h-12 w-12 items-center justify-center rounded-full text-white ${tone === 'emerald' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`}>
               <Icon size={26} strokeWidth={3} aria-hidden="true" />
             </span>
             {label}

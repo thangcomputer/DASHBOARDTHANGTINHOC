@@ -266,7 +266,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
 
         {/* Color pickers - native input[type=color] hidden behind buttons */}
         <label className={btnClass + " relative overflow-hidden"} title="Màu chữ" onMouseDown={e => e.stopPropagation()}>
-          <span className="flex items-center gap-0.5">A<span className="w-3 h-1.5 rounded-sm bg-red-500 block" /></span>
+          <span className="flex items-center gap-0.5">A<span className="w-3 h-1.5 rounded-sm bg-emerald-500 block" /></span>
           <input type="color" defaultValue="#ff0000"
             onMouseDown={e => { e.stopPropagation(); saveSelection(); }}
             onChange={handleFgColor}
@@ -322,7 +322,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
             autoFocus
           />
           <button type="button" onClick={applyLink}
-            className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-700 transition">Chèn</button>
+            className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition">Chèn</button>
           <button type="button" onClick={() => setShowLinkInput(false)}
             className="text-gray-400 hover:text-gray-600 text-xs">Huỷ</button>
         </div>

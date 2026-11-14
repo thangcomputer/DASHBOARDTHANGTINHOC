@@ -32,7 +32,7 @@ export default function CertPrepQuestionArea({
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
               exam
-                ? (isCorrect ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30')
+                ? (isCorrect ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-500/20 text-red-300 border border-emerald-500/30')
                 : (isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700')
             }`}
           >

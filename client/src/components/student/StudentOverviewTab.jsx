@@ -555,7 +555,7 @@ export default function StudentOverviewTab({
       icon: lost ? Gamepad2 : Flame,
       tone: lost
         ? 'bg-slate-600'
-        : (freePortalUi ? 'bg-emerald-500' : 'bg-red-500'),
+        : (freePortalUi ? 'bg-emerald-500' : 'bg-emerald-500'),
       title: freePortalUi
         ? (atRisk ? `Duy trì chuỗi ${practiceStats.streak} ngày` : lost ? 'Luyện tập để lấy lại chuỗi' : 'Luyện tập hằng ngày')
         : (atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày'),
@@ -607,7 +607,7 @@ export default function StudentOverviewTab({
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-1.5">
                           {item.live ? (
-                            <span className="shrink-0 rounded-[6px] bg-red-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white uppercase">
+                            <span className="shrink-0 rounded-[6px] bg-emerald-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white uppercase">
                               ĐANG DIỄN RA
                             </span>
                           ) : null}

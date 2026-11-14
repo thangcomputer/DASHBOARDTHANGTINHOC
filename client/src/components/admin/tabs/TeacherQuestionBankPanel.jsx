@@ -636,7 +636,7 @@ export default function TeacherQuestionBankPanel() {
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">{essayQuestions.length}</span>
             </div>
           </header>
-          <div className="px-3 py-2.5 border-b border-violet-50 flex flex-wrap items-center gap-2 bg-red-50/40">
+          <div className="px-3 py-2.5 border-b border-violet-50 flex flex-wrap items-center gap-2 bg-emerald-50/40">
             <button
               type="button"
               onClick={() => openAddForm('essay')}
@@ -750,7 +750,7 @@ export default function TeacherQuestionBankPanel() {
                           <button
                             type="button"
                             onClick={() => setQForm({ ...qForm, imageUrl: '', imageName: '' })}
-                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow"
+                            className="absolute -top-2 -right-2 p-1 bg-emerald-500 text-white rounded-full shadow"
                           >
                             <X size={12} />
                           </button>

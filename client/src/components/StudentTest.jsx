@@ -56,7 +56,7 @@ const ConfirmModal = ({ title, message, boldText, onConfirm, onCancel, confirmLa
       </p>
       <div className="flex gap-3 mt-5">
         <button onClick={onCancel} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-600 font-semibold text-sm hover:bg-gray-50">{cancelLabel}</button>
-        <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 rounded-xl text-white font-bold text-sm transition-all">{confirmLabel}</button>
+        <button onClick={onConfirm} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white font-bold text-sm transition-all">{confirmLabel}</button>
       </div>
     </div>
   </div>
@@ -1005,7 +1005,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
               <div className="space-y-1.5 relative mt-3">
                 {/* Nút số 1 được đóng khung đỏ */}
                 <div className="relative">
-                  <div className="absolute -left-[5px] -right-[5px] -top-[5px] -bottom-[5px] border-2 border-red-500 rounded-[14px] pointer-events-none" />
+                  <div className="absolute -left-[5px] -right-[5px] -top-[5px] -bottom-[5px] border-2 border-emerald-500 rounded-[14px] pointer-events-none" />
                   <div className="bg-green-200/50 text-green-800 text-center py-1.5 rounded-[10px] font-bold text-xs">Cho phép mỗi khi truy cập...</div>
                   {/* SVG Arrow Pointing UP-LEFT */}
                   <svg className="absolute -right-[20px] -bottom-[20px] w-6 h-6 text-red-500 animate-bounce pointer-events-none"
@@ -1033,8 +1033,8 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                 disabled={!canStartExam}
                 onClick={() => beginOrResumeExam()}
                 className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${canStartExam
-                  ? 'bg-red-500 text-white shadow-xl shadow-emerald-500/30 hover:bg-emerald-600 hover:scale-[1.02] active:scale-95'
-                  : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
+                  ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/30 hover:bg-emerald-600 hover:scale-[1.02] active:scale-95'
+                  : 'bg-emerald-50 text-red-400 border-2 border-emerald-200 cursor-not-allowed'
                   }`}>
                 {questionsLoading
                   ? 'Đang tải đề thi...'
@@ -1062,7 +1062,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
   if (phase === 'banned') return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-gradient-to-r from-red-700 to-red-600 px-8 py-6 text-center">
+        <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 px-8 py-6 text-center">
           <div className="text-5xl mb-3">🚫</div>
           <h2 className="text-white font-black text-xl">Tạm khóa quyền thi</h2>
           <p className="text-red-200 text-sm mt-1">Hệ thống phát hiện vi phạm</p>
@@ -1228,7 +1228,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
               </span>
               <span
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all ${timeLeft < 300
-                  ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
+                  ? 'border-emerald-500/45 bg-red-950/60 text-red-200 animate-pulse'
                   : 'border-white/15 bg-black/35 text-white'
                   }`}
               >
@@ -1505,7 +1505,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                             type="button"
                             disabled={tuLuanSubmitting || !uploadFile}
                             onClick={trySubmitTuLuan}
-                            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
+                            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/25 transition hover:from-emerald-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             <Send size={18} /> {tuLuanSubmitting ? 'Đang tải lên…' : uploadFile ? 'Nộp bài' : 'Chọn file'}
                           </button>

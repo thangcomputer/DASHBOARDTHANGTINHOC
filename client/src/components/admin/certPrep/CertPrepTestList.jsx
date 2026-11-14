@@ -53,7 +53,7 @@ export default function CertPrepTestList({
                 <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPromptUpload?.(t, f); }} />
               </label>
               {t.essayPromptFile?.url ? <button type="button" onClick={() => onPromptRemove?.(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-red-50 text-red-700">Xóa file</button> : null}
-              <button type="button" onClick={() => onQuestions(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-red-600 text-white">Câu hỏi</button>
+              <button type="button" onClick={() => onQuestions(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white">Câu hỏi</button>
               <button type="button" onClick={() => onPreview(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-slate-100 inline-flex items-center gap-1">
                 <Eye size={14} aria-hidden="true" /> Preview đề
               </button>

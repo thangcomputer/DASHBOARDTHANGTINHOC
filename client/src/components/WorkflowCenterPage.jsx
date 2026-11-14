@@ -154,7 +154,7 @@ export default function WorkflowCenterPage() {
                       type="button"
                       disabled={!!busyId}
                       onClick={() => onAdvance(w._id, 'reject')}
-                      className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1 disabled:opacity-40"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1 disabled:opacity-40"
                     >
                       {busyId === w._id + 'reject' ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
                       Từ chối

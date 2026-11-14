@@ -749,7 +749,7 @@ const StudentDashboard = () => {
               <h3 className="font-bold text-base sm:text-lg text-slate-800 flex items-center gap-2 min-w-0">
                 <FileUp size={20} className="text-blue-600" /> Nộp bài tập
               </h3>
-              <button onClick={() => setActiveAssignment(null)} className="text-slate-400 hover:text-red-500 transition-colors p-1 bg-white hover:bg-red-50 rounded-xl">
+              <button onClick={() => setActiveAssignment(null)} className="text-slate-400 hover:text-red-500 transition-colors p-1 bg-white hover:bg-emerald-50 rounded-xl">
                 <XCircle size={24} />
               </button>
             </div>
@@ -795,7 +795,7 @@ const StudentDashboard = () => {
                         window.cmsAlert?.('Lỗi kết nối khi nộp bài. Vui lòng thử lại.', 'error');
                       });
                   }}
-                  className={`w-full ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] mt-4`}
+                  className={`w-full ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] mt-4`}
                 >
                   {isSubmitting ? 'Đang nộp...' : 'Xác nhận Nộp bài'}
                 </button>

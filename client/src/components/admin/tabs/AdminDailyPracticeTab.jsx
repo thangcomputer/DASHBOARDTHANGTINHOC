@@ -193,7 +193,7 @@ function TopicModal({ topic, onClose, onSaved }) {
                 type="button"
                 onClick={() => set({ icon: key })}
                 aria-label={key}
-                className={`flex h-10 items-center justify-center rounded-xl border-2 ${form.icon === key ? 'border-red-500 bg-red-50 text-red-600' : 'border-slate-200 text-slate-500'}`}
+                className={`flex h-10 items-center justify-center rounded-xl border-2 ${form.icon === key ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-slate-200 text-slate-500'}`}
               >
                 <Icon size={18} />
               </button>
@@ -333,7 +333,7 @@ function ListEditor({ values, onChange, min = 2, max = 8, placeholder, ordered =
         </div>
       ))}
       {values.length < max && (
-        <button type="button" onClick={() => onChange([...values, ''])} className="flex items-center gap-1 text-xs font-bold text-red-600 !shadow-none">
+        <button type="button" onClick={() => onChange([...values, ''])} className="flex items-center gap-1 text-xs font-bold text-emerald-600 !shadow-none">
           <Plus size={14} /> Thêm dòng
         </button>
       )}
@@ -443,7 +443,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
                 key={type}
                 type="button"
                 onClick={() => set({ type })}
-                className={`rounded-xl border-2 px-2 py-2 text-xs font-bold ${form.type === type ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 text-slate-600'}`}
+                className={`rounded-xl border-2 px-2 py-2 text-xs font-bold ${form.type === type ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600'}`}
               >
                 {QUESTION_TYPES[type].label}
               </button>
@@ -494,7 +494,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
               <span className={LABEL}>Phát biểu trên là</span>
               <div className="flex gap-2">
                 {[true, false].map((value) => (
-                  <button key={String(value)} type="button" onClick={() => set({ answerBool: value })} className={`rounded-xl border-2 px-5 py-2 text-sm font-black ${form.answerBool === value ? (value ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-red-500 bg-red-50 text-red-700') : 'border-slate-200 text-slate-600'}`}>
+                  <button key={String(value)} type="button" onClick={() => set({ answerBool: value })} className={`rounded-xl border-2 px-5 py-2 text-sm font-black ${form.answerBool === value ? (value ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-emerald-500 bg-red-50 text-red-700') : 'border-slate-200 text-slate-600'}`}>
                     {value ? 'Đúng' : 'Sai'}
                   </button>
                 ))}
@@ -520,7 +520,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
                   </div>
                 ))}
                 {form.pairs.length < 6 && (
-                  <button type="button" onClick={() => set({ pairs: [...form.pairs, { left: '', right: '' }] })} className="flex items-center gap-1 text-xs font-bold text-red-600 !shadow-none"><Plus size={14} /> Thêm cặp</button>
+                  <button type="button" onClick={() => set({ pairs: [...form.pairs, { left: '', right: '' }] })} className="flex items-center gap-1 text-xs font-bold text-emerald-600 !shadow-none"><Plus size={14} /> Thêm cặp</button>
                 )}
               </div>
             </>
@@ -551,7 +551,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
                 </div>
               ))}
               {form.groups.length < 4 && (
-                <button type="button" onClick={() => set({ groups: [...form.groups, { name: '', items: [] }] })} className="flex items-center gap-1 text-xs font-bold text-red-600 !shadow-none"><Plus size={14} /> Thêm nhóm</button>
+                <button type="button" onClick={() => set({ groups: [...form.groups, { name: '', items: [] }] })} className="flex items-center gap-1 text-xs font-bold text-emerald-600 !shadow-none"><Plus size={14} /> Thêm nhóm</button>
               )}
             </div>
           )}
@@ -1458,7 +1458,7 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
   return (
     <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="mr-auto flex items-center gap-1.5 text-sm font-black text-slate-800"><Route size={16} className="text-red-600" /> Các chặng</p>
+        <p className="mr-auto flex items-center gap-1.5 text-sm font-black text-slate-800"><Route size={16} className="text-emerald-600" /> Các chặng</p>
         <button type="button" onClick={() => setModal({})} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm chặng</button>
       </div>
       <p className="text-[11px] text-slate-500">

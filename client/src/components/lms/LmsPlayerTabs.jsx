@@ -799,7 +799,7 @@ function QaPanel({
                     }}
                     className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${isRead
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                        : 'border-red-700 bg-emerald-600 text-white hover:bg-emerald-700'
+                        : 'border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700'
                       }`}
                   >
                     <MessageSquare size={14} />
@@ -874,7 +874,7 @@ function QaPanel({
                           onChange={(e) => setAnswerDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
                           rows={2}
                           placeholder={it.status === 'answered' ? 'Tiếp tục trả lời trong đối thoại...' : 'Nhập câu trả lời...'}
-                          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none resize-y ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-red-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-red-500/40'}`}
+                          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none resize-y ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-emerald-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-emerald-500/40'}`}
                         />
                         <button
                           type="button"

@@ -815,7 +815,7 @@ export default function AdminStudentsTab() {
                   <li key={s.id || s._id} role="option">
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-red-50 transition-colors"
+                      className="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         const name = String(s.name || '').trim();
@@ -961,7 +961,7 @@ export default function AdminStudentsTab() {
                   role="student"
                   src={s.avatar}
                   gender={s.gender}
-                  color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-red-500'}
+                  color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-emerald-500'}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -1152,7 +1152,7 @@ export default function AdminStudentsTab() {
                         role="student"
                         src={s.avatar}
                         gender={s.gender}
-                        color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-red-500'}
+                        color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-emerald-500'}
                       />
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 text-base leading-snug truncate max-w-[200px]">{s.name}</p>
@@ -1376,7 +1376,7 @@ export default function AdminStudentsTab() {
                 type="button"
                 onClick={handleConfirmRefund}
                 disabled={refundSubmitting}
-                className="flex-1 min-h-11 px-3 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-0 text-center leading-tight"
+                className="flex-1 min-h-11 px-3 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-0 text-center leading-tight"
               >
                 {refundSubmitting ? <Loader2 size={14} className="animate-spin shrink-0" /> : null}
                 <span className="min-w-0 break-words">

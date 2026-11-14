@@ -350,7 +350,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         <div className="meet-start-alert__actions mt-4">
           {link ? (
             <a
-              className="meet-start-alert__join bg-red-600 hover:bg-red-700 text-white font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+              className="meet-start-alert__join bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2"
               href={link}
               target="_blank"
               rel="noopener noreferrer"

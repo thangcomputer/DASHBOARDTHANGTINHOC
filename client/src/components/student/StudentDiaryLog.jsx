@@ -145,7 +145,7 @@ export default function StudentDiaryLog({
                   className={`min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
                     active
                       ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-emerald-600 text-white border border-emerald-600')
-                      : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-red-500 hover:bg-red-50/60')
+                      : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-emerald-500 hover:bg-red-50/60')
                   }`}
                 >
                   {tab.label}
@@ -161,7 +161,7 @@ export default function StudentDiaryLog({
               className={`w-full min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
                 filter === 'Chưa điểm danh'
                   ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-emerald-600 text-white border border-emerald-600')
-                  : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-red-500 hover:bg-red-50/60')
+                  : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-emerald-500 hover:bg-red-50/60')
               }`}
             >
               Chưa điểm danh

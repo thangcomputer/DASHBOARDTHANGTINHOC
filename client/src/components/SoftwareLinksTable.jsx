@@ -69,7 +69,7 @@ export default function SoftwareLinksTable({
               {name}
             </h1>
             {desc ? (
-              <p className="text-base text-slate-600 font-medium border-l-4 border-red-500 pl-4 leading-relaxed">
+              <p className="text-base text-slate-600 font-medium border-l-4 border-emerald-500 pl-4 leading-relaxed">
                 {desc}
               </p>
             ) : null}

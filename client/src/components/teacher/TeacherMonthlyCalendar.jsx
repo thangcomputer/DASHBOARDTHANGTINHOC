@@ -65,7 +65,7 @@ const STATUS_COLORS = {
   makeup_attendance: {
     cell: 'bg-rose-50 border-rose-300 text-rose-800',
     badge: 'bg-rose-100 text-rose-800 border-rose-300',
-    dot: 'bg-rose-600',
+    dot: 'bg-emerald-600',
     label: '● Điểm danh bù',
   },
   cancelled: {
@@ -281,16 +281,16 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   {hasData && (
                     <div className="flex gap-0.5 mt-0.5 justify-center px-0.5">
                       {daySchs.filter((s) => isScheduleUpcomingDisplay(s)).slice(0, 2).map((s) => (
-                        <div key={'s-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
+                        <div key={'s-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-emerald-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
                       ))}
                       {daySchs.filter((s) => ['past_pending', 'overdue_attendance', 'makeup_attendance', 'awaiting_confirm'].includes(getScheduleDisplayKind(s))).slice(0, 2).map((s) => (
-                        <div key={'p-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-slate-300' : 'bg-slate-400'} shadow-sm`} />
+                        <div key={'p-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-emerald-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-slate-300' : 'bg-slate-400'} shadow-sm`} />
                       ))}
                       {daySchs.filter((s) => getScheduleDisplayKind(s) === 'completed').slice(0, 2).map((s) => (
-                        <div key={'c-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
+                        <div key={'c-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-emerald-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
                       ))}
                       {daySchs.filter((s) => getScheduleDisplayKind(s) === 'cancelled').slice(0, 2).map((s) => (
-                        <div key={'x-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
+                        <div key={'x-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-emerald-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
                       ))}
                     </div>
                   )}
@@ -383,7 +383,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                         )}
 
                         {s.studentNote && (
-                          <div className="text-[11px] font-bold text-red-200 mt-1 line-clamp-2 border-l-2 border-red-500 pl-2 bg-red-500/10 p-1 rounded-r flex gap-1 items-start">
+                          <div className="text-[11px] font-bold text-red-200 mt-1 line-clamp-2 border-l-2 border-emerald-500 pl-2 bg-emerald-500/10 p-1 rounded-r flex gap-1 items-start">
                             <MessageSquare size={11} className="mt-0.5 text-red-400 shrink-0" />
                             <div className="leading-tight flex-1">
                               Học viên nhắn: <span className="italic font-normal text-red-200">"{s.studentNote}"</span>
@@ -403,7 +403,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                           {isCancellable && (
                             <button
                               onClick={() => { setCancelTarget(s); setCancelReason(''); }}
-                              className="px-2 py-1 rounded-lg bg-red-600/40 hover:bg-red-600 text-red-200 text-[10px] font-bold transition flex items-center gap-1"
+                              className="px-2 py-1 rounded-lg bg-emerald-600/40 hover:bg-emerald-600 text-red-200 text-[10px] font-bold transition flex items-center gap-1"
                             >
                               <Trash2 size={11} /> Hủy ca
                             </button>
@@ -520,7 +520,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
       {cancelTarget && (
         <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-red-600 p-5 text-white flex items-center gap-3">
+            <div className="bg-emerald-600 p-5 text-white flex items-center gap-3">
               <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
                 <Trash2 size={18} />
               </div>
@@ -540,7 +540,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   value={cancelReason}
                   onChange={e => setCancelReason(e.target.value)}
                   placeholder="Ví dụ: Học viên xin nghỉ, Giảng viên bận đột xuất..."
-                  className="w-full border border-slate-200 focus:border-red-500 rounded-xl px-3 py-2 text-xs outline-none resize-none"
+                  className="w-full border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs outline-none resize-none"
                 />
               </div>
               <div className="flex gap-2 pt-1">
@@ -553,7 +553,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                 <button
                   onClick={handleConfirmCancel}
                   disabled={!cancelReason.trim() || cancelling}
-                  className="flex-[1.5] py-2.5 text-white font-bold bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-xs"
+                  className="flex-[1.5] py-2.5 text-white font-bold bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-xs"
                 >
                   {cancelling ? 'Đang hủy...' : 'Xác nhận Hủy'}
                 </button>

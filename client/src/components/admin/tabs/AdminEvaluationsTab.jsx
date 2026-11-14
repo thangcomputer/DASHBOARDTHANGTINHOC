@@ -64,14 +64,14 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
   return (
     <div
       className={`p-4 sm:p-5 transition-all duration-200 border-l-4 rounded-xl mb-4 ${
-        ev.read ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-red-500 bg-red-50/70 shadow-md ring-1 ring-red-100'
+        ev.read ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-emerald-500 bg-red-50/70 shadow-md ring-1 ring-red-100'
       }`}
     >
       <div className="flex flex-col gap-4 min-w-0">
         <div className="space-y-3 flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {!ev.read && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">Mới</span>
+              <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">Mới</span>
             )}
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
               ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'

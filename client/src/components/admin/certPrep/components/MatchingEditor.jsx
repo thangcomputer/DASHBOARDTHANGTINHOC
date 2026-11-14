@@ -88,7 +88,7 @@ export default function MatchingEditor({
             type="button"
             disabled={disabled}
             onClick={() => emit([...items, { id: nextId('i', items), text: '', imageUrl: '' }], targets, pairs)}
-            className="min-h-10 px-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
+            className="min-h-10 px-3 rounded-xl text-sm font-bold text-emerald-600 hover:bg-emerald-50 inline-flex items-center gap-2"
           >
             <Plus size={14} aria-hidden="true" /> Thêm mục cột A
           </button>
@@ -142,7 +142,7 @@ export default function MatchingEditor({
             type="button"
             disabled={disabled}
             onClick={() => emit(items, [...targets, { id: nextId('t', targets), text: '', imageUrl: '' }], pairs)}
-            className="min-h-10 px-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
+            className="min-h-10 px-3 rounded-xl text-sm font-bold text-emerald-600 hover:bg-emerald-50 inline-flex items-center gap-2"
           >
             <Plus size={14} aria-hidden="true" /> Thêm mục cột B
           </button>

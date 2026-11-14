@@ -271,7 +271,7 @@ function VideoPane({
                 key={video.id}
                 type="button"
                 onClick={() => onSelectVideo(video.id)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${selectedVideo?.id === video.id ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200'}`}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${selectedVideo?.id === video.id ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-200'}`}
               >
                 {video.title || `Video ${index + 1}`}
                 {unit.videoDoneIds?.includes(video.id) && <CheckCircle2 size={13} />}
@@ -396,7 +396,7 @@ function NotePane({ unit, content, done, onMarkRead }) {
             const saved = await onMarkRead?.(selectedContent?.id);
             if (saved) setReadCelebrating(true);
           }}
-          className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
         >
           <CheckCircle2 size={17} aria-hidden="true" />
           {atEnd ? 'Đã đọc xong · Tiếp tục' : 'Lăn hết nội dung để tích đã đọc'}
@@ -427,14 +427,14 @@ function LessonNavigationBar({ unit, sections, activeId, previousUnit, nextUnit,
     const previousOpen = Boolean(previousUnit && !previousUnit.locked);
     return (
       <div className="mt-2 flex shrink-0 gap-2">
-        <button type="button" disabled={!previousOpen} onClick={() => onUnit(previousUnit)} className={`${base} border-slate-200 bg-white hover:border-red-200`}>
-          <ArrowLeft size={16} className="shrink-0 text-red-600" aria-hidden="true" />
+        <button type="button" disabled={!previousOpen} onClick={() => onUnit(previousUnit)} className={`${base} border-slate-200 bg-white hover:border-emerald-200`}>
+          <ArrowLeft size={16} className="shrink-0 text-emerald-600" aria-hidden="true" />
           <span className="min-w-0">
             <span className="block text-[11px] font-bold text-slate-500">Bài trước</span>
             <span className="block truncate text-sm font-black text-slate-800">{previousUnit?.title || 'Không có'}</span>
           </span>
         </button>
-        <button type="button" disabled={!nextOpen} onClick={() => onUnit(nextUnit)} className={`${base} justify-end text-right ${nextOpen ? 'border-red-600 bg-red-600 text-white hover:bg-red-700' : 'border-slate-200 bg-slate-50'}`}>
+        <button type="button" disabled={!nextOpen} onClick={() => onUnit(nextUnit)} className={`${base} justify-end text-right ${nextOpen ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700' : 'border-slate-200 bg-slate-50'}`}>
           <span className="min-w-0">
             <span className={`block text-[11px] font-bold ${nextOpen ? 'text-red-100' : 'text-slate-500'}`}>Bài tiếp theo</span>
             <span className={`block truncate text-sm font-black ${nextOpen ? 'text-white' : 'text-slate-800'}`}>{nextUnit?.title || 'Đã đến bài cuối'}</span>
@@ -450,8 +450,8 @@ function LessonNavigationBar({ unit, sections, activeId, previousUnit, nextUnit,
   const currentDone = index >= 0 && isSectionDone(unit, sections[index]);
   return (
     <div className="mt-2 flex shrink-0 gap-2">
-      <button type="button" disabled={!previous} onClick={() => onSection(previous.id)} className={`${base} border-slate-200 bg-white hover:border-red-200`}>
-        <ArrowLeft size={15} className="shrink-0 text-red-600" aria-hidden="true" />
+      <button type="button" disabled={!previous} onClick={() => onSection(previous.id)} className={`${base} border-slate-200 bg-white hover:border-emerald-200`}>
+        <ArrowLeft size={15} className="shrink-0 text-emerald-600" aria-hidden="true" />
         <span className="truncate text-sm font-black text-slate-800">{previous?.label || 'Mục trước'}</span>
       </button>
       <button
@@ -600,7 +600,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
         ))}
       </div>
       <div onClick={(e) => e.stopPropagation()} className="lp-cele-anim relative w-full max-w-md overflow-hidden rounded-3xl bg-white text-center shadow-2xl" style={{ animation: 'lp-cele-in .5s ease-out both' }}>
-        <div className="bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 px-6 pb-10 pt-8">
+        <div className="bg-gradient-to-br from-amber-400 via-orange-500 to-emerald-600 px-6 pb-10 pt-8">
           <div className="lp-cele-anim mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white/95" style={{ animation: 'lp-cele-trophy .9s ease-out both, lp-cele-glow 2s ease-in-out .9s infinite' }}>
             <Trophy size={64} className="text-amber-500" strokeWidth={2} />
           </div>
@@ -611,7 +611,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
           <p className="text-sm font-semibold text-slate-600">Bạn đã hoàn thành xuất sắc tất cả các buổi của môn</p>
           <p className="mt-1 text-xl font-black text-red-600">{subjectName}</p>
           <p className="mt-3 text-sm text-slate-500">Tiếp tục phát huy, thành quả này là bước tiến lớn trên hành trình học tập của bạn.</p>
-          <button type="button" onClick={onClose} className="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl bg-red-600 px-8 text-sm font-black text-white shadow-md transition hover:bg-red-700">Tiếp tục</button>
+          <button type="button" onClick={onClose} className="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-8 text-sm font-black text-white shadow-md transition hover:bg-emerald-700">Tiếp tục</button>
         </div>
         <div className="h-1.5 bg-slate-100">
           <div className="h-full bg-gradient-to-r from-amber-400 to-emerald-500" style={{ animation: `lp-cele-bar ${CELEBRATION_MS}ms linear forwards` }} />
@@ -861,7 +861,7 @@ export default function LessonPracticeUnitsPage() {
       {celebrating && <CompletionCelebrationModal subjectName={payload?.subject?.name || ''} onClose={closeCelebration} />}
       <div className="mb-3 flex min-w-0 shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-1 pb-3 md:flex-wrap md:gap-3 md:border-0 md:bg-transparent md:px-0 md:pb-0">
         <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-initial md:gap-3">
-          <button type="button" onClick={() => navigate('/student/lesson-practice')} aria-label="Quay lại danh sách khóa học" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100 md:h-9 md:w-auto md:gap-1.5 md:rounded-lg md:border-slate-200 md:bg-white md:px-3 md:text-sm md:font-bold md:shadow-sm">
+          <button type="button" onClick={() => navigate('/student/lesson-practice')} aria-label="Quay lại danh sách khóa học" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:border-red-300 hover:bg-red-100 md:h-9 md:w-auto md:gap-1.5 md:rounded-lg md:border-slate-200 md:bg-white md:px-3 md:text-sm md:font-bold md:shadow-sm">
             <ArrowLeft size={17} /> <span className="hidden md:inline">Trở về</span>
           </button>
           {payload?.subject && <h1 className="min-w-0 truncate text-base font-black text-slate-900 md:text-lg">{payload.subject.name}</h1>}
@@ -877,7 +877,7 @@ export default function LessonPracticeUnitsPage() {
             aria-expanded={lessonListOpen}
             aria-controls="lesson-list"
             onClick={() => setLessonListOpen((open) => !open)}
-            className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 md:rounded-lg md:text-sm lg:hidden"
+            className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-emerald-600 shadow-sm transition hover:border-red-300 hover:bg-emerald-50 md:rounded-lg md:text-sm lg:hidden"
           >
             <Menu size={14} />
             <span>Danh sách bài học</span>
@@ -1020,7 +1020,7 @@ export default function LessonPracticeUnitsPage() {
                                   setLessonListOpen(false);
                                 }}
                                 title={item.label}
-                                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'}`}
+                                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50'}`}
                               >
                                 <Icon size={15} />
                                 <span className="min-w-0 flex-1 text-left">{item.label}</span>

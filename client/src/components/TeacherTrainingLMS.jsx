@@ -707,7 +707,7 @@ const YouTubePlayerSecure = ({
         {!isReady && (
           <div className="absolute inset-0 z-20 bg-slate-900 flex items-center justify-center rounded-none lg:rounded-2xl">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-[3px] border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+              <div className="w-12 h-12 border-[3px] border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
               <p className="text-slate-400 font-semibold text-xs animate-pulse tracking-widest ">Đang tải video...</p>
             </div>
           </div>
@@ -852,7 +852,7 @@ const AdminProgressPanel = ({ courseId }) => {
                   <div className="flex items-center gap-2 mt-1">
                     <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${t.isCertified ? 'bg-emerald-500' : 'bg-red-500'}`}
+                        className={`h-full rounded-full transition-all ${t.isCertified ? 'bg-emerald-500' : 'bg-emerald-500'}`}
                         style={{ width: `${t.progressPct}%` }}
                       />
                     </div>
@@ -1262,7 +1262,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             {isAdmin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-emerald-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-red-100'}`}
               >
                 <BarChart2 size={16} /> Xem tiến độ
               </button>
@@ -1280,14 +1280,14 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
         {/* TOP TABS FOR TEACHER */}
         <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-3 mb-6 mt-1 sm:gap-3">
           {[
-            { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length, tone: 'from-red-500 via-rose-500 to-red-700' },
+            { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length, tone: 'from-emerald-500 via-rose-500 to-emerald-700' },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0, tone: 'from-sky-400 via-blue-500 to-indigo-700' },
-            { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0, tone: 'from-amber-400 via-orange-500 to-red-600' },
+            { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0, tone: 'from-amber-400 via-orange-500 to-emerald-600' },
             { key: 'software', icon: Link2, label: 'Phần mềm', count: visibleTraining?.softwareLinks?.length || 0, tone: 'from-emerald-400 via-teal-500 to-cyan-700' },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`group relative flex min-h-[4.75rem] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-1 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 sm:min-h-[5.5rem] sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${mainTab === t.key
-                  ? 'border-red-500 bg-red-50 text-slate-800 shadow-md shadow-red-100'
+              className={`group relative flex min-h-[4.75rem] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-1 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 sm:min-h-[5.5rem] sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${mainTab === t.key
+                  ? 'border-emerald-500 bg-emerald-50 text-slate-800 shadow-md shadow-emerald-100'
                   : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-red-200'
                 }`}>
               <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br ${t.tone} text-white shadow-lg ring-2 ring-white transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2 sm:h-12 sm:w-12 sm:rounded-2xl`}>
@@ -1296,7 +1296,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[10px] font-black leading-tight sm:text-sm">{t.label}</span>
-                <span className={`mt-1 hidden text-[11px] font-semibold sm:block ${mainTab === t.key ? 'text-red-600' : 'text-slate-400'}`}>
+                <span className={`mt-1 hidden text-[11px] font-semibold sm:block ${mainTab === t.key ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {t.count} mục đang có
                 </span>
               </span>
@@ -1428,7 +1428,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                         <button
                           type="button"
                           onClick={() => setExpandedGuideKey(expanded ? null : gKey)}
-                          className="text-[11px] font-bold text-red-600 hover:text-red-800 mt-1"
+                          className="text-[11px] font-bold text-emerald-600 hover:text-red-800 mt-1"
                         >
                           {expanded ? 'Thu gọn' : 'Xem thêm'}
                         </button>

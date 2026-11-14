@@ -315,7 +315,7 @@ export default function AdminCertPrepTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <nav aria-label="Đường dẫn ôn thi" className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
-          <button type="button" className="font-bold text-red-600 hover:underline" onClick={() => goSection('courses')}>Khóa học MOS/IC3</button>
+          <button type="button" className="font-bold text-emerald-600 hover:underline" onClick={() => goSection('courses')}>Khóa học MOS/IC3</button>
           {course ? (
             <>
               <ChevronRight size={14} aria-hidden="true" />
@@ -336,7 +336,7 @@ export default function AdminCertPrepTab() {
           ) : null}
         </nav>
         {section !== 'access' && section !== 'enrollment' ? (
-          <button type="button" onClick={primaryAdd} className="inline-flex min-h-10 items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">
+          <button type="button" onClick={primaryAdd} className="inline-flex min-h-10 items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">
             <Plus size={15} aria-hidden="true" /> {
               section === 'courses' ? 'Thêm khóa học'
                 : section === 'levels' ? 'Thêm level'
@@ -359,7 +359,7 @@ export default function AdminCertPrepTab() {
                 type="button"
                 disabled={disabled}
                 onClick={() => goSection(t.key)}
-                className={`cms-hscroll-tab ${section === t.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'} disabled:opacity-40`}
+                className={`cms-hscroll-tab ${section === t.key ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'} disabled:opacity-40`}
               >
                 {t.label}
               </button>

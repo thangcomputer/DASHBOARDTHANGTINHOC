@@ -4,7 +4,7 @@ import { resolveAvatarUrl, DEFAULT_AVATARS } from '../../../utils/defaultAvatars
 const ROLE_BADGE = {
   teacher: { label: 'GV', className: 'bg-amber-500 text-white' },
   student: { label: 'HV', className: 'bg-sky-500 text-white' },
-  admin: { label: 'AD', className: 'bg-rose-600 text-white' },
+  admin: { label: 'AD', className: 'bg-emerald-600 text-white' },
   staff: { label: 'NV', className: 'bg-slate-600 text-white' },
   support: { label: 'HT', className: 'bg-blue-600 text-white' },
 };

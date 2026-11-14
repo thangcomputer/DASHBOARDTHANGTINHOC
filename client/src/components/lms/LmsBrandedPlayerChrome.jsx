@@ -324,8 +324,8 @@ export default function LmsBrandedPlayerChrome({
       {/* Thông báo HUD giữa màn hình khi kéo tua video có bật tính năng chống tua */}
       {!overlayVisible && isAntiSeekNoticeActive && (
         <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 z-[25] flex items-center justify-center px-4 animate-in fade-in zoom-in-95 duration-150 select-none">
-          <div className="inline-flex items-center gap-2 rounded-2xl bg-black/85 backdrop-blur-md px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-2xl border border-red-500/50">
-            <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md">
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-black/85 backdrop-blur-md px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-2xl border border-emerald-500/50">
+            <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md">
               <ShieldAlert size={13} className="sm:scale-110" />
             </span>
             <span>Chống tua video</span>
@@ -387,7 +387,7 @@ export default function LmsBrandedPlayerChrome({
                 />
               )}
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-red-500"
+                className="absolute inset-y-0 left-0 rounded-full bg-emerald-500"
                 style={{ width: `${progressPct}%` }}
               />
               <div

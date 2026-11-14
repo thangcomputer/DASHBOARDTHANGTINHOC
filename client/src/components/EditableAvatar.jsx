@@ -259,7 +259,7 @@ export default function EditableAvatar({
                 </button>
                 <div className="flex gap-2">
                   <button type="button" className="rounded-xl px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100" onClick={() => setCropSource(null)} disabled={loading}>Hủy</button>
-                  <button type="button" className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700 disabled:opacity-50" onClick={finishCrop} disabled={loading}>
+                  <button type="button" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700 disabled:opacity-50" onClick={finishCrop} disabled={loading}>
                     {loading ? <Loader2 size={14} className="animate-spin" /> : 'Lưu ảnh'}
                   </button>
                 </div>

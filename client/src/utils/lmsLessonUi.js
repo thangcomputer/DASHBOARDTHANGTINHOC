@@ -273,12 +273,12 @@ export function lessonStatusToneClass(tone, surface = 'dark') {
 
 /** Badge overlay trên video: nền đỏ đặc + chữ trắng (tránh đỏ mờ trên nền đỏ). */
 export const LMS_PLAYER_PROGRESS_BADGE_CLASS =
-  'bg-red-600/90 text-white border border-white/25 backdrop-blur-md shadow-md';
+  'bg-emerald-600/90 text-white border border-white/25 backdrop-blur-md shadow-md';
 
 /** Thanh tiến độ trên sidebar tối: track trắng mờ + fill đỏ + viền trắng. */
 export const LMS_DARK_PROGRESS_TRACK_CLASS = 'h-1.5 rounded-full bg-white/25 overflow-hidden';
 export const LMS_DARK_PROGRESS_FILL_CLASS =
-  'h-full rounded-full bg-red-500 border border-white/40 shadow-[0_0_6px_rgba(255,255,255,0.25)] transition-all duration-300';
+  'h-full rounded-full bg-emerald-500 border border-white/40 shadow-[0_0_6px_rgba(255,255,255,0.25)] transition-all duration-300';
 
 /** Khớp groupedLessons: thiếu chapterTitle → 'Chương 1'. */
 export function lessonChapterKey(lesson) {

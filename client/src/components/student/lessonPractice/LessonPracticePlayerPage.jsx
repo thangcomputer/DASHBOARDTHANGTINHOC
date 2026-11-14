@@ -223,7 +223,7 @@ function PracticeModalIcon({ timeout = false }) {
     <div
       aria-hidden="true"
       className={`relative mx-auto mb-4 grid h-[76px] w-[76px] place-items-center rounded-[26px] bg-gradient-to-br ${
-        timeout ? 'from-orange-500 to-emerald-600 shadow-orange-200' : 'from-emerald-500 to-rose-600 shadow-red-200'
+        timeout ? 'from-orange-500 to-emerald-600 shadow-orange-200' : 'from-emerald-500 to-emerald-600 shadow-emerald-200'
       } text-white shadow-lg`}
     >
       <span className="absolute inset-[5px] rounded-[22px] border border-white/35" />
@@ -595,7 +595,7 @@ function QuestionCard({
           ))}
           {dragGhost && (
             <div
-              className="pointer-events-none fixed z-[80] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-xl border border-red-700 bg-emerald-600 px-3 py-2 text-sm font-bold text-white shadow-xl"
+              className="pointer-events-none fixed z-[80] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-xl border border-emerald-700 bg-emerald-600 px-3 py-2 text-sm font-bold text-white shadow-xl"
               style={{ left: dragGhost.x, top: dragGhost.y }}
             >
               <Move size={16} />
@@ -661,7 +661,7 @@ function QuestionCard({
               if (reviewMode) onReviewSubmit?.(answer);
               else onConfirm(answer);
             }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(239,68,68,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(239,68,68,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             {reviewMode ? 'Kiểm tra câu ôn tập' : 'Xác nhận'}
@@ -1102,7 +1102,7 @@ export default function LessonPracticePlayerPage({
         <button
           type="button"
           onClick={() => navigate(subjectId ? `/student/lesson-practice/subjects/${subjectId}` : '/student/lesson-practice')}
-          className="inline-flex items-center gap-1 text-sm font-bold text-red-600"
+          className="inline-flex items-center gap-1 text-sm font-bold text-emerald-600"
         >
           <ArrowLeft size={16} /> Danh sách buổi
         </button>
@@ -1269,7 +1269,7 @@ export default function LessonPracticePlayerPage({
                         type="button"
                         disabled={resetting}
                         onClick={() => resetPractice({ startImmediately: true })}
-                        className="h-8 shrink-0 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                        className="h-8 shrink-0 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                       >
                         {resetting ? 'Đang làm lại...' : 'Luyện tập lại'}
                       </button>
@@ -1397,7 +1397,7 @@ export default function LessonPracticePlayerPage({
                         type="button"
                         disabled={resetting}
                         onClick={() => resetPractice({ startImmediately: true })}
-                        className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-black text-white transition-colors hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+                        className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white transition-colors hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
                       >
                         {resetting ? 'Đang làm lại...' : 'Làm lại'}
                       </button>

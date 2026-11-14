@@ -430,7 +430,7 @@ export default function AdminMeetClassTab() {
               <ul className="mt-1 max-h-40 overflow-auto rounded-xl border border-slate-100">
                 {found.map((student) => (
                   <li key={student.id}>
-                    <button type="button" onClick={() => addStudent(student)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-red-50">
+                    <button type="button" onClick={() => addStudent(student)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-emerald-50">
                       <span className="font-bold text-slate-800">{student.name}</span>
                       <span className="text-xs text-slate-400">{student.phone || student.studentCode || ''}</span>
                     </button>

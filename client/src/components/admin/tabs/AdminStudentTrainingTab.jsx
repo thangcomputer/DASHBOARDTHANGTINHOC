@@ -362,7 +362,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
               {sTrainingTab === 'videos' && (
                 <div className="flex justify-end">
                   <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
-                    className="inline-flex min-h-10 justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
+                    className="inline-flex min-h-10 justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition items-center gap-1.5">
                     <Plus size={15} /> Gắn nội dung khóa đã tạo
                   </button>
                 </div>
@@ -415,7 +415,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                     type="button"
                     onClick={saveLearningGuide}
                     disabled={learningGuideSaving || (learningGuideVideoUrl.trim() && !getLearningGuideVideoEmbedUrl(learningGuideVideoUrl))}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {learningGuideSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                     {learningGuideSaving ? 'Đang lưu...' : 'Lưu hướng dẫn'}
@@ -575,7 +575,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                                       <button
                                         type="button"
                                         onClick={() => setSTrainingForm((prev) => ({ ...prev, coverImage: '' }))}
-                                        className="min-h-11 px-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50"
+                                        className="min-h-11 px-3 rounded-xl text-sm font-bold text-emerald-600 hover:bg-emerald-50"
                                       >
                                         Xóa ảnh
                                       </button>
@@ -1188,7 +1188,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                                               }}
                                               className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200"
                                             >
-                                              <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-black shadow-lg hover:bg-red-700 transition whitespace-nowrap">
+                                              <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black shadow-lg hover:bg-emerald-700 transition whitespace-nowrap">
                                                 🔓 Mở khóa thi lại
                                               </span>
                                             </button>
@@ -1250,7 +1250,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && (
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {sTrainingTab === 'videos' && courseCatalogError && (
-                      <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <div className="border-b border-red-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                         Không thể đồng bộ danh mục khóa học: {courseCatalogError}
                       </div>
                     )}
@@ -1288,7 +1288,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                                     </td>
                                     <td className="px-4 py-3">
                                       {sTrainingTab === 'files' ? (
-                                        <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black text-white shadow-xs ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'}`}>
+                                        <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black text-white shadow-xs ${item.fileType === 'PDF' ? 'bg-emerald-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'}`}>
                                           {item.fileType || 'File'}
                                         </span>
                                       ) : (
@@ -1406,7 +1406,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                           )}
 
                           {sTrainingTab === 'files' && (
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-emerald-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'
                               }`}>
                               {item.fileType || 'File'}
                             </div>

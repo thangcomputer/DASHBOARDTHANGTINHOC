@@ -10,7 +10,7 @@ const PLAN_TONES = {
   '3m': 'from-emerald-400 to-teal-600',
   '6m': 'from-violet-400 to-purple-600',
   '12m': 'from-amber-400 to-orange-600',
-  lifetime: 'from-red-500 to-rose-700',
+  lifetime: 'from-emerald-500 to-emerald-700',
 };
 
 /** Chọn gói (thanh toán SePay) hoặc nhập mã kích hoạt - dùng ở màn khóa và popup gia hạn. */

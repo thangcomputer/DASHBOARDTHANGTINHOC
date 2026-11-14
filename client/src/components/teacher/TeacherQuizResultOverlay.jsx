@@ -154,7 +154,7 @@ export default function TeacherQuizResultOverlay() {
 
           <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
             <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
-              isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-500/20 text-red-400 border border-emerald-500/30'
             }`}>
               <Award size={40} />
             </div>
@@ -211,7 +211,7 @@ export default function TeacherQuizResultOverlay() {
                         <CheckCircle size={12} /> Đúng
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-md shrink-0">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-red-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md shrink-0">
                         <XCircle size={12} /> Sai
                       </span>
                     )}
@@ -225,7 +225,7 @@ export default function TeacherQuizResultOverlay() {
                       if (isCorrectChoice) {
                         optionStyle = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold';
                       } else if (isUserChoice && !q.isCorrect) {
-                        optionStyle = 'bg-red-500/20 text-red-300 border-red-500/40 font-bold';
+                        optionStyle = 'bg-emerald-500/20 text-red-300 border-emerald-500/40 font-bold';
                       }
                       return (
                         <div key={optIdx} className={`p-3 rounded-xl border flex items-center gap-2 ${optionStyle}`}>

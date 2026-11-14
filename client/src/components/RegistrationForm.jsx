@@ -77,7 +77,7 @@ function ExpiredOverlay({ onBack }) {
         </p>
         <button
           onClick={onBack}
-          className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold py-3.5 rounded-2xl hover:from-red-700 transition shadow-lg inline-flex items-center justify-center gap-1"
+          className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold py-3.5 rounded-2xl hover:from-emerald-700 transition shadow-lg inline-flex items-center justify-center gap-1"
         >
           <NavArrow size={18} direction="back" className="text-white" />
           Quay lại nhập thông tin
@@ -462,7 +462,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
         <div className="bg-white shadow-2xl rounded-2xl border border-gray-100 overflow-hidden">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-700 via-red-600 to-emerald-500 px-8 py-5">
+          <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-500 px-8 py-5">
             <div className="flex items-center gap-3">
               <img src="/logo-thang-tin-hoc.svg" alt="Thắng Tin Học" className="h-10 brightness-0 invert" />
               <div>
@@ -518,7 +518,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, gender: 'male' }))}
                       className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
-                        ? 'bg-red-50 text-red-700 border-red-500 shadow-sm'
+                        ? 'bg-red-50 text-red-700 border-emerald-500 shadow-sm'
                         : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                         }`}
                     >
@@ -528,7 +528,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, gender: 'female' }))}
                       className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
-                        ? 'bg-rose-50 text-rose-700 border-rose-500 shadow-sm'
+                        ? 'bg-rose-50 text-rose-700 border-emerald-500 shadow-sm'
                         : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                         }`}
                     >
@@ -639,7 +639,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 )}
 
                 <button onClick={handleNext} disabled={!formData.course || coursesLoading}
-                  className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
+                  className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
                   Tiếp tục thanh toán
                   <NavArrow size={20} className="text-white" />
                 </button>

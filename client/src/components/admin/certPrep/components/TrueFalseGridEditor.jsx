@@ -84,7 +84,7 @@ export default function TrueFalseGridEditor({
                     disabled={disabled || rows.length <= 1}
                     aria-label={`Xóa nhận định ${idx + 1}`}
                     onClick={() => emit(rows.filter((x) => x.id !== row.id))}
-                    className="w-9 h-9 rounded-xl text-red-600 hover:bg-red-50 disabled:opacity-40"
+                    className="w-9 h-9 rounded-xl text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"
                   >
                     <Trash2 size={16} />
                   </button>

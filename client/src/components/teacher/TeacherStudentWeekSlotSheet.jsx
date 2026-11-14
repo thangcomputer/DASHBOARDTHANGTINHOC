@@ -325,7 +325,7 @@ export default function TeacherStudentWeekSlotSheet({
     <div className="fixed inset-0 z-[10040] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
       <button type="button" className="absolute inset-0" aria-label="Đóng" onClick={onClose} />
       <div className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
-        <div className="bg-red-600 px-4 sm:px-5 py-3.5 text-white flex items-center justify-between gap-2 shrink-0">
+        <div className="bg-emerald-600 px-4 sm:px-5 py-3.5 text-white flex items-center justify-between gap-2 shrink-0">
           <h3 className="font-bold text-sm sm:text-base flex items-center gap-2 min-w-0">
             <Calendar size={18} className="shrink-0" />
             <span className="truncate">Xếp lịch tuần · {name}</span>
@@ -337,7 +337,7 @@ export default function TeacherStudentWeekSlotSheet({
 
         <div className="px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0">
           <p className="text-xs text-slate-500 font-medium">
-            Khóa: <span className="font-bold text-red-700">{activeStudent.course || '-'}</span>
+            Khóa: <span className="font-bold text-emerald-700">{activeStudent.course || '-'}</span>
             {' · '}
             {progress.displayDone}/{progress.totalSessions} buổi
           </p>
@@ -358,13 +358,13 @@ export default function TeacherStudentWeekSlotSheet({
             </select>
           )}
           <div className="flex items-center justify-center gap-1.5 mt-3">
-            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), -7))} className="w-9 h-9 rounded-xl border-2 border-emerald-600 text-red-600 hover:bg-red-50 flex items-center justify-center" aria-label="Tuần trước">
+            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), -7))} className="w-9 h-9 rounded-xl border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 flex items-center justify-center" aria-label="Tuần trước">
               <ChevronLeft size={16} />
             </button>
-            <button type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))} className="px-3 h-9 rounded-xl border-2 border-emerald-600 text-xs font-bold text-red-600 hover:bg-red-50 min-w-[9.5rem]">
+            <button type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))} className="px-3 h-9 rounded-xl border-2 border-emerald-600 text-xs font-bold text-emerald-600 hover:bg-emerald-50 min-w-[9.5rem]">
               {formatWeekRangeLabel(weekStart)}
             </button>
-            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), 7))} className="w-9 h-9 rounded-xl border-2 border-emerald-600 text-red-600 hover:bg-red-50 flex items-center justify-center" aria-label="Tuần sau">
+            <button type="button" onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), 7))} className="w-9 h-9 rounded-xl border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 flex items-center justify-center" aria-label="Tuần sau">
               <ChevronRight size={16} />
             </button>
           </div>
@@ -401,7 +401,7 @@ export default function TeacherStudentWeekSlotSheet({
               type="button"
               disabled={saving || dirtyKeys.length === 0}
               onClick={handleCommit}
-              className="flex-[1.6] h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-black  tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-[1.6] h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black  tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? 'Đang lưu...' : 'Xếp lịch ngay'}
             </button>

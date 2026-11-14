@@ -586,7 +586,7 @@ export default function StudentQuestionBankPanel({
               type="button"
               onClick={() => openAddForm('multiple')}
               disabled={!activeSection}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               <Plus size={14} /> Thêm câu
             </button>
@@ -653,12 +653,12 @@ export default function StudentQuestionBankPanel({
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">{essayQuestions.length}</span>
             </div>
           </header>
-          <div className="px-3 py-2.5 border-b border-violet-50 flex flex-wrap items-center gap-2 bg-red-50/40">
+          <div className="px-3 py-2.5 border-b border-violet-50 flex flex-wrap items-center gap-2 bg-emerald-50/40">
             <button
               type="button"
               onClick={() => openAddForm('essay')}
               disabled={!activeSection}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               <Plus size={14} /> Thêm câu / đề TH
             </button>
@@ -768,7 +768,7 @@ export default function StudentQuestionBankPanel({
                           <button
                             type="button"
                             onClick={() => setSqForm({ ...sqForm, imageUrl: '', imageName: '' })}
-                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow"
+                            className="absolute -top-2 -right-2 p-1 bg-emerald-500 text-white rounded-full shadow"
                           >
                             <X size={12} />
                           </button>

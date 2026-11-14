@@ -222,7 +222,7 @@ const LoginPage = ({ onLogin }) => {
         <div className="hidden md:flex md:w-1/2 p-8 lg:p-12 xl:p-16 flex-col justify-center relative min-w-0">
           <div className="absolute top-6 left-8 lg:top-10 lg:left-12">
             <div className="cms-login-chip">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
               <span>Hệ thống quản lý trực tuyến</span>
             </div>
           </div>
@@ -302,7 +302,7 @@ const LoginPage = ({ onLogin }) => {
                           if (phone) q.set('phone', normalizePhone(phone) || phone);
                           navigate(`/dangkykhoahoc?${q.toString()}`);
                         }}
-                        className="mt-1 w-full py-2 rounded-xl bg-red-600 text-white text-xs font-black tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
+                        className="mt-1 w-full py-2 rounded-xl bg-emerald-600 text-white text-xs font-black tracking-wide hover:bg-emerald-500 transition inline-flex items-center justify-center gap-1"
                       >
                         Đăng ký / thanh toán khóa học
                         <NavArrow size={14} className="text-white" />
@@ -400,9 +400,9 @@ const LoginPage = ({ onLogin }) => {
                     <label className="text-xs font-bold text-gray-400  block mb-2">Vai trò</label>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setForgotRole('student')}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'student' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Học viên</button>
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'student' ? 'border-emerald-500 bg-emerald-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Học viên</button>
                       <button type="button" onClick={() => setForgotRole('teacher')}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'teacher' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Giảng viên</button>
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'teacher' ? 'border-emerald-500 bg-emerald-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Giảng viên</button>
                     </div>
                   </div>
                   <div>
@@ -411,7 +411,7 @@ const LoginPage = ({ onLogin }) => {
                       <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                       <input type="tel" inputMode="tel" autoComplete="tel" value={forgotPhone} maxLength={PHONE_MAX_DIGITS + 1} onChange={e => { setForgotPhone(limitPhoneInput(e.target.value)); setForgotError(''); }}
                         onKeyDown={e => e.key === 'Enter' && handleCheckPhone()}
-                        className="w-full bg-[#0f172a] border-2 border-white/10 rounded-xl pl-11 pr-4 py-3 text-white text-sm font-bold outline-none focus:border-red-500 transition placeholder:text-slate-400"
+                        className="w-full bg-[#0f172a] border-2 border-white/10 rounded-xl pl-11 pr-4 py-3 text-white text-sm font-bold outline-none focus:border-emerald-500 transition placeholder:text-slate-400"
                         placeholder="VD: 0912345678" />
                     </div>
                   </div>
@@ -430,9 +430,9 @@ const LoginPage = ({ onLogin }) => {
                     </div>
                   )}
 
-                  {forgotError && <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center gap-2 text-red-400 text-sm font-bold"><AlertCircle size={14} /> {forgotError}</div>}
+                  {forgotError && <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-2 text-red-400 text-sm font-bold"><AlertCircle size={14} /> {forgotError}</div>}
                   <button type="button" onClick={handleCheckPhone} disabled={forgotLoading || !forgotConfirmLine}
-                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-orange-600 text-white font-black rounded-xl  tracking-wider text-sm hover:from-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-orange-600 text-white font-black rounded-xl  tracking-wider text-sm hover:from-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
                     {forgotLoading
                       ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       : <><CheckCircle2 size={16} /> Xác nhận</>}

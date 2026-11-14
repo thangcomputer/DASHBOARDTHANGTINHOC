@@ -1087,7 +1087,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
   // UI LAYOUTS
   if (phase === 'banned') return (
     <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
-      <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600">
+      <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-emerald-600">
         <XCircle size={80} className="text-red-600 mx-auto mb-6" />
         <h2 className="text-3xl font-black text-red-600  italic">Bài thi bị hủy</h2>
         <div className="bg-red-50 p-6 rounded-3xl mt-6 border border-red-100">
@@ -1152,7 +1152,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
               <div className="space-y-1.5 relative mt-3">
                 {/* Nút số 1 được đóng khung đỏ */}
                 <div className="relative">
-                  <div className="absolute -left-[5px] -right-[5px] -top-[5px] -bottom-[5px] border-2 border-red-500 rounded-[14px] pointer-events-none" />
+                  <div className="absolute -left-[5px] -right-[5px] -top-[5px] -bottom-[5px] border-2 border-emerald-500 rounded-[14px] pointer-events-none" />
                   <div className="bg-[#B9F5C5] text-[#1E5C2A] text-center py-1.5 rounded-[10px] font-bold text-xs">Cho phép mỗi khi truy cập...</div>
                   {/* SVG Arrow Pointing UP-LEFT */}
                   <svg className="absolute -right-[20px] -bottom-[20px] w-6 h-6 text-red-500 animate-bounce pointer-events-none"
@@ -1397,7 +1397,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
     if (practicalExpired) {
       return (
         <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
-          <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600">
+          <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-emerald-600">
             <XCircle size={72} className="text-red-600 mx-auto mb-4" />
             <h2 className="text-2xl font-black text-red-600  italic">Hết giờ nộp bài</h2>
             <p className="text-red-900 font-bold mt-4 leading-relaxed">
@@ -1651,7 +1651,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
               </p>
               <div className="h-4 bg-slate-100 rounded-full mt-8 overflow-hidden border border-slate-200 p-1">
                 <div
-                  className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-1000 ease-in-out"
+                  className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-1000 ease-in-out"
                   style={{ width: `${(warningOverlay.count / 2) * 100}%` }}
                 />
               </div>
@@ -1773,7 +1773,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
 
             <div className="h-4 bg-slate-100 rounded-full mt-8 overflow-hidden border border-slate-200 p-1">
               <div
-                className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-1000 ease-in-out"
+                className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-1000 ease-in-out"
                 style={{ width: `${(warningOverlay.count / 2) * 100}%` }}
               />
             </div>
@@ -1938,7 +1938,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
                       });
                     }
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 py-2.5 text-sm font-black text-white shadow-md hover:from-red-700 hover:to-red-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-sm font-black text-white shadow-md hover:from-emerald-700 hover:to-red-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} />
                   {submitting ? 'Đang nộp bài…' : 'Nộp bài kiểm tra'}

@@ -44,7 +44,7 @@ export default function CoursePurchaseConfirmModal({ course, onCancel, onConfirm
         aria-describedby="course-purchase-confirm-description"
         className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
       >
-        <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500" />
+        <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-500 to-emerald-500" />
         <div className="p-6 sm:p-8">
         <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-orange-50 text-amber-600 shadow-inner">
           <ShoppingCart size={29} strokeWidth={2.2} />

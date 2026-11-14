@@ -68,7 +68,7 @@ function FaviconRow({
             type="url"
             value={value}
             onChange={onChange}
-            className={`flex-1 min-w-0 border rounded-lg px-2 py-1.5 text-[11px] font-mono outline-none bg-white ${isRose ? 'border-rose-100 focus:border-rose-400' : 'border-slate-200 focus:border-blue-400'
+            className={`flex-1 min-w-0 border rounded-lg px-2 py-1.5 text-[11px] font-mono outline-none bg-white ${isRose ? 'border-rose-100 focus:border-emerald-400' : 'border-slate-200 focus:border-blue-400'
               }`}
             placeholder="URL…"
           />
@@ -420,7 +420,7 @@ export default function WebSettingsTab() {
             <div key={index} className="relative rounded-xl border border-gray-200 bg-gray-50 p-2 group">
               <button
                 type="button"
-                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-emerald-600 hover:text-white z-10"
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-emerald-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-emerald-600 hover:text-white z-10"
                 onClick={() => setConfig((prev) => ({
                   ...prev,
                   studentBanners: prev.studentBanners.filter((_, i) => i !== index),
@@ -553,7 +553,7 @@ export default function WebSettingsTab() {
           <button
             type="button"
             onClick={handlePreview}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold hover:bg-red-100 transition"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[11px] font-bold hover:bg-red-100 transition"
           >
             <Eye size={12} /> Xem 3s
           </button>
@@ -566,7 +566,7 @@ export default function WebSettingsTab() {
               type="button"
               onClick={() => setConfig((prev) => ({ ...prev, loadingStyle: ls.id }))}
               className={`relative rounded-xl border p-2.5 text-left transition-all ${config.loadingStyle === ls.id
-                  ? 'border-red-500 bg-red-50'
+                  ? 'border-emerald-500 bg-red-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
                 }`}
             >

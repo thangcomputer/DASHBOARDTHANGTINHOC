@@ -252,7 +252,7 @@ export function CompactCoursePicker({ items, activeCourseName, onChange, error, 
                       GV: {item.teacherName || 'Chưa phân công'}{item.completed ? ' · Đã hoàn thành' : ''}
                     </span>
                     <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-slate-100">
-                      <span className={`block h-full rounded-full ${item.completed ? 'bg-emerald-500' : selected ? 'bg-blue-500' : 'bg-red-500'}`} style={{ width: `${item.pct}%` }} />
+                      <span className={`block h-full rounded-full ${item.completed ? 'bg-emerald-500' : selected ? 'bg-blue-500' : 'bg-emerald-500'}`} style={{ width: `${item.pct}%` }} />
                     </span>
                   </span>
                   <span className="shrink-0 text-[11px] font-bold tabular-nums text-slate-500">{progressText(item)}</span>

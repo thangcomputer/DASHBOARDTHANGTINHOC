@@ -59,7 +59,7 @@ export default function CertPrepTestCard({
             disabled={busy}
             onClick={() => setImmediate((v) => !v)}
             className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${
-              immediate ? 'bg-red-600' : 'bg-slate-300'
+              immediate ? 'bg-emerald-600' : 'bg-slate-300'
             } disabled:opacity-50`}
           >
             <span
@@ -89,7 +89,7 @@ export default function CertPrepTestCard({
             type="button"
             onClick={handleContinue}
             disabled={busy}
-            className="w-full min-h-11 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2"
+            className="w-full min-h-11 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
             {en ? 'Continue' : 'Tiếp tục'}
@@ -99,7 +99,7 @@ export default function CertPrepTestCard({
             type="button"
             onClick={handleStart}
             disabled={busy}
-            className="w-full min-h-11 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2"
+            className="w-full min-h-11 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
             {en ? 'Start practice' : 'Bắt đầu làm bài'}

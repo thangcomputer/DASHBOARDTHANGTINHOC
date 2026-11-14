@@ -1078,7 +1078,7 @@ export default function FeedBoard({ session, role }) {
                       <button
                         type="button"
                         onClick={() => removePending(i)}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-emerald-600 text-white flex items-center justify-center transition-colors"
                       >
                         <X size={12} />
                       </button>
@@ -1879,7 +1879,7 @@ export default function FeedBoard({ session, role }) {
                 type="button"
                 disabled={!reportReason || reportBusy}
                 onClick={submitPostReport}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-red-700 disabled:opacity-45"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-45"
               >
                 {reportBusy ? <Loader2 size={14} className="animate-spin" /> : <Flag size={14} />}
                 {reportBusy ? 'Đang gửi…' : 'Gửi báo cáo'}

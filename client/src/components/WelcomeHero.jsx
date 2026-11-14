@@ -51,10 +51,10 @@ const ACCENT = {
     glow: 'bg-red-200/30',
     dotGrid: 'rgba(220,38,38,0.25)',
     eyebrow: 'text-red-700 bg-red-50 border border-red-200',
-    name: 'bg-gradient-to-r from-red-700 via-red-600 to-orange-500 bg-clip-text text-transparent',
+    name: 'bg-gradient-to-r from-emerald-700 via-emerald-600 to-orange-500 bg-clip-text text-transparent',
     chipIcon: 'text-red-500',
     chipLive: 'bg-red-600 text-white border border-red-500 border-b-2 border-b-red-800 font-black',
-    join: 'bg-red-600 border border-red-500 border-b-4 border-b-red-800',
+    join: 'bg-emerald-600 border border-emerald-500 border-b-4 border-b-red-800',
     joinPing: 'bg-red-400/60',
   },
   emerald: {

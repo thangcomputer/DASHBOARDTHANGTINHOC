@@ -30,7 +30,7 @@ const VARIANT_STYLES = {
     activeShadow: '0 1px 0 #B45309',
   },
   danger: {
-    bg: 'bg-gradient-to-b from-rose-500 to-red-600 text-white border-red-600',
+    bg: 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-emerald-600',
     shadow: '0 4px 0 #B91C1C, 0 8px 18px -4px rgba(225, 29, 72, 0.3)',
     activeShadow: '0 1px 0 #B91C1C',
   },

@@ -186,7 +186,7 @@ function RegionDraw({ imageUrl, region, onChange }) {
       <img src={resolveMediaUrl(imageUrl)} alt="" className="block w-full max-h-80 object-contain pointer-events-none" />
       {region && (
         <span
-          className="absolute border-2 border-red-500 bg-red-400/20 pointer-events-none"
+          className="absolute border-2 border-emerald-500 bg-red-400/20 pointer-events-none"
           style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.w}%`, height: `${region.h}%` }}
         />
       )}
@@ -703,11 +703,11 @@ export default function AdminLessonPracticeTab() {
                     const expanded = expandedCourseId === course.id;
                     return (
                       <div key={course.id} className="space-y-1">
-                        <div className={`flex items-center gap-1 rounded-xl border p-1 ${expanded ? 'border-red-100 bg-red-50' : 'border-slate-100 bg-white'}`}>
+                        <div className={`flex items-center gap-1 rounded-xl border p-1 ${expanded ? 'border-red-100 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
                           <button
                             type="button"
                             onClick={() => setExpandedCourseId(expanded ? '' : course.id)}
-                            className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold ${expanded ? 'text-red-700' : 'text-slate-700'}`}
+                            className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold ${expanded ? 'text-emerald-700' : 'text-slate-700'}`}
                           >
                             <span className="min-w-0 truncate">{course.name}</span>
                             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -1044,7 +1044,7 @@ export default function AdminLessonPracticeTab() {
                                       <button
                                         key={sec}
                                         type="button"
-                                        className="rounded-md border border-red-200 bg-white px-2 py-1 text-[11px] font-bold text-red-700"
+                                        className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-bold text-emerald-700"
                                         onMouseDown={(event) => event.preventDefault()}
                                         onClick={() => {
                                           setPracticeGroupTimeLimit(groupId, sec);
@@ -1074,7 +1074,7 @@ export default function AdminLessonPracticeTab() {
                                           </button>
                                           <button
                                             type="button"
-                                            className="font-bold text-red-600"
+                                            className="font-bold text-emerald-600"
                                             onClick={() => {
                                               setItems((rows) => rows.filter((row) => row.id !== item.id));
                                               if (!String(item.id).startsWith('pending-')) {
@@ -1231,14 +1231,14 @@ export default function AdminLessonPracticeTab() {
                               <div className="flex flex-wrap gap-1.5">
                                 {draft.id ? (
                                   <>
-                                    <button type="submit" disabled={saving} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">Cập nhật câu</button>
+                                    <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">Cập nhật câu</button>
                                     <button
                                       type="submit"
                                       data-next="1"
                                       disabled={saving}
                                       aria-label="Cập nhật câu và thêm câu mới"
                                       title="Cập nhật câu và thêm câu mới"
-                                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white disabled:opacity-60"
+                                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white disabled:opacity-60"
                                     >
                                       <Plus size={17} />
                                     </button>
@@ -1250,7 +1250,7 @@ export default function AdminLessonPracticeTab() {
                                     disabled={saving}
                                     aria-label="Thêm câu và tạo câu tiếp theo"
                                     title="Thêm câu và tạo câu tiếp theo"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white disabled:opacity-60"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white disabled:opacity-60"
                                   >
                                     <Plus size={17} />
                                   </button>
@@ -1330,7 +1330,7 @@ export default function AdminLessonPracticeTab() {
                             <button
                               type="button"
                               disabled={!lessonContentReady || saving}
-                              className="min-h-9 min-w-36 rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-red-700"
+                              className="min-h-9 min-w-36 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-emerald-700"
                               onClick={() => run(saveAllUnitContent)}
                             >
                               Hoàn tất

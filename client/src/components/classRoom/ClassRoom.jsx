@@ -283,7 +283,7 @@ function Room({ scheduleId, onClose }) {
         </button>
       </div>
       <div className="relative min-h-0 w-full flex-1 bg-black">
-        {error ? <p className="absolute left-4 right-4 top-4 z-10 rounded-2xl bg-red-500/20 px-4 py-3 text-sm font-bold text-red-100">{error}</p> : null}
+        {error ? <p className="absolute left-4 right-4 top-4 z-10 rounded-2xl bg-emerald-500/20 px-4 py-3 text-sm font-bold text-red-100">{error}</p> : null}
         {!error && status ? <p className="absolute left-4 top-4 z-10 max-w-lg rounded-full bg-black/50 px-3 py-1 text-xs text-slate-200">{status}</p> : null}
         {mainRemote ? (
           <StageVideo stream={mainRemote.stream} className="absolute inset-0 h-full w-full bg-black object-contain" />

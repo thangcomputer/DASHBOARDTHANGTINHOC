@@ -186,7 +186,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
             <button
               type="button"
               onClick={() => handleSelect('all', 'Tất cả chi nhánh')}
-              className="w-full min-h-11 rounded-xl bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors"
+              className="w-full min-h-11 rounded-xl bg-emerald-50 text-emerald-600 text-xs font-semibold hover:bg-red-100 transition-colors"
             >
               Xóa bộ lọc
             </button>

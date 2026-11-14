@@ -2541,7 +2541,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <li key={c.id} role="option">
                         <button
                           type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-red-50 transition-colors"
+                          className="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             selectConversation(c);
@@ -2661,7 +2661,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   className={`cms-chat-conv-row group border border-slate-100 bg-white shadow-sm ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'}`}
                 >
                   <div className="relative shrink-0">
-                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold relative z-10 overflow-hidden ${isGroup ? 'cms-chat-group-badge bg-red-500' : 'bg-white ring-2 shadow-md ' + (
+                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold relative z-10 overflow-hidden ${isGroup ? 'cms-chat-group-badge bg-emerald-500' : 'bg-white ring-2 shadow-md ' + (
                       conv.user.role === 'teacher' ? 'ring-amber-400/80'
                         : conv.user.role === 'student' ? 'ring-sky-400/80'
                           : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'ring-blue-400/80'
@@ -2691,7 +2691,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           : conv.user.role === 'student' ? 'bg-sky-500 text-white'
                             : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'bg-blue-600 text-white'
                               : String(conv.user.adminRole || '').toUpperCase() === 'STAFF' || conv.user.role === 'staff' ? 'bg-slate-600 text-white'
-                                : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
+                                : conv.user.role === 'admin' ? 'bg-emerald-600 text-white'
                                   : 'bg-slate-600 text-white'
                           }`}
                       >
@@ -2814,7 +2814,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       </p>
                       {conv.unread > 0 && (
                         <div className="flex gap-1 items-center shrink-0">
-                          <span className="px-1.5 py-0.5 bg-red-500 rounded-md text-white text-[10px] font-semibold animate-pulse shadow-sm">
+                          <span className="px-1.5 py-0.5 bg-emerald-500 rounded-md text-white text-[10px] font-semibold animate-pulse shadow-sm">
                             Mới
                           </span>
                         </div>
@@ -2893,7 +2893,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <ChevronLeft size={22} />
                   </button>
                   <div className="relative shrink-0">
-                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white ${activeConv.isGroup ? 'cms-chat-group-badge bg-red-500' : 'bg-white shadow-sm'
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white ${activeConv.isGroup ? 'cms-chat-group-badge bg-emerald-500' : 'bg-white shadow-sm'
                       }`}>
                       {activeConv.isGroup ? (
                         <Users size={16} />
@@ -2946,7 +2946,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       href={classroomJoin.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
+                      className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
                       aria-label={isClassTime ? 'Lớp học đang diễn ra, vào lớp ngay' : 'Vào lớp học ngay'}
                       title={isClassTime ? 'Buổi học đang diễn ra. Bấm để vào lớp Meet' : 'Vào lớp học ngay'}
                     >
@@ -3568,7 +3568,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             {!isMine && activeConv?.isGroup && (
                               <div className="mb-1 ml-1 flex min-w-0 items-center gap-1.5">
                                 <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-emerald-500 text-white' :
                                   role === 'staff' ? 'bg-amber-600 text-white' :
                                     role === 'teacher' ? 'bg-emerald-600 text-white' : 'bg-green-600 text-white'
                                   }`}>
@@ -3950,7 +3950,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <button
                             type="button"
                             onClick={() => setPendingImage(null)}
-                            className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-emerald-600 hover:bg-red-50 flex items-center justify-center transition shrink-0"
+                            className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition shrink-0"
                             title="Bỏ chọn ảnh"
                           >
                             <X size={14} />
@@ -4002,7 +4002,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {showCreateGroup && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[24px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-280 max-h-[min(92dvh,720px)] flex flex-col">
-            <div className="px-5 py-4 bg-gradient-to-br from-red-700 to-red-900 text-white flex items-center justify-between shrink-0">
+            <div className="px-5 py-4 bg-gradient-to-br from-emerald-700 to-red-900 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <Users size={18} className="text-red-200 shrink-0" />
                 <h3 className="font-semibold text-base tracking-tight truncate">Tạo nhóm chat mới</h3>
@@ -4063,7 +4063,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               }}
                             />
                           </div>
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${u.role === 'admin' ? 'bg-red-500' :
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${u.role === 'admin' ? 'bg-emerald-500' :
                             u.role === 'teacher' ? 'bg-amber-600' : 'bg-emerald-600'
                             }`}>
                             {(u.name || '?')[0].toUpperCase()}
@@ -4108,7 +4108,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       toast?.error('Lỗi kết nối máy chủ.');
                     }
                   }}
-                  className="flex-[1.4] min-h-12 py-3 px-4 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                  className="flex-[1.4] min-h-12 py-3 px-4 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                 >
                   Tạo nhóm ngay
                 </button>
@@ -4148,7 +4148,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   }
                   setGroupToDelete(null);
                 }}
-                className="flex-1 py-3.5 px-4 bg-red-500 text-white rounded-2xl font-black text-xs  hover:bg-red-600 transition-all shadow-lg shadow-red-200"
+                className="flex-1 py-3.5 px-4 bg-emerald-500 text-white rounded-2xl font-black text-xs  hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200"
               >
                 Xóa Vĩnh Viễn
               </button>
@@ -4227,7 +4227,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       }
                     }}
                     disabled={isBroadcasting || !broadcastContent.trim()}
-                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl font-black text-xs  tracking-widest hover:shadow-xl hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-2xl font-black text-xs  tracking-widest hover:shadow-xl hover:shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
                   >
                     {isBroadcasting ? (
                       <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>
@@ -4326,7 +4326,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         : u.role === 'staff' ? (u.adminRole === 'SUPPORT' ? 'Support viên' : 'Admin Chi nhánh')
                           : u.role === 'teacher' ? 'Giảng viên'
                             : 'Học viên';
-                      const roleColor = u.role === 'admin' ? 'bg-red-500 text-white' : u.role === 'staff' ? 'bg-amber-600 text-white' : u.role === 'teacher' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white';
+                      const roleColor = u.role === 'admin' ? 'bg-emerald-500 text-white' : u.role === 'staff' ? 'bg-amber-600 text-white' : u.role === 'teacher' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white';
                       const isSelected = selectedParticipants.some(p => p.userId === u.id);
 
                       return (

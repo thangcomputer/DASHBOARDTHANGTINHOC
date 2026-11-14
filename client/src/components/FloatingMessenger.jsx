@@ -252,7 +252,7 @@ function ReactionPicker({ msgId, isMine, onReact, myReactions = [] }) {
           onClick={(event) => event.stopPropagation()}
         >
           {[
-            { type: 'heart', label: 'Tim', icon: '❤️', active: 'bg-red-50' },
+            { type: 'heart', label: 'Tim', icon: '❤️', active: 'bg-emerald-50' },
             { type: 'like', label: 'Thích', icon: '👍', active: 'bg-blue-50' },
           ].map((reaction) => (
             <button

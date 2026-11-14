@@ -214,7 +214,7 @@ const AdminLoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="cms-login-bg relative min-h-[100dvh] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto selection:bg-red-500/30">
+    <div className="cms-login-bg relative min-h-[100dvh] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto selection:bg-emerald-500/30">
       <div className="cms-login-aura cms-login-aura--red" aria-hidden="true" />
       <div className="cms-login-aura cms-login-aura--blue" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-0 overflow-hidden text-white/[0.05]" aria-hidden="true">

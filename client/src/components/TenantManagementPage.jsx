@@ -107,7 +107,7 @@ export default function TenantManagementPage() {
             <input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} placeholder="SĐT" className="border border-gray-200 rounded-xl px-3 py-2 text-sm" />
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={create} disabled={saving} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-40">Tạo</button>
+            <button type="button" onClick={create} disabled={saving} className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-40">Tạo</button>
             <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold">Hủy</button>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function TenantManagementPage() {
       <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
         <ul className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50 overflow-y-auto min-h-0 max-lg:max-h-[40vh] h-full">
           {tenants.map((t) => (
-            <li key={t._id} className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50 ${selected?._id === t._id ? 'bg-red-50' : ''}`} onClick={() => openTenant(t)}>
+            <li key={t._id} className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50 ${selected?._id === t._id ? 'bg-emerald-50' : ''}`} onClick={() => openTenant(t)}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-gray-900 truncate">
                   {t.code} - {t.name}
@@ -168,7 +168,7 @@ export default function TenantManagementPage() {
                     ))}
                   </CmsSelect>
                 </div>
-                <button type="button" onClick={assign} disabled={!assignBranchId} className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-40">Gán</button>
+                <button type="button" onClick={assign} disabled={!assignBranchId} className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold disabled:opacity-40">Gán</button>
               </div>
             </>
           )}

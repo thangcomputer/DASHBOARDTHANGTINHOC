@@ -51,7 +51,7 @@ export default function CertPrepPlayerHeader({
             <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-black text-sm tabular-nums border ${
                 critical
-                  ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-red-300'
                   : warning
                     ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                     : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
@@ -66,7 +66,7 @@ export default function CertPrepPlayerHeader({
               type="button"
               onClick={onSubmit}
               disabled={submitDisabled}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition shadow-md shadow-red-900/30 flex items-center gap-1.5"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition shadow-md shadow-red-900/30 flex items-center gap-1.5"
             >
               <Send size={14} aria-hidden="true" /> Nộp bài
             </button>
@@ -123,7 +123,7 @@ export default function CertPrepPlayerHeader({
           aria-valuemax={total}
         >
           <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full rounded-full bg-red-500 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
       ) : null}

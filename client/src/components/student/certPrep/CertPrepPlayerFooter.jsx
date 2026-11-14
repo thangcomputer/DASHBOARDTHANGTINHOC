@@ -26,7 +26,7 @@ export default function CertPrepPlayerFooter({
           type="button"
           onClick={onSubmit}
           disabled={submitDisabled}
-          className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 transition lg:hidden"
+          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 transition lg:hidden"
         >
           <Send size={14} aria-hidden="true" /> Nộp bài
         </button>
@@ -61,7 +61,7 @@ export default function CertPrepPlayerFooter({
           type="button"
           onClick={onSubmit}
           disabled={submitDisabled}
-          className="min-h-11 px-5 rounded-xl font-black text-sm bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-600/20 disabled:opacity-60 inline-flex items-center gap-2"
+          className="min-h-11 px-5 rounded-xl font-black text-sm bg-gradient-to-r from-emerald-600 to-emerald-600 text-white shadow-md shadow-emerald-600/20 disabled:opacity-60 inline-flex items-center gap-2"
         >
           <Send size={15} aria-hidden="true" /> Nộp bài
         </button>

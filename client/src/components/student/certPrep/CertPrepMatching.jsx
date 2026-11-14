@@ -37,7 +37,7 @@ export default function CertPrepMatching({
           ? (isOk
             ? 'border-emerald-500/40 bg-emerald-500/15'
             : isBad
-              ? 'border-red-500/40 bg-red-500/15'
+              ? 'border-emerald-500/40 bg-emerald-500/15'
               : 'border-white/10 bg-white/5')
           : (isOk
             ? 'border-emerald-400 bg-emerald-50'

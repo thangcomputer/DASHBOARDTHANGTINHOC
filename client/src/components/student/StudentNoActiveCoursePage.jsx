@@ -38,7 +38,7 @@ export default function StudentNoActiveCoursePage({ student }) {
       </div>
 
       {isLocked ? (
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center border-t-4 border-red-500">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center border-t-4 border-emerald-500">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-red-500" />
           </div>

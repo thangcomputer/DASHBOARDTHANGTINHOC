@@ -249,7 +249,7 @@ export default function FreeSurveyModal({ open, onDone }) {
                 type="button"
                 onClick={submit}
                 disabled={saving}
-                className="min-w-36 rounded-2xl bg-gradient-to-b from-red-500 to-red-700 px-6 py-3 text-sm font-black text-white disabled:opacity-60"
+                className="min-w-36 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-6 py-3 text-sm font-black text-white disabled:opacity-60"
               >
                 {saving ? 'Đang lưu...' : 'Vào học'}
               </button>

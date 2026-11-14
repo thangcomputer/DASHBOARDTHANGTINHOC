@@ -156,7 +156,7 @@ export default function PinLockSettingsModal({ userKey }) {
                 >
                   <Lock size={15} aria-hidden="true" /> Khóa ngay
                 </button>
-                <button type="button" onClick={() => goStep('verify-remove')} className="cms-pin-press rounded-xl border border-red-200 bg-white px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">Tắt khóa</button>
+                <button type="button" onClick={() => goStep('verify-remove')} className="cms-pin-press rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-bold text-emerald-600 hover:bg-emerald-50">Tắt khóa</button>
               </div>
             ) : (
               <button type="button" onClick={() => goStep('create')} className="cms-pin-press w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white">

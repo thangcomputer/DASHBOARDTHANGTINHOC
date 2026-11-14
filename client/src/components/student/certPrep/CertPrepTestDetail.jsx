@@ -40,7 +40,7 @@ export default function CertPrepTestDetail({
           type="button"
           disabled={starting}
           onClick={onStart}
-          className="min-h-11 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-black disabled:opacity-60"
+          className="min-h-11 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black disabled:opacity-60"
         >
           {starting ? 'Đang bắt đầu...' : 'Bắt đầu làm bài'}
         </button>

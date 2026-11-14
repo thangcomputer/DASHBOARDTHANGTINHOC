@@ -113,7 +113,7 @@ export default function BackupCenterPage() {
             type="button"
             onClick={onCreate}
             disabled={creating}
-            className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-40"
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-40"
           >
             {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
             Tạo backup
@@ -177,7 +177,7 @@ export default function BackupCenterPage() {
                       type="button"
                       disabled={busyId === row._id}
                       onClick={() => onDownload(row)}
-                      className="p-2 rounded-lg text-red-600 hover:bg-red-50"
+                      className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50"
                       title="Tải về"
                     >
                       <Download size={16} />

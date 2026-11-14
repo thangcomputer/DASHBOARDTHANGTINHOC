@@ -7,7 +7,7 @@ export default function TransferPaymentHeader({
   children,
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-rose-600 via-fuchsia-700 to-indigo-600 px-3 py-2.5 text-white">
+    <div className="flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-emerald-600 via-fuchsia-700 to-indigo-600 px-3 py-2.5 text-white">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20">
         <CreditCard size={18} />
       </div>

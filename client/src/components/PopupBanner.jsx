@@ -140,7 +140,7 @@ export default function PopupBanner({ role }) {
           <button
             type="button"
             onClick={handleClose}
-            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-600 text-white font-bold rounded-2xl hover:from-red-700 transition shadow-lg shadow-red-100"
+            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-600 text-white font-bold rounded-2xl hover:from-emerald-700 transition shadow-lg shadow-emerald-100"
           >
             Đã hiểu, đóng thông báo ✓
           </button>

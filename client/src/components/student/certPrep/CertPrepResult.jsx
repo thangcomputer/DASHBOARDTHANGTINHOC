@@ -37,7 +37,7 @@ export default function CertPrepResult() {
       : state.loadResult;
     return (
       <div className="space-y-4">
-        <button type="button" onClick={() => navigate('/student/cert-prep')} className="text-sm font-bold text-red-600 inline-flex items-center gap-1">
+        <button type="button" onClick={() => navigate('/student/cert-prep')} className="text-sm font-bold text-emerald-600 inline-flex items-center gap-1">
           <ChevronLeft size={16} aria-hidden="true" /> Quay lại Ôn thi MOS/IC3
         </button>
         <CertPrepErrorState
@@ -53,7 +53,7 @@ export default function CertPrepResult() {
 
   return (
     <div className="space-y-4">
-      <button type="button" onClick={() => navigate('/student/cert-prep')} className="text-sm font-bold text-red-600 inline-flex items-center gap-1">
+      <button type="button" onClick={() => navigate('/student/cert-prep')} className="text-sm font-bold text-emerald-600 inline-flex items-center gap-1">
         <ChevronLeft size={16} aria-hidden="true" /> Quay lại Ôn thi MOS/IC3
       </button>
       <CertPrepResultSummary result={result} />

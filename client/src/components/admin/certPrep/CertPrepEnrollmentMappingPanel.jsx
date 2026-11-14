@@ -115,7 +115,7 @@ export default function CertPrepEnrollmentMappingPanel({ certPrepCourses, toast 
             type="button"
             disabled={saving || !courseId || !certPrepCourseId}
             onClick={save}
-            className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white disabled:opacity-60"
+            className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white disabled:opacity-60"
           >
             Lưu mapping
           </button>

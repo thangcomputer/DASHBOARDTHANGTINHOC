@@ -655,7 +655,7 @@ export const StudentVideoPlayer = ({
             className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center bg-slate-950/95"
             onContextMenu={e => e.preventDefault()}
           >
-            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
               <Lock size={28} />
             </div>
             <h3 className="text-red-400 font-black text-sm  tracking-wider">Video Đã Tạm Dừng</h3>

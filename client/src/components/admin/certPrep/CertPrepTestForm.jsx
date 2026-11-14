@@ -76,7 +76,7 @@ export default function CertPrepTestForm({ test, saving, onSave, onClose }) {
         </div>
         <div className="px-5 py-4 border-t flex justify-end gap-2">
           <button type="button" onClick={() => (dirty ? setDirtyConfirm(true) : onClose())} className="min-h-11 px-4 rounded-xl font-bold text-sm">Hủy</button>
-          <button type="submit" disabled={saving} className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white disabled:opacity-60 inline-flex items-center gap-2">
+          <button type="submit" disabled={saving} className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white disabled:opacity-60 inline-flex items-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null} Lưu
           </button>
         </div>

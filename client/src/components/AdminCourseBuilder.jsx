@@ -319,7 +319,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 sm:min-w-0 sm:px-3 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-red-700 font-semibold text-sm shrink-0 transition"
+              className="inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 sm:min-w-0 sm:px-3 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-emerald-700 font-semibold text-sm shrink-0 transition"
             >
               <ArrowLeft size={18} />
               <span className="hidden sm:inline">Quay lại</span>
@@ -391,8 +391,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
               <div className="bg-slate-50 border-b border-slate-200 px-3 sm:px-5 py-3 sm:py-4 flex items-start sm:items-center justify-between gap-2 min-w-0">
                 <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
                   <div className="flex flex-col gap-0.5 opacity-60 shrink-0 pt-0.5">
-                    <button type="button" onClick={() => moveChapter(cIdx, 'up')} disabled={cIdx === 0} className="p-1 hover:text-red-600 disabled:opacity-20" aria-label="Lên"><ArrowUp size={14} /></button>
-                    <button type="button" onClick={() => moveChapter(cIdx, 'down')} disabled={cIdx === chapters.length - 1} className="p-1 hover:text-red-600 disabled:opacity-20" aria-label="Xuống"><ArrowDown size={14} /></button>
+                    <button type="button" onClick={() => moveChapter(cIdx, 'up')} disabled={cIdx === 0} className="p-1 hover:text-emerald-600 disabled:opacity-20" aria-label="Lên"><ArrowUp size={14} /></button>
+                    <button type="button" onClick={() => moveChapter(cIdx, 'down')} disabled={cIdx === chapters.length - 1} className="p-1 hover:text-emerald-600 disabled:opacity-20" aria-label="Xuống"><ArrowDown size={14} /></button>
                   </div>
 
                   {editingChapterId === chapter.id ? (
@@ -578,8 +578,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                         ) : (
                           <div className="flex items-start gap-2 sm:gap-3 min-w-0">
                             <div className="flex flex-col gap-0.5 opacity-60 shrink-0 pt-1">
-                              <button type="button" onClick={() => moveLesson(chapter.id, lIdx, 'up')} disabled={lIdx === 0} className="p-1 hover:text-red-600 disabled:opacity-20" aria-label="Lên"><ArrowUp size={12} /></button>
-                              <button type="button" onClick={() => moveLesson(chapter.id, lIdx, 'down')} disabled={lIdx === chapter.lessons.length - 1} className="p-1 hover:text-red-600 disabled:opacity-20" aria-label="Xuống"><ArrowDown size={12} /></button>
+                              <button type="button" onClick={() => moveLesson(chapter.id, lIdx, 'up')} disabled={lIdx === 0} className="p-1 hover:text-emerald-600 disabled:opacity-20" aria-label="Lên"><ArrowUp size={12} /></button>
+                              <button type="button" onClick={() => moveLesson(chapter.id, lIdx, 'down')} disabled={lIdx === chapter.lessons.length - 1} className="p-1 hover:text-emerald-600 disabled:opacity-20" aria-label="Xuống"><ArrowDown size={12} /></button>
                             </div>
                             <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
                               <Video size={14} />
@@ -642,7 +642,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                     <button
                       type="button"
                       onClick={() => addLesson(chapter.id)}
-                      className="min-h-11 text-sm font-bold text-red-600 hover:text-red-700 inline-flex items-center gap-1.5 px-2 py-2 transition"
+                      className="min-h-11 text-sm font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1.5 px-2 py-2 transition"
                     >
                       <Plus size={16} /> Thêm bài giảng mới
                     </button>
@@ -655,7 +655,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
           <button
             type="button"
             onClick={addChapter}
-            className="w-full min-h-12 py-3.5 border-2 border-dashed border-red-200 text-red-600 font-bold rounded-2xl hover:bg-red-50 hover:border-emerald-300 transition inline-flex items-center justify-center gap-2 text-sm sm:text-base"
+            className="w-full min-h-12 py-3.5 border-2 border-dashed border-emerald-200 text-emerald-600 font-bold rounded-2xl hover:bg-emerald-50 hover:border-emerald-300 transition inline-flex items-center justify-center gap-2 text-sm sm:text-base"
           >
             <Plus size={18} /> Thêm Phần/Chương mới
           </button>

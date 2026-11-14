@@ -161,7 +161,7 @@ export function MilestoneEvaluationModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-3 sm:p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-300">
-        <div className={`bg-gradient-to-r from-red-600 to-red-500 text-center text-white relative ${isCompactHeader ? 'px-4 py-4' : 'px-6 py-8'
+        <div className={`bg-gradient-to-r from-emerald-600 to-emerald-500 text-center text-white relative ${isCompactHeader ? 'px-4 py-4' : 'px-6 py-8'
           }`}>
           {!isCompactHeader ? (
             <p className="text-sm mt-1">Khóa học: {courseName}</p>
@@ -222,7 +222,7 @@ export function MilestoneEvaluationModal({
                 type="button"
                 onClick={submitCenter}
                 disabled={!canSubmitCenter || submitting}
-                className="w-full bg-gradient-to-r from-red-600 to-red-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-red-100 active:scale-95 transition transform disabled:opacity-50 inline-flex items-center justify-center gap-1"
+                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-emerald-100 active:scale-95 transition transform disabled:opacity-50 inline-flex items-center justify-center gap-1"
               >
                 Tiếp tục
                 <NavArrow size={16} className="text-white" />
@@ -261,7 +261,7 @@ export function MilestoneEvaluationModal({
                 type="button"
                 onClick={submitLesson1Teacher}
                 disabled={!canSubmitLesson1 || submitting}
-                className="w-full bg-gradient-to-r from-red-600 to-red-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-red-100 active:scale-95 transition transform disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-emerald-100 active:scale-95 transition transform disabled:opacity-50"
               >
                 Gửi đánh giá
               </button>
@@ -292,7 +292,7 @@ export function MilestoneEvaluationModal({
                           type="button"
                           onClick={() => setRatingCriteria((prev) => ({ ...prev, [catKey]: opt.key }))}
                           className={`min-h-[30px] px-1 py-1.5 rounded-lg text-[10px] font-black leading-tight transition-all ${ratingCriteria[catKey] === opt.key
-                              ? 'bg-red-500 text-white shadow-sm'
+                              ? 'bg-emerald-500 text-white shadow-sm'
                               : 'bg-white text-gray-500 border border-gray-200 hover:border-red-200 hover:text-emerald-600'
                             }`}
                         >
@@ -314,7 +314,7 @@ export function MilestoneEvaluationModal({
                 type="button"
                 onClick={submitPublicTeacher}
                 disabled={!canSubmitPublic || submitting}
-                className="w-full bg-gradient-to-r from-red-600 to-red-500 py-3 rounded-xl text-white font-black text-sm shadow-lg shadow-red-100 active:scale-95 transition transform disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 py-3 rounded-xl text-white font-black text-sm shadow-lg shadow-emerald-100 active:scale-95 transition transform disabled:opacity-50"
               >
                 {submitting
                   ? 'Đang gửi…'
@@ -339,7 +339,7 @@ function YesNoRow({ label, value, yesLabel, noLabel, onChange }) {
             type="button"
             onClick={() => onChange(v)}
             className={`px-3 py-1 rounded-full text-xs font-black transition-all ${value === v
-                ? 'bg-red-500 text-white shadow-md shadow-red-200'
+                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
                 : 'bg-white text-gray-400 border border-gray-200'
               }`}
           >

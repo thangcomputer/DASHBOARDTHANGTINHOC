@@ -101,7 +101,7 @@ export const EvaluationView = ({
         <button 
           onClick={() => setActiveTab('admin')}
           className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black  tracking-wide sm:tracking-widest transition-all ${
-            activeTab === 'admin' ? 'bg-white text-red-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
+            activeTab === 'admin' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <AlertCircle size={13} className="shrink-0 sm:hidden" />
@@ -195,7 +195,7 @@ export const EvaluationView = ({
                                        key={v.val} 
                                        onClick={() => setPrivateForm(prev => ({ ...prev, satisfied: v.val }))}
                                        className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all  ${
-                                         privateForm.satisfied === v.val ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
+                                         privateForm.satisfied === v.val ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-emerald-200'
                                        }`}
                                      >
                                        {v.label}
@@ -214,7 +214,7 @@ export const EvaluationView = ({
                                        key={v.val} 
                                        onClick={() => setPrivateForm(prev => ({ ...prev, lessonClear: v.val }))}
                                        className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all  ${
-                                         privateForm.lessonClear === v.val ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
+                                         privateForm.lessonClear === v.val ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-emerald-200'
                                        }`}
                                      >
                                        {v.label}
@@ -251,7 +251,7 @@ export const EvaluationView = ({
                                      type: 'success' 
                                  });
                                }}
-                               className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-red-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
+                               className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
                              >
                                <Star size={14} className="fill-white" /> {existingEval ? 'Cập nhật phản hồi' : 'Gửi phản hồi cho trung tâm'}
                              </button>

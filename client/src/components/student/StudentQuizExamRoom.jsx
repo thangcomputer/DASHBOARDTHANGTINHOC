@@ -362,7 +362,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
-              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-500/20 text-red-400 border border-emerald-500/30'
                 }`}>
                 <Award size={40} />
               </div>
@@ -431,7 +431,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                             className={`rounded-xl border px-3 py-2 text-xs font-semibold ${correct
                               ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
                               : picked
-                                ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                                ? 'border-red-400/40 bg-emerald-500/10 text-red-200'
                                 : 'border-white/10 bg-black/10 text-slate-300'
                               }`}
                           >
@@ -641,7 +641,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                   type="button"
                   disabled={submitting}
                   onClick={submitAnswers}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-md"
                 >
                   {submitting ? 'Đang nộp...' : 'Nộp bài ngay'}
                 </button>
@@ -653,7 +653,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
         {/* ── MODAL THOÁT = RỚT ── */}
         {showExitModal && (
           <div data-exam-modal className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#161d2a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
+            <div className="bg-[#161d2a] border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
               <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
                 <AlertTriangle className="text-red-400" size={20} /> Thoát sẽ bị RỚT
               </h3>
@@ -672,7 +672,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                   type="button"
                   disabled={submitting}
                   onClick={confirmExitForfeit}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-md"
                 >
                   {submitting ? 'Đang ghi nhận...' : 'Đồng ý thoát (Rớt)'}
                 </button>

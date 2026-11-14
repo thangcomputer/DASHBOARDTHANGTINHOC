@@ -279,7 +279,7 @@ export default function FormReportBuilderPage() {
               </div>
 
               <div className="flex gap-2">
-                <button type="button" onClick={saveForm} disabled={saving} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-40">
+                <button type="button" onClick={saveForm} disabled={saving} className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-40">
                   {saving ? <Loader2 className="animate-spin inline" size={14} /> : <Check size={14} className="inline" />} Lưu
                 </button>
                 <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold">Hủy</button>
@@ -318,7 +318,7 @@ export default function FormReportBuilderPage() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={saveReport} disabled={saving || !repName || !repColumns.length} className="w-full py-2 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-40">
+            <button type="button" onClick={saveReport} disabled={saving || !repName || !repColumns.length} className="w-full py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-40">
               Lưu báo cáo
             </button>
           </div>

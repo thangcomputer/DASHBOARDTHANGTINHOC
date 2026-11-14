@@ -372,7 +372,7 @@ export default function SystemSettingsTab() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 flex items-center justify-center shadow-lg shadow-red-200">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-200">
             <Settings size={20} className="text-white" />
           </div>
           <div className="min-w-0">
@@ -394,7 +394,7 @@ export default function SystemSettingsTab() {
             }`}
         >
           {settings.destructiveResetEnabled !== false && (
-            <span className="absolute inset-0 bg-red-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
+            <span className="absolute inset-0 bg-emerald-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
           )}
           <AlertOctagon size={16} className="relative z-10" />
           <span className="relative z-10">
@@ -422,11 +422,11 @@ export default function SystemSettingsTab() {
                   aria-label={t.label}
                   onClick={() => setActiveSubTab(t.key)}
                   className={`inline-flex items-center justify-center gap-1.5 flex-1 basis-0 min-w-[2.75rem] px-2 sm:px-3 py-2.5 text-sm font-bold rounded-xl transition ${active
-                      ? 'text-red-700 bg-red-50 ring-1 ring-red-200'
+                      ? 'text-emerald-700 bg-emerald-50 ring-1 ring-red-200'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                 >
-                  <t.icon size={16} className={`flex-shrink-0 ${active ? 'text-red-600' : 'text-gray-400'}`} aria-hidden="true" />
+                  <t.icon size={16} className={`flex-shrink-0 ${active ? 'text-emerald-600' : 'text-gray-400'}`} aria-hidden="true" />
                   <span className="hidden min-[640px]:inline leading-snug truncate">{t.label}</span>
                 </button>
               );
@@ -500,7 +500,7 @@ export default function SystemSettingsTab() {
                     type="button"
                     onClick={() => handleSave(['centerBankCode', 'centerBankName', 'centerBankAccountNumber', 'centerBankAccountName'])}
                     disabled={saving || !settings.centerBankCode || !settings.centerBankAccountNumber}
-                    className="w-full sm:w-auto sm:min-w-[200px] py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-black  tracking-wide rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+                    className="w-full sm:w-auto sm:min-w-[200px] py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black  tracking-wide rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
                   >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                     {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
@@ -582,7 +582,7 @@ export default function SystemSettingsTab() {
                       type="button"
                       onClick={() => setSettings(prev => ({ ...prev, popupTargetRole: v }))}
                       className={`py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition border ${settings.popupTargetRole === v
-                          ? 'border-red-500 bg-red-50 text-red-700'
+                          ? 'border-emerald-500 bg-red-50 text-red-700'
                           : 'border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}
                       title={v === 'staff' ? 'Thông báo nội bộ Staff khi đăng nhập' : undefined}

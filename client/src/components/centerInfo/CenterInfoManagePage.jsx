@@ -101,7 +101,7 @@ function ImagePick({ value, onChange, label = 'Ảnh', uploading, onPickFile }) 
           type="button"
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
-          className={`inline-flex items-center gap-2 min-h-11 px-3 rounded-xl border-2 border-dashed border-red-300 bg-red-50/50 text-red-800 text-xs font-black ${uploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+          className={`inline-flex items-center gap-2 min-h-11 px-3 rounded-xl border-2 border-dashed border-red-300 bg-emerald-50/50 text-red-800 text-xs font-black ${uploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
         >
           {uploading ? <Loader2 className="animate-spin" size={14} /> : <ImagePlus size={14} />}
           Chọn ảnh
@@ -147,7 +147,7 @@ function GalleryAddButton({ uploading, onPick }) {
         type="button"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
-        className={`inline-flex mt-2 items-center gap-2 text-xs font-bold text-red-700 ${uploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+        className={`inline-flex mt-2 items-center gap-2 text-xs font-bold text-emerald-700 ${uploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
       >
         {uploading ? <Loader2 className="animate-spin" size={14} /> : <ImagePlus size={14} />}
         Thêm ảnh vào gallery
@@ -387,7 +387,7 @@ export default function CenterInfoManagePage() {
             type="button"
             disabled={saving || !overviewDirty}
             onClick={saveOverview}
-            className="inline-flex items-center gap-2 min-h-11 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-2 min-h-11 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50 shrink-0"
           >
             {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
             Lưu tổng quan
@@ -531,7 +531,7 @@ export default function CenterInfoManagePage() {
                 type="button"
                 disabled={saving || !overviewDirty}
                 onClick={saveOverview}
-                className="inline-flex items-center gap-2 min-h-11 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50"
+                className="inline-flex items-center gap-2 min-h-11 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50"
               >
                 {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                 Lưu tổng quan
@@ -710,7 +710,7 @@ export default function CenterInfoManagePage() {
                     </label>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    <button type="button" disabled={saving || !formDirty} onClick={saveItem} className="inline-flex items-center gap-2 min-h-11 px-5 rounded-2xl bg-red-600 text-white text-sm font-bold disabled:opacity-50">
+                    <button type="button" disabled={saving || !formDirty} onClick={saveItem} className="inline-flex items-center gap-2 min-h-11 px-5 rounded-2xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-50">
                       {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                       Lưu
                     </button>
@@ -782,7 +782,7 @@ export default function CenterInfoManagePage() {
                 type="button"
                 disabled={saving}
                 onClick={saveOverview}
-                className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50"
               >
                 {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                 Lưu tổng quan
@@ -792,7 +792,7 @@ export default function CenterInfoManagePage() {
                 type="button"
                 disabled={saving}
                 onClick={saveItem}
-                className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50"
               >
                 {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                 Lưu mục

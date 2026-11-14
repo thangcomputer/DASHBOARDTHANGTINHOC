@@ -81,7 +81,7 @@ export default function AdminOverviewTab({ session }) {
             label="Doanh thu"
             value={`${(statTotalRevenue / 1000000).toFixed(1)}M`}
             sub="VNĐ doanh thu thực tế"
-            color="bg-red-500"
+            color="bg-emerald-500"
           />
         )}
         <StatCard
@@ -137,7 +137,7 @@ export default function AdminOverviewTab({ session }) {
                       : refunded
                         ? 'cms-dash-badge-primary'
                         : 'cms-dash-badge-warning';
-                    const color = isPaid ? 'bg-red-600' : refunded ? 'bg-red-500' : 'bg-slate-400';
+                    const color = isPaid ? 'bg-emerald-600' : refunded ? 'bg-emerald-500' : 'bg-slate-400';
                     return (
                       <>
                   <Avatar

@@ -1969,7 +1969,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                       type="button"
                                       disabled={makeupBusyId === schId}
                                       onClick={() => handleAdminMakeup(sch)}
-                                      className="w-full min-h-10 px-2.5 py-1.5 rounded-lg text-[10px] font-black  bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                                      className="w-full min-h-10 px-2.5 py-1.5 rounded-lg text-[10px] font-black  bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                                     >
                                       {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
                                     </button>
@@ -2040,7 +2040,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                               type="button"
                                               disabled={makeupBusyId === schId}
                                               onClick={() => handleAdminMakeup(sch)}
-                                              className="px-2.5 py-1 rounded-lg text-[10px] font-black  bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 shadow-sm"
+                                              className="px-2.5 py-1 rounded-lg text-[10px] font-black  bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 shadow-sm"
                                             >
                                               {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
                                             </button>
@@ -2257,7 +2257,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       <button
                         type="button"
                         onClick={handleAddAssignment}
-                        className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black  tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-red-100"
+                        className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black  tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-emerald-100"
                       >
                         Xác nhận giao bài
                       </button>
@@ -2419,7 +2419,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                           <Trophy size={16} className="text-amber-500 shrink-0" /> <span className="leading-snug">Kết quả thi tốt nghiệp</span>
                         </h3>
                         {(data.student.examProgress || []).some(ep => ep.lockUntil && new Date(ep.lockUntil).getTime() > currentTime) && (
-                          <button onClick={handleUnlockExams} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black  tracking-wider shadow-sm transition-all flex items-center gap-1">
+                          <button onClick={handleUnlockExams} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black  tracking-wider shadow-sm transition-all flex items-center gap-1">
                             <Clock size={12} />  Mở khóa thi lại
                           </button>
                         )}
@@ -2791,7 +2791,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                   <button
                     type="button"
                     onClick={onClose}
-                    className="min-h-12 flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-bold hover:bg-red-600 transition-colors inline-flex items-center justify-center gap-2"
+                    className="min-h-12 flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-bold hover:bg-emerald-600 transition-colors inline-flex items-center justify-center gap-2"
                   >
                     Hoàn tất xem
                     <ChevronRight size={15} />
@@ -2919,7 +2919,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
               <button
                 type="button"
                 onClick={handleConfirmCancelEnrollment}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700"
               >
                 {cancelEnrModal.isPaid && cancelEnrModal.refundAmount > 0
                   ? `Hủy & hoàn ${Number(cancelEnrModal.refundAmount).toLocaleString('vi-VN')}đ`

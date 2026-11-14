@@ -19,7 +19,7 @@ export default function LessonVideoTabs({ active, hidden = false }) {
           role="tab"
           aria-selected={active === t.key}
           onClick={() => active !== t.key && navigate(t.to)}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${active === t.key ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${active === t.key ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <t.icon size={15} /> {t.label}
         </button>

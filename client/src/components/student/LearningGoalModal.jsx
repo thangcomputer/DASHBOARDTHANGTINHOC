@@ -200,14 +200,14 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
                         role="radio"
                         aria-checked={active}
                         onClick={() => setPeriod(option.id)}
-                        className={`relative rounded-xl border-2 px-1.5 py-1.5 sm:py-2 text-center transition ${active ? 'border-red-500 bg-red-50/80 text-red-700 shadow-2xs' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
+                        className={`relative rounded-xl border-2 px-1.5 py-1.5 sm:py-2 text-center transition ${active ? 'border-emerald-500 bg-emerald-50/80 text-emerald-700 shadow-2xs' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
                       >
                         {option.popular && (
                           <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-b from-emerald-500 to-emerald-600 px-1.5 py-0.2 text-[8px] sm:text-[8.5px] font-black uppercase tracking-wide text-white shadow-2xs">
                             Phổ biến
                           </span>
                         )}
-                        <Icon size={15} className={`mx-auto mb-0.5 ${active ? 'text-red-600' : 'text-slate-400'}`} aria-hidden="true" />
+                        <Icon size={15} className={`mx-auto mb-0.5 ${active ? 'text-emerald-600' : 'text-slate-400'}`} aria-hidden="true" />
                         <span className="block text-xs sm:text-sm font-black leading-tight">{option.label}</span>
                         <span className="block text-[10px] sm:text-[10.5px] font-semibold text-slate-400">{option.days} ngày</span>
                       </button>

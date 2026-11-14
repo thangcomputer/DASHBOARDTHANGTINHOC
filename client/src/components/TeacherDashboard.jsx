@@ -264,7 +264,7 @@ const TeacherDashboard = () => {
       ...s,
       displayName: getDisplayName(s),
       // Giữ avatar upload từ API - không ghi đè bằng initials (tránh fallback cartoon mặc định)
-      color: (typeof studentId === 'number' ? studentId : (String(studentId).charCodeAt(0) || 0)) % 2 === 1 ? 'bg-purple-500' : 'bg-red-500',
+      color: (typeof studentId === 'number' ? studentId : (String(studentId).charCodeAt(0) || 0)) % 2 === 1 ? 'bg-purple-500' : 'bg-emerald-500',
     };
   }), [getStudentsByTeacher, TEACHER_ID]);
   const teacherName = (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name))
@@ -505,7 +505,7 @@ const TeacherDashboard = () => {
                       label: 'Nộp bài thực hành',
                       done: step2Done,
                       sub: step2Done ? (currentTeacher.practicalStatus === 'reviewed' ? 'Đã duyệt' : 'Đã nộp bài') : 'Chưa nộp',
-                      color: 'bg-red-500',
+                      color: 'bg-emerald-500',
                       text: 'text-blue-700'
                     },
                     {
@@ -514,7 +514,7 @@ const TeacherDashboard = () => {
                       done: false,
                       active: step3Active,
                       sub: step3Active ? 'Đang chờ Admin chấm điểm...' : 'Đang chờ...',
-                      color: 'bg-red-500',
+                      color: 'bg-emerald-500',
                       text: 'text-red-700'
                     },
                   ];
@@ -523,12 +523,12 @@ const TeacherDashboard = () => {
                     <div
                       key={i}
                       className={`flex items-center gap-4 p-4 rounded-2xl transition-all border-2 ${s.done ? 'bg-green-50 border-green-100' :
-                          s.active ? 'bg-red-50 border-red-200 animate-pulse' :
+                          s.active ? 'bg-emerald-50 border-emerald-200 animate-pulse' :
                             'bg-gray-50 border-transparent'
                         }`}
                     >
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 shadow-sm ${s.done ? 'bg-green-500 text-white' :
-                          s.active ? 'bg-red-500 text-white' :
+                          s.active ? 'bg-emerald-500 text-white' :
                             'bg-gray-200 text-gray-400'
                         }`}>
                         {s.done ? '✓' : s.step}
@@ -553,7 +553,7 @@ const TeacherDashboard = () => {
                 onClick={() => navigate('/teacher/test')}
                 className={`w-full py-4 rounded-2xl font-black text-base transition-all flex items-center justify-center gap-3 shadow-lg ${(currentTeacher?.testScore != null && !!currentTeacher?.practicalFile)
                     ? 'bg-gradient-to-r from-slate-700 to-slate-800 text-white hover:from-black'
-                    : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-red-700 shadow-emerald-500/30'
+                    : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-emerald-700 shadow-emerald-500/30'
                   }`}
               >
                 <BookOpen size={20} />

@@ -197,7 +197,7 @@ export default function StudentQuizInviteHost() {
       aria-labelledby="quiz-invite-title"
     >
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-[fadeIn_0.25s_ease-out]">
-        <div className="bg-gradient-to-br from-red-600 to-red-700 px-5 py-4 text-white relative">
+        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 px-5 py-4 text-white relative">
           <button
             type="button"
             onClick={handleCancel}
@@ -251,7 +251,7 @@ export default function StudentQuizInviteHost() {
           <button
             type="button"
             onClick={handleStart}
-            className="flex-1 min-h-[44px] rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 shadow-lg shadow-red-200 transition"
+            className="flex-1 min-h-[44px] rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition"
           >
             Làm bài ngay
           </button>

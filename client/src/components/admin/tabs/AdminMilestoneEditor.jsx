@@ -39,7 +39,7 @@ export const DEFAULT_SECTION_ORDER = ['content', 'file', 'video', 'practice'];
 const DIFFICULTY_TABS = [
   { key: 'easy', label: 'Dễ', badge: 'bg-emerald-100 text-emerald-800', active: 'bg-emerald-600 text-white shadow-sm', ring: 'ring-emerald-200' },
   { key: 'medium', label: 'Vừa', badge: 'bg-amber-100 text-amber-800', active: 'bg-amber-500 text-white shadow-sm', ring: 'ring-amber-200' },
-  { key: 'hard', label: 'Khó', badge: 'bg-rose-100 text-rose-800', active: 'bg-rose-600 text-white shadow-sm', ring: 'ring-rose-200' },
+  { key: 'hard', label: 'Khó', badge: 'bg-rose-100 text-rose-800', active: 'bg-emerald-600 text-white shadow-sm', ring: 'ring-rose-200' },
 ];
 
 const SECTION_META = {

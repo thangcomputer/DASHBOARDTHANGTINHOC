@@ -81,7 +81,7 @@ export default function StudentAttendanceConfirmModal({
     onDismiss?.();
   };
 
-  let headerTone = 'bg-gradient-to-br from-red-700 via-red-600 to-rose-700';
+  let headerTone = 'bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-700';
   let eyebrowTone = 'text-red-100/90';
   let titleTone = 'text-red-50';
   let fractionTone = 'text-red-100/90';

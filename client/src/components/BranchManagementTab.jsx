@@ -92,7 +92,7 @@ function BranchModal({ branch, onClose, onSaved }) {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-gradient-to-r from-red-700 to-emerald-600 px-6 py-5 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
               <Building2 size={18} />
@@ -130,7 +130,7 @@ function BranchModal({ branch, onClose, onSaved }) {
               Hủy
             </button>
             <button onClick={handleSave} disabled={saving}
-              className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-3 rounded-xl hover:from-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
+              className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold py-3 rounded-xl hover:from-emerald-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Thêm chi nhánh')}
             </button>

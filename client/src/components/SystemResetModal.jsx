@@ -52,7 +52,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-200 border border-white/20 max-h-[min(92dvh,640px)] flex flex-col">
 
         {/* Header gọn ngang */}
-        <div className="bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 flex items-center gap-3 shrink-0">
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 flex items-center gap-3 shrink-0">
           <AlertTriangle size={22} className="text-white shrink-0" />
           <div className="min-w-0 text-left">
             <h2 className="text-sm font-black text-white  tracking-wider leading-tight">
@@ -76,7 +76,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
               onClick={() => toggleOption('all')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border-2 transition-all ${
                 options.all
-                  ? 'border-red-500 bg-red-50'
+                  ? 'border-emerald-500 bg-red-50'
                   : 'border-slate-100 hover:border-slate-200'
               }`}
             >
@@ -165,7 +165,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
             disabled={!isValid || submitting}
             className={`flex-[1.6] py-2.5 rounded-xl font-black  tracking-wider text-[10px] flex justify-center items-center gap-1.5 transition-all ${
               isValid
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-red-200 cursor-pointer'
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-200 cursor-pointer'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >

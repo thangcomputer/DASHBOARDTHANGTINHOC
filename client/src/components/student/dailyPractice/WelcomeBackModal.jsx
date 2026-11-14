@@ -76,7 +76,7 @@ export default function WelcomeBackModal({
           </p>
         )}
         <span className="absolute inset-x-0 bottom-0 h-1.5 bg-amber-100" aria-hidden="true">
-          <span className="block h-full origin-left bg-red-500" style={{ animation: 'dp-welcome-bar 3s linear forwards' }} />
+          <span className="block h-full origin-left bg-emerald-500" style={{ animation: 'dp-welcome-bar 3s linear forwards' }} />
         </span>
       </div>
     </div>,

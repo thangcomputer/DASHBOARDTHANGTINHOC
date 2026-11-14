@@ -455,7 +455,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             <button
               type="button"
               onClick={() => setBroadcastOpen((v) => !v)}
-              className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5 min-w-0"
+              className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-1.5 min-w-0"
             >
               <Megaphone size={14} /> Gửi thông báo
             </button>
@@ -492,7 +492,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             type="button"
             onClick={onBroadcast}
             disabled={bcSending}
-            className="w-full py-2.5 bg-red-600 text-white font-bold rounded-xl disabled:opacity-40 flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-xl disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {bcSending ? <Loader2 size={16} className="animate-spin" /> : <Megaphone size={16} />}
             Gửi ngay
@@ -536,7 +536,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
               return (
                 <li
                   key={id}
-                  className={`p-4 flex gap-3 hover:bg-gray-50 transition cursor-pointer ${!n.read ? 'bg-red-50/30' : ''}`}
+                  className={`p-4 flex gap-3 hover:bg-gray-50 transition cursor-pointer ${!n.read ? 'bg-emerald-50/30' : ''}`}
                   onClick={() => onOpen(n)}
                 >
                   <div className="flex-1 text-left min-w-0">
@@ -826,7 +826,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                           type="button"
                           disabled={qaSaving || !qaAnswer.trim()}
                           onClick={submitQaAnswer}
-                          className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-40"
+                          className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold disabled:opacity-40"
                         >
                           {qaSaving ? 'Đang gửi...' : 'Gửi trả lời'}
                         </button>

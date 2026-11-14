@@ -47,7 +47,7 @@ export default function CertPrepExitDialog({
               type="button"
               onClick={onConfirm}
               disabled={leaving}
-              className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 inline-flex items-center gap-2"
+              className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {leaving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
               Thoát

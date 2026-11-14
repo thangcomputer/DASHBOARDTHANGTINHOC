@@ -1329,7 +1329,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   title={t.label}
                   aria-label={t.label}
                   className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
-                    ? (isFreeStudent ? 'bg-emerald-600 text-white shadow-sm' : 'bg-red-500 text-white shadow-sm')
+                    ? (isFreeStudent ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm')
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                 >
@@ -1359,7 +1359,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   role="tab"
                   aria-selected={mainTab === t.key}
                   onClick={() => setMainTab(t.key)}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? (isFreeStudent ? 'bg-white text-emerald-600 shadow-sm' : 'bg-white text-red-600 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? (isFreeStudent ? 'bg-white text-emerald-600 shadow-sm' : 'bg-white text-emerald-600 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <t.icon size={15} /> {t.label}
                   {t.count > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-black text-slate-600">{t.count}</span>}
@@ -1598,7 +1598,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   return (
                     <div key={fKey} className="p-4 rounded-xl border border-slate-100 hover:bg-green-50/50 hover:border-green-200 transition-all flex flex-col md:flex-row justify-between md:items-start gap-4 group">
                       <div className="flex items-start gap-4 min-w-0 flex-1">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? (isFreeStudent ? 'bg-emerald-600' : 'bg-rose-500') : (isFreeStudent ? 'bg-emerald-600' : 'bg-green-500'))
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? (isFreeStudent ? 'bg-emerald-600' : 'bg-emerald-500') : (isFreeStudent ? 'bg-emerald-600' : 'bg-green-500'))
                           }`}>
                           {isLink ? 'Link' : (file.fileType || 'FILE')}
                         </div>
@@ -2305,7 +2305,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                     type="button"
                     onClick={() => setCatalogInfoTab(t.key)}
                     className={`flex-1 min-w-[7.5rem] min-h-11 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${catalogInfoTab === t.key
-                        ? (isFreeStudent ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40' : 'text-red-600 border-b-2 border-emerald-600 bg-red-50/40')
+                        ? (isFreeStudent ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40' : 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40')
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                       }`}
                   >
@@ -2332,16 +2332,16 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                               setCurrentLesson(lesson);
                             }}
                             className={`w-full flex items-center gap-3 py-2.5 px-1 text-left rounded-lg transition-colors ${playable
-                                ? `cursor-pointer hover:bg-slate-50 ${isActive ? (isFreeStudent ? 'bg-emerald-50/70' : 'bg-red-50/70') : ''}`
+                                ? `cursor-pointer hover:bg-slate-50 ${isActive ? (isFreeStudent ? 'bg-emerald-50/70' : 'bg-emerald-50/70') : ''}`
                                 : 'opacity-70 cursor-not-allowed'
                               }`}
                           >
                             {playable ? (
-                              <PlayCircle size={16} className={`shrink-0 ${isActive ? (isFreeStudent ? 'text-emerald-600' : 'text-red-600') : (isFreeStudent ? 'text-emerald-500' : 'text-red-500')}`} />
+                              <PlayCircle size={16} className={`shrink-0 ${isActive ? (isFreeStudent ? 'text-emerald-600' : 'text-emerald-600') : (isFreeStudent ? 'text-emerald-500' : 'text-red-500')}`} />
                             ) : (
                               <Lock size={16} className="text-slate-400 shrink-0" />
                             )}
-                            <span className={`flex-1 text-sm font-semibold truncate ${isActive ? (isFreeStudent ? 'text-emerald-700' : 'text-red-700') : 'text-slate-700'}`}>
+                            <span className={`flex-1 text-sm font-semibold truncate ${isActive ? (isFreeStudent ? 'text-emerald-700' : 'text-emerald-700') : 'text-slate-700'}`}>
                               {idx + 1}. {lesson.title}
                             </span>
                             {lesson.isPreview || playable ? (

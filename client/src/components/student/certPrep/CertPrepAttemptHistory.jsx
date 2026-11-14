@@ -22,7 +22,7 @@ export default function CertPrepAttemptHistory({ attempts = [], currentSessionId
             {attempts.map((row) => {
               const active = String(row.sessionId) === String(currentSessionId);
               return (
-                <tr key={row.sessionId} className={active ? 'bg-red-50' : ''}>
+                <tr key={row.sessionId} className={active ? 'bg-emerald-50' : ''}>
                   <td className="px-4 py-3 font-bold">{row.attempt}</td>
                   <td className="px-4 py-3">{formatDateTime(row.submittedAt || row.startedAt)}</td>
                   <td className="px-4 py-3 font-bold">{row.score}</td>
@@ -35,7 +35,7 @@ export default function CertPrepAttemptHistory({ attempts = [], currentSessionId
                     <button
                       type="button"
                       onClick={() => navigate(`/student/cert-prep/result/${row.sessionId}`)}
-                      className="font-bold text-red-600 hover:underline"
+                      className="font-bold text-emerald-600 hover:underline"
                     >
                       {formatDuration(row.durationSeconds)} · Xem
                     </button>

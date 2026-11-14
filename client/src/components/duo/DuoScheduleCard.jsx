@@ -103,7 +103,7 @@ export function DuoScheduleCard({
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 {item.live ? (
-                  <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white">
+                  <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white">
                     ĐANG DIỄN RA
                   </span>
                 ) : null}

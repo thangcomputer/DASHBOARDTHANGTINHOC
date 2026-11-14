@@ -654,7 +654,7 @@ const ExamMonitor = forwardRef(({
 
   const warningPortal = warningOverlay ? createPortal(
     <div data-exam-warning-overlay className="fixed inset-0 z-[200000] flex items-center justify-center bg-red-950/90 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-300">
-      <div className={`bg-white rounded-[40px] shadow-[0_32px_120px_-15px_rgba(220,38,38,0.5)] w-full max-w-sm overflow-hidden border-t-[12px] ${warningOverlay.soft ? 'border-amber-500' : 'border-red-600'} animate-in zoom-in duration-500 scale-100`}>
+      <div className={`bg-white rounded-[40px] shadow-[0_32px_120px_-15px_rgba(220,38,38,0.5)] w-full max-w-sm overflow-hidden border-t-[12px] ${warningOverlay.soft ? 'border-amber-500' : 'border-emerald-600'} animate-in zoom-in duration-500 scale-100`}>
         <div className="p-10 text-center space-y-6">
           <div className={`w-24 h-24 rounded-[35%] flex items-center justify-center mx-auto shadow-2xl ${warningOverlay.type === 'tab' ? 'bg-orange-100 text-orange-600' : warningOverlay.soft ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'} animate-bounce`}>
             <AlertTriangle size={48} />
@@ -670,7 +670,7 @@ const ExamMonitor = forwardRef(({
                 <span className="text-sm font-black text-red-600">{warningOverlay.count}/{warningOverlay.max}</span>
               </div>
               <div className="h-5 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-1">
-                <div className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full transition-all duration-1000" style={{ width: `${(warningOverlay.count / warningOverlay.max) * 100}%` }} />
+                <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000" style={{ width: `${(warningOverlay.count / warningOverlay.max) * 100}%` }} />
               </div>
             </div>
           )}
@@ -680,7 +680,7 @@ const ExamMonitor = forwardRef(({
             </button>
           ) : (
             <div className="pt-4">
-              <div className="w-12 h-12 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mx-auto" />
+              <div className="w-12 h-12 border-4 border-red-200 border-t-emerald-600 rounded-full animate-spin mx-auto" />
             </div>
           )}
         </div>
@@ -807,7 +807,7 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
         <div className="absolute inset-0 flex items-start justify-center pt-0.5 pointer-events-none">
           <div className="w-[58%] aspect-[3/4] max-h-[78%] rounded-[42%] border-2 border-dashed border-white/55 opacity-90" aria-hidden />
         </div>
-        <div className={`absolute inset-0 pointer-events-none ${stats.lastFacePresent && stats.lastFaceDetected && !stats.lastMultiFace ? 'bg-emerald-500/10' : 'bg-red-500/25 animate-pulse'}`} />
+        <div className={`absolute inset-0 pointer-events-none ${stats.lastFacePresent && stats.lastFaceDetected && !stats.lastMultiFace ? 'bg-emerald-500/10' : 'bg-emerald-500/25 animate-pulse'}`} />
         <div className="absolute top-1 left-1.5 flex items-center gap-1">
           <span className="rounded-md bg-black/45 px-1.5 py-0.5 text-white/70 font-black  text-[9px] tracking-wider cms-min-text-xs">Live</span>
         </div>

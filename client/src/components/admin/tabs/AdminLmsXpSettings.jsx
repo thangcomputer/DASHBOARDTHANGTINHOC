@@ -123,7 +123,7 @@ export default function AdminLmsXpSettings() {
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <button type="button" onClick={save} disabled={saving} className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+        <button type="button" onClick={save} disabled={saving} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">
           {saving ? <Loader2 size={16} className="animate-spin" /> : 'Lưu số XP'}
         </button>
         {notice && <p className="text-sm font-semibold text-slate-600">{notice}</p>}

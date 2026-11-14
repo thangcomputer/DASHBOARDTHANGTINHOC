@@ -98,7 +98,7 @@ export default function CourseSubjectSelector({
                 >
                   <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
                     checked
-                      ? accent === 'red' ? 'border-red-500 bg-red-500 text-white' : 'border-sky-500 bg-sky-500 text-white'
+                      ? accent === 'red' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-sky-500 bg-sky-500 text-white'
                       : 'border-slate-300 bg-white'
                   }`}>
                     {checked && <Check size={10} strokeWidth={3} />}

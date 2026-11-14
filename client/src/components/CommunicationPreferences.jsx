@@ -86,7 +86,7 @@ export default function CommunicationPreferences({ role, compact = false }) {
                   disabled={disabled}
                   onClick={() => { void toggle(key, !checked); }}
                   style={{ boxShadow: 'none' }}
-                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-red-600' : 'bg-slate-300'}`}
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-emerald-600' : 'bg-slate-300'}`}
                 >
                   <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
@@ -126,7 +126,7 @@ export default function CommunicationPreferences({ role, compact = false }) {
               aria-label={title}
               disabled={disabled}
               onClick={() => { void toggle(key, !checked); }}
-              className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${checked ? 'bg-red-600' : 'bg-slate-300'}`}
+              className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${checked ? 'bg-emerald-600' : 'bg-slate-300'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>

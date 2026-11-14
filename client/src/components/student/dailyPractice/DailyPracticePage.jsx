@@ -362,7 +362,7 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
           <button type="button" onClick={onStay} disabled={quitting} className="cms-btn cms-btn-primary w-full !py-3">
             <Play size={16} /> Ở lại luyện tiếp
           </button>
-          <button type="button" onClick={onQuit} disabled={quitting} className="cms-btn cms-btn-outline w-full !py-2.5 !text-red-600">
+          <button type="button" onClick={onQuit} disabled={quitting} className="cms-btn cms-btn-outline w-full !py-2.5 !text-emerald-600">
             {quitting ? <Loader2 size={16} className="animate-spin" /> : null}
             {loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát'}
           </button>

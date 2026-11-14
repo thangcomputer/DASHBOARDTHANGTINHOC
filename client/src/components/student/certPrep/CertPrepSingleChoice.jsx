@@ -13,7 +13,7 @@ function optionTone({ showFeedback, isCorrectOpt, isSelected, wrongSelected, exa
   }
   if (!showFeedback) {
     return isSelected
-      ? 'border-red-500 bg-red-50 ring-1 ring-red-200'
+      ? 'border-emerald-500 bg-red-50 ring-1 ring-red-200'
       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50';
   }
   if (isCorrectOpt) return 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200';

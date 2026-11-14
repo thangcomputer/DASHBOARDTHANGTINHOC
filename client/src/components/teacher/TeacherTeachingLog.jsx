@@ -263,7 +263,7 @@ export default function TeacherTeachingLog({
                   onClick={() => setTab(selected ? 'all' : id)}
                   className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition-all cursor-pointer sm:text-xs ${selected
                       ? cancelled
-                        ? 'border-rose-400 bg-rose-600 text-white shadow-sm border-b-4 border-b-rose-800'
+                        ? 'border-emerald-400 bg-emerald-600 text-white shadow-sm border-b-4 border-b-emerald-800'
                         : 'border-[#34D399] bg-[#10B981] text-white shadow-sm border-b-4 border-b-[#059669]'
                       : cancelled
                         ? 'border-rose-200 bg-rose-50 text-rose-700 border-b-2'

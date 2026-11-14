@@ -135,7 +135,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
       title={hint}
       onClick={openConfirm}
       className={`flex flex-1 min-[360px]:flex-initial justify-center items-center gap-2 text-xs font-black px-4 py-3 sm:px-5 rounded-2xl transition-all  tracking-widest ${canFail
-          ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/40'
+          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-red-900/40'
           : 'bg-slate-100 text-slate-400 border-2 border-slate-200 cursor-not-allowed opacity-60'
         }`}
     >
@@ -709,7 +709,7 @@ export const StudentCard = ({
         ? 'Đã điểm danh - không thể hủy sau khi hết thời gian chờ'
         : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
-    'bg-red-600 hover:bg-red-700 text-white border border-red-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2 font-extrabold cursor-pointer shadow-xs';
+    'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2 font-extrabold cursor-pointer shadow-xs';
   const cancelButtonClassDisabled =
     'bg-slate-100 text-slate-400 border border-slate-200 border-b-2 border-b-slate-300 cursor-not-allowed opacity-60 font-semibold';
 
@@ -1978,10 +1978,10 @@ export const StudentCard = ({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-[440px]:w-auto min-[440px]:justify-end">
-              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-blue-400'
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-emerald-500/20 text-blue-400'
                 }`}>{isDroppedOut ? 'Thôi học' : isCompleted ? '✓ Hoàn thành' : student.status}</span>
               <a href={`https://zalo.me/${student.zalo}`} target="_blank" rel="noreferrer"
-                className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
+                className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
                 <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{maskPhone(student.zalo)}</span>
               </a>
               {onLockExam && (

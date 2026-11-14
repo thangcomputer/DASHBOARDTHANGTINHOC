@@ -229,7 +229,7 @@ function XpConfigCard() {
                     onClick={() => setConfig((prev) => ({ ...prev, resetCycle: item.id }))}
                     className={`text-left p-2.5 rounded-xl border transition cursor-pointer ${
                       active
-                        ? 'border-red-500 bg-red-50/70 text-red-950 ring-2 ring-red-200'
+                        ? 'border-emerald-500 bg-emerald-50/70 text-red-950 ring-2 ring-red-200'
                         : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 text-slate-700'
                     }`}
                   >
@@ -555,7 +555,7 @@ function StudentRenewCard() {
       {selectedId ? (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/50 p-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-rose-600 text-sm font-black text-white">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-sm font-black text-white">
               {String(selected?.name || 'H').trim().charAt(0).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
@@ -586,7 +586,7 @@ function StudentRenewCard() {
                   <button
                     type="button"
                     onClick={() => setSelected(student)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-red-50/60 !shadow-none"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-emerald-50/60 !shadow-none"
                   >
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-slate-800">{student.name}</span>

@@ -44,7 +44,7 @@ export default function CertPrepSubmitDialog({
               type="button"
               onClick={onConfirm}
               disabled={submitting}
-              className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white disabled:opacity-60 inline-flex items-center gap-2"
+              className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
               Nộp bài
@@ -86,7 +86,7 @@ export default function CertPrepSubmitDialog({
             type="button"
             onClick={onConfirm}
             disabled={submitting}
-            className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white disabled:opacity-60 inline-flex items-center gap-2"
+            className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white disabled:opacity-60 inline-flex items-center gap-2"
           >
             {submitting ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
             Nộp bài

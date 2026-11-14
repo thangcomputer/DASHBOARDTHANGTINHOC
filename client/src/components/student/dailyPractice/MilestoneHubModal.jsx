@@ -38,7 +38,7 @@ function sectionActionLabel(secKey, { unlocked, done, videoInProgress }) {
 const DIFFICULTY_TABS = [
   { key: 'easy', label: 'Dễ', activeClass: 'bg-emerald-600 text-white shadow-sm', barClass: 'bg-emerald-500' },
   { key: 'medium', label: 'Vừa', activeClass: 'bg-amber-500 text-white shadow-sm', barClass: 'bg-amber-500' },
-  { key: 'hard', label: 'Khó', activeClass: 'bg-rose-600 text-white shadow-sm', barClass: 'bg-rose-500' },
+  { key: 'hard', label: 'Khó', activeClass: 'bg-emerald-600 text-white shadow-sm', barClass: 'bg-emerald-500' },
 ];
 
 const SECTION_META = {

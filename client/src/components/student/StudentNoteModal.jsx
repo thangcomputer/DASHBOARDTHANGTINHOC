@@ -20,7 +20,7 @@ export function StudentNoteModal({ schedule, onClose, onSubmit }) {
            />
            <div className="flex gap-3 mt-6">
              <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 transition-colors">Hủy</button>
-             <button type="button" onClick={() => onSubmit(note)} disabled={!note.trim()} className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-colors shadow-lg shadow-red-600/30">
+             <button type="button" onClick={() => onSubmit(note)} disabled={!note.trim()} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-colors shadow-lg shadow-emerald-600/30">
                {hasExistingNote ? 'Cập nhật' : 'Gửi Ghi Chú'}
              </button>
            </div>
@@ -28,7 +28,7 @@ export function StudentNoteModal({ schedule, onClose, onSubmit }) {
              <button
                type="button"
                onClick={() => onSubmit('')}
-               className="w-full mt-3 py-2.5 text-sm font-bold rounded-xl bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 transition-colors"
+               className="w-full mt-3 py-2.5 text-sm font-bold rounded-xl bg-white border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition-colors"
              >
                Xóa ghi chú
              </button>

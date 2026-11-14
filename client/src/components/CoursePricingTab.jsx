@@ -471,7 +471,7 @@ function CourseModal({
             {/* Cột trái: Thông tin & học phí */}
             <div className="space-y-5 md:border-r border-gray-100 md:pr-10">
               <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2  tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">1</span>
+                <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs shadow-lg shadow-emerald-200">1</span>
                 Thông tin khóa học
               </h4>
 
@@ -502,7 +502,7 @@ function CourseModal({
                       <label
                         key={option.id}
                         className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-blue-300 ${selected
-                            ? 'border-red-500 bg-red-50 text-red-800'
+                            ? 'border-emerald-500 bg-red-50 text-red-800'
                             : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200'
                           }`}
                       >
@@ -612,7 +612,7 @@ function CourseModal({
                       <>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="line-through text-gray-400 text-[11px]">{fmt(form.price)}đ</span>
-                          <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                          <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
                             -{form.discountPercent}%
                           </span>
                         </div>
@@ -743,7 +743,7 @@ function CourseModal({
             {/* Cột phải: Môn thi */}
             <div className="space-y-5 md:pl-2">
               <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2  tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">2</span>
+                <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs shadow-lg shadow-emerald-200">2</span>
                 Môn thi trong Phòng Thi ({selectedCount})
               </h4>
 
@@ -907,7 +907,7 @@ function CourseModal({
                         const src = otherCourses.find((c) => String(c._id) === String(importCourseId));
                         mergeExamSubjectsFromCourse(src);
                       }}
-                      className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-2xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                       title="Thêm môn thi từ khóa đã chọn"
                     >
                       <Plus size={18} />
@@ -1006,7 +1006,7 @@ function CourseModal({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-red-200 hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3  active:scale-95 disabled:opacity-50"
+              className="px-12 py-4 bg-gradient-to-r from-emerald-600 to-emerald-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-emerald-200 hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3  active:scale-95 disabled:opacity-50"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Thêm khóa học')}
@@ -1057,7 +1057,7 @@ function CourseModal({
                   type="button"
                   disabled={savingSubject}
                   onClick={confirmDeleteSubject}
-                  className="min-h-10 px-4 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-2"
+                  className="min-h-10 px-4 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-2"
                 >
                   {savingSubject ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   Xóa môn
@@ -1461,7 +1461,7 @@ export default function CoursePricingTab() {
           <button
             type="button"
             onClick={() => setModalCourse(null)}
-            className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition shadow-sm shrink-0 w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm shrink-0 w-full sm:w-auto"
           >
             <Plus size={15} /> Thêm khóa học
           </button>

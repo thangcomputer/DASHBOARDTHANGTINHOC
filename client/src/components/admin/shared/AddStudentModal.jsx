@@ -559,7 +559,7 @@ export default function AddStudentModal({
 
           <div className="border-t border-slate-100 bg-white p-3">
             {expired ? (
-              <button type="button" onClick={() => { setStep('form'); }} className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700">
+              <button type="button" onClick={() => { setStep('form'); }} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
                 Quay lại
               </button>
             ) : (

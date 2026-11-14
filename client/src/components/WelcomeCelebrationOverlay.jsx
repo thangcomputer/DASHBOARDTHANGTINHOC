@@ -380,7 +380,7 @@ export default function WelcomeCelebrationOverlay({
             <button
               type="button"
               onClick={() => onClose?.()}
-              className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-sm font-bold shadow-lg shadow-red-600/25 transition"
+              className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-600 hover:from-emerald-700 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition"
             >
               Vào học ngay
             </button>
@@ -540,7 +540,7 @@ export default function WelcomeCelebrationOverlay({
 
       {/* 2. Card */}
       <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-[28px] border border-white/25 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.5)]">
-        <div className="relative overflow-hidden bg-gradient-to-br from-red-700 via-red-600 to-rose-700 px-6 pt-8 pb-10 text-center text-white">
+        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-700 px-6 pt-8 pb-10 text-center text-white">
           <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-amber-300/20 blur-2xl" aria-hidden="true" />
           <div className="pointer-events-none absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
           <button
@@ -591,7 +591,7 @@ export default function WelcomeCelebrationOverlay({
           <button
             type="button"
             onClick={() => onClose?.()}
-            className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-800 hover:to-red-700 text-white text-sm font-bold shadow-lg shadow-red-600/25 transition tracking-wide"
+            className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition tracking-wide"
           >
             {isCourseComplete ? 'Tiếp tục hành trình' : 'Tiếp tục vào hệ thống'}
           </button>

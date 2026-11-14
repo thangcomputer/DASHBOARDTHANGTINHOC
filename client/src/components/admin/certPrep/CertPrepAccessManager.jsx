@@ -172,7 +172,7 @@ export default function CertPrepAccessManager({ courses, rows, loading, onRefres
           type="button"
           disabled={!selected || !courseId || saving}
           onClick={grant}
-          className="min-h-11 px-5 rounded-2xl bg-red-600 text-white font-bold text-sm disabled:opacity-50 inline-flex items-center gap-2"
+          className="min-h-11 px-5 rounded-2xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50 inline-flex items-center gap-2"
         >
           {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
           Cấp quyền

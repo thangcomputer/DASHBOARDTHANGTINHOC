@@ -277,7 +277,7 @@ function CourseCatalogCard({
             onClick={onSelect}
             aria-haspopup={directSubject ? undefined : 'dialog'}
             aria-expanded={selected}
-            className={`inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-xs font-black shadow-sm transition-colors ${course.enrolled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white'}`}
+            className={`inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-xs font-black shadow-sm transition-colors ${course.enrolled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-700 hover:bg-emerald-600 hover:text-white'}`}
           >
             {course.enrolled
               ? courseProgressPercent > 0 && courseProgressPercent < 100

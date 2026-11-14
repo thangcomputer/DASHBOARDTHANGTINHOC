@@ -39,7 +39,7 @@ function statusClass(s) {
   return 'bg-amber-50 text-amber-700';
 }
 
-const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold shadow-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-red-500';
+const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold shadow-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-emerald-500';
 const NEWS_VIEW_KEY = 'cms-news-view';
 
 function readNewsView() {
@@ -320,7 +320,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           )}
           <h1 className="text-2xl font-black text-slate-900">{title || 'Chưa có tiêu đề'}</h1>
           {excerpt && (
-            <p className="text-base text-slate-600 font-medium border-l-4 border-red-500 pl-4">{excerpt}</p>
+            <p className="text-base text-slate-600 font-medium border-l-4 border-emerald-500 pl-4">{excerpt}</p>
           )}
           <div
             className="prose prose-slate max-w-none text-slate-800 text-[15px] leading-relaxed
@@ -460,7 +460,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
                 type="button"
                 disabled={busy}
                 onClick={() => coverRef.current?.click()}
-                className="text-xs font-bold text-red-600 hover:underline"
+                className="text-xs font-bold text-emerald-600 hover:underline"
               >
                 Đổi ảnh bìa
               </button>
@@ -486,7 +486,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
                 type="button"
                 disabled={busy}
                 onClick={() => fileRef.current?.click()}
-                className="text-xs font-bold text-slate-600 hover:text-red-600 inline-flex items-center gap-1"
+                className="text-xs font-bold text-slate-600 hover:text-emerald-600 inline-flex items-center gap-1"
               >
                 <Paperclip size={13} /> Thêm tệp
               </button>
@@ -540,7 +540,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           type="button"
           disabled={busy}
           onClick={() => save('published')}
-          className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5"
+          className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-1.5"
         >
           <Send size={14} /> Đăng bài
         </button>
@@ -816,7 +816,7 @@ export default function NewsPage({ session, role = 'admin' }) {
             </div>
           </div>
           {detail.excerpt && (
-            <p className="text-base text-slate-600 font-medium border-l-4 border-red-500 pl-4">{detail.excerpt}</p>
+            <p className="text-base text-slate-600 font-medium border-l-4 border-emerald-500 pl-4">{detail.excerpt}</p>
           )}
           <div
             className="prose prose-slate max-w-none text-slate-800 leading-relaxed text-[15px]
@@ -899,7 +899,7 @@ export default function NewsPage({ session, role = 'admin' }) {
               )}
               <button
                 type="button"
-                className="px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 hover:bg-red-50"
+                className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-600 text-xs font-bold flex items-center gap-1 hover:bg-emerald-50"
                 onClick={async () => {
                   if (!(await window.cmsConfirm('Xóa bài viết này?'))) return;
                   const res = await blogAPI.remove(detail.id);
@@ -1157,7 +1157,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                 </button>
                 <button
                   type="button"
-                  className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
                   onClick={async (e) => {
                     e.stopPropagation();
                     if (!(await window.cmsConfirm(`Xóa bài viết "${p.title}"?`))) return;

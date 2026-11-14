@@ -2434,7 +2434,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
                             <Icon size={18} aria-hidden="true" />
                             {!n.read && (
-                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-red-500" aria-hidden="true" />
+                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500" aria-hidden="true" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">

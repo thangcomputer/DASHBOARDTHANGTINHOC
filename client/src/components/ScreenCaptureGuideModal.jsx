@@ -26,7 +26,7 @@ export default function ScreenCaptureGuideModal({
     >
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[2px]" aria-hidden="true" onClick={onCancel} />
       <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-[24px] border border-white/20 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.5)]">
-        <div className="relative bg-gradient-to-r from-red-700 via-red-600 to-red-500 px-5 pt-6 pb-5 text-white">
+        <div className="relative bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-500 px-5 pt-6 pb-5 text-white">
           <button
             type="button"
             onClick={onCancel}

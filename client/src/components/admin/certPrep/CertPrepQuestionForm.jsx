@@ -264,7 +264,7 @@ export default function CertPrepQuestionForm({
         </div>
         <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
           <button type="button" onClick={requestClose} className="min-h-11 px-4 rounded-xl font-bold text-sm text-slate-600">Hủy</button>
-          <button type="submit" disabled={saving} className="min-h-11 px-4 rounded-xl font-bold text-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 inline-flex items-center gap-2">
+          <button type="submit" disabled={saving} className="min-h-11 px-4 rounded-xl font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 inline-flex items-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
             Lưu
           </button>

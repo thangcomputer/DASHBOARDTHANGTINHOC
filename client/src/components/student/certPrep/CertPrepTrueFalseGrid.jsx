@@ -50,7 +50,7 @@ export default function CertPrepTrueFalseGrid({
               ? (isOk
                 ? 'bg-emerald-500/15'
                 : isBad
-                  ? 'bg-red-500/15'
+                  ? 'bg-emerald-500/15'
                   : idx % 2 === 0
                     ? 'bg-transparent'
                     : 'bg-white/[0.03]')

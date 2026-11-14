@@ -134,7 +134,7 @@ export default function CertPrepCourseList({
                         />
                         Ghi đè
                       </label>
-                      <button type="button" onClick={() => onOpen(c)} className="min-h-10 px-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 inline-flex items-center gap-1">
+                      <button type="button" onClick={() => onOpen(c)} className="min-h-10 px-3 rounded-xl text-xs font-bold text-emerald-600 hover:bg-emerald-50 inline-flex items-center gap-1">
                         Level <ChevronRight size={14} aria-hidden="true" />
                       </button>
                       <button type="button" onClick={() => onEdit(c)} aria-label={`Sửa ${c.name}`} className="w-10 h-10 rounded-xl hover:bg-slate-50 text-slate-600">

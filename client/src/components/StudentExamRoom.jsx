@@ -251,7 +251,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               <button
                 type="button"
                 onClick={() => onStart(subject.id)}
-                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
+                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
               >
                 {(subject.attemptCount || 0) > 0 ? <><Play size={15} /> Thi lại</> : 'Vào thi ngay'}
               </button>
@@ -260,7 +260,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               <button
                 type="button"
                 onClick={() => onStart(subject.id)}
-                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-red-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
+                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
               >
                 <Play size={15} /> Thi lại
               </button>
@@ -338,7 +338,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
         <button
           type="button"
           onClick={() => setActiveTab('quizzes')}
-          className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${activeTab === 'quizzes' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+          className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${activeTab === 'quizzes' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
         >
           Trắc nghiệm GV
@@ -346,7 +346,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
         <button
           type="button"
           onClick={() => setActiveTab('cert')}
-          className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${activeTab === 'cert' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+          className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${activeTab === 'cert' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
         >
           Thi chứng nhận
@@ -663,8 +663,8 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('quiz')}
-            className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'quiz'
-                ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
+            className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'quiz'
+                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
                 : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
@@ -682,8 +682,8 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('cert')}
-            className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'cert'
-                ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
+            className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'cert'
+                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
                 : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
@@ -701,8 +701,8 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('scores')}
-            className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'scores'
-                ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
+            className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'scores'
+                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
                 : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
@@ -720,8 +720,8 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('mos-ic3')}
-            className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'mos-ic3'
-                ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
+            className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'mos-ic3'
+                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
                 : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
@@ -816,7 +816,7 @@ const StudentExamRoom = ({
                     onClick={() => setFilterStatus(filterStatus === f.value ? 'all' : f.value)}
                     className={`px-3 py-1.5 rounded-full text-xs font-black  tracking-wide border transition-all ${filterStatus === f.value
                         ? f.value === 'rot'
-                          ? 'bg-red-600 text-white border-red-600'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
                           : f.value === 'da_thi'
                             ? 'bg-emerald-600 text-white border-emerald-600'
                             : (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-600 text-white border-emerald-600')

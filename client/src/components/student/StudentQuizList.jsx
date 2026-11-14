@@ -195,7 +195,7 @@ export default function StudentQuizList() {
                       ? 'bg-slate-800 hover:bg-slate-900 text-white'
                       : isExpired || notYetOpen
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                      : 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   }`}
                 >
                   {hasSubmitted ? (

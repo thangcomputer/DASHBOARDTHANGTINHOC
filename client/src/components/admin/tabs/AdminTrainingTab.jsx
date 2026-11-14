@@ -363,7 +363,7 @@ export default function AdminTrainingTab({ section }) {
                           <button
                             type="button"
                             onClick={() => setTrainingForm((prev) => ({ ...prev, coverImage: '' }))}
-                            className="min-h-11 px-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50"
+                            className="min-h-11 px-3 rounded-xl text-sm font-bold text-emerald-600 hover:bg-emerald-50"
                           >
                             Xóa ảnh
                           </button>
@@ -490,7 +490,7 @@ export default function AdminTrainingTab({ section }) {
                 <p className="text-xs text-slate-500">Đang tải môn học từ khóa học admin…</p>
               )}
               {trainingTab === 'guides' && courseCatalogError && (
-                <p className="text-xs text-red-600">{courseCatalogError}</p>
+                <p className="text-xs text-emerald-600">{courseCatalogError}</p>
               )}
               {trainingTab === 'guides' && !courseCatalogLoading && !courseCatalogError && courseCatalog.length === 0 && (
                 <p className="text-xs text-amber-600">Chưa có khóa học trong danh mục admin để lấy môn.</p>
@@ -631,7 +631,7 @@ export default function AdminTrainingTab({ section }) {
                         return (
                           <div key={t.id || t._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 space-y-3 min-w-0">
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-9 h-9 rounded-xl bg-red-500 flex items-center justify-center text-white text-xs font-black shrink-0">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center text-white text-xs font-black shrink-0">
                                 {(t.name || '?')[0]}
                               </div>
                               <div className="min-w-0 flex-1">
@@ -652,7 +652,7 @@ export default function AdminTrainingTab({ section }) {
                                   <button
                                     type="button"
                                     onClick={() => setGvReviewModal(t)}
-                                    className="text-[10px] font-bold text-red-700 underline truncate max-w-full"
+                                    className="text-[10px] font-bold text-emerald-700 underline truncate max-w-full"
                                     title={practicalFileDisplayName(t.practicalFile)}
                                   >
                                     Xem file
@@ -733,7 +733,7 @@ export default function AdminTrainingTab({ section }) {
                                 <tr key={t.id || t._id} className="hover:bg-blue-50/20 transition-colors">
                                   <td className="px-3 py-3">
                                     <div className="flex items-center gap-2 min-w-0">
-                                      <div className="w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center text-white text-xs font-black shrink-0">
+                                      <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center text-white text-xs font-black shrink-0">
                                         {(t.name || '?')[0]}
                                       </div>
                                       <div className="min-w-0">
@@ -753,7 +753,7 @@ export default function AdminTrainingTab({ section }) {
                                       <button
                                         type="button"
                                         onClick={() => setGvReviewModal(t)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all border border-red-200 max-w-[200px] truncate"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all border border-emerald-200 max-w-[200px] truncate"
                                         title={practicalFileDisplayName(t.practicalFile)}
                                       >
                                         <Download size={12} className="shrink-0" />
@@ -870,7 +870,7 @@ export default function AdminTrainingTab({ section }) {
                                 </td>
                                 <td className="px-4 py-3">
                                   {trainingTab === 'files' ? (
-                                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black text-white shadow-xs ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'}`}>
+                                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-black text-white shadow-xs ${item.fileType === 'PDF' ? 'bg-emerald-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'}`}>
                                       {item.fileType || 'File'}
                                     </span>
                                   ) : (
@@ -967,7 +967,7 @@ export default function AdminTrainingTab({ section }) {
                         </div>
                       )}
                       {trainingTab === 'files' && (
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-emerald-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'
                           }`}>
                           {item.fileType || 'File'}
                         </div>
@@ -1023,7 +1023,7 @@ export default function AdminTrainingTab({ section }) {
                   <div className="p-8 text-center text-sm text-slate-500">Đang đồng bộ danh mục khóa học…</div>
                 )}
                 {trainingTab === 'videos' && courseCatalogError && (
-                  <div className="p-8 text-center text-sm text-red-600">Không thể đồng bộ danh mục khóa học: {courseCatalogError}</div>
+                  <div className="p-8 text-center text-sm text-emerald-600">Không thể đồng bộ danh mục khóa học: {courseCatalogError}</div>
                 )}
                 {trainingTab === 'videos' && !courseCatalogLoading && !courseCatalogError && trainingItems.length === 0 && (
                   <div className="p-12 text-center text-gray-400">
@@ -1049,7 +1049,7 @@ export default function AdminTrainingTab({ section }) {
       {erGvForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-            <div className="bg-gradient-to-r from-red-700 to-emerald-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
+            <div className="bg-gradient-to-r from-emerald-700 to-emerald-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
               <h3 className="font-bold text-lg sm:text-xl flex items-center gap-2 sm:gap-3 min-w-0">
                 <GraduationCap size={22} className="shrink-0" /> {erGvForm.id ? 'Chỉnh sửa kết quả' : 'Thêm kết quả thi Giảng viên'}
               </h3>
@@ -1097,7 +1097,7 @@ export default function AdminTrainingTab({ section }) {
                       }`}>Đạt (cấp quyền)</button>
                   <button onClick={() => setErGvForm({ ...erGvForm, status: 'Locked' })}
                     className={`flex-1 px-5 py-3 rounded-2xl text-[12px] font-black transition-all duration-300 border-2 ${erGvForm.status === 'Locked'
-                        ? 'bg-red-600 border-transparent text-white shadow-md scale-[1.02]'
+                        ? 'bg-emerald-600 border-transparent text-white shadow-md scale-[1.02]'
                         : 'bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 hover:bg-red-50/50 hover:scale-[1.02]'
                       }`}>Chưa đạt (khóa lại)</button>
                 </div>
@@ -1121,7 +1121,7 @@ export default function AdminTrainingTab({ section }) {
                 } catch (err) {
                   toast.error('Lỗi cập nhật: ' + (err.message || 'Không xác định'));
                 }
-              }} className="flex-1 min-h-11 py-3 bg-gradient-to-r from-red-700 to-red-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
+              }} className="flex-1 min-h-11 py-3 bg-gradient-to-r from-emerald-700 to-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
                 <Save size={16} /> Lưu & Áp dụng
               </button>
             </div>

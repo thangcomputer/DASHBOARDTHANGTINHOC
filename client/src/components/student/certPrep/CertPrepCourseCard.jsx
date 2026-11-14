@@ -24,7 +24,7 @@ export default function CertPrepCourseCard({ course, onOpen }) {
           <button
             type="button"
             onClick={() => onOpen(course)}
-            className="mt-auto min-h-11 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold w-full"
+            className="mt-auto min-h-11 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold w-full"
           >
             Xem khóa học
           </button>
