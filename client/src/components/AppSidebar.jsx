@@ -850,7 +850,7 @@ const AppSidebar = ({
             : isCourseStudent
               ? 'Khóa chính thức'
               : isLifetime
-                ? 'Không giới hạn'
+                ? freeXpText
                 : `Còn ${sub.daysLeft ?? 0} ngày`;
 
           if (isStudentNav) {
@@ -875,11 +875,7 @@ const AppSidebar = ({
                 )}
               </span>
             );
-            const actionChip = isCourseStudent ? null : isLifetime ? (
-              <span className="shrink-0 rounded-[6px] bg-[#F59E0B]/25 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-[#FDE68A]">
-                VĨNH VIỄN
-              </span>
-            ) : (
+            const actionChip = (isCourseStudent || isLifetime) ? null : (
               <button
                 type="button"
                 onClick={studentSubscription.openRenew}
