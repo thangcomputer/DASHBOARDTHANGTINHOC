@@ -389,7 +389,7 @@ export function PathVideoModal({
               </Text>
             </View>
             <View style={styles.headerTitleWrap}>
-              <Clapperboard size={isCompact ? 14 : 16} color="#F87171" />
+              <Clapperboard size={isCompact ? 14 : 16} color="#34D399" />
               <Text numberOfLines={isCompact ? 1 : 2} style={[styles.headerVideoTitle, isCompact && styles.headerVideoTitleCompact]}>{current?.title || 'Video của chặng'}</Text>
             </View>
             <DuoButton variant="danger" size="sm" text="Đóng" onPress={onClose} accessibilityLabel="Đóng video" />

@@ -113,7 +113,7 @@ export function PathSnakeConnector({
   );
 }
 
-export function DropletMark({ size = 14, fill = '#EF4444' }: { size?: number; fill?: string }) {
+export function DropletMark({ size = 14, fill = '#10B981' }: { size?: number; fill?: string }) {
   return (
     <Svg width={size} height={size * 1.15} viewBox="0 0 24 28">
       <Path d="M12 2 C12 2 4 13 4 18 a8 8 0 0 0 16 0 C20 13 12 2 12 2 Z" fill={fill} stroke="rgba(255,255,255,0.9)" strokeWidth={1.2} />

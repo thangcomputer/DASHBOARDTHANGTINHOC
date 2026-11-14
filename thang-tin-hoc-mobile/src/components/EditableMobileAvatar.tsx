@@ -140,7 +140,7 @@ export function EditableMobileAvatar({
         <View
           style={[
             styles.cameraBadge,
-            isBrandStudent && { backgroundColor: '#EF4444' },
+            isBrandStudent && { backgroundColor: '#10B981' },
             {
               width: badgeSize,
               height: badgeSize,

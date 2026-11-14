@@ -176,7 +176,7 @@ export function PinLockGate({
 const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: '#0B1220' },
   card: { width: '100%', maxWidth: 380, alignItems: 'center', gap: 10 },
-  icon: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, boxShadow: '0px 8px 24px rgba(220, 38, 38, 0.45)' },
+  icon: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, boxShadow: '0px 8px 24px rgba(5, 150, 105, 0.45)' },
   title: { marginTop: 6, color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
   subtitle: { marginBottom: 8, color: '#CBD5E1', fontSize: 14, textAlign: 'center' },
   forgot: { width: '100%', alignItems: 'center', gap: 10, marginTop: 6, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },

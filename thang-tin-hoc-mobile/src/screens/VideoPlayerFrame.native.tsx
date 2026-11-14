@@ -209,7 +209,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
       el=document.createElement('div');
       el.id='anti-seek-hud';
       el.style.cssText='position:fixed;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;z-index:2147483646';
-      el.innerHTML='<div style="display:flex;align-items:center;background:rgba(0,0,0,0.88);padding:10px 16px;border-radius:20px;border:1.5px solid #EF4444;color:#fff;font-weight:900;font-size:13px;font-family:system-ui,sans-serif;letter-spacing:0.04em"><span style="display:inline-flex;width:22px;height:22px;margin-right:8px;border-radius:11px;background:#DC2626;align-items:center;justify-content:center;font-size:11px">!</span><span>Chống tua video</span></div>';
+      el.innerHTML='<div style="display:flex;align-items:center;background:rgba(0,0,0,0.88);padding:10px 16px;border-radius:20px;border:1.5px solid #10B981;color:#fff;font-weight:900;font-size:13px;font-family:system-ui,sans-serif;letter-spacing:0.04em"><span style="display:inline-flex;width:22px;height:22px;margin-right:8px;border-radius:11px;background:#059669;align-items:center;justify-content:center;font-size:11px">!</span><span>Chống tua video</span></div>';
       document.body.appendChild(el);
     }
     el.style.display='flex';

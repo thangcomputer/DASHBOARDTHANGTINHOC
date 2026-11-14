@@ -53,7 +53,7 @@ const practiceFireworkRays: Array<[number, string, number]> = [
   [240, '#0F766E', 16], [270, '#C4A35A', 22], [300, '#0F766E', 16], [330, '#C4A35A', 22],
 ];
 const sectionFireworkParticles: Array<[number, number, string, number, number]> = [
-  [-20, -14, '#EF4444', 0, -32], [-12, -22, '#F59E0B', -4, -38],
+  [-20, -14, '#10B981', 0, -32], [-12, -22, '#F59E0B', -4, -38],
   [-3, -26, '#10B981', 0, -42], [7, -22, '#3B82F6', 5, -38],
   [17, -14, '#A855F7', 9, -32], [22, -3, '#EC4899', 12, -24],
   [18, 9, '#FACC15', 10, 24], [8, 16, '#06B6D4', 5, 34],
@@ -1586,7 +1586,7 @@ function UnitDetails({
               </Pressable>
               {practiceTimeLimit > 0 ? (
                 <View style={[styles.practiceClock, practiceRemaining > 0 && practiceRemaining <= 10 && styles.practiceClockWarning]}>
-                  <Clock3 size={15} color={practiceRemaining > 0 && practiceRemaining <= 10 ? '#DC2626' : '#334155'} />
+                  <Clock3 size={15} color={practiceRemaining > 0 && practiceRemaining <= 10 ? '#059669' : '#334155'} />
                   <Text style={styles.practiceClockText}>
                     {Math.floor((practiceStarted ? practiceRemaining : practiceTimeLimit) / 60)}:{String((practiceStarted ? practiceRemaining : practiceTimeLimit) % 60).padStart(2, '0')}
                   </Text>
@@ -1730,7 +1730,7 @@ function UnitDetails({
                   Có {practiceItems.length} câu hỏi. Câu hỏi sẽ hiện và đồng hồ bắt đầu tính sau khi bạn bấm nút bên dưới.
                 </Text>
                 {practiceTimeLimit > 0 ? (
-                  <View style={styles.practiceStartTime}><Clock3 size={14} color="#DC2626" /><Text style={styles.practiceStartTimeText}>Thời gian: {Math.floor(practiceTimeLimit / 60)}:{String(practiceTimeLimit % 60).padStart(2, '0')}</Text></View>
+                  <View style={styles.practiceStartTime}><Clock3 size={14} color="#059669" /><Text style={styles.practiceStartTimeText}>Thời gian: {Math.floor(practiceTimeLimit / 60)}:{String(practiceTimeLimit % 60).padStart(2, '0')}</Text></View>
                 ) : null}
                 <Pressable
                   onPress={() => {
@@ -2453,19 +2453,19 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   tooltipTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   tooltipHeading: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   tooltipLine: { color: '#475569', fontSize: typography.caption, lineHeight: 16 },
-  tooltipWarning: { marginTop: 2, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#FEE2E2', color: colors.ink, fontSize: typography.micro, lineHeight: 15, fontWeight: '700' },
+  tooltipWarning: { marginTop: 2, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#D1FAE5', color: colors.ink, fontSize: typography.micro, lineHeight: 15, fontWeight: '700' },
   registerButton: { minHeight: 32, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#ECFDF5' },
   registerText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
-  openButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#FEF2F2' },
+  openButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#ECFDF5' },
   openButtonActive: { backgroundColor: '#ECFDF5' },
-  openButtonText: { color: '#B91C1C', fontSize: typography.micro, fontWeight: '900' },
+  openButtonText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
   openButtonTextActive: { color: '#047857' },
   modalBackdrop: { flex: 1, justifyContent: 'flex-start', backgroundColor: 'rgba(15,23,42,0.55)' },
   modalCard: { width: '100%', height: '100%', maxHeight: '100%', paddingTop: spacing.md, borderRadius: 0, backgroundColor: colors.surface },
   modalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  modalBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA', borderRadius: radius.md, backgroundColor: '#FFF7F7' },
+  modalBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.md, backgroundColor: '#FFF7F7' },
   headerLessonNav: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  headerLessonNavOpen: { borderColor: '#FECACA', backgroundColor: '#FFF7F7' },
+  headerLessonNavOpen: { borderColor: '#A7F3D0', backgroundColor: '#FFF7F7' },
   headerLessonNavText: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '900' },
   modalTitle: { marginTop: 3, color: colors.ink, fontSize: typography.heading, fontWeight: '900' },
   muted: { color: colors.muted, fontSize: typography.micro },
@@ -2509,13 +2509,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   lessonDrawerTitle: { marginBottom: spacing.sm, color: colors.ink, fontSize: typography.body, fontWeight: '900' },
   unitNavTopScroll: { flexGrow: 0, flexShrink: 1, maxHeight: '42%' },
   unitNavToggle: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  unitNavToggleOpen: { borderColor: '#FECACA', backgroundColor: '#FFF7F7' },
+  unitNavToggleOpen: { borderColor: '#A7F3D0', backgroundColor: '#FFF7F7' },
   unitNavToggleIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#FFF1F2' },
   unitNavToggleTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   unitNavToggleSubtitle: { marginTop: 2, color: colors.muted, fontSize: typography.micro },
   unitNavList: { gap: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
   unitNavItem: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 11, backgroundColor: '#FFFFFF' },
-  unitNavItemActive: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  unitNavItemActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   unitNavItemLocked: { backgroundColor: '#F1F5F9' },
   unitNavNumber: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#F1F5F9' },
   unitNavNumberActive: { backgroundColor: colors.brand },
@@ -2523,12 +2523,12 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   unitNavNumberText: { color: '#475569', fontSize: typography.micro, fontWeight: '900' },
   unitNavNumberTextActive: { color: '#FFFFFF' },
   unitNavItemTitle: { flex: 1, color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
-  unitNavItemTitleActive: { color: '#B91C1C' },
+  unitNavItemTitleActive: { color: '#047857' },
   unitNavItemTitleLocked: { color: '#94A3B8' },
-  unitNavCurrent: { color: '#B91C1C', fontSize: typography.micro, fontWeight: '900' },
+  unitNavCurrent: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
   lessonNavGroup: { gap: 2 },
   unitNavSubItem: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginLeft: 26, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 9, backgroundColor: '#FFFFFF' },
-  unitNavSubItemActive: { borderColor: colors.brand, backgroundColor: '#FEF2F2' },
+  unitNavSubItemActive: { borderColor: colors.brand, backgroundColor: '#ECFDF5' },
   unitNavSubItemLocked: { backgroundColor: '#F1F5F9' },
   unitNavSubItemText: { flex: 1, color: '#334155', fontSize: typography.micro, fontWeight: '700' },
   unitNavSubItemTextActive: { color: colors.brandDark },
@@ -2547,11 +2547,11 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   videoStartOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#080D19' },
   videoBrandBadge: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.brand },
   videoBrandText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.6 },
-  videoStartButton: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: '#EF4444', shadowColor: '#EF4444', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
+  videoStartButton: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
   videoStartLabel: { marginTop: spacing.sm, color: '#E2E8F0', fontSize: typography.caption, fontWeight: '800' },
   videoTabBar: { flexDirection: 'row', flexWrap: 'nowrap', marginTop: spacing.xs, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
   videoTab: { flex: 1, minWidth: 0, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 1, paddingVertical: 5, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  videoTabActive: { borderBottomColor: colors.brand, backgroundColor: '#FEF2F2' },
+  videoTabActive: { borderBottomColor: colors.brand, backgroundColor: '#ECFDF5' },
   videoTabText: { color: '#64748B', fontSize: typography.micro, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
   videoTabTextActive: { color: colors.brandDark, fontWeight: '900' },
   videoOverview: { minHeight: 155, gap: spacing.sm, padding: spacing.md },
@@ -2578,7 +2578,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   unitNavigationCopy: { flex: 1, minWidth: 0 },
   unitNavigationLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   unitNavigationTitle: { marginTop: 2, color: colors.ink, fontSize: typography.micro, fontWeight: '900' },
-  nextUnitNavigationLabel: { color: '#FEE2E2' },
+  nextUnitNavigationLabel: { color: '#D1FAE5' },
   nextUnitNavigationTitle: { color: '#FFFFFF' },
   completeSectionButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brand },
   completeSectionButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900' },
@@ -2598,7 +2598,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   practiceStreak: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderRadius: radius.pill, backgroundColor: '#FFFBEB' },
   practiceStreakText: { color: '#92400E', fontSize: typography.micro, fontWeight: '800' },
   practiceClock: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.pill, backgroundColor: '#F8FAFC' },
-  practiceClockWarning: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  practiceClockWarning: { borderColor: '#FCA5A5', backgroundColor: '#ECFDF5' },
   practiceClockText: { color: '#334155', fontSize: typography.micro, fontWeight: '900', fontVariant: ['tabular-nums'] },
   practiceProgressText: { marginTop: 3, color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   practiceSoundButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.sm, backgroundColor: '#FFFFFF' },
@@ -2654,13 +2654,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   practiceFeedbackSparkleTwo: { right: 22, bottom: 7 },
   practiceModalOverlay: { ...StyleSheet.absoluteFill, zIndex: 30, alignItems: 'center', justifyContent: 'center', padding: spacing.md, borderRadius: radius.md, backgroundColor: 'rgba(15,23,42,0.2)' },
   practiceStartModal: { width: '100%', maxWidth: 380, alignItems: 'center', padding: spacing.lg, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
-  practiceStartIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm, borderWidth: 3, borderColor: '#FCA5A5', borderRadius: 18, backgroundColor: '#EF4444', shadowColor: '#EF4444', shadowOpacity: 0.22, shadowRadius: 10, elevation: 3 },
-  practiceTimeoutIcon: { borderColor: '#FECACA', backgroundColor: '#DC2626' },
+  practiceStartIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm, borderWidth: 3, borderColor: '#FCA5A5', borderRadius: 18, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.22, shadowRadius: 10, elevation: 3 },
+  practiceTimeoutIcon: { borderColor: '#A7F3D0', backgroundColor: '#059669' },
   practiceStartTitle: { color: '#0F172A', fontSize: typography.body, fontWeight: '900', textAlign: 'center' },
   practiceStartCopy: { marginTop: spacing.xs, color: '#475569', fontSize: typography.caption, lineHeight: 18, textAlign: 'center' },
   practiceStartTime: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
   practiceStartTimeText: { color: '#334155', fontSize: typography.caption, fontWeight: '800' },
-  practiceStartButton: { width: '100%', minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.md, paddingHorizontal: spacing.md, borderRadius: 11, backgroundColor: '#DC2626' },
+  practiceStartButton: { width: '100%', minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.md, paddingHorizontal: spacing.md, borderRadius: 11, backgroundColor: '#059669' },
   practiceStartButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900' },
   practiceResultCard: { alignItems: 'center', gap: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
   practiceResultIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 16, backgroundColor: '#D1FAE5' },

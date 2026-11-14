@@ -45,7 +45,7 @@ export function getRoleBadgeConfig(role?: string, adminRole?: string | null) {
     return { label: 'AD', bg: '#E11D48', ring: '#FB7185' };
   }
   if (r === 'group') {
-    return { label: 'GR', bg: '#DC2626', ring: '#F87171' };
+    return { label: 'GR', bg: '#059669', ring: '#34D399' };
   }
   return { label: 'HT', bg: '#2563EB', ring: '#60A5FA' };
 }

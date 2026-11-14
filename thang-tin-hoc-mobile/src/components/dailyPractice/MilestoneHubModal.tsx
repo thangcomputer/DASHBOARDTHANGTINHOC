@@ -91,8 +91,8 @@ const SECTION_META: Record<DpSectionKey, {
   video: {
     title: 'Video bài giảng',
     defaultSub: 'Xem video bài giảng',
-    iconBg: '#FEE2E2',
-    iconColor: '#DC2626',
+    iconBg: '#D1FAE5',
+    iconColor: '#059669',
   },
   practice: {
     title: 'Luyện tập',
@@ -812,7 +812,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#DC2626',
+    backgroundColor: '#059669',
     paddingHorizontal: 20,
     paddingVertical: 13,
     borderRadius: 16,

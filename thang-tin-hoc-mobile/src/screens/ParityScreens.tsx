@@ -1289,9 +1289,9 @@ export function FeedScreen() {
               accessibilityLabel="Chọn quyền riêng tư bài đăng"
               accessibilityState={{ expanded: showAudienceMenu }}
             >
-              <Globe size={13} color={isBrandStudent ? '#DC2626' : colors.green} />
-              <Text numberOfLines={1} style={[styles.privacyText, isBrandStudent && { color: '#DC2626' }]}>{audience}</Text>
-              <ChevronDown size={12} color={isBrandStudent ? '#DC2626' : colors.green} />
+              <Globe size={13} color={isBrandStudent ? '#059669' : colors.green} />
+              <Text numberOfLines={1} style={[styles.privacyText, isBrandStudent && { color: '#059669' }]}>{audience}</Text>
+              <ChevronDown size={12} color={isBrandStudent ? '#059669' : colors.green} />
             </Pressable>
             {showAudienceMenu ? (
               <View
@@ -1347,7 +1347,7 @@ export function FeedScreen() {
         ) : null}
         <View style={styles.feedComposerActions}>
           <Pressable onPress={() => { void selectFeedImages(); }} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh">
-            <ImagePlus size={18} color={isBrandStudent ? '#DC2626' : colors.green} /><Text style={styles.feedImageActionText}>{`Thêm ảnh (${selectedImages.length}/6)`}</Text>
+            <ImagePlus size={18} color={isBrandStudent ? '#059669' : colors.green} /><Text style={styles.feedImageActionText}>{`Thêm ảnh (${selectedImages.length}/6)`}</Text>
           </Pressable>
           <Pressable
             disabled={busy}
@@ -1402,9 +1402,9 @@ export function FeedScreen() {
       )}
       <View style={styles.feedListHeading}>
         <Text style={styles.feedListTitle}>Bài viết mới nhất</Text>
-        <View style={[styles.feedListCount, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
-          <Newspaper size={13} color={isBrandStudent ? '#DC2626' : theme.brand} />
-          <Text style={[styles.feedListCountText, isBrandStudent && { color: '#DC2626' }]}>{visibleItems.length} bài</Text>
+        <View style={[styles.feedListCount, isBrandStudent && { backgroundColor: '#ECFDF5' }]}>
+          <Newspaper size={13} color={isBrandStudent ? '#059669' : theme.brand} />
+          <Text style={[styles.feedListCountText, isBrandStudent && { color: '#059669' }]}>{visibleItems.length} bài</Text>
         </View>
       </View>
       {resource.loading ? <LoadingSkeleton /> : null}
@@ -3343,7 +3343,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   feedListCountText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
   privacyMenuAnchor: { position: 'relative', zIndex: 30, alignItems: 'flex-end' },
   privacyButton: { maxWidth: 190, minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#86EFAC', borderRadius: radius.md, backgroundColor: '#ECFDF5' },
-  privacyButtonBrand: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  privacyButtonBrand: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   privacyText: { flexShrink: 1, color: '#047857', fontSize: typography.micro, fontWeight: '700' },
   privacyMenu: { position: 'absolute', top: 42, right: 0, zIndex: 40, width: 252, maxWidth: 286, gap: 3, padding: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
   privacyMenuTitle: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 0.45, paddingHorizontal: spacing.xs, paddingVertical: 5 },
@@ -3363,7 +3363,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   feedImageAction: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F1F5F9' },
   feedImageActionText: { color: '#334155', fontSize: typography.caption, fontWeight: '700' },
   feedSubmitButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 12, backgroundColor: '#059669', borderWidth: 1, borderColor: '#047857', borderBottomWidth: 4, borderBottomColor: '#065F46', shadowColor: '#064E3B', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
-  feedSubmitButtonBrand: { backgroundColor: '#DC2626', borderColor: '#B91C1C', borderBottomColor: '#991B1B', shadowColor: '#991B1B' },
+  feedSubmitButtonBrand: { backgroundColor: '#059669', borderColor: '#047857', borderBottomColor: '#065F46', shadowColor: '#065F46' },
   feedSubmitButtonPressed: { transform: [{ translateY: 2 }], borderBottomWidth: 2 },
   feedSubmitButtonDisabled: { opacity: 0.6 },
   feedSubmitButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.2 },
@@ -3753,7 +3753,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   menuItemDescription: { color: colors.muted, fontSize: typography.micro, lineHeight: 15, fontWeight: '500' },
   menuArrow: { width: 22, height: 30, alignItems: 'center', justifyContent: 'center' },
   courseCard: { gap: spacing.sm },
-  availableCourse: { overflow: 'hidden', borderColor: '#FECACA' },
+  availableCourse: { overflow: 'hidden', borderColor: '#A7F3D0' },
   courseRibbon: { marginTop: -spacing.lg, marginHorizontal: -spacing.lg, marginBottom: spacing.sm, minHeight: 42, backgroundColor: colors.brand, justifyContent: 'center', paddingHorizontal: spacing.lg },
   courseRibbonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.6 },
   examEntryGrid: { gap: spacing.sm },

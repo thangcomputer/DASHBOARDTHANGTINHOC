@@ -39,7 +39,7 @@ export const LEARNING_GOAL_LEVELS: Record<number, { label: string; color: string
   2: { label: 'Vừa sức', color: '#0EA5E9', soft: '#F0F9FF' },
   3: { label: 'Tập trung', color: '#F59E0B', soft: '#FFFBEB' },
   4: { label: 'Chuyên sâu', color: '#F97316', soft: '#FFF7ED' },
-  5: { label: 'Bứt phá', color: '#DC2626', soft: '#FEF2F2' },
+  5: { label: 'Bứt phá', color: '#059669', soft: '#ECFDF5' },
 };
 
 const MOTIVATION: Record<number, string> = {

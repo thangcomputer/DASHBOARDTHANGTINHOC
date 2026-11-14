@@ -588,7 +588,7 @@ export function HomeScreen() {
     if (item.status === 'completed') return { label: 'Đã dạy', color: '#047857', background: '#ECFDF5', live: false };
     if (scheduleIsLive(item)) return { label: 'Đang dạy', color: '#FFFFFF', background: 'rgba(255,255,255,0.22)', live: true };
     if (item.attendanceConfirmPending) return { label: 'Chờ HV xác nhận', color: '#B45309', background: '#FFFBEB', live: false };
-    if (Number.isFinite(sessionStartMs(item)) && sessionStartMs(item) <= nowMs) return { label: 'Chưa điểm danh', color: '#DC2626', background: '#FEF2F2', live: false };
+    if (Number.isFinite(sessionStartMs(item)) && sessionStartMs(item) <= nowMs) return { label: 'Chưa điểm danh', color: '#059669', background: '#ECFDF5', live: false };
     return { label: 'Sắp tới', color: '#2563EB', background: '#EFF6FF', live: false };
   };
   const taughtThisMonth = (schedules.data || [])
@@ -657,7 +657,7 @@ export function HomeScreen() {
     studentTasks.push({
       key: 'practice',
       icon: lost ? Gamepad2 : Flame,
-      tone: lost ? '#64748B' : (isBrandStudent ? '#DC2626' : '#10B981'),
+      tone: lost ? '#64748B' : (isBrandStudent ? '#059669' : '#10B981'),
       title: isBrandStudent
         ? (atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày')
         : (atRisk ? `Duy trì chuỗi ${practiceStats.streak} ngày` : lost ? 'Luyện tập để lấy lại chuỗi' : 'Luyện tập hằng ngày'),
@@ -684,7 +684,7 @@ export function HomeScreen() {
   const heroProgress = pathTopic?.totalUnits
     ? Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100)
     : (practiceStats?.playedToday ? 100 : 0);
-  const scheduleAccent = isBrandStudent ? '#DC2626' : '#059669';
+  const scheduleAccent = isBrandStudent ? '#059669' : '#059669';
   const portalSub = subscription?.subscription;
   const meetAccess = hasMeetAccessClient(portalSub);
   const meetEmptyMode: 'default' | 'purchase' | 'renew' = freeMenu
@@ -859,7 +859,7 @@ export function HomeScreen() {
               {!freePortalCourse && Boolean(currentCourse) ? (
                 <Card style={styles.ovCard}>
                   <View style={styles.ovHeadRow}>
-                    <BookOpen size={18} color={isBrandStudent ? '#DC2626' : colors.brand} />
+                    <BookOpen size={18} color={isBrandStudent ? '#059669' : colors.brand} />
                     <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
                   </View>
                   <CompactCoursePicker
@@ -928,7 +928,7 @@ export function HomeScreen() {
 
               <Card style={styles.ovCard}>
                 <View style={styles.ovHeadRow}>
-                  <CheckCircle size={18} color={isBrandStudent ? '#DC2626' : scheduleAccent} />
+                  <CheckCircle size={18} color={isBrandStudent ? '#059669' : scheduleAccent} />
                   <Text style={[styles.ovTitle, styles.flex]}>Việc cần làm hôm nay</Text>
                 </View>
                 {studentTasks.length
@@ -1193,11 +1193,11 @@ const styles = StyleSheet.create({
   teacherActionIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, shadowColor: '#1E3A5F', shadowOpacity: 0.08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   liveClassCard: { minHeight: 80, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandDark, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.brand },
   liveClassIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
-  liveClassEyebrow: { color: '#FECACA', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.7 },
+  liveClassEyebrow: { color: '#A7F3D0', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.7 },
   liveClassTitle: { color: '#FFFFFF', fontSize: typography.small, fontWeight: '800' },
   liveClassTime: { color: '#FEF08A', fontSize: typography.caption, fontWeight: '800', marginTop: 2 },
-  liveClassCopy: { color: '#FEE2E2' },
-  liveClassNoLink: { color: '#FEE2E2', fontSize: typography.micro, fontWeight: '700' },
+  liveClassCopy: { color: '#D1FAE5' },
+  liveClassNoLink: { color: '#D1FAE5', fontSize: typography.micro, fontWeight: '700' },
   teacherStatsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
   teacherStatCard: { width: '48%', minHeight: 116, padding: spacing.md, gap: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: colors.surface, shadowColor: '#1E3A5F', shadowOpacity: 0.045, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   teacherStatCardWide: { width: '100%', minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -51,8 +51,8 @@ function Avatar({ name, avatar, isBrandStudent = false }: { name: string; avatar
     return <Image source={getMobileImageSource(avatar)} onError={() => setFailed(true)} style={styles.avatar} />;
   }
   return (
-    <View style={[styles.avatar, styles.avatarFallback, isBrandStudent && { backgroundColor: '#FEE2E2' }]}>
-      <Text style={[styles.avatarText, isBrandStudent && { color: '#DC2626' }]}>{initial}</Text>
+    <View style={[styles.avatar, styles.avatarFallback, isBrandStudent && { backgroundColor: '#D1FAE5' }]}>
+      <Text style={[styles.avatarText, isBrandStudent && { color: '#059669' }]}>{initial}</Text>
     </View>
   );
 }
@@ -110,8 +110,8 @@ export function LearningLeaderboardCard({ isBrandStudent = false }: { isBrandStu
             </View>
             <View style={styles.right}>
               <View style={styles.daysRow}>
-                <CheckCircle2 size={12} color={isBrandStudent ? '#DC2626' : '#059669'} />
-                <Text style={[styles.days, isBrandStudent && { color: '#DC2626' }]}>{`${row.goalDays} /${data?.daysSoFar || 7} ngày`}</Text>
+                <CheckCircle2 size={12} color={isBrandStudent ? '#059669' : '#059669'} />
+                <Text style={[styles.days, isBrandStudent && { color: '#059669' }]}>{`${row.goalDays} /${data?.daysSoFar || 7} ngày`}</Text>
               </View>
               <Text style={styles.minutes}>
                 {formatStudyMinutes(row.minutes)}
@@ -129,8 +129,8 @@ export function LearningLeaderboardCard({ isBrandStudent = false }: { isBrandStu
           ) : !me.rank ? (
             <Text style={styles.footerText}>Tuần này bạn chưa học phút nào - vào bài học ngay để lên bảng!</Text>
           ) : (
-            <View style={[styles.mine, { backgroundColor: meInTop ? '#ECFDF5' : '#FEF2F2' }]}>
-              <Text style={[styles.mineRank, { color: meInTop ? '#047857' : '#B91C1C' }]}>{`#${me.rank}`}</Text>
+            <View style={[styles.mine, { backgroundColor: meInTop ? '#ECFDF5' : '#ECFDF5' }]}>
+              <Text style={[styles.mineRank, { color: meInTop ? '#047857' : '#047857' }]}>{`#${me.rank}`}</Text>
               <View style={styles.flex}>
                 <Text style={styles.mineTitle}>
                   {`Bạn đang hạng ${me.rank}/${data.participants} · ${me.goalDays} ngày đạt · ${formatStudyMinutes(me.minutes)}${me.xp > 0 ? ` · ${me.xp} XP` : ''}`}
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: spacing.md, backgroundColor: '#F8FAFC', borderRadius: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12 },
   rowMe: { backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: colors.line },
-  rowMeBrand: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  rowMeBrand: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   rowPodium: { backgroundColor: 'rgba(255, 251, 235, 0.6)' },
   rank: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rankPlain: { backgroundColor: '#F1F5F9' },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flexShrink: 1, color: colors.ink, fontSize: 14, fontWeight: '800' },
   meTag: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
-  meTagBrand: { backgroundColor: '#EF4444' },
+  meTagBrand: { backgroundColor: '#10B981' },
   meTagText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   sub: { color: '#94A3B8', fontSize: 12 },
   right: { alignItems: 'flex-end' },

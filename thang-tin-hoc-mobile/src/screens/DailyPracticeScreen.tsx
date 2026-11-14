@@ -72,7 +72,7 @@ const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
   keyboard: Keyboard, shield: ShieldCheck, cpu: Cpu, mail: Mail, image: ImageIcon, code: Code2,
 };
-const CONFETTI_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
+const CONFETTI_COLORS = ['#10B981', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const gradient = (from: string, to: string) => ({ backgroundColor: to, backgroundImage: `linear-gradient(180deg, ${from} 0%, ${to} 100%)` } as never);
 
@@ -232,7 +232,7 @@ function DailyPracticeGoalPanel({
         </View>
 
         <View style={[styles.pathTrack, { height: 8 }]}>
-          <View style={[styles.pathFill, { width: `${todayProgress}% `, backgroundColor: todayProgress >= 100 ? '#10B981' : '#EF4444' }]} />
+          <View style={[styles.pathFill, { width: `${todayProgress}% `, backgroundColor: todayProgress >= 100 ? '#10B981' : '#10B981' }]} />
         </View>
 
         <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
@@ -247,10 +247,10 @@ function DailyPracticeGoalPanel({
                 paddingVertical: 4,
                 borderRadius: 10,
                 borderWidth: 1.5,
-                borderColor: '#FECACA',
+                borderColor: '#A7F3D0',
                 borderBottomWidth: pressed ? 1.5 : 3.5,
-                borderBottomColor: '#F87171',
-                backgroundColor: pressed ? '#FEF2F2' : '#FFFFFF',
+                borderBottomColor: '#34D399',
+                backgroundColor: pressed ? '#ECFDF5' : '#FFFFFF',
                 transform: [{ translateY: pressed ? 2 : 0 }],
               })}
             >
@@ -954,7 +954,7 @@ type PopoverState = { unitId: string; nodeKey?: string; stepKey?: DpStepKey; tes
 
 /** Màu tối hơn cho "đế" nút 3D. */
 function darken(hex: string, amount = 0.28) {
-  const value = String(hex || '#B91C1C').replace('#', '');
+  const value = String(hex || '#047857').replace('#', '');
   const channel = (start: number) => Math.max(0, Math.round(parseInt(value.slice(start, start + 2), 16) * (1 - amount)));
   return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
 }
@@ -1115,7 +1115,7 @@ function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0
   const LEVEL_DOTS: Array<{ diff: 'easy' | 'medium' | 'hard'; color: string }> = [
     { diff: 'easy', color: '#22C55E' },
     { diff: 'medium', color: '#F97316' },
-    { diff: 'hard', color: '#EF4444' },
+    { diff: 'hard', color: '#10B981' },
   ];
   const isDotDone = (i: number) => {
     if (done) return true;
@@ -1335,7 +1335,7 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }: {
 
                 {Boolean(single.videos?.[0]?.url) && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }}>
-                    <PlayCircle size={14} color="#FECACA" />
+                    <PlayCircle size={14} color="#A7F3D0" />
                     <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' }}>
                       Video bài giảng {single.videos?.[0]?.checks?.length ? `(${single.videos[0].checks.length} câu hỏi)` : ''}
                     </Text>
@@ -3099,7 +3099,7 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
                   <Text style={{ fontSize: 12, fontWeight: '800', color: '#065F46' }}>
                     {busy || remainingMs <= 0 ? 'Đang vào bài luyện…' : 'Tự động vào luyện sau'}
                   </Text>
-                  <View style={{ backgroundColor: isBrandStudent ? '#EF4444' : '#059669', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                  <View style={{ backgroundColor: isBrandStudent ? '#10B981' : '#059669', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                     <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF' }}>
                       {remainingMs <= 0 ? '0s' : `${secLeft}s`}
                     </Text>
@@ -3668,7 +3668,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
         <View style={styles.resultStats}>
           <View style={styles.resultStat}><Text style={[styles.resultValue, { color: '#059669' }]}>{`${summary.correctCount}/${summary.total}`}</Text><Text style={styles.statLabel}>câu đúng</Text></View>
           <View style={styles.resultStat}>
-            <Text style={[styles.resultValue, { color: !finishXp.positive ? '#DC2626' : finishXp.amount > 0 ? '#D97706' : '#64748B' }]}>
+            <Text style={[styles.resultValue, { color: !finishXp.positive ? '#059669' : finishXp.amount > 0 ? '#D97706' : '#64748B' }]}>
               {`${finishXp.prefix}${finishXp.amount}`}
             </Text>
             <Text style={styles.statLabel}>{summary.xpCapReached ? 'Hết XP free' : 'XP ròng lượt này'}</Text>
@@ -3684,7 +3684,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
       {summary.xpCapReached ? (
         <View style={styles.resultCapBanner}>
           <View style={styles.xpCapBannerTop}>
-            <Lock size={16} color="#B91C1C" />
+            <Lock size={16} color="#047857" />
             <Text style={styles.xpCapBannerTitle}>Đã dùng hết {DP_PLAN_XP_CAP.free} XP miễn phí hôm nay</Text>
           </View>
           <Text style={styles.xpCapBannerDesc}>
@@ -4184,7 +4184,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   hintRevealWrap: { marginTop: 12, gap: 6 },
   hintChargeLine: { color: '#B45309', fontSize: 12, fontWeight: '600', paddingHorizontal: 4 },
-  xpHintSpend: { color: '#DC2626', fontSize: 10, fontWeight: '800', marginTop: 2 },
+  xpHintSpend: { color: '#059669', fontSize: 10, fontWeight: '800', marginTop: 2 },
   answerArea: { marginTop: 2, width: '100%' },
   feedback: {
     padding: spacing.lg,
@@ -4198,7 +4198,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     borderColor: '#6EE7B7',
   },
   feedbackBad: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#D1FAE5',
     borderColor: '#FCA5A5',
   },
   feedbackRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
@@ -4775,19 +4775,19 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   xpCapRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   xpCapLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   xpCapLabel: { color: '#B45309', fontSize: 12, fontWeight: '600' },
-  xpCapLabelFull: { color: '#DC2626' },
+  xpCapLabelFull: { color: '#059669' },
   xpCapPct: { color: '#B45309', fontSize: 12, fontWeight: '600' },
   xpCapTrack: { height: 8, borderRadius: 999, backgroundColor: '#FEF3C7', overflow: 'hidden' },
   xpCapFill: { height: '100%', borderRadius: 999 },
   xpCapHint: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   xpCapHintBold: { color: '#B45309', fontWeight: '600' },
   xpCapBanner: {
-    padding: spacing.md, borderRadius: 20, borderWidth: 1.5, borderColor: '#FECACA', backgroundColor: '#FEF2F2', gap: 10,
+    padding: spacing.md, borderRadius: 20, borderWidth: 1.5, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5', gap: 10,
   },
   xpCapBannerTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  xpCapBannerTitle: { color: '#991B1B', fontSize: 15, fontWeight: '700' },
+  xpCapBannerTitle: { color: '#065F46', fontSize: 15, fontWeight: '700' },
   xpCapBannerDesc: { color: '#475569', fontSize: 13, lineHeight: 18 },
-  xpCapBannerBold: { color: '#991B1B', fontWeight: '600' },
+  xpCapBannerBold: { color: '#065F46', fontWeight: '600' },
   xpCapBannerPlans: { gap: 6, paddingVertical: 4 },
   xpCapPlanRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   xpCapPlanText: { color: '#334155', fontSize: 13 },
@@ -4795,7 +4795,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   xpCapPlanBadge: { color: '#059669', fontWeight: '600', fontSize: 12 },
   xpCapBannerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44,
-    borderRadius: 12, backgroundColor: '#DC2626',
+    borderRadius: 12, backgroundColor: '#059669',
   },
   xpCapBannerBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   resultCapBanner: {
@@ -4818,7 +4818,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   lessonModalClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
   lessonVideoCallout: {
     flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16,
-    borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2',
+    borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5',
   },
   lessonVideoCalloutTitle: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   lessonFileCard: {
@@ -4923,15 +4923,15 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     padding: 4,
   },
   videoGateMissedBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#A7F3D0',
   },
   videoGateMissedText: {
-    color: '#B91C1C',
+    color: '#047857',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -5110,10 +5110,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 12,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#10B981',
   },
   lessonFootDoneBtnDone: {
-    backgroundColor: '#F87171',
+    backgroundColor: '#34D399',
   },
   lessonFootDoneBtnText: {
     color: '#FFFFFF',

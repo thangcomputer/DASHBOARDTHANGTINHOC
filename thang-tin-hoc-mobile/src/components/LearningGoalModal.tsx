@@ -38,7 +38,7 @@ const STUDY_ROUTES = new Set([
   'CertPrepCatalog', 'CertPrepLevel', 'CertPrepPlayer', 'CertPrepResult', 'DailyPractice',
 ]);
 const PERIOD_ICONS = { week: Sprout, month: Flame, quarter: Trophy } as const;
-const CONFETTI_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
+const CONFETTI_COLORS = ['#10B981', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
 const CONFETTI = Array.from({ length: 18 }, (_, i) => {
   const angle = (i / 18) * Math.PI * 2;
   const distance = 95 + (i % 3) * 28;
@@ -411,7 +411,7 @@ function LearningGoalModal({
                         {option.popular ? (
                           <View style={[styles.popular, isBrandStudent && styles.popularBrand]}><Text style={styles.popularText}>PHỔ BIẾN</Text></View>
                         ) : null}
-                        <Icon size={18} color={active ? (isBrandStudent ? '#DC2626' : colors.brand) : '#94A3B8'} />
+                        <Icon size={18} color={active ? (isBrandStudent ? '#059669' : colors.brand) : '#94A3B8'} />
                         <Text style={[styles.optionTitle, active && (isBrandStudent ? styles.optionTitleActiveBrand : styles.optionTitleActive)]}>{option.label}</Text>
                         <Text style={styles.optionHint}>{`${option.days} ngày`}</Text>
                       </Pressable>
@@ -467,7 +467,7 @@ function LearningGoalModal({
                     <Text style={styles.strong}>{`${selected.days} ngày`}</Text>
                   </Text>
                   <View style={styles.inlineRow}>
-                    <CalendarCheck size={13} color={isBrandStudent ? '#DC2626' : '#047857'} />
+                    <CalendarCheck size={13} color={isBrandStudent ? '#059669' : '#047857'} />
                     <Text style={[styles.summaryDate, isBrandStudent && styles.summaryDateBrand]}>{`Hoàn thành dự kiến ${endDate} `}</Text>
                   </View>
                   <View style={styles.inlineRow}>
@@ -516,8 +516,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: 28,
     paddingBottom: spacing.lg,
-    backgroundColor: '#FEF2F2',
-    backgroundImage: 'linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 50%, #FFFBEB 100%)',
+    backgroundColor: '#ECFDF5',
+    backgroundImage: 'linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 50%, #FFFBEB 100%)',
   } as never,
   droplet: {
     position: 'absolute',
@@ -538,15 +538,15 @@ const styles = StyleSheet.create({
   },
   badgeWrap: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: 'rgba(16, 185, 129, 0.55)' },
-  ringBrand: { borderColor: 'rgba(239, 68, 68, 0.55)' },
+  ringBrand: { borderColor: 'rgba(16, 185, 129, 0.55)' },
   badge: {
     width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand,
     backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
     boxShadow: '0px 10px 22px rgba(4, 120, 87, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(4, 120, 87, 0.5)',
   } as never,
   badgeBrand: {
-    backgroundColor: '#EF4444',
-    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #DC2626 100%)',
+    backgroundColor: '#10B981',
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
     boxShadow: '0px 10px 22px rgba(185, 28, 28, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(153, 27, 27, 0.5)',
   } as never,
   badgeSuccess: {
@@ -575,18 +575,18 @@ const styles = StyleSheet.create({
   },
   hourOption: { paddingTop: 10, paddingBottom: 8, gap: 0, borderRadius: 14 },
   optionActive: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
-  optionActiveBrand: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
+  optionActiveBrand: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
   optionTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
   optionTitleActive: { color: '#047857' },
-  optionTitleActiveBrand: { color: '#DC2626' },
+  optionTitleActiveBrand: { color: '#059669' },
   optionHint: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
   popular: {
     position: 'absolute', top: -10, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.brand,
     backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
   } as never,
   popularBrand: {
-    backgroundColor: '#DC2626',
-    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #DC2626 100%)',
+    backgroundColor: '#059669',
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
   } as never,
   popularText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   hoursHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -601,13 +601,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryBrand: {
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
   },
   summaryText: { color: '#065F46', fontSize: 14, textAlign: 'center' },
-  summaryTextBrand: { color: '#991B1B' },
+  summaryTextBrand: { color: '#065F46' },
   summaryDate: { color: '#047857', fontSize: 12, fontWeight: '700' },
-  summaryDateBrand: { color: '#DC2626' },
+  summaryDateBrand: { color: '#059669' },
   motivation: { color: colors.muted, fontSize: 12, fontStyle: 'italic', flexShrink: 1 },
   strong: { fontWeight: '900', color: colors.ink },
   inlineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },

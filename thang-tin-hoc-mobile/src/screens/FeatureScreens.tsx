@@ -785,8 +785,8 @@ export function ScheduleScreen() {
   return (
     <AppScreen scrollViewRef={screenScrollRef}>
       <Card style={styles.scheduleHero}>
-        <View style={[styles.scheduleHeroIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
-          <CalendarDays size={22} color={isBrandStudent ? '#DC2626' : theme.brand} />
+        <View style={[styles.scheduleHeroIcon, isBrandStudent && { backgroundColor: '#ECFDF5' }]}>
+          <CalendarDays size={22} color={isBrandStudent ? '#059669' : theme.brand} />
         </View>
         <View style={styles.rowCopy}>
           <Text style={styles.scheduleHeroTitle}>
@@ -801,12 +801,12 @@ export function ScheduleScreen() {
           {courseProfile.error ? <ErrorState onRetry={courseProfile.reload} /> : null}
           <View style={styles.scheduleStats}>
             {[
-              { label: 'Đã học tháng này', value: studentMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: isBrandStudent ? '#DC2626' : colors.green },
+              { label: 'Đã học tháng này', value: studentMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: isBrandStudent ? '#059669' : colors.green },
               { label: 'Buổi sắp tới', value: studentMonthItems.filter(isUpcomingSchedule).length, icon: Clock3, color: '#D97706' },
               { label: 'Đã hủy', value: studentMonthItems.filter((item) => item.status === 'cancelled').length, icon: Ban, color: colors.red },
             ].map((stat) => (
               <Card key={stat.label} style={styles.scheduleStat}>
-                <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === '#DC2626' ? '#FEF2F2' : (stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft) }]}>
+                <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === '#059669' ? '#ECFDF5' : (stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft) }]}>
                   <stat.icon size={17} color={stat.color} />
                 </View>
                 <Text style={styles.scheduleStatLabel}>{stat.label}</Text>
@@ -816,7 +816,7 @@ export function ScheduleScreen() {
           </View>
           <Card style={styles.weeklyGridCard}>
             <View style={styles.weeklyGridHeading}>
-              <View style={[styles.scheduleOverviewIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}><Table2 size={18} color={isBrandStudent ? '#DC2626' : theme.brand} /></View>
+              <View style={[styles.scheduleOverviewIcon, isBrandStudent && { backgroundColor: '#ECFDF5' }]}><Table2 size={18} color={isBrandStudent ? '#059669' : theme.brand} /></View>
               <View style={styles.weeklyGridHeadingCopy}>
                 <Text style={styles.weeklyGridTitle}>Lịch học theo tuần</Text>
               </View>
@@ -829,20 +829,20 @@ export function ScheduleScreen() {
               accessibilityState={{ expanded: showStudentCoursePicker }}
             >
               <Text style={styles.courseFilterSelectLabel}>Khóa học</Text>
-              <Text numberOfLines={1} style={[styles.courseFilterSelectValue, isBrandStudent && { color: '#DC2626' }]}>
+              <Text numberOfLines={1} style={[styles.courseFilterSelectValue, isBrandStudent && { color: '#059669' }]}>
                 {activeStudentCourse || 'Chưa có khóa học'}
               </Text>
-              <ChevronDown size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
+              <ChevronDown size={16} color={isBrandStudent ? '#059669' : theme.brand} />
             </Pressable>
-            <View style={[styles.teacherWeekRange, isBrandStudent && { backgroundColor: '#FFF5F5', borderColor: '#FEE2E2' }]}>
+            <View style={[styles.teacherWeekRange, isBrandStudent && { backgroundColor: '#FFF5F5', borderColor: '#D1FAE5' }]}>
               <Pressable onPress={() => setWeekOffset((value) => value - 1)} style={styles.teacherWeekRangeArrow} accessibilityRole="button" accessibilityLabel="Tuần trước">
-                <ChevronLeft size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
+                <ChevronLeft size={16} color={isBrandStudent ? '#059669' : theme.brand} />
               </Pressable>
               <Pressable onPress={() => setWeekOffset(0)} accessibilityRole="button" accessibilityLabel="Về tuần hiện tại">
-                <Text style={[styles.teacherWeekRangeLabel, isBrandStudent && { color: '#DC2626' }]}>{weekLabel}</Text>
+                <Text style={[styles.teacherWeekRangeLabel, isBrandStudent && { color: '#059669' }]}>{weekLabel}</Text>
               </Pressable>
               <Pressable onPress={() => setWeekOffset((value) => value + 1)} style={styles.teacherWeekRangeArrow} accessibilityRole="button" accessibilityLabel="Tuần sau">
-                <ChevronRight size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
+                <ChevronRight size={16} color={isBrandStudent ? '#059669' : theme.brand} />
               </Pressable>
             </View>
             <ScrollView
@@ -858,20 +858,20 @@ export function ScheduleScreen() {
                       styles.teacherCompactDayCell,
                       styles.compactWeekHeaderCell,
                       styles.studentCompactWeekHeaderCell,
-                      day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#FEF2F2' } : styles.weekGridTodayCell)
+                      day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#ECFDF5' } : styles.weekGridTodayCell)
                     ]}>
                       <Text style={[
                         styles.teacherCompactDayText,
-                        day.dateKey === todayKey && (isBrandStudent ? { color: '#DC2626' } : styles.weekGridTodayText)
+                        day.dateKey === todayKey && (isBrandStudent ? { color: '#059669' } : styles.weekGridTodayText)
                       ]}>
                         {index === 6 ? 'CN' : `T${index + 2}`}
                       </Text>
                       <Text style={[
                         styles.teacherCompactDateText,
-                        day.dateKey === todayKey && (isBrandStudent ? { color: '#DC2626' } : styles.weekGridTodayText)
+                        day.dateKey === todayKey && (isBrandStudent ? { color: '#059669' } : styles.weekGridTodayText)
                       ]}>{day.day}</Text>
                       <View style={styles.teacherCompactSort}>
-                        <Text style={[styles.teacherCompactSortText, day.dateKey === todayKey && isBrandStudent && { color: '#DC2626' }]}>Giờ</Text>
+                        <Text style={[styles.teacherCompactSortText, day.dateKey === todayKey && isBrandStudent && { color: '#059669' }]}>Giờ</Text>
                       </View>
                     </View>
                   ))}
@@ -891,7 +891,7 @@ export function ScheduleScreen() {
                       : item?.status === 'cancelled'
                         ? styles.weekGridCancelledCell
                         : item
-                          ? (isBrandStudent ? { backgroundColor: '#FFF5F5', borderColor: '#FECACA' } : styles.weekGridBookedCell)
+                          ? (isBrandStudent ? { backgroundColor: '#FFF5F5', borderColor: '#A7F3D0' } : styles.weekGridBookedCell)
                           : undefined;
                     const time = item?.time.match(/\d{1,2}:\d{2}/)?.[0];
                     return item ? (
@@ -907,8 +907,8 @@ export function ScheduleScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`${activeStudentCourse}, ${day.weekday} ${day.day}, ${item.time}, ${slotStatus}`}
                       >
-                        <Text numberOfLines={1} style={[styles.teacherCompactTime, isBrandStudent ? { color: '#DC2626', fontWeight: '800' } : styles.weekGridBookedText]}>{time}</Text>
-                        <Text numberOfLines={1} style={[styles.teacherCompactStatus, isBrandStudent && { color: '#DC2626' }]}>{slotStatus}</Text>
+                        <Text numberOfLines={1} style={[styles.teacherCompactTime, isBrandStudent ? { color: '#059669', fontWeight: '800' } : styles.weekGridBookedText]}>{time}</Text>
+                        <Text numberOfLines={1} style={[styles.teacherCompactStatus, isBrandStudent && { color: '#059669' }]}>{slotStatus}</Text>
                       </Pressable>
                     ) : (
                       <View key={day.dateKey} style={[
@@ -1086,7 +1086,7 @@ export function ScheduleScreen() {
                                     accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
                                     accessibilityState={{ disabled: true }}
                                   >
-                                    <CheckCircle size={14} color="#B91C1C" />
+                                    <CheckCircle size={14} color="#047857" />
                                     <Text style={[styles.calendarAttendanceActionText, styles.calendarAttendanceActionTextSubmitted]}>Điểm danh</Text>
                                   </Pressable>
                                 </>
@@ -1384,8 +1384,8 @@ export function ScheduleScreen() {
         !isTeacher && !resource.loading && !resource.error ? (
           <Card style={styles.studentDiaryCard}>
             <View style={styles.studentDiaryHeading}>
-              <View style={[styles.diaryHeadingIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
-                <BookText size={16} color={isBrandStudent ? '#DC2626' : theme.brand} />
+              <View style={[styles.diaryHeadingIcon, isBrandStudent && { backgroundColor: '#ECFDF5' }]}>
+                <BookText size={16} color={isBrandStudent ? '#059669' : theme.brand} />
               </View>
               <View style={styles.weeklyGridHeadingCopy}>
                 <Text style={styles.weeklyGridTitle}>Nhật ký học tập</Text>
@@ -1408,7 +1408,7 @@ export function ScheduleScreen() {
                       style={[
                         styles.studentDiaryFilter,
                         dateFilter ? styles.studentDiaryDateFilter : styles.studentDiaryStatusFilter,
-                        isBrandStudent && { borderColor: '#DC2626' },
+                        isBrandStudent && { borderColor: '#059669' },
                         selected && (isBrandStudent ? styles.studentDiaryFilterActiveBrand : styles.studentDiaryFilterActive),
                       ]}
                       accessibilityRole="tab"
@@ -1417,7 +1417,7 @@ export function ScheduleScreen() {
                       <Text
                         style={[
                           styles.studentDiaryFilterText,
-                          isBrandStudent && { color: '#DC2626' },
+                          isBrandStudent && { color: '#059669' },
                           selected && styles.studentDiaryFilterTextActive,
                         ]}
                         numberOfLines={1}
@@ -1466,7 +1466,7 @@ export function ScheduleScreen() {
                         {item.meetingUrl ? (
                           <Pressable
                             onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }}
-                            style={[styles.studentDiaryJoinButton, isBrandStudent && { backgroundColor: '#DC2626' }]}
+                            style={[styles.studentDiaryJoinButton, isBrandStudent && { backgroundColor: '#059669' }]}
                             accessibilityRole="button"
                           >
                             <Text style={styles.studentDiaryJoinButtonText}>Vào lớp</Text>
@@ -1478,10 +1478,10 @@ export function ScheduleScreen() {
                             setStudentNote(item.studentNote || '');
                             setShowStudentNote(true);
                           }}
-                          style={[styles.studentDiaryNoteButton, isBrandStudent && { borderColor: '#DC2626' }]}
+                          style={[styles.studentDiaryNoteButton, isBrandStudent && { borderColor: '#059669' }]}
                           accessibilityRole="button"
                         >
-                          <Text style={[styles.studentDiaryNoteButtonText, isBrandStudent && { color: '#DC2626' }]}>Ghi chú / Đổi lịch</Text>
+                          <Text style={[styles.studentDiaryNoteButtonText, isBrandStudent && { color: '#059669' }]}>Ghi chú / Đổi lịch</Text>
                         </Pressable>
                       </View>
                     ) : null}
@@ -1642,7 +1642,7 @@ export function ScheduleScreen() {
                             accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
                             accessibilityState={{ disabled: true }}
                           >
-                            <CheckCircle size={15} color="#B91C1C" />
+                            <CheckCircle size={15} color="#047857" />
                             <Text style={[styles.teacherDiaryAttendanceButtonText, styles.teacherDiaryAttendanceButtonTextSubmitted]}>Điểm danh</Text>
                           </Pressable>
                         ) : (
@@ -2577,7 +2577,7 @@ export function AssignmentsScreen({
               <Text style={styles.assignCourseCaption}>Bài tập của</Text>
               <Text numberOfLines={1} style={styles.assignCourseName}>{courseFilter || 'Chưa có khóa học'}</Text>
             </View>
-            {courses.length > 1 ? <ChevronDown size={18} color="#B91C1C" /> : null}
+            {courses.length > 1 ? <ChevronDown size={18} color="#047857" /> : null}
           </Pressable>
           <Pressable onPress={openCreateAssignment} style={styles.assignCreateButton} accessibilityRole="button" accessibilityLabel="Tạo bài tập mới">
             <Plus size={16} color="#FFFFFF" />
@@ -3078,7 +3078,7 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
   const pageItems = resource.data?.page === currentPage ? notifications : [];
   const unreadCount = resource.data?.unread || 0;
   const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
-  const refreshControl = <RefreshControl refreshing={resource.loading} onRefresh={resource.reload} tintColor={isBrandStudent ? '#DC2626' : theme.brand} />;
+  const refreshControl = <RefreshControl refreshing={resource.loading} onRefresh={resource.reload} tintColor={isBrandStudent ? '#059669' : theme.brand} />;
 
   useEffect(() => {
     setPage(1);
@@ -3264,8 +3264,8 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
         </Pressable>
         {unreadCount > 0 ? (
           <Pressable onPress={() => { void markAll(); }} style={styles.notificationMarkAll} accessibilityRole="button">
-            <Check size={14} color={isBrandStudent ? '#DC2626' : colors.ink} />
-            <Text style={[styles.notificationMarkAllText, isBrandStudent && { color: '#DC2626' }]}>Đánh dấu là đã đọc</Text>
+            <Check size={14} color={isBrandStudent ? '#059669' : colors.ink} />
+            <Text style={[styles.notificationMarkAllText, isBrandStudent && { color: '#059669' }]}>Đánh dấu là đã đọc</Text>
           </Pressable>
         ) : null}
       </View>
@@ -3330,8 +3330,8 @@ function NotificationCard({ item, onPress, onMarkRead, onDismiss, last }: { item
   const [hovered, setHovered] = useState(false);
   const [showDeleteAction, setShowDeleteAction] = useState(false);
   const category = notificationCategory(item);
-  const tint = category === 'Lịch dạy' ? '#FFF7ED' : category === 'Hệ thống' ? (isBrandStudent ? '#FEF2F2' : theme.brandSoft) : colors.blueSoft;
-  const iconColor = category === 'Lịch dạy' ? '#EA580C' : category === 'Hệ thống' ? (isBrandStudent ? '#DC2626' : theme.brand) : colors.blue;
+  const tint = category === 'Lịch dạy' ? '#FFF7ED' : category === 'Hệ thống' ? (isBrandStudent ? '#ECFDF5' : theme.brandSoft) : colors.blueSoft;
+  const iconColor = category === 'Lịch dạy' ? '#EA580C' : category === 'Hệ thống' ? (isBrandStudent ? '#059669' : theme.brand) : colors.blue;
   const Icon = category === 'Lịch dạy' ? CalendarDays : category === 'Hệ thống' ? Bell : GraduationCap;
   return (
     <View
@@ -3342,11 +3342,11 @@ function NotificationCard({ item, onPress, onMarkRead, onDismiss, last }: { item
       <View style={styles.notificationItemMain}>
         <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.unread ? 'chưa đọc' : 'đã đọc'}`} style={[styles.notificationItemIcon, { backgroundColor: tint }]}>
           <Icon size={15} color={iconColor} />
-          {item.unread ? <View style={[styles.notificationItemDot, isBrandStudent && { backgroundColor: '#EF4444' }]} /> : null}
+          {item.unread ? <View style={[styles.notificationItemDot, isBrandStudent && { backgroundColor: '#10B981' }]} /> : null}
         </Pressable>
         <View style={styles.notificationItemCopy}>
           <View style={styles.notificationItemMeta}>
-            <Text style={[styles.notificationItemCategory, isBrandStudent && { color: '#DC2626' }]}>{category}</Text>
+            <Text style={[styles.notificationItemCategory, isBrandStudent && { color: '#059669' }]}>{category}</Text>
             <View style={styles.notificationItemTimeActions}>
               <Text style={styles.notificationItemTime}>{item.time}</Text>
               <Pressable
@@ -3370,7 +3370,7 @@ function NotificationCard({ item, onPress, onMarkRead, onDismiss, last }: { item
       <View style={styles.notificationItemActions}>
         {item.unread ? (
           <Pressable onPress={onMarkRead} style={styles.notificationItemAction} accessibilityRole="button" accessibilityLabel={`Đánh dấu đã đọc: ${item.title}`}>
-            <Check size={15} color={isBrandStudent ? '#DC2626' : colors.green} />
+            <Check size={15} color={isBrandStudent ? '#059669' : colors.green} />
           </Pressable>
         ) : null}
         {showDeleteAction ? (
@@ -4418,7 +4418,7 @@ export function ProfileScreen() {
               color={user?.avatarColor}
             />
             <View style={styles.studentProfileHeroCopy}>
-              <Text style={[styles.studentProfileHeroEyebrow, isBrandStudent && { color: '#DC2626' }]}>Hồ sơ cá nhân</Text>
+              <Text style={[styles.studentProfileHeroEyebrow, isBrandStudent && { color: '#059669' }]}>Hồ sơ cá nhân</Text>
               <Text style={styles.studentProfileHeroName}>{studentText('name', user?.name || 'Học viên')}</Text>
               <Text style={styles.studentProfileHeroSubtitle}>Chạm vào ảnh để thay đổi ảnh đại diện</Text>
             </View>
@@ -4427,16 +4427,16 @@ export function ProfileScreen() {
           <Card style={styles.studentProfileSection}>
             <View style={styles.studentProfileSectionHeader}>
               <View style={styles.studentProfileSectionTitle}>
-                <UserRound size={16} color={isBrandStudent ? '#DC2626' : colors.green} />
+                <UserRound size={16} color={isBrandStudent ? '#059669' : colors.green} />
                 <Text style={styles.studentProfileSectionText}>Thông tin cá nhân</Text>
               </View>
               <Pressable
                 onPress={() => setShowStudentProfileForm(true)}
-                style={[styles.profileEditButton, isBrandStudent && { backgroundColor: '#FEF2F2' }]}
+                style={[styles.profileEditButton, isBrandStudent && { backgroundColor: '#ECFDF5' }]}
                 accessibilityRole="button"
               >
-                <Settings size={14} color={isBrandStudent ? '#DC2626' : theme.brand} />
-                <Text style={[styles.profileEditButtonText, isBrandStudent && { color: '#DC2626' }]}>Chỉnh sửa</Text>
+                <Settings size={14} color={isBrandStudent ? '#059669' : theme.brand} />
+                <Text style={[styles.profileEditButtonText, isBrandStudent && { color: '#059669' }]}>Chỉnh sửa</Text>
               </Pressable>
             </View>
           </Card>
@@ -4473,9 +4473,9 @@ export function ProfileScreen() {
         </Card>
       ) : (
         <Card style={styles.menuCard}>
-          <MenuRow icon={<Settings size={18} color={isBrandStudent ? '#EF4444' : theme.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
-          <MenuRow icon={<KeyRound size={18} color={isBrandStudent ? '#EF4444' : theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
-          <MenuRow icon={<Target size={18} color={isBrandStudent ? '#EF4444' : theme.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} borderless />
+          <MenuRow icon={<Settings size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
+          <MenuRow icon={<KeyRound size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
+          <MenuRow icon={<Target size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} borderless />
         </Card>
       )}
       {showPinSettings && user ? (
@@ -4652,12 +4652,12 @@ function EditableMobileAvatar({
     >
       <Avatar
         name={name}
-        color={color || (isBrandStudent ? '#FEE2E2' : theme.brandSoft)}
-        textColor={isBrandStudent ? '#DC2626' : undefined}
+        color={color || (isBrandStudent ? '#D1FAE5' : theme.brandSoft)}
+        textColor={isBrandStudent ? '#059669' : undefined}
         size={size}
         imageSource={imageSource}
       />
-      <View style={[styles.editableAvatarCamera, isBrandStudent && { backgroundColor: '#DC2626' }]}>
+      <View style={[styles.editableAvatarCamera, isBrandStudent && { backgroundColor: '#059669' }]}>
         {uploading ? <Text style={styles.editableAvatarLoading}>…</Text> : <Camera size={14} color="#FFFFFF" />}
       </View>
     </Pressable>
@@ -4729,7 +4729,7 @@ function StudentProfileEditModal({
         >
           <View style={[styles.studentProfileModalHeader, isBrandStudent && styles.studentProfileModalHeaderBrand]}>
             <View style={styles.studentProfileModalTitle}>
-              <UserRound size={18} color={isBrandStudent ? '#DC2626' : '#0F766E'} />
+              <UserRound size={18} color={isBrandStudent ? '#059669' : '#0F766E'} />
               <Text style={[styles.studentProfileModalTitleText, isBrandStudent && styles.studentProfileModalTitleTextBrand]}>Cập nhật Hồ sơ Cá nhân</Text>
             </View>
             <Pressable onPress={onClose} style={styles.studentProfileModalClose} accessibilityRole="button" accessibilityLabel="Đóng cập nhật hồ sơ">
@@ -4865,9 +4865,9 @@ function ChangePasswordModal({
           behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           style={styles.changePasswordModal}
         >
-          <View style={[styles.teacherEditHeader, isBrandStudent && { backgroundColor: '#FEF2F2', borderBottomColor: '#FEE2E2' }]}>
+          <View style={[styles.teacherEditHeader, isBrandStudent && { backgroundColor: '#ECFDF5', borderBottomColor: '#D1FAE5' }]}>
             <View>
-              <Text style={[styles.teacherEditTitle, isBrandStudent && { color: '#DC2626' }]}>Thay đổi mật khẩu</Text>
+              <Text style={[styles.teacherEditTitle, isBrandStudent && { color: '#059669' }]}>Thay đổi mật khẩu</Text>
               <Text style={styles.teacherEditSubtitle}>Dùng mật khẩu mới cho lần đăng nhập tiếp theo</Text>
             </View>
             <Pressable
@@ -5341,7 +5341,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1 },
   group: { gap: spacing.md },
   scheduleHero: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderColor: '#F1D7D8' },
-  scheduleHeroIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: '#FECACA' },
+  scheduleHeroIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: '#A7F3D0' },
   scheduleHeroTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '900', letterSpacing: -0.2 },
   scheduleStats: { flexDirection: 'row', gap: spacing.sm },
   studentCourseSection: { gap: spacing.sm },
@@ -5517,15 +5517,15 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     shadowOpacity: 0,
   },
   calendarAttendanceActionSubmitted: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#D1FAE5',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#A7F3D0',
     borderBottomWidth: 3,
     borderBottomColor: '#FCA5A5',
   },
   calendarAttendanceActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   calendarAttendanceActionTextDisabled: { color: '#64748B' },
-  calendarAttendanceActionTextSubmitted: { color: '#B91C1C' },
+  calendarAttendanceActionTextSubmitted: { color: '#047857' },
   calendarEditAction: {
     alignSelf: 'flex-start',
     minHeight: 34,
@@ -5554,12 +5554,12 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
     borderRadius: 12,
-    backgroundColor: '#DC2626',
+    backgroundColor: '#059669',
     borderWidth: 1,
-    borderColor: '#B91C1C',
+    borderColor: '#047857',
     borderBottomWidth: 3.5,
-    borderBottomColor: '#991B1B',
-    shadowColor: '#991B1B',
+    borderBottomColor: '#065F46',
+    shadowColor: '#065F46',
     shadowOpacity: 0.18,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -5602,7 +5602,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   rosterStatusCount: { color: colors.muted, fontSize: typography.micro, fontWeight: '800' },
   rosterStatusCountActive: { color: '#FFE4E6' },
   rosterSearchIconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DBEAFE', borderRadius: radius.sm, backgroundColor: '#EFF6FF' },
-  rosterSearchIconButtonActive: { borderColor: '#FECACA', backgroundColor: colors.brandSoft },
+  rosterSearchIconButtonActive: { borderColor: '#A7F3D0', backgroundColor: colors.brandSoft },
   courseFilterSelect: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#DBE3EE', borderRadius: radius.sm, backgroundColor: colors.surface },
   courseFilterSelectLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   courseFilterSelectValue: { flex: 1, color: colors.brandDark, fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
@@ -5630,13 +5630,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   teacherDiaryStatusFilters: { width: '100%', flexDirection: 'row', alignItems: 'stretch', gap: 7 },
   teacherDiaryStatusFilter: { flex: 1, minWidth: 0, minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 8, borderWidth: 1, borderColor: '#FED7AA', borderRadius: 12, backgroundColor: '#FFF7ED' },
   teacherDiaryPendingFilterActive: { borderColor: '#C2410C', backgroundColor: '#C2410C', shadowColor: '#C2410C', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  teacherDiaryConfirmationFilter: { minWidth: 104, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  teacherDiaryConfirmationFilterActive: { borderColor: '#B91C1C', backgroundColor: '#B91C1C', shadowColor: '#B91C1C', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  teacherDiaryConfirmationFilter: { minWidth: 104, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  teacherDiaryConfirmationFilterActive: { borderColor: '#047857', backgroundColor: '#047857', shadowColor: '#047857', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   teacherDiaryStatusFilterText: { flexShrink: 1, color: '#9A3412', fontSize: typography.micro, fontWeight: '800' },
-  teacherDiaryConfirmationFilterText: { color: '#B91C1C' },
+  teacherDiaryConfirmationFilterText: { color: '#047857' },
   teacherDiaryStatusFilterTextActive: { color: colors.surface },
   teacherDiaryStatusCount: { minWidth: 20, height: 20, textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden', paddingHorizontal: 4, borderRadius: radius.pill, backgroundColor: '#FFEDD5', color: '#9A3412', fontSize: typography.micro, fontWeight: '900' },
-  teacherDiaryConfirmationCount: { backgroundColor: '#FEE2E2', color: '#B91C1C' },
+  teacherDiaryConfirmationCount: { backgroundColor: '#D1FAE5', color: '#047857' },
   teacherDiaryStatusCountActive: { backgroundColor: 'rgba(255,255,255,0.2)', color: colors.surface },
   teacherDiarySession: { gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.sm, borderColor: '#E8EDF4', borderRadius: radius.md, backgroundColor: colors.surface },
   teacherDiarySessionCancelled: { borderColor: '#FECDD3', backgroundColor: '#FFFBFC' },
@@ -5725,12 +5725,12 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: '#DC2626',
+    backgroundColor: '#059669',
     borderWidth: 1,
-    borderColor: '#B91C1C',
+    borderColor: '#047857',
     borderBottomWidth: 3.5,
-    borderBottomColor: '#991B1B',
-    shadowColor: '#991B1B',
+    borderBottomColor: '#065F46',
+    shadowColor: '#065F46',
     shadowOpacity: 0.18,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -5747,7 +5747,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   studentDiaryDateFilter: { flexBasis: '22%', flexGrow: 1, minWidth: 0 },
   studentDiaryStatusFilter: { flexBasis: '48%', flexGrow: 0 },
   studentDiaryFilterActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  studentDiaryFilterActiveBrand: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  studentDiaryFilterActiveBrand: { backgroundColor: '#059669', borderColor: '#059669' },
   studentDiaryFilterText: { color: colors.brand, fontSize: typography.micro, fontWeight: '800' },
   studentDiaryFilterTextActive: { color: colors.surface },
   studentDiaryLogRow: { marginHorizontal: spacing.md, marginBottom: spacing.xs, padding: spacing.md, gap: spacing.xs, borderColor: '#EEF2F7', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
@@ -5764,8 +5764,8 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   studentDiaryStatusTextOngoing: { color: '#15803D' },
   studentDiaryStatusPending: { backgroundColor: '#FFF7ED' },
   studentDiaryStatusTextPending: { color: '#C2410C' },
-  studentDiaryStatusOverdue: { backgroundColor: '#FEF2F2' },
-  studentDiaryStatusTextOverdue: { color: '#DC2626' },
+  studentDiaryStatusOverdue: { backgroundColor: '#ECFDF5' },
+  studentDiaryStatusTextOverdue: { color: '#059669' },
   studentDiaryStatusUpcoming: { backgroundColor: '#FFF7ED' },
   studentDiaryStatusTextUpcoming: { color: '#B45309' },
   studentDiaryNote: { color: colors.muted, fontSize: typography.caption, lineHeight: 17 },
@@ -6021,12 +6021,12 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
     borderRadius: 16,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#10B981',
     borderWidth: 1.5,
-    borderColor: '#DC2626',
+    borderColor: '#059669',
     borderBottomWidth: 4,
-    borderBottomColor: '#991B1B',
-    shadowColor: '#991B1B',
+    borderBottomColor: '#065F46',
+    shadowColor: '#065F46',
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
@@ -6155,14 +6155,14 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.xl,
     borderWidth: 1.5,
-    borderColor: '#FECACA',
+    borderColor: '#A7F3D0',
     borderBottomWidth: 4,
-    borderBottomColor: '#F87171',
+    borderBottomColor: '#34D399',
     borderRadius: 14,
     backgroundColor: '#FFFFFF',
   },
   profileSignOutButtonPressed: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     transform: [{ translateY: 3 }],
     borderBottomWidth: 1,
   },
@@ -6192,9 +6192,9 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   editableAvatarCamera: { position: 'absolute', right: 0, bottom: 0, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface, borderRadius: radius.pill, backgroundColor: '#0FAF9F' },
   editableAvatarLoading: { color: colors.surface, fontSize: typography.caption, fontWeight: '900' },
   teacherProfileHero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg, backgroundColor: colors.brandDark, borderColor: colors.brandDark },
-  teacherProfileEyebrow: { color: '#FEE2E2', fontSize: typography.caption, fontWeight: '800', letterSpacing: 1 },
+  teacherProfileEyebrow: { color: '#D1FAE5', fontSize: typography.caption, fontWeight: '800', letterSpacing: 1 },
   teacherProfileName: { color: '#FFFFFF', fontSize: typography.heading, fontWeight: '800', textAlign: 'center' },
-  teacherProfileSubtitle: { color: '#FEE2E2', fontSize: typography.small, textAlign: 'center' },
+  teacherProfileSubtitle: { color: '#D1FAE5', fontSize: typography.small, textAlign: 'center' },
   teacherProfileTags: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xs },
   teacherProfileStatus: { color: '#FFFFFF', fontSize: typography.caption, paddingVertical: 6, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#FCA5A5', borderRadius: radius.pill },
   teacherDetails: { gap: spacing.sm },
@@ -6327,10 +6327,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   studentProfileModalBackdrop: { justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(15, 23, 42, 0.6)' },
   studentProfileModal: { width: '100%', maxWidth: 440, maxHeight: '94%', alignSelf: 'center', overflow: 'hidden', backgroundColor: colors.surface, borderRadius: 28 },
   studentProfileModalHeader: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, backgroundColor: '#F0FDFA', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  studentProfileModalHeaderBrand: { backgroundColor: '#FEF2F2', borderBottomColor: '#FEE2E2' },
+  studentProfileModalHeaderBrand: { backgroundColor: '#ECFDF5', borderBottomColor: '#D1FAE5' },
   studentProfileModalTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   studentProfileModalTitleText: { color: '#115E59', fontSize: typography.small, fontWeight: '900' },
-  studentProfileModalTitleTextBrand: { color: '#DC2626' },
+  studentProfileModalTitleTextBrand: { color: '#059669' },
   studentProfileModalClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.surface },
   studentProfileModalBody: { padding: spacing.lg, gap: spacing.md },
   studentProfileModalField: { gap: spacing.xs },
@@ -6340,10 +6340,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   studentProfileGenderRow: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
   studentProfileGenderOption: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#F8FAFC' },
   studentProfileGenderOptionSelected: { borderColor: '#2DD4BF', backgroundColor: '#F0FDFA' },
-  studentProfileGenderOptionSelectedBrand: { borderColor: '#F87171', backgroundColor: '#FEF2F2' },
+  studentProfileGenderOptionSelectedBrand: { borderColor: '#34D399', backgroundColor: '#ECFDF5' },
   studentProfileGenderText: { color: '#475569', fontSize: typography.micro, fontWeight: '700', textAlign: 'center' },
   studentProfileGenderTextSelected: { color: '#0F766E' },
-  studentProfileGenderTextSelectedBrand: { color: '#DC2626', fontWeight: '800' },
+  studentProfileGenderTextSelectedBrand: { color: '#059669', fontWeight: '800' },
   studentProfilePhoneRow: { flexDirection: 'row', gap: spacing.sm },
   studentProfilePhoneRowStack: { flexDirection: 'column' },
   studentProfilePhoneField: { flex: 1, minWidth: 0 },

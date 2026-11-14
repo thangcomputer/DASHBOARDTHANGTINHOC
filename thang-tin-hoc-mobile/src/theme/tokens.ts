@@ -24,9 +24,9 @@ export const colors = {
 export type Palette = { [K in keyof typeof colors]: string };
 export const brandColors: Palette = {
   ...colors,
-  brand: '#DC2626',
-  brandDark: '#B91C1C',
-  brandSoft: '#FEF2F2',
+  brand: '#059669',
+  brandDark: '#047857',
+  brandSoft: '#ECFDF5',
 };
 
 /** Cờ theme hiện tại, AuthContext cập nhật mỗi lần user đổi. */
@@ -68,15 +68,12 @@ function remapGreenToRed(value: unknown): unknown {
  * StyleSheet có hai phiên bản (xanh/đỏ), chọn theo 	hemeState mỗi lần đọc style.
  * emapGreen: với bản đỏ, đổi luôn các mã màu xanh viết cứng sang đỏ (chỉ dùng cho màn hình mà xanh là màu trang trí, không phải màu đúng/sai).
  */
-export function createThemedStyles<T extends object>(factory: (palette: Palette) => T, options?: { remapGreen?: boolean }): T {
+export function createThemedStyles<T extends object>(factory: (palette: Palette) => T, _options?: { remapGreen?: boolean }): T {
   let base: T | undefined;
-  let brand: T | undefined;
   return new Proxy({} as T, {
     get: (_target, key) => {
-      if (!themeState.brand) base ??= factory(colors);
-      else brand ??= options?.remapGreen ? (remapGreenToRed(factory(brandColors)) as T) : factory(brandColors);
-      const sheet = themeState.brand ? brand : base;
-      return (sheet as Record<PropertyKey, unknown>)[key];
+      base ??= factory(colors);
+      return (base as Record<PropertyKey, unknown>)[key];
     },
   });
 }

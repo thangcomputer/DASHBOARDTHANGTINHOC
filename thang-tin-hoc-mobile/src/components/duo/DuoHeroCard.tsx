@@ -47,13 +47,13 @@ export function DuoHeroCard({
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        <View style={[styles.mascotBox, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' }]}>
+        <View style={[styles.mascotBox, isBrandStudent && { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
           <Mascot mood={mascotMood} size={76} />
         </View>
         <View style={styles.infoCol}>
           <View style={styles.badgeRow}>
-            <View style={[styles.eyebrowBadge, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-              <Text style={[styles.eyebrowText, isBrandStudent && { color: '#DC2626' }]}>
+            <View style={[styles.eyebrowBadge, isBrandStudent && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+              <Text style={[styles.eyebrowText, isBrandStudent && { color: '#059669' }]}>
                 {playedToday ? 'ĐÃ HOÀN THÀNH HÔM NAY' : 'BÀI HỌC HIỆN TẠI'}
               </Text>
             </View>
@@ -70,9 +70,9 @@ export function DuoHeroCard({
       {/* Progress Track */}
       <View style={styles.progressRow}>
         <View style={styles.track}>
-          <View style={[styles.fill, isBrandStudent && { backgroundColor: '#EF4444' }, { width: `${Math.min(100, Math.max(5, finalProgress))}%` }]} />
+          <View style={[styles.fill, isBrandStudent && { backgroundColor: '#10B981' }, { width: `${Math.min(100, Math.max(5, finalProgress))}%` }]} />
         </View>
-        <Text style={[styles.progressText, isBrandStudent && { color: '#DC2626' }]}>{`${Math.round(finalProgress)}%`}</Text>
+        <Text style={[styles.progressText, isBrandStudent && { color: '#059669' }]}>{`${Math.round(finalProgress)}%`}</Text>
       </View>
 
       {/* Big Tactile 3D Action Button */}

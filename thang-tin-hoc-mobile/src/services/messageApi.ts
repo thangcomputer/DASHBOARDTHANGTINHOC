@@ -155,7 +155,7 @@ function roleColor(role: string, adminRole?: string | null) {
     case 'student': return '#0EA5E9';
     case 'recruitment': return '#64748B';
     case 'admin': return '#E11D48';
-    case 'group': return '#EF4444';
+    case 'group': return '#10B981';
     default: return '#2563EB';
   }
 }
@@ -368,7 +368,7 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
         time: formatMessageTime(lastActivity),
         lastActivityAt: timestamp(lastActivity),
         unread: group.unreadCount,
-        color: '#EF4444',
+        color: '#10B981',
         online: false,
       };
     });
@@ -455,7 +455,7 @@ export async function createMessageGroup(
     lastMessage: 'Nhóm chat mới',
     time: 'Vừa xong',
     unread: 0,
-    color: '#EF4444',
+    color: '#10B981',
   };
 }
 

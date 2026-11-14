@@ -628,7 +628,7 @@ export function FreeSurveyModal({
 
               <View style={styles.fieldGroup}>
                 <View style={styles.fieldLabelRow}>
-                  <MapPin size={14} color="#EF4444" />
+                  <MapPin size={14} color="#10B981" />
                   <Text style={styles.fieldLabel}>Bạn đến từ đâu?</Text>
                 </View>
                 <TextInput
@@ -642,7 +642,7 @@ export function FreeSurveyModal({
 
               <View style={styles.fieldGroup}>
                 <View style={styles.fieldLabelRow}>
-                  <Calendar size={14} color="#EF4444" />
+                  <Calendar size={14} color="#10B981" />
                   <Text style={styles.fieldLabel}>Năm sinh</Text>
                 </View>
                 <TextInput
@@ -657,7 +657,7 @@ export function FreeSurveyModal({
 
               <View style={styles.fieldGroup}>
                 <View style={styles.fieldLabelRow}>
-                  <Briefcase size={14} color="#EF4444" />
+                  <Briefcase size={14} color="#10B981" />
                   <Text style={styles.fieldLabel}>Nghề nghiệp</Text>
                 </View>
                 <View style={styles.occGrid}>
@@ -1301,7 +1301,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1591,15 +1591,15 @@ const styles = StyleSheet.create({
   errorBox: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   errorText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B91C1C',
+    color: '#047857',
   },
   guideHintBox: {
     flexDirection: 'row',

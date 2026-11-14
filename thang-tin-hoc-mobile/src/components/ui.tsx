@@ -353,9 +353,9 @@ export function AppHeader({
       tint="light"
       style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, centered ? styles.headerCentered : null, containerStyle]}
     >
-      {Icon ? <View style={[styles.headerIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}><Icon size={19} color={isBrandStudent ? '#DC2626' : theme.brand} /></View> : null}
+      {Icon ? <View style={[styles.headerIcon, isBrandStudent && { backgroundColor: '#ECFDF5' }]}><Icon size={19} color={isBrandStudent ? '#059669' : theme.brand} /></View> : null}
       {handleBack ? (
-        <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null, compact && isBrandStudent && { backgroundColor: '#DC2626' }]} accessibilityRole="button" accessibilityLabel="Quay lại">
+        <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null, compact && isBrandStudent && { backgroundColor: '#059669' }]} accessibilityRole="button" accessibilityLabel="Quay lại">
           <ChevronLeft size={compact ? 20 : 22} color={compact ? colors.surface : colors.ink} />
         </Pressable>
       ) : null}
@@ -392,7 +392,7 @@ export function SectionHeading({
       <Text style={styles.sectionTitle}>{title}</Text>
       {action ? (
         <Pressable onPress={onPress} accessibilityRole="button">
-          <Text style={[styles.sectionAction, isBrandStudent && { color: '#DC2626' }]}>{action}</Text>
+          <Text style={[styles.sectionAction, isBrandStudent && { color: '#059669' }]}>{action}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -415,7 +415,7 @@ const badgePalette: Record<string, { backgroundColor: string; color: string }> =
   'Chưa nhận': { backgroundColor: colors.goldSoft, color: '#9A6C0A' },
   'Tốt': { backgroundColor: colors.greenSoft, color: colors.green },
   'Có mặt': { backgroundColor: colors.greenSoft, color: colors.green },
-  'Điểm danh': { backgroundColor: '#FEE2E2', color: '#B91C1C' },
+  'Điểm danh': { backgroundColor: '#D1FAE5', color: '#047857' },
   'Đã điểm danh': { backgroundColor: colors.greenSoft, color: colors.green },
   'Đã điểm danh bù': { backgroundColor: colors.greenSoft, color: colors.green },
   'Đã xác nhận': { backgroundColor: colors.greenSoft, color: colors.green },
@@ -430,7 +430,7 @@ const badgePalette: Record<string, { backgroundColor: string; color: string }> =
 export function StatusBadge({ label, compact = false }: { label: string; compact?: boolean }) {
   const isBrandStudent = useIsBrandStudent();
   const basePalette = badgePalette[label] || { backgroundColor: colors.canvas, color: colors.muted };
-  const palette = isBrandStudent && label === 'upcoming' ? { backgroundColor: '#FEF2F2', color: '#B91C1C' } : basePalette;
+  const palette = isBrandStudent && label === 'upcoming' ? { backgroundColor: '#ECFDF5', color: '#047857' } : basePalette;
   const displayLabel = ({
     upcoming: 'Sắp tới',
     completed: 'Hoàn thành',
@@ -504,7 +504,7 @@ export function PrimaryButton({
         pressed && !disabled && styles.pressed,
       ]}
     >
-      {loading ? <ActivityIndicator color={secondary || quiet ? (isBrandStudent ? '#DC2626' : theme.brand) : '#FFFFFF'} /> : (
+      {loading ? <ActivityIndicator color={secondary || quiet ? (isBrandStudent ? '#059669' : theme.brand) : '#FFFFFF'} /> : (
         <Text style={[styles.buttonText, (secondary || quiet) && styles.buttonTextSecondary]}>{title}</Text>
       )}
     </Pressable>
@@ -558,7 +558,7 @@ export function EmptyState({ title, message }: { title: string; message: string 
   const isBrandStudent = useIsBrandStudent();
   return (
     <Card style={styles.stateCard}>
-      <View style={[styles.stateIcon, isBrandStudent && { backgroundColor: '#FEF2F2' }]}><Inbox size={22} color={isBrandStudent ? '#DC2626' : theme.brand} /></View>
+      <View style={[styles.stateIcon, isBrandStudent && { backgroundColor: '#ECFDF5' }]}><Inbox size={22} color={isBrandStudent ? '#059669' : theme.brand} /></View>
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateMessage}>{message}</Text>
     </Card>
@@ -602,7 +602,7 @@ export function ProgressBar({ value }: { value: number }) {
       accessibilityValue={{ min: 0, max: 100, now: value }}
       accessibilityLabel={`Tiến độ ${value}%`}
     >
-      <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, value))}%` }, isBrandStudent && { backgroundColor: '#EF4444' }]} />
+      <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, value))}%` }, isBrandStudent && { backgroundColor: '#10B981' }]} />
     </View>
   );
 }
@@ -693,7 +693,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },
   notificationBell: { position: 'relative' },
   notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },
-  notificationUnreadBadgeBrand: { backgroundColor: '#EF4444' },
+  notificationUnreadBadgeBrand: { backgroundColor: '#10B981' },
   notificationUnreadBadgeText: { color: '#FFFFFF', fontSize: 8, lineHeight: 11, fontWeight: '800' },
   fill: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.lg },
@@ -739,7 +739,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.brandDark, fontWeight: '800' },
   button: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#059669', borderBottomWidth: 4, borderBottomColor: '#047857' },
-  buttonBrand: { backgroundColor: '#EF4444', borderColor: '#DC2626', borderBottomColor: '#B91C1C' },
+  buttonBrand: { backgroundColor: '#10B981', borderColor: '#059669', borderBottomColor: '#047857' },
   buttonSecondary: { backgroundColor: '#F8FAFC', borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1' },
   buttonQuiet: { backgroundColor: 'transparent', borderWidth: 0, borderBottomWidth: 0 },
   buttonDisabled: { opacity: 0.5, borderBottomWidth: 2 },

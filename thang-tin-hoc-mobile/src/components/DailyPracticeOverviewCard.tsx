@@ -54,7 +54,7 @@ export function DailyPracticeOverviewCard({
     <View style={styles.card}>
       {/* Hàng trên: Linh vật + Thông tin lộ trình */}
       <View style={styles.topRow}>
-        <View style={[styles.mascotStage, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+        <View style={[styles.mascotStage, isBrandStudent && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
           <Mascot mood={playedToday ? 'energy' : 'happy'} size={72} />
           {topicDone ? (
             <View style={[styles.mascotCornerBadge, { backgroundColor: '#10B981' }]}>
@@ -69,9 +69,9 @@ export function DailyPracticeOverviewCard({
 
         <View style={styles.headlineCol}>
           <View style={styles.badgeRow}>
-            <View style={[styles.topicPill, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-              <Sparkles size={11} color={isBrandStudent ? '#DC2626' : '#059669'} />
-              <Text style={[styles.topicPillText, isBrandStudent && { color: '#DC2626' }]} numberOfLines={1}>
+            <View style={[styles.topicPill, isBrandStudent && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+              <Sparkles size={11} color={isBrandStudent ? '#059669' : '#059669'} />
+              <Text style={[styles.topicPillText, isBrandStudent && { color: '#059669' }]} numberOfLines={1}>
                 {`LỘ TRÌNH · ${topicName}`}
               </Text>
             </View>
@@ -98,7 +98,7 @@ export function DailyPracticeOverviewCard({
             <Text style={styles.progressValue}>{`${completedUnits}/${totalUnits} chặng · ${pct}%`}</Text>
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${barWidth}%` }, isBrandStudent && { backgroundColor: '#EF4444' }]} />
+            <View style={[styles.progressFill, { width: `${barWidth}%` }, isBrandStudent && { backgroundColor: '#10B981' }]} />
           </View>
         </View>
       ) : null}

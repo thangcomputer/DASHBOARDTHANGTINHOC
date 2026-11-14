@@ -109,8 +109,8 @@ export function PinLockSettingsModal({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={styles.headerTitle}>
-              <KeyRound size={20} color={isBrandStudent ? '#DC2626' : colors.brand} />
-              <Text style={[styles.title, isBrandStudent && { color: '#DC2626' }]}>Khóa mã PIN</Text>
+              <KeyRound size={20} color={isBrandStudent ? '#059669' : colors.brand} />
+              <Text style={[styles.title, isBrandStudent && { color: '#059669' }]}>Khóa mã PIN</Text>
             </View>
             <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Đóng">
               <X size={18} color={colors.muted} />
@@ -257,8 +257,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   optionActiveBrand: {
-    borderColor: '#DC2626',
-    backgroundColor: '#EF4444',
+    borderColor: '#059669',
+    backgroundColor: '#10B981',
   },
   optionText: { color: '#334155', fontSize: 13, fontWeight: '700' },
   optionTextActive: { color: '#FFFFFF', fontWeight: '800' },

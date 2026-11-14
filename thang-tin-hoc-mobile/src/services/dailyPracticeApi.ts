@@ -568,7 +568,7 @@ export function playQuestionHeaderChips(path: DpSession['path'], typeLabel: stri
       ? `Chặng ${path.unitIndex} · Kiểm tra vượt`
       : [`Chặng ${path.unitIndex}`, path.pathNodeLabel, path.stepLabel].filter(Boolean).join(' · ');
     return [
-      { id: 'path', text: pathText, soft: '#FEF2F2', color: '#B91C1C' },
+      { id: 'path', text: pathText, soft: '#ECFDF5', color: '#047857' },
       { id: 'type', text: typeLabel, ...TYPE_CHIP },
     ];
   }
@@ -579,7 +579,7 @@ export function playQuestionHeaderChips(path: DpSession['path'], typeLabel: stri
 }
 
 export const DP_TOPIC_COLORS: Record<string, { from: string; to: string; soft: string }> = {
-  red: { from: '#F87171', to: '#B91C1C', soft: '#FEF2F2' },
+  red: { from: '#34D399', to: '#047857', soft: '#ECFDF5' },
   blue: { from: '#60A5FA', to: '#1D4ED8', soft: '#EFF6FF' },
   green: { from: '#4ADE80', to: '#15803D', soft: '#F0FDF4' },
   orange: { from: '#FB923C', to: '#C2410C', soft: '#FFF7ED' },

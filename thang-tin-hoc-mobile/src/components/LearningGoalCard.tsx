@@ -74,7 +74,7 @@ export function LearningGoalCard() {
     return (
       <View style={[styles.card, styles.emptyCard]}>
         <View style={styles.headRow}>
-          <View style={styles.icon}><Target size={18} color="#DC2626" /></View>
+          <View style={styles.icon}><Target size={18} color="#059669" /></View>
           <View style={styles.flex}>
             <Text style={styles.title}>Bạn chưa đặt mục tiêu học</Text>
             <Text style={styles.meta}>Đặt mục tiêu để theo dõi số giờ học mỗi ngày.</Text>
@@ -99,7 +99,7 @@ export function LearningGoalCard() {
       {/* 1. Header: Icon + Tiêu đề + Nút Đổi */}
       <View style={styles.headRow}>
         <View style={styles.icon}>
-          <Target size={18} color="#DC2626" />
+          <Target size={18} color="#059669" />
         </View>
         <View style={styles.flex}>
           <Text numberOfLines={1} style={styles.title}>
@@ -116,10 +116,10 @@ export function LearningGoalCard() {
             paddingVertical: 4,
             borderRadius: 10,
             borderWidth: 1.5,
-            borderColor: '#FECACA',
+            borderColor: '#A7F3D0',
             borderBottomWidth: pressed ? 1.5 : 3.5,
-            borderBottomColor: '#F87171',
-            backgroundColor: pressed ? '#FEF2F2' : '#FFFFFF',
+            borderBottomColor: '#34D399',
+            backgroundColor: pressed ? '#ECFDF5' : '#FFFFFF',
             transform: [{ translateY: pressed ? 2 : 0 }],
           })}
           accessibilityRole="button"
@@ -240,13 +240,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     padding: 14,
     gap: 12,
   },
-  emptyCard: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  emptyCard: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   icon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -204,7 +204,7 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
           <View style={s.tabGoalWrap}>
             {!goal ? (
               <View style={s.emptyGoalRow}>
-                <View style={s.icon}><Target size={18} color="#DC2626" /></View>
+                <View style={s.icon}><Target size={18} color="#059669" /></View>
                 <View style={s.f1}>
                   <Text style={s.goalTitle}>Chưa đặt mục tiêu học</Text>
                   <Text style={s.goalMeta}>Đặt mục tiêu để theo dõi số giờ học.</Text>
@@ -215,7 +215,7 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
               <>
                 {/* Header */}
                 <View style={s.row}>
-                  <View style={s.icon}><Target size={18} color="#DC2626" /></View>
+                  <View style={s.icon}><Target size={18} color="#059669" /></View>
                   <View style={s.f1}>
                     <Text numberOfLines={1} style={s.goalTitle}>Mục tiêu: {goal.hoursPerDay} giờ/ngày</Text>
                     <Text numberOfLines={1} style={s.goalMeta}>
@@ -495,15 +495,15 @@ const s = StyleSheet.create({
   rankN: { fontSize: 10, fontWeight: '900', color: '#64748B' },
   rankNTop: { color: '#78350F' },
   rankAv: { width: 28, height: 28, borderRadius: 14 },
-  rankAvF: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
-  rankAvTxt: { fontSize: 11, fontWeight: '900', color: '#DC2626' },
+  rankAvF: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
+  rankAvTxt: { fontSize: 11, fontWeight: '900', color: '#059669' },
   rankName: { flex: 1, fontSize: 12, fontWeight: '700', color: '#1E293B' },
   rankLvl: { fontSize: 10, fontWeight: '600', color: '#94A3B8' },
   rankXp: { fontSize: 12, fontWeight: '900', color: '#1E293B' },
   myRank: { fontSize: 11, fontWeight: '600', color: '#94A3B8', textAlign: 'center' },
 
-  emptyGoalRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', borderRadius: 14, padding: 12 },
-  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
+  emptyGoalRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#ECFDF5', borderRadius: 14, padding: 12 },
+  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
   goalTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   goalMeta: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 1 },
 

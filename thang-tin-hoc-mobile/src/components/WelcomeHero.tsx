@@ -115,7 +115,7 @@ export function WelcomeHero({
 
         <View style={styles.content}>
           <View style={[styles.eyebrow, isBrand && styles.eyebrowBrand]}>
-            <EyebrowIcon size={12} color={isBrand ? '#DC2626' : colors.brand} />
+            <EyebrowIcon size={12} color={isBrand ? '#059669' : colors.brand} />
             <Text style={[styles.eyebrowText, isBrand && styles.eyebrowTextBrand]}>{eyebrowLabel}</Text>
           </View>
           <Text style={styles.greeting}>{`${greetingFor(hour)} 👋`}</Text>
@@ -126,7 +126,7 @@ export function WelcomeHero({
           </View>
           <View style={styles.chips}>
             <View style={styles.chip}>
-              <CalendarDays size={12} color={isBrand ? '#DC2626' : colors.brand} />
+              <CalendarDays size={12} color={isBrand ? '#059669' : colors.brand} />
               <Text style={styles.chipText}>{date}</Text>
             </View>
             {chips.filter((chip) => chip.label).map(({ icon: Icon, label, live }) => (
@@ -134,7 +134,7 @@ export function WelcomeHero({
                 {live ? (
                   <View style={[styles.liveDot, isBrand && styles.liveDotBrand]} />
                 ) : Icon ? (
-                  <Icon size={12} color={isBrand ? '#DC2626' : colors.brand} />
+                  <Icon size={12} color={isBrand ? '#059669' : colors.brand} />
                 ) : null}
                 <Text numberOfLines={1} style={[styles.chipText, styles.chipCourse, live && styles.chipLiveText]}>{label}</Text>
               </View>
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   cardBrand: {
     borderColor: '#FFE4E6',
     backgroundColor: '#FFF5F5',
-    backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #FFF1F2 55%, #FEF2F2 100%)',
+    backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #FFF1F2 55%, #ECFDF5 100%)',
     boxShadow: '0px 10px 24px rgba(225, 29, 72, 0.08)',
   } as never,
   decor: { ...StyleSheet.absoluteFill, borderRadius: 26, overflow: 'hidden' },
@@ -198,8 +198,8 @@ const styles = StyleSheet.create({
     backgroundImage: 'linear-gradient(135deg, rgba(5,150,105,0.18) 0%, rgba(16,185,129,0.14) 50%, rgba(245,158,11,0.18) 100%)',
   } as never,
   blobBrand: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    backgroundImage: 'linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(244,63,94,0.14) 50%, rgba(245,158,11,0.18) 100%)',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundImage: 'linear-gradient(135deg, rgba(16, 185, 129,0.18) 0%, rgba(244,63,94,0.14) 50%, rgba(245,158,11,0.18) 100%)',
   } as never,
   ring: { position: 'absolute', right: 18, bottom: -30, width: 140, height: 140, borderRadius: 70, borderWidth: 8, borderColor: 'rgba(255,255,255,0.7)' },
   glow: { position: 'absolute', left: -40, top: -50, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(167, 243, 208, 0.35)' },
@@ -212,14 +212,14 @@ const styles = StyleSheet.create({
     borderRadius: 12, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0',
   },
   eyebrowBrand: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     borderColor: '#FECDD3',
   },
   eyebrowText: { color: '#047857', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
-  eyebrowTextBrand: { color: '#DC2626' },
+  eyebrowTextBrand: { color: '#059669' },
   greeting: { marginTop: 6, color: colors.muted, fontSize: 13, fontWeight: '700' },
   name: { color: colors.brandDark, fontSize: 24, fontWeight: '900', lineHeight: 29 },
-  nameBrand: { color: '#DC2626' },
+  nameBrand: { color: '#059669' },
   quoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   quote: { flex: 1, color: colors.muted, fontSize: 12, fontStyle: 'italic', lineHeight: 17 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
@@ -230,10 +230,10 @@ const styles = StyleSheet.create({
   chipText: { color: '#334155', fontSize: 11, fontWeight: '800' },
   chipCourse: { flexShrink: 1 },
   chipLive: { backgroundColor: '#ECFDF5', borderColor: '#34D399', borderBottomColor: '#059669' },
-  chipLiveBrand: { backgroundColor: '#FEF2F2', borderColor: '#F87171', borderBottomColor: '#B91C1C' },
+  chipLiveBrand: { backgroundColor: '#ECFDF5', borderColor: '#34D399', borderBottomColor: '#047857' },
   chipLiveText: { color: '#065F46' },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
-  liveDotBrand: { backgroundColor: '#EF4444' },
+  liveDotBrand: { backgroundColor: '#10B981' },
   figure: { position: 'absolute', right: FIGURE_RIGHT, bottom: 0, width: FIGURE_WIDTH, alignItems: 'center' },
   figureNoJoin: { bottom: 4 },
   joinSlot: { height: JOIN_SPACE, justifyContent: 'center', alignItems: 'center' },
@@ -245,8 +245,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#34D399', borderBottomWidth: 3.5, borderBottomColor: '#059669', backgroundColor: '#10B981',
   } as never,
   joinActiveBrand: {
-    backgroundColor: '#DC2626',
-    borderWidth: 1.5, borderColor: '#F87171', borderBottomWidth: 3.5, borderBottomColor: '#991B1B',
+    backgroundColor: '#059669',
+    borderWidth: 1.5, borderColor: '#34D399', borderBottomWidth: 3.5, borderBottomColor: '#065F46',
   } as never,
   joinPulse: { ...StyleSheet.absoluteFill, borderRadius: 14, backgroundColor: 'rgba(52, 211, 153, 0.4)' },
   joinPulseBrand: { backgroundColor: 'rgba(248, 113, 113, 0.4)' },

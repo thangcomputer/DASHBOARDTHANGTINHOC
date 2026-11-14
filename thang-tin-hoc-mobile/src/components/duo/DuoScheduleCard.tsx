@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   meetGlowButton: {
     zIndex: 2,
     borderRadius: 14,
-    shadowColor: '#DC2626',
+    shadowColor: '#059669',
     shadowOpacity: 0.9,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   livePulseBadge: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#10B981',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,

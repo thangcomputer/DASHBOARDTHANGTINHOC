@@ -22,7 +22,7 @@ const PLAN_TONES: Record<string, [string, string]> = {
   '3m': ['#34D399', '#0D9488'],
   '6m': ['#A78BFA', '#7C3AED'],
   '12m': ['#FBBF24', '#EA580C'],
-  lifetime: ['#EF4444', '#BE123C'],
+  lifetime: ['#10B981', '#BE123C'],
 };
 const gradient = (from: string, to: string) => ({ backgroundColor: to, backgroundImage: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` } as never);
 const formatVnd = (value: number) => `${Math.round(Number(value) || 0).toLocaleString('vi-VN')}đ`;
@@ -152,7 +152,7 @@ export function SubscriptionExpiredScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <View style={styles.hero}>
-        <View style={[styles.heroIcon, gradient('#EF4444', '#B91C1C')]}><CalendarX2 size={30} color="#FFFFFF" /></View>
+        <View style={[styles.heroIcon, gradient('#10B981', '#047857')]}><CalendarX2 size={30} color="#FFFFFF" /></View>
         <Text style={styles.heroTitle}>{neverActivated ? 'Tài khoản chưa được kích hoạt' : 'Tài khoản đã hết hạn'}</Text>
         <Text style={styles.heroText}>
           {neverActivated
@@ -253,18 +253,18 @@ export function SubscriptionStatusCard({
               style={[
                 styles.drawerSubIconBox,
                 isLifetime
-                  ? (isBrandStudent ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' } : styles.drawerSubIconLifetime)
+                  ? (isBrandStudent ? { backgroundColor: 'rgba(16, 185, 129, 0.2)' } : styles.drawerSubIconLifetime)
                   : expiring
                     ? styles.drawerSubIconExpiring
                     : isBrandStudent
-                      ? { backgroundColor: 'rgba(239, 68, 68, 0.2)' }
+                      ? { backgroundColor: 'rgba(16, 185, 129, 0.2)' }
                       : styles.drawerSubIconActive,
               ]}
             >
               {isLifetime && !isBrandStudent ? (
                 <Crown size={13} color="#FBBF24" />
               ) : (
-                <CalendarClock size={13} color={isBrandStudent ? '#EF4444' : (expiring ? '#FB923C' : '#34D399')} />
+                <CalendarClock size={13} color={isBrandStudent ? '#10B981' : (expiring ? '#FB923C' : '#34D399')} />
               )}
             </View>
             <View style={styles.drawerSubCopy}>
@@ -273,7 +273,7 @@ export function SubscriptionStatusCard({
                 style={[
                   styles.drawerSubTitle,
                   isLifetime && !isBrandStudent && styles.drawerSubTextLifetime,
-                  isBrandStudent && { color: '#FEE2E2' },
+                  isBrandStudent && { color: '#D1FAE5' },
                 ]}
               >
                 {planTitle}
@@ -284,7 +284,7 @@ export function SubscriptionStatusCard({
                   style={[
                     styles.drawerSubDays,
                     styles.drawerSubDaysFlex,
-                    isBrandStudent && { color: '#F87171' },
+                    isBrandStudent && { color: '#34D399' },
                   ]}
                 >
                   {daysLine}
@@ -342,12 +342,12 @@ export function SubscriptionStatusCard({
     <>
       {compact ? (
         <View style={[styles.statusCard, styles.statusCardCompact, expiring && styles.statusCardExpiring]}>
-          <View style={[styles.statusIcon, isBrandStudent ? gradient('#EF4444', '#DC2626') : isLifetime ? gradient('#EF4444', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
+          <View style={[styles.statusIcon, isBrandStudent ? gradient('#10B981', '#059669') : isLifetime ? gradient('#10B981', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
             <CalendarClock size={16} color="#FFFFFF" />
           </View>
           <View style={styles.flex}>
             <Text numberOfLines={1} style={styles.statusTitle}>{planTitle}</Text>
-            <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#DC2626' }]}>{daysLine}</Text>
+            <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#059669' }]}>{daysLine}</Text>
           </View>
           {!isLifetime && !isBrandStudent ? (
             <DuoButton variant="primary" size="sm" text={actionLabel} onPress={() => setOpen(true)} accessibilityLabel={actionLabel} />
@@ -356,19 +356,19 @@ export function SubscriptionStatusCard({
       ) : (
         <View style={styles.profileSubCard}>
           <View style={styles.profileSubHeader}>
-            <Crown size={18} color={isBrandStudent ? '#EF4444' : (isFree ? '#10B981' : '#F59E0B')} />
+            <Crown size={18} color={isBrandStudent ? '#10B981' : (isFree ? '#10B981' : '#F59E0B')} />
             <Text style={[styles.profileSubHeaderTitle, isBrandStudent && { color: '#0F172A' }]}>
               {isFree ? 'Gói miễn phí' : (isBrandStudent ? 'Gói Khóa học' : 'Gói học Meet')}
             </Text>
           </View>
 
           <View style={[styles.profileSubInnerBox, expiring && styles.statusCardExpiring]}>
-            <View style={[styles.profileSubIcon, isBrandStudent ? gradient('#EF4444', '#DC2626') : isLifetime ? gradient('#EF4444', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
+            <View style={[styles.profileSubIcon, isBrandStudent ? gradient('#10B981', '#059669') : isLifetime ? gradient('#10B981', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
               <CalendarClock size={22} color="#FFFFFF" />
             </View>
             <View style={styles.flex}>
               <Text numberOfLines={1} style={styles.statusTitle}>{planTitle}</Text>
-              <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#DC2626' }]}>{daysLine}</Text>
+              <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#059669' }]}>{daysLine}</Text>
             </View>
             {(!isLifetime || isFree) && !isBrandStudent ? (
               <DuoButton variant="primary" size="sm" text={actionLabel} onPress={() => setOpen(true)} accessibilityLabel={actionLabel} />
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   muted: { color: colors.muted, fontSize: 11, lineHeight: 15 },
   planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   plan: { width: '48%', flexGrow: 1, overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
-  planHighlight: { borderColor: '#FECACA' },
+  planHighlight: { borderColor: '#A7F3D0' },
   planHead: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center' },
   planLabel: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   planSub: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '700' },
@@ -474,9 +474,9 @@ const styles = StyleSheet.create({
   codeInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
   codeInput: { flex: 1, minHeight: 40, color: colors.ink, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   codeButton: { minWidth: 108 },
-  screen: { flex: 1, backgroundColor: '#FEF2F2' },
+  screen: { flex: 1, backgroundColor: '#ECFDF5' },
   screenContent: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
-  hero: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#FECACA' },
+  hero: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#A7F3D0' },
   heroIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   heroTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', textAlign: 'center' },
   heroText: { color: '#475569', fontSize: 13, lineHeight: 19, textAlign: 'center' },
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.35)',
   },
   drawerSubCardBrand: {
-    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+    backgroundColor: 'rgba(16, 185, 129, 0.14)',
     borderColor: 'rgba(248, 113, 113, 0.35)',
   },
   drawerSubCardActive: {

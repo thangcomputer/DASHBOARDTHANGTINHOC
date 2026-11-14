@@ -2616,7 +2616,7 @@ export function ConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel="Xóa nhóm vĩnh viễn"
             >
-              <Trash2 size={19} color="#DC2626" />
+              <Trash2 size={19} color="#059669" />
             </Pressable>
           ) : isGroupConversation && groupDetails && !isGroupCreator ? (
             <Pressable
@@ -4346,7 +4346,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   groupLeaveHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFF7ED' },
   groupActionDisabled: { opacity: 0.5 },
   meetHeaderAction: { minWidth: 44, height: 34, paddingHorizontal: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  meetHeaderActionLive: { backgroundColor: '#DC2626', borderBottomWidth: 3, borderBottomColor: '#991B1B' },
+  meetHeaderActionLive: { backgroundColor: '#059669', borderBottomWidth: 3, borderBottomColor: '#065F46' },
   meetHeaderActionUpcoming: { backgroundColor: '#F1F5F9', opacity: 0.55 },
   meetHeaderLiveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FFFFFF' },
   attendanceHeaderAction: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
@@ -4419,10 +4419,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   teacherAttendanceConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900', textAlign: 'center' },
   attendancePromptCard: { width: '100%', maxWidth: 400, overflow: 'hidden', borderRadius: 24, backgroundColor: colors.surface },
   attendancePromptHeader: { minHeight: 184, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.lg, backgroundColor: '#D7192D' },
-  attendancePromptEyebrow: { color: '#FEE2E2', fontSize: typography.micro, fontWeight: '900', letterSpacing: 2 },
+  attendancePromptEyebrow: { color: '#D1FAE5', fontSize: typography.micro, fontWeight: '900', letterSpacing: 2 },
   attendancePromptSessionLabel: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   attendancePromptSessionNumber: { color: '#FFFFFF', fontSize: 48, lineHeight: 54, fontWeight: '900' },
-  attendancePromptSessionTotal: { color: '#FECACA', fontSize: typography.title, fontWeight: '800' },
+  attendancePromptSessionTotal: { color: '#A7F3D0', fontSize: typography.title, fontWeight: '800' },
   attendancePromptCourse: { color: '#FFFFFF', fontSize: typography.caption, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
   attendancePromptDetails: { marginHorizontal: spacing.md, marginTop: spacing.md, padding: spacing.md, gap: 5, borderWidth: 1, borderColor: '#E8EEF5', borderRadius: 16, backgroundColor: '#F8FAFC' },
   attendancePromptDetailLabel: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '900' },
@@ -4485,7 +4485,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   callEventSubtitle: { color: '#64748B', fontSize: typography.micro },
   inboxFilterRow: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.xs },
   inboxFilterRowStudent: { gap: 0 },
-  createGroupButton: { width: 42, height: 42, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA', borderRadius: radius.sm, backgroundColor: colors.brandSoft },
+  createGroupButton: { width: 42, height: 42, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.sm, backgroundColor: colors.brandSoft },
   createGroupText: { color: colors.brand, fontSize: 11, fontWeight: '700' },
   groupModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
   groupModal: { maxHeight: '88%', gap: spacing.md, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
@@ -4527,11 +4527,11 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     elevation: 3,
   },
   filterChipActiveBrand: {
-    backgroundColor: '#EF4444',
-    borderColor: '#F87171',
+    backgroundColor: '#10B981',
+    borderColor: '#34D399',
     borderBottomWidth: 3,
-    borderBottomColor: '#DC2626',
-    shadowColor: '#DC2626',
+    borderBottomColor: '#059669',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 3,
@@ -4580,7 +4580,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   contactMessageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   contactMessageText: { fontSize: typography.caption, color: '#64748B', flex: 1 },
   contactMessageTextUnread: { color: '#1E293B', fontWeight: '600' },
-  unreadCountBadge: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' },
+  unreadCountBadge: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
   unreadCountText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   chatHeaderAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   chatHeaderAvatarImg: { width: 38, height: 38, borderRadius: 19 },
@@ -4730,7 +4730,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   composerInputPill: { flex: 1, height: 42, minHeight: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 21, paddingHorizontal: 12 },
   composerTextInput: { flex: 1, height: 40, color: '#1E293B', fontSize: typography.small, lineHeight: 20, paddingTop: Platform.OS === 'web' ? 10 : 0, paddingBottom: 0, paddingHorizontal: 0, textAlignVertical: 'center' },
   composerEmoji: { width: 28, height: 38, alignItems: 'center', justifyContent: 'center' },
-  composerSendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F87171', alignItems: 'center', justifyContent: 'center', shadowColor: '#F87171', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 },
+  composerSendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#34D399', alignItems: 'center', justifyContent: 'center', shadowColor: '#34D399', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 },
   messageInput: { minHeight: 42, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, color: colors.ink, fontSize: typography.small },
   composerSendBtnDisabled: { opacity: 0.45, shadowOpacity: 0 },
   replyBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.brandSoft, borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },

@@ -362,18 +362,18 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
 
           {item.personInfo ? (
             <View style={styles.personBadge}>
-              <User size={14} color="#DC2626" />
+              <User size={14} color="#059669" />
               <Text style={styles.personText}>{item.personInfo}</Text>
             </View>
           ) : null}
 
           <View style={styles.metaRow}>
-            <Clock size={15} color="#DC2626" />
+            <Clock size={15} color="#059669" />
             <Text style={styles.meta}>{item.startTime} – {item.endTime}</Text>
           </View>
 
           <View style={styles.metaRow}>
-            <Calendar size={15} color="#DC2626" />
+            <Calendar size={15} color="#059669" />
             <Text style={styles.meta}>{dayLabel(item.day)}</Text>
           </View>
 
@@ -415,12 +415,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 24,
     borderWidth: 2,
-    borderColor: '#FECACA',
+    borderColor: '#A7F3D0',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 22,
     paddingTop: 28,
     paddingBottom: 20,
-    shadowColor: '#DC2626',
+    shadowColor: '#059669',
     shadowOpacity: 0.35,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 4 },
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   kicker: {
-    color: '#DC2626',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -457,16 +457,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: '#D1FAE5',
   },
   personText: {
-    color: '#991B1B',
+    color: '#065F46',
     fontSize: 13,
     fontWeight: '700',
   },

@@ -499,8 +499,8 @@ export function CertPrepPlayerScreen() {
           ) : null}
         </View>
         <View style={styles.examTimer}>
-          <Clock size={14} color={remainingSeconds < 120 ? '#F87171' : '#94A3B8'} />
-          <Text style={[styles.examTimerText, remainingSeconds < 120 && { color: '#F87171' }]}>
+          <Clock size={14} color={remainingSeconds < 120 ? '#34D399' : '#94A3B8'} />
+          <Text style={[styles.examTimerText, remainingSeconds < 120 && { color: '#34D399' }]}>
             {formatSeconds(remainingSeconds)}
           </Text>
         </View>
@@ -865,7 +865,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   questionText: { color: '#E2E8F0', fontSize: typography.body, lineHeight: 24 },
   optionList: { gap: spacing.sm, marginTop: spacing.xs },
   optionItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' },
-  optionItemSelected: { borderColor: colors.brand, backgroundColor: 'rgba(220,38,38,0.12)' },
+  optionItemSelected: { borderColor: colors.brand, backgroundColor: 'rgba(5, 150, 105,0.12)' },
   optionRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#475569', alignItems: 'center', justifyContent: 'center' },
   optionRadioSelected: { borderColor: colors.brand },
   optionRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.brand },

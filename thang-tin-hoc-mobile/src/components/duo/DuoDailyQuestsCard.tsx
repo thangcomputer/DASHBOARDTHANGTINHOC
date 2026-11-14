@@ -68,13 +68,13 @@ export function DuoDailyQuestsCard({
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <View style={[styles.targetIconBox, isBrandStudent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-            <Target size={18} color={isBrandStudent ? '#DC2626' : '#059669'} />
+          <View style={[styles.targetIconBox, isBrandStudent && { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+            <Target size={18} color={isBrandStudent ? '#059669' : '#059669'} />
           </View>
           <Text style={styles.cardTitle}>Nhiệm vụ hôm nay</Text>
         </View>
-        <View style={[styles.statusBadge, isBrandStudent && { backgroundColor: '#FEF2F2' }]}>
-          <Text style={[styles.statusText, isBrandStudent && { color: '#DC2626' }]}>{`${completedCount}/${resolvedQuests.length} xong`}</Text>
+        <View style={[styles.statusBadge, isBrandStudent && { backgroundColor: '#ECFDF5' }]}>
+          <Text style={[styles.statusText, isBrandStudent && { color: '#059669' }]}>{`${completedCount}/${resolvedQuests.length} xong`}</Text>
         </View>
       </View>
 
@@ -87,10 +87,10 @@ export function DuoDailyQuestsCard({
             <Pressable
               key={quest.id}
               onPress={onOpenPractice}
-              style={[styles.questRow, isDone && (isBrandStudent ? { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' } : styles.questRowDone)]}
+              style={[styles.questRow, isDone && (isBrandStudent ? { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' } : styles.questRowDone)]}
               accessibilityRole="button"
             >
-              <View style={[styles.questIconBox, isDone ? (isBrandStudent ? { backgroundColor: '#DC2626' } : styles.iconBoxDone) : styles.iconBoxNormal]}>
+              <View style={[styles.questIconBox, isDone ? (isBrandStudent ? { backgroundColor: '#059669' } : styles.iconBoxDone) : styles.iconBoxNormal]}>
                 {isDone ? (
                   <Check size={16} color="#FFFFFF" strokeWidth={3} />
                 ) : quest.icon === 'lightning' ? (
@@ -104,7 +104,7 @@ export function DuoDailyQuestsCard({
 
               <View style={styles.questContentCol}>
                 <View style={styles.questTitleRow}>
-                  <Text style={[styles.questTitle, isDone && (isBrandStudent ? { color: '#991B1B' } : styles.questTitleDone)]} numberOfLines={1}>
+                  <Text style={[styles.questTitle, isDone && (isBrandStudent ? { color: '#065F46' } : styles.questTitleDone)]} numberOfLines={1}>
                     {quest.title}
                   </Text>
                   <Text style={styles.questCountText}>{`${Math.min(quest.current, quest.target)}/${quest.target}`}</Text>
@@ -112,15 +112,15 @@ export function DuoDailyQuestsCard({
 
                 {/* Progress bar */}
                 <View style={styles.barTrack}>
-                  <View style={[styles.barFill, isDone ? (isBrandStudent ? { backgroundColor: '#DC2626' } : styles.barFillDone) : (isBrandStudent ? { backgroundColor: '#EF4444' } : styles.barFillActive), { width: `${pct}%` }]} />
+                  <View style={[styles.barFill, isDone ? (isBrandStudent ? { backgroundColor: '#059669' } : styles.barFillDone) : (isBrandStudent ? { backgroundColor: '#10B981' } : styles.barFillActive), { width: `${pct}%` }]} />
                 </View>
               </View>
 
               {/* Reward pill */}
-              <View style={[styles.rewardPill, isDone && (isBrandStudent ? { backgroundColor: '#FEE2E2' } : styles.rewardPillDone)]}>
-                <Gift size={13} color={isDone ? (isBrandStudent ? '#DC2626' : '#047857') : '#D97706'} />
+              <View style={[styles.rewardPill, isDone && (isBrandStudent ? { backgroundColor: '#D1FAE5' } : styles.rewardPillDone)]}>
+                <Gift size={13} color={isDone ? (isBrandStudent ? '#059669' : '#047857') : '#D97706'} />
                 {quest.rewardXp ? (
-                  <Text style={[styles.rewardText, isDone && (isBrandStudent ? { color: '#DC2626' } : styles.rewardTextDone)]}>
+                  <Text style={[styles.rewardText, isDone && (isBrandStudent ? { color: '#059669' } : styles.rewardTextDone)]}>
                     {`+${quest.rewardXp}`}
                   </Text>
                 ) : null}

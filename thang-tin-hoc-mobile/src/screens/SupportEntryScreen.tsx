@@ -233,10 +233,10 @@ const styles = {
   choiceError: {
     padding: spacing.sm,
     borderRadius: 12,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    color: '#DC2626',
+    borderColor: '#A7F3D0',
+    color: '#059669',
     fontSize: typography.caption,
     lineHeight: 19,
     fontWeight: '700' as const,

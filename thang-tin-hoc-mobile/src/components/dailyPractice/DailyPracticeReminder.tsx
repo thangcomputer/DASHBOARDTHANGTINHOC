@@ -62,12 +62,12 @@ export function DailyPracticeReminder({ userId, ready }: { userId: string; ready
     ? [
       { icon: CalendarX2, value: stats.missedDays || 0, label: 'ngày đã nghỉ', color: '#475569', bg: '#F1F5F9' },
       { icon: Flame, value: stats.lostStreak || 0, label: 'chuỗi vừa mất', color: '#EA580C', bg: '#FFF7ED' },
-      { icon: Trophy, value: stats.bestStreak || 0, label: 'kỷ lục chuỗi', color: '#DC2626', bg: '#FEF2F2' },
+      { icon: Trophy, value: stats.bestStreak || 0, label: 'kỷ lục chuỗi', color: '#059669', bg: '#ECFDF5' },
     ]
     : [
       { icon: Flame, value: stats.streak || 0, label: 'ngày liên tiếp', color: '#EA580C', bg: '#FFF7ED' },
       { icon: Zap, value: stats.xpTotal || 0, label: 'tổng XP', color: '#D97706', bg: '#FFFBEB' },
-      { icon: Trophy, value: stats.bestStreak || 0, label: 'kỷ lục chuỗi', color: '#DC2626', bg: '#FEF2F2' },
+      { icon: Trophy, value: stats.bestStreak || 0, label: 'kỷ lục chuỗi', color: '#059669', bg: '#ECFDF5' },
     ];
 
   return (
@@ -136,8 +136,8 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   card: { width: '100%', maxWidth: 380, borderRadius: 28, backgroundColor: colors.surface, overflow: 'hidden', boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)' },
   hero: {
-    alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: 26, paddingBottom: spacing.lg, backgroundColor: '#FEF2F2',
-    backgroundImage: 'linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 50%, #FFFBEB 100%)',
+    alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: 26, paddingBottom: spacing.lg, backgroundColor: '#ECFDF5',
+    backgroundImage: 'linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 50%, #FFFBEB 100%)',
   } as never,
   close: {
     position: 'absolute', top: 12, right: 12, width: 36, height: 36, borderRadius: 18, zIndex: 2,
@@ -147,7 +147,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     backgroundColor: '#F0F9FF',
     backgroundImage: 'linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 50%, #F1F5F9 100%)',
   } as never,
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: '#DC2626' },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: '#059669' },
   pillLost: { backgroundColor: '#334155' },
   social: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginHorizontal: spacing.lg, marginTop: spacing.md,
@@ -169,7 +169,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   secondaryText: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   primary: {
     flex: 1.4, minHeight: 46, borderRadius: radius.md, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.brand, backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
+    backgroundColor: colors.brand, backgroundImage: 'linear-gradient(180deg, #34D399 0%, #059669 55%, #047857 100%)',
     boxShadow: '0px 8px 18px rgba(185, 28, 28, 0.3)',
   } as never,
   primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
