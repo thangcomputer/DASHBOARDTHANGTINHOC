@@ -123,10 +123,11 @@ const MENU_CONFIG = {
       { key: 'student-training', section: 'HỌC VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'student-resources', section: 'HỌC VIÊN', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'lesson-practice', section: 'HỌC VIÊN', icon: BookOpen, label: 'Bài giảng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-      { key: 'daily-practice', section: 'HỌC VIÊN', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'cert-prep', section: 'HỌC VIÊN', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
-      { key: 'subscription-codes', section: 'HỌC VIÊN', icon: Ticket, label: 'Mã kích hoạt & gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
-      { key: 'meet-classes', section: 'HỌC VIÊN', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
+
+      { key: 'daily-practice', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Gamepad2, label: 'Luyện tập & Tài nguyên', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'subscription-codes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Ticket, label: 'Mã kích hoạt & gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'meet-classes', section: 'TÀI KHOẢN MIỄN PHÍ', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
 
       { key: 'teachers', section: 'GIẢNG VIÊN', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
       { key: 'training-videos', section: 'GIẢNG VIÊN', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
