@@ -175,7 +175,7 @@ export function MilestoneEvaluationModal({
           <h3 className={`font-black  tracking-tight ${isCompactHeader ? 'text-base' : 'text-xl'}`}>
             {title}
           </h3>
-          <p className={`text-red-100 font-medium italic ${isCompactHeader ? 'text-[10px] mt-0.5' : 'text-xs mt-1'}`}>
+          <p className={`text-emerald-100 font-medium italic ${isCompactHeader ? 'text-[10px] mt-0.5' : 'text-xs mt-1'}`}>
             {subtitle}
           </p>
           {isCourseEnd ? (
@@ -232,7 +232,7 @@ export function MilestoneEvaluationModal({
           ) : !isCourseEnd ? (
             <>
               <p className="text-sm text-gray-600 leading-relaxed text-center font-medium inline-flex items-center justify-center gap-2 w-full">
-                <UserRound size={16} className="text-red-500" />
+                <UserRound size={16} className="text-emerald-600" />
                 Chào buổi học đầu tiên! Cho Admin biết cảm nhận về Thầy/Cô.
               </p>
               <div className="space-y-4">
@@ -293,7 +293,7 @@ export function MilestoneEvaluationModal({
                           onClick={() => setRatingCriteria((prev) => ({ ...prev, [catKey]: opt.key }))}
                           className={`min-h-[30px] px-1 py-1.5 rounded-lg text-[10px] font-black leading-tight transition-all ${ratingCriteria[catKey] === opt.key
                               ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'bg-white text-gray-500 border border-gray-200 hover:border-red-200 hover:text-emerald-600'
+                              : 'bg-white text-gray-500 border border-gray-200 hover:border-emerald-200 hover:text-emerald-600'
                             }`}
                         >
                           {opt.label}

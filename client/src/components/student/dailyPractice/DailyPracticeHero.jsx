@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { CalendarCheck, Flame, Layers, Play, Sparkles, Star, Zap } from 'lucide-react';
+import { Award, CalendarCheck, Flame, Layers, Play, Sparkles, Star, Zap } from 'lucide-react';
 import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 import Mascot from './Mascot';
 import { SoundToggleButton } from './GameButton';
@@ -29,6 +29,7 @@ export default function DailyPracticeHero({
   courseProgress = null,
   _freeTopicName = '',
   _onBuyXp,
+  onOpenCertificate = null,
 }) {
   const streak = stats?.streak || 0;
   const playedToday = Boolean(stats?.playedToday);
@@ -153,7 +154,7 @@ export default function DailyPracticeHero({
               </p>
             )}
           </div>
-          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:max-w-[17rem]">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:max-w-[20rem]">
             <button
               type="button"
               disabled={primaryDisabled}
@@ -163,9 +164,21 @@ export default function DailyPracticeHero({
               {mode === 'free' ? <Sparkles size={16} aria-hidden="true" /> : <Play size={16} fill="currentColor" aria-hidden="true" />}
               {ctaLabel}
             </button>
-            <div className="flex items-center justify-between gap-2">
-              <SoundToggleButton compact className="shrink-0 sm:hidden" />
-              <SoundToggleButton className="hidden shrink-0 sm:inline-flex" />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <SoundToggleButton compact className="shrink-0 sm:hidden" />
+                <SoundToggleButton className="hidden shrink-0 sm:inline-flex" />
+                {onOpenCertificate ? (
+                  <button
+                    type="button"
+                    onClick={onOpenCertificate}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300/80 bg-white/90 px-2.5 py-1 text-[11px] font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-400 hover:bg-white cursor-pointer"
+                  >
+                    <Award size={12} className="text-emerald-600" aria-hidden="true" />
+                    <span>Chứng chỉ QR</span>
+                  </button>
+                ) : null}
+              </div>
               {typeof stats?.todayXp === 'number' ? (
                 <p className="min-w-0 flex-1 text-right text-[10px] font-bold text-emerald-800/70 sm:flex-none">
                   <Zap size={11} className="mr-0.5 inline text-amber-500" aria-hidden="true" />

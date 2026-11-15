@@ -101,7 +101,7 @@ function ImagePick({ value, onChange, label = 'Ảnh', uploading, onPickFile }) 
           type="button"
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
-          className={`inline-flex items-center gap-2 min-h-11 px-3 rounded-xl border-2 border-dashed border-red-300 bg-emerald-50/50 text-red-800 text-xs font-black ${uploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+          className={`inline-flex items-center gap-2 min-h-11 px-3 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 text-emerald-800 text-xs font-black ${uploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
         >
           {uploading ? <Loader2 className="animate-spin" size={14} /> : <ImagePlus size={14} />}
           Chọn ảnh
@@ -378,7 +378,7 @@ export default function CenterInfoManagePage() {
             <ArrowLeft size={14} /> Xem trang công khai
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Building2 className="text-red-600" size={22} />
+            <Building2 className="text-emerald-600" size={22} />
             Quản trị Thông tin trung tâm
           </h1>
         </div>
@@ -431,7 +431,7 @@ export default function CenterInfoManagePage() {
                 </div>
               ) : null}
               {overviewDirty ? (
-                <div className="flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 font-bold">
+                <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 font-bold">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
                   Có thay đổi chưa lưu - nhớ bấm 「Lưu tổng quan」.
                 </div>
@@ -557,10 +557,10 @@ export default function CenterInfoManagePage() {
               </div>
 
               {form ? (
-                <div className="bg-white rounded-2xl border border-red-200 p-4 sm:p-6 space-y-3 shadow-sm">
-                  <h3 className="font-bold text-red-700">{form.id ? 'Chỉnh sửa' : 'Thêm mới'}</h3>
+                <div className="bg-white rounded-2xl border border-emerald-200 p-4 sm:p-6 space-y-3 shadow-sm">
+                  <h3 className="font-bold text-emerald-700">{form.id ? 'Chỉnh sửa' : 'Thêm mới'}</h3>
                   {formDirty ? (
-                    <div className="flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 font-bold">
+                    <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 font-bold">
                       <AlertCircle size={16} className="shrink-0 mt-0.5" />
                       Có thay đổi chưa lưu - nhớ bấm 「Lưu」.
                     </div>

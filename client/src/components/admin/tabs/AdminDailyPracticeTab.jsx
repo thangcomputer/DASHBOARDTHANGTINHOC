@@ -227,7 +227,7 @@ function TopicModal({ topic, onClose, onSaved }) {
         </div>
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
           <label className={`${LABEL} flex items-center gap-1.5`} htmlFor="dp-topic-lesson">
-            <PlayCircle size={14} className="text-red-600" /> Video bài giảng liên quan
+            <PlayCircle size={14} className="text-emerald-600" /> Video bài giảng liên quan
           </label>
           <p className="mb-2 text-xs text-slate-500">
             Học viên luyện xong chủ đề sẽ được gợi ý xem video này; đang học video sẽ được gợi ý luyện chủ đề này.
@@ -494,7 +494,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
               <span className={LABEL}>Phát biểu trên là</span>
               <div className="flex gap-2">
                 {[true, false].map((value) => (
-                  <button key={String(value)} type="button" onClick={() => set({ answerBool: value })} className={`rounded-xl border-2 px-5 py-2 text-sm font-black ${form.answerBool === value ? (value ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-emerald-500 bg-red-50 text-red-700') : 'border-slate-200 text-slate-600'}`}>
+                  <button key={String(value)} type="button" onClick={() => set({ answerBool: value })} className={`rounded-xl border-2 px-5 py-2 text-sm font-black ${form.answerBool === value ? (value ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-red-500 bg-red-50 text-red-700') : 'border-slate-200 text-slate-600'}`}>
                     {value ? 'Đúng' : 'Sai'}
                   </button>
                 ))}
@@ -1204,7 +1204,7 @@ function UnitVideosPanel({ unit, onSaved }) {
   };
 
   return (
-    <div className="space-y-2 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
+    <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5">
       <p className="text-[11px] font-semibold text-slate-500">
         Mỗi video hiện thành nút 🎬 trên lộ trình của chặng; học viên bấm vào sẽ mở popup trình phát Thắng Tin Học ngay tại trang.
       </p>
@@ -1473,7 +1473,7 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
             const active = filterUnitId === unit.id;
             const videosOpen = openVideosId === unit.id;
             return (
-              <li key={unit.id} className={`space-y-2 rounded-xl bg-white p-2.5 ring-1 ${active || videosOpen ? 'ring-red-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
+              <li key={unit.id} className={`space-y-2 rounded-xl bg-white p-2.5 ring-1 ${active || videosOpen ? 'ring-emerald-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
                 <div className="flex items-center gap-2">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 text-xs font-black text-white">{index + 1}</span>
                   <button type="button" onClick={() => onFilterUnit(active ? '' : unit.id)} className="min-w-0 flex-1 text-left !shadow-none" title="Lọc câu hỏi của chặng">
@@ -1747,7 +1747,7 @@ export default function AdminDailyPracticeTab() {
                   tabIndex={0}
                   onClick={() => setTopicId(t.id)}
                   onKeyDown={(e) => { if (e.key === 'Enter') setTopicId(t.id); }}
-                  className={`flex items-center gap-3 rounded-2xl border-2 bg-white p-3 transition ${active ? 'border-red-400' : 'border-slate-100 hover:border-slate-200'} ${t.active ? '' : 'opacity-60'}`}
+                  className={`flex items-center gap-3 rounded-2xl border-2 bg-white p-3 transition ${active ? 'border-emerald-500' : 'border-slate-100 hover:border-slate-200'} ${t.active ? '' : 'opacity-60'}`}
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}>
                     <Icon size={20} />
@@ -1759,7 +1759,7 @@ export default function AdminDailyPracticeTab() {
                       {t.counts.draft ? <span className="ml-1 font-bold text-amber-600">· {t.counts.draft} nháp</span> : null}
                     </p>
                     {t.lessonSubjectId ? (
-                      <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-red-600">
+                      <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-emerald-600">
                         <PlayCircle size={11} /> Đã gắn video{t.lessonUnitIds?.length ? ` · ${t.lessonUnitIds.length} buổi` : ' · cả môn'}
                       </p>
                     ) : null}
@@ -1866,7 +1866,7 @@ export default function AdminDailyPracticeTab() {
                               <span className="rounded-full bg-slate-900 px-2 py-0.5 text-white">{QUESTION_TYPES[q.type]?.label}</span>
                               <span className="rounded-full px-2 py-0.5" style={{ background: level.soft, color: level.color }}>{level.label}</span>
                               {q.unitId
-                                ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700">{unitTitle.get(q.unitId) || 'Chặng'}</span>
+                                ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">{unitTitle.get(q.unitId) || 'Chặng'}</span>
                                 : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Chưa xếp chặng</span>}
                               {q.status === 'draft'
                                 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Nháp{q.source === 'ai' ? ' · AI' : ''}</span>

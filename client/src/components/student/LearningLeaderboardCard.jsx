@@ -13,6 +13,25 @@ const MEDALS = {
   3: 'from-orange-300 to-orange-600 text-orange-950',
 };
 
+const LEAGUE_TIERS = [
+  { key: 'bronze', name: 'Đồng', icon: '🥉', minMinutes: 0, frame: 'ring-2 ring-amber-700/60', badge: 'bg-amber-100 text-amber-800' },
+  { key: 'silver', name: 'Bạc', icon: '🥈', minMinutes: 60, frame: 'ring-2 ring-slate-400', badge: 'bg-slate-200 text-slate-700' },
+  { key: 'gold', name: 'Vàng', icon: '🥇', minMinutes: 120, frame: 'ring-2 ring-amber-400 shadow-xs', badge: 'bg-yellow-100 text-amber-800' },
+  { key: 'platinum', name: 'Bạch Kim', icon: '💠', minMinutes: 210, frame: 'ring-2 ring-cyan-400 shadow-sm', badge: 'bg-cyan-100 text-cyan-800' },
+  { key: 'diamond', name: 'Kim Cương', icon: '💎', minMinutes: 300, frame: 'ring-[3px] ring-fuchsia-400 shadow-md', badge: 'bg-fuchsia-100 text-fuchsia-800' },
+];
+
+function leagueForRow(row) {
+  const mins = Number(row?.minutes) || 0;
+  const days = Number(row?.goalDays) || 0;
+  if (row?.rank === 1 && mins >= 60) return LEAGUE_TIERS[4];
+  if (mins >= 300 || days >= 6) return LEAGUE_TIERS[4];
+  if (mins >= 210 || days >= 5) return LEAGUE_TIERS[3];
+  if (mins >= 120 || days >= 3) return LEAGUE_TIERS[2];
+  if (mins >= 60 || days >= 2) return LEAGUE_TIERS[1];
+  return LEAGUE_TIERS[0];
+}
+
 function formatWeekDay(key) {
   const [, month, day] = String(key || '').split('-');
   return day && month ? `${day}/${month}` : '';
@@ -35,7 +54,7 @@ function RankBadge({ rank }) {
   );
 }
 
-function Avatar({ name, avatar, freePortal = false }) {
+function Avatar({ name, avatar, freePortal = false, frameClass = 'ring-2 ring-white' }) {
   const [failed, setFailed] = useState(false);
   const initial = String(name || '?').trim().split(/\s+/).pop()?.[0]?.toUpperCase() || '?';
   if (avatar && !failed) {
@@ -44,18 +63,12 @@ function Avatar({ name, avatar, freePortal = false }) {
         src={resolveMediaUrl(avatar)}
         alt=""
         onError={() => setFailed(true)}
-        className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-white"
+        className={`h-8 w-8 shrink-0 rounded-full object-cover ${frameClass}`}
       />
     );
   }
   return (
-    <span
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ring-2 ring-white ${
-        freePortal
-          ? 'bg-gradient-to-br from-emerald-50 to-green-50 text-emerald-700'
-          : 'bg-gradient-to-br from-red-50 to-amber-50 text-red-700'
-      }`}
-    >
+    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black bg-gradient-to-br from-emerald-50 to-green-50 text-emerald-700 ${frameClass}`}>
       {initial}
     </span>
   );
@@ -101,6 +114,9 @@ export default function LearningLeaderboardCard() {
   const me = data?.me;
   const top = data?.top || [];
   const meInTop = top.some((row) => row.isMe);
+  const myLeague = leagueForRow(me);
+  const nextTierIdx = Math.min(LEAGUE_TIERS.length - 1, LEAGUE_TIERS.findIndex((t) => t.key === myLeague.key) + 1);
+  const nextLeague = LEAGUE_TIERS[nextTierIdx];
 
   return (
     <section className="duo-card flex min-w-0 flex-col p-3.5">
@@ -109,7 +125,12 @@ export default function LearningLeaderboardCard() {
           <Trophy size={20} aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-black text-slate-900">Bảng xếp hạng tuần</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-black text-slate-900">Bảng xếp hạng tuần</h3>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${myLeague.badge}`}>
+              {myLeague.icon} {myLeague.name}
+            </span>
+          </div>
           <p className="truncate text-[11px] text-slate-500">
             {data
               ? `${formatWeekDay(data.weekStart)} – ${formatWeekDay(data.weekEnd)} · ${data.participants} ${freePortal ? 'học viên tham gia' : 'HV'}`
@@ -117,6 +138,15 @@ export default function LearningLeaderboardCard() {
           </p>
         </div>
       </div>
+
+      {me && myLeague.key !== 'diamond' && (
+        <div className="mt-2 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 flex items-center justify-between gap-2">
+          <span>League tuần: {LEAGUE_TIERS.map((t) => t.icon).join(' → ')}</span>
+          <span className="text-emerald-700 font-bold shrink-0">
+            Lên {nextLeague.name}: {Math.max(0, nextLeague.minMinutes - (Number(me.minutes) || 0))}p
+          </span>
+        </div>
+      )}
 
       {error ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800">{error}</p>
@@ -128,37 +158,34 @@ export default function LearningLeaderboardCard() {
             Tuần này chưa có ai — hãy là người đầu tiên!
           </li>
         ) : null}
-        {top.map((row) => (
+        {top.map((row) => {
+          const tier = leagueForRow(row);
+          return (
           <li
             key={`${row.rank}-${row.name}`}
             className={`flex items-center gap-2 rounded-xl px-1.5 py-1.5 ${
               row.isMe
-                ? (freePortal ? 'bg-emerald-50/90 ring-1 ring-emerald-200' : 'bg-red-50/90 ring-1 ring-red-100')
+                ? 'bg-emerald-50/90 ring-1 ring-emerald-200'
                 : row.rank <= 3
                   ? 'bg-amber-50/30'
                   : ''
             }`}
           >
             <RankBadge rank={row.rank} />
-            <Avatar name={row.name} avatar={row.avatar} freePortal={freePortal} />
+            <Avatar name={row.name} avatar={row.avatar} freePortal={freePortal} frameClass={tier.frame} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-extrabold text-slate-800">
                 {row.name}
                 {row.isMe ? (
-                  <span
-                    className={`ml-1.5 align-middle text-[9px] font-black uppercase tracking-wide ${
-                      freePortal ? 'rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800' : 'text-red-600'
-                    }`}
-                  >
+                  <span className="ml-1.5 align-middle text-[9px] font-black uppercase tracking-wide rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800">
                     Bạn
                   </span>
                 ) : null}
               </p>
-              {freePortal && row.hoursPerDay ? (
-                <p className="truncate text-[10px] font-semibold text-slate-500">
-                  Mục tiêu {row.hoursPerDay} giờ / ngày
-                </p>
-              ) : null}
+              <p className="truncate text-[10px] font-semibold text-slate-500">
+                <span>{tier.icon} Hạng {tier.name}</span>
+                {freePortal && row.hoursPerDay ? ` · Mục tiêu ${row.hoursPerDay}g/ngày` : ''}
+              </p>
             </div>
             <div className="shrink-0 text-right leading-tight">
               <p className="flex items-center justify-end gap-0.5 text-[11px] font-black text-emerald-600">
@@ -171,7 +198,8 @@ export default function LearningLeaderboardCard() {
               </p>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ol>
 
       {data && me ? (
@@ -186,7 +214,7 @@ export default function LearningLeaderboardCard() {
             ) : null
           ) : (
             <div className="flex items-start gap-2 rounded-xl bg-slate-50 px-2.5 py-2">
-              <span className={`text-base font-black tabular-nums ${freePortal ? 'text-emerald-600' : 'text-red-600'}`}>#{me.rank}</span>
+              <span className="text-base font-black tabular-nums text-emerald-600">#{me.rank}</span>
               <p className="min-w-0 flex-1 text-[11px] leading-snug text-slate-600">
                 <span className="font-bold text-slate-800">
                   {me.goalDays} ngày đạt · {formatStudyMinutes(me.minutes)}

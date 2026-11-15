@@ -15,7 +15,7 @@ export default function SupportMascot({ size = 56, className = '', waving = true
       aria-hidden="true"
     >
       <svg viewBox="0 0 64 64" width={s} height={s} fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="32" cy="32" r="30" fill="#DC2626" />
+        <circle cx="32" cy="32" r="30" fill="#059669" />
         <circle cx="32" cy="32" r="30" fill={`url(#${glowId})`} fillOpacity="0.35" />
         <circle cx="32" cy="26" r="11" fill="#FFE4C8" />
         <path d="M22 24c1-8 7-12 10-12s9 4 10 12c-3-2-7-3-10-3s-7 1-10 3z" fill="#1E293B" />
@@ -28,7 +28,7 @@ export default function SupportMascot({ size = 56, className = '', waving = true
         <rect x="15" y="24" width="6" height="9" rx="3" fill="#F8FAFC" />
         <rect x="43" y="24" width="6" height="9" rx="3" fill="#F8FAFC" />
         <path d="M18 30h-3c-1.5 0-2.5 1-2.5 2.5V36c0 2 1.5 3.5 3.5 3.5H21" stroke="#F8FAFC" strokeWidth="2" strokeLinecap="round" />
-        <path d="M22 44c2.5-5 7-8 10-8s7.5 3 10 8v6H22v-6z" fill="#FEF2F2" />
+        <path d="M22 44c2.5-5 7-8 10-8s7.5 3 10 8v6H22v-6z" fill="#ECFDF5" />
         <g className="cms-support-mascot__arm">
           <path d="M44 42c4-1 8 1 9 4" stroke="#FFE4C8" strokeWidth="3.5" strokeLinecap="round" />
           <circle cx="54" cy="47" r="3.2" fill="#FFE4C8" />
@@ -36,7 +36,7 @@ export default function SupportMascot({ size = 56, className = '', waving = true
         <defs>
           <radialGradient id={glowId} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(22 18) rotate(55) scale(40)">
             <stop stopColor="#fff" />
-            <stop offset="1" stopColor="#DC2626" stopOpacity="0" />
+            <stop offset="1" stopColor="#059669" stopOpacity="0" />
           </radialGradient>
         </defs>
       </svg>

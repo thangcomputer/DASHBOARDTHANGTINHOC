@@ -55,7 +55,7 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.VIEW_BRANCH_REVENUE, label: '📊 Xem Báo cáo doanh thu', desc: 'Chỉ xem doanh thu chi nhánh (read-only)' },
   { key: PERMISSIONS.MANAGE_TRAINING, label: 'Đào tạo GV', desc: 'Module đào tạo giảng viên' },
   { key: PERMISSIONS.MANAGE_STUDENT_TRAINING, label: 'Đào tạo HV', desc: 'Module đào tạo học viên' },
-  { key: PERMISSIONS.MANAGE_CERT_PREP, label: 'Ôn thi MOS/IC3', desc: 'Quản lý ngân hàng ôn thi chứng chỉ MOS/IC3' },
+  { key: PERMISSIONS.MANAGE_CERT_PREP, label: 'Ôn thi MOS/IC3', desc: 'Quản lý ngân hàng ôn thi chứng nhận MOS/IC3' },
   { key: PERMISSIONS.MANAGE_HR, label: '👤 Nhân sự & Lương', desc: 'Quản lý hồ sơ nhân viên, trả lương hàng tháng' },
   { key: PERMISSIONS.MANAGE_BLOG, label: '📰 Tin tức / Blog', desc: 'Đăng, sửa, ẩn, xóa bài viết tin tức trung tâm' },
   { key: PERMISSIONS.VIEW_CENTER_INFO, label: 'ℹ️ Xem Thông tin trung tâm', desc: 'Xem trang giới thiệu trung tâm' },

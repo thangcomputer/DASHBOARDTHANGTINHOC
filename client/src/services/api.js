@@ -795,6 +795,61 @@ export const authAPI = {
     return res.json();
   },
 
+  otp2faConfig: async () => {
+    const res = await apiFetch('/auth/mfa/otp-config');
+    return res.json();
+  },
+
+  otp2faSetupSend: async (payload) => {
+    const res = await apiFetch('/auth/mfa/otp-setup/send', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    });
+    return res.json();
+  },
+
+  otp2faSetupVerify: async ({ setupToken, code }) => {
+    const res = await apiFetch('/auth/mfa/otp-setup/verify', {
+      method: 'POST',
+      body: JSON.stringify({ setupToken, code }),
+    });
+    return res.json();
+  },
+
+  otp2faDisable: async (password) => {
+    const res = await apiFetch('/auth/mfa/otp-disable', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+    return res.json();
+  },
+
+  deviceSessions: async ({ scope = 'all', role = '', status = 'active', search = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (scope) params.set('scope', scope);
+    if (role) params.set('role', role);
+    if (status) params.set('status', status);
+    if (search) params.set('search', search);
+    const res = await apiFetch(`/auth/device-sessions?${params.toString()}`);
+    return res.json();
+  },
+
+  revokeDeviceSession: async (sessionId, clientType = '') => {
+    const res = await apiFetch(`/auth/device-sessions/${encodeURIComponent(sessionId)}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ clientType }),
+    });
+    return res.json();
+  },
+
+  revokeOtherDeviceSessions: async (scope = 'mine') => {
+    const res = await apiFetch('/auth/device-sessions/revoke-others', {
+      method: 'POST',
+      body: JSON.stringify({ scope }),
+    });
+    return res.json();
+  },
+
   me: async () => {
     const res = await apiFetch('/auth/me');
     return res.json();
@@ -2164,6 +2219,28 @@ export const monitoringAPI = {
   },
   resetMetrics: async () => {
     const res = await apiFetch('/monitoring/metrics/reset', { method: 'POST' });
+    return res.json();
+  },
+  telemetry: async ({ windowHours = 24, issueStatus = 'all' } = {}) => {
+    const params = new URLSearchParams({
+      windowHours: String(windowHours),
+      issueStatus: String(issueStatus),
+    });
+    const res = await apiFetch(`/monitoring/telemetry?${params.toString()}`);
+    return res.json();
+  },
+  resolveTelemetryIssue: async (fingerprint, resolved = true) => {
+    const res = await apiFetch(`/monitoring/telemetry/errors/${encodeURIComponent(fingerprint)}/resolve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resolved }),
+    });
+    return res.json();
+  },
+  sendTestError: async (source = 'frontend') => {
+    const res = await apiFetch('/monitoring/telemetry/test-error', {
+      method: 'POST',
+      body: JSON.stringify({ source }),
+    });
     return res.json();
   },
 };

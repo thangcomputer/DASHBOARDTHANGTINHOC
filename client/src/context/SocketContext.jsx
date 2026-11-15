@@ -230,6 +230,11 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       window.dispatchEvent(new CustomEvent('cms:session-replaced', { detail: { token } }));
     };
 
+    const onForceLogout = (payload = {}) => {
+      sessionReplaced = true;
+      window.dispatchEvent(new CustomEvent('cms:force-logout', { detail: { token, ...(payload || {}) } }));
+    };
+
     const onUsersOnline = (users) => {
       const list = Array.isArray(users)
         ? users
@@ -417,6 +422,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('connect_error', onConnectError);
     newSocket.on('disconnect', onDisconnect);
     newSocket.on('auth:session-replaced', onSessionReplaced);
+    newSocket.on('auth:forceLogout', onForceLogout);
     newSocket.on('users:online', onUsersOnline);
     newSocket.on('users:lastSeen', onUsersLastSeen);
     newSocket.on('message:receive', onMessageReceive);
@@ -474,6 +480,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.off('connect_error', onConnectError);
       newSocket.off('disconnect', onDisconnect);
       newSocket.off('auth:session-replaced', onSessionReplaced);
+      newSocket.off('auth:forceLogout', onForceLogout);
       newSocket.off('users:online', onUsersOnline);
       newSocket.off('users:lastSeen', onUsersLastSeen);
       newSocket.off('message:receive', onMessageReceive);

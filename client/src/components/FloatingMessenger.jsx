@@ -971,7 +971,7 @@ function ChatWindow({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
             {tab.user?.isGroup ? (
-              <span className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-700 text-white ring-1 ring-red-200">
+              <span className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-700 text-white ring-1 ring-emerald-200">
                 <Users size={19} strokeWidth={2.4} />
               </span>
             ) : isAiPeer ? (
@@ -1154,7 +1154,7 @@ function ChatWindow({
                           e.stopPropagation();
                           setActiveMsgOptions(showOptions ? null : msgId);
                         }}
-                        className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-red-50 transition"
+                        className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition"
                         title="Tùy chọn tin nhắn"
                       >
                         <MoreVertical size={14} />
@@ -2721,7 +2721,7 @@ export default function FloatingMessenger({ session, role }) {
             <div className="cms-fm-support__body">
               {unreadConversations.length > 0 && (
                 <div className="px-2 pb-2 mb-1 border-b border-slate-50">
-                  <p className="text-[10px] font-black  tracking-wide text-red-500 px-1 mb-1">
+                  <p className="text-[10px] font-black  tracking-wide text-emerald-600 px-1 mb-1">
                     Tin chưa đọc
                   </p>
                   <ul className="space-y-0.5">
@@ -2734,7 +2734,7 @@ export default function FloatingMessenger({ session, role }) {
                             openChat(c.user, { expand: true });
                             markMessagesRead?.(c.id, meId);
                           }}
-                          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-red-50 text-left transition-colors"
+                          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-emerald-50 text-left transition-colors"
                         >
                           <span className="relative shrink-0">
                             <AvatarImage
@@ -2812,7 +2812,7 @@ export default function FloatingMessenger({ session, role }) {
                                   {peerUnread > 99 ? '99+' : peerUnread}
                                 </span>
                               ) : (
-                                <MessageCircle size={14} className="text-slate-300 group-hover:text-red-500 shrink-0" />
+                                <MessageCircle size={14} className="text-slate-300 group-hover:text-emerald-500 shrink-0" />
                               )}
                             </button>
                           </li>

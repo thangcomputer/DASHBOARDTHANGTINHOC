@@ -359,12 +359,12 @@ export function MobileLmsPlayerChrome({
 
 const styles = StyleSheet.create({
   overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 50,
     ...(Platform.OS === 'android' ? { elevation: 50 } : null),
   },
   antiSeekHudWrap: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 60,
@@ -401,18 +401,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   tapLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     bottom: 64,
     zIndex: 12,
   },
   centerPlayWrap: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 14,
   },
   startOverlayWindow: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 18,
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EF3B36',
+    backgroundColor: '#059669',
     shadowColor: '#059669',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.45,
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   qualityRowTextSelected: {
-    color: '#FCA5A5',
+    color: '#34D399',
     fontWeight: '900',
   },
 });

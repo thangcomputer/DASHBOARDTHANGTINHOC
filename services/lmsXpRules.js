@@ -15,6 +15,7 @@ const DEFAULT_AMOUNTS = {
   streak7: 50,
   streak14: 100,
   streak30: 300,
+  referral: 100,
 };
 
 const DEFAULT_VIDEO_RATIO = 0.9;
@@ -51,6 +52,8 @@ const REASON_LABELS = {
   streak7: 'Chuỗi 7 ngày',
   streak14: 'Chuỗi 14 ngày',
   streak30: 'Chuỗi 30 ngày',
+  referral: 'Giới thiệu bạn bè',
+  spaced_review: 'Ôn tập ngắt quãng',
 };
 
 const BADGES = [

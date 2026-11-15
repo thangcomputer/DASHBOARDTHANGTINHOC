@@ -9,6 +9,7 @@ import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlConte
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import LessonPracticePlayerPage from './LessonPracticePlayerPage';
 import LmsPlayerPanels, { LmsTabBar } from '../../lms/LmsPlayerTabs';
+import { saveLastStudySession } from '../../../utils/resumeLearning';
 
 function orderedSections(unit) {
   const contents = unit?.contents?.length
@@ -259,7 +260,7 @@ function VideoPane({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <h3 className="flex items-center gap-2 px-4 pt-4 text-base font-black text-slate-900">
-        <Clapperboard size={17} className="text-red-600" />
+        <Clapperboard size={17} className="text-emerald-600" />
         {selectedVideo?.title || `Video ${selectedVideoIndex + 1}`}
         {videoDone && <CheckCircle2 size={16} className="text-emerald-600" />}
       </h3>
@@ -307,6 +308,10 @@ function VideoPane({
           setExpandedChapters={() => { }}
           onSelectLesson={() => { }}
           getCurrentTime={() => Number(playerApiRef.current?.getCurrentTime?.()) || 0}
+          onSeekTo={(sec) => {
+            playerApiRef.current?.seekTo?.(sec);
+            playerApiRef.current?.play?.();
+          }}
           antiSeekEnabled={unit.antiSeek !== false}
           audience="student"
           canAnswerQa={false}
@@ -436,7 +441,7 @@ function LessonNavigationBar({ unit, sections, activeId, previousUnit, nextUnit,
         </button>
         <button type="button" disabled={!nextOpen} onClick={() => onUnit(nextUnit)} className={`${base} justify-end text-right ${nextOpen ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700' : 'border-slate-200 bg-slate-50'}`}>
           <span className="min-w-0">
-            <span className={`block text-[11px] font-bold ${nextOpen ? 'text-red-100' : 'text-slate-500'}`}>Bài tiếp theo</span>
+            <span className={`block text-[11px] font-bold ${nextOpen ? 'text-emerald-100' : 'text-slate-500'}`}>Bài tiếp theo</span>
             <span className={`block truncate text-sm font-black ${nextOpen ? 'text-white' : 'text-slate-800'}`}>{nextUnit?.title || 'Đã đến bài cuối'}</span>
           </span>
           <ChevronRight size={16} className={`shrink-0 ${nextOpen ? 'text-white' : 'text-slate-400'}`} aria-hidden="true" />
@@ -459,7 +464,7 @@ function LessonNavigationBar({ unit, sections, activeId, previousUnit, nextUnit,
         disabled={!next || !currentDone}
         onClick={() => onSection(next.id)}
         title={next && !currentDone ? 'Hoàn thành mục hiện tại để tiếp tục' : undefined}
-        className={`${base} justify-end border-slate-200 bg-slate-50 hover:border-red-200`}
+        className={`${base} justify-end border-slate-200 bg-slate-50 hover:border-emerald-200`}
       >
         <span className="truncate text-sm font-black text-slate-800">{next?.label || 'Mục sau'}</span>
         <ChevronRight size={15} className="shrink-0 text-slate-500" aria-hidden="true" />
@@ -609,7 +614,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
         </div>
         <div className="px-6 pb-6 pt-5">
           <p className="text-sm font-semibold text-slate-600">Bạn đã hoàn thành xuất sắc tất cả các buổi của môn</p>
-          <p className="mt-1 text-xl font-black text-red-600">{subjectName}</p>
+          <p className="mt-1 text-xl font-black text-emerald-600">{subjectName}</p>
           <p className="mt-3 text-sm text-slate-500">Tiếp tục phát huy, thành quả này là bước tiến lớn trên hành trình học tập của bạn.</p>
           <button type="button" onClick={onClose} className="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-8 text-sm font-black text-white shadow-md transition hover:bg-emerald-700">Tiếp tục</button>
         </div>
@@ -798,6 +803,9 @@ export default function LessonPracticeUnitsPage() {
   }, [payload, subjectId, openUnitId, units, resumeStorageKey, requestedUnitId, requestedSectionId, searchParams, setSearchParams]);
 
   const activeSectionId = activeSection?.id || '';
+  const activeSectionLabel = activeSection?.label || '';
+  const activeSubjectName = payload?.subject?.name || '';
+  const resumeStudentId = studentUser.id || studentUser._id || '';
   const lastSyncedPosition = useRef('');
   useEffect(() => {
     if (!openUnit || openUnit.isPreview || !activeSectionId) return undefined;
@@ -806,6 +814,23 @@ export default function LessonPracticeUnitsPage() {
     const timer = window.setTimeout(() => {
       lastSyncedPosition.current = signature;
       saveResumePoint(resumeStorageKey, openUnit.id, activeSectionId);
+      const qs = new URLSearchParams();
+      if (requestedCourseId) qs.set('courseId', requestedCourseId);
+      qs.set('unitId', openUnit.id);
+      qs.set('section', activeSectionId);
+      saveLastStudySession({
+        kind: 'lesson_practice',
+        studentId: resumeStudentId,
+        courseId: requestedCourseId,
+        courseTitle: activeSubjectName,
+        subjectId,
+        subjectName: activeSubjectName,
+        unitId: openUnit.id,
+        unitTitle: openUnit.title || '',
+        sectionId: activeSectionId,
+        sectionLabel: activeSectionLabel,
+        href: `/student/lesson-practice/subjects/${encodeURIComponent(subjectId)}?${qs.toString()}`,
+      });
       lessonPracticeApi.student.saveResumePoint({
         unitId: openUnit.id,
         sectionId: activeSectionId,
@@ -813,7 +838,7 @@ export default function LessonPracticeUnitsPage() {
       }).catch(() => { lastSyncedPosition.current = ''; });
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [openUnit, activeSectionId, requestedCourseId, resumeStorageKey]);
+  }, [openUnit, activeSectionId, activeSectionLabel, activeSubjectName, resumeStudentId, subjectId, requestedCourseId, resumeStorageKey]);
 
   function chooseUnit(unit) {
     if (unit.locked) return;
@@ -861,7 +886,7 @@ export default function LessonPracticeUnitsPage() {
       {celebrating && <CompletionCelebrationModal subjectName={payload?.subject?.name || ''} onClose={closeCelebration} />}
       <div className="mb-3 flex min-w-0 shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-1 pb-3 md:flex-wrap md:gap-3 md:border-0 md:bg-transparent md:px-0 md:pb-0">
         <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-initial md:gap-3">
-          <button type="button" onClick={() => navigate('/student/lesson-practice')} aria-label="Quay lại danh sách khóa học" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:border-red-300 hover:bg-red-100 md:h-9 md:w-auto md:gap-1.5 md:rounded-lg md:border-slate-200 md:bg-white md:px-3 md:text-sm md:font-bold md:shadow-sm">
+          <button type="button" onClick={() => navigate('/student/lesson-practice')} aria-label="Quay lại danh sách khóa học" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:border-emerald-300 hover:bg-emerald-100 md:h-9 md:w-auto md:gap-1.5 md:rounded-lg md:border-slate-200 md:bg-white md:px-3 md:text-sm md:font-bold md:shadow-sm">
             <ArrowLeft size={17} /> <span className="hidden md:inline">Trở về</span>
           </button>
           {payload?.subject && <h1 className="min-w-0 truncate text-base font-black text-slate-900 md:text-lg">{payload.subject.name}</h1>}
@@ -877,7 +902,7 @@ export default function LessonPracticeUnitsPage() {
             aria-expanded={lessonListOpen}
             aria-controls="lesson-list"
             onClick={() => setLessonListOpen((open) => !open)}
-            className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-emerald-600 shadow-sm transition hover:border-red-300 hover:bg-emerald-50 md:rounded-lg md:text-sm lg:hidden"
+            className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-emerald-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 md:rounded-lg md:text-sm lg:hidden"
           >
             <Menu size={14} />
             <span>Danh sách bài học</span>
@@ -973,11 +998,11 @@ export default function LessonPracticeUnitsPage() {
                           onClick={() => chooseUnit(unit)}
                           title={unit.title}
                           aria-label={`${unit.title}, ${lessonStatus.label}`}
-                          className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                          className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                         >
                           <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
                           <span className="min-w-0 flex-1">
-                            <span className={`block truncate font-bold ${opened ? 'text-red-700' : 'text-slate-900'}`}>{unit.title}</span>
+                            <span className={`block truncate font-bold ${opened ? 'text-emerald-700' : 'text-slate-900'}`}>{unit.title}</span>
                             <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${lessonStatus.className}`}>
                               {lessonStatus.label}
                             </span>

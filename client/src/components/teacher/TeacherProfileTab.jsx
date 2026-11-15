@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   User, Phone, Mail, Building2, CreditCard, Landmark, Edit3, Shield, MapPin, Save, X,
   Clock, ChevronRight, KeyRound, Camera, Bell, LogOut, Users, Settings,
@@ -17,6 +18,7 @@ function openChangePassword() {
 }
 
 export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
+  const navigate = useNavigate();
   const toast = useToast();
   const { updateTeacher, onLogout } = useData();
 
@@ -247,7 +249,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
         <button
           type="button"
-          onClick={() => { window.location.hash = 'center-info'; }}
+          onClick={() => navigate('/teacher/center-info')}
           className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
         >
           <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">

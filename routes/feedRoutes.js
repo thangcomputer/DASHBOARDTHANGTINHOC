@@ -311,10 +311,25 @@ function serializePost(doc, currentUserId) {
 const feedDir = path.join(__dirname, '..', 'uploads', 'feed');
 if (!fs.existsSync(feedDir)) fs.mkdirSync(feedDir, { recursive: true });
 
+const ALLOWED_FEED_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const ALLOWED_FEED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+function feedImageFileFilter(_req, file, cb) {
+  const mime = String(file?.mimetype || '').toLowerCase();
+  const ext = path.extname(file?.originalname || '').toLowerCase();
+  if (ALLOWED_FEED_IMAGE_MIMES.has(mime) && ALLOWED_FEED_IMAGE_EXT.has(ext)) {
+    return cb(null, true);
+  }
+  return cb(new Error('Chỉ cho phép file ảnh JPG, JPEG, PNG, WEBP hoặc GIF'));
+}
+
 const feedStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, feedDir),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ALLOWED_FEED_IMAGE_EXT.has(ext)) {
+      return cb(new Error('Định dạng ảnh không được phép'));
+    }
     cb(null, 'feed_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + ext);
   },
 });
@@ -322,10 +337,7 @@ const feedStorage = multer.diskStorage({
 const uploadFeed = multer({
   storage: feedStorage,
   limits: { fileSize: 5 * 1024 * 1024, files: 6 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Chi cho phep file anh'));
-  },
+  fileFilter: feedImageFileFilter,
 });
 
 router.post('/upload', authMiddleware, ...feedGuard('upload'), (req, res) => {
@@ -820,5 +832,11 @@ router.delete('/:id/comments/:commentId', authMiddleware, ...feedGuard('delete_c
     return res.status(500).json({ success: false, message: 'Loi server' });
   }
 });
+
+router._test = {
+  feedImageFileFilter,
+  ALLOWED_FEED_IMAGE_EXT,
+  ALLOWED_FEED_IMAGE_MIMES,
+};
 
 module.exports = router;

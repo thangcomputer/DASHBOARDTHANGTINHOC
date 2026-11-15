@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/app/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
+import { mobileLinkingConfig } from './src/navigation/linking';
 import { colors } from './src/theme/tokens';
 
 const mobileSystemFont = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -28,7 +29,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationContainer ref={navigationRef}>
+        <NavigationContainer ref={navigationRef} linking={mobileLinkingConfig}>
           <StatusBar style="dark" />
           <RootNavigator />
         </NavigationContainer>

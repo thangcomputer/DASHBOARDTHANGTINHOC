@@ -394,7 +394,7 @@ export default function TeacherStudentWeekSlotSheet({
             Chọn giờ trước - chỉ lưu và nhắn tin khi bấm Xếp lịch ngay.
           </p>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl bg-white border-2 border-red-600 text-red-600 text-sm font-bold hover:bg-red-50">
+            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl bg-white border-2 border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50">
               Hủy
             </button>
             <button
@@ -479,9 +479,9 @@ function DaySlotRow({ label, dateKey, student, schedules, teacherId, saved, valu
   }
 
   return (
-    <div className={`flex items-center gap-2 ${isToday ? 'bg-red-50/70 -mx-2 px-2 py-1.5 rounded-xl' : ''}`}>
+    <div className={`flex items-center gap-2 ${isToday ? 'bg-emerald-50/70 -mx-2 px-2 py-1.5 rounded-xl' : ''}`}>
       <div className="w-[5.5rem] shrink-0">
-        <p className={`text-xs font-black ${isToday ? 'text-red-700' : 'text-slate-700'}`}>{label}</p>
+        <p className={`text-xs font-black ${isToday ? 'text-emerald-700' : 'text-slate-700'}`}>{label}</p>
         <p className="text-[10px] font-semibold text-slate-400">{dateLabel}</p>
       </div>
       {control}

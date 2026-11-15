@@ -361,7 +361,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                 type="button"
                 onClick={handleSave}
                 disabled={saving || fileUploading}
-                className={lmsBtn('danger', { size: 'md', className: 'min-h-11 px-3 sm:px-4 text-sm disabled:opacity-60' })}
+                className={lmsBtn('primary', { size: 'md', className: 'min-h-11 px-3 sm:px-4 text-sm disabled:opacity-60' })}
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 <span className="hidden sm:inline">{saving ? 'Đang lưu...' : 'Lưu giáo trình'}</span>
@@ -404,7 +404,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                         className="w-full min-w-0 border border-slate-200 px-3 py-2 rounded-xl text-sm outline-none focus:border-violet-400"
                       />
                       <div className="flex gap-2 shrink-0">
-                        <button type="button" onClick={() => updateChapterTitle(chapter.id, tempTitle)} className={lmsBtn('danger', { size: 'sm', className: 'flex-1 sm:flex-none text-xs' })}>Lưu</button>
+                        <button type="button" onClick={() => updateChapterTitle(chapter.id, tempTitle)} className={lmsBtn('primary', { size: 'sm', className: 'flex-1 sm:flex-none text-xs' })}>Lưu</button>
                         <button type="button" onClick={() => setEditingChapterId(null)} className="flex-1 sm:flex-none text-xs text-slate-500 hover:bg-slate-200 px-3 py-2 rounded-xl font-bold">Hủy</button>
                       </div>
                     </div>
@@ -521,14 +521,14 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                     : 'Tắt: học viên có thể tua tự do trong bài, nhưng vẫn phải đạt 2/3 thời lượng để hoàn thành.'}
                                 </p>
                               </div>
-                              <div className="rounded-xl border border-red-100 bg-red-50/60 p-3 space-y-1.5">
+                              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 space-y-1.5">
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="checkbox"
                                     id={`earlyAccess_${lesson.id}`}
                                     checked={tempAllowEarlyAccess}
                                     onChange={(e) => setTempAllowEarlyAccess(e.target.checked)}
-                                    className="w-4 h-4 text-red-600 rounded focus:ring-emerald-500 cursor-pointer"
+                                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
                                   />
                                   <label htmlFor={`earlyAccess_${lesson.id}`} className="text-xs font-bold text-slate-800 cursor-pointer select-none">
                                     Cho phép mở bài sớm (allowEarlyAccess)
@@ -545,7 +545,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                     id={`preview_${lesson.id}`}
                                     checked={tempIsPreview}
                                     onChange={(e) => setTempIsPreview(e.target.checked)}
-                                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer"
+                                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
                                   />
                                   <label htmlFor={`preview_${lesson.id}`} className="text-xs font-bold text-slate-800 cursor-pointer select-none">
                                     Cho xem thử (khóa trả phí)
@@ -569,7 +569,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                   allowEarlyAccess: tempAllowEarlyAccess,
                                   isPreview: tempIsPreview,
                                 })}
-                                className={lmsBtn('danger', { size: 'md', className: 'min-h-11 px-4 text-sm' })}
+                                className={lmsBtn('primary', { size: 'md', className: 'min-h-11 px-4 text-sm' })}
                               >
                                 Lưu bài học
                               </button>
@@ -581,7 +581,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                               <button type="button" onClick={() => moveLesson(chapter.id, lIdx, 'up')} disabled={lIdx === 0} className="p-1 hover:text-emerald-600 disabled:opacity-20" aria-label="Lên"><ArrowUp size={12} /></button>
                               <button type="button" onClick={() => moveLesson(chapter.id, lIdx, 'down')} disabled={lIdx === chapter.lessons.length - 1} className="p-1 hover:text-emerald-600 disabled:opacity-20" aria-label="Xuống"><ArrowDown size={12} /></button>
                             </div>
-                            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
                               <Video size={14} />
                             </div>
                             <div className="min-w-0 flex-1 overflow-hidden">
@@ -596,7 +596,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                   }`}>
                                   {lesson.antiSeek !== false ? 'Chống tua: BẬT' : 'Tua tự do'}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${lesson.allowEarlyAccess === true ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${lesson.allowEarlyAccess === true ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-50 text-slate-500 border border-slate-200'
                                   }`}>
                                   {lesson.allowEarlyAccess === true ? 'Mở sớm: BẬT' : 'Mở sớm: TẮT'}
                                 </span>
@@ -619,7 +619,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                   setTempAllowEarlyAccess(lesson.allowEarlyAccess === true);
                                   setTempIsPreview(lesson.isPreview === true);
                                 }}
-                                className="inline-flex items-center justify-center min-w-10 min-h-10 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl"
+                                className="inline-flex items-center justify-center min-w-10 min-h-10 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl"
                                 aria-label="Sửa bài học"
                               >
                                 <Edit3 size={14} />

@@ -390,11 +390,11 @@ export default function SystemSettingsTab() {
             : 'Danger Zone: xóa toàn bộ dữ liệu hệ thống'}
           className={`font-bold px-4 py-2.5 rounded-xl text-xs tracking-widest flex items-center justify-center gap-2 shadow-sm relative group overflow-hidden w-full sm:w-auto transition ${settings.destructiveResetEnabled === false
               ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-              : 'bg-red-50 text-red-600 border border-red-200 hover:bg-emerald-600 hover:text-white'
+              : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white'
             }`}
         >
           {settings.destructiveResetEnabled !== false && (
-            <span className="absolute inset-0 bg-emerald-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
+            <span className="absolute inset-0 bg-red-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
           )}
           <AlertOctagon size={16} className="relative z-10" />
           <span className="relative z-10">
@@ -422,7 +422,7 @@ export default function SystemSettingsTab() {
                   aria-label={t.label}
                   onClick={() => setActiveSubTab(t.key)}
                   className={`inline-flex items-center justify-center gap-1.5 flex-1 basis-0 min-w-[2.75rem] px-2 sm:px-3 py-2.5 text-sm font-bold rounded-xl transition ${active
-                      ? 'text-emerald-700 bg-emerald-50 ring-1 ring-red-200'
+                      ? 'text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                 >
@@ -534,7 +534,7 @@ export default function SystemSettingsTab() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
                   <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                    <Bell size={14} className="text-red-600" /> Popup thông báo
+                    <Bell size={14} className="text-emerald-600" /> Popup thông báo
                   </h3>
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     {settings.popupIsActive
@@ -582,7 +582,7 @@ export default function SystemSettingsTab() {
                       type="button"
                       onClick={() => setSettings(prev => ({ ...prev, popupTargetRole: v }))}
                       className={`py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition border ${settings.popupTargetRole === v
-                          ? 'border-emerald-500 bg-red-50 text-red-700'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                           : 'border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}
                       title={v === 'staff' ? 'Thông báo nội bộ Staff khi đăng nhập' : undefined}
@@ -630,7 +630,7 @@ export default function SystemSettingsTab() {
                     type="button"
                     onClick={() => imgInputRef.current?.click()}
                     disabled={uploading}
-                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-red-300 text-red-600 text-[11px] font-semibold hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-emerald-300 text-emerald-600 text-[11px] font-semibold hover:bg-emerald-50 transition disabled:opacity-50 whitespace-nowrap"
                   >
                     {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                     {uploading ? 'Upload…' : 'Chọn ảnh'}
@@ -771,7 +771,7 @@ export default function SystemSettingsTab() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                      <Lock size={14} className="text-red-600 shrink-0" /> Thông tin tài khoản đăng nhập
+                      <Lock size={14} className="text-emerald-600 shrink-0" /> Thông tin tài khoản đăng nhập
                     </h3>
                     <p className="text-[11px] text-slate-400 mt-0.5">Đổi tên hiển thị / mật khẩu cho tài khoản đang đăng nhập</p>
                   </div>
@@ -794,7 +794,7 @@ export default function SystemSettingsTab() {
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-500 block mb-1">Tên hiển thị</label>
-                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10 transition">
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-500/10 transition">
                     <User size={14} className="text-slate-400 flex-shrink-0" />
                     <input
                       type="text"
@@ -813,7 +813,7 @@ export default function SystemSettingsTab() {
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-500 block mb-1">Mật khẩu hiện tại</label>
-                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10 transition">
+                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-500/10 transition">
                       <Lock size={14} className="text-slate-400 flex-shrink-0" />
                       <input
                         type={showAdminOldPw ? 'text' : 'password'}
@@ -831,7 +831,7 @@ export default function SystemSettingsTab() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-[11px] font-semibold text-slate-500 block mb-1">Mật khẩu mới (≥6)</label>
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10 transition">
+                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-500/10 transition">
                         <KeyRound size={14} className="text-slate-400 flex-shrink-0" />
                         <input
                           type={showAdminNewPw ? 'text' : 'password'}
@@ -849,7 +849,7 @@ export default function SystemSettingsTab() {
                       <label className="text-[11px] font-semibold text-slate-500 block mb-1">Xác nhận</label>
                       <div className={`flex items-center gap-2 bg-white border rounded-lg px-2.5 min-h-9 transition ${adminNewPw2 && adminNewPw !== adminNewPw2
                           ? 'border-red-300'
-                          : 'border-slate-200 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10'
+                          : 'border-slate-200 focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-500/10'
                         }`}>
                         <KeyRound size={14} className="text-slate-400 flex-shrink-0" />
                         <input
@@ -949,7 +949,7 @@ export default function SystemSettingsTab() {
                         type="password"
                         value={mfaDisablePw}
                         onChange={(e) => setMfaDisablePw(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] font-medium outline-none focus:border-red-300"
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] font-medium outline-none focus:border-emerald-400"
                         placeholder="Mật khẩu hiện tại"
                       />
                       <input

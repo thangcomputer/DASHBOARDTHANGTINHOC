@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
+  Award, Check, CheckCircle, ChevronDown, ChevronUp, Clock, Copy, Download,
   ExternalLink, FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
 import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getChapterLessonIndex, isLessonFullyWatched } from '../../utils/lmsLessonUi';
@@ -198,7 +198,7 @@ export function LmsTabBar({
             className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${t.mobileOnly ? 'lg:hidden' : ''
               } ${courseTab === t.key
                 ? light
-                  ? 'text-red-700 border-emerald-600 bg-red-50'
+                  ? 'text-emerald-700 border-emerald-600 bg-emerald-50'
                   : 'text-white border-emerald-500 bg-white/[0.03]'
                 : light
                   ? 'text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-800'
@@ -304,13 +304,41 @@ function readNoteTimeSec(getCurrentTime) {
   }
 }
 
-function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light = false }) {
+const NOTE_QUICK_TAGS = [
+  { label: '📌 Quan trọng', prefix: '📌 [Quan trọng] ' },
+  { label: '💡 Mẹo hay', prefix: '💡 [Mẹo hay] ' },
+  { label: '❓ Cần ôn lại', prefix: '❓ [Cần ôn lại] ' },
+  { label: '⌨️ Phím tắt', prefix: '⌨️ [Phím tắt] ' },
+];
+
+function exportNotesMarkdown(list, courseTitle = 'Khóa học') {
+  const header = `# Sổ tay ghi chú · ${courseTitle || 'Bài giảng'}\nXuất lúc: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n\n`;
+  const lines = list.map((n) => {
+    const ts = formatLmsTimestamp(n.atSec);
+    const title = n.lessonTitle ? ` · ${n.lessonTitle}` : '';
+    return `- **[${ts}]${title}**: ${n.text}`;
+  });
+  return `${header}${lines.join('\n')}\n`;
+}
+
+export function NotesPanel({
+  storageKey,
+  lessonId,
+  lessonTitle,
+  courseTitle = '',
+  getCurrentTime,
+  onSeekTo = null,
+  light = false,
+}) {
   const [notes, setNotes] = useLmsLocalStore(storageKey, []);
   const [draft, setDraft] = useState('');
   const [filterLesson, setFilterLesson] = useState('current');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [copied, setCopied] = useState(false);
   // Đồng bộ với giây player - trước đây chỉ đọc lúc render nên lệch đến khi đổi tab
   const [liveAtSec, setLiveAtSec] = useState(() => readNoteTimeSec(getCurrentTime));
   const getCurrentTimeRef = useRef(getCurrentTime);
+  const inputRef = useRef(null);
   getCurrentTimeRef.current = getCurrentTime;
 
   useEffect(() => {
@@ -326,9 +354,16 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light =
   const filtered = useMemo(() => {
     const list = Array.isArray(notes) ? notes : [];
     const sorted = [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    if (filterLesson === 'current') return sorted.filter((n) => String(n.lessonId) === String(lessonId));
-    return sorted;
-  }, [notes, filterLesson, lessonId]);
+    const scoped = filterLesson === 'current'
+      ? sorted.filter((n) => String(n.lessonId) === String(lessonId))
+      : sorted;
+    const needle = searchQuery.trim().toLowerCase();
+    if (!needle) return scoped;
+    return scoped.filter((n) => (
+      String(n.text || '').toLowerCase().includes(needle)
+      || String(n.lessonTitle || '').toLowerCase().includes(needle)
+    ));
+  }, [notes, filterLesson, lessonId, searchQuery]);
 
   const addNote = () => {
     const text = draft.trim();
@@ -349,12 +384,55 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light =
     setDraft('');
   };
 
+  const applyQuickTag = (prefix) => {
+    setDraft((prev) => {
+      const trimmed = String(prev || '').trimStart();
+      if (trimmed.startsWith(prefix.trim())) return prev;
+      return `${prefix}${trimmed}`;
+    });
+    inputRef.current?.focus?.();
+  };
+
+  const handleCopyAll = async () => {
+    if (!filtered.length) return;
+    const text = exportNotesMarkdown(filtered, courseTitle || lessonTitle);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore clipboard error */
+    }
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (!filtered.length) return;
+    const md = exportNotesMarkdown(filtered, courseTitle || lessonTitle);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `so-tay-ghi-chu-${lessonId || 'khoa-hoc'}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const removeNote = (id) => setNotes((prev) => (prev || []).filter((n) => n.id !== id));
 
   return (
-    <div className={`space-y-4 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
+    <div className={`space-y-3.5 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
       <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${light ? 'border-slate-300 bg-white shadow-sm' : 'border-white/10 bg-white/[0.03]'}`}>
+        <span
+          className={`shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black tabular-nums ${light ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
+            }`}
+        >
+          <Clock size={11} />
+          {formatLmsTimestamp(liveAtSec)}
+        </span>
         <input
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -363,45 +441,106 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light =
               addNote();
             }
           }}
-          placeholder={`Tạo ghi chú mới tại ${formatLmsTimestamp(liveAtSec)}`}
+          placeholder={`Ghi chú nhanh tại mốc ${formatLmsTimestamp(liveAtSec)}…`}
           className={`flex-1 min-w-0 bg-transparent text-sm outline-none ${light ? 'text-slate-900 placeholder:text-slate-500' : 'text-slate-200 placeholder:text-slate-500'}`}
         />
         <button
           type="button"
           onClick={addNote}
-          className={`shrink-0 w-9 h-9 rounded-full border flex items-center justify-center ${light ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'}`}
+          disabled={!draft.trim()}
+          className={`shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition disabled:opacity-40 ${light ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'}`}
           aria-label="Thêm ghi chú"
         >
           <Plus size={16} />
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setFilterLesson('current')}
-          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${filterLesson === 'current'
-              ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
-              : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
-            }`}
-        >
-          Bài hiện tại
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilterLesson('all')}
-          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${filterLesson === 'all'
-              ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
-              : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
-            }`}
-        >
-          Tất cả bài giảng
-        </button>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {NOTE_QUICK_TAGS.map((tag) => (
+          <button
+            key={tag.label}
+            type="button"
+            onClick={() => applyQuickTag(tag.prefix)}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition cursor-pointer ${light
+                ? 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800'
+                : 'border-white/10 bg-white/[0.04] text-slate-300 hover:border-emerald-500/40 hover:bg-emerald-500/15 hover:text-emerald-300'
+              }`}
+          >
+            {tag.label}
+          </button>
+        ))}
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterLesson('current')}
+            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition cursor-pointer ${filterLesson === 'current'
+              ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
+              : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
+              }`}
+          >
+            Bài hiện tại
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterLesson('all')}
+            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition cursor-pointer ${filterLesson === 'all'
+              ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
+              : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
+              }`}
+          >
+            Tất cả bài giảng
+          </button>
+        </div>
+
+        {filtered.length > 0 ? (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleCopyAll}
+              className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${light
+                  ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
+                }`}
+              title="Sao chép toàn bộ ghi chú"
+            >
+              {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+              {copied ? 'Đã chép' : 'Sao chép'}
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadMarkdown}
+              className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${light
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  : 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                }`}
+              title="Tải xuống sổ tay ghi chú (.md)"
+            >
+              <Download size={12} /> Xuất .md
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {(Array.isArray(notes) ? notes.length : 0) > 2 ? (
+        <div className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 ${light ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/[0.02]'}`}>
+          <Search size={13} className="text-slate-500 shrink-0" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm trong ghi chú của bạn…"
+            className={`flex-1 min-w-0 bg-transparent text-xs outline-none ${light ? 'text-slate-800 placeholder:text-slate-400' : 'text-slate-200 placeholder:text-slate-500'}`}
+          />
+        </div>
+      ) : null}
 
       {filtered.length === 0 ? (
         <p className={`text-center text-sm py-10 leading-relaxed px-4 ${light ? 'text-slate-600' : 'text-slate-500'}`}>
-          Nhấp vào ô &quot;Tạo ghi chú mới&quot; hoặc nút + để tạo ghi chú đầu tiên của bạn.
+          {searchQuery.trim()
+            ? 'Không tìm thấy ghi chú phù hợp với từ khóa.'
+            : 'Nhấp vào ô "Ghi chú nhanh" hoặc chọn nhãn gợi ý để lưu lại mốc thời gian quan trọng trong video.'}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -411,19 +550,36 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light =
               className={`rounded-xl border px-4 py-3 flex gap-3 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'}`}
             >
               <div className="flex-1 min-w-0">
-                <div className={`flex flex-wrap items-center gap-2 text-[11px] font-bold mb-1 ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>
-                  <span className="tabular-nums">{formatLmsTimestamp(n.atSec)}</span>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold mb-1.5">
+                  {onSeekTo && (filterLesson === 'current' || String(n.lessonId) === String(lessonId)) ? (
+                    <button
+                      type="button"
+                      onClick={() => onSeekTo(n.atSec)}
+                      title={`Tua video đến ${formatLmsTimestamp(n.atSec)}`}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 tabular-nums transition cursor-pointer ${light
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
+                        }`}
+                    >
+                      <PlayCircle size={11} />
+                      <span>{formatLmsTimestamp(n.atSec)}</span>
+                    </button>
+                  ) : (
+                    <span className={`tabular-nums ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>
+                      {formatLmsTimestamp(n.atSec)}
+                    </span>
+                  )}
                   {filterLesson === 'all' && n.lessonTitle ? (
-                    <span className={`${light ? 'text-slate-600' : 'text-slate-500'} font-semibold truncate`}>{n.lessonTitle}</span>
+                    <span className={`${light ? 'text-slate-600' : 'text-slate-400'} font-semibold truncate`}>{n.lessonTitle}</span>
                   ) : null}
-                  <span className={`${light ? 'text-slate-500' : 'text-slate-600'} font-medium`}>{timeAgo(n.createdAt)}</span>
+                  <span className={`${light ? 'text-slate-500' : 'text-slate-500'} font-medium`}>{timeAgo(n.createdAt)}</span>
                 </div>
                 <p className={`text-sm whitespace-pre-wrap break-words ${light ? 'text-slate-800' : 'text-slate-300'}`}>{n.text}</p>
               </div>
               <button
                 type="button"
                 onClick={() => removeNote(n.id)}
-                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${light ? 'text-slate-500 hover:text-red-700 hover:bg-red-50' : 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'}`}
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer ${light ? 'text-slate-500 hover:text-red-700 hover:bg-red-50' : 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'}`}
                 aria-label="Xóa ghi chú"
               >
                 <Trash2 size={14} />
@@ -446,6 +602,7 @@ function QaPanel({
   canAnswer = false,
   highlightQaId = null,
   getCurrentTime,
+  onSeekTo = null,
   videoUrl = '',
   videoDuration = 0,
   currentUserId = '',
@@ -783,8 +940,8 @@ function QaPanel({
                 id={`lms-qa-${id}`}
                 data-lms-qa-id={id}
                 className={`relative rounded-xl border p-4 ${highlighted
-                    ? light ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300' : 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
-                    : light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'
+                  ? light ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300' : 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
+                  : light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'
                   }`}
               >
                 {dialogue.length > 0 ? (
@@ -798,8 +955,8 @@ function QaPanel({
                       setExpandedQaId((current) => (current === id ? '' : id));
                     }}
                     className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${isRead
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                        : 'border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      : 'border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700'
                       }`}
                   >
                     <MessageSquare size={14} />
@@ -827,10 +984,10 @@ function QaPanel({
                       </button>
                       <span
                         className={`text-[10px] font-bold  tracking-wide px-2 py-0.5 rounded-full ${it.status === 'answered'
-                            ? isRead
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-red-100 text-red-800'
-                            : light ? 'bg-amber-100 text-amber-800' : 'bg-amber-500/15 text-amber-300'
+                          ? isRead
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-emerald-600 text-white'
+                          : light ? 'bg-amber-100 text-amber-800' : 'bg-amber-500/15 text-amber-300'
                           }`}
                       >
                         {it.status === 'answered' ? 'Đã trả lời' : 'Chờ trả lời'}
@@ -840,7 +997,19 @@ function QaPanel({
                     <p className={`text-[11px] mt-2 ${light ? 'text-slate-600' : 'text-slate-500'}`}>
                       <span className={`font-semibold ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>{it.askerName || it.author || userName}</span>
                       {it.lessonTitle ? ` · ${it.lessonTitle}` : ''}
-                      <span className={`font-semibold tabular-nums ${light ? 'text-amber-800' : 'text-amber-300/90'}`}>{` · ${formatLmsTimestamp(it.atSec)}`}</span>
+                      {onSeekTo ? (
+                        <button
+                          type="button"
+                          onClick={() => onSeekTo(it.atSec)}
+                          title={`Tua video đến ${formatLmsTimestamp(it.atSec)}`}
+                          className={`inline-flex items-center gap-0.5 ml-1 font-semibold tabular-nums underline-offset-2 hover:underline cursor-pointer ${light ? 'text-amber-800' : 'text-amber-300/90'
+                            }`}
+                        >
+                          {`· ${formatLmsTimestamp(it.atSec)}`}
+                        </button>
+                      ) : (
+                        <span className={`font-semibold tabular-nums ${light ? 'text-amber-800' : 'text-amber-300/90'}`}>{` · ${formatLmsTimestamp(it.atSec)}`}</span>
+                      )}
                       {` · ${timeAgo(it.createdAt)}`}
                     </p>
 
@@ -850,11 +1019,11 @@ function QaPanel({
                         <div
                           key={msg.id || `${id}-m-${idx}`}
                           className={`mt-3 rounded-lg px-3 py-2.5 ${staffish
-                              ? 'border border-slate-200 bg-white shadow-sm'
-                              : 'border border-emerald-500/20 bg-emerald-500/10'
+                            ? 'border border-slate-200 bg-white shadow-sm'
+                            : 'border border-emerald-500/20 bg-emerald-500/10'
                             }`}
                         >
-                          <p className={`text-[10px] font-black  tracking-widest mb-1 ${staffish ? 'text-red-700' : light ? 'text-emerald-800' : 'text-emerald-300'}`}>
+                          <p className={`text-[10px] font-black  tracking-widest mb-1 ${staffish ? 'text-emerald-700' : light ? 'text-emerald-800' : 'text-emerald-300'}`}>
                             {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Phản hồi · ${msg.authorName || 'Học viên'}`}
                           </p>
                           <p className={`text-[13px] whitespace-pre-wrap ${staffish || light ? 'text-slate-800' : 'text-slate-200'}`}>
@@ -880,7 +1049,7 @@ function QaPanel({
                           type="button"
                           disabled={sending || !String(answerDrafts[id] || '').trim()}
                           onClick={() => submitAnswer(id)}
-                          className={lmsBtn('danger', { size: 'sm', className: 'text-xs disabled:opacity-40' })}
+                          className={lmsBtn('primary', { size: 'sm', className: 'text-xs disabled:opacity-40' })}
                         >
                           Gửi trả lời
                         </button>
@@ -1116,7 +1285,7 @@ function ResourcesPanel({ files, light = false }) {
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 text-xs no-underline' })}
+                  className={lmsBtn('primary', { size: 'sm', className: 'shrink-0 text-xs no-underline' })}
                 >
                   <ExternalLink size={14} /> Mở
                 </a>
@@ -1131,7 +1300,7 @@ function ResourcesPanel({ files, light = false }) {
                       window.cmsAlert(err?.message || 'Không tải được tài liệu', 'error');
                     }
                   }}
-                  className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 text-xs border-0' })}
+                  className={lmsBtn('primary', { size: 'sm', className: 'shrink-0 text-xs border-0' })}
                 >
                   <Download size={14} /> Tải về
                 </button>
@@ -1154,6 +1323,7 @@ function ListPanel({
   expandedChapters,
   setExpandedChapters,
   onSelectLesson,
+  onOpenCertificate = null,
 }) {
   return (
     <div className="max-w-3xl mx-auto w-full space-y-3 lg:hidden">
@@ -1225,10 +1395,10 @@ function ListPanel({
                     <div className="flex-1 min-w-0">
                       <h4
                         className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent
-                            ? 'text-emerald-400 font-bold'
-                            : isLessonFullyWatched(lesson)
-                              ? 'text-slate-500 font-semibold'
-                              : 'text-slate-300 font-semibold'
+                          ? 'text-emerald-400 font-bold'
+                          : isLessonFullyWatched(lesson)
+                            ? 'text-slate-500 font-semibold'
+                            : 'text-slate-300 font-semibold'
                           }`}
                       >
                         {formatLessonDisplayTitle(lesson.title, idx)}
@@ -1245,6 +1415,15 @@ function ListPanel({
         <div className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 text-center">
           <Award size={26} className="text-emerald-400 mx-auto mb-2" />
           <p className="font-black text-emerald-400 text-sm">Hoàn thành 100%</p>
+          {typeof onOpenCertificate === 'function' && (
+            <button
+              type="button"
+              onClick={onOpenCertificate}
+              className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition-colors cursor-pointer"
+            >
+              <Award size={14} /> Xem chứng nhận số
+            </button>
+          )}
         </div>
       ) : null}
     </div>
@@ -1267,6 +1446,8 @@ export default function LmsPlayerPanels({
   setExpandedChapters,
   onSelectLesson,
   getCurrentTime,
+  onSeekTo = null,
+  onOpenCertificate = null,
   teacherAntiSeekSlot = null,
   audience = 'student',
   canAnswerQa = false,
@@ -1302,7 +1483,9 @@ export default function LmsPlayerPanels({
         storageKey={notesKey}
         lessonId={lessonId}
         lessonTitle={lessonTitle}
+        courseTitle={selectedCourse?.title || ''}
         getCurrentTime={getCurrentTime}
+        onSeekTo={onSeekTo}
         light={light}
       />
     );
@@ -1319,6 +1502,7 @@ export default function LmsPlayerPanels({
         canAnswer={canAnswerQa}
         highlightQaId={highlightQaId}
         getCurrentTime={getCurrentTime}
+        onSeekTo={onSeekTo}
         currentUserId={userId}
         videoUrl={
           currentLesson?.videoUrl
@@ -1360,6 +1544,7 @@ export default function LmsPlayerPanels({
         expandedChapters={expandedChapters}
         setExpandedChapters={setExpandedChapters}
         onSelectLesson={onSelectLesson}
+        onOpenCertificate={onOpenCertificate}
       />
     );
   }

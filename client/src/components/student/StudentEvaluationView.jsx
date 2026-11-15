@@ -174,7 +174,7 @@ export const EvaluationView = ({
                          className={`w-full sm:w-auto shrink-0 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-black  tracking-widest transition-all ${
                            isEvaluating ? 'bg-slate-100 text-slate-500' : 
                            existingEval ? 'bg-green-50 text-green-600 hover:bg-green-100 shadow-sm' : 
-                           'bg-red-50 text-red-600 hover:bg-red-100 shadow-sm'
+                           'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 shadow-sm'
                          }`}>
                          {isEvaluating ? 'Đóng form' : existingEval ? 'Sửa Phản hồi' : 'Gửi Phản hồi'}
                        </button>
@@ -251,7 +251,7 @@ export const EvaluationView = ({
                                      type: 'success' 
                                  });
                                }}
-                               className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
+                               className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
                              >
                                <Star size={14} className="fill-white" /> {existingEval ? 'Cập nhật phản hồi' : 'Gửi phản hồi cho trung tâm'}
                              </button>

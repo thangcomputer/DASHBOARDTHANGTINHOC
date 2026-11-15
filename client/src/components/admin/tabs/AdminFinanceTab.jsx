@@ -189,20 +189,20 @@ export default function AdminFinanceTab() {
             </button>
           </div>
           <div className="p-3 sm:p-4 shrink-0">
-            <div className="bg-gradient-to-br from-emerald-700 to-red-900 rounded-2xl p-3.5 sm:p-5 text-white shadow-[0_6px_20px_rgba(220,38,38,0.25)] relative overflow-hidden">
+            <div className="bg-gradient-to-br from-emerald-700 to-emerald-950 rounded-2xl p-3.5 sm:p-5 text-white shadow-[0_6px_20px_rgba(5,150,105,0.25)] relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <DollarSign size={80} />
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
                 <div className="min-w-0">
-                  <p className="text-red-100 text-xs font-semibold tracking-wide">
+                  <p className="text-emerald-100 text-xs font-semibold tracking-wide">
                     Doanh thu thuần {ledger ? '(Ledger)' : '(Đã thu − Hoàn)'}
                   </p>
                   <p className="text-[1.35rem] sm:text-3xl font-extrabold mt-1.5 break-words">
                     {totalNet.toLocaleString('vi-VN')}đ
                   </p>
                   {totalGross != null && (
-                    <p className="text-[11px] text-red-100/80 mt-1">
+                    <p className="text-[11px] text-emerald-100/80 mt-1">
                       Gross {totalGross.toLocaleString('vi-VN')}đ
                     </p>
                   )}
@@ -217,7 +217,7 @@ export default function AdminFinanceTab() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4 text-xs font-semibold text-red-100 border-t border-white/10 pt-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4 text-xs font-semibold text-emerald-100 border-t border-white/10 pt-3">
                 <div className="min-w-0 bg-white/5 px-2.5 sm:px-3 py-2 rounded-xl border border-white/5">
                   <p className="opacity-70 mb-0.5 truncate">Dự kiến</p>
                   <p className="text-sm sm:text-[15px] font-bold text-white break-words tabular-nums">{totalListed.toLocaleString('vi-VN')}đ</p>

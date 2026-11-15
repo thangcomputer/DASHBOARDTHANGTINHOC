@@ -39,7 +39,7 @@ function statusClass(s) {
   return 'bg-amber-50 text-amber-700';
 }
 
-const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold shadow-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-emerald-500';
+const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold shadow-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-emerald-100 focus-visible:border-emerald-500';
 const NEWS_VIEW_KEY = 'cms-news-view';
 
 function readNewsView() {
@@ -57,7 +57,7 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
     <button
       type="button"
       onClick={() => onOpen(post)}
-      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 w-full ${isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
+      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all duration-200 w-full ${isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
         }`}
     >
       <div className={`relative bg-slate-100 overflow-hidden shrink-0 ${isList ? 'w-[7.5rem] sm:w-40 self-stretch min-h-[7.5rem]' : 'aspect-video w-full'
@@ -326,7 +326,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
             className="prose prose-slate max-w-none text-slate-800 text-[15px] leading-relaxed
               [&_h2]:text-xl [&_h2]:font-black [&_h3]:text-lg [&_h3]:font-bold
               [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
-              [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[28rem] [&_img]:mx-0 [&_img]:inline-block [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3"
+              [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[28rem] [&_img]:mx-0 [&_img]:inline-block [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-400 [&_blockquote]:pl-3"
             dangerouslySetInnerHTML={{ __html: resolveContentHtml(contentHtml) }}
           />
         </div>
@@ -450,7 +450,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
                 type="button"
                 disabled={busy}
                 onClick={() => coverRef.current?.click()}
-                className="w-full max-w-md aspect-video rounded-xl border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold hover:border-red-300 hover:text-red-500 flex flex-col items-center justify-center gap-2"
+                className="w-full max-w-md aspect-video rounded-xl border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold hover:border-emerald-300 hover:text-emerald-600 flex flex-col items-center justify-center gap-2"
               >
                 <ImagePlus size={22} /> Chọn ảnh bìa
               </button>
@@ -754,7 +754,7 @@ export default function NewsPage({ session, role = 'admin' }) {
     if (loading && !detail && !detailError) {
       return (
         <div className="w-full py-16 flex flex-col items-center justify-center text-slate-400">
-          <Loader2 className="animate-spin mb-2 text-red-600" size={32} />
+          <Loader2 className="animate-spin mb-2 text-emerald-600" size={32} />
           <p className="text-xs font-semibold">Đang tải bài viết...</p>
         </div>
       );
@@ -823,8 +823,8 @@ export default function NewsPage({ session, role = 'admin' }) {
               [&_h2]:text-xl [&_h2]:font-black [&_h2]:mt-5 [&_h2]:mb-2
               [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-1.5
               [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
-              [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3 [&_blockquote]:italic
-              [&_a]:text-red-600 [&_a]:underline
+              [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-400 [&_blockquote]:pl-3 [&_blockquote]:italic
+              [&_a]:text-emerald-600 [&_a]:underline
               [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[28rem] [&_img]:my-3 [&_img]:mx-0 [&_img]:inline-block"
             dangerouslySetInnerHTML={{ __html: resolveContentHtml(detail.contentHtml || '') }}
           />
@@ -847,7 +847,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                           href={resolveMediaUrl(a.url)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:underline"
+                          className="inline-flex items-center gap-2 text-sm font-bold text-emerald-600 hover:underline"
                         >
                           <Paperclip size={14} /> {a.name || 'Tải file'}
                         </a>

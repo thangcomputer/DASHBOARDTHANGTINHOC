@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  CalendarDays, ChevronRight, Award, Zap, UserCheck, Clipboard, GraduationCap, WalletCards, Clock, TrendingUp,
+  AlertTriangle, CalendarDays, ChevronRight, Award, Zap, UserCheck, Clipboard, GraduationCap, WalletCards, Clock, TrendingUp,
 } from 'lucide-react';
+import { computeAtRiskStudents } from '../../utils/atRiskStudents';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import api from '../../services/api';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
@@ -205,6 +206,10 @@ export default function TeacherOverviewTab({
   const activeStudents = useMemo(
     () => (students || []).filter((student) => student.enrollmentStatus === 'active'),
     [students],
+  );
+  const atRiskStudents = useMemo(
+    () => computeAtRiskStudents(activeStudents, mySchedules),
+    [activeStudents, mySchedules],
   );
 
   const heroChips = ongoingSchedule
@@ -495,6 +500,79 @@ export default function TeacherOverviewTab({
           <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} reviewsScrollLimit={3} />
         </div>
       </div>
+
+      {/* Bảng cảnh báo học viên có nguy cơ bỏ học */}
+      <section className="rounded-3xl border border-amber-200/80 bg-white p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+              <AlertTriangle size={18} aria-hidden="true" />
+            </span>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900">
+                Cảnh báo học viên có nguy cơ bỏ học
+              </h3>
+              <p className="text-xs font-medium text-slate-500">
+                Theo dõi học viên lâu không truy cập (≥ 5 ngày), điểm giảm hoặc gián đoạn lịch học.
+              </p>
+            </div>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-black ${
+              atRiskStudents.length > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
+            }`}
+          >
+            {atRiskStudents.length > 0 ? `${atRiskStudents.length} học viên cần quan tâm` : 'Tất cả ổn định'}
+          </span>
+        </div>
+
+        {atRiskStudents.length > 0 ? (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {atRiskStudents.slice(0, 6).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => navigate(`/teacher#students?studentId=${item.id}`)}
+                className="flex flex-col justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-amber-300 hover:bg-amber-50/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-900">{item.name}</p>
+                    <p className="truncate text-xs font-medium text-slate-500">{item.course}</p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                      item.level === 'high' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {item.level === 'high' ? 'Nguy cơ cao' : 'Cần nhắc'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {item.reasons.map((reason) => (
+                    <span
+                      key={reason}
+                      className="rounded-lg bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 border border-slate-200/70"
+                    >
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-700 pt-1 border-t border-slate-200/60">
+                  <span>Còn {item.remainingSessions} buổi</span>
+                  <span className="inline-flex items-center gap-0.5">
+                    Mở hồ sơ <ChevronRight size={13} aria-hidden="true" />
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="py-4 text-center text-xs font-medium text-slate-500">
+            Không có học viên nào có dấu hiệu gián đoạn hoặc giảm điểm trong lớp bạn phụ trách.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

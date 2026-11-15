@@ -41,7 +41,7 @@ export default function AdminTeacherQuizHistoryPanel() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div>
           <h3 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
-            <Award className="text-red-600" size={22} /> Lịch sử Tạo Trắc Nghiệm của Giảng Viên
+            <Award className="text-emerald-600" size={22} /> Lịch sử Tạo Trắc Nghiệm của Giảng Viên
           </h3>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
             Theo dõi tất cả các đề trắc nghiệm do giảng viên khởi tạo và kết quả làm bài của học viên.
@@ -73,7 +73,7 @@ export default function AdminTeacherQuizHistoryPanel() {
       {/* List / Table */}
       {loading ? (
         <div className="py-16 text-center text-slate-400 bg-white rounded-3xl border border-slate-100">
-          <RefreshCw className="animate-spin mx-auto mb-2 text-red-600" size={28} />
+          <RefreshCw className="animate-spin mx-auto mb-2 text-emerald-600" size={28} />
           <p className="text-xs font-bold">Đang tải lịch sử bài trắc nghiệm...</p>
         </div>
       ) : filtered.length === 0 ? (
@@ -98,7 +98,7 @@ export default function AdminTeacherQuizHistoryPanel() {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[10px] font-black ">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black ">
                       {quiz.courseName || 'Toàn hệ thống'}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">
@@ -112,7 +112,7 @@ export default function AdminTeacherQuizHistoryPanel() {
 
                   <div className="space-y-1.5 text-xs text-slate-600 my-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
                     <p className="flex items-center gap-1.5 font-semibold text-slate-700">
-                      <User size={14} className="text-red-500" /> GV: {quiz.teacherName || 'Giảng viên'}
+                      <User size={14} className="text-emerald-600" /> GV: {quiz.teacherName || 'Giảng viên'}
                     </p>
                     <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
                       <Clock size={14} /> Thời gian: {quiz.timeLimitMinutes || 15} phút · {quiz.questions?.length || 0} câu hỏi

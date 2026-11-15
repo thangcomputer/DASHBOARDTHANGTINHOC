@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle, User, Settings, BookOpen,
   Mail, Phone, MapPin, ChevronRight, ChevronDown,
   GraduationCap, KeyRound, Target, Camera, Bell, LogOut,
   CalendarClock, Crown, History, Zap, Wallet, Receipt, Shield,
-  Award,
+  Award, Laptop, QrCode, Smartphone, Users,
 } from 'lucide-react';
+import DigitalCertificateModal from './DigitalCertificateModal';
 import EditableAvatar from '../EditableAvatar';
 import { openPinLockSettings } from '../../utils/pinLock';
 import { openLearningGoal } from '../../utils/learningGoal';
@@ -62,6 +64,7 @@ export default function StudentProfileTab({
   setShowTuitionModal,
   sessionGender = '',
 }) {
+  const navigate = useNavigate();
   const toast = useToast();
   const { onLogout } = useData();
   const subCtx = useStudentSubscription();
@@ -78,7 +81,9 @@ export default function StudentProfileTab({
   const [openSections, setOpenSections] = useState({
     courses: false,
     videoOrders: false,
+    devices: false,
   });
+  const [certificateCourse, setCertificateCourse] = useState(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [videoOrders, setVideoOrders] = useState([]);
   const [lessonProgress, setLessonProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
@@ -238,10 +243,10 @@ export default function StudentProfileTab({
     ? 'Gói miễn phí'
     : subscription
       ? (isBrandStudent
-          ? 'Gói Khóa học'
-          : (isLifetime
-              ? 'Gói Vĩnh viễn'
-              : (rawPlanLabel.toLowerCase().startsWith('gói') ? rawPlanLabel : `Gói ${rawPlanLabel}`)))
+        ? 'Gói Khóa học'
+        : (isLifetime
+          ? 'Gói Vĩnh viễn'
+          : (rawPlanLabel.toLowerCase().startsWith('gói') ? rawPlanLabel : `Gói ${rawPlanLabel}`)))
       : 'Tài khoản học viên';
   const daysLeftNum = subscription?.daysLeft != null ? Number(subscription.daysLeft) : null;
   const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : subscription?.state === 'expiring';
@@ -262,29 +267,21 @@ export default function StudentProfileTab({
   return (
     <div className="max-w-2xl mx-auto space-y-3.5 sm:space-y-4 py-3 px-2 sm:px-4 animate-in fade-in duration-300">
       {/* ── 1. Thẻ Hero hồ sơ cá nhân (Đồng bộ 100% Mobile App) ── */}
-      <div className={`rounded-[20px] border-[1.5px] p-4 sm:p-5 flex items-center gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] ${
-        isBrandStudent ? 'border-[#FEE2E2] bg-[#FEF2F2]' : 'border-[#CCFBF1] bg-[#F0FDFA]'
-      }`}>
+      <div className="rounded-[20px] border-[1.5px] p-4 sm:p-5 flex items-center gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] border-[#CCFBF1] bg-[#F0FDFA]">
         <div className="relative shrink-0">
           <EditableAvatar
             avatar={studentData?.avatar}
             name={studentData?.name}
             role="student"
             gender={profileGender}
-            className={`w-[76px] h-[76px] rounded-full border-2 border-white shadow-xs cursor-pointer ${
-              isBrandStudent ? 'bg-[#FEE2E2]' : 'bg-[#CCFBF1]'
-            }`}
+            className="w-[76px] h-[76px] rounded-full border-2 border-white shadow-xs cursor-pointer bg-[#CCFBF1]"
           />
-          <div className={`absolute right-0 bottom-0 w-[25px] h-[25px] rounded-full border-2 border-white flex items-center justify-center text-white shadow-xs pointer-events-none ${
-            isBrandStudent ? 'bg-[#EF4444]' : 'bg-[#0FAF9F]'
-          }`}>
+          <div className="absolute right-0 bottom-0 w-[25px] h-[25px] rounded-full border-2 border-white flex items-center justify-center text-white shadow-xs pointer-events-none bg-[#0FAF9F]">
             <Camera size={14} className="text-white" />
           </div>
         </div>
         <div className="flex-1 min-w-0 space-y-0.5">
-          <p className={`text-[11px] font-black tracking-[0.8px] uppercase ${
-            isBrandStudent ? 'text-[#DC2626]' : 'text-[#0F766E]'
-          }`}>
+          <p className="text-[11px] font-black tracking-[0.8px] uppercase text-[#0F766E]">
             Hồ sơ cá nhân
           </p>
           <h2 className="text-[18px] sm:text-[20px] font-black text-[#0F172A] truncate leading-tight">
@@ -299,24 +296,20 @@ export default function StudentProfileTab({
       {/* ── 2. Gói học Meet & Lịch sử gia hạn (Ngay dưới Hero theo đúng Mobile App) ── */}
       <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] p-4 sm:p-5">
         <div className="flex items-center gap-2 pb-3 border-b border-[#F1F5F9]">
-          <Crown size={18} className={isBrandStudent ? 'text-[#EF4444]' : 'text-[#F59E0B]'} />
+          <Crown size={18} className="text-[#F59E0B]" />
           <h3 className="text-[15px] font-extrabold text-[#1E293B]">{isBrandStudent ? 'Gói Khóa học' : 'Gói học Meet'}</h3>
         </div>
 
         <div className="mt-3.5 p-3.5 rounded-[16px] bg-[#F8FAFC] border border-[#F1F5F9] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className={`w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0 text-white ${
-              isBrandStudent ? 'bg-gradient-to-br from-[#EF4444] to-[#DC2626]' : 'bg-gradient-to-br from-[#10B981] to-[#059669]'
-            }`}>
+            <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0 text-white bg-gradient-to-br from-[#10B981] to-[#059669]">
               <CalendarClock size={22} />
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="text-[14px] font-black text-[#0F172A] truncate">
                 {planName}
               </h4>
-              <p className={`text-[12px] font-bold truncate mt-0.5 ${
-                isBrandStudent ? 'text-[#DC2626]' : 'text-[#059669]'
-              }`}>
+              <p className="text-[12px] font-bold truncate mt-0.5 text-[#059669]">
                 {daysLine}
               </p>
             </div>
@@ -363,9 +356,7 @@ export default function StudentProfileTab({
               <button
                 type="button"
                 onClick={() => setShowAllHistory((prev) => !prev)}
-                className={`mt-2 w-full py-1.5 rounded-[10px] bg-[#F8FAFC] hover:bg-[#F1F5F9] text-[12px] font-bold flex items-center justify-center gap-1 transition cursor-pointer !shadow-none ${
-                  isBrandStudent ? 'text-[#DC2626]' : 'text-[#059669]'
-                }`}
+                className="mt-2 w-full py-1.5 rounded-[10px] bg-[#F8FAFC] hover:bg-[#F1F5F9] text-[12px] font-bold flex items-center justify-center gap-1 transition cursor-pointer !shadow-none text-[#059669]"
               >
                 <span>{showAllHistory ? 'Thu gọn' : `Xem thêm (${history.length - 3})`}</span>
                 <ChevronDown size={14} className={`transition-transform duration-200 ${showAllHistory ? 'rotate-180' : ''}`} />
@@ -379,15 +370,13 @@ export default function StudentProfileTab({
       <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
         <div className="min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <User size={16} className={`shrink-0 ${isBrandStudent ? 'text-[#DC2626]' : 'text-[#16A34A]'}`} />
+            <User size={16} className="shrink-0 text-[#16A34A]" />
             <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Thông tin cá nhân</h3>
           </div>
           <button
             type="button"
             onClick={() => setShowUpdateProfileModal(true)}
-            className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 rounded-[10px] text-[12px] font-bold transition cursor-pointer !shadow-none shrink-0 ${
-              isBrandStudent ? 'bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2]' : 'bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]'
-            }`}
+            className="inline-flex items-center gap-1.5 min-h-[34px] px-3 rounded-[10px] text-[12px] font-bold transition cursor-pointer !shadow-none shrink-0 bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5]"
           >
             <Settings size={14} />
             <span>Chỉnh sửa</span>
@@ -436,9 +425,8 @@ export default function StudentProfileTab({
                     <div key={c.id || c.enrollmentId || title} className="px-4 py-3.5 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{title}</h4>
-                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
-                          isCompleted ? 'bg-[#EFF6FF] text-[#2563EB]' : 'bg-[#ECFDF5] text-[#16A34A]'
-                        }`}>
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${isCompleted ? 'bg-[#EFF6FF] text-[#2563EB]' : 'bg-[#ECFDF5] text-[#16A34A]'
+                          }`}>
                           {isCompleted ? 'Hoàn thành' : 'Đang học'}
                         </span>
                       </div>
@@ -446,12 +434,29 @@ export default function StudentProfileTab({
                         GV: {c.teacherName || teacherValue || 'Chưa phân công'}{c.registeredAt ? ` · ${formatDateDisplay(c.registeredAt)}` : ''}
                       </p>
                       <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${isBrandStudent ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`} style={{ width: `${pct}%` }} />
+                        <div className="h-full rounded-full transition-all bg-[#10B981]" style={{ width: `${pct}%` }} />
                       </div>
                       <div className="flex items-center justify-between text-[12px]">
                         <span className="text-[#64748B]">{done}/{total} buổi · Tiến độ {pct}%</span>
                         <span className="font-extrabold text-[#0F172A]">{c.avgGrade ?? 0} TB</span>
                       </div>
+                      {isCompleted ? (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setCertificateCourse({
+                              courseId: String(c.courseId || c.id || ''),
+                              courseTitle: title,
+                              instructorName: c.teacherName || teacherValue || 'Trung tâm Thắng Tin Học',
+                              completionRate: pct || 100,
+                              avgGrade: c.avgGrade,
+                            })}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                          >
+                            <QrCode size={13} /> Xem chứng nhận QR
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })
@@ -468,9 +473,7 @@ export default function StudentProfileTab({
           onClick={openChangePassword}
           className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
         >
-          <span className={`w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 ${
-            isBrandStudent ? 'text-[#EF4444]' : 'text-[#10B981]'
-          }`}>
+          <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 text-[#10B981]">
             <Settings size={18} />
           </span>
           <div className="flex-1 min-w-0">
@@ -485,9 +488,7 @@ export default function StudentProfileTab({
           onClick={openPinLockSettings}
           className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
         >
-          <span className={`w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 ${
-            isBrandStudent ? 'text-[#EF4444]' : 'text-[#10B981]'
-          }`}>
+          <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 text-[#10B981]">
             <KeyRound size={18} />
           </span>
           <div className="flex-1 min-w-0">
@@ -502,9 +503,7 @@ export default function StudentProfileTab({
           onClick={openLearningGoal}
           className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
         >
-          <span className={`w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 ${
-            isBrandStudent ? 'text-[#EF4444]' : 'text-[#10B981]'
-          }`}>
+          <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 text-[#10B981]">
             <Target size={18} />
           </span>
           <div className="flex-1 min-w-0">
@@ -513,6 +512,109 @@ export default function StudentProfileTab({
           </div>
           <ChevronRight size={18} className="text-[#64748B] shrink-0" />
         </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/student/center-info')}
+          className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
+        >
+          <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 text-[#10B981]">
+            <Users size={18} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] font-semibold text-[#0F172A]">Liên hệ Trung tâm</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Thông tin trung tâm</p>
+          </div>
+          <ChevronRight size={18} className="text-[#64748B] shrink-0" />
+        </button>
+
+        {/* Thiết bị đã đăng nhập & bảo vệ tài khoản */}
+        {(() => {
+          const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
+          const isMobileUa = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+          const osLabel = /Windows NT/i.test(ua)
+            ? 'Windows PC'
+            : /Mac OS X|Macintosh/i.test(ua)
+              ? 'macOS'
+              : /Android/i.test(ua)
+                ? 'Android'
+                : /iPhone|iPad|iPod/i.test(ua)
+                  ? 'iPhone / iPad'
+                  : /Linux/i.test(ua)
+                    ? 'Linux'
+                    : 'Thiết bị Web';
+          const browserLabel = /Edg\//i.test(ua)
+            ? 'Microsoft Edge'
+            : /Chrome\//i.test(ua) && !/Edg\//i.test(ua)
+              ? 'Google Chrome'
+              : /Safari\//i.test(ua) && !/Chrome\//i.test(ua)
+                ? 'Safari'
+                : /Firefox\//i.test(ua)
+                  ? 'Firefox'
+                  : 'Trình duyệt';
+          const deviceCount = Math.min(3, Math.max(1, Number(studentData?.knownDeviceCount) || 1));
+          const deviceSummary = String(studentData?.knownDeviceSummary || '').trim();
+          const DeviceIcon = isMobileUa ? Smartphone : Laptop;
+          return (
+            <div>
+              <button
+                type="button"
+                onClick={() => toggleSection('devices')}
+                className="w-full min-h-[60px] flex items-center gap-3.5 py-2.5 text-left hover:bg-slate-50/70 transition-colors cursor-pointer !shadow-none"
+              >
+                <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] flex items-center justify-center shrink-0 text-[#10B981]">
+                  <Shield size={18} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-semibold text-[#0F172A]">Thiết bị đã đăng nhập</p>
+                  <p className="text-[12px] text-[#64748B] mt-0.5 tabular-nums">
+                    {deviceCount}/3 thiết bị được phép • Bảo vệ tài khoản
+                  </p>
+                </div>
+                {openSections.devices ? (
+                  <ChevronDown size={18} className="text-[#64748B] shrink-0" />
+                ) : (
+                  <ChevronRight size={18} className="text-[#64748B] shrink-0" />
+                )}
+              </button>
+
+              {openSections.devices && (
+                <div className="pb-3.5 pt-1 pl-[52px] pr-1 space-y-2.5">
+                  <div className="p-3 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] flex items-start justify-between gap-2.5">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-[10px] bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <DeviceIcon size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-[#0F172A] truncate">
+                          {osLabel} • {browserLabel}
+                        </p>
+                        <p className="text-[11px] text-[#64748B] mt-0.5">
+                          Phiên trình duyệt hiện tại
+                        </p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Đang hoạt động
+                    </span>
+                  </div>
+
+                  {deviceSummary ? (
+                    <p className="text-[11.5px] text-[#475569] leading-relaxed">
+                      <span className="font-semibold text-[#0F172A]">Thiết bị đã ghi nhận:</span>{' '}
+                      {deviceSummary}
+                    </p>
+                  ) : null}
+
+                  <div className="p-2.5 rounded-[10px] bg-emerald-50/70 border border-emerald-200/70 text-[11px] text-emerald-800 leading-relaxed">
+                    Hệ thống tự động ghi nhớ tối đa <strong>3 thiết bị</strong> quen thuộc ({deviceCount}/3 đang dùng) để bảo vệ tiến độ học tập và ngăn đăng nhập trái phép.
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── 6. Đơn mua khóa video (chỉ hiển thị khi có đơn, mặc định thu gọn) ── */}
@@ -546,9 +648,8 @@ export default function StudentProfileTab({
                       </p>
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        paid ? 'cms-profile-soft' : 'bg-amber-100 text-amber-800'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${paid ? 'cms-profile-soft' : 'bg-amber-100 text-amber-800'
+                        }`}>
                         {paid ? 'Đã thanh toán' : 'Chờ TT'}
                       </span>
                       {paid ? (
@@ -610,6 +711,20 @@ export default function StudentProfileTab({
           <span>Đăng xuất</span>
         </button>
       </div>
+
+      <DigitalCertificateModal
+        open={Boolean(certificateCourse)}
+        onClose={() => setCertificateCourse(null)}
+        studentName={studentData?.name || 'Học viên'}
+        studentCode={studentData?.studentCode || ''}
+        studentId={studentId}
+        courseId={certificateCourse?._id || certificateCourse?.id || ''}
+        courseTitle={certificateCourse?.title || ''}
+        instructorName={certificateCourse?.instructorName || 'Trung tâm Thắng Tin Học'}
+        completionRate={
+          Number(certificateCourse?.completionRate ?? certificateCourse?.progress) || 100
+        }
+      />
     </div>
   );
 }

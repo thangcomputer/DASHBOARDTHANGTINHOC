@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Clock, Eye, Lightbulb, Loader2, Move, Play, RotateCcw, Sparkles, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Clock, Eye, Lightbulb, Loader2, Maximize2, Minimize2, Move, Play, RotateCcw, Sparkles, Trophy, Volume2, VolumeX } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
-import { isSoundMuted, playLessonCorrectSound, playLessonTick, playLessonWrongSound, unlockAudio } from '../../../utils/sound';
+import { SOUND_MUTE_CHANGED_EVENT, gameSounds, isSoundMuted, playLessonCorrectSound, playLessonTick, playLessonWrongSound, setSoundMuted, unlockAudio } from '../../../utils/sound';
+import { useFocusMode } from '../../../utils/focusMode';
 import { remainingPracticeSeconds, resolvePracticeClock, resolvePracticeGroupTimeLimit, restorePracticeClockSession } from '../../../utils/lessonPracticeClock';
 import {
   advancePracticeAttemptStats,
@@ -402,6 +403,42 @@ function QuestionCard({
   const [dropId, setDropId] = useState('');
   const dragListeners = useRef(null);
 
+  const questionKeyRef = useRef({ active: false });
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof Element) {
+        const tag = target.tagName;
+        const inputType = tag === 'INPUT' ? String(target.getAttribute('type') || '').toLowerCase() : '';
+        if (tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable || (tag === 'INPUT' && inputType !== 'radio' && inputType !== 'checkbox')) return;
+      }
+      const s = questionKeyRef.current;
+      if (!s.active) return;
+      const key = String(event.key || '');
+      const lower = key.toLowerCase();
+      const letterMap = { a: 0, b: 1, c: 2, d: 3 };
+      let pickIdx = null;
+      if (/^[1-9]$/.test(key)) {
+        pickIdx = Number(key) - 1;
+      } else if (Object.prototype.hasOwnProperty.call(letterMap, lower)) {
+        pickIdx = letterMap[lower];
+      }
+      if (pickIdx !== null && Array.isArray(s.options) && pickIdx < s.options.length) {
+        event.preventDefault();
+        gameSounds.tap();
+        s.pick(s.options[pickIdx].id);
+        return;
+      }
+      if (key === 'Enter' && s.canSubmit) {
+        event.preventDefault();
+        s.submit();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   useEffect(() => () => {
     if (!dragListeners.current) return;
     window.removeEventListener('pointermove', dragListeners.current.move);
@@ -409,6 +446,7 @@ function QuestionCard({
   }, []);
 
   if (item.type === 'image_view') {
+    questionKeyRef.current = { active: false };
     return (
       <article className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5">
         <LessonFigure imageUrl={item.imageUrl} caption={item.caption || item.prompt} />
@@ -431,6 +469,18 @@ function QuestionCard({
             : item.type === 'written'
               ? !!text.trim()
               : false;
+
+  questionKeyRef.current = {
+    active: open && !frozen && !busy && item.type === 'mcq',
+    options: item.options || [],
+    canSubmit: Boolean(choiceId),
+    pick: (id) => setChoiceId(id),
+    submit: () => {
+      const answer = { choiceId };
+      if (reviewMode) onReviewSubmit?.(answer);
+      else onConfirm(answer);
+    },
+  };
 
   function beginDrag(event, opt, step) {
     if (frozen || event.button !== 0) return;
@@ -486,7 +536,7 @@ function QuestionCard({
     <article id={`lesson-q-${item.id}`} className="rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.06)] space-y-4 sm:p-5">
       {(index > 0 || item.prompt) && (
         <div className="space-y-2">
-          <p className="text-[11px] font-black  tracking-[0.22em] text-red-600">
+          <p className="text-[11px] font-black  tracking-[0.22em] text-emerald-600">
             {index > 0 ? `Câu ${index}` : 'Câu'}
           </p>
           <h2 className="text-xl sm:text-2xl font-black leading-snug text-slate-900">
@@ -513,7 +563,7 @@ function QuestionCard({
             const selected = (done ? item.answer?.choiceId : choiceId) === opt.id;
             const isKey = done && item.correctOptionId === opt.id;
             return (
-              <label key={opt.id}                   className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-red-200 ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+              <label key={opt.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-emerald-200 ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? (done ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50') : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                 <input
                   type="radio"
                   name={`q-${item.id}`}
@@ -522,7 +572,7 @@ function QuestionCard({
                   checked={selected}
                   onChange={() => setChoiceId(opt.id)}
                 />
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? (done ? 'border-red-600 bg-red-600 text-white' : 'border-emerald-600 bg-emerald-600 text-white') : 'border-slate-300 bg-white text-slate-500'}`}>
                   {isKey ? '✓' : optIndex + 1}
                 </span>
                 <span className="leading-relaxed text-slate-800">{opt.text}</span>
@@ -538,7 +588,7 @@ function QuestionCard({
             const selected = picked.includes(opt.id);
             const isKey = done && (item.correctOptionIds || []).includes(opt.id);
             return (
-              <label key={opt.id}               className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-red-200 ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+              <label key={opt.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-emerald-200 ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? (done ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50') : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                 <input
                   type="checkbox"
                   disabled={frozen}
@@ -546,7 +596,7 @@ function QuestionCard({
                   checked={selected}
                   onChange={() => setChoiceIds((current) => (current.includes(opt.id) ? current.filter((id) => id !== opt.id) : [...current, opt.id]))}
                 />
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? (done ? 'border-red-600 bg-red-600 text-white' : 'border-emerald-600 bg-emerald-600 text-white') : 'border-slate-300 bg-white text-slate-500'}`}>
                   {isKey ? '✓' : selected ? '✓' : String(optIndex + 1)}
                 </span>
                 <span className="leading-relaxed text-slate-800">{opt.text}</span>
@@ -584,7 +634,7 @@ function QuestionCard({
               aria-label={frozen ? undefined : `Kéo bước ${optIndex + 1} ${opt.text}`}
               data-drag-id={frozen ? undefined : opt.id}
               onPointerDown={frozen ? undefined : (event) => beginDrag(event, opt, optIndex + 1)}
-              className={`group flex select-none items-center gap-2 rounded-xl border px-2 py-1.5 text-sm ${dropId === opt.id && dragGhost ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'} ${dragGhost?.id === opt.id ? 'opacity-50' : ''} ${frozen ? '' : 'cursor-grab touch-none'}`}
+              className={`group flex select-none items-center gap-2 rounded-xl border px-2 py-1.5 text-sm ${dropId === opt.id && dragGhost ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'} ${dragGhost?.id === opt.id ? 'opacity-50' : ''} ${frozen ? '' : 'cursor-grab touch-none'}`}
             >
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${frozen ? 'border-transparent text-transparent' : 'border-slate-200 bg-white text-slate-500 group-hover:border-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
                 <Move size={16} />
@@ -612,7 +662,7 @@ function QuestionCard({
           onChange={(e) => setText(e.target.value)}
           rows={4}
           placeholder="Ghi câu trả lời của bạn"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 disabled:bg-slate-50"
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 disabled:bg-slate-50"
         />
       )}
       {reviewMode && done && (
@@ -661,7 +711,7 @@ function QuestionCard({
               if (reviewMode) onReviewSubmit?.(answer);
               else onConfirm(answer);
             }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(239,68,68,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(16,185,129,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             {reviewMode ? 'Kiểm tra câu ôn tập' : 'Xác nhận'}
@@ -728,8 +778,19 @@ export default function LessonPracticePlayerPage({
   const [reviewBusyId, setReviewBusyId] = useState('');
   const [reviewRound, setReviewRound] = useState(0);
   const [completionCelebration, setCompletionCelebration] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(() => !isSoundMuted());
+  const { focusMode, toggle: toggleFocus, setFocusMode } = useFocusMode();
   const clockSessionRef = useRef(null);
+
+  useEffect(() => {
+    const syncSound = () => setSoundEnabled(!isSoundMuted());
+    window.addEventListener(SOUND_MUTE_CHANGED_EVENT, syncSound);
+    return () => window.removeEventListener(SOUND_MUTE_CHANGED_EVENT, syncSound);
+  }, []);
+
+  useEffect(() => () => {
+    if (!embedded) setFocusMode(false);
+  }, [embedded, setFocusMode]);
   const clockPersistenceDisabledRef = useRef(false);
   const attemptStatsRef = useRef(attemptStats);
   const wrongQuestionIdsRef = useRef(wrongQuestionIds);
@@ -1038,7 +1099,9 @@ export default function LessonPracticePlayerPage({
   }
 
   function toggleSound() {
-    setSoundEnabled((enabled) => !enabled);
+    const nextEnabled = !soundEnabled;
+    setSoundEnabled(nextEnabled);
+    setSoundMuted(!nextEnabled);
   }
 
   async function resetPractice({ startImmediately = false } = {}) {
@@ -1175,10 +1238,29 @@ export default function LessonPracticePlayerPage({
                         aria-label={soundEnabled ? 'Tắt âm thanh luyện tập' : 'Bật âm thanh luyện tập'}
                         aria-pressed={soundEnabled}
                         title={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                       >
                         {soundEnabled ? <Volume2 size={19} aria-hidden="true" /> : <VolumeX size={19} aria-hidden="true" />}
                       </button>
+                      {!embedded && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            gameSounds.tap();
+                            toggleFocus();
+                          }}
+                          aria-label={focusMode ? 'Thoát chế độ tập trung' : 'Bật chế độ tập trung'}
+                          aria-pressed={focusMode}
+                          title={focusMode ? 'Thoát chế độ tập trung' : 'Chế độ tập trung'}
+                          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                            focusMode
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {focusMode ? <Minimize2 size={18} aria-hidden="true" /> : <Maximize2 size={18} aria-hidden="true" />}
+                        </button>
+                      )}
                       {timed && (
                         <QuizClock
                           remaining={started ? remaining : (savedClockSeconds ?? clockLimit)}
@@ -1210,7 +1292,7 @@ export default function LessonPracticePlayerPage({
                           : needsRetry
                             ? 'bg-amber-400 text-amber-950'
                             : current
-                              ? 'border-2 border-emerald-600 bg-white text-red-700'
+                              ? 'border-2 border-emerald-600 bg-white text-emerald-700'
                               : 'border border-slate-300 bg-white text-slate-500';
                         return (
                           <button
@@ -1220,7 +1302,7 @@ export default function LessonPracticePlayerPage({
                             onClick={() => setFocusId(item.id)}
                             aria-current={current ? 'step' : undefined}
                             aria-label={`Câu ${index + 1}${needsRetry ? ', đang luyện tập lại' : item.confirmed ? ', trả lời đúng' : ', chưa làm'}${current ? ', đang xem' : ''}`}
-                            className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <span className={`lesson-progress-marker grid h-4 w-4 place-items-center rounded-full text-[9px] leading-none ${tone}`}>
                               {item.confirmed && item.correct === true ? '✓' : needsRetry ? '↻' : ''}
@@ -1423,7 +1505,7 @@ export default function LessonPracticePlayerPage({
                       </p>
                       {clockLimit > 0 && (
                         <p className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
-                          <Clock size={16} className="text-red-600" />
+                          <Clock size={16} className="text-emerald-600" />
                           {hasResumableAttempt ? 'Còn lại:' : 'Thời gian:'} {formatClock(savedClockSeconds ?? clockLimit)}
                         </p>
                       )}

@@ -9,7 +9,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
-import { themeState } from '../../theme/tokens';
+import { triggerMobileHaptic } from '../dailyPractice/useGameSounds';
 
 export type DuoButtonVariant =
   | 'primary'   // Emerald / Lime green (Học tiếp, Bắt đầu)
@@ -117,8 +117,7 @@ export function DuoButton({
   const contentText = label || text;
 
   const sizeSpec = SIZES[size];
-  // Học viên theo khóa: nút chính màu đỏ (đồng bộ web app).
-  const variantSpec = VARIANTS[variant === 'primary' && themeState.brand ? 'danger' : variant];
+  const variantSpec = VARIANTS[variant];
 
   const isDisabled = disabled || loading;
   const isPressed = pressed && !isDisabled;
@@ -134,7 +133,10 @@ export function DuoButton({
   return (
     <Pressable
       onPress={isDisabled ? undefined : onPress}
-      onPressIn={() => setPressed(true)}
+      onPressIn={() => {
+        setPressed(true);
+        if (!isDisabled) triggerMobileHaptic('light');
+      }}
       onPressOut={() => setPressed(false)}
       disabled={isDisabled}
       accessibilityRole="button"

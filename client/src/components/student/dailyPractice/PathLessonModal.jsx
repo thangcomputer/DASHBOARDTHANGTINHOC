@@ -391,7 +391,7 @@ export default function PathLessonModal({
           {url ? (
             <div className="space-y-2">
               <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500">
-                <Play size={13} className="text-red-600" fill="currentColor" /> Video bài giảng
+                <Play size={13} className="text-emerald-600" fill="currentColor" /> Video bài giảng
                 {checks.length > 0 && <span className="font-semibold text-slate-400">({checks.length} mốc kiểm tra)</span>}
               </p>
               <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-[#23262E]">

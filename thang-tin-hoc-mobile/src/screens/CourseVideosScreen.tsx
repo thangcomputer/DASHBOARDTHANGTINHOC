@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, Sparkles, Star, StickyNote, Trophy, Volume2, VolumeX } from 'lucide-react-native';
+import { Alert, Animated, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ArrowLeft, Award, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Download, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, ShieldCheck, Sparkles, Star, StickyNote, Trash2, Trophy, Volume2, VolumeX, WifiOff, X } from 'lucide-react-native';
 import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
 import RenderHtml from '@native-html/render';
 import type { MixedStyleDeclaration } from '@native-html/render';
@@ -10,8 +10,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { dailyPracticeApi, type DpTopic } from '../services/dailyPracticeApi';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
+import { saveLastStudySession } from '../utils/resumeLearning';
 import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from './VideoPlayerFrame';
 import { VideoLessonTabs } from './VideoLessonTabs';
+import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
 import { AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { useMockResource } from '../hooks/useMockResource';
@@ -32,6 +34,18 @@ import {
   type LessonPracticeUnit,
 } from '../services/courseVideoApi';
 import { learningService } from '../services/mockService';
+import {
+  cleanupTempDecryptedVideos,
+  deleteOfflineVideo,
+  downloadEncryptedOfflineVideo,
+  formatOfflineBytes,
+  getOfflineVideoRecord,
+  listOfflineVideos,
+  OFFLINE_VIDEOS_UPDATED_EVENT,
+  prepareOfflinePlaybackUri,
+  releaseOfflinePlaybackUri,
+  type OfflineVideoRecord,
+} from '../services/offlineVideos';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 
@@ -342,6 +356,35 @@ export function CourseVideosScreen() {
   );
   const resource = useMockResource(loader);
   const [filter, setFilter] = useState<CourseFilter>('all');
+  const [offlineVideos, setOfflineVideos] = useState<OfflineVideoRecord[]>([]);
+  const [offlinePlayer, setOfflinePlayer] = useState<{ record: OfflineVideoRecord; uri: string } | null>(null);
+  const refreshOfflineList = useCallback(() => {
+    if (Platform.OS === 'web') return;
+    void listOfflineVideos().then(setOfflineVideos).catch(() => setOfflineVideos([]));
+  }, []);
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    void cleanupTempDecryptedVideos().then(refreshOfflineList);
+    const sub = DeviceEventEmitter.addListener(OFFLINE_VIDEOS_UPDATED_EVENT, refreshOfflineList);
+    return () => { sub.remove(); };
+  }, [refreshOfflineList]);
+  const openOfflineModalVideo = async (record: OfflineVideoRecord) => {
+    try {
+      const uri = await prepareOfflinePlaybackUri(record.lessonKey);
+      if (!uri) {
+        Alert.alert('Video ngoại tuyến', 'Không tìm thấy tệp video mã hóa trong bộ nhớ ứng dụng.');
+        return;
+      }
+      setOfflinePlayer({ record, uri });
+    } catch (err) {
+      Alert.alert('Không thể mở video offline', err instanceof Error ? err.message : 'Lỗi giải mã nội bộ.');
+    }
+  };
+  const closeOfflineModalVideo = () => {
+    const uri = offlinePlayer?.uri;
+    setOfflinePlayer(null);
+    if (uri) void releaseOfflinePlaybackUri(uri);
+  };
   const [selectedCourse, setSelectedCourse] = useState<LessonPracticeCourse | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<LessonPracticeSubject | null>(null);
   const [units, setUnits] = useState<LessonPracticeUnit[]>([]);
@@ -381,6 +424,7 @@ export function CourseVideosScreen() {
   }, [courses]);
   const [registeringCourseId, setRegisteringCourseId] = useState('');
   const [checkout, setCheckout] = useState<CoursePaymentCheckout | null>(null);
+  const [certificateCourse, setCertificateCourse] = useState<LessonPracticeCourse | null>(null);
 
   const startCourseCheckout = async (course: LessonPracticeCourse) => {
     setRegisteringCourseId(course.id);
@@ -651,19 +695,49 @@ export function CourseVideosScreen() {
   };
 
   const displayedSectionId = displayedSectionIndex >= 0 ? displayedUnitSections[displayedSectionIndex]?.id || '' : '';
+  const displayedSectionObj = displayedSectionIndex >= 0 ? displayedUnitSections[displayedSectionIndex] : undefined;
   const lastSyncedPosition = useRef('');
   useEffect(() => {
     if (isPreview || !selectedSubject || !displayedUnit?.id || !displayedSectionId) return undefined;
     const courseId = selectedCourse?.id || '';
     const signature = `${displayedUnit.id}|${displayedSectionId}|${courseId}`;
     if (lastSyncedPosition.current === signature) return undefined;
+    const doneUnitsCount = units.filter((u) => u.status === 'completed').length;
+    const progressPct = units.length
+      ? Math.round((doneUnitsCount / units.length) * 100)
+      : (selectedCourse ? courseProgress(selectedCourse) : 0);
     const timer = setTimeout(() => {
       lastSyncedPosition.current = signature;
       saveStudyResumePoint({ unitId: displayedUnit.id, sectionId: displayedSectionId, courseId })
         .catch(() => { lastSyncedPosition.current = ''; });
+      void saveLastStudySession({
+        kind: displayedSectionObj?.kind === 'video' ? 'lms_video' : 'lesson_practice',
+        studentId: String(user?.id || user?._id || ''),
+        courseId,
+        courseTitle: selectedCourse?.name || '',
+        subjectId: selectedSubject.id,
+        subjectName: selectedSubject.name || '',
+        unitId: displayedUnit.id,
+        unitTitle: displayedUnit.title || '',
+        sectionId: displayedSectionId,
+        sectionLabel: displayedSectionObj?.title || '',
+        progressPct,
+      });
     }, 1200);
     return () => clearTimeout(timer);
-  }, [displayedSectionId, displayedUnit?.id, isPreview, selectedCourse?.id, selectedSubject]);
+  }, [
+    displayedSectionId,
+    displayedSectionObj?.kind,
+    displayedSectionObj?.title,
+    displayedUnit?.id,
+    displayedUnit?.title,
+    isPreview,
+    selectedCourse,
+    selectedSubject,
+    units,
+    user?._id,
+    user?.id,
+  ]);
   const lessonNavigation = displayedUnit && (allDisplayedSectionsDone || !displayedUnitSections.length)
     ? (
       <UnitNavigationBar
@@ -716,6 +790,52 @@ export function CourseVideosScreen() {
           );
         })}
       </View>
+      {!resource.loading && Platform.OS !== 'web' && offlineVideos.length > 0 ? (
+        <Card style={styles.offlineCatalogCard}>
+          <View style={styles.offlineCatalogHead}>
+            <View style={styles.offlineCatalogTitleRow}>
+              <ShieldCheck size={17} color="#059669" />
+              <Text style={styles.cardTitle}>Kho video offline (Mã hóa nội bộ · {offlineVideos.length})</Text>
+            </View>
+            <View style={styles.offlineSandboxPill}>
+              <WifiOff size={11} color="#047857" />
+              <Text style={styles.offlineSandboxPillText}>Chỉ phát trong app</Text>
+            </View>
+          </View>
+          {offlineVideos.slice(0, 6).map((rec) => (
+            <View key={rec.lessonKey} style={styles.offlineRow}>
+              <Pressable onPress={() => { void openOfflineModalVideo(rec); }} style={styles.offlineRowBody} accessibilityRole="button">
+                <Play size={14} color="#059669" />
+                <View style={styles.flex}>
+                  <Text style={styles.offlineRowTitle} numberOfLines={1}>{rec.title}</Text>
+                  <Text style={styles.offlineRowSub} numberOfLines={1}>
+                    {rec.courseTitle} • {formatOfflineBytes(rec.sizeBytes)}
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Alert.alert('Xóa video offline?', `Xóa bản mã hóa "${rec.title}" khỏi thiết bị?`, [
+                    { text: 'Hủy', style: 'cancel' },
+                    {
+                      text: 'Xóa',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteOfflineVideo(rec.lessonKey).then(refreshOfflineList);
+                      },
+                    },
+                  ]);
+                }}
+                style={styles.offlineTrashButton}
+                accessibilityRole="button"
+                accessibilityLabel="Xóa video offline"
+              >
+                <Trash2 size={14} color="#DC2626" />
+              </Pressable>
+            </View>
+          ))}
+        </Card>
+      ) : null}
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {!resource.loading && !resource.error && filter === 'guide' ? (
@@ -746,6 +866,7 @@ export function CourseVideosScreen() {
               courses={section.courses}
               onOpen={openCourse}
               onRegister={requestCourseRegistration}
+              onOpenCertificate={setCertificateCourse}
               registeringCourseId={registeringCourseId}
             />
           </View>
@@ -755,6 +876,46 @@ export function CourseVideosScreen() {
         <EmptyState title="Không có khóa học trong bộ lọc" message="Thử chọn một bộ lọc khác." />
       ) : null}
       <CoursePaymentModal checkout={checkout} onClose={() => setCheckout(null)} onPaid={handleCoursePaid} />
+      <Modal visible={Boolean(offlinePlayer)} transparent animationType="slide" onRequestClose={closeOfflineModalVideo}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeOfflineModalVideo} />
+          <View style={styles.offlinePlayerModalCard}>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={closeOfflineModalVideo} style={styles.modalBack} accessibilityRole="button" accessibilityLabel="Đóng video offline">
+                <X size={18} color={theme.brand} />
+              </Pressable>
+              <View style={styles.flex}>
+                <Text style={styles.modalTitle} numberOfLines={1}>{offlinePlayer?.record.title || 'Video offline'}</Text>
+                <Text style={styles.muted} numberOfLines={1}>Phát ngoại tuyến từ kho mã hóa nội bộ</Text>
+              </View>
+            </View>
+            {offlinePlayer ? (
+              <View style={styles.videoFrame}>
+                <VideoPlayerFrame
+                  videoUrl={offlinePlayer.uri}
+                  embeddedUrl=""
+                  title={offlinePlayer.record.title}
+                  lessonId={`offline-${offlinePlayer.record.lessonKey}`}
+                  antiSeekEnabled={offlinePlayer.record.antiSeekEnabled}
+                  done
+                  onProgress={() => { }}
+                  onWatched={async () => true}
+                />
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+      <DigitalCertificateModal
+        visible={Boolean(certificateCourse)}
+        onClose={() => setCertificateCourse(null)}
+        studentName={user?.name || 'Học viên'}
+        studentCode={user?.code || ''}
+        studentId={String(user?.id || user?._id || '')}
+        courseId={certificateCourse?.id || ''}
+        courseTitle={certificateCourse?.name || ''}
+        completionRate={certificateCourse ? courseProgress(certificateCourse) : 100}
+      />
       <Modal visible={Boolean(selectedCourse)} transparent animationType="slide" onRequestClose={() => { setSelectedCourse(null); setSelectedSubject(null); }}>
         <View style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => { setSelectedCourse(null); setSelectedSubject(null); }} accessibilityRole="button" accessibilityLabel="Đóng nội dung khóa học" />
@@ -782,6 +943,17 @@ export function CourseVideosScreen() {
                 <Text style={styles.modalTitle}>{selectedSubject?.name || selectedCourse?.name}</Text>
                 {!selectedSubject ? <Text style={styles.muted}>{`${selectedCourse?.subjects.length || 0} môn học`}</Text> : null}
               </View>
+              {selectedCourse?.enrolled && courseProgress(selectedCourse) >= 100 ? (
+                <Pressable
+                  onPress={() => setCertificateCourse(selectedCourse)}
+                  style={styles.headerCertButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xem chứng nhận số có mã QR"
+                >
+                  <Award size={15} color="#047857" />
+                  <Text style={styles.headerCertButtonText}>Chứng chỉ QR</Text>
+                </Pressable>
+              ) : null}
               {selectedSubject && units.length > 0 ? (
                 <Pressable
                   onPress={() => setUnitNavOpen((open) => !open)}
@@ -821,9 +993,17 @@ export function CourseVideosScreen() {
                         <UnitDetails
                           key={unit.id}
                           unit={unit}
+                          subjectId={selectedSubject?.id || ''}
                           subjectName={selectedSubject?.name || ''}
                           courseId={selectedCourse?.id || ''}
                           courseTitle={selectedCourse?.name || ''}
+                          progressPct={
+                            units.length
+                              ? Math.round((units.filter((u) => u.status === 'completed').length / units.length) * 100)
+                              : selectedCourse
+                                ? courseProgress(selectedCourse)
+                                : 0
+                          }
                           userId={user?.id || ''}
                           enabled={!isPreview && Boolean(user?.id)}
                           resources={selectedCourse?.files || []}
@@ -1043,7 +1223,19 @@ export function CourseVideosScreen() {
   );
 }
 
-function CourseCard({ course, onOpen, onRegister, registering = false }: { course: LessonPracticeCourse; onOpen: () => void; onRegister: () => void; registering?: boolean }) {
+function CourseCard({
+  course,
+  onOpen,
+  onRegister,
+  onOpenCertificate,
+  registering = false,
+}: {
+  course: LessonPracticeCourse;
+  onOpen: () => void;
+  onRegister: () => void;
+  onOpenCertificate?: () => void;
+  registering?: boolean;
+}) {
   const [isHovered, setIsHovered] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const isVideo = course.deliveryMode === 'video';
@@ -1097,7 +1289,18 @@ function CourseCard({ course, onOpen, onRegister, registering = false }: { cours
           </View>
         </Pressable>
         <View style={styles.courseActions}>
-          {!course.enrolled && isVideo ? <Pressable onPress={onRegister} disabled={registering} style={[styles.registerButton, registering && { opacity: 0.6 }]} accessibilityRole="button"><Text style={styles.registerText}>{registering ? 'Đang tạo thanh toán…' : 'Đăng ký học'}</Text></Pressable> : <View />}
+          {!course.enrolled && isVideo ? (
+            <Pressable onPress={onRegister} disabled={registering} style={[styles.registerButton, registering && { opacity: 0.6 }]} accessibilityRole="button">
+              <Text style={styles.registerText}>{registering ? 'Đang tạo thanh toán…' : 'Đăng ký học'}</Text>
+            </Pressable>
+          ) : course.enrolled && progress >= 100 && onOpenCertificate ? (
+            <Pressable onPress={onOpenCertificate} style={styles.certButton} accessibilityRole="button" accessibilityLabel={`Xem chứng nhận QR khóa học ${course.name}`}>
+              <Award size={14} color="#047857" />
+              <Text style={styles.certButtonText}>Chứng chỉ QR</Text>
+            </Pressable>
+          ) : (
+            <View />
+          )}
           {!course.enrolled && !isVideo ? <Pressable onPress={onRegister} style={styles.registerButton} accessibilityRole="button"><Text style={styles.registerText}>Zalo tư vấn</Text></Pressable> : null}
           <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
             <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
@@ -1125,11 +1328,13 @@ function CourseList({
   courses,
   onOpen,
   onRegister,
+  onOpenCertificate,
   registeringCourseId = '',
 }: {
   courses: LessonPracticeCourse[];
   onOpen: (course: LessonPracticeCourse) => void;
   onRegister: (course: LessonPracticeCourse) => void;
+  onOpenCertificate?: (course: LessonPracticeCourse) => void;
   registeringCourseId?: string;
 }) {
   return (
@@ -1140,6 +1345,7 @@ function CourseList({
             course={course}
             onOpen={() => onOpen(course)}
             onRegister={() => onRegister(course)}
+            onOpenCertificate={onOpenCertificate ? () => onOpenCertificate(course) : undefined}
             registering={registeringCourseId === course.id}
           />
         </View>
@@ -1178,9 +1384,11 @@ function CourseTooltip({ isVideo }: { isVideo: boolean }) {
 
 function UnitDetails({
   unit,
+  subjectId = '',
   subjectName,
   courseId,
   courseTitle,
+  progressPct = 0,
   userId,
   enabled,
   resources,
@@ -1194,9 +1402,11 @@ function UnitDetails({
   onContinuePractice,
 }: {
   unit: LessonPracticeUnit;
+  subjectId?: string;
   subjectName: string;
   courseId: string;
   courseTitle: string;
+  progressPct?: number;
   userId: string;
   enabled: boolean;
   resources: NonNullable<LessonPracticeCourse['files']>;
@@ -1541,12 +1751,16 @@ function UnitDetails({
         <VideoLessonPane
           key={`${unit.id}-${section.itemId}`}
           unit={unit}
+          subjectId={subjectId}
           subjectName={subjectName}
+          sectionId={section.id}
+          sectionLabel={section.title}
           video={sectionVideo}
           done={Boolean(sectionDone)}
           antiSeekEnabled={sectionVideo?.antiSeek ?? unit.antiSeek !== false}
           courseId={courseId}
           courseTitle={courseTitle}
+          progressPct={progressPct}
           userId={userId}
           enabled={enabled}
           resources={resources}
@@ -1918,12 +2132,16 @@ const getEmbeddedVideoUrl = embeddedVideoUrl;
 
 function VideoLessonPane({
   unit,
+  subjectId = '',
   subjectName,
+  sectionId = '',
+  sectionLabel = '',
   video,
   done,
   antiSeekEnabled,
   courseId,
   courseTitle,
+  progressPct = 0,
   userId,
   enabled,
   resources,
@@ -1931,12 +2149,16 @@ function VideoLessonPane({
   onComplete,
 }: {
   unit: LessonPracticeUnit;
+  subjectId?: string;
   subjectName: string;
+  sectionId?: string;
+  sectionLabel?: string;
   video: { id: string; title: string; url: string } | undefined;
   done: boolean;
   antiSeekEnabled: boolean;
   courseId: string;
   courseTitle: string;
+  progressPct?: number;
   userId: string;
   enabled: boolean;
   resources: NonNullable<LessonPracticeCourse['files']>;
@@ -1953,15 +2175,141 @@ function VideoLessonPane({
     playing: false,
   });
   const playerApiRef = useRef<VideoPlayerApi | null>(null);
+  const lastSyncedAtSecRef = useRef(-1);
   const rawUrl = video?.url || '';
   const url = playableVideoUrl(rawUrl);
   const embeddedUrl = getEmbeddedVideoUrl(url);
   const directVideo = isDirectVideoUrl(url);
+  const resolvedUrl = url ? resolveMobilePublicUrl(url) : '';
+  const offlineLessonKey = `${userId || 'anon'}_${unit.id}_${video?.id || 'video'}`;
+  const [offlineRecord, setOfflineRecord] = useState<OfflineVideoRecord | null>(null);
+  const [offlineDownloadPct, setOfflineDownloadPct] = useState<number | null>(null);
+  const [offlineUri, setOfflineUri] = useState<string>('');
+  const [usingOfflineUri, setUsingOfflineUri] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setUsingOfflineUri(false);
+    setOfflineUri('');
+    if (Platform.OS === 'web') return undefined;
+    void getOfflineVideoRecord(offlineLessonKey).then((rec) => {
+      if (alive) setOfflineRecord(rec);
+    });
+    return () => { alive = false; };
+  }, [offlineLessonKey]);
+
+  useEffect(() => {
+    return () => {
+      if (offlineUri) void releaseOfflinePlaybackUri(offlineUri);
+    };
+  }, [offlineUri]);
+
+  const handleDownloadOffline = async () => {
+    if (!directVideo || !resolvedUrl || offlineDownloadPct !== null) return;
+    setOfflineDownloadPct(1);
+    try {
+      const rec = await downloadEncryptedOfflineVideo({
+        lessonKey: offlineLessonKey,
+        url: resolvedUrl,
+        title: video?.title || unit.title,
+        courseTitle,
+        subjectName,
+        antiSeekEnabled,
+        onProgress: setOfflineDownloadPct,
+      });
+      setOfflineRecord(rec);
+      Alert.alert('Đã tải offline', 'Video đã được mã hóa khóa thiết bị trong bộ nhớ nội bộ của ứng dụng.');
+    } catch (err) {
+      Alert.alert('Không thể tải offline', err instanceof Error ? err.message : 'Lỗi tải hoặc mã hóa tệp video.');
+    } finally {
+      setOfflineDownloadPct(null);
+    }
+  };
+
+  const handlePlayOfflineToggle = async () => {
+    if (usingOfflineUri && offlineUri) {
+      setUsingOfflineUri(false);
+      void releaseOfflinePlaybackUri(offlineUri);
+      setOfflineUri('');
+      return;
+    }
+    try {
+      const decrypted = await prepareOfflinePlaybackUri(offlineLessonKey);
+      if (!decrypted) {
+        Alert.alert('Chưa có bản offline', 'Vui lòng tải video trước.');
+        return;
+      }
+      setOfflineUri(decrypted);
+      setUsingOfflineUri(true);
+      setStarted(true);
+    } catch (err) {
+      Alert.alert('Không thể mở bản offline', err instanceof Error ? err.message : 'Lỗi giải mã nội bộ.');
+    }
+  };
+
+  const handleDeleteOffline = () => {
+    Alert.alert('Xóa bản tải offline?', 'Xóa tệp video đã mã hóa khỏi máy?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: () => {
+          void deleteOfflineVideo(offlineLessonKey).then(() => {
+            setOfflineRecord(null);
+            if (usingOfflineUri) {
+              setUsingOfflineUri(false);
+              if (offlineUri) void releaseOfflinePlaybackUri(offlineUri);
+              setOfflineUri('');
+            }
+          });
+        },
+      },
+    ]);
+  };
   const invalidLink = Boolean(rawUrl) && !url;
 
   // Luôn phát ngay trong khung; link không phát được thì báo tại chỗ, không mở sang tab/ứng dụng khác.
   const startVideo = () => {
     if (url) setStarted(true);
+  };
+
+  const handleVideoProgress = (p: VideoPlayerProgress) => {
+    setVideoProgress(p);
+    const currentSec = Math.floor(p.currentTime || 0);
+    if (
+      p.playing &&
+      userId &&
+      courseId &&
+      Math.abs(currentSec - lastSyncedAtSecRef.current) >= 5
+    ) {
+      lastSyncedAtSecRef.current = currentSec;
+      void saveLastStudySession({
+        kind: 'lms_video',
+        studentId: userId,
+        courseId,
+        courseTitle,
+        subjectId,
+        subjectName,
+        unitId: unit.id,
+        unitTitle: unit.title,
+        sectionId,
+        sectionLabel: sectionLabel || video?.title || unit.title,
+        atSec: currentSec,
+        durationSec: Math.floor(p.duration || 0),
+        progressPct,
+      });
+    }
+  };
+
+  const handleSeekTo = (sec: number) => {
+    if (!url) return;
+    const safe = Math.max(0, Math.floor(Number(sec) || 0));
+    if (!started) {
+      setStarted(true);
+      setTimeout(() => playerApiRef.current?.seekTo?.(safe), 450);
+    } else {
+      playerApiRef.current?.seekTo?.(safe);
+    }
   };
 
   return (
@@ -1979,16 +2327,16 @@ function VideoLessonPane({
         ) : null}
       </View>
       <View style={styles.videoFrame}>
-        {started && (embeddedUrl || directVideo) ? (
+        {started && (usingOfflineUri ? Boolean(offlineUri) : (embeddedUrl || directVideo)) ? (
           <VideoPlayerFrame
-            videoUrl={resolveMobilePublicUrl(url)}
-            embeddedUrl={embeddedUrl}
+            videoUrl={usingOfflineUri && offlineUri ? offlineUri : resolveMobilePublicUrl(url)}
+            embeddedUrl={usingOfflineUri ? '' : embeddedUrl}
             title={video?.title || unit.title}
             lessonId={`${userId || 'anon'}-${unit.id}-${video?.id || 'video'}`}
             antiSeekEnabled={antiSeekEnabled}
             done={done}
             playerApiRef={playerApiRef}
-            onProgress={setVideoProgress}
+            onProgress={handleVideoProgress}
             onWatched={onComplete}
           />
         ) : (
@@ -2008,6 +2356,54 @@ function VideoLessonPane({
           </View>
         )}
       </View>
+      {Platform.OS !== 'web' && url ? (
+        <View style={styles.offlineLessonBar}>
+          <View style={styles.offlineLessonLeft}>
+            <ShieldCheck size={14} color={offlineRecord ? '#059669' : '#64748B'} />
+            <Text style={styles.offlineLessonText} numberOfLines={1}>
+              {offlineDownloadPct !== null
+                ? `Đang tải & mã hóa: ${offlineDownloadPct}%`
+                : offlineRecord
+                  ? `Đã tải offline (Mã hóa • ${formatOfflineBytes(offlineRecord.sizeBytes)})`
+                  : directVideo
+                    ? 'Hỗ trợ tải offline (Mã hóa nội bộ)'
+                    : 'Link nhúng YouTube (chỉ tải offline file MP4/WebM nội bộ)'}
+            </Text>
+          </View>
+          {directVideo ? (
+            <View style={styles.offlineLessonActions}>
+              {offlineRecord ? (
+                <>
+                  <Pressable
+                    onPress={() => { void handlePlayOfflineToggle(); }}
+                    style={[styles.offlineActionBtn, usingOfflineUri && styles.offlineActionBtnActive]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.offlineActionBtnText, usingOfflineUri && styles.offlineActionBtnTextActive]}>
+                      {usingOfflineUri ? 'Đang phát Offline' : 'Phát Offline'}
+                    </Text>
+                  </Pressable>
+                  <Pressable onPress={handleDeleteOffline} style={styles.offlineTrashButton} accessibilityRole="button">
+                    <Trash2 size={14} color="#DC2626" />
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  onPress={() => { void handleDownloadOffline(); }}
+                  disabled={offlineDownloadPct !== null}
+                  style={styles.offlineActionBtn}
+                  accessibilityRole="button"
+                >
+                  <Download size={13} color="#047857" />
+                  <Text style={styles.offlineActionBtnText}>
+                    {offlineDownloadPct !== null ? `${offlineDownloadPct}%` : 'Tải Offline'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.videoTabBar} accessibilityRole="tablist">
         {videoLessonTabs.map((tab) => {
           const active = activeTab === tab.id;
@@ -2064,6 +2460,7 @@ function VideoLessonPane({
             resources={resources}
             currentTime={videoProgress.currentTime || playerApiRef.current?.getCurrentTime() || 0}
             videoDuration={videoProgress.duration || playerApiRef.current?.getDuration() || 0}
+            onSeekTo={handleSeekTo}
           />
         )}
       </View>
@@ -2685,4 +3082,75 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   guideHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   cardTitle: { color: colors.ink, fontSize: typography.body, fontWeight: '800' },
   body: { color: colors.muted, fontSize: typography.small, lineHeight: 20 },
+  certButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  certButtonText: { color: '#047857', fontSize: typography.micro, fontWeight: '800' },
+  headerCertButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  headerCertButtonText: { color: '#047857', fontSize: typography.micro, fontWeight: '800' },
+  offlineCatalogCard: { gap: spacing.xs, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#F0FDF4' },
+  offlineCatalogHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, flexWrap: 'wrap' },
+  offlineCatalogTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  offlineSandboxPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#D1FAE5' },
+  offlineSandboxPillText: { color: '#047857', fontSize: 10, fontWeight: '800' },
+  offlineRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#DCFCE7' },
+  offlineRowBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  offlineRowTitle: { color: '#065F46', fontSize: typography.small, fontWeight: '800' },
+  offlineRowSub: { color: '#047857', fontSize: typography.micro, fontWeight: '600' },
+  offlinePlayerModalCard: { width: '94%', maxWidth: 640, borderRadius: 20, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  offlineLessonBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    flexWrap: 'wrap',
+  },
+  offlineLessonLeft: { flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  offlineLessonText: { flex: 1, color: '#475569', fontSize: 11, fontWeight: '700' },
+  offlineLessonActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  offlineActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  offlineActionBtnActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  offlineActionBtnText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  offlineActionBtnTextActive: { color: '#FFFFFF' },
+  offlineTrashButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 }));

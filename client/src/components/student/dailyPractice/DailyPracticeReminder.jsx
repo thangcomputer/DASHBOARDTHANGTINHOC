@@ -20,18 +20,18 @@ export default function DailyPracticeReminder({ stats, topicCount, onStart, onCl
     ? [
       { icon: CalendarX2, value: stats?.missedDays || 0, label: 'ngày đã nghỉ', tone: 'bg-slate-100 text-slate-600', iconTone: 'text-slate-500' },
       { icon: Flame, value: stats?.lostStreak || 0, label: 'chuỗi vừa mất', tone: 'bg-orange-50 text-orange-600', iconTone: 'fill-orange-200 text-orange-400' },
-      { icon: Trophy, value: stats?.bestStreak || 0, label: 'kỷ lục chuỗi', tone: 'bg-red-50 text-red-600', iconTone: 'text-red-500' },
+      { icon: Trophy, value: stats?.bestStreak || 0, label: 'kỷ lục chuỗi', tone: 'bg-emerald-50 text-emerald-600', iconTone: 'text-emerald-500' },
     ]
     : [
       { icon: Flame, value: stats?.streak || 0, label: 'ngày liên tiếp', tone: 'bg-orange-50 text-orange-600', iconTone: 'fill-orange-300 text-orange-500' },
       { icon: Zap, value: stats?.xpTotal || 0, label: 'tổng XP', tone: 'bg-amber-50 text-amber-600', iconTone: 'fill-amber-300 text-amber-500' },
-      { icon: Trophy, value: stats?.bestStreak || 0, label: 'kỷ lục chuỗi', tone: 'bg-red-50 text-red-600', iconTone: 'text-red-500' },
+      { icon: Trophy, value: stats?.bestStreak || 0, label: 'kỷ lục chuỗi', tone: 'bg-emerald-50 text-emerald-600', iconTone: 'text-emerald-500' },
     ];
 
   return createPortal(
     <div className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
       <div className="cms-goal-in relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="daily-reminder-title">
-        <div className={`relative overflow-hidden px-6 pb-5 pt-7 text-center ${lost ? 'bg-gradient-to-br from-sky-50 via-white to-slate-100' : 'bg-gradient-to-br from-red-50 via-white to-amber-50'}`}>
+        <div className={`relative overflow-hidden px-6 pb-5 pt-7 text-center ${lost ? 'bg-gradient-to-br from-sky-50 via-white to-slate-100' : 'bg-gradient-to-br from-emerald-50 via-white to-amber-50'}`}>
           <span className="cms-goal-droplet left-5 top-6 h-6 w-6" aria-hidden="true" />
           <span className="cms-goal-droplet cms-goal-droplet--amber right-12 top-10 h-4 w-4 [animation-delay:1s]" aria-hidden="true" />
           <span className="cms-goal-droplet -right-3 bottom-2 h-12 w-12 [animation-delay:2s]" aria-hidden="true" />

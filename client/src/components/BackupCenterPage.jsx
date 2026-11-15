@@ -99,7 +99,7 @@ export default function BackupCenterPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <Archive className="text-red-600" size={22} /> Sao lưu dữ liệu
+            <Archive className="text-emerald-600" size={22} /> Sao lưu dữ liệu
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
             Chỉ Super Admin · Giữ tối đa {stats?.keep ?? 7} bản · {stats?.diskLabel || '-'} trên disk
@@ -135,7 +135,7 @@ export default function BackupCenterPage() {
         ))}
       </div>
 
-      <div className="bg-red-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium shrink-0">
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 font-medium shrink-0">
         Backup xuất toàn bộ collection MongoDB ra file <code className="font-mono">.json.gz</code>.
         Lịch tự động 03:00 hàng ngày (tắt bằng <code className="font-mono">Backup_schedule=0</code>).
         Restore thủ công từ file tải về - không ghi đè DB qua UI.

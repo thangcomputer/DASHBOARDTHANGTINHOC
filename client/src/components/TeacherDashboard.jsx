@@ -515,7 +515,7 @@ const TeacherDashboard = () => {
                       active: step3Active,
                       sub: step3Active ? 'Đang chờ Admin chấm điểm...' : 'Đang chờ...',
                       color: 'bg-emerald-500',
-                      text: 'text-red-700'
+                      text: 'text-emerald-700'
                     },
                   ];
 
@@ -535,11 +535,11 @@ const TeacherDashboard = () => {
                       </div>
                       <div className="flex-1">
                         <p className={`text-sm font-bold ${s.done ? 'text-green-800' :
-                            s.active ? 'text-red-800' :
+                            s.active ? 'text-emerald-800' :
                               'text-gray-600'
                           }`}>{s.label}</p>
                         <p className={`text-xs ${s.done ? 'text-green-600/70' :
-                            s.active ? 'text-red-500 font-medium' :
+                            s.active ? 'text-emerald-600 font-medium' :
                               'text-gray-400'
                           }`}>{s.sub}</p>
                       </div>
@@ -806,7 +806,7 @@ const TeacherDashboard = () => {
                         value={noShowReason}
                         onChange={(e) => setNoShowReason(e.target.value)}
                         placeholder="Bắt buộc nhập lý do (VD: HS xin nghỉ, GV bận đột xuất...)"
-                        className="w-full border-2 border-red-200 focus:border-emerald-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white mb-3"
+                        className="w-full border-2 border-red-200 focus:border-red-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white mb-3"
                       />
                       <button
                         type="button"

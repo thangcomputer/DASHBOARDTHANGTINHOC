@@ -32,7 +32,7 @@
 | S12 | Bài tập — `StudentMaterialsTab.jsx` → Assignments | ALIGNED | NOT CONNECTED | NONE | — |
 | S13 | Chi tiết / nộp bài — `StudentMaterialsTab.jsx` → Assignment detail/submission | ALIGNED | NOT CONNECTED | NONE | — |
 | S14 | Điểm / kết quả học tập — `StudentOverviewTab.jsx` → Grades | ALIGNED | NOT CONNECTED | NONE | — |
-| S15 | Thi, quiz attempt, chứng chỉ — `/student/exam/*`, `/student/cert-prep/*` → StudentExam inventory | WEB-ONLY | NOT CONNECTED | WEB-ONLY | Attempt, certification, proctoring and official exam results remain website-only by scope. |
+| S15 | Thi, quiz attempt, chứng nhận — `/student/exam/*`, `/student/cert-prep/*` → StudentExam inventory | WEB-ONLY | NOT CONNECTED | WEB-ONLY | Attempt, certification, proctoring and official exam results remain website-only by scope. |
 | S16 | Bảng tin trao đổi — `FeedBoard.jsx` → Feed | ALIGNED | NOT CONNECTED | NONE | — |
 | S17 | Tin tức — `NewsPage.jsx` → News | ALIGNED | NOT CONNECTED | NONE | — |
 | S18 | Chi tiết tin tức — `NewsPage.jsx` → NewsDetail | ALIGNED | NOT CONNECTED | NONE | — |

@@ -30,7 +30,7 @@
 | Lịch học, lịch tuần, nhật ký học | Schedule | CHƯA ĐỦ | Có KPI buổi, bộ lọc tuần/ngày, card buổi học, detail, xác nhận local và nhật ký mock. Chưa phản ánh ghi chú, đánh giá buổi học và trạng thái từ web. |
 | Tài liệu, video, bài tập, quiz, đánh giá | Materials / Assignments / StudentExam / Evaluations | CHƯA ĐỦ | Tài liệu và video có mock list; các category còn lại điều hướng tới màn tương ứng. File, nộp bài và feedback không gửi đi. |
 | Điểm/kết quả học tập | Grades / StudentExam | CHƯA ĐỦ | Có tiến độ bài học; điểm thi chính thức, lịch sử thi và báo cáo vẫn trên web. |
-| Thi/chứng chỉ/MOS/IC3 | StudentExam (menu) | WEB-ONLY TẠM THỜI | Có inventory/menu và thông báo tiếp tục trên website. Không có attempt, camera, proctoring, screen capture, fullscreen hoặc kết quả chính thức trên mobile. |
+| Thi/chứng nhận/MOS/IC3 | StudentExam (menu) | WEB-ONLY TẠM THỜI | Có inventory/menu và thông báo tiếp tục trên website. Không có attempt, camera, proctoring, screen capture, fullscreen hoặc kết quả chính thức trên mobile. |
 | Bảng tin | Feed | CHƯA ĐỦ | Bài viết, reaction và bình luận đồng bộ API; upload ảnh chưa hỗ trợ. |
 | Tin tức/chi tiết | News / NewsDetail | CHƯA ĐỦ | Danh sách, chi tiết và liên kết tệp đọc từ Blog API; nội dung HTML phong phú và thumbnail chưa được hiển thị đầy đủ. |
 | Đánh giá giảng viên | Evaluations | CHƯA ĐỦ | Đọc điều kiện, phản hồi riêng đã gửi, đánh giá công khai đã có và khóa cuối khóa từ API; gửi/sửa phản hồi và đánh giá qua API. |
@@ -38,13 +38,13 @@
 | Hồ sơ/cập nhật/học phí | Profile / Tuition | CHƯA ĐỦ | Profile đã bổ sung KPI, thông tin cá nhân, tóm tắt học tập/tiến độ khóa, tình trạng học phí và trạng thái rỗng đơn hàng video; QA responsive không thấy tràn ngang ở 320–768 px. Dữ liệu thanh toán/đơn hàng và cập nhật chính thức không kết nối; screenshot parity chưa xác nhận. |
 | Thông báo | Notifications | CHƯA ĐỦ | Có loại, lọc, chi tiết, đọc/ẩn local, điều hướng mock và phân trang 20 mục. QA fixture 25 mục đã kiểm tra Trang 1/2 và responsive 320–768 px; trạng thái/đích thực tế không đồng bộ. |
 
-**WEB-ONLY TẠM THỜI:** lượt thi/chứng chỉ và các luồng cần camera, chống gian lận, screen capture hoặc fullscreen. Quiz một câu hỏi trong app chỉ là fixture UI tĩnh để kiểm tra tương tác, không phải chức năng thi hoặc attempt.
+**WEB-ONLY TẠM THỜI:** lượt thi/chứng nhận và các luồng cần camera, chống gian lận, screen capture hoặc fullscreen. Quiz một câu hỏi trong app chỉ là fixture UI tĩnh để kiểm tra tương tác, không phải chức năng thi hoặc attempt.
 
 ## Thay đổi Student trong lượt này
 
 - Student Home giữ thứ tự thông tin chính: lịch gần nhất, KPI học tập, việc cần làm, thông báo và quick actions. Điểm trung bình chưa có fixture sẽ hiển thị `—` thay vì giả định bằng 0.
 - Bài học có bộ lọc khóa đăng ký/tự học video; card giữ cấu trúc khóa, môn/phần mềm, tiến độ, units và lessons.
-- Thêm màn Phòng thi chỉ để giữ đường truy cập và ghi rõ phần chứng chỉ/điểm chính thức tiếp tục trên website; câu hỏi mẫu không lưu kết quả.
+- Thêm màn Phòng thi chỉ để giữ đường truy cập và ghi rõ phần chứng nhận/điểm chính thức tiếp tục trên website; câu hỏi mẫu không lưu kết quả.
 - Lịch học bổ sung KPI và khu vực nhật ký học tập, vẫn dùng fixture hiện có.
 - Tài liệu học tập có lựa chọn tài liệu/video và đường điều hướng tới bài tập, trắc nghiệm, đánh giá, phần mềm.
 - Thông báo có chi tiết và mark-read local.

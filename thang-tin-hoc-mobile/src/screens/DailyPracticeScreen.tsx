@@ -6,8 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Gift, Globe,
-  HelpCircle, Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
-  ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, X, XCircle, Zap,
+  HelpCircle, Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Maximize2, Minimize2, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
+  ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, Volume2, VolumeX, X, XCircle, Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle, Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
@@ -43,6 +43,8 @@ import { useAuth } from '../app/AuthContext';
 import { isFreePortalMenu } from '../utils/freePortalHelper';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from '../components/dailyPractice/Questions';
 import { useGameSounds, type GameSound } from '../components/dailyPractice/useGameSounds';
+import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
+import { useMobileFocusMode } from '../utils/focusMode';
 import { DuoButton } from '../components/duo/DuoButton';
 import { getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
 import { getMobileImageSource } from '../services/apiClient';
@@ -3218,11 +3220,37 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [answerResetKey, setAnswerResetKey] = useState(0);
   const [retryBaselineKey, setRetryBaselineKey] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
+  const { focusMode, toggle: toggleFocus, setFocusMode } = useMobileFocusMode();
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
   const total = session.questions.length;
   const meta = DP_TYPES[question.type];
   const level = DP_DIFFICULTIES.find((d) => d.id === question.difficulty) || DP_DIFFICULTIES[0];
+
+  useEffect(() => {
+    let active = true;
+    getMobileSoundEnabled()
+      .then((enabled) => { if (active) setSoundEnabled(enabled); })
+      .catch(() => { });
+    const unsub = subscribeToMobileSoundPreference((enabled) => setSoundEnabled(enabled));
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+
+  useEffect(() => () => {
+    setFocusMode(false);
+  }, [setFocusMode]);
+
+  const toggleSound = useCallback(() => {
+    const nextEnabled = !soundEnabled;
+    void setMobileSoundEnabled(nextEnabled)
+      .then(() => setSoundEnabled(nextEnabled))
+      .catch(() => { });
+  }, [soundEnabled]);
+
   useEffect(() => {
     setExplainOpen(false);
     setHintChargedXp(0);
@@ -3397,6 +3425,101 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       ? result.xp
       : (isPerQuestionStake && !session.xpDisabled ? QUESTION_STAKE_XP : 0))
     : 0;
+  const canRetryInteractive = Boolean(
+    result
+    && !result.correct
+    && !immediate
+    && canSubmitRetryAfterWrong({
+      pending,
+      retryBaselineKey,
+      questionType: question.type,
+    }),
+  );
+
+  const keyActionsRef = useRef({
+    question,
+    reveal,
+    result,
+    busy,
+    immediate,
+    pending,
+    canRetryInteractive,
+    quitOpen,
+    submit,
+    next,
+    askHint,
+  });
+  keyActionsRef.current = {
+    question,
+    reveal,
+    result,
+    busy,
+    immediate,
+    pending,
+    canRetryInteractive,
+    quitOpen,
+    submit,
+    next,
+    askHint,
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const current = keyActionsRef.current;
+      if (current.quitOpen || current.busy) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const key = event.key.toLowerCase();
+      if (!current.result?.correct) {
+        let optionIndex = -1;
+        if (key >= '1' && key <= '4') optionIndex = Number(key) - 1;
+        else if (key === 'a') optionIndex = 0;
+        else if (key === 'b') optionIndex = 1;
+        else if (key === 'c') optionIndex = 2;
+        else if (key === 'd') optionIndex = 3;
+
+        if (optionIndex >= 0) {
+          if (current.question.type === 'mcq' && optionIndex < (current.question.options?.length || 0)) {
+            if (current.reveal?.eliminate?.includes(optionIndex)) return;
+            event.preventDefault();
+            play('tap');
+            void current.submit({ index: optionIndex });
+            return;
+          }
+          if (current.question.type === 'truefalse' && optionIndex < 2) {
+            event.preventDefault();
+            play('tap');
+            void current.submit({ value: optionIndex === 0 });
+            return;
+          }
+        }
+        if (key === 'h') {
+          event.preventDefault();
+          void current.askHint();
+          return;
+        }
+      }
+
+      if (event.key === 'Enter' || event.key === 'ArrowRight') {
+        if (current.result?.correct) {
+          event.preventDefault();
+          void current.next();
+        } else if (current.result && !current.result.correct && current.canRetryInteractive) {
+          event.preventDefault();
+          void current.submit(current.pending);
+        } else if (!current.result && !current.immediate && current.pending) {
+          event.preventDefault();
+          void current.submit(current.pending);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [play]);
 
   return (
     <DragProvider onDraggingChange={onDraggingChange}>
@@ -3406,7 +3529,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             <LogOut size={15} color="#475569" />
             <Text style={styles.quitBtnText}>Thoát</Text>
           </Pressable>
-          <View style={styles.flex}>
+          <View style={styles.topBarProgressCol}>
             <View style={styles.topBarMetaRow}>
               <Text numberOfLines={1} style={styles.topBarStepTitle}>{stepTitle}</Text>
               <Text style={styles.topBarCount}>{`${index + 1}/${total}`}</Text>
@@ -3414,6 +3537,27 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             <View style={styles.playProgressTrack}>
               <Animated.View style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
             </View>
+          </View>
+          <View style={styles.topBarUtilities}>
+            <Pressable
+              onPress={toggleSound}
+              style={styles.topBarUtilityBtn}
+              accessibilityRole="button"
+              accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
+            >
+              {soundEnabled ? <Volume2 size={16} color="#475569" /> : <VolumeX size={16} color="#94A3B8" />}
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                play('tap');
+                toggleFocus();
+              }}
+              style={[styles.topBarUtilityBtn, focusMode && styles.topBarUtilityBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={focusMode ? 'Thoát chế độ tập trung' : 'Bật chế độ tập trung'}
+            >
+              {focusMode ? <Minimize2 size={16} color="#047857" /> : <Maximize2 size={16} color="#475569" />}
+            </Pressable>
           </View>
           {combo >= 2 ? (
             <Animated.View style={[styles.comboChip, { transform: [{ scale: comboPop }] }]} accessibilityLabel={`Combo ${combo} câu đúng liên tiếp`}>
@@ -3566,6 +3710,16 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             </View>
           ) : null}
         </Animated.View>
+
+        {Platform.OS === 'web' ? (
+          <Text style={styles.shortcutLegend}>
+            {question.type === 'mcq'
+              ? 'Phím tắt: 1–4 / A–D chọn đáp án · H gợi ý · Enter tiếp tục'
+              : question.type === 'truefalse'
+                ? 'Phím tắt: 1–2 / A–B chọn Đúng hoặc Sai · H gợi ý · Enter tiếp tục'
+                : 'Phím tắt: H gợi ý · Enter kiểm tra / tiếp tục'}
+          </Text>
+        ) : null}
 
         {quitOpen ? (
           <QuitConfirm
@@ -5232,10 +5386,18 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   playWrap: { gap: 10, paddingTop: 12, paddingBottom: 92, maxWidth: 760, width: '100%', alignSelf: 'center' },
   topBarCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9,
     borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
     shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
+  topBarProgressCol: { flex: 1, minWidth: 64 },
+  topBarUtilities: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  topBarUtilityBtn: {
+    width: 34, height: 34, borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+  },
+  topBarUtilityBtnActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  shortcutLegend: { color: '#64748B', fontSize: 12, fontWeight: '500', textAlign: 'center', paddingTop: 2 },
   topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   topBarStepTitle: { flex: 1, color: '#64748B', fontSize: 12, fontWeight: '700', marginRight: 8 },
   topBarCount: { color: '#0F172A', fontSize: 12, fontWeight: '800' },

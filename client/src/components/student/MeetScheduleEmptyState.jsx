@@ -19,8 +19,8 @@ export default function MeetScheduleEmptyState({
 }) {
   if (mode === 'purchase') {
     return (
-      <div className={`flex flex-col items-center justify-center rounded-xl border border-dashed p-4 text-center ${freePortalUi ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50/70'}`}>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-full ${freePortalUi ? 'bg-emerald-100 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+      <div className={`flex flex-col items-center justify-center rounded-xl border border-dashed p-4 text-center ${freePortalUi ? 'border-emerald-200 bg-emerald-50/40' : 'border-emerald-200/80 bg-emerald-50/30'}`}>
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <Video size={22} aria-hidden="true" />
         </div>
         <p className="mt-2 text-sm font-black text-slate-900">Học Meet cùng giảng viên</p>
@@ -30,7 +30,7 @@ export default function MeetScheduleEmptyState({
         <DuoButton
           variant="primary"
           size="md"
-          className={`mt-3 ${freePortalUi ? '!from-emerald-500 !to-emerald-700' : ''}`}
+          className="mt-3 !from-emerald-500 !to-emerald-700"
           icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
           label="Mua gói Meet"
           onClick={onPurchaseMeet}

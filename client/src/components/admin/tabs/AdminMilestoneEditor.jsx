@@ -39,7 +39,7 @@ export const DEFAULT_SECTION_ORDER = ['content', 'file', 'video', 'practice'];
 const DIFFICULTY_TABS = [
   { key: 'easy', label: 'Dễ', badge: 'bg-emerald-100 text-emerald-800', active: 'bg-emerald-600 text-white shadow-sm', ring: 'ring-emerald-200' },
   { key: 'medium', label: 'Vừa', badge: 'bg-amber-100 text-amber-800', active: 'bg-amber-500 text-white shadow-sm', ring: 'ring-amber-200' },
-  { key: 'hard', label: 'Khó', badge: 'bg-rose-100 text-rose-800', active: 'bg-emerald-600 text-white shadow-sm', ring: 'ring-rose-200' },
+  { key: 'hard', label: 'Khó', badge: 'bg-rose-100 text-rose-800', active: 'bg-rose-600 text-white shadow-sm', ring: 'ring-rose-200' },
 ];
 
 const SECTION_META = {
@@ -65,7 +65,7 @@ const SECTION_META = {
     subtitle: 'YouTube, video và câu hỏi trong video',
     studentDesc: 'Xem video bài giảng',
     icon: Clapperboard,
-    iconBox: 'bg-red-50 text-red-700 ring-red-200',
+    iconBox: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   },
   practice: {
     key: 'practice',
@@ -609,7 +609,7 @@ export default function AdminMilestoneEditor({
               value={lockMode}
               onChange={(e) => setLockMode(e.target.value)}
               aria-label="Chế độ mở khóa bài học"
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-700 outline-none focus:border-red-400"
+              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-700 outline-none focus:border-emerald-500"
             >
               <option value="sequential">🔒 Xong bài trước mới mở</option>
               <option value="unlocked">🔓 Mở khóa sẵn</option>
@@ -736,7 +736,7 @@ export default function AdminMilestoneEditor({
                       setDragOverKey(null);
                     }}
                     className={`rounded-2xl border bg-white transition ${
-                      isDragTarget ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200'
+                      isDragTarget ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-slate-200'
                     } ${isHidden ? 'opacity-65' : ''}`}
                   >
                     {/* Card Header */}

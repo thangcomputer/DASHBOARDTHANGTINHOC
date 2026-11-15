@@ -79,11 +79,11 @@ export function FreeHiddenRoute({ session, children }) {
 function LockCard({ onClose, onBuy }) {
   return (
     <div className="relative w-[min(100vw-2rem,24rem)] overflow-hidden rounded-[28px] bg-white text-left shadow-[0_24px_80px_rgba(15,23,42,0.28)] ring-1 ring-white/70">
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#1a1030] to-red-800 px-6 pb-6 pt-5 text-center text-white">
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d281f] to-emerald-800 px-6 pb-6 pt-5 text-center text-white">
         <span className="pointer-events-none absolute -left-6 top-8 h-24 w-24 rounded-full bg-fuchsia-400/30 blur-2xl" aria-hidden="true" />
         <span className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-amber-300/25 blur-2xl" aria-hidden="true" />
         <Sparkles size={14} className="absolute left-5 top-5 text-amber-200" aria-hidden="true" />
-        <Sparkles size={12} className="absolute bottom-5 right-6 text-rose-200" aria-hidden="true" />
+        <Sparkles size={12} className="absolute bottom-5 right-6 text-emerald-200" aria-hidden="true" />
         {onClose && (
           <button type="button" onClick={onClose} aria-label="Đóng" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 !shadow-none">
             <X size={16} />

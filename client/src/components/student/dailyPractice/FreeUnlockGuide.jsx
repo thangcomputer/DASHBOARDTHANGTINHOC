@@ -20,7 +20,7 @@ export default function FreeUnlockGuide({ open, onClose }) {
   return (
     <div className="pointer-events-none fixed inset-0 z-[10120] flex items-center justify-center p-4">
       <div className="pointer-events-auto w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="free-unlock-guide-title">
-        <div className="relative bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 px-6 py-5 text-white">
+        <div className="relative bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 px-6 py-5 text-white">
           <button type="button" onClick={onClose} aria-label="Đóng" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 !shadow-none">
             <X size={16} />
           </button>
@@ -30,7 +30,7 @@ export default function FreeUnlockGuide({ open, onClose }) {
         <ol className="space-y-3 px-6 py-5">
           {STEPS.map((step, index) => (
             <li key={step} className="flex gap-3 text-sm font-semibold text-slate-700">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-50 text-xs font-black text-red-700">{index + 1}</span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-700">{index + 1}</span>
               <span className="pt-0.5">{step}</span>
             </li>
           ))}

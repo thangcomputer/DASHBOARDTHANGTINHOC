@@ -1,9 +1,18 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import BranchFilterDropdown from './BranchFilterDropdown';
-import FloatingMessenger from './FloatingMessenger';
+
+const FloatingMessenger = lazy(() => import('./FloatingMessenger'));
+const StudentQuizInviteHost = lazy(() => import('./student/StudentQuizInviteHost'));
+const MeetStartAlert = lazy(() => import('./student/MeetStartAlert'));
+const StudentAttendanceConfirmModal = lazy(() => import('./student/StudentAttendanceConfirmModal'));
+const WelcomeCelebrationOverlay = lazy(() => import('./WelcomeCelebrationOverlay'));
+const FreeSurveyModal = lazy(() => import('./student/FreeSurveyModal'));
+const LoginInboxAlertPopup = lazy(() => import('./LoginInboxAlertPopup'));
+const ClassRoomHost = lazy(() => import('./classRoom/ClassRoom'));
+const LearningGoalModal = lazy(() => import('./student/LearningGoalModal'));
 import { FloatingMessengerProvider } from '../context/FloatingMessengerContext';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
@@ -12,21 +21,22 @@ import api, { setTokens, csrfFetch } from '../services/api';
 import {
   Bell, MessageCircle, CheckCircle2, Clock, X, Lock,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
+  Search, Sun, Moon, Minimize2,
 } from 'lucide-react';
+import { useTheme } from '../utils/theme';
+import { useFocusMode } from '../utils/focusMode';
+import { isStudyLocation } from '../utils/learningGoal';
+
+const OPEN_COMMAND_PALETTE_EVENT = 'cms:open-command-palette';
+const CommandPalette = lazy(() => import('./ui/CommandPalette'));
 
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { LMS_PLAYER_OPEN_EVENT, isLmsPlayerOpen } from '../utils/lmsPlayerOverlay';
 import { getMessagingRole } from '../lib/messagingRoles';
-import StudentQuizInviteHost from './student/StudentQuizInviteHost';
-import MeetStartAlert from './student/MeetStartAlert';
-import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmModal';
 import StudentAssignedTeacherModal from './student/StudentAssignedTeacherModal';
 import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
-import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
-import FreeSurveyModal from './student/FreeSurveyModal';
 import FreeUnlockGuide from './student/dailyPractice/FreeUnlockGuide';
-import LoginInboxAlertPopup from './LoginInboxAlertPopup';
-import ClassRoomHost from './classRoom/ClassRoom';
+import DeferredMount, { IdleMount } from './ui/DeferredMount';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 import { isStudentConfirmExpired } from '../utils/scheduleTime';
 import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
@@ -39,7 +49,6 @@ import TeacherStudentNoteModal, {
   isStudentScheduleNoteNotif,
 } from './teacher/TeacherStudentNoteModal';
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
-import LearningGoalModal from './student/LearningGoalModal';
 import DailyPracticeReminder from './student/dailyPractice/DailyPracticeReminder';
 import { isStudentSchedulesApiBlocked, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
 import dailyPracticeApi from '../services/dailyPracticeApi';
@@ -47,7 +56,7 @@ import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT } from '../utils/learningGoal';
 import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
-import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
+import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/teacherQuizKeys';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
 import { setLoginOverlay } from '../utils/loginOverlayGate';
@@ -66,6 +75,7 @@ const PAGE_TITLES = {
   'student-training': 'Đào tạo HV',
   'lesson-practice': 'Bài giảng',
   'daily-practice': 'Luyện tập hằng ngày',
+  'lms-xp-settings': 'Điểm XP học bài',
   'subscription-codes': 'Mã kích hoạt & gói',
   'meet-classes': 'Lịch Meet',
   'cert-prep': 'Ôn thi MOS/IC3',
@@ -73,6 +83,7 @@ const PAGE_TITLES = {
   hr: 'Nhân sự',
   analytics: 'Doanh thu',
   settings: 'Cài đặt',
+  'device-security': 'Thiết bị & 2FA',
   logs: 'Nhật ký',
   schedule: 'Lịch học',
   materials: 'Tài liệu',
@@ -244,7 +255,7 @@ const getNotifStyle = (type) => {
     case 'SYSTEM':
       return { icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'Hệ thống' };
     case 'NEWS':
-      return { icon: Bell, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', label: 'Tin tức' };
+      return { icon: Bell, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'Tin tức' };
     case 'TRAINING':
       return { icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', label: 'Đào tạo' };
     default:
@@ -269,6 +280,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const { isDark, toggle: toggleTheme } = useTheme();
+  const { focusMode, setFocusMode } = useFocusMode();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileFooterHiddenRouteKey, setMobileFooterHiddenRouteKey] = useState(null);
   const [mobileFooterInputFocused, setMobileFooterInputFocused] = useState(false);
@@ -294,6 +307,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     else root.removeAttribute('data-free-portal-student');
     return () => root.removeAttribute('data-free-portal-student');
   }, [isFreePortalStudent]);
+  useEffect(() => {
+    if (focusMode && role === 'student' && !isStudyLocation(location.pathname, location.hash)) {
+      setFocusMode(false);
+    }
+  }, [focusMode, role, location.pathname, location.hash, setFocusMode]);
+  useEffect(() => () => setFocusMode(false), [setFocusMode]);
   const scrollPositions = useRef(new WeakMap());
   const focusRestoreTimer = useRef(null);
   const [ratingDetail, setRatingDetail] = useState(null);
@@ -1866,6 +1885,43 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   </div>
                 )}
 
+                {focusMode && (
+                  <button
+                    type="button"
+                    onClick={() => setFocusMode(false)}
+                    className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-xs font-bold shrink-0"
+                    title="Thoát Chế độ Tập trung"
+                    aria-label="Thoát Chế độ Tập trung"
+                  >
+                    <Minimize2 size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="hidden sm:inline">Thoát tập trung</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
+                  className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white transition text-xs font-medium shrink-0"
+                  title="Tìm kiếm nhanh (Ctrl+K)"
+                  aria-label="Tìm kiếm nhanh (Ctrl+K)"
+                >
+                  <Search size={14} className="shrink-0" />
+                  <span className="hidden lg:inline">Tìm nhanh</span>
+                  <kbd className="hidden xl:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-700/80 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600">
+                    Ctrl K
+                  </kbd>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-amber-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shrink-0"
+                  title={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+                  aria-label={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+                >
+                  {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+
                 <div className="relative">
                   <button
                     ref={bellRef}
@@ -1927,64 +1983,80 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           </div>
         </main>
 
-        {role === 'student' ? <StudentQuizInviteHost /> : null}
-        {(role === 'student' || role === 'teacher') ? <MeetStartAlert role={role} session={session} /> : null}
-        <ClassRoomHost />
+        {role === 'student' ? (
+          <IdleMount><StudentQuizInviteHost /></IdleMount>
+        ) : null}
+        {(role === 'student' || role === 'teacher') ? (
+          <IdleMount><MeetStartAlert role={role} session={session} /></IdleMount>
+        ) : null}
+        <IdleMount><ClassRoomHost /></IdleMount>
 
-        <LoginInboxAlertPopup
-          role={role}
-          userId={myId}
-          adminRole={session?.adminRole || ''}
-          blocked={
-            showFreeSurvey
-            || showWelcomeCelebration
-            || !!courseCelebration
-            || !!starBonusCelebration
-            || (role === 'teacher' && !!teacherPaymentCelebration)
-            || (role === 'student' && !!attendanceConfirm)
-            || (role === 'student' && assignedTeacherModal.open)
-            || (canManageAttendanceAdminPopups && !!attendanceDispute)
-            || (role === 'teacher' && !!teacherAttendanceConfirm)
-            || (role === 'teacher' && !!studentNotePopup)
-            || (session?.isFirstLogin === true && role !== 'teacher')
-          }
-        />
-        <FreeSurveyModal
-          open={showFreeSurvey}
-          onDone={() => {
-            setFreeSurveyClosed(true);
-            window.dispatchEvent(new Event('free-survey-done'));
-          }}
-        />
-        <WelcomeCelebrationOverlay
-          open={freeUnlockShow === 'fireworks'}
-          fireworksOnly
-          onClose={finishFreeFireworks}
-        />
+        <IdleMount>
+          <LoginInboxAlertPopup
+            role={role}
+            userId={myId}
+            adminRole={session?.adminRole || ''}
+            blocked={
+              showFreeSurvey
+              || showWelcomeCelebration
+              || !!courseCelebration
+              || !!starBonusCelebration
+              || (role === 'teacher' && !!teacherPaymentCelebration)
+              || (role === 'student' && !!attendanceConfirm)
+              || (role === 'student' && assignedTeacherModal.open)
+              || (canManageAttendanceAdminPopups && !!attendanceDispute)
+              || (role === 'teacher' && !!teacherAttendanceConfirm)
+              || (role === 'teacher' && !!studentNotePopup)
+              || (session?.isFirstLogin === true && role !== 'teacher')
+            }
+          />
+        </IdleMount>
+        <DeferredMount when={showFreeSurvey}>
+          <FreeSurveyModal
+            open={showFreeSurvey}
+            onDone={() => {
+              setFreeSurveyClosed(true);
+              window.dispatchEvent(new Event('free-survey-done'));
+            }}
+          />
+        </DeferredMount>
+        <DeferredMount when={freeUnlockShow === 'fireworks'}>
+          <WelcomeCelebrationOverlay
+            open={freeUnlockShow === 'fireworks'}
+            fireworksOnly
+            onClose={finishFreeFireworks}
+          />
+        </DeferredMount>
         <FreeUnlockGuide open={freeUnlockShow === 'guide'} onClose={() => setFreeUnlockShow(null)} />
-        <WelcomeCelebrationOverlay
-          open={showWelcomeCelebration && !showFreeSurvey}
-          role={role}
-          name={displayName || session?.name || ''}
-          variant="welcome"
-          onClose={dismissWelcomeCelebration}
-        />
-        <WelcomeCelebrationOverlay
-          open={!showWelcomeCelebration && !!courseCelebration}
-          role="student"
-          name={displayName || session?.name || ''}
-          variant="course_complete"
-          courseName={courseCelebration?.courseName || ''}
-          onClose={dismissCourseCelebration}
-        />
-        <WelcomeCelebrationOverlay
-          open={!showWelcomeCelebration && !courseCelebration && !!starBonusCelebration}
-          role="teacher"
-          name={displayName || session?.name || ''}
-          variant="star_bonus"
-          starBonus={starBonusCelebration}
-          onClose={dismissStarBonusCelebration}
-        />
+        <DeferredMount when={showWelcomeCelebration && !showFreeSurvey}>
+          <WelcomeCelebrationOverlay
+            open={showWelcomeCelebration && !showFreeSurvey}
+            role={role}
+            name={displayName || session?.name || ''}
+            variant="welcome"
+            onClose={dismissWelcomeCelebration}
+          />
+        </DeferredMount>
+        <DeferredMount when={!showWelcomeCelebration && !!courseCelebration}>
+          <WelcomeCelebrationOverlay
+            open={!showWelcomeCelebration && !!courseCelebration}
+            role="student"
+            name={displayName || session?.name || ''}
+            variant="course_complete"
+            courseName={courseCelebration?.courseName || ''}
+            onClose={dismissCourseCelebration}
+          />
+        </DeferredMount>
+        <DeferredMount when={!showWelcomeCelebration && !courseCelebration && !!starBonusCelebration}>
+          <WelcomeCelebrationOverlay
+            open={!showWelcomeCelebration && !courseCelebration && !!starBonusCelebration}
+            role="teacher"
+            name={displayName || session?.name || ''}
+            variant="star_bonus"
+            starBonus={starBonusCelebration}
+            onClose={dismissStarBonusCelebration}
+          />
+        </DeferredMount>
         {role === 'student' && dailyReminderOpen && (
           <DailyPracticeReminder
             stats={dailyReminder?.stats}
@@ -1997,15 +2069,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           />
         )}
         {role === 'student' && (
-          <LearningGoalModal
-            open={learningGoalOpen}
-            currentGoal={learningGoalData?.goal || null}
-            onClose={closeLearningGoal}
-            onSaved={(data) => {
-              if (data) setLearningGoalData(data);
-              setLearningGoalOpen(false);
-            }}
-          />
+          <DeferredMount when={learningGoalOpen}>
+            <LearningGoalModal
+              open={learningGoalOpen}
+              currentGoal={learningGoalData?.goal || null}
+              onClose={closeLearningGoal}
+              onSaved={(data) => {
+                if (data) setLearningGoalData(data);
+                setLearningGoalOpen(false);
+              }}
+            />
+          </DeferredMount>
         )}
         <TeacherPaymentCelebration
           key={teacherPaymentCelebration?.id || 'none'}
@@ -2017,14 +2091,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             navigate('/teacher/finance');
           }}
         />
-        <StudentAttendanceConfirmModal
-          open={role === 'student' && !!attendanceConfirm}
-          payload={attendanceConfirm}
-          busy={attendanceConfirmBusy}
-          onAccept={() => handleStudentAttendanceDecision('accept')}
-          onDispute={() => handleStudentAttendanceDecision('dispute')}
-          onDismiss={dismissStudentAttendanceConfirm}
-        />
+        <DeferredMount when={role === 'student' && !!attendanceConfirm}>
+          <StudentAttendanceConfirmModal
+            open={role === 'student' && !!attendanceConfirm}
+            payload={attendanceConfirm}
+            busy={attendanceConfirmBusy}
+            onAccept={() => handleStudentAttendanceDecision('accept')}
+            onDispute={() => handleStudentAttendanceDecision('dispute')}
+            onDismiss={dismissStudentAttendanceConfirm}
+          />
+        </DeferredMount>
         <StudentAssignedTeacherModal
           open={role === 'student' && assignedTeacherModal.open}
           teacher={assignedTeacherModal.teacher}
@@ -2597,8 +2673,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         )}
 
 
-        {/* Chat nổi toàn site - mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
-        <FloatingMessenger session={session} role={role} />
+        {/* Chat nổi toàn site + Command Palette (Ctrl+K) tải nền sau initial paint */}
+        <IdleMount>
+          <FloatingMessenger session={session} role={role} />
+          <CommandPalette role={role} />
+        </IdleMount>
         {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
           <div className="cms-lms-attention" role="status" aria-live="polite">
             <span className="cms-lms-attention__label">Trong LMS</span>

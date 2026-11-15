@@ -5,9 +5,10 @@ import { useStudentSubscription } from './subscription/subscriptionContext';
 import { hasMeetAccessClient } from '../../utils/subscription';
 import { useNavigate } from 'react-router-dom';
 import {
-  BookOpen, Calendar, CheckCircle2, ChevronRight, ClipboardList, Clock, Crown, ExternalLink, Flame, Gamepad2, Plus,
+  Award, BookOpen, Calendar, CheckCircle2, ChevronRight, ClipboardList, Clock, Copy, Crown, ExternalLink, Flame, Gamepad2, Gift, Plus,
   PlayCircle, Trophy, Video, Zap,
 } from 'lucide-react';
+import DigitalCertificateModal from './DigitalCertificateModal';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
 import { CompactCoursePicker } from './StudentShared';
 import WelcomeHero from '../WelcomeHero';
@@ -15,6 +16,8 @@ import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../services/dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
+import { LAST_STUDY_UPDATED_EVENT, formatResumeTimeAgo, readLastStudySession } from '../../utils/resumeLearning';
+import { formatLmsTimestamp } from '../../utils/lmsLessonUi';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { isFreePortalCourseName, isFreePortalSelfRegistrationStudent } from '../../utils/enrollments';
 import { isMeetEnded, isMeetLiveNow, meetLessonName, vnScheduleClock } from '../../utils/meetJoin';
@@ -88,13 +91,11 @@ function sortMeetClasses(rows = [], clock = vnScheduleClock()) {
     .sort((a, b) => a.nextStart - b.nextStart);
 }
 
-function TaskRow({ icon: Icon, tone, title, sub, cta, onClick, freePortalUi = false }) {
+function TaskRow({ icon: Icon, tone, title, sub, cta, onClick, freePortalUi: _freePortalUi = false }) {
   return (
     <div
       onClick={onClick}
-      className={`duo-pressable flex w-full flex-col gap-2.5 rounded-2xl border bg-white p-3 sm:flex-row sm:items-center sm:justify-between shadow-sm transition cursor-pointer ${
-        freePortalUi ? 'border-[#E2E8F0] hover:border-emerald-200' : 'border-slate-200 hover:border-red-200'
-      }`}
+      className="duo-pressable flex w-full flex-col gap-2.5 rounded-2xl border bg-white p-3 sm:flex-row sm:items-center sm:justify-between shadow-sm transition cursor-pointer border-[#E2E8F0] hover:border-emerald-200"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
@@ -106,7 +107,7 @@ function TaskRow({ icon: Icon, tone, title, sub, cta, onClick, freePortalUi = fa
         </div>
       </div>
       <DuoButton
-        variant={freePortalUi ? 'primary' : 'danger'}
+        variant="primary"
         size="sm"
         className="w-full shrink-0 sm:w-auto"
         rightIcon={<ChevronRight size={14} aria-hidden="true" />}
@@ -139,8 +140,26 @@ export default function StudentOverviewTab({
   const [meetClasses, setMeetClasses] = useState([]);
   const [pendingQuizzes, setPendingQuizzes] = useState([]);
   const [meetPlanOpen, setMeetPlanOpen] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
+  const [referralInput, setReferralInput] = useState('');
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralCopied, setReferralCopied] = useState(false);
+  const [referralFeedback, setReferralFeedback] = useState({ type: '', text: '' });
+  const overviewStudentId = studentData?.id || studentData?._id || '';
+  const [lastStudy, setLastStudy] = useState(() => readLastStudySession(overviewStudentId));
   const subCtx = useStudentSubscription();
   const portalSub = subCtx?.subscription;
+
+  useEffect(() => {
+    const refreshLastStudy = () => setLastStudy(readLastStudySession(overviewStudentId));
+    refreshLastStudy();
+    window.addEventListener(LAST_STUDY_UPDATED_EVENT, refreshLastStudy);
+    window.addEventListener('focus', refreshLastStudy);
+    return () => {
+      window.removeEventListener(LAST_STUDY_UPDATED_EVENT, refreshLastStudy);
+      window.removeEventListener('focus', refreshLastStudy);
+    };
+  }, [overviewStudentId]);
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 30_000);
@@ -461,7 +480,7 @@ export default function StudentOverviewTab({
     })
     || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
   );
-  const accentIconClass = freePortalUi ? 'text-emerald-600' : 'text-red-600';
+  const accentIconClass = 'text-emerald-600';
   const freePortalAccount = freePortalUi;
   const meetAccess = hasMeetAccessClient(portalSub);
   const meetScheduleEmptyMode = freePortalAccount
@@ -474,6 +493,40 @@ export default function StudentOverviewTab({
   const canOpenScheduleTab = meetScheduleEmptyMode === 'default' && !freePortalAccount;
 
   const practiceStats = practice?.stats;
+  const referralInfo = practice?.referral || practiceStats?.referral || null;
+  const handleCopyReferral = async () => {
+    if (!referralInfo?.code) return;
+    try {
+      await navigator.clipboard?.writeText(referralInfo.code);
+      setReferralCopied(true);
+      setTimeout(() => setReferralCopied(false), 2000);
+    } catch {
+      setReferralFeedback({ type: 'error', text: `Mã của bạn là ${referralInfo.code}` });
+    }
+  };
+  const handleRedeemReferral = async (e) => {
+    e.preventDefault();
+    const cleaned = String(referralInput || '').trim();
+    if (!cleaned || referralBusy) return;
+    setReferralBusy(true);
+    setReferralFeedback({ type: '', text: '' });
+    try {
+      const data = await dailyPracticeApi.student.redeemReferral(cleaned);
+      setReferralInput('');
+      setReferralFeedback({
+        type: 'success',
+        text: `Đã nhận +${data.rewardXp} XP cho cả bạn và ${data.referrerName}!`,
+      });
+      if (typeof data.profileXp === 'number') {
+        window.dispatchEvent(new CustomEvent(DAILY_PRACTICE_STATS_EVENT, { detail: { xpTotal: data.profileXp } }));
+      }
+      dailyPracticeApi.student.overview().then(setPractice).catch(() => { });
+    } catch (err) {
+      setReferralFeedback({ type: 'error', text: err.message || 'Không thể áp dụng mã giới thiệu' });
+    } finally {
+      setReferralBusy(false);
+    }
+  };
   const pathTopic = useMemo(
     () => pickActivePathTopic(pathData, '', resolveSavedPathTopicId(undefined, pathData?.activeTopicId)),
     [pathData],
@@ -492,6 +545,34 @@ export default function StudentOverviewTab({
     ? practiceStats.todaySessions * 10
     : (practiceStats?.playedToday ? 10 : 0);
   const todayXp = practiceStats?.todayXp ?? studentData?.lms?.dailyXpToday ?? 0;
+
+  const effectiveLastStudy = useMemo(() => {
+    if (lastStudy) return lastStudy;
+    if (!practiceLocked && (pathTopic || activePathUnit)) {
+      const topicName = pathTopic?.topic?.name || 'Lộ trình DewSkill';
+      const lessonTitle = pathTopic?.next?.unitTitle || activePathUnit?.title || topicName;
+      const stepLabel = pathTopic?.next?.stepLabel
+        ? `${pathTopicNextLinePrefix(pathTopic)} · ${pathTopic.next.stepLabel}`
+        : `Chặng ${activePathUnit?.index || 1}`;
+      return {
+        kind: 'daily_practice',
+        courseTitle: topicName,
+        lessonTitle,
+        sectionLabel: stepLabel,
+        atSec: 0,
+        progressPct: heroProgress,
+        href: '/student/daily-practice',
+        updatedAt: 0,
+      };
+    }
+    return null;
+  }, [lastStudy, practiceLocked, pathTopic, activePathUnit, heroProgress]);
+
+  const resumeKindLabel = effectiveLastStudy?.kind === 'lesson_practice'
+    ? 'Bài giảng thực hành'
+    : effectiveLastStudy?.kind === 'daily_practice'
+      ? 'Lộ trình DewSkill'
+      : 'Video khóa học';
 
   const liveMeet = meetCardsPre.find((item) => item.live);
   const nextMeet = meetCardsPre[0] || null;
@@ -582,6 +663,77 @@ export default function StudentOverviewTab({
       <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
         <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3">
           <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3">
+            {effectiveLastStudy ? (
+              <section className="flex min-w-0 flex-col gap-3 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/60 p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white uppercase">
+                      <Zap size={11} aria-hidden="true" /> Học tiếp 1 chạm
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-700">
+                      {resumeKindLabel}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {effectiveLastStudy.updatedAt > 0
+                      ? formatResumeTimeAgo(effectiveLastStudy.updatedAt)
+                      : 'Lộ trình hiện tại'}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="truncate text-[15px] font-black text-slate-900">
+                      {effectiveLastStudy.lessonTitle || effectiveLastStudy.unitTitle || effectiveLastStudy.courseTitle || 'Tiếp tục bài học'}
+                    </h3>
+                    <p className="truncate text-xs font-semibold text-slate-600">
+                      {[effectiveLastStudy.courseTitle || effectiveLastStudy.subjectName, effectiveLastStudy.sectionLabel].filter(Boolean).join(' · ') || 'Quay lại đúng vị trí bạn đang học dở'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      {effectiveLastStudy.atSec > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700 tabular-nums">
+                          <Clock size={11} aria-hidden="true" />
+                          Đang xem tại {formatLmsTimestamp(effectiveLastStudy.atSec)}
+                        </span>
+                      ) : null}
+                      {effectiveLastStudy.progressPct != null ? (
+                        <span className="text-[11px] font-bold text-slate-500 tabular-nums">
+                          {effectiveLastStudy.progressPct}% hoàn thành
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setCertOpen(true)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+                    >
+                      <Award size={14} className="text-emerald-600" aria-hidden="true" />
+                      Chứng chỉ QR
+                    </button>
+                    <DuoButton
+                      variant="primary"
+                      size="sm"
+                      className="w-full shrink-0 sm:w-auto"
+                      icon={<PlayCircle size={15} color="#FFFFFF" aria-hidden="true" />}
+                      rightIcon={<ChevronRight size={14} color="#FFFFFF" aria-hidden="true" />}
+                      label="Học tiếp ngay"
+                      onClick={() => {
+                        const [pathname, hash] = String(effectiveLastStudy.href || '').split('#');
+                        if (hash) {
+                          navigate({ pathname: pathname || '/student', hash });
+                          window.location.hash = hash;
+                        } else {
+                          navigate(effectiveLastStudy.href);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
             <section className={`flex min-w-0 flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm ${freePortalUi ? 'border-[#E2E8F0]' : 'border-slate-200'}`}>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
@@ -636,7 +788,7 @@ export default function StudentOverviewTab({
                           />
                         ) : item.meetLink && item.joinable ? (
                           <DuoButton
-                            variant="danger"
+                            variant="primary"
                             className="duo-btn--meet-live"
                             size="sm"
                             icon={<Video size={14} color="#FFFFFF" aria-hidden="true" />}
@@ -761,7 +913,7 @@ export default function StudentOverviewTab({
                   ) : (
                     <>
                       <DuoButton
-                        variant={freePortalUi ? 'primary' : 'danger'}
+                        variant="primary"
                         size="md"
                         className="flex-1 min-w-[140px]"
                         icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
@@ -832,6 +984,77 @@ export default function StudentOverviewTab({
                 />
               </>
             ) : null}
+
+            {referralInfo ? (
+              <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-emerald-50/50 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                      <Gift size={17} className="shrink-0 text-amber-500" aria-hidden="true" />
+                      Giới thiệu bạn bè · Nhận thưởng XP
+                    </h3>
+                    <p className="mt-0.5 text-xs font-medium text-slate-500">
+                      Gửi mã cho bạn bè cùng học — cả 2 nhận ngay{' '}
+                      <span className="font-black text-emerald-700">+{referralInfo.rewardXp} XP</span>!
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-black text-amber-800">
+                    {referralInfo.referralCount || 0} bạn · +{referralInfo.referralXpEarned || 0} XP
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mã của bạn</p>
+                    <p className="truncate font-mono text-sm font-black tracking-wide text-slate-900">{referralInfo.code}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyReferral}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700"
+                  >
+                    <Copy size={13} aria-hidden="true" />
+                    {referralCopied ? 'Đã sao chép' : 'Sao chép'}
+                  </button>
+                </div>
+
+                {referralInfo.redeemed ? (
+                  <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                    ✓ Đã áp dụng mã giới thiệu {referralInfo.referredByCode || ''}.
+                  </p>
+                ) : (
+                  <form onSubmit={handleRedeemReferral} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={referralInput}
+                      onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                      placeholder="Nhập mã bạn bè (VD: DEW-XXXXXX)"
+                      maxLength={32}
+                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase text-slate-800 placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={referralBusy || !referralInput.trim()}
+                      className="shrink-0 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {referralBusy ? 'Đang gửi...' : 'Nhận XP'}
+                    </button>
+                  </form>
+                )}
+
+                {referralFeedback.text ? (
+                  <p
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                      referralFeedback.type === 'success'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-rose-50 text-rose-700'
+                    }`}
+                  >
+                    {referralFeedback.text}
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
           </div>
         </div>
       </div>
@@ -844,6 +1067,19 @@ export default function StudentOverviewTab({
           reloadMeetClasses();
         }}
       />
+      {certOpen && (
+        <DigitalCertificateModal
+          open={certOpen}
+          onClose={() => setCertOpen(false)}
+          studentName={studentData?.name || viewStudent?.name || 'Học viên Thắng Tin Học'}
+          studentCode={studentData?.studentCode || viewStudent?.studentCode || ''}
+          studentId={overviewStudentId}
+          courseId={pathTopic?.topic?.id || currentCourseName || 'dewskill'}
+          courseTitle={effectiveLastStudy?.courseTitle || currentCourseName || pathTopic?.topic?.name || 'Lộ trình Tin học DewSkill'}
+          instructorName="Trung tâm Thắng Tin Học"
+          completionRate={effectiveLastStudy?.progressPct ?? (Number.isFinite(Number(progressPct)) ? Number(progressPct) : heroProgress)}
+        />
+      )}
     </div>
   );
 }

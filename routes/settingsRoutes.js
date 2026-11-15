@@ -1313,27 +1313,12 @@ router.post('/upload-exam-warning-sound', authMiddleware, ...settingsGuard('stud
 
 // ── POST /api/settings/upload-logo ── Upload logo thương hiệu ────────────────
 const logoDir = path.join(__dirname, '..', 'uploads', 'logo');
-if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true });
-
-const logoStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, logoDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `logo_${Date.now()}${ext}`);
-  },
-});
-const uploadLogo = multer({
-  storage: logoStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Chỉ cho phép file ảnh'));
-  },
-});
+const uploadLogo = createSafeImageUpload(logoDir, 'logo', 5 * 1024 * 1024);
 
 router.post('/upload-logo', authMiddleware, ...settingsGuard('system_write'), uploadLogo.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
+    normalizeMulterFile(req.file);
     const logoUrl = `/uploads/logo/${req.file.filename}`;
     await updateMainSettings({ $set: { logoUrl } });
     return res.json({ success: true, logoUrl, message: 'Upload logo thành công' });
@@ -1346,10 +1331,16 @@ router.post('/upload-logo', authMiddleware, ...settingsGuard('system_write'), up
 const faviconDir = path.join(__dirname, '..', 'uploads', 'favicon');
 if (!fs.existsSync(faviconDir)) fs.mkdirSync(faviconDir, { recursive: true });
 
+const ALLOWED_FAVICON_EXT = new Set(['.png', '.ico', '.webp', '.jpg', '.jpeg', '.gif']);
+const ALLOWED_FAVICON_MIMES = new Set(['image/png', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/webp', 'image/jpeg', 'image/gif']);
+
 const faviconStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, faviconDir),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.png';
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ALLOWED_FAVICON_EXT.has(ext)) {
+      return cb(new Error('Chỉ cho phép file ảnh (PNG, ICO, WEBP, JPG, GIF)'));
+    }
     const kind = String(req.query?.kind || 'public').toLowerCase() === 'admin' ? 'admin' : 'public';
     cb(null, `favicon_${kind}_${Date.now()}${ext}`);
   },
@@ -1358,15 +1349,17 @@ const uploadFavicon = multer({
   storage: faviconStorage,
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'image/svg+xml' || file.mimetype === 'image/x-icon';
-    if (ok) cb(null, true);
-    else cb(new Error('Chỉ cho phép file ảnh (PNG, SVG, ICO, WEBP...)'));
+    const mime = String(file.mimetype || '').toLowerCase();
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (ALLOWED_FAVICON_MIMES.has(mime) && ALLOWED_FAVICON_EXT.has(ext)) cb(null, true);
+    else cb(new Error('Chỉ cho phép file ảnh (PNG, ICO, WEBP, JPG, GIF)'));
   },
 });
 
 router.post('/upload-favicon', authMiddleware, ...settingsGuard('system_write'), uploadFavicon.single('favicon'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
+    normalizeMulterFile(req.file);
     const kind = String(req.query?.kind || req.body?.kind || 'public').toLowerCase() === 'admin' ? 'admin' : 'public';
     const faviconPath = `/uploads/favicon/${req.file.filename}`;
     const field = kind === 'admin' ? 'faviconAdminUrl' : 'faviconUrl';
@@ -1385,27 +1378,12 @@ router.post('/upload-favicon', authMiddleware, ...settingsGuard('system_write'),
 
 // ── POST /api/settings/upload-invoice-logo ── Upload logo dành riêng cho hóa đơn ──
 const invLogoDir = path.join(__dirname, '..', 'uploads', 'invoice_logo');
-if (!fs.existsSync(invLogoDir)) fs.mkdirSync(invLogoDir, { recursive: true });
-
-const invLogoStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, invLogoDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `inv_logo_${Date.now()}${ext}`);
-  },
-});
-const uploadInvLogo = multer({
-  storage: invLogoStorage,
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Chỉ cho phép file ảnh'));
-  },
-});
+const uploadInvLogo = createSafeImageUpload(invLogoDir, 'inv_logo', 2 * 1024 * 1024);
 
 router.post('/upload-invoice-logo', authMiddleware, ...settingsGuard('system_write'), uploadInvLogo.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
+    normalizeMulterFile(req.file);
     const logoUrl = `/uploads/invoice_logo/${req.file.filename}`;
     await updateMainSettings({ $set: { invoiceLogoUrl: logoUrl } });
     return res.json({ success: true, logoUrl, message: 'Upload logo hóa đơn thành công' });

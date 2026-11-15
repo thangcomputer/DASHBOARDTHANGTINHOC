@@ -334,7 +334,7 @@ function StudyHubPopover({ node, unit, color, onClose, onOpenLesson, onStartPrac
             )}
             {Boolean(single.videos?.[0]?.url) && (
               <div className="flex items-center gap-1.5 px-1 text-[11px] font-bold text-white/90">
-                <PlayCircle size={13} className="shrink-0 text-red-200" />
+                <PlayCircle size={13} className="shrink-0 text-emerald-200" />
                 <span>Video bài giảng{single.videos?.[0]?.checks?.length ? ` (${single.videos[0].checks.length} câu hỏi video)` : ''}</span>
               </div>
             )}
@@ -386,7 +386,7 @@ function StudyHubPopover({ node, unit, color, onClose, onOpenLesson, onStartPrac
                       {done ? <span className="font-bold text-emerald-200">Đã học</span> : null}
                       {hasContent ? <span>Lý thuyết</span> : null}
                       {hasFile ? <span className="flex items-center gap-0.5 text-amber-200"><Paperclip size={10} /> File</span> : null}
-                      {hasVideo ? <span className="flex items-center gap-0.5 text-red-200"><PlayCircle size={10} /> Video</span> : null}
+                      {hasVideo ? <span className="flex items-center gap-0.5 text-emerald-200"><PlayCircle size={10} /> Video</span> : null}
                     </div>
                   </div>
                   {!locked && (

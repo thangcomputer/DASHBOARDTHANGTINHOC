@@ -25,7 +25,7 @@ export const MaterialsView = ({ trainingData, studentQuestions, onSelectAssignme
   };
 
   const tabs = [
-    { key: 'quizzes', label: 'Trắc nghiệm GV', icon: Trophy, color: 'text-emerald-600', bgActive: 'bg-red-100 text-emerald-700' },
+    { key: 'quizzes', label: 'Trắc nghiệm GV', icon: Trophy, color: 'text-emerald-600', bgActive: 'bg-emerald-100 text-emerald-700' },
     { key: 'videos', label: 'Video học', icon: Video, color: 'text-purple-600', bgActive: 'bg-purple-100 text-purple-700' },
     { key: 'files', label: 'Tài liệu', icon: FileText, color: 'text-blue-600', bgActive: 'bg-blue-100 text-blue-700' },
     { key: 'guides', label: 'Bài tập', icon: ClipboardList, color: 'text-orange-600', bgActive: 'bg-orange-100 text-orange-700' },
@@ -40,7 +40,7 @@ export const MaterialsView = ({ trainingData, studentQuestions, onSelectAssignme
   });
 
   const typeColors = {
-    VIDEO: 'bg-purple-500', PDF: 'bg-red-500', XLSX: 'bg-green-500', PPTX: 'bg-orange-500', DOCX: 'bg-red-500',
+    VIDEO: 'bg-purple-500', PDF: 'bg-red-500', XLSX: 'bg-green-500', PPTX: 'bg-orange-500', DOCX: 'bg-blue-500',
   };
 
   return (

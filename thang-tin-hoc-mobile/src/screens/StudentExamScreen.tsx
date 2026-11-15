@@ -265,7 +265,7 @@ export function StudentExamScreen() {
     { key: 'quiz', title: 'Trắc nghiệm buổi học', subtitle: 'Bài do giảng viên giao theo buổi học', Icon: Trophy, tone: '#E11D48' },
     { key: 'cert', title: 'Thi chứng nhận môn học', subtitle: 'Thi có camera · theo tiến độ khóa học', Icon: Monitor, tone: '#2563EB' },
     { key: 'scores', title: 'Xem điểm của tôi', subtitle: 'Nhật ký điểm trắc nghiệm & chứng nhận', Icon: Award, tone: '#EA580C' },
-    { key: 'mos-ic3', title: 'MOS / IC3', subtitle: 'Ôn tập và luyện thi chứng chỉ', Icon: GraduationCap, tone: '#7C3AED' },
+    { key: 'mos-ic3', title: 'MOS / IC3', subtitle: 'Ôn tập và luyện thi chứng nhận', Icon: GraduationCap, tone: '#7C3AED' },
   ];
 
   if (quizDetail) {
@@ -522,7 +522,7 @@ export function StudentExamScreen() {
   if (user?.role === 'student' && isFreePortalLocked(user)) {
     return (
       <AppScreen scrollViewRef={screenScrollRef}>
-        <AppHeader title="Phòng luyện đề & thi" subtitle="Phòng thi chứng chỉ và trắc nghiệm" showBackButton={false} centered />
+        <AppHeader title="Phòng luyện đề & thi" subtitle="Phòng thi chứng nhận và trắc nghiệm" showBackButton={false} centered />
         <View style={styles.examLockedWrap}>
           <View style={styles.examLockedCard}>
             <View style={styles.examLockedIconCircle}>
@@ -530,7 +530,7 @@ export function StudentExamScreen() {
             </View>
             <Text style={styles.examLockedTitle}>Phòng thi đang khóa</Text>
             <Text style={styles.examLockedDesc}>
-              Tính năng làm bài thi và luyện đề chứng chỉ chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
+              Tính năng làm bài thi và luyện đề chứng nhận chỉ dành cho học viên chính thức hoặc đã đăng ký gói Meet.
             </Text>
             <Pressable
               onPress={() => DeviceEventEmitter.emit('mobile:open-free-lock-modal')}
@@ -700,7 +700,7 @@ export function StudentExamScreen() {
       ) : activeTab === 'cert' ? (
         <Card style={styles.disabledInfo}><Monitor size={24} color={colors.muted} /><Text style={styles.sectionTitle}>Thi chứng nhận chỉ trên máy tính</Text><Text style={styles.examMuted}>Để bảo đảm camera và giám sát bài thi, hãy mở Phòng thi trên máy tính.</Text></Card>
       ) : (
-        <Card style={styles.disabledInfo}><GraduationCap size={24} color={colors.purple} /><Text style={styles.sectionTitle}>MOS / IC3</Text><Text style={styles.examMuted}>Mở mục ôn tập chứng chỉ để xem đề luyện tập.</Text><Pressable onPress={() => navigation.navigate('CertPrepCatalog')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Mở ôn tập MOS / IC3</Text></Pressable></Card>
+        <Card style={styles.disabledInfo}><GraduationCap size={24} color={colors.purple} /><Text style={styles.sectionTitle}>MOS / IC3</Text><Text style={styles.examMuted}>Mở mục ôn tập chứng nhận để xem đề luyện tập.</Text><Pressable onPress={() => navigation.navigate('CertPrepCatalog')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Mở ôn tập MOS / IC3</Text></Pressable></Card>
       )) : null}
     </AppScreen>
   );

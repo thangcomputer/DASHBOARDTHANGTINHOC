@@ -129,7 +129,7 @@ Mọi dòng “Đang hoạt động” dưới đây được mount tại `serve
 
 ### 1.5 Luồng nghiệp vụ chính
 
-Quản trị học viên/giáo viên/nhân viên/chi nhánh; xếp lịch và điểm danh; học phí, hóa đơn, ledger và SePay; bài tập, quiz, thi chứng chỉ, thi giáo viên; LMS/training; chat/inbox/feed/blog; file/backup; AI; notification và realtime. Các lỗi toàn vẹn thi trong SEC-001/002/003/006 đã được sửa ở Giai đoạn 1 và đang chờ kiểm thử route/E2E trên QA.
+Quản trị học viên/giáo viên/nhân viên/chi nhánh; xếp lịch và điểm danh; học phí, hóa đơn, ledger và SePay; bài tập, quiz, thi chứng nhận, thi giáo viên; LMS/training; chat/inbox/feed/blog; file/backup; AI; notification và realtime. Các lỗi toàn vẹn thi trong SEC-001/002/003/006 đã được sửa ở Giai đoạn 1 và đang chờ kiểm thử route/E2E trên QA.
 
 ## 2. Kết quả chạy kiểm tra
 
@@ -206,7 +206,7 @@ Chi tiết test runner:
 
 ## 4. Chi tiết từng lỗi
 
-### [SEC-001] Lộ đáp án thi chứng chỉ học viên - Đã sửa – chờ kiểm thử môi trường QA
+### [SEC-001] Lộ đáp án thi chứng nhận học viên - Đã sửa – chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái/nhóm: Nghiêm trọng; Đã xác nhận; Broken Access Control/Exam integrity.
 - File/dòng: `routes/settingsRoutes.js:498-529`; `StudentTest.jsx:424-433,641-644`.
@@ -484,7 +484,7 @@ Chi tiết test runner:
 ### Các nhận định cũ không còn đúng
 
 - Không xác nhận thiếu JWT verify, thiếu CSRF, CORS wildcard production, thiếu Helmet, generic student mass assignment, path traversal backup/static, broad NoSQL injection hoặc pre-submit answer leak ở teacher-assigned quiz.
-- Teacher-assigned quiz `/api/quizzes/:id/submit` chấm server-side; lỗi client-authoritative nằm ở luồng thi chứng chỉ StudentTest.
+- Teacher-assigned quiz `/api/quizzes/:id/submit` chấm server-side; lỗi client-authoritative nằm ở luồng thi chứng nhận StudentTest.
 - Google OAuth được theo dõi tại CFG-001; Zalo OAuth cần xác nhận nghiệp vụ riêng.
 
 ## 6. Hiệu năng

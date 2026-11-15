@@ -252,7 +252,7 @@ export default function LmsBrandedPlayerChrome({
           className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4"
           style={{
             background: windowLook
-              ? 'radial-gradient(circle at 50% 45%, rgba(239,68,68,0.10) 0%, #23262E 55%, #1C1F26 100%)'
+              ? 'radial-gradient(circle at 50% 45%, rgba(16,185,129,0.12) 0%, #23262E 55%, #1C1F26 100%)'
               : 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.78) 100%)',
           }}
           onContextMenu={(e) => e.preventDefault()}
@@ -276,8 +276,8 @@ export default function LmsBrandedPlayerChrome({
             onClick={() => onPlay?.()}
             className={`relative rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95 ${windowLook ? 'w-20 h-20 sm:w-28 sm:h-28' : 'w-16 h-16 sm:w-20 sm:h-20'}`}
             style={{
-              background: windowLook ? '#EF3B36' : 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)',
-              boxShadow: '0 0 32px rgba(220,38,38,0.45), 0 8px 24px rgba(0,0,0,0.35)',
+              background: windowLook ? '#10B981' : 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
+              boxShadow: '0 0 32px rgba(16,185,129,0.45), 0 8px 24px rgba(0,0,0,0.35)',
             }}
             aria-label="Phát video"
           >
@@ -312,8 +312,8 @@ export default function LmsBrandedPlayerChrome({
           <span
             className={`flex items-center justify-center rounded-full shadow-2xl ${windowLook ? 'h-16 w-16 sm:h-20 sm:w-20' : 'h-14 w-14 sm:h-16 sm:w-16'}`}
             style={{
-              background: '#EF3B36',
-              boxShadow: '0 0 28px rgba(220,38,38,0.5), 0 6px 20px rgba(0,0,0,0.35)',
+              background: '#10B981',
+              boxShadow: '0 0 28px rgba(16,185,129,0.5), 0 6px 20px rgba(0,0,0,0.35)',
             }}
           >
             <Play size={windowLook ? 32 : 26} className="ml-1 text-white drop-shadow-lg" fill="white" />
@@ -391,7 +391,7 @@ export default function LmsBrandedPlayerChrome({
                 style={{ width: `${progressPct}%` }}
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow border border-red-200"
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow border border-emerald-200"
                 style={{ left: `calc(${progressPct}% - 8px)` }}
               />
             </div>
@@ -406,8 +406,8 @@ export default function LmsBrandedPlayerChrome({
               }}
               className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white transition hover:scale-105 active:scale-95"
               style={{
-                background: 'linear-gradient(135deg, #f87171 0%, #b91c1c 100%)',
-                boxShadow: '0 4px 14px rgba(220,38,38,0.35)',
+                background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
+                boxShadow: '0 4px 14px rgba(16,185,129,0.35)',
               }}
               aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}
             >
@@ -476,7 +476,7 @@ export default function LmsBrandedPlayerChrome({
                     const v = Number(e.target.value);
                     onVolumeChange?.(v);
                   }}
-                  className="w-full h-1.5 accent-red-400 cursor-pointer"
+                  className="w-full h-1.5 accent-emerald-400 cursor-pointer"
                   aria-label="Âm lượng"
                 />
               </div>

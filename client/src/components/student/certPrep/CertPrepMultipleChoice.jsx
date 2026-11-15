@@ -13,7 +13,7 @@ function optionTone({ showFeedback, isCorrectOpt, isSelected, wrongSelected, exa
   }
   if (!showFeedback) {
     return isSelected
-      ? 'border-emerald-500 bg-red-50 ring-1 ring-red-200'
+      ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200'
       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50';
   }
   if (isCorrectOpt) return 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200';
@@ -59,7 +59,7 @@ export default function CertPrepMultipleChoice({
               checked={checked}
               disabled={disabled}
               onChange={() => toggle(i)}
-              className={`mt-1 ${exam ? 'accent-emerald-500' : 'accent-red-600'}`}
+              className={`mt-1 ${exam ? 'accent-emerald-500' : 'accent-emerald-600'}`}
             />
             <span className="min-w-0 flex-1">
               <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full border text-xs font-black mr-2 align-middle ${

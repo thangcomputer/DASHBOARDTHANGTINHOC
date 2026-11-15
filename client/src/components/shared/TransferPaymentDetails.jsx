@@ -18,12 +18,12 @@ export default function TransferPaymentDetails({
           <div className="mt-1.5">
             <p className="text-[10px] font-bold  tracking-wide text-slate-500">Số tiền thanh toán</p>
             {amount != null && (
-              <p className="text-2xl font-black leading-7 text-red-600 tabular-nums">
+              <p className="text-2xl font-black leading-7 text-emerald-600 tabular-nums">
                 {Number(amount || 0).toLocaleString('vi-VN')}đ
               </p>
             )}
           </div>
-          <div className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+          <div className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
             <GraduationCap size={22} strokeWidth={2.5} />
           </div>
         </div>

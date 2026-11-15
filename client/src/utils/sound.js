@@ -279,6 +279,25 @@ export const playLessonWrongSound = () => {
   });
 };
 
+const HAPTIC_PATTERNS = {
+  light: 8,
+  medium: 15,
+  success: [10, 35, 16],
+  error: [24, 40, 24],
+};
+
+/** Phản hồi rung nhẹ trên thiết bị hỗ trợ; bỏ qua nếu tắt âm thanh hoặc giảm chuyển động. */
+export const triggerHaptic = (kind = 'light') => {
+  if (muted || typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+  try {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+      return;
+    }
+    const pattern = HAPTIC_PATTERNS[kind] ?? HAPTIC_PATTERNS.light;
+    navigator.vibrate(pattern);
+  } catch { /* ignore unsupported vibrate error */ }
+};
+
 /** Chuỗi nốt ngắn cho hiệu ứng trò chơi luyện tập hằng ngày. */
 function playNotes(notes, { type = 'sine', volume = 0.18 } = {}) {
   unlockAudio();
@@ -303,54 +322,94 @@ function playNotes(notes, { type = 'sine', volume = 0.18 } = {}) {
 }
 
 export const gameSounds = {
-  tap: () => playNotes([{ freq: 660, dur: 0.05 }], { type: 'triangle', volume: 0.08 }),
-  click: () => playNotes([{ freq: 660, dur: 0.05 }], { type: 'triangle', volume: 0.08 }),
-  pick: () => playNotes([{ freq: 520, dur: 0.06, slideTo: 760 }], { type: 'triangle', volume: 0.1 }),
-  drop: () => playNotes([{ freq: 760, dur: 0.07, slideTo: 440 }], { type: 'triangle', volume: 0.1 }),
-  correct: () => playNotes([
-    { freq: 659, at: 0, dur: 0.12 },
-    { freq: 880, at: 0.09, dur: 0.12 },
-    { freq: 1319, at: 0.18, dur: 0.22 },
-  ], { type: 'triangle', volume: 0.16 }),
-  wrong: () => playNotes([
-    { freq: 330, at: 0, dur: 0.2, slideTo: 247 },
-    { freq: 247, at: 0.18, dur: 0.32, slideTo: 165 },
-  ], { type: 'sawtooth', volume: 0.07 }),
+  tap: () => {
+    triggerHaptic('light');
+    playNotes([{ freq: 660, dur: 0.05 }], { type: 'triangle', volume: 0.08 });
+  },
+  click: () => {
+    triggerHaptic('light');
+    playNotes([{ freq: 660, dur: 0.05 }], { type: 'triangle', volume: 0.08 });
+  },
+  pick: () => {
+    triggerHaptic('light');
+    playNotes([{ freq: 520, dur: 0.06, slideTo: 760 }], { type: 'triangle', volume: 0.1 });
+  },
+  drop: () => {
+    triggerHaptic('light');
+    playNotes([{ freq: 760, dur: 0.07, slideTo: 440 }], { type: 'triangle', volume: 0.1 });
+  },
+  correct: () => {
+    triggerHaptic('success');
+    playNotes([
+      { freq: 659, at: 0, dur: 0.12 },
+      { freq: 880, at: 0.09, dur: 0.12 },
+      { freq: 1319, at: 0.18, dur: 0.22 },
+    ], { type: 'triangle', volume: 0.16 });
+  },
+  wrong: () => {
+    triggerHaptic('error');
+    playNotes([
+      { freq: 330, at: 0, dur: 0.2, slideTo: 247 },
+      { freq: 247, at: 0.18, dur: 0.32, slideTo: 165 },
+    ], { type: 'sawtooth', volume: 0.07 });
+  },
   hint: () => playNotes([
     { freq: 988, at: 0, dur: 0.1 },
     { freq: 1319, at: 0.07, dur: 0.16 },
   ], { type: 'sine', volume: 0.12 }),
-  xp: () => playNotes([
-    { freq: 880, at: 0, dur: 0.09 },
-    { freq: 1175, at: 0.07, dur: 0.11 },
-    { freq: 1568, at: 0.15, dur: 0.2 },
-  ], { type: 'sine', volume: 0.14 }),
-  unlock: () => playNotes([
-    { freq: 587, at: 0, dur: 0.11 },
-    { freq: 784, at: 0.09, dur: 0.12 },
-    { freq: 988, at: 0.18, dur: 0.14 },
-    { freq: 1175, at: 0.28, dur: 0.28 },
-  ], { type: 'triangle', volume: 0.16 }),
-  complete: () => playNotes([
-    { freq: 523, at: 0, dur: 0.14 },
-    { freq: 659, at: 0.12, dur: 0.14 },
-    { freq: 784, at: 0.24, dur: 0.14 },
-    { freq: 1047, at: 0.36, dur: 0.34 },
-    { freq: 1319, at: 0.5, dur: 0.4 },
-  ], { type: 'triangle', volume: 0.16 }),
-  win: () => playNotes([
-    { freq: 523, at: 0, dur: 0.14 },
-    { freq: 659, at: 0.12, dur: 0.14 },
-    { freq: 784, at: 0.24, dur: 0.14 },
-    { freq: 1047, at: 0.36, dur: 0.34 },
-    { freq: 1319, at: 0.5, dur: 0.4 },
-  ], { type: 'triangle', volume: 0.16 }),
+  xp: () => {
+    triggerHaptic('success');
+    playNotes([
+      { freq: 880, at: 0, dur: 0.09 },
+      { freq: 1175, at: 0.07, dur: 0.11 },
+      { freq: 1568, at: 0.15, dur: 0.2 },
+    ], { type: 'sine', volume: 0.14 });
+  },
+  streak: () => {
+    triggerHaptic('success');
+    playNotes([
+      { freq: 587, at: 0, dur: 0.09 },
+      { freq: 880, at: 0.07, dur: 0.11 },
+      { freq: 1175, at: 0.15, dur: 0.18 },
+      { freq: 1568, at: 0.24, dur: 0.24 },
+    ], { type: 'triangle', volume: 0.16 });
+  },
+  unlock: () => {
+    triggerHaptic('success');
+    playNotes([
+      { freq: 587, at: 0, dur: 0.11 },
+      { freq: 784, at: 0.09, dur: 0.12 },
+      { freq: 988, at: 0.18, dur: 0.14 },
+      { freq: 1175, at: 0.28, dur: 0.28 },
+    ], { type: 'triangle', volume: 0.16 });
+  },
+  complete: () => {
+    triggerHaptic('success');
+    playNotes([
+      { freq: 523, at: 0, dur: 0.14 },
+      { freq: 659, at: 0.12, dur: 0.14 },
+      { freq: 784, at: 0.24, dur: 0.14 },
+      { freq: 1047, at: 0.36, dur: 0.34 },
+      { freq: 1319, at: 0.5, dur: 0.4 },
+    ], { type: 'triangle', volume: 0.16 });
+  },
+  win: () => {
+    triggerHaptic('success');
+    playNotes([
+      { freq: 523, at: 0, dur: 0.14 },
+      { freq: 659, at: 0.12, dur: 0.14 },
+      { freq: 784, at: 0.24, dur: 0.14 },
+      { freq: 1047, at: 0.36, dur: 0.34 },
+      { freq: 1319, at: 0.5, dur: 0.4 },
+    ], { type: 'triangle', volume: 0.16 });
+  },
   sad: () => playNotes([
     { freq: 392, at: 0, dur: 0.28 },
     { freq: 349, at: 0.26, dur: 0.28 },
     { freq: 311, at: 0.52, dur: 0.5, slideTo: 262 },
   ], { type: 'sine', volume: 0.14 }),
   lightningCombo: () => {
+    triggerHaptic('success');
     unlockAudio();
     const ctx = lessonAudio();
     if (!ctx) return;
@@ -382,6 +441,7 @@ export const gameSounds = {
     }
   },
   mascotVictory: () => {
+    triggerHaptic('success');
     unlockAudio();
     const ctx = lessonAudio();
     if (!ctx) return;
@@ -411,10 +471,12 @@ export const GameSoundManager = {
   isMuted: isSoundMuted,
   setMuted: setSoundMuted,
   toggleMuted: toggleSoundMuted,
+  haptic: (kind) => triggerHaptic(kind),
   click: () => gameSounds.click(),
   correct: () => gameSounds.correct(),
   wrong: () => gameSounds.wrong(),
   xp: () => gameSounds.xp(),
+  streak: () => gameSounds.streak(),
   complete: () => gameSounds.complete(),
   unlock: () => gameSounds.unlock(),
   play(soundKey) {

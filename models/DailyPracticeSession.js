@@ -29,6 +29,8 @@ const dailyPracticeSessionSchema = new mongoose.Schema({
   recovery: { type: Boolean, default: false },
   /** Ôn lại nấc đã xong khi còn XP - không cược, không đổi tiến độ. */
   review: { type: Boolean, default: false },
+  /** Lượt ôn tập ngắt quãng câu từng làm sai (1-3-7 ngày). */
+  spacedReview: { type: Boolean, default: false },
   xp: { type: Number, default: 0 },
   bonusXp: { type: Number, default: 0 },
   correctCount: { type: Number, default: 0 },

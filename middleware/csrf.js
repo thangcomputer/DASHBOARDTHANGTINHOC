@@ -9,6 +9,7 @@ const HEADER_NAME = 'x-csrf-token';
 
 const SKIP_PREFIXES = [
   '/api/webhooks',
+  '/api/monitoring/ingest',
   '/healthz',
 ];
 

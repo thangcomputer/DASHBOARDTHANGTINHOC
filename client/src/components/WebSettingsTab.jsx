@@ -32,12 +32,12 @@ function FaviconRow({
 }) {
   const isRose = tone === 'rose';
   return (
-    <div className={`rounded-xl border p-3 ${isRose ? 'border-rose-100 bg-rose-50/40' : 'border-slate-100 bg-slate-50/60'}`}>
-      <p className={`text-[10px] font-black  tracking-wider mb-2 ${isRose ? 'text-rose-700' : 'text-slate-500'}`}>
+    <div className={`rounded-xl border p-3 ${isRose ? 'border-emerald-100 bg-emerald-50/40' : 'border-slate-100 bg-slate-50/60'}`}>
+      <p className={`text-[10px] font-black  tracking-wider mb-2 ${isRose ? 'text-emerald-700' : 'text-slate-500'}`}>
         {label}
       </p>
       <div className="flex items-center gap-2.5">
-        <div className={`w-10 h-10 rounded-lg border bg-white flex items-center justify-center overflow-hidden flex-shrink-0 ${isRose ? 'border-rose-100' : 'border-slate-200'}`}>
+        <div className={`w-10 h-10 rounded-lg border bg-white flex items-center justify-center overflow-hidden flex-shrink-0 ${isRose ? 'border-emerald-100' : 'border-slate-200'}`}>
           <img
             src={resolveMediaUrl(value) || value || fallbackSrc}
             alt=""
@@ -57,7 +57,7 @@ function FaviconRow({
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
             className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed text-[11px] font-semibold transition disabled:opacity-50 whitespace-nowrap ${isRose
-                ? 'border-rose-300 text-rose-700 hover:bg-white'
+                ? 'border-emerald-300 text-emerald-700 hover:bg-white'
                 : 'border-slate-300 text-slate-600 hover:bg-white'
               }`}
           >
@@ -68,7 +68,7 @@ function FaviconRow({
             type="url"
             value={value}
             onChange={onChange}
-            className={`flex-1 min-w-0 border rounded-lg px-2 py-1.5 text-[11px] font-mono outline-none bg-white ${isRose ? 'border-rose-100 focus:border-emerald-400' : 'border-slate-200 focus:border-blue-400'
+            className={`flex-1 min-w-0 border rounded-lg px-2 py-1.5 text-[11px] font-mono outline-none bg-white ${isRose ? 'border-emerald-100 focus:border-emerald-400' : 'border-slate-200 focus:border-blue-400'
               }`}
             placeholder="URL…"
           />
@@ -394,7 +394,7 @@ export default function WebSettingsTab() {
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-              <Image size={14} className="text-red-600" /> Banner Quảng cáo Học viên
+              <Image size={14} className="text-emerald-600" /> Banner Quảng cáo Học viên
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">
               Banner dạng trượt hiển thị góc phải trên Dashboard học viên. Khuyến nghị thiết kế để tối ưu chiều cao: 1000x200px hoặc 1200x240px (Tỷ lệ 5:1).
@@ -420,7 +420,7 @@ export default function WebSettingsTab() {
             <div key={index} className="relative rounded-xl border border-gray-200 bg-gray-50 p-2 group">
               <button
                 type="button"
-                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-emerald-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-emerald-600 hover:text-white z-10"
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-red-600 hover:text-white z-10"
                 onClick={() => setConfig((prev) => ({
                   ...prev,
                   studentBanners: prev.studentBanners.filter((_, i) => i !== index),
@@ -546,14 +546,14 @@ export default function WebSettingsTab() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-              <Monitor size={14} className="text-red-600" /> Hiệu ứng Loading
+              <Monitor size={14} className="text-emerald-600" /> Hiệu ứng Loading
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">Chọn 1 kiểu khi khởi động hệ thống</p>
           </div>
           <button
             type="button"
             onClick={handlePreview}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[11px] font-bold hover:bg-red-100 transition"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[11px] font-bold hover:bg-emerald-100 transition"
           >
             <Eye size={12} /> Xem 3s
           </button>
@@ -566,7 +566,7 @@ export default function WebSettingsTab() {
               type="button"
               onClick={() => setConfig((prev) => ({ ...prev, loadingStyle: ls.id }))}
               className={`relative rounded-xl border p-2.5 text-left transition-all ${config.loadingStyle === ls.id
-                  ? 'border-emerald-500 bg-red-50'
+                  ? 'border-emerald-500 bg-emerald-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
                 }`}
             >

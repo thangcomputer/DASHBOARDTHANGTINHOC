@@ -10,6 +10,27 @@ import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../utils/htmlContent'
 function renderRichHtml(html) {
   return resolveRichHtmlMedia(sanitizeRichHtml(html), resolveMediaUrl);
 }
+
+function safeExternalHref(rawUrl) {
+  const s = String(rawUrl || '').trim();
+  if (!s) return '';
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) return s;
+  return '';
+}
+
+function safeVideoEmbedUrl(rawUrl) {
+  const s = String(rawUrl || '').trim();
+  if (!/^https?:\/\//i.test(s)) return '';
+  try {
+    const u = new URL(s);
+    const host = u.hostname.toLowerCase();
+    const allowedHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com', 'vimeo.com', 'player.vimeo.com'];
+    if (allowedHosts.includes(host)) return u.toString();
+    return '';
+  } catch {
+    return '';
+  }
+}
 import { CENTER_SECTIONS } from './centerInfoConstants';
 import { hasPermission, PERMISSIONS } from '../../constants/permissions';
 
@@ -69,7 +90,7 @@ function OverviewView({ overview }) {
           { label: 'Giá trị cốt lõi', value: overview.coreValues },
         ].filter((x) => x.value).map((x) => (
           <div key={x.label} className="rounded-2xl border border-slate-100 bg-white p-4">
-            <p className="text-[11px] font-black  tracking-wide text-red-600 mb-1">{x.label}</p>
+            <p className="text-[11px] font-black  tracking-wide text-emerald-600 mb-1">{x.label}</p>
             <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{x.value}</p>
           </div>
         ))}
@@ -84,8 +105,8 @@ function OverviewView({ overview }) {
         {overview.contactEmail ? (
           <p className="flex items-center gap-2"><Mail size={14} /> {overview.contactEmail}</p>
         ) : null}
-        {overview.website ? (
-          <a href={overview.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-red-600 font-bold hover:underline">
+        {safeExternalHref(overview.website) ? (
+          <a href={safeExternalHref(overview.website)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-emerald-600 font-bold hover:underline">
             <Globe size={14} /> {overview.website}
           </a>
         ) : null}
@@ -114,16 +135,16 @@ function OverviewView({ overview }) {
 
       {overview.introVideoUrl ? (
         <div className="rounded-2xl overflow-hidden border border-slate-100 bg-black aspect-video">
-          {/youtube|youtu\.be|vimeo/i.test(overview.introVideoUrl) ? (
+          {safeVideoEmbedUrl(overview.introVideoUrl) ? (
             <iframe
               title="Video giới thiệu"
-              src={overview.introVideoUrl}
+              src={safeVideoEmbedUrl(overview.introVideoUrl)}
               className="w-full h-full"
               allowFullScreen
             />
-          ) : (
+          ) : safeExternalHref(overview.introVideoUrl) || overview.introVideoUrl.startsWith('/uploads/') ? (
             <video src={resolveMediaUrl(overview.introVideoUrl)} controls className="w-full h-full" />
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -178,9 +199,9 @@ function ItemCard({ item, section }) {
         {item.validity ? <span>Thời hạn: {item.validity}</span> : null}
       </div>
       <div className="flex flex-wrap gap-2 pt-1">
-        {item.url ? (
+        {safeExternalHref(item.url) ? (
           <a
-            href={item.url}
+            href={safeExternalHref(item.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
@@ -189,9 +210,9 @@ function ItemCard({ item, section }) {
             <ExternalLink size={12} />
           </a>
         ) : null}
-        {item.mapsUrl ? (
+        {safeExternalHref(item.mapsUrl) ? (
           <a
-            href={item.mapsUrl}
+            href={safeExternalHref(item.mapsUrl)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 text-xs font-bold"
@@ -199,14 +220,14 @@ function ItemCard({ item, section }) {
             <MapPin size={12} /> Xem bản đồ
           </a>
         ) : null}
-        {item.verifyUrl ? (
+        {safeExternalHref(item.verifyUrl) ? (
           <a
-            href={item.verifyUrl}
+            href={safeExternalHref(item.verifyUrl)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold"
           >
-            Xác minh chứng chỉ
+            Xác minh chứng nhận
           </a>
         ) : null}
       </div>
@@ -286,8 +307,8 @@ export default function CenterInfoPage({ session, role = 'student' }) {
                   type="button"
                   onClick={() => setSection(s.key)}
                   className={`w-full flex items-center gap-2.5 px-3 min-h-11 rounded-xl text-sm font-bold transition-colors text-left ${active
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-50'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
                     }`}
                 >
                   <Icon size={16} className="shrink-0" />

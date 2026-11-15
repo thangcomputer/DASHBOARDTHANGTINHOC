@@ -14,8 +14,10 @@ import {
   AdminLazyCertPrepTab,
   AdminLazyLessonPracticeTab,
   AdminLazyDailyPracticeTab,
+  AdminLazyLmsXpSettingsTab,
   AdminLazySubscriptionTab,
   AdminLazyMeetClassTab,
+  AdminLazyDeviceSecurityTab,
 } from './admin/AdminLazyTabShell';
 
 import AdminModalManager from './admin/shared/AdminModalManager';
@@ -86,8 +88,10 @@ const AdminDashboard = () => {
               </AdminTrainingProvider>
             )}
             {activeTab === 'daily-practice' && <AdminLazyDailyPracticeTab />}
+            {activeTab === 'lms-xp-settings' && <AdminLazyLmsXpSettingsTab />}
             {activeTab === 'subscription-codes' && <AdminLazySubscriptionTab />}
             {activeTab === 'meet-classes' && <AdminLazyMeetClassTab />}
+            {activeTab === 'device-security' && <AdminLazyDeviceSecurityTab />}
             {activeTab === 'logs' && (
               <AdminLogsProvider activeTab={activeTab}>
                 <AdminLazyLogsTab />

@@ -37,7 +37,7 @@ export default function EditableAvatar({
     })())
   );
   const isBrandStudent = role === 'student' && !isFreePortal;
-  const cameraBadgeBg = isBrandStudent ? 'bg-[#EF4444]' : 'bg-[#10B981]';
+  const cameraBadgeBg = 'bg-[#10B981]';
 
   useEffect(() => {
     setLocalAvatar(avatar);

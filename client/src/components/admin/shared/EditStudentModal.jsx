@@ -237,7 +237,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
         <div className="cms-sheet-header">
-          <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
+          <span className="cms-sheet-header__side bg-emerald-50 text-emerald-600" aria-hidden="true">
             <Edit3 size={18} />
           </span>
           <h3 className="cms-sheet-header__title">Chỉnh sửa học viên</h3>
@@ -245,7 +245,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
           >
             <X size={18} />
           </button>

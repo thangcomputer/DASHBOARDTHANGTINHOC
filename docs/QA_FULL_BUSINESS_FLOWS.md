@@ -19,7 +19,7 @@
 | ID | Trước | Sau |
 |----|--------|-----|
 | G1-18/24 | SKIP thiếu HV / UI | PASS - tạo fixture + cross-cover G3/G5 |
-| G2-20 | SKIP chứng chỉ/lịch UI | PASS - tạo lịch + HV xem + unlock-exam |
+| G2-20 | SKIP chứng nhận/lịch UI | PASS - tạo lịch + HV xem + unlock-exam |
 | G3-11 | SKIP LMS/nộp bài UI | PASS - assignment + submit + evaluation + exam-result + progress |
 | G4-04 | SKIP voucher/refund | PASS - `PUT /api/students/:id/refund` |
 | G5-03 | SKIP thi UI | PASS - unlock + exam-results API |

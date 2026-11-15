@@ -1250,7 +1250,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && (
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {sTrainingTab === 'videos' && courseCatalogError && (
-                      <div className="border-b border-red-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         Không thể đồng bộ danh mục khóa học: {courseCatalogError}
                       </div>
                     )}
@@ -1575,15 +1575,15 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
               </div>
 
               {/* Tự luận */}
-              <div className="bg-red-50 rounded-2xl p-4 space-y-3 border border-red-100">
-                <p className="text-xs font-black text-sky-700  tracking-widest">✍️ Phần tự luận (quản trị tự chấm)</p>
+              <div className="bg-emerald-50 rounded-2xl p-4 space-y-3 border border-emerald-100">
+                <p className="text-xs font-black text-emerald-700  tracking-widest">✍️ Phần tự luận (quản trị tự chấm)</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-gray-500  block mb-1">Điểm tự luận (0–10)</label>
                     <input type="number" min="0" max="10" step="0.5"
                       value={erForm.essayScore !== undefined ? erForm.essayScore : ''}
                       onChange={e => setErForm({ ...erForm, essayScore: e.target.value })}
-                      className="w-full border-2 border-red-200 rounded-xl p-3 focus:border-green-500 outline-none text-sm font-bold text-red-800"
+                      className="w-full border-2 border-emerald-200 rounded-xl p-3 focus:border-emerald-500 outline-none text-sm font-bold text-emerald-800"
                       placeholder="7.5" />
                   </div>
                   <div>
@@ -1597,7 +1597,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 <div>
                   <label className="text-xs font-bold text-gray-500  block mb-1">Nhận xét tự luận</label>
                   <textarea value={erForm.essayNote || ''} onChange={e => setErForm({ ...erForm, essayNote: e.target.value })}
-                    rows={2} className="w-full border-2 border-red-100 rounded-xl p-3 focus:border-green-500 outline-none text-sm resize-none"
+                    rows={2} className="w-full border-2 border-emerald-100 rounded-xl p-3 focus:border-emerald-500 outline-none text-sm resize-none"
                     placeholder="Nhận xét bài tự luận, ghi chú..." />
                 </div>
               </div>
@@ -1613,7 +1613,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       }`}>Đạt</button>
                   <button onClick={() => setErForm({ ...erForm, passed: false })}
                     className={`flex-1 px-8 py-3 rounded-2xl text-[13px] font-black transition-all duration-300 border-2 ${!erForm.passed
-                        ? 'bg-emerald-600 border-transparent text-white shadow-md scale-[1.02]'
+                        ? 'bg-red-600 border-transparent text-white shadow-md scale-[1.02]'
                         : 'bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 hover:bg-red-50/50 hover:scale-[1.02]'
                       }`}>Chưa đạt</button>
                 </div>

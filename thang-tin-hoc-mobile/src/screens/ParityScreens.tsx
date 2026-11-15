@@ -92,7 +92,7 @@ type MenuItem = { label: string; screen?: MenuScreen; description: string };
 
 const studentMenu: MenuItem[] = [
   { label: 'Bài học', screen: 'StudentLearning', description: 'Khóa học đã đăng ký và tự học qua video' },
-  { label: 'Ôn thi chứng chỉ MOS / IC3', screen: 'CertPrepCatalog', description: 'Luyện đề và thi thử chứng chỉ theo cấp độ' },
+  { label: 'Ôn thi chứng nhận MOS / IC3', screen: 'CertPrepCatalog', description: 'Luyện đề và thi thử chứng nhận theo cấp độ' },
   { label: 'Bài tập về nhà', screen: 'Assignments', description: 'Bài tập, hạn nộp và trạng thái bài làm' },
   { label: 'Tài liệu học tập', screen: 'Materials', description: 'Tài liệu và video theo khóa học' },
   { label: 'Phần mềm', screen: 'SoftwareLinks', description: 'Phần mềm được cung cấp theo khóa học' },
@@ -787,7 +787,7 @@ export function FeedScreen() {
       target.measureLayout(
         scrollView,
         (_x, y) => scrollView.scrollTo({ y: Math.max(0, y - 100), animated: true }),
-        () => {},
+        () => { },
       );
     }, 250);
     return () => clearTimeout(timer);
@@ -1197,532 +1197,532 @@ export function FeedScreen() {
   return (
     <AppScreen scrollViewRef={scrollViewRef}>
       <View onTouchStart={Platform.OS !== 'web' ? closeCommentsOnOutsideTouch : undefined}>
-      <AppHeader title="Bảng tin chung" subtitle="Học viên và giảng viên đều có thể đăng bài" icon={Newspaper} />
-      {canModerateFeed && reportQueueError ? (
-        <View style={styles.feedReportError}><Text style={styles.feedReportErrorText}>{reportQueueError}</Text></View>
-      ) : null}
-      {canModerateFeed && pendingReports.length ? (
-        <Card style={styles.feedModerationCard}>
-          <View style={styles.feedModerationHeading}>
-            <View style={styles.feedModerationHeadingIcon}><Flag size={16} color="#B45309" /></View>
-            <View style={styles.flex}>
-              <Text style={styles.feedModerationTitle}>Báo cáo cần xem xét</Text>
-              <Text style={styles.feedModerationSubtitle}>{pendingReports.length} báo cáo đang chờ xử lý</Text>
-            </View>
-          </View>
-          {pendingReports.map((report) => (
-            <View key={report.id} style={styles.feedReportItem}>
-              <View style={styles.feedReportCopy}>
-                <Text style={styles.feedReportReason}>{reportReasonOptions.find((option) => option.value === report.reason)?.label || 'Lý do khác'}</Text>
-                <Text numberOfLines={2} style={styles.feedReportExcerpt}>{report.post?.content || 'Bài viết không còn tồn tại.'}</Text>
-                <Text style={styles.feedReportReporter}>Báo cáo bởi {report.reporterName} · {report.reporterRole}</Text>
-                {report.details ? <Text style={styles.feedReportDetails}>{report.details}</Text> : null}
-              </View>
-              <View style={styles.feedReportActions}>
-                <Pressable
-                  onPress={() => {
-                    if (Platform.OS === 'web') {
-                      if (globalThis.confirm('Xóa bài viết này và đóng tất cả báo cáo liên quan?')) void handleResolveFeedReport(report, 'delete');
-                      return;
-                    }
-                    Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị xóa và các báo cáo liên quan được đóng.', [
-                      { text: 'Hủy', style: 'cancel' },
-                      { text: 'Xóa bài viết', style: 'destructive', onPress: () => { void handleResolveFeedReport(report, 'delete'); } },
-                    ]);
-                  }}
-                  disabled={resolvingReportId === report.id}
-                  style={[styles.feedReportResolve, styles.feedReportDelete]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Xóa bài viết bị báo cáo"
-                >
-                  <Trash2 size={15} color={colors.red} />
-                  <Text style={[styles.feedReportResolveText, styles.feedReportDeleteText]}>{resolvingReportId === report.id ? 'Đang xử lý' : 'Xóa bài viết'}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => { void handleResolveFeedReport(report, 'keep'); }}
-                  disabled={resolvingReportId === report.id}
-                  style={styles.feedReportResolve}
-                  accessibilityRole="button"
-                  accessibilityLabel="Giữ lại bài viết"
-                >
-                  <Check size={15} color="#047857" />
-                  <Text style={styles.feedReportResolveText}>{resolvingReportId === report.id ? 'Đang xử lý' : 'Giữ lại bài viết'}</Text>
-                </Pressable>
+        <AppHeader title="Bảng tin chung" subtitle="Học viên và giảng viên đều có thể đăng bài" icon={Newspaper} />
+        {canModerateFeed && reportQueueError ? (
+          <View style={styles.feedReportError}><Text style={styles.feedReportErrorText}>{reportQueueError}</Text></View>
+        ) : null}
+        {canModerateFeed && pendingReports.length ? (
+          <Card style={styles.feedModerationCard}>
+            <View style={styles.feedModerationHeading}>
+              <View style={styles.feedModerationHeadingIcon}><Flag size={16} color="#B45309" /></View>
+              <View style={styles.flex}>
+                <Text style={styles.feedModerationTitle}>Báo cáo cần xem xét</Text>
+                <Text style={styles.feedModerationSubtitle}>{pendingReports.length} báo cáo đang chờ xử lý</Text>
               </View>
             </View>
-          ))}
-        </Card>
-      ) : null}
-      {postLocked ? (
-        <Card style={styles.feedComposerLocked}>
-          <View style={styles.feedLockRow}>
-            <View style={styles.feedLockIconWrap}>
-              <Send size={18} color={colors.muted} />
-              <View style={styles.feedLockBadge}>
-                <Lock size={9} color="#FFFFFF" strokeWidth={3} />
-              </View>
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.feedLockTitle}>Chức năng đăng bài bị khóa</Text>
-              <Text style={styles.feedLockText}>
-                Tài khoản chưa đăng ký gói hoặc đã hết hạn chỉ xem bảng tin. Mua gói để mở quyền đăng bài.
-              </Text>
-            </View>
-          </View>
-        </Card>
-      ) : (
-        <Card style={styles.feedComposer}>
-        <View style={styles.feedAuthorRow}>
-          <Avatar name={user?.name || roleLabel} avatar={user?.avatar} color={user?.avatarColor} size={42} />
-          <View style={styles.flex}>
-            <Text style={styles.cardTitle}>{user?.name || roleLabel}</Text>
-            <View style={styles.feedRoleTag}><Text style={styles.feedRoleCaption}>{roleLabel}</Text></View>
-          </View>
-          <View
-            style={styles.privacyMenuAnchor}
-            {...(Platform.OS === 'web' ? { 'data-feed-audience-wrap': 'true' } : {})}
-          >
-            <Pressable
-              onPress={() => setShowAudienceMenu((visible) => !visible)}
-              style={[styles.privacyButton, isBrandStudent && styles.privacyButtonBrand]}
-              accessibilityRole="button"
-              accessibilityLabel="Chọn quyền riêng tư bài đăng"
-              accessibilityState={{ expanded: showAudienceMenu }}
-            >
-              <Globe size={13} color={isBrandStudent ? '#059669' : colors.green} />
-              <Text numberOfLines={1} style={[styles.privacyText, isBrandStudent && { color: '#059669' }]}>{audience}</Text>
-              <ChevronDown size={12} color={isBrandStudent ? '#059669' : colors.green} />
-            </Pressable>
-            {showAudienceMenu ? (
-              <View
-                style={styles.privacyMenu}
-                onTouchStart={(e) => e.stopPropagation?.()}
-                onPointerDown={(e) => {
-                  if (Platform.OS === 'web') e.stopPropagation?.();
-                }}
-              >
-                <Text style={styles.privacyMenuTitle}>AI CÓ THỂ XEM BÀI VIẾT?</Text>
-                {audienceOptions.map((option) => {
-                  const OptionIcon = option.icon;
-                  const selected = audience === option.value;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => {
-                        setAudience(option.value);
-                        setShowAudienceMenu(false);
-                      }}
-                      style={[styles.privacyOption, selected && styles.privacyOptionSelected]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${option.title}. ${option.description}`}
-                      accessibilityState={{ selected }}
-                    >
-                      <OptionIcon size={15} color={selected ? theme.brand : colors.muted} />
-                      <View style={styles.privacyOptionCopy}>
-                        <View style={styles.privacyOptionTitleRow}>
-                          <Text numberOfLines={1} style={styles.privacyOptionTitle}>{option.title}</Text>
-                          {selected ? <Check size={14} color={theme.brand} /> : null}
-                        </View>
-                        <Text style={styles.privacyOptionDescription}>{option.description}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        </View>
-        <TextInput value={draft} onChangeText={setDraft} placeholder="Chia sẻ với mọi người trong bảng tin…" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng" />
-        {selectedImages.length ? (
-          <View style={styles.feedImagePreviewList}>
-            {selectedImages.map((asset, index) => (
-              <View key={`${asset.uri}-${index}`} style={styles.feedImagePreview}>
-                <Image source={{ uri: asset.uri }} style={styles.feedImagePreviewImage} />
-                <Pressable onPress={() => setSelectedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.feedImageRemove} accessibilityRole="button" accessibilityLabel={`Bỏ ảnh ${index + 1}`}>
-                  <Text style={styles.feedImageRemoveText}>×</Text>
-                </Pressable>
+            {pendingReports.map((report) => (
+              <View key={report.id} style={styles.feedReportItem}>
+                <View style={styles.feedReportCopy}>
+                  <Text style={styles.feedReportReason}>{reportReasonOptions.find((option) => option.value === report.reason)?.label || 'Lý do khác'}</Text>
+                  <Text numberOfLines={2} style={styles.feedReportExcerpt}>{report.post?.content || 'Bài viết không còn tồn tại.'}</Text>
+                  <Text style={styles.feedReportReporter}>Báo cáo bởi {report.reporterName} · {report.reporterRole}</Text>
+                  {report.details ? <Text style={styles.feedReportDetails}>{report.details}</Text> : null}
+                </View>
+                <View style={styles.feedReportActions}>
+                  <Pressable
+                    onPress={() => {
+                      if (Platform.OS === 'web') {
+                        if (globalThis.confirm('Xóa bài viết này và đóng tất cả báo cáo liên quan?')) void handleResolveFeedReport(report, 'delete');
+                        return;
+                      }
+                      Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị xóa và các báo cáo liên quan được đóng.', [
+                        { text: 'Hủy', style: 'cancel' },
+                        { text: 'Xóa bài viết', style: 'destructive', onPress: () => { void handleResolveFeedReport(report, 'delete'); } },
+                      ]);
+                    }}
+                    disabled={resolvingReportId === report.id}
+                    style={[styles.feedReportResolve, styles.feedReportDelete]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Xóa bài viết bị báo cáo"
+                  >
+                    <Trash2 size={15} color={colors.red} />
+                    <Text style={[styles.feedReportResolveText, styles.feedReportDeleteText]}>{resolvingReportId === report.id ? 'Đang xử lý' : 'Xóa bài viết'}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { void handleResolveFeedReport(report, 'keep'); }}
+                    disabled={resolvingReportId === report.id}
+                    style={styles.feedReportResolve}
+                    accessibilityRole="button"
+                    accessibilityLabel="Giữ lại bài viết"
+                  >
+                    <Check size={15} color="#047857" />
+                    <Text style={styles.feedReportResolveText}>{resolvingReportId === report.id ? 'Đang xử lý' : 'Giữ lại bài viết'}</Text>
+                  </Pressable>
+                </View>
               </View>
             ))}
-          </View>
+          </Card>
         ) : null}
-        <View style={styles.feedComposerActions}>
-          <Pressable onPress={() => { void selectFeedImages(); }} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh">
-            <ImagePlus size={18} color={isBrandStudent ? '#059669' : colors.green} /><Text style={styles.feedImageActionText}>{`Thêm ảnh (${selectedImages.length}/6)`}</Text>
-          </Pressable>
-          <Pressable
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.feedSubmitButton,
-              isBrandStudent && styles.feedSubmitButtonBrand,
-              pressed && !busy && styles.feedSubmitButtonPressed,
-              busy && styles.feedSubmitButtonDisabled,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Đăng bài"
-            onPress={() => {
-              const content = draft.trim();
-              if (!content && !selectedImages.length) {
-                Alert.alert('Bảng tin', 'Nhập nội dung hoặc thêm ảnh');
-                return;
-              }
-              if (live) {
-                void apiRun(async () => {
-                  const images = await uploadFeedImages(selectedImages.map((asset, index) => ({
-                    uri: asset.uri,
-                    name: asset.fileName || `feed-${Date.now()}-${index + 1}.jpg`,
-                    mimeType: asset.mimeType || 'image/jpeg',
-                    file: asset.file || undefined,
-                  })));
-                  await createFeedPost(content, audience, images, user?.avatar);
-                }).then((success) => {
-                  if (success) {
-                    setDraft('');
-                    setSelectedImages([]);
-                  }
-                });
-                return;
-              }
-              setPosts([{
-                id: `feed-${Date.now()}`, authorId: user?.id, author: user?.name || roleLabel, role: roleLabel,
-                authorAvatar: user?.avatar,
-                time: 'Vừa xong', content, audience, images: selectedImages.map((asset) => asset.uri),
-                mediaType: selectedImages.length ? 'image' : undefined,
-                comments: [], replies: [], reactionCount: 0,
-              }, ...items]);
-              setDraft('');
-              setSelectedImages([]);
-            }}
-          >
-            <Send size={15} color="#FFFFFF" />
-            <Text style={styles.feedSubmitButtonText}>Đăng bài</Text>
-          </Pressable>
-        </View>
-        {!live ? <Text style={styles.note}>Bài đăng và ảnh chỉ được giữ cục bộ trong bản xem trước.</Text> : null}
-      </Card>
-      )}
-      <View style={styles.feedListHeading}>
-        <Text style={styles.feedListTitle}>Bài viết mới nhất</Text>
-        <View style={[styles.feedListCount, isBrandStudent && { backgroundColor: '#ECFDF5' }]}>
-          <Newspaper size={13} color={isBrandStudent ? '#059669' : theme.brand} />
-          <Text style={[styles.feedListCountText, isBrandStudent && { color: '#059669' }]}>{visibleItems.length} bài</Text>
-        </View>
-      </View>
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {refreshError ? <Text style={styles.note}>Không thể cập nhật bảng tin: {refreshError}</Text> : null}
-      {feedActionError ? <Text style={styles.note}>Không thể hoàn tất thao tác: {feedActionError}</Text> : null}
-      {feedActionNotice ? <Text style={styles.feedActionNotice}>{feedActionNotice}</Text> : null}
-      {visiblePosts.map((post) => (
-        <View
-          key={post.id}
-          nativeID={`feed-post-${post.id}`}
-          ref={feedFocusTarget?.postId === post.id ? focusPostRef : undefined}
-        >
-        <Card style={styles.feedPostCard}>
-          <View style={styles.feedAuthorRow}><Avatar name={post.author} color={theme.brandSoft} size={42} avatar={String(post.authorId) === String(user?.id) && user?.avatar ? user.avatar : post.authorAvatar} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
-            <View nativeID="feed-post-menu" style={styles.feedPostMenuAnchor}>
-              <Pressable
-                ref={(node) => { postMenuButtonRefs.current[post.id] = node; }}
-                onPress={() => openPostMenu(post.id)}
-                style={styles.feedPostMenuButton}
-                accessibilityRole="button"
-                accessibilityLabel="Tùy chọn bài viết"
-                accessibilityState={{ expanded: postMenuId === post.id }}
-              >
-                <MoreVertical size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-          </View>
-          <View style={styles.feedPostMeta}>
-            {personalPinnedPostIds.includes(post.id) ? (
-              <View style={styles.feedPinnedBadge}><Pin size={12} color="#B45309" /><Text style={styles.feedPinnedText}>Đã ghim</Text></View>
-            ) : null}
-            <View style={styles.feedAudience}>
-              {post.audience === 'Công khai' ? <Globe size={12} color={colors.green} /> : <Users size={12} color={theme.brand} />}
-              <Text numberOfLines={1} style={styles.feedAudienceText}>{post.audience || 'Công khai'}</Text>
-            </View>
-          </View>
-          {editingPostId === post.id ? (
-            <View style={styles.feedEditBox}>
-              <TextInput value={editDraft} onChangeText={setEditDraft} multiline style={styles.feedDraft} accessibilityLabel="Chỉnh sửa bài đăng demo" />
-              <View style={styles.rowBetween}>
-                <Pressable onPress={() => setEditingPostId(null)} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Hủy</Text></Pressable>
-                <Pressable onPress={() => {
-                  const content = editDraft.trim();
-                  if (!content) { Alert.alert('Nội dung trống', 'Nhập nội dung trước khi lưu.'); return; }
-                  if (live) { setEditingPostId(null); void apiRun(() => updateFeedPost(post.id, content)); return; }
-                  updatePost(post.id, (item) => ({ ...item, content }));
-                  setEditingPostId(null);
-                }} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Lưu thay đổi</Text></Pressable>
+        {postLocked ? (
+          <Card style={styles.feedComposerLocked}>
+            <View style={styles.feedLockRow}>
+              <View style={styles.feedLockIconWrap}>
+                <Send size={18} color={colors.muted} />
+                <View style={styles.feedLockBadge}>
+                  <Lock size={9} color="#FFFFFF" strokeWidth={3} />
+                </View>
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.feedLockTitle}>Chức năng đăng bài bị khóa</Text>
+                <Text style={styles.feedLockText}>
+                  Tài khoản chưa đăng ký gói hoặc đã hết hạn chỉ xem bảng tin. Mua gói để mở quyền đăng bài.
+                </Text>
               </View>
             </View>
-          ) : <Text style={styles.feedPostBody}>{post.content}</Text>}
-          {post.images?.length ? (
-            <View style={styles.feedPostImages}>
-              {post.images.map((image, index) => (
-                <Pressable key={`${image}-${index}`} onPress={() => { void openExternalUrl(resolveMobilePublicUrl(image), 'Ảnh bài đăng'); }} style={[styles.feedPostImageFrame, post.images?.length === 1 && styles.feedPostImageSingle]} accessibilityRole="button" accessibilityLabel={`Mở ảnh ${index + 1} trong bài đăng`}>
-                  <Image source={getMobileImageSource(image)} style={styles.feedPostImage} resizeMode="cover" />
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-          <View style={styles.feedEngagement}>
-            <View style={styles.feedEngagementSummary}>
-              <View style={styles.feedReactionSummary}>
-                {([
-                  ['heart', '❤️'],
-                  ['like', '👍'],
-                  ['haha', '😄'],
-                  ['wow', '😮'],
-                  ['sad', '😢'],
-                ] as const).map(([type, emoji]) => ({
-                  type,
-                  emoji,
-                  count: post.reactions?.[type] || (!post.reactions && type === 'like' ? post.reactionCount : 0),
-                })).filter(({ count }) => count > 0).map(({ type, emoji, count }) => (
-                  <View key={type} style={styles.feedReactionSummaryChip} accessibilityLabel={`${emoji} ${count}`}>
-                    <Text style={styles.feedReactionSummaryEmoji}>{emoji}</Text>
-                    <Text style={styles.feedReactionSummaryCount}>{count}</Text>
-                  </View>
-                ))}
+          </Card>
+        ) : (
+          <Card style={styles.feedComposer}>
+            <View style={styles.feedAuthorRow}>
+              <Avatar name={user?.name || roleLabel} avatar={user?.avatar} color={user?.avatarColor} size={42} />
+              <View style={styles.flex}>
+                <Text style={styles.cardTitle}>{user?.name || roleLabel}</Text>
+                <View style={styles.feedRoleTag}><Text style={styles.feedRoleCaption}>{roleLabel}</Text></View>
               </View>
-              <Text style={styles.feedCommentSummary}>
-                {post.commentsCount ?? post.comments.length + (post.replies || []).length} bình luận
-              </Text>
-            </View>
-            <View style={styles.feedActionBar}>
               <View
-                style={styles.feedReactionActionWrap}
-                {...(Platform.OS === 'web' ? { 'data-feed-reaction-wrap': 'true' } : {})}
+                style={styles.privacyMenuAnchor}
+                {...(Platform.OS === 'web' ? { 'data-feed-audience-wrap': 'true' } : {})}
               >
-                {reactionPickerPostId === post.id ? (
+                <Pressable
+                  onPress={() => setShowAudienceMenu((visible) => !visible)}
+                  style={[styles.privacyButton, isBrandStudent && styles.privacyButtonBrand]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chọn quyền riêng tư bài đăng"
+                  accessibilityState={{ expanded: showAudienceMenu }}
+                >
+                  <Globe size={13} color={isBrandStudent ? '#059669' : colors.green} />
+                  <Text numberOfLines={1} style={[styles.privacyText, isBrandStudent && { color: '#059669' }]}>{audience}</Text>
+                  <ChevronDown size={12} color={isBrandStudent ? '#059669' : colors.green} />
+                </Pressable>
+                {showAudienceMenu ? (
                   <View
-                    style={styles.feedReactionPicker}
-                    {...(Platform.OS === 'web' ? ({
-                      'data-feed-reaction-picker': 'true',
-                      onPointerEnter: () => {
-                        if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
-                      },
-                      onPointerLeave: scheduleReactionPickerClose,
-                    } as any) : {})}
+                    style={styles.privacyMenu}
                     onTouchStart={(e) => e.stopPropagation?.()}
                     onPointerDown={(e) => {
                       if (Platform.OS === 'web') e.stopPropagation?.();
                     }}
                   >
+                    <Text style={styles.privacyMenuTitle}>AI CÓ THỂ XEM BÀI VIẾT?</Text>
+                    {audienceOptions.map((option) => {
+                      const OptionIcon = option.icon;
+                      const selected = audience === option.value;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => {
+                            setAudience(option.value);
+                            setShowAudienceMenu(false);
+                          }}
+                          style={[styles.privacyOption, selected && styles.privacyOptionSelected]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${option.title}. ${option.description}`}
+                          accessibilityState={{ selected }}
+                        >
+                          <OptionIcon size={15} color={selected ? theme.brand : colors.muted} />
+                          <View style={styles.privacyOptionCopy}>
+                            <View style={styles.privacyOptionTitleRow}>
+                              <Text numberOfLines={1} style={styles.privacyOptionTitle}>{option.title}</Text>
+                              {selected ? <Check size={14} color={theme.brand} /> : null}
+                            </View>
+                            <Text style={styles.privacyOptionDescription}>{option.description}</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            <TextInput value={draft} onChangeText={setDraft} placeholder="Chia sẻ với mọi người trong bảng tin…" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng" />
+            {selectedImages.length ? (
+              <View style={styles.feedImagePreviewList}>
+                {selectedImages.map((asset, index) => (
+                  <View key={`${asset.uri}-${index}`} style={styles.feedImagePreview}>
+                    <Image source={{ uri: asset.uri }} style={styles.feedImagePreviewImage} />
+                    <Pressable onPress={() => setSelectedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.feedImageRemove} accessibilityRole="button" accessibilityLabel={`Bỏ ảnh ${index + 1}`}>
+                      <Text style={styles.feedImageRemoveText}>×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.feedComposerActions}>
+              <Pressable onPress={() => { void selectFeedImages(); }} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh">
+                <ImagePlus size={18} color={isBrandStudent ? '#059669' : colors.green} /><Text style={styles.feedImageActionText}>{`Thêm ảnh (${selectedImages.length}/6)`}</Text>
+              </Pressable>
+              <Pressable
+                disabled={busy}
+                style={({ pressed }) => [
+                  styles.feedSubmitButton,
+                  isBrandStudent && styles.feedSubmitButtonBrand,
+                  pressed && !busy && styles.feedSubmitButtonPressed,
+                  busy && styles.feedSubmitButtonDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Đăng bài"
+                onPress={() => {
+                  const content = draft.trim();
+                  if (!content && !selectedImages.length) {
+                    Alert.alert('Bảng tin', 'Nhập nội dung hoặc thêm ảnh');
+                    return;
+                  }
+                  if (live) {
+                    void apiRun(async () => {
+                      const images = await uploadFeedImages(selectedImages.map((asset, index) => ({
+                        uri: asset.uri,
+                        name: asset.fileName || `feed-${Date.now()}-${index + 1}.jpg`,
+                        mimeType: asset.mimeType || 'image/jpeg',
+                        file: asset.file || undefined,
+                      })));
+                      await createFeedPost(content, audience, images, user?.avatar);
+                    }).then((success) => {
+                      if (success) {
+                        setDraft('');
+                        setSelectedImages([]);
+                      }
+                    });
+                    return;
+                  }
+                  setPosts([{
+                    id: `feed-${Date.now()}`, authorId: user?.id, author: user?.name || roleLabel, role: roleLabel,
+                    authorAvatar: user?.avatar,
+                    time: 'Vừa xong', content, audience, images: selectedImages.map((asset) => asset.uri),
+                    mediaType: selectedImages.length ? 'image' : undefined,
+                    comments: [], replies: [], reactionCount: 0,
+                  }, ...items]);
+                  setDraft('');
+                  setSelectedImages([]);
+                }}
+              >
+                <Send size={15} color="#FFFFFF" />
+                <Text style={styles.feedSubmitButtonText}>Đăng bài</Text>
+              </Pressable>
+            </View>
+            {!live ? <Text style={styles.note}>Bài đăng và ảnh chỉ được giữ cục bộ trong bản xem trước.</Text> : null}
+          </Card>
+        )}
+        <View style={styles.feedListHeading}>
+          <Text style={styles.feedListTitle}>Bài viết mới nhất</Text>
+          <View style={[styles.feedListCount, isBrandStudent && { backgroundColor: '#ECFDF5' }]}>
+            <Newspaper size={13} color={isBrandStudent ? '#059669' : theme.brand} />
+            <Text style={[styles.feedListCountText, isBrandStudent && { color: '#059669' }]}>{visibleItems.length} bài</Text>
+          </View>
+        </View>
+        {resource.loading ? <LoadingSkeleton /> : null}
+        {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+        {refreshError ? <Text style={styles.note}>Không thể cập nhật bảng tin: {refreshError}</Text> : null}
+        {feedActionError ? <Text style={styles.note}>Không thể hoàn tất thao tác: {feedActionError}</Text> : null}
+        {feedActionNotice ? <Text style={styles.feedActionNotice}>{feedActionNotice}</Text> : null}
+        {visiblePosts.map((post) => (
+          <View
+            key={post.id}
+            nativeID={`feed-post-${post.id}`}
+            ref={feedFocusTarget?.postId === post.id ? focusPostRef : undefined}
+          >
+            <Card style={styles.feedPostCard}>
+              <View style={styles.feedAuthorRow}><Avatar name={post.author} color={theme.brandSoft} size={42} avatar={String(post.authorId) === String(user?.id) && user?.avatar ? user.avatar : post.authorAvatar} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
+                <View nativeID="feed-post-menu" style={styles.feedPostMenuAnchor}>
+                  <Pressable
+                    ref={(node) => { postMenuButtonRefs.current[post.id] = node; }}
+                    onPress={() => openPostMenu(post.id)}
+                    style={styles.feedPostMenuButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Tùy chọn bài viết"
+                    accessibilityState={{ expanded: postMenuId === post.id }}
+                  >
+                    <MoreVertical size={18} color={colors.muted} />
+                  </Pressable>
+                </View>
+              </View>
+              <View style={styles.feedPostMeta}>
+                {personalPinnedPostIds.includes(post.id) ? (
+                  <View style={styles.feedPinnedBadge}><Pin size={12} color="#B45309" /><Text style={styles.feedPinnedText}>Đã ghim</Text></View>
+                ) : null}
+                <View style={styles.feedAudience}>
+                  {post.audience === 'Công khai' ? <Globe size={12} color={colors.green} /> : <Users size={12} color={theme.brand} />}
+                  <Text numberOfLines={1} style={styles.feedAudienceText}>{post.audience || 'Công khai'}</Text>
+                </View>
+              </View>
+              {editingPostId === post.id ? (
+                <View style={styles.feedEditBox}>
+                  <TextInput value={editDraft} onChangeText={setEditDraft} multiline style={styles.feedDraft} accessibilityLabel="Chỉnh sửa bài đăng demo" />
+                  <View style={styles.rowBetween}>
+                    <Pressable onPress={() => setEditingPostId(null)} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Hủy</Text></Pressable>
+                    <Pressable onPress={() => {
+                      const content = editDraft.trim();
+                      if (!content) { Alert.alert('Nội dung trống', 'Nhập nội dung trước khi lưu.'); return; }
+                      if (live) { setEditingPostId(null); void apiRun(() => updateFeedPost(post.id, content)); return; }
+                      updatePost(post.id, (item) => ({ ...item, content }));
+                      setEditingPostId(null);
+                    }} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Lưu thay đổi</Text></Pressable>
+                  </View>
+                </View>
+              ) : <Text style={styles.feedPostBody}>{post.content}</Text>}
+              {post.images?.length ? (
+                <View style={styles.feedPostImages}>
+                  {post.images.map((image, index) => (
+                    <Pressable key={`${image}-${index}`} onPress={() => { void openExternalUrl(resolveMobilePublicUrl(image), 'Ảnh bài đăng'); }} style={[styles.feedPostImageFrame, post.images?.length === 1 && styles.feedPostImageSingle]} accessibilityRole="button" accessibilityLabel={`Mở ảnh ${index + 1} trong bài đăng`}>
+                      <Image source={getMobileImageSource(image)} style={styles.feedPostImage} resizeMode="cover" />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.feedEngagement}>
+                <View style={styles.feedEngagementSummary}>
+                  <View style={styles.feedReactionSummary}>
                     {([
-                      ['heart', '❤️'], ['like', '👍'], ['haha', '😄'], ['wow', '😮'], ['sad', '😢'],
-                    ] as const).map(([type, emoji]) => (
-                      <Pressable
-                        key={type}
-                        onHoverIn={() => openReactionPicker(post.id)}
+                      ['heart', '❤️'],
+                      ['like', '👍'],
+                      ['haha', '😄'],
+                      ['wow', '😮'],
+                      ['sad', '😢'],
+                    ] as const).map(([type, emoji]) => ({
+                      type,
+                      emoji,
+                      count: post.reactions?.[type] || (!post.reactions && type === 'like' ? post.reactionCount : 0),
+                    })).filter(({ count }) => count > 0).map(({ type, emoji, count }) => (
+                      <View key={type} style={styles.feedReactionSummaryChip} accessibilityLabel={`${emoji} ${count}`}>
+                        <Text style={styles.feedReactionSummaryEmoji}>{emoji}</Text>
+                        <Text style={styles.feedReactionSummaryCount}>{count}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={styles.feedCommentSummary}>
+                    {post.commentsCount ?? post.comments.length + (post.replies || []).length} bình luận
+                  </Text>
+                </View>
+                <View style={styles.feedActionBar}>
+                  <View
+                    style={styles.feedReactionActionWrap}
+                    {...(Platform.OS === 'web' ? { 'data-feed-reaction-wrap': 'true' } : {})}
+                  >
+                    {reactionPickerPostId === post.id ? (
+                      <View
+                        style={styles.feedReactionPicker}
+                        {...(Platform.OS === 'web' ? ({
+                          'data-feed-reaction-picker': 'true',
+                          onPointerEnter: () => {
+                            if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
+                          },
+                          onPointerLeave: scheduleReactionPickerClose,
+                        } as any) : {})}
+                        onTouchStart={(e) => e.stopPropagation?.()}
                         onPointerDown={(e) => {
                           if (Platform.OS === 'web') e.stopPropagation?.();
                         }}
-                        onTouchStart={(e) => e.stopPropagation?.()}
-                        onPress={() => selectReaction(post.id, type)}
-                        style={({ pressed }) => [
-                          styles.feedReactionOption,
-                          post.myReaction === type && styles.feedReactionOptionActive,
-                          pressed && styles.feedReactionOptionPressed,
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: post.myReaction === type }}
-                        accessibilityLabel={`Cảm xúc ${type}`}
                       >
-                        <Text style={styles.feedReactionEmoji}>{emoji}</Text>
-                      </Pressable>
-                    ))}
+                        {([
+                          ['heart', '❤️'], ['like', '👍'], ['haha', '😄'], ['wow', '😮'], ['sad', '😢'],
+                        ] as const).map(([type, emoji]) => (
+                          <Pressable
+                            key={type}
+                            onHoverIn={() => openReactionPicker(post.id)}
+                            onPointerDown={(e) => {
+                              if (Platform.OS === 'web') e.stopPropagation?.();
+                            }}
+                            onTouchStart={(e) => e.stopPropagation?.()}
+                            onPress={() => selectReaction(post.id, type)}
+                            style={({ pressed }) => [
+                              styles.feedReactionOption,
+                              post.myReaction === type && styles.feedReactionOptionActive,
+                              pressed && styles.feedReactionOptionPressed,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: post.myReaction === type }}
+                            accessibilityLabel={`Cảm xúc ${type}`}
+                          >
+                            <Text style={styles.feedReactionEmoji}>{emoji}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
+                    <Pressable
+                      onHoverIn={() => openReactionPicker(post.id)}
+                      onHoverOut={scheduleReactionPickerClose}
+                      onPress={() => setReactionPickerPostId((current) => (current === post.id ? null : post.id))}
+                      style={[styles.feedActionButton, post.myReaction ? styles.feedActionButtonActive : null]}
+                      accessibilityRole="button"
+                      accessibilityLabel={post.myReaction ? 'Đổi cảm xúc' : 'Thả cảm xúc'}
+                    >
+                      {post.myReaction === 'heart' ? <Heart size={15} color={colors.red} fill={colors.red} />
+                        : post.myReaction === 'like' ? <ThumbsUp size={15} color={theme.brand} fill={theme.brand} />
+                          : post.myReaction === 'haha' ? <Laugh size={15} color={colors.gold} />
+                            : post.myReaction === 'wow' ? <Sparkles size={15} color={theme.brand} />
+                              : post.myReaction === 'sad' ? <Frown size={15} color={colors.muted} />
+                                : <Heart size={15} color={colors.muted} />}
+                      <Text numberOfLines={1} style={styles.feedActionButtonText}>{post.myReaction ? ({ heart: 'Tim', like: 'Like', haha: 'Haha', wow: 'Wow', sad: 'Buồn' })[post.myReaction] : 'Thích'}</Text>
+                    </Pressable>
                   </View>
-                ) : null}
-                <Pressable
-                  onHoverIn={() => openReactionPicker(post.id)}
-                  onHoverOut={scheduleReactionPickerClose}
-                  onPress={() => setReactionPickerPostId((current) => (current === post.id ? null : post.id))}
-                  style={[styles.feedActionButton, post.myReaction ? styles.feedActionButtonActive : null]}
-                  accessibilityRole="button"
-                  accessibilityLabel={post.myReaction ? 'Đổi cảm xúc' : 'Thả cảm xúc'}
-                >
-                  {post.myReaction === 'heart' ? <Heart size={15} color={colors.red} fill={colors.red} />
-                    : post.myReaction === 'like' ? <ThumbsUp size={15} color={theme.brand} fill={theme.brand} />
-                      : post.myReaction === 'haha' ? <Laugh size={15} color={colors.gold} />
-                        : post.myReaction === 'wow' ? <Sparkles size={15} color={theme.brand} />
-                          : post.myReaction === 'sad' ? <Frown size={15} color={colors.muted} />
-                            : <Heart size={15} color={colors.muted} />}
-                  <Text numberOfLines={1} style={styles.feedActionButtonText}>{post.myReaction ? ({ heart: 'Tim', like: 'Like', haha: 'Haha', wow: 'Wow', sad: 'Buồn' })[post.myReaction] : 'Thích'}</Text>
-                </Pressable>
+                  <Pressable
+                    onPress={() => toggleComments(post.id)}
+                    style={[styles.feedActionButton, commentsOpen[post.id] ? styles.feedActionButtonActive : null]}
+                    accessibilityRole="button"
+                    accessibilityLabel={commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}
+                  >
+                    <MessageCircle size={15} color={commentsOpen[post.id] ? theme.brand : colors.muted} />
+                    <Text numberOfLines={1} style={styles.feedActionButtonText}>{commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}</Text>
+                  </Pressable>
+                </View>
               </View>
-              <Pressable
-                onPress={() => toggleComments(post.id)}
-                style={[styles.feedActionButton, commentsOpen[post.id] ? styles.feedActionButtonActive : null]}
-                accessibilityRole="button"
-                accessibilityLabel={commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}
-              >
-                <MessageCircle size={15} color={commentsOpen[post.id] ? theme.brand : colors.muted} />
-                <Text numberOfLines={1} style={styles.feedActionButtonText}>{commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}</Text>
-              </Pressable>
-            </View>
-          </View>
-          {commentsOpen[post.id] ? (
-            <View
-              style={styles.feedCommentsSection}
-              onPointerDown={(event) => event.stopPropagation()}
-              onTouchStart={(event) => event.stopPropagation()}
-            >
-              {getFeedRootComments(post).map((item) => renderCommentNode(post, item, 0, ''))}
-              {(replyTarget?.postId !== post.id || !feedCommentExists(post, replyTarget.commentId)) ? renderCommentComposer(post) : null}
-            </View>
-          ) : null}
-        </Card>
-        </View>
-      ))}
-      {visibleItems.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
-      {!resource.loading && !resource.error && !visibleItems.length ? <EmptyState title={items.length ? 'Bạn đã ẩn tất cả bài viết' : 'Chưa có bài đăng'} message={items.length ? 'Bài viết mới sẽ hiển thị tại đây.' : 'Bài đăng mới sẽ hiển thị tại đây.'} /> : null}
-      {(() => {
-        const post = postMenuId ? items.find((entry) => entry.id === postMenuId) : null;
-        if (!post) return null;
-        const own = ownPost(post);
-        const showReport = live && !own;
-        const itemCount = (own ? 2 : 0) + 1 + (showReport ? 1 : 0) + 1;
-        const menuWidth = 174;
-        const menuHeight = itemCount * 40 + 10;
-        const edge = 12;
-        const gap = 4;
-        const anchor = postMenuAnchor;
-        let top: number;
-        let left: number;
-        if (anchor) {
-          const spaceBelow = feedWindowHeight - (anchor.y + anchor.height) - edge;
-          const spaceAbove = anchor.y - edge;
-          const fitsBelow = spaceBelow >= menuHeight + gap;
-          const fitsAbove = spaceAbove >= menuHeight + gap;
-          // Ưu tiên mở xuống; thiếu chỗ thì mở lên; nếu cả hai đều thiếu thì chọn phía rộng hơn rồi kẹp vào vùng an toàn.
-          const openUp = fitsBelow ? false : fitsAbove ? true : spaceAbove > spaceBelow;
-          top = openUp ? anchor.y - menuHeight - gap : anchor.y + anchor.height + gap;
-          left = anchor.x + anchor.width - menuWidth;
-        } else {
-          top = feedWindowHeight / 3;
-          left = feedWindowWidth - menuWidth - edge;
-        }
-        top = Math.max(edge, Math.min(top, feedWindowHeight - menuHeight - edge));
-        left = Math.max(edge, Math.min(left, feedWindowWidth - menuWidth - edge));
-        return (
-          <Modal visible transparent animationType="none" onRequestClose={closePostMenu} statusBarTranslucent>
-            <Pressable style={StyleSheet.absoluteFill} onPress={closePostMenu} accessibilityRole="button" accessibilityLabel="Đóng menu bài viết" />
-            <View style={[styles.feedPostMenu, { top, left, width: menuWidth }]} pointerEvents="box-none">
-              {own ? (
-                <>
-                  <Pressable onPress={() => {
-                    setEditingPostId(post.id);
-                    setEditDraft(post.content);
-                    setPostMenuId(null);
-                  }} style={styles.feedPostMenuItem} accessibilityRole="button">
-                    <Pencil size={15} color={theme.brand} /><Text style={styles.feedPostMenuText}>Chỉnh sửa</Text>
-                  </Pressable>
-                  <Pressable onPress={() => {
-                    setPostMenuId(null);
-                    Alert.alert('Xóa bài viết?', live ? 'Bài viết sẽ bị xóa khỏi bảng tin.' : 'Bài viết sẽ bị xóa khỏi bản xem trước.', [
-                      { text: 'Hủy', style: 'cancel' },
-                      { text: 'Xóa', style: 'destructive', onPress: () => (live ? void apiRun(() => deleteFeedPost(post.id)) : setPosts(items.filter((item) => item.id !== post.id))) },
-                    ]);
-                  }} style={styles.feedPostMenuItem} accessibilityRole="button">
-                    <Trash2 size={15} color={colors.red} /><Text style={[styles.feedPostMenuText, styles.feedPostMenuDelete]}>Xóa</Text>
-                  </Pressable>
-                </>
+              {commentsOpen[post.id] ? (
+                <View
+                  style={styles.feedCommentsSection}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onTouchStart={(event) => event.stopPropagation()}
+                >
+                  {getFeedRootComments(post).map((item) => renderCommentNode(post, item, 0, ''))}
+                  {(replyTarget?.postId !== post.id || !feedCommentExists(post, replyTarget.commentId)) ? renderCommentComposer(post) : null}
+                </View>
               ) : null}
-              <Pressable
-                onPress={() => {
-                  setPostMenuId(null);
-                  togglePersonalPin(post.id);
-                }}
-                style={styles.feedPostMenuItem}
-                accessibilityRole="button"
-              >
-                {personalPinnedPostIds.includes(post.id) ? <PinOff size={15} color={theme.brand} /> : <Pin size={15} color={theme.brand} />}
-                <Text style={styles.feedPostMenuText}>{personalPinnedPostIds.includes(post.id) ? 'Bỏ ghim bài viết' : 'Ghim bài viết'}</Text>
-              </Pressable>
-              {showReport ? (
+            </Card>
+          </View>
+        ))}
+        {visibleItems.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
+        {!resource.loading && !resource.error && !visibleItems.length ? <EmptyState title={items.length ? 'Bạn đã ẩn tất cả bài viết' : 'Chưa có bài đăng'} message={items.length ? 'Bài viết mới sẽ hiển thị tại đây.' : 'Bài đăng mới sẽ hiển thị tại đây.'} /> : null}
+        {(() => {
+          const post = postMenuId ? items.find((entry) => entry.id === postMenuId) : null;
+          if (!post) return null;
+          const own = ownPost(post);
+          const showReport = live && !own;
+          const itemCount = (own ? 2 : 0) + 1 + (showReport ? 1 : 0) + 1;
+          const menuWidth = 174;
+          const menuHeight = itemCount * 40 + 10;
+          const edge = 12;
+          const gap = 4;
+          const anchor = postMenuAnchor;
+          let top: number;
+          let left: number;
+          if (anchor) {
+            const spaceBelow = feedWindowHeight - (anchor.y + anchor.height) - edge;
+            const spaceAbove = anchor.y - edge;
+            const fitsBelow = spaceBelow >= menuHeight + gap;
+            const fitsAbove = spaceAbove >= menuHeight + gap;
+            // Ưu tiên mở xuống; thiếu chỗ thì mở lên; nếu cả hai đều thiếu thì chọn phía rộng hơn rồi kẹp vào vùng an toàn.
+            const openUp = fitsBelow ? false : fitsAbove ? true : spaceAbove > spaceBelow;
+            top = openUp ? anchor.y - menuHeight - gap : anchor.y + anchor.height + gap;
+            left = anchor.x + anchor.width - menuWidth;
+          } else {
+            top = feedWindowHeight / 3;
+            left = feedWindowWidth - menuWidth - edge;
+          }
+          top = Math.max(edge, Math.min(top, feedWindowHeight - menuHeight - edge));
+          left = Math.max(edge, Math.min(left, feedWindowWidth - menuWidth - edge));
+          return (
+            <Modal visible transparent animationType="none" onRequestClose={closePostMenu} statusBarTranslucent>
+              <Pressable style={StyleSheet.absoluteFill} onPress={closePostMenu} accessibilityRole="button" accessibilityLabel="Đóng menu bài viết" />
+              <View style={[styles.feedPostMenu, { top, left, width: menuWidth }]} pointerEvents="box-none">
+                {own ? (
+                  <>
+                    <Pressable onPress={() => {
+                      setEditingPostId(post.id);
+                      setEditDraft(post.content);
+                      setPostMenuId(null);
+                    }} style={styles.feedPostMenuItem} accessibilityRole="button">
+                      <Pencil size={15} color={theme.brand} /><Text style={styles.feedPostMenuText}>Chỉnh sửa</Text>
+                    </Pressable>
+                    <Pressable onPress={() => {
+                      setPostMenuId(null);
+                      Alert.alert('Xóa bài viết?', live ? 'Bài viết sẽ bị xóa khỏi bảng tin.' : 'Bài viết sẽ bị xóa khỏi bản xem trước.', [
+                        { text: 'Hủy', style: 'cancel' },
+                        { text: 'Xóa', style: 'destructive', onPress: () => (live ? void apiRun(() => deleteFeedPost(post.id)) : setPosts(items.filter((item) => item.id !== post.id))) },
+                      ]);
+                    }} style={styles.feedPostMenuItem} accessibilityRole="button">
+                      <Trash2 size={15} color={colors.red} /><Text style={[styles.feedPostMenuText, styles.feedPostMenuDelete]}>Xóa</Text>
+                    </Pressable>
+                  </>
+                ) : null}
                 <Pressable
                   onPress={() => {
                     setPostMenuId(null);
-                    setReportingPost(post);
-                    setReportReason('');
-                    setReportDetails('');
-                    setFeedActionError('');
-                    setFeedActionNotice('');
+                    togglePersonalPin(post.id);
                   }}
                   style={styles.feedPostMenuItem}
                   accessibilityRole="button"
                 >
-                  <Flag size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Báo cáo bài viết</Text>
+                  {personalPinnedPostIds.includes(post.id) ? <PinOff size={15} color={theme.brand} /> : <Pin size={15} color={theme.brand} />}
+                  <Text style={styles.feedPostMenuText}>{personalPinnedPostIds.includes(post.id) ? 'Bỏ ghim bài viết' : 'Ghim bài viết'}</Text>
                 </Pressable>
-              ) : null}
-              <Pressable onPress={() => hidePost(post.id)} style={styles.feedPostMenuItem} accessibilityRole="button">
-                <EyeOff size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Ẩn bài viết</Text>
-              </Pressable>
-            </View>
-          </Modal>
-        );
-      })()}
-      <Modal visible={!!reportingPost} transparent animationType="fade" onRequestClose={() => setReportingPost(null)}>
-        <View style={styles.feedReportModalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setReportingPost(null)} accessibilityRole="button" accessibilityLabel="Đóng báo cáo" />
-          <View style={styles.feedReportModal}>
-            <View style={styles.feedReportModalHeading}>
-              <View style={styles.feedReportModalIcon}><Flag size={18} color="#B45309" /></View>
-              <View style={styles.flex}>
-                <Text style={styles.feedReportModalTitle}>Báo cáo bài viết</Text>
-                <Text style={styles.feedReportModalSubtitle}>Chọn lý do để trung tâm xem xét</Text>
-              </View>
-              <Pressable onPress={() => setReportingPost(null)} style={styles.feedReportClose} accessibilityRole="button" accessibilityLabel="Đóng">
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-            <Text numberOfLines={3} style={styles.feedReportTarget}>{reportingPost?.content || 'Bài viết có hình ảnh đính kèm'}</Text>
-            <View style={styles.feedReportReasonList}>
-              {reportReasonOptions.map((option) => {
-                const selected = reportReason === option.value;
-                return (
+                {showReport ? (
                   <Pressable
-                    key={option.value}
-                    onPress={() => setReportReason(option.value)}
-                    style={[styles.feedReportReasonOption, selected && styles.feedReportReasonOptionSelected]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setPostMenuId(null);
+                      setReportingPost(post);
+                      setReportReason('');
+                      setReportDetails('');
+                      setFeedActionError('');
+                      setFeedActionNotice('');
+                    }}
+                    style={styles.feedPostMenuItem}
+                    accessibilityRole="button"
                   >
-                    <View style={[styles.feedReportRadio, selected && styles.feedReportRadioSelected]}>{selected ? <View style={styles.feedReportRadioDot} /> : null}</View>
-                    <Text style={[styles.feedReportReasonOptionText, selected && styles.feedReportReasonOptionTextSelected]}>{option.label}</Text>
+                    <Flag size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Báo cáo bài viết</Text>
                   </Pressable>
-                );
-              })}
-            </View>
-            <TextInput
-              value={reportDetails}
-              onChangeText={setReportDetails}
-              placeholder="Thông tin bổ sung (không bắt buộc)"
-              maxLength={500}
-              multiline
-              style={styles.feedReportDetailsInput}
-              accessibilityLabel="Thông tin bổ sung cho báo cáo"
-            />
-            {feedActionError ? <Text style={styles.feedReportErrorText}>{feedActionError}</Text> : null}
-            <View style={styles.feedReportModalActions}>
-              <Pressable onPress={() => setReportingPost(null)} style={styles.feedReportCancel} accessibilityRole="button">
-                <Text style={styles.feedReportCancelText}>Hủy</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => { void submitPostReport(); }}
-                disabled={!reportReason || reportSubmitting}
-                style={[styles.feedReportSubmit, (!reportReason || reportSubmitting) && styles.feedReportSubmitDisabled]}
-                accessibilityRole="button"
-              >
-                <Flag size={15} color="#FFFFFF" />
-                <Text style={styles.feedReportSubmitText}>{reportSubmitting ? 'Đang gửi…' : 'Gửi báo cáo'}</Text>
-              </Pressable>
+                ) : null}
+                <Pressable onPress={() => hidePost(post.id)} style={styles.feedPostMenuItem} accessibilityRole="button">
+                  <EyeOff size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Ẩn bài viết</Text>
+                </Pressable>
+              </View>
+            </Modal>
+          );
+        })()}
+        <Modal visible={!!reportingPost} transparent animationType="fade" onRequestClose={() => setReportingPost(null)}>
+          <View style={styles.feedReportModalBackdrop}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setReportingPost(null)} accessibilityRole="button" accessibilityLabel="Đóng báo cáo" />
+            <View style={styles.feedReportModal}>
+              <View style={styles.feedReportModalHeading}>
+                <View style={styles.feedReportModalIcon}><Flag size={18} color="#B45309" /></View>
+                <View style={styles.flex}>
+                  <Text style={styles.feedReportModalTitle}>Báo cáo bài viết</Text>
+                  <Text style={styles.feedReportModalSubtitle}>Chọn lý do để trung tâm xem xét</Text>
+                </View>
+                <Pressable onPress={() => setReportingPost(null)} style={styles.feedReportClose} accessibilityRole="button" accessibilityLabel="Đóng">
+                  <X size={18} color={colors.muted} />
+                </Pressable>
+              </View>
+              <Text numberOfLines={3} style={styles.feedReportTarget}>{reportingPost?.content || 'Bài viết có hình ảnh đính kèm'}</Text>
+              <View style={styles.feedReportReasonList}>
+                {reportReasonOptions.map((option) => {
+                  const selected = reportReason === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setReportReason(option.value)}
+                      style={[styles.feedReportReasonOption, selected && styles.feedReportReasonOptionSelected]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                    >
+                      <View style={[styles.feedReportRadio, selected && styles.feedReportRadioSelected]}>{selected ? <View style={styles.feedReportRadioDot} /> : null}</View>
+                      <Text style={[styles.feedReportReasonOptionText, selected && styles.feedReportReasonOptionTextSelected]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <TextInput
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                placeholder="Thông tin bổ sung (không bắt buộc)"
+                maxLength={500}
+                multiline
+                style={styles.feedReportDetailsInput}
+                accessibilityLabel="Thông tin bổ sung cho báo cáo"
+              />
+              {feedActionError ? <Text style={styles.feedReportErrorText}>{feedActionError}</Text> : null}
+              <View style={styles.feedReportModalActions}>
+                <Pressable onPress={() => setReportingPost(null)} style={styles.feedReportCancel} accessibilityRole="button">
+                  <Text style={styles.feedReportCancelText}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void submitPostReport(); }}
+                  disabled={!reportReason || reportSubmitting}
+                  style={[styles.feedReportSubmit, (!reportReason || reportSubmitting) && styles.feedReportSubmitDisabled]}
+                  accessibilityRole="button"
+                >
+                  <Flag size={15} color="#FFFFFF" />
+                  <Text style={styles.feedReportSubmitText}>{reportSubmitting ? 'Đang gửi…' : 'Gửi báo cáo'}</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
       </View>
     </AppScreen>
   );
@@ -1948,7 +1948,7 @@ export function CenterInfoScreen() {
           <View style={styles.centerItemActions}>
             {item.url ? <Pressable onPress={() => { void openExternalUrl(item.url, item.title); }} style={styles.centerItemPrimaryAction} accessibilityRole="button"><Text style={styles.centerItemPrimaryActionText}>{section === 'Mạng xã hội' ? 'Mở trang' : 'Mở link'}</Text></Pressable> : null}
             {item.mapsUrl ? <Pressable onPress={() => { void openExternalUrl(item.mapsUrl, 'Bản đồ'); }} style={styles.centerItemSecondaryAction} accessibilityRole="button"><Text style={styles.centerItemSecondaryText}>Xem bản đồ</Text></Pressable> : null}
-            {item.verifyUrl ? <Pressable onPress={() => { void openExternalUrl(item.verifyUrl, 'Xác minh chứng chỉ'); }} style={styles.centerItemSecondaryAction} accessibilityRole="button"><Text style={styles.centerItemSecondaryText}>Xác minh chứng chỉ</Text></Pressable> : null}
+            {item.verifyUrl ? <Pressable onPress={() => { void openExternalUrl(item.verifyUrl, 'Xác minh chứng nhận'); }} style={styles.centerItemSecondaryAction} accessibilityRole="button"><Text style={styles.centerItemSecondaryText}>Xác minh chứng nhận</Text></Pressable> : null}
           </View>
         </Card>
       ))}
@@ -2486,413 +2486,413 @@ export function TeacherQuizzesScreen() {
         </Pressable>
       </View>
       {activeAssessmentTab === 'quiz' ? (
-      <>
-      <Card style={styles.quizManagerIntro}>
-        <View style={styles.quizManagerIntroHeading}>
-          <BookOpen size={20} color={theme.brand} />
-          <Text style={styles.quizManagerIntroTitle}>Quản lý Trắc nghiệm mỗi buổi học</Text>
-        </View>
-        <Text style={styles.quizManagerIntroDescription}>Tạo câu hỏi trắc nghiệm, gán cho học viên và chấm điểm tự động theo chuẩn phòng thi chứng chỉ.</Text>
-        <Pressable
-          onPress={() => setShowCreate(true)}
-          style={styles.quizManagerCreateButton}
-          accessibilityRole="button"
-          accessibilityLabel="Tạo bài trắc nghiệm mới"
-          accessibilityState={{ expanded: showCreate }}
-        >
-          <Plus size={18} color="#FFFFFF" />
-          <Text style={styles.quizManagerCreateButtonText}>Tạo bài trắc nghiệm mới</Text>
-        </Pressable>
-      </Card>
-      <Modal visible={showCreate} transparent animationType="fade" onRequestClose={() => setShowCreate(false)} statusBarTranslucent>
-        <View style={styles.quizModalOverlay}>
-          <View style={[styles.quizModalCard, width >= 760 && styles.quizModalCardWide, { maxHeight: Math.min(height * 0.92, 900) }]}>
-            <View style={styles.quizModalHeader}>
-              <View style={styles.quizModalHeaderCopy}>
-                <View style={styles.quizModalHeaderTitleRow}>
-                  <View style={styles.quizModalHeaderIcon}><Plus size={17} color="#FFFFFF" /></View>
-                  <Text style={styles.quizModalTitle}>Tạo bài thi trắc nghiệm theo buổi học</Text>
-                </View>
-                <Text style={styles.quizModalSubtitle}>Soạn nội dung trắc nghiệm và giao cho học viên.</Text>
-              </View>
-              <Pressable onPress={() => setShowCreate(false)} style={styles.quizModalClose} accessibilityRole="button" accessibilityLabel="Đóng cửa sổ tạo bài">
-                <X size={19} color={colors.muted} />
-              </Pressable>
+        <>
+          <Card style={styles.quizManagerIntro}>
+            <View style={styles.quizManagerIntroHeading}>
+              <BookOpen size={20} color={theme.brand} />
+              <Text style={styles.quizManagerIntroTitle}>Quản lý Trắc nghiệm mỗi buổi học</Text>
             </View>
-            <ScrollView
-              style={styles.quizModalScroll}
-              contentContainerStyle={styles.quizModalContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator
+            <Text style={styles.quizManagerIntroDescription}>Tạo câu hỏi trắc nghiệm, gán cho học viên và chấm điểm tự động theo chuẩn phòng thi chứng nhận.</Text>
+            <Pressable
+              onPress={() => setShowCreate(true)}
+              style={styles.quizManagerCreateButton}
+              accessibilityRole="button"
+              accessibilityLabel="Tạo bài trắc nghiệm mới"
+              accessibilityState={{ expanded: showCreate }}
             >
-          <View style={[styles.quizModalTopGrid, width >= 760 && styles.quizModalTopGridWide]}>
-            <View style={[styles.quizFormPanel, width >= 760 && styles.quizFormPanelWide]}>
-              <Text style={styles.quizModalFieldLabel}>Tên bài kiểm tra / Buổi học *</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Ví dụ: Trắc nghiệm Buổi 1 - MS Word"
-              style={[styles.input, styles.quizTitleInput]}
-              accessibilityLabel="Tên bài kiểm tra hoặc buổi học"
-            />
-          </View>
-          <View style={[styles.quizFormPanel, styles.quizAssignmentPanel]}>
-          <Text style={styles.quizModalFieldLabel}>Giao cho học viên</Text>
-          {studentsResource.loading ? <LoadingSkeleton rows={1} /> : null}
-          {studentsResource.error ? <ErrorState onRetry={studentsResource.reload} /> : null}
-          <View style={styles.quizAssignmentColumns}>
-            <View style={styles.quizAssignmentColumn}>
-              <Text style={styles.quizAssignmentColumnTitle}>Khóa học</Text>
-              <ScrollView style={styles.quizAssignmentChoiceList} contentContainerStyle={styles.quizAssignmentChoices} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                <Pressable
-                  onPress={() => { setCourseName(''); setTargetAll(true); setTargetStudentIds([]); }}
-                  style={[styles.quizAssignmentChoice, !courseName && styles.quizAssignmentChoiceActive]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: !courseName }}
-                >
-                  <Text style={[styles.quizAssignmentChoiceText, !courseName && styles.quizAssignmentChoiceTextActive]}>Tất cả</Text>
-                  {!courseName ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
-                </Pressable>
-                {courses.map((course) => {
-                  const selected = courseName === course;
-                  return (
-                  <Pressable
-                    key={course}
-                    onPress={() => { setCourseName(course); setTargetAll(true); setTargetStudentIds([]); }}
-                    style={[styles.quizAssignmentChoice, selected && styles.quizAssignmentChoiceActive]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text style={[styles.quizAssignmentChoiceText, selected && styles.quizAssignmentChoiceTextActive]}>{course}</Text>
-                    {selected ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
-                  </Pressable>
-                  );
-                })}
-              </ScrollView>
-              {!courses.length && !studentsResource.loading ? <Text style={styles.note}>Chưa có khóa học được phân công.</Text> : null}
-            </View>
-            <View style={styles.quizAssignmentColumn}>
-              <Text style={styles.quizAssignmentColumnTitle}>Đối tượng</Text>
-              <View style={styles.quizAssignmentChoices}>
-                <Pressable onPress={() => setTargetAll(true)} style={[styles.quizAssignmentChoice, targetAll && styles.quizAssignmentChoiceActive]} accessibilityRole="button" accessibilityState={{ selected: targetAll }}>
-                  <Text style={[styles.quizAssignmentChoiceText, targetAll && styles.quizAssignmentChoiceTextActive]}>Tất cả</Text>
-                  {targetAll ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
-                </Pressable>
-                <Pressable onPress={() => setTargetAll(false)} style={[styles.quizAssignmentChoice, !targetAll && styles.quizAssignmentChoiceActive]} accessibilityRole="button" accessibilityState={{ selected: !targetAll }}>
-                  <Text style={[styles.quizAssignmentChoiceText, !targetAll && styles.quizAssignmentChoiceTextActive]}>Chọn học viên</Text>
-                  {!targetAll ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
-                </Pressable>
-              </View>
-          {!targetAll ? (
-            <View style={styles.studentTargetList}>
-              <TextInput value={targetSearch} onChangeText={setTargetSearch} placeholder="Tìm học viên" style={[styles.input, styles.quizCompactInput]} accessibilityLabel="Tìm học viên để giao trắc nghiệm" />
-              <View style={styles.quizAssignmentActions}>
-                <Pressable onPress={() => setTargetStudentIds((current) => [...new Set([...current, ...visibleTargetStudents.map((student) => student.id)])])} style={styles.quizAssignmentAction} accessibilityRole="button"><Text style={styles.quizAssignmentActionText}>Chọn hiển thị</Text></Pressable>
-                <Pressable onPress={() => setTargetStudentIds([])} style={styles.quizAssignmentAction} accessibilityRole="button"><Text style={styles.quizAssignmentActionText}>Bỏ chọn</Text></Pressable>
-              </View>
-              <Text style={styles.quizAssignmentStatus}>
-                {targetStudentIds.length
-                  ? `Đã chọn ${targetStudentIds.length}/${courseStudents.length} học viên`
-                  : `Mặc định: cả lớp (${courseStudents.length} HV)`}
-              </Text>
-              <ScrollView style={[styles.quizStudentList, styles.quizAssignmentStudentList]} contentContainerStyle={styles.quizAssignmentStudentListContent} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                {visibleTargetStudents.map((student) => {
-                  const selected = targetStudentIds.includes(student.id);
-                  return <Pressable key={student.id} onPress={() => setTargetStudentIds((current) => selected ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.studentTarget, selected && styles.studentTargetSelected]} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><Text numberOfLines={1} style={styles.studentTargetText}>{selected ? '✓  ' : ''}{student.name}</Text></Pressable>;
-                })}
-              </ScrollView>
-              {!visibleTargetStudents.length ? <Text style={styles.note}>{courseStudents.length ? 'Không tìm thấy học viên phù hợp.' : 'Khóa học này chưa có học viên được phân công.'}</Text> : null}
-            </View>
-          ) : null}
-          </View>
-          </View>
-          </View>
-          </View>
-          <View style={styles.quizScheduleFields}>
-            <View style={[styles.quizScheduleGrid, width >= 760 && styles.quizScheduleGridWide]}>
-            <View style={styles.quizScheduleField}>
-            <Text style={styles.quizModalFieldLabel}>Thời gian (phút)</Text>
-            <TextInput value={timeLimit} onChangeText={setTimeLimit} keyboardType="number-pad" placeholder="Thời lượng (phút)" style={[styles.input, styles.quizCompactInput]} />
-            </View>
-            <View style={styles.quizScheduleField}>
-            <Text style={styles.quizModalFieldLabel}>Thời điểm bắt đầu (tuỳ chọn)</Text>
-            <Pressable onPress={() => openSchedulePicker('start')} style={styles.quizDateTimeButton} accessibilityRole="button" accessibilityLabel={startTime ? `Thời điểm bắt đầu: ${startTime}` : 'Chọn thời điểm bắt đầu'}>
-              <CalendarDays size={17} color={theme.brand} />
-              <Text style={[styles.quizDateTimeText, !startTime && styles.quizDateTimePlaceholder]}>{startTime || 'Chọn ngày và giờ'}</Text>
-              <Clock3 size={16} color={colors.muted} />
+              <Plus size={18} color="#FFFFFF" />
+              <Text style={styles.quizManagerCreateButtonText}>Tạo bài trắc nghiệm mới</Text>
             </Pressable>
-            </View>
-            <View style={styles.quizScheduleField}>
-            <Text style={styles.quizModalFieldLabel}>Hạn chót (tuỳ chọn)</Text>
-            <Pressable onPress={() => openSchedulePicker('deadline')} style={styles.quizDateTimeButton} accessibilityRole="button" accessibilityLabel={deadline ? `Hạn chót: ${deadline}` : 'Chọn hạn chót'}>
-              <CalendarDays size={17} color={theme.brand} />
-              <Text style={[styles.quizDateTimeText, !deadline && styles.quizDateTimePlaceholder]}>{deadline || 'Chọn ngày và giờ'}</Text>
-              <Clock3 size={16} color={colors.muted} />
-            </Pressable>
-            </View>
-            </View>
-          </View>
-          <View style={styles.quizTools}>
-            <Text style={styles.quizModalFieldLabel}>Ngân hàng câu hỏi</Text>
-            <View style={styles.quizExcelActions}>
-              <Pressable onPress={() => { void handleImportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
-                <Text style={styles.quizActionText}>{questionExcelBusy ? 'Đang xử lý…' : 'Nhập Excel'}</Text>
-              </Pressable>
-              <Pressable onPress={() => { void handleDownloadQuestionTemplate(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
-                <Text style={styles.quizActionText}>Mẫu</Text>
-              </Pressable>
-              <Pressable onPress={() => { void handleExportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
-                <Text style={styles.quizActionText}>Xuất</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.note}>Câu hỏi Excel sẽ được thêm vào bài và lưu lên hệ thống khi bạn tạo bài trắc nghiệm.</Text>
-            <View style={styles.quizAiPanel}>
-              <TextInput
-                value={aiTopic}
-                onChangeText={(value) => {
-                  setAiTopic(value);
-                  if (value.trim()) setAiTopicError(false);
-                }}
-                placeholder="Chủ đề câu hỏi AI * (prompt tạo câu hỏi)"
-                style={[styles.input, styles.quizCompactInput, aiTopicError && { borderColor: colors.red }]}
-                accessibilityLabel="Chủ đề câu hỏi AI, prompt tạo câu hỏi"
-                accessibilityHint={aiTopicError ? 'Bắt buộc nhập trước khi tạo câu hỏi bằng AI.' : undefined}
-              />
-              {aiTopicError ? <Text style={{ color: colors.red, fontSize: typography.micro, fontWeight: '700' }}>Nhập chủ đề câu hỏi để AI tạo câu hỏi.</Text> : null}
-              <View style={[styles.quizAiControls, width >= 760 && styles.quizAiControlsWide]}>
-                <View style={[styles.quizAiChoiceGroup, width >= 760 && styles.quizAiChoiceGroupWide]}>
-                  <Text style={styles.quizAiLabel}>Số câu AI</Text>
-                  <View style={styles.radioChoices} accessibilityRole="radiogroup">
-                    {[5, 10, 15].map((count) => {
-                      const selected = aiQuestionCount === count;
-                      return (
-                        <Pressable key={count} onPress={() => setAiQuestionCount(count)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
-                          <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-                            {selected ? <View style={styles.radioInner} /> : null}
-                          </View>
-                          <Text style={styles.radioChoiceText}>{count} câu</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-                <View style={[styles.quizAiChoiceGroup, width >= 760 && styles.quizAiChoiceGroupWide]}>
-                  <Text style={styles.quizAiLabel}>Độ khó</Text>
-                  <View style={styles.radioChoices} accessibilityRole="radiogroup">
-                    {['dễ', 'trung bình', 'khó'].map((difficulty) => {
-                      const selected = aiDifficulty === difficulty;
-                      return (
-                        <Pressable key={difficulty} onPress={() => setAiDifficulty(difficulty)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
-                          <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-                            {selected ? <View style={styles.radioInner} /> : null}
-                          </View>
-                          <Text style={styles.radioChoiceText}>{difficulty}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-                <Pressable onPress={() => { void handleGenerateQuestions(); }} style={[styles.quizAiButton, width >= 760 && styles.quizAiButtonWide, generatingQuestions && styles.quizAiButtonDisabled]} disabled={generatingQuestions} accessibilityRole="button" accessibilityState={{ disabled: generatingQuestions }}>
-                  <Sparkles size={16} color="#FFFFFF" />
-                  <Text style={styles.quizAiButtonText}>{generatingQuestions ? 'Đang soạn…' : 'Tạo bằng AI (Gemini)'}</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.quizAiHint}>AI chỉ điền câu hỏi vào form. Bạn kiểm tra đáp án rồi mới bấm “Tạo bài trắc nghiệm”.</Text>
-              {quizToolsMessage ? <Text style={styles.note}>{quizToolsMessage}</Text> : null}
-            </View>
-          </View>
-          <View style={styles.quizQuestionSectionHeader}>
-            <Text style={styles.quizQuestionSectionTitle}>Danh sách câu hỏi ({questions.length} câu)</Text>
-            <Pressable onPress={() => setQuestions((current) => [...current, { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }])} style={styles.quizAddQuestionButton} accessibilityRole="button">
-              <Plus size={14} color="#FFFFFF" />
-              <Text style={styles.quizAddQuestionText}>Thêm câu hỏi</Text>
-            </Pressable>
-          </View>
-          {!questions.length ? (
-            <View style={styles.quizEmptyQuestions}>
-              <Text style={styles.quizEmptyQuestionsTitle}>Chưa có câu hỏi</Text>
-              <Text style={styles.quizEmptyQuestionsText}>Nhập câu hỏi từ Excel, hoặc dùng AI trước khi tạo bài.</Text>
-            </View>
-          ) : null}
-          {questions.map((question, questionIndex) => (
-            <View key={`question-${questionIndex}`} style={styles.questionEditor}>
-              <View style={styles.rowBetween}>
-                <Text style={styles.quizQuestionNumber}>Câu hỏi số {questionIndex + 1}</Text>
-                <Pressable onPress={() => setQuestions((current) => current.filter((_, index) => index !== questionIndex))} style={styles.questionRemove} accessibilityRole="button" accessibilityLabel={`Xóa câu hỏi ${questionIndex + 1}`}>
-                  <Trash2 size={13} color={colors.red} />
-                  <Text style={styles.quizDeleteText}>Xóa câu</Text>
-                </Pressable>
-              </View>
-              <TextInput value={question.text} onChangeText={(text) => updateQuestion(questionIndex, (current) => ({ ...current, text }))} placeholder="Nhập nội dung câu hỏi..." style={[styles.input, styles.quizQuestionText]} />
-              <View style={[styles.quizOptionGrid, width >= 600 && styles.quizOptionGridWide]}>
-                {question.options.map((option, optionIndex) => {
-                  const letter = String.fromCharCode(65 + optionIndex);
-                  const isCorrect = question.correctOption === optionIndex;
-                  return (
-                    <View key={`option-${questionIndex}-${optionIndex}`} style={[styles.quizOptionRow, width >= 600 && styles.quizOptionRowWide]}>
-                      <Pressable
-                        onPress={() => updateQuestion(questionIndex, (current) => ({ ...current, correctOption: optionIndex }))}
-                        style={[styles.quizOptionToggle, isCorrect && styles.quizOptionToggleActive]}
-                        accessibilityRole="radio"
-                        accessibilityLabel={`Đánh dấu phương án ${letter} câu ${questionIndex + 1} là đáp án đúng`}
-                        accessibilityState={{ selected: isCorrect }}
-                      >
-                        <Text style={[styles.quizOptionToggleText, isCorrect && styles.quizOptionToggleTextActive]}>{letter}</Text>
-                      </Pressable>
-                      <TextInput value={option} onChangeText={(value) => updateQuestion(questionIndex, (current) => ({ ...current, options: current.options.map((item, index) => index === optionIndex ? value : item) }))} placeholder={`Đáp án ${letter}`} style={[styles.input, styles.quizOptionInput]} />
+          </Card>
+          <Modal visible={showCreate} transparent animationType="fade" onRequestClose={() => setShowCreate(false)} statusBarTranslucent>
+            <View style={styles.quizModalOverlay}>
+              <View style={[styles.quizModalCard, width >= 760 && styles.quizModalCardWide, { maxHeight: Math.min(height * 0.92, 900) }]}>
+                <View style={styles.quizModalHeader}>
+                  <View style={styles.quizModalHeaderCopy}>
+                    <View style={styles.quizModalHeaderTitleRow}>
+                      <View style={styles.quizModalHeaderIcon}><Plus size={17} color="#FFFFFF" /></View>
+                      <Text style={styles.quizModalTitle}>Tạo bài thi trắc nghiệm theo buổi học</Text>
                     </View>
-                  );
-                })}
-              </View>
-              <TextInput value={question.explanation} onChangeText={(explanation) => updateQuestion(questionIndex, (current) => ({ ...current, explanation }))} placeholder="Lời giải thích (không bắt buộc)..." style={[styles.input, styles.quizExplanationInput]} />
-            </View>
-          ))}
-          {isPreview ? <Text style={styles.note}>Bản xem trước: bài tạo chỉ lưu cục bộ, không gửi cho học viên.</Text> : null}
-            </ScrollView>
-            <View style={styles.quizModalFooter}>
-              <Pressable onPress={() => setShowCreate(false)} style={styles.quizModalCancelButton} accessibilityRole="button">
-                <Text style={styles.quizModalCancelText}>Hủy</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => { void handleCreateQuiz(); }}
-                style={[styles.quizModalSubmitButton, savingQuiz && styles.quizModalSubmitDisabled]}
-                disabled={savingQuiz}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: savingQuiz }}
-              >
-                {savingQuiz ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
-                <Text style={styles.quizModalSubmitText}>{savingQuiz ? 'Đang tạo…' : isPreview ? 'Thêm vào danh sách xem trước' : 'Tạo bài trắc nghiệm'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={schedulePickerTarget !== null} transparent animationType="fade" onRequestClose={() => setSchedulePickerTarget(null)} statusBarTranslucent>
-        <View style={styles.quizDatePickerOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSchedulePickerTarget(null)} accessibilityRole="button" accessibilityLabel="Đóng bộ chọn ngày giờ" />
-          <View style={styles.quizDatePickerCard}>
-            <View style={styles.quizDatePickerHeader}>
-              <View style={styles.quizDatePickerTitleGroup}>
-                <View style={styles.quizDatePickerIcon}><CalendarDays size={17} color="#FFFFFF" /></View>
-                <View>
-                  <Text style={styles.quizDatePickerTitle}>{schedulePickerTarget === 'start' ? 'Thời điểm bắt đầu' : 'Hạn chót'}</Text>
-                  <Text style={styles.quizDatePickerSubtitle}>Chọn ngày và giờ</Text>
-                </View>
-              </View>
-              <Pressable onPress={() => setSchedulePickerTarget(null)} style={styles.quizDatePickerClose} accessibilityRole="button" accessibilityLabel="Đóng bộ chọn ngày giờ">
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-            <View style={styles.quizDatePickerMonthRow}>
-              <Pressable
-                onPress={() => setSchedulePickerMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-                style={styles.quizDatePickerMonthButton}
-                accessibilityRole="button"
-                accessibilityLabel="Tháng trước"
-              >
-                <ChevronDown size={18} color={colors.ink} style={{ transform: [{ rotate: '90deg' }] }} />
-              </Pressable>
-              <Text style={styles.quizDatePickerMonth}>{schedulePickerMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</Text>
-              <Pressable
-                onPress={() => setSchedulePickerMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-                style={styles.quizDatePickerMonthButton}
-                accessibilityRole="button"
-                accessibilityLabel="Tháng sau"
-              >
-                <ChevronDown size={18} color={colors.ink} style={{ transform: [{ rotate: '-90deg' }] }} />
-              </Pressable>
-            </View>
-            <View style={styles.quizDatePickerCalendar}>
-              {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => (
-                <Text key={day} style={styles.quizDatePickerWeekday}>{day}</Text>
-              ))}
-              {scheduleCalendarCells.map((day, index) => {
-                if (!day) return <View key={`empty-${index}`} style={styles.quizDatePickerDayEmpty} />;
-                const selected = schedulePickerDate.getFullYear() === schedulePickerMonth.getFullYear()
-                  && schedulePickerDate.getMonth() === schedulePickerMonth.getMonth()
-                  && schedulePickerDate.getDate() === day;
-                const today = new Date();
-                const isToday = today.getFullYear() === schedulePickerMonth.getFullYear()
-                  && today.getMonth() === schedulePickerMonth.getMonth()
-                  && today.getDate() === day;
-                return (
-                  <Pressable
-                    key={`day-${day}`}
-                    onPress={() => setSchedulePickerDate(new Date(schedulePickerMonth.getFullYear(), schedulePickerMonth.getMonth(), day))}
-                    style={[styles.quizDatePickerDay, isToday && styles.quizDatePickerDayToday, selected && styles.quizDatePickerDaySelected]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${day} ${schedulePickerMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`}
-                    accessibilityState={{ selected }}
-                  >
-                    <Text style={[styles.quizDatePickerDayText, selected && styles.quizDatePickerDayTextSelected]}>{day}</Text>
+                    <Text style={styles.quizModalSubtitle}>Soạn nội dung trắc nghiệm và giao cho học viên.</Text>
+                  </View>
+                  <Pressable onPress={() => setShowCreate(false)} style={styles.quizModalClose} accessibilityRole="button" accessibilityLabel="Đóng cửa sổ tạo bài">
+                    <X size={19} color={colors.muted} />
                   </Pressable>
-                );
-              })}
-            </View>
-            <View style={styles.quizDatePickerTimeSection}>
-              <Text style={styles.quizDatePickerTimeLabel}>Giờ bắt đầu</Text>
-              <View style={styles.quizDatePickerTimeInputs}>
-                <View style={styles.quizDatePickerTimeInputGroup}>
-                  <Text style={styles.quizDatePickerTimeUnit}>Giờ</Text>
-                  <TextInput
-                    value={schedulePickerHour}
-                    onChangeText={(value) => setSchedulePickerHour(value.replace(/\D/g, '').slice(0, 2))}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    placeholder="09"
-                    style={styles.quizDatePickerTimeInput}
-                    accessibilityLabel="Giờ"
-                  />
                 </View>
-                <Text style={styles.quizDatePickerTimeSeparator}>:</Text>
-                <View style={styles.quizDatePickerTimeInputGroup}>
-                  <Text style={styles.quizDatePickerTimeUnit}>Phút</Text>
-                  <TextInput
-                    value={schedulePickerMinute}
-                    onChangeText={(value) => setSchedulePickerMinute(value.replace(/\D/g, '').slice(0, 2))}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    placeholder="00"
-                    style={styles.quizDatePickerTimeInput}
-                    accessibilityLabel="Phút"
-                  />
+                <ScrollView
+                  style={styles.quizModalScroll}
+                  contentContainerStyle={styles.quizModalContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator
+                >
+                  <View style={[styles.quizModalTopGrid, width >= 760 && styles.quizModalTopGridWide]}>
+                    <View style={[styles.quizFormPanel, width >= 760 && styles.quizFormPanelWide]}>
+                      <Text style={styles.quizModalFieldLabel}>Tên bài kiểm tra / Buổi học *</Text>
+                      <TextInput
+                        value={title}
+                        onChangeText={setTitle}
+                        placeholder="Ví dụ: Trắc nghiệm Buổi 1 - MS Word"
+                        style={[styles.input, styles.quizTitleInput]}
+                        accessibilityLabel="Tên bài kiểm tra hoặc buổi học"
+                      />
+                    </View>
+                    <View style={[styles.quizFormPanel, styles.quizAssignmentPanel]}>
+                      <Text style={styles.quizModalFieldLabel}>Giao cho học viên</Text>
+                      {studentsResource.loading ? <LoadingSkeleton rows={1} /> : null}
+                      {studentsResource.error ? <ErrorState onRetry={studentsResource.reload} /> : null}
+                      <View style={styles.quizAssignmentColumns}>
+                        <View style={styles.quizAssignmentColumn}>
+                          <Text style={styles.quizAssignmentColumnTitle}>Khóa học</Text>
+                          <ScrollView style={styles.quizAssignmentChoiceList} contentContainerStyle={styles.quizAssignmentChoices} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                            <Pressable
+                              onPress={() => { setCourseName(''); setTargetAll(true); setTargetStudentIds([]); }}
+                              style={[styles.quizAssignmentChoice, !courseName && styles.quizAssignmentChoiceActive]}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: !courseName }}
+                            >
+                              <Text style={[styles.quizAssignmentChoiceText, !courseName && styles.quizAssignmentChoiceTextActive]}>Tất cả</Text>
+                              {!courseName ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                            </Pressable>
+                            {courses.map((course) => {
+                              const selected = courseName === course;
+                              return (
+                                <Pressable
+                                  key={course}
+                                  onPress={() => { setCourseName(course); setTargetAll(true); setTargetStudentIds([]); }}
+                                  style={[styles.quizAssignmentChoice, selected && styles.quizAssignmentChoiceActive]}
+                                  accessibilityRole="button"
+                                  accessibilityState={{ selected }}
+                                >
+                                  <Text style={[styles.quizAssignmentChoiceText, selected && styles.quizAssignmentChoiceTextActive]}>{course}</Text>
+                                  {selected ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                                </Pressable>
+                              );
+                            })}
+                          </ScrollView>
+                          {!courses.length && !studentsResource.loading ? <Text style={styles.note}>Chưa có khóa học được phân công.</Text> : null}
+                        </View>
+                        <View style={styles.quizAssignmentColumn}>
+                          <Text style={styles.quizAssignmentColumnTitle}>Đối tượng</Text>
+                          <View style={styles.quizAssignmentChoices}>
+                            <Pressable onPress={() => setTargetAll(true)} style={[styles.quizAssignmentChoice, targetAll && styles.quizAssignmentChoiceActive]} accessibilityRole="button" accessibilityState={{ selected: targetAll }}>
+                              <Text style={[styles.quizAssignmentChoiceText, targetAll && styles.quizAssignmentChoiceTextActive]}>Tất cả</Text>
+                              {targetAll ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                            </Pressable>
+                            <Pressable onPress={() => setTargetAll(false)} style={[styles.quizAssignmentChoice, !targetAll && styles.quizAssignmentChoiceActive]} accessibilityRole="button" accessibilityState={{ selected: !targetAll }}>
+                              <Text style={[styles.quizAssignmentChoiceText, !targetAll && styles.quizAssignmentChoiceTextActive]}>Chọn học viên</Text>
+                              {!targetAll ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                            </Pressable>
+                          </View>
+                          {!targetAll ? (
+                            <View style={styles.studentTargetList}>
+                              <TextInput value={targetSearch} onChangeText={setTargetSearch} placeholder="Tìm học viên" style={[styles.input, styles.quizCompactInput]} accessibilityLabel="Tìm học viên để giao trắc nghiệm" />
+                              <View style={styles.quizAssignmentActions}>
+                                <Pressable onPress={() => setTargetStudentIds((current) => [...new Set([...current, ...visibleTargetStudents.map((student) => student.id)])])} style={styles.quizAssignmentAction} accessibilityRole="button"><Text style={styles.quizAssignmentActionText}>Chọn hiển thị</Text></Pressable>
+                                <Pressable onPress={() => setTargetStudentIds([])} style={styles.quizAssignmentAction} accessibilityRole="button"><Text style={styles.quizAssignmentActionText}>Bỏ chọn</Text></Pressable>
+                              </View>
+                              <Text style={styles.quizAssignmentStatus}>
+                                {targetStudentIds.length
+                                  ? `Đã chọn ${targetStudentIds.length}/${courseStudents.length} học viên`
+                                  : `Mặc định: cả lớp (${courseStudents.length} HV)`}
+                              </Text>
+                              <ScrollView style={[styles.quizStudentList, styles.quizAssignmentStudentList]} contentContainerStyle={styles.quizAssignmentStudentListContent} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                                {visibleTargetStudents.map((student) => {
+                                  const selected = targetStudentIds.includes(student.id);
+                                  return <Pressable key={student.id} onPress={() => setTargetStudentIds((current) => selected ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.studentTarget, selected && styles.studentTargetSelected]} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><Text numberOfLines={1} style={styles.studentTargetText}>{selected ? '✓  ' : ''}{student.name}</Text></Pressable>;
+                                })}
+                              </ScrollView>
+                              {!visibleTargetStudents.length ? <Text style={styles.note}>{courseStudents.length ? 'Không tìm thấy học viên phù hợp.' : 'Khóa học này chưa có học viên được phân công.'}</Text> : null}
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.quizScheduleFields}>
+                    <View style={[styles.quizScheduleGrid, width >= 760 && styles.quizScheduleGridWide]}>
+                      <View style={styles.quizScheduleField}>
+                        <Text style={styles.quizModalFieldLabel}>Thời gian (phút)</Text>
+                        <TextInput value={timeLimit} onChangeText={setTimeLimit} keyboardType="number-pad" placeholder="Thời lượng (phút)" style={[styles.input, styles.quizCompactInput]} />
+                      </View>
+                      <View style={styles.quizScheduleField}>
+                        <Text style={styles.quizModalFieldLabel}>Thời điểm bắt đầu (tuỳ chọn)</Text>
+                        <Pressable onPress={() => openSchedulePicker('start')} style={styles.quizDateTimeButton} accessibilityRole="button" accessibilityLabel={startTime ? `Thời điểm bắt đầu: ${startTime}` : 'Chọn thời điểm bắt đầu'}>
+                          <CalendarDays size={17} color={theme.brand} />
+                          <Text style={[styles.quizDateTimeText, !startTime && styles.quizDateTimePlaceholder]}>{startTime || 'Chọn ngày và giờ'}</Text>
+                          <Clock3 size={16} color={colors.muted} />
+                        </Pressable>
+                      </View>
+                      <View style={styles.quizScheduleField}>
+                        <Text style={styles.quizModalFieldLabel}>Hạn chót (tuỳ chọn)</Text>
+                        <Pressable onPress={() => openSchedulePicker('deadline')} style={styles.quizDateTimeButton} accessibilityRole="button" accessibilityLabel={deadline ? `Hạn chót: ${deadline}` : 'Chọn hạn chót'}>
+                          <CalendarDays size={17} color={theme.brand} />
+                          <Text style={[styles.quizDateTimeText, !deadline && styles.quizDateTimePlaceholder]}>{deadline || 'Chọn ngày và giờ'}</Text>
+                          <Clock3 size={16} color={colors.muted} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.quizTools}>
+                    <Text style={styles.quizModalFieldLabel}>Ngân hàng câu hỏi</Text>
+                    <View style={styles.quizExcelActions}>
+                      <Pressable onPress={() => { void handleImportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
+                        <Text style={styles.quizActionText}>{questionExcelBusy ? 'Đang xử lý…' : 'Nhập Excel'}</Text>
+                      </Pressable>
+                      <Pressable onPress={() => { void handleDownloadQuestionTemplate(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
+                        <Text style={styles.quizActionText}>Mẫu</Text>
+                      </Pressable>
+                      <Pressable onPress={() => { void handleExportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
+                        <Text style={styles.quizActionText}>Xuất</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={styles.note}>Câu hỏi Excel sẽ được thêm vào bài và lưu lên hệ thống khi bạn tạo bài trắc nghiệm.</Text>
+                    <View style={styles.quizAiPanel}>
+                      <TextInput
+                        value={aiTopic}
+                        onChangeText={(value) => {
+                          setAiTopic(value);
+                          if (value.trim()) setAiTopicError(false);
+                        }}
+                        placeholder="Chủ đề câu hỏi AI * (prompt tạo câu hỏi)"
+                        style={[styles.input, styles.quizCompactInput, aiTopicError && { borderColor: colors.red }]}
+                        accessibilityLabel="Chủ đề câu hỏi AI, prompt tạo câu hỏi"
+                        accessibilityHint={aiTopicError ? 'Bắt buộc nhập trước khi tạo câu hỏi bằng AI.' : undefined}
+                      />
+                      {aiTopicError ? <Text style={{ color: colors.red, fontSize: typography.micro, fontWeight: '700' }}>Nhập chủ đề câu hỏi để AI tạo câu hỏi.</Text> : null}
+                      <View style={[styles.quizAiControls, width >= 760 && styles.quizAiControlsWide]}>
+                        <View style={[styles.quizAiChoiceGroup, width >= 760 && styles.quizAiChoiceGroupWide]}>
+                          <Text style={styles.quizAiLabel}>Số câu AI</Text>
+                          <View style={styles.radioChoices} accessibilityRole="radiogroup">
+                            {[5, 10, 15].map((count) => {
+                              const selected = aiQuestionCount === count;
+                              return (
+                                <Pressable key={count} onPress={() => setAiQuestionCount(count)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
+                                  <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                                    {selected ? <View style={styles.radioInner} /> : null}
+                                  </View>
+                                  <Text style={styles.radioChoiceText}>{count} câu</Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+                        <View style={[styles.quizAiChoiceGroup, width >= 760 && styles.quizAiChoiceGroupWide]}>
+                          <Text style={styles.quizAiLabel}>Độ khó</Text>
+                          <View style={styles.radioChoices} accessibilityRole="radiogroup">
+                            {['dễ', 'trung bình', 'khó'].map((difficulty) => {
+                              const selected = aiDifficulty === difficulty;
+                              return (
+                                <Pressable key={difficulty} onPress={() => setAiDifficulty(difficulty)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
+                                  <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                                    {selected ? <View style={styles.radioInner} /> : null}
+                                  </View>
+                                  <Text style={styles.radioChoiceText}>{difficulty}</Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+                        <Pressable onPress={() => { void handleGenerateQuestions(); }} style={[styles.quizAiButton, width >= 760 && styles.quizAiButtonWide, generatingQuestions && styles.quizAiButtonDisabled]} disabled={generatingQuestions} accessibilityRole="button" accessibilityState={{ disabled: generatingQuestions }}>
+                          <Sparkles size={16} color="#FFFFFF" />
+                          <Text style={styles.quizAiButtonText}>{generatingQuestions ? 'Đang soạn…' : 'Tạo bằng AI (Gemini)'}</Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.quizAiHint}>AI chỉ điền câu hỏi vào form. Bạn kiểm tra đáp án rồi mới bấm “Tạo bài trắc nghiệm”.</Text>
+                      {quizToolsMessage ? <Text style={styles.note}>{quizToolsMessage}</Text> : null}
+                    </View>
+                  </View>
+                  <View style={styles.quizQuestionSectionHeader}>
+                    <Text style={styles.quizQuestionSectionTitle}>Danh sách câu hỏi ({questions.length} câu)</Text>
+                    <Pressable onPress={() => setQuestions((current) => [...current, { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }])} style={styles.quizAddQuestionButton} accessibilityRole="button">
+                      <Plus size={14} color="#FFFFFF" />
+                      <Text style={styles.quizAddQuestionText}>Thêm câu hỏi</Text>
+                    </Pressable>
+                  </View>
+                  {!questions.length ? (
+                    <View style={styles.quizEmptyQuestions}>
+                      <Text style={styles.quizEmptyQuestionsTitle}>Chưa có câu hỏi</Text>
+                      <Text style={styles.quizEmptyQuestionsText}>Nhập câu hỏi từ Excel, hoặc dùng AI trước khi tạo bài.</Text>
+                    </View>
+                  ) : null}
+                  {questions.map((question, questionIndex) => (
+                    <View key={`question-${questionIndex}`} style={styles.questionEditor}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.quizQuestionNumber}>Câu hỏi số {questionIndex + 1}</Text>
+                        <Pressable onPress={() => setQuestions((current) => current.filter((_, index) => index !== questionIndex))} style={styles.questionRemove} accessibilityRole="button" accessibilityLabel={`Xóa câu hỏi ${questionIndex + 1}`}>
+                          <Trash2 size={13} color={colors.red} />
+                          <Text style={styles.quizDeleteText}>Xóa câu</Text>
+                        </Pressable>
+                      </View>
+                      <TextInput value={question.text} onChangeText={(text) => updateQuestion(questionIndex, (current) => ({ ...current, text }))} placeholder="Nhập nội dung câu hỏi..." style={[styles.input, styles.quizQuestionText]} />
+                      <View style={[styles.quizOptionGrid, width >= 600 && styles.quizOptionGridWide]}>
+                        {question.options.map((option, optionIndex) => {
+                          const letter = String.fromCharCode(65 + optionIndex);
+                          const isCorrect = question.correctOption === optionIndex;
+                          return (
+                            <View key={`option-${questionIndex}-${optionIndex}`} style={[styles.quizOptionRow, width >= 600 && styles.quizOptionRowWide]}>
+                              <Pressable
+                                onPress={() => updateQuestion(questionIndex, (current) => ({ ...current, correctOption: optionIndex }))}
+                                style={[styles.quizOptionToggle, isCorrect && styles.quizOptionToggleActive]}
+                                accessibilityRole="radio"
+                                accessibilityLabel={`Đánh dấu phương án ${letter} câu ${questionIndex + 1} là đáp án đúng`}
+                                accessibilityState={{ selected: isCorrect }}
+                              >
+                                <Text style={[styles.quizOptionToggleText, isCorrect && styles.quizOptionToggleTextActive]}>{letter}</Text>
+                              </Pressable>
+                              <TextInput value={option} onChangeText={(value) => updateQuestion(questionIndex, (current) => ({ ...current, options: current.options.map((item, index) => index === optionIndex ? value : item) }))} placeholder={`Đáp án ${letter}`} style={[styles.input, styles.quizOptionInput]} />
+                            </View>
+                          );
+                        })}
+                      </View>
+                      <TextInput value={question.explanation} onChangeText={(explanation) => updateQuestion(questionIndex, (current) => ({ ...current, explanation }))} placeholder="Lời giải thích (không bắt buộc)..." style={[styles.input, styles.quizExplanationInput]} />
+                    </View>
+                  ))}
+                  {isPreview ? <Text style={styles.note}>Bản xem trước: bài tạo chỉ lưu cục bộ, không gửi cho học viên.</Text> : null}
+                </ScrollView>
+                <View style={styles.quizModalFooter}>
+                  <Pressable onPress={() => setShowCreate(false)} style={styles.quizModalCancelButton} accessibilityRole="button">
+                    <Text style={styles.quizModalCancelText}>Hủy</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { void handleCreateQuiz(); }}
+                    style={[styles.quizModalSubmitButton, savingQuiz && styles.quizModalSubmitDisabled]}
+                    disabled={savingQuiz}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: savingQuiz }}
+                  >
+                    {savingQuiz ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+                    <Text style={styles.quizModalSubmitText}>{savingQuiz ? 'Đang tạo…' : isPreview ? 'Thêm vào danh sách xem trước' : 'Tạo bài trắc nghiệm'}</Text>
+                  </Pressable>
                 </View>
-                <Text style={styles.quizDatePickerTimeHint}>24 giờ</Text>
               </View>
             </View>
-            <View style={styles.quizDatePickerFooter}>
-              {schedulePickerTarget === 'start' ? (
-                <Pressable onPress={() => { setStartTime(''); setSchedulePickerTarget(null); }} style={styles.quizDatePickerClear} accessibilityRole="button">
-                  <Text style={styles.quizDatePickerClearText}>Xóa ngày giờ</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={() => { setDeadline(''); setSchedulePickerTarget(null); }} style={styles.quizDatePickerClear} accessibilityRole="button">
-                  <Text style={styles.quizDatePickerClearText}>Không giới hạn</Text>
-                </Pressable>
-              )}
-              <Pressable onPress={applySchedulePicker} style={styles.quizDatePickerConfirm} accessibilityRole="button">
-                <Check size={16} color="#FFFFFF" />
-                <Text style={styles.quizDatePickerConfirmText}>Xác nhận</Text>
-              </Pressable>
+          </Modal>
+          <Modal visible={schedulePickerTarget !== null} transparent animationType="fade" onRequestClose={() => setSchedulePickerTarget(null)} statusBarTranslucent>
+            <View style={styles.quizDatePickerOverlay}>
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => setSchedulePickerTarget(null)} accessibilityRole="button" accessibilityLabel="Đóng bộ chọn ngày giờ" />
+              <View style={styles.quizDatePickerCard}>
+                <View style={styles.quizDatePickerHeader}>
+                  <View style={styles.quizDatePickerTitleGroup}>
+                    <View style={styles.quizDatePickerIcon}><CalendarDays size={17} color="#FFFFFF" /></View>
+                    <View>
+                      <Text style={styles.quizDatePickerTitle}>{schedulePickerTarget === 'start' ? 'Thời điểm bắt đầu' : 'Hạn chót'}</Text>
+                      <Text style={styles.quizDatePickerSubtitle}>Chọn ngày và giờ</Text>
+                    </View>
+                  </View>
+                  <Pressable onPress={() => setSchedulePickerTarget(null)} style={styles.quizDatePickerClose} accessibilityRole="button" accessibilityLabel="Đóng bộ chọn ngày giờ">
+                    <X size={18} color={colors.muted} />
+                  </Pressable>
+                </View>
+                <View style={styles.quizDatePickerMonthRow}>
+                  <Pressable
+                    onPress={() => setSchedulePickerMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+                    style={styles.quizDatePickerMonthButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Tháng trước"
+                  >
+                    <ChevronDown size={18} color={colors.ink} style={{ transform: [{ rotate: '90deg' }] }} />
+                  </Pressable>
+                  <Text style={styles.quizDatePickerMonth}>{schedulePickerMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</Text>
+                  <Pressable
+                    onPress={() => setSchedulePickerMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+                    style={styles.quizDatePickerMonthButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Tháng sau"
+                  >
+                    <ChevronDown size={18} color={colors.ink} style={{ transform: [{ rotate: '-90deg' }] }} />
+                  </Pressable>
+                </View>
+                <View style={styles.quizDatePickerCalendar}>
+                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => (
+                    <Text key={day} style={styles.quizDatePickerWeekday}>{day}</Text>
+                  ))}
+                  {scheduleCalendarCells.map((day, index) => {
+                    if (!day) return <View key={`empty-${index}`} style={styles.quizDatePickerDayEmpty} />;
+                    const selected = schedulePickerDate.getFullYear() === schedulePickerMonth.getFullYear()
+                      && schedulePickerDate.getMonth() === schedulePickerMonth.getMonth()
+                      && schedulePickerDate.getDate() === day;
+                    const today = new Date();
+                    const isToday = today.getFullYear() === schedulePickerMonth.getFullYear()
+                      && today.getMonth() === schedulePickerMonth.getMonth()
+                      && today.getDate() === day;
+                    return (
+                      <Pressable
+                        key={`day-${day}`}
+                        onPress={() => setSchedulePickerDate(new Date(schedulePickerMonth.getFullYear(), schedulePickerMonth.getMonth(), day))}
+                        style={[styles.quizDatePickerDay, isToday && styles.quizDatePickerDayToday, selected && styles.quizDatePickerDaySelected]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${day} ${schedulePickerMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`}
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={[styles.quizDatePickerDayText, selected && styles.quizDatePickerDayTextSelected]}>{day}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={styles.quizDatePickerTimeSection}>
+                  <Text style={styles.quizDatePickerTimeLabel}>Giờ bắt đầu</Text>
+                  <View style={styles.quizDatePickerTimeInputs}>
+                    <View style={styles.quizDatePickerTimeInputGroup}>
+                      <Text style={styles.quizDatePickerTimeUnit}>Giờ</Text>
+                      <TextInput
+                        value={schedulePickerHour}
+                        onChangeText={(value) => setSchedulePickerHour(value.replace(/\D/g, '').slice(0, 2))}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        placeholder="09"
+                        style={styles.quizDatePickerTimeInput}
+                        accessibilityLabel="Giờ"
+                      />
+                    </View>
+                    <Text style={styles.quizDatePickerTimeSeparator}>:</Text>
+                    <View style={styles.quizDatePickerTimeInputGroup}>
+                      <Text style={styles.quizDatePickerTimeUnit}>Phút</Text>
+                      <TextInput
+                        value={schedulePickerMinute}
+                        onChangeText={(value) => setSchedulePickerMinute(value.replace(/\D/g, '').slice(0, 2))}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        placeholder="00"
+                        style={styles.quizDatePickerTimeInput}
+                        accessibilityLabel="Phút"
+                      />
+                    </View>
+                    <Text style={styles.quizDatePickerTimeHint}>24 giờ</Text>
+                  </View>
+                </View>
+                <View style={styles.quizDatePickerFooter}>
+                  {schedulePickerTarget === 'start' ? (
+                    <Pressable onPress={() => { setStartTime(''); setSchedulePickerTarget(null); }} style={styles.quizDatePickerClear} accessibilityRole="button">
+                      <Text style={styles.quizDatePickerClearText}>Xóa ngày giờ</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable onPress={() => { setDeadline(''); setSchedulePickerTarget(null); }} style={styles.quizDatePickerClear} accessibilityRole="button">
+                      <Text style={styles.quizDatePickerClearText}>Không giới hạn</Text>
+                    </Pressable>
+                  )}
+                  <Pressable onPress={applySchedulePicker} style={styles.quizDatePickerConfirm} accessibilityRole="button">
+                    <Check size={16} color="#FFFFFF" />
+                    <Text style={styles.quizDatePickerConfirmText}>Xác nhận</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
+          </Modal>
+          {resource.loading ? <LoadingSkeleton /> : null}
+          {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+          <View style={[styles.quizListGrid, width >= 760 && styles.quizListGridWide, width >= 1120 && styles.quizListGridExtraWide]}>
+            {items.map((quiz) => (
+              <View key={quiz.id} style={[styles.quizListItem, width >= 760 && styles.quizListItemWide, width >= 1120 && styles.quizListItemExtraWide]}>
+                <QuizCard
+                  quiz={quiz}
+                  onDelete={() => handleDeleteQuiz(quiz)}
+                  onRecreate={() => handleRecreateQuiz(quiz)}
+                />
+              </View>
+            ))}
           </View>
-        </View>
-      </Modal>
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      <View style={[styles.quizListGrid, width >= 760 && styles.quizListGridWide, width >= 1120 && styles.quizListGridExtraWide]}>
-        {items.map((quiz) => (
-          <View key={quiz.id} style={[styles.quizListItem, width >= 760 && styles.quizListItemWide, width >= 1120 && styles.quizListItemExtraWide]}>
-            <QuizCard
-              quiz={quiz}
-              onDelete={() => handleDeleteQuiz(quiz)}
-              onRecreate={() => handleRecreateQuiz(quiz)}
-            />
-          </View>
-        ))}
-      </View>
-      {!resource.loading && !resource.error && !items.length ? <EmptyState title="Chưa có bài trắc nghiệm" message="Bài trắc nghiệm đã tạo sẽ hiển thị tại đây." /> : null}
-      </>
+          {!resource.loading && !resource.error && !items.length ? <EmptyState title="Chưa có bài trắc nghiệm" message="Bài trắc nghiệm đã tạo sẽ hiển thị tại đây." /> : null}
+        </>
       ) : <AssignmentsScreen embedded />}
     </AppScreen>
   );

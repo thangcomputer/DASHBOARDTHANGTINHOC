@@ -325,13 +325,13 @@ export default function WelcomeCelebrationOverlay({
         aria-labelledby="video-purchase-celebration-title"
       >
         <div
-          className="absolute inset-0 z-0 bg-gradient-to-b from-slate-950/80 via-red-950/45 to-slate-950/85"
+          className="absolute inset-0 z-0 bg-gradient-to-b from-slate-950/80 via-emerald-950/45 to-slate-950/85"
           onClick={() => onClose?.()}
           aria-hidden="true"
         />
 
-        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-red-200/35 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
-          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-rose-600 to-indigo-700 px-6 pt-10 pb-12 text-center text-white">
+        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-emerald-200/35 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-800 px-6 pt-10 pb-12 text-center text-white">
             <div className="pointer-events-none absolute -top-16 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-white/20 blur-3xl" aria-hidden="true" />
             <button
               type="button"
@@ -357,7 +357,7 @@ export default function WelcomeCelebrationOverlay({
               />
             </div>
 
-            <p className="relative text-[11px] font-bold  tracking-[0.28em] text-red-100/90">
+            <p className="relative text-[11px] font-bold  tracking-[0.28em] text-emerald-100/90">
               Trung tâm Tin học Thắng Tin Học
             </p>
             <h2
@@ -561,7 +561,7 @@ export default function WelcomeCelebrationOverlay({
             {title}
           </h2>
           {name ? (
-            <p className="relative mt-2 text-sm font-medium text-red-50/95">
+            <p className="relative mt-2 text-sm font-medium text-emerald-50/95">
               Kính gửi <span className="font-bold text-white">{name}</span>
             </p>
           ) : null}
@@ -584,7 +584,7 @@ export default function WelcomeCelebrationOverlay({
             </p>
           </blockquote>
 
-          <div className="h-px w-16 mx-auto bg-gradient-to-r from-transparent via-red-200 to-transparent" aria-hidden="true" />
+          <div className="h-px w-16 mx-auto bg-gradient-to-r from-transparent via-emerald-200 to-transparent" aria-hidden="true" />
           <p className="text-xs font-semibold tracking-wide text-slate-400 ">
             Lời chào từ đội ngũ Thắng Tin Học
           </p>

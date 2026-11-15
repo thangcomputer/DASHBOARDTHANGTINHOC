@@ -111,8 +111,8 @@ function buildBranches() {
       hours: 'Thứ 2 – Chủ nhật: 8:00 – 21:00',
       scheduleInfo: 'Thứ 2 – Chủ nhật: 8:00 – 21:00',
       mapsUrl: 'https://maps.google.com/?q=Nguyen+Van+Cu+Quan+5+Ho+Chi+Minh',
-      description: 'Trụ sở chính, phòng lab đầy đủ máy tính cấu hình cao, hỗ trợ thi chứng chỉ MOS / IC3.',
-      detailHtml: '<p>Chi nhánh TP.HCM là trung tâm điều phối đào tạo toàn hệ thống, có phòng thi chứng chỉ và đội ngũ giảng viên chuyên Word – Excel – PowerPoint.</p>',
+      description: 'Trụ sở chính, phòng lab đầy đủ máy tính cấu hình cao, hỗ trợ thi chứng nhận MOS / IC3.',
+      detailHtml: '<p>Chi nhánh TP.HCM là trung tâm điều phối đào tạo toàn hệ thống, có phòng thi chứng nhận và đội ngũ giảng viên chuyên Word – Excel – PowerPoint.</p>',
     },
     {
       section: 'branch',
@@ -150,7 +150,7 @@ function buildBranches() {
       scheduleInfo: 'Thứ 2 – Chủ nhật: 8:00 – 21:00',
       mapsUrl: 'https://maps.google.com/?q=Le+Duan+Hai+Chau+Da+Nang',
       description: 'Phục vụ học viên Đà Nẵng và các tỉnh lân cận; có lớp online kèm lab tại chỗ.',
-      detailHtml: '<p>Chi nhánh Đà Nẵng hỗ trợ lộ trình từ tin học cơ bản đến luyện thi chứng chỉ quốc tế.</p>',
+      detailHtml: '<p>Chi nhánh Đà Nẵng hỗ trợ lộ trình từ tin học cơ bản đến luyện thi chứng nhận quốc tế.</p>',
     },
   ];
 }
@@ -232,9 +232,9 @@ function buildServices() {
     },
     {
       section: 'service', status: 'published', isActive: true, sortOrder: 5,
-      title: 'Luyện thi chứng chỉ MOS',
+      title: 'Luyện thi chứng nhận MOS',
       subtitle: 'Word / Excel / PowerPoint',
-      audience: 'Học viên cần chứng chỉ quốc tế',
+      audience: 'Học viên cần chứng nhận quốc tế',
       curriculum: 'Đề thi thử, kỹ năng thời gian, mẹo đạt điểm cao',
       duration: '8–16 buổi tùy môn',
       learningMode: 'Tại trung tâm (có phòng thi)',
@@ -273,7 +273,7 @@ function buildExamVenues() {
     },
     {
       section: 'exam_venue', status: 'published', isActive: true, sortOrder: 2,
-      title: 'Phòng thi chứng chỉ – Đà Lạt',
+      title: 'Phòng thi chứng nhận – Đà Lạt',
       code: 'THI-LD-01',
       city: 'Lâm Đồng',
       address: '45 Trần Phú, Phường 3, Đà Lạt',
@@ -312,7 +312,7 @@ function buildCertificates() {
       requirements: 'Hoàn thành ≥ 80% buổi học và bài kiểm tra cuối khóa',
       relatedExam: 'Kiểm tra nội bộ',
       validity: 'Không thời hạn (ghi nhận hoàn thành khóa)',
-      verifyInfo: 'Mã chứng chỉ trên phiếu / tra cứu tại trung tâm',
+      verifyInfo: 'Mã chứng nhận trên phiếu / tra cứu tại trung tâm',
       verifyUrl: 'https://thangtinhoc.vn/xac-minh',
       description: 'Chứng nhận đã hoàn thành lộ trình Word – Excel – PowerPoint cơ bản.',
     },
@@ -337,7 +337,7 @@ function buildCertificates() {
       relatedExam: 'IC3',
       validity: 'Theo quy định đơn vị cấp',
       verifyInfo: 'Mã xác minh trên hệ thống Certiport',
-      description: 'Phù hợp học viên cần chứng chỉ tin học quốc tế nền tảng.',
+      description: 'Phù hợp học viên cần chứng nhận tin học quốc tế nền tảng.',
     },
   ];
 }
@@ -359,11 +359,11 @@ const OVERVIEW = {
   website: 'https://thangtinhoc.vn',
   headquartersAddress: '123 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh',
   detailHtml: `
-<p><strong>Thắng Tin Học</strong> đồng hành cùng hàng nghìn học viên mỗi năm trên lộ trình tin học văn phòng từ cơ bản đến luyện thi chứng chỉ MOS.</p>
+<p><strong>Thắng Tin Học</strong> đồng hành cùng hàng nghìn học viên mỗi năm trên lộ trình tin học văn phòng từ cơ bản đến luyện thi chứng nhận MOS.</p>
 <ul>
   <li>Giảng viên kinh nghiệm, giáo trình cập nhật theo nhu cầu công việc thực tế</li>
   <li>Lịch học linh hoạt: sáng / chiều / tối / cuối tuần</li>
-  <li>Hỗ trợ luyện đề và thi chứng chỉ tại trung tâm</li>
+  <li>Hỗ trợ luyện đề và thi chứng nhận tại trung tâm</li>
   <li>3 chi nhánh: TP.HCM · Lâm Đồng · Đà Nẵng</li>
 </ul>
 <p>Nội dung trang này là <em>dữ liệu mẫu</em> - bạn có thể chỉnh sửa toàn bộ trên trang Quản trị Thông tin trung tâm.</p>

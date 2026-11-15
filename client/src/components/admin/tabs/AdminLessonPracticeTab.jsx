@@ -5,7 +5,6 @@ import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import RichTextEditor from '../shared/RichTextEditor';
 import AdminStudentTrainingTab from './AdminStudentTrainingTab';
-import AdminLmsXpSettings from './AdminLmsXpSettings';
 
 const TYPES = [
   { id: 'multi', label: 'Chọn nhiều đáp án' },
@@ -186,7 +185,7 @@ function RegionDraw({ imageUrl, region, onChange }) {
       <img src={resolveMediaUrl(imageUrl)} alt="" className="block w-full max-h-80 object-contain pointer-events-none" />
       {region && (
         <span
-          className="absolute border-2 border-emerald-500 bg-red-400/20 pointer-events-none"
+          className="absolute border-2 border-emerald-500 bg-emerald-400/20 pointer-events-none"
           style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.w}%`, height: `${region.h}%` }}
         />
       )}
@@ -382,9 +381,9 @@ export default function AdminLessonPracticeTab() {
   }
 
   function entryCardClass(entry) {
-    if (draggedEntry === entry) return 'space-y-2 rounded-xl border border-red-300 p-3 opacity-50 transition-colors';
+    if (draggedEntry === entry) return 'space-y-2 rounded-xl border border-emerald-300 p-3 opacity-50 transition-colors';
     const line = dragOverEntry === entry && draggedEntry
-      ? (dragOverAfter ? 'shadow-[0_5px_0_0_#ef4444]' : 'shadow-[0_-5px_0_0_#ef4444]')
+      ? (dragOverAfter ? 'shadow-[0_5px_0_0_#10b981]' : 'shadow-[0_-5px_0_0_#10b981]')
       : '';
     return `space-y-2 rounded-xl border border-slate-200 p-3 transition-colors ${line}`;
   }
@@ -626,23 +625,9 @@ export default function AdminLessonPracticeTab() {
             <CircleHelp size={16} />
             Hướng dẫn học
           </button>
-          <button
-            type="button"
-            onClick={() => setModuleTab('xp')}
-            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'xp' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
-          >
-            Điểm XP học bài
-          </button>
         </div>
         {moduleTab === 'guide' ? (
           <AdminStudentTrainingTab learningGuideOnly />
-        ) : moduleTab === 'xp' ? (
-          <div className="rounded-2xl border border-slate-100 bg-white p-4">
-            <h1 className="text-2xl font-black text-slate-900">Điểm XP học bài</h1>
-            <div className="mt-4">
-              <AdminLmsXpSettings />
-            </div>
-          </div>
         ) : (
           <>
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -703,7 +688,7 @@ export default function AdminLessonPracticeTab() {
                     const expanded = expandedCourseId === course.id;
                     return (
                       <div key={course.id} className="space-y-1">
-                        <div className={`flex items-center gap-1 rounded-xl border p-1 ${expanded ? 'border-red-100 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
+                        <div className={`flex items-center gap-1 rounded-xl border p-1 ${expanded ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
                           <button
                             type="button"
                             onClick={() => setExpandedCourseId(expanded ? '' : course.id)}
@@ -1025,8 +1010,8 @@ export default function AdminLessonPracticeTab() {
                                       </button>
                                     </div>
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-2.5 py-2">
-                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-red-800">
+                                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-2">
+                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800">
                                       <Clock size={14} /> Thời gian chung
                                     </span>
                                     <input
@@ -1037,9 +1022,9 @@ export default function AdminLessonPracticeTab() {
                                       onChange={(event) => setPracticeGroupTimeLimit(groupId, event.target.value)}
                                       onBlur={(event) => savePracticeGroupTimeLimit(groupId, event.target.value)}
                                       aria-label={`Thời gian chung cho phần luyện tập ${entryIndex + 1}`}
-                                      className="w-16 rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold"
+                                      className="w-16 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold"
                                     />
-                                    <span className="text-[11px] text-red-700">giây · 0 = tắt</span>
+                                    <span className="text-[11px] text-emerald-700">giây · 0 = tắt</span>
                                     {[30, 60, 90, 120].map((sec) => (
                                       <button
                                         key={sec}

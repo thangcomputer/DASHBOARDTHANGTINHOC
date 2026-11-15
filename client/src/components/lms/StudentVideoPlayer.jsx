@@ -446,7 +446,21 @@ export const StudentVideoPlayer = ({
       },
       pause: () => { try { playerRef.current?.pauseVideo?.(); } catch { /* bỏ qua */ } },
       play: () => { try { playerRef.current?.playVideo?.(); } catch { /* bỏ qua */ } },
-      seekTo: (sec) => { try { playerRef.current?.seekTo?.(Math.max(0, Number(sec) || 0), true); } catch { /* bỏ qua */ } },
+      seekTo: (sec) => {
+        try {
+          const requested = Math.max(0, Number(sec) || 0);
+          const unlocked = seekUnlockedRef.current || !antiSeekEnabledRef.current;
+          const cap = unlocked
+            ? Number.POSITIVE_INFINITY
+            : Math.max(maxPosRef.current, uiTimeRef.current);
+          const targetSec = unlocked ? requested : Math.min(requested, cap);
+          seekGuardRef.current = true;
+          playerRef.current?.seekTo?.(targetSec, true);
+          uiTimeRef.current = targetSec;
+          setCurrentTime(targetSec);
+          window.setTimeout(() => { seekGuardRef.current = false; }, 450);
+        } catch { /* bỏ qua */ }
+      },
     };
     return () => {
       playerApiRef.current = null;
@@ -655,7 +669,7 @@ export const StudentVideoPlayer = ({
             className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center bg-slate-950/95"
             onContextMenu={e => e.preventDefault()}
           >
-            <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
               <Lock size={28} />
             </div>
             <h3 className="text-red-400 font-black text-sm  tracking-wider">Video Đã Tạm Dừng</h3>

@@ -6,6 +6,7 @@ import { connect as connectSocket, disconnect as disconnectSocket } from '../ser
 import { registerMobilePushNotifications, unregisterMobilePushNotifications } from '../services/mobilePushNotifications';
 import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { clearLastActive, pinUserKey } from '../services/pinLock';
+import { authenticateWithBiometrics, saveBiometricCredential } from '../services/biometricAuth';
 import { subscriptionApi, type SubscriptionOverview } from '../services/subscriptionApi';
 import type { DemoUser, UserRole } from '../types';
 import { themeState } from '../theme/tokens';
@@ -20,7 +21,8 @@ type AuthContextValue = {
   subscription: SubscriptionOverview | null;
   refreshSubscription: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  signIn: (role: UserRole, phone: string, password: string) => Promise<void>;
+  signIn: (role: UserRole, phone: string, password: string, options?: { saveBiometric?: boolean }) => Promise<void>;
+  signInWithBiometrics: () => Promise<void>;
   updateAvatar: (avatar: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -217,11 +219,37 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     subscription,
     refreshSubscription,
     refreshUser,
-    async signIn(role, phone, password) {
+    async signIn(role, phone, password, options) {
       setIsSigningIn(true);
       setAuthError('');
       try {
         const session = await authService.signIn(role, phone, password);
+        if (options?.saveBiometric) {
+          await saveBiometricCredential({
+            role,
+            contact: phone,
+            password,
+            displayName: session.user.name,
+          });
+        }
+        setUser(session.user);
+      } finally {
+        setIsSigningIn(false);
+      }
+    },
+    async signInWithBiometrics() {
+      setIsSigningIn(true);
+      setAuthError('');
+      try {
+        const auth = await authenticateWithBiometrics();
+        if (!auth.ok || !auth.credential) {
+          throw new Error(auth.error || 'Không thể đăng nhập bằng sinh trắc học.');
+        }
+        const session = await authService.signIn(
+          auth.credential.role,
+          auth.credential.contact,
+          auth.credential.password,
+        );
         setUser(session.user);
       } finally {
         setIsSigningIn(false);

@@ -293,21 +293,31 @@ function BrandingTopBar() {
             />
           ))}
         </Pressable>
-        <Pressable
-          onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
-          style={({ pressed }) => [styles.topBarAction, pressed && styles.topBarNeoPressed]}
-          accessibilityRole="button"
-          accessibilityLabel={unreadCount > 0 ? `Mở thông báo, ${unreadCount} chưa đọc` : 'Mở thông báo'}
-        >
-          <View style={styles.notificationBell}>
-            <Bell size={20} color={colors.muted} />
-            {unreadCount > 0 ? (
-              <View style={[styles.notificationUnreadBadge, !isFreeStudent && styles.notificationUnreadBadgeBrand]}>
-                <Text style={styles.notificationUnreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-              </View>
-            ) : null}
-          </View>
-        </Pressable>
+        <View style={styles.topBarActionsRow}>
+          <Pressable
+            onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
+            style={({ pressed }) => [styles.topBarAction, pressed && styles.topBarNeoPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Tìm kiếm và tác vụ nhanh"
+          >
+            <Search size={19} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
+            style={({ pressed }) => [styles.topBarAction, pressed && styles.topBarNeoPressed]}
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Mở thông báo, ${unreadCount} chưa đọc` : 'Mở thông báo'}
+          >
+            <View style={styles.notificationBell}>
+              <Bell size={20} color={colors.muted} />
+              {unreadCount > 0 ? (
+                <View style={[styles.notificationUnreadBadge, !isFreeStudent && styles.notificationUnreadBadgeBrand]}>
+                  <Text style={styles.notificationUnreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
+        </View>
       </BlurView>
     </Animated.View>
   );
@@ -689,6 +699,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
   topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  topBarActionsRow: { zIndex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   topBarAction: { zIndex: 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },
   notificationBell: { position: 'relative' },

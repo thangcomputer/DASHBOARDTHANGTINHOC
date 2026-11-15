@@ -1,5 +1,5 @@
 /** Class nút 3D Duo (đồng bộ mobile) cho trang LMS. */
-export function lmsBtn(variant = 'danger', options = {}) {
+export function lmsBtn(variant = 'primary', options = {}) {
   const { size = 'md', fullWidth = false, className = '' } = options;
   return [
     'duo-btn',

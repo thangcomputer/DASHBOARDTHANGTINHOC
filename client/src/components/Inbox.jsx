@@ -2561,11 +2561,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 <button
                   type="button"
                   onClick={() => setShowCreateGroup(true)}
-                  className={`w-11 h-11 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center rounded-2xl transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${
-                    isGreenTheme
-                      ? 'bg-white border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-[#10B981] hover:bg-emerald-50/50'
-                      : 'bg-white border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] text-red-600 hover:bg-red-50/50'
-                  }`}
+                  className="w-11 h-11 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center rounded-2xl transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 bg-white border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-[#10B981] hover:bg-emerald-50/50"
                   title="Tạo nhóm chat"
                   aria-label="Tạo nhóm chat"
                 >
@@ -2590,9 +2586,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     onClick={() => setContactTab(tab.id)}
                     className={`min-h-[38px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 flex items-center justify-center ${
                       active
-                        ? (isGreenTheme
-                            ? 'bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
-                            : 'bg-[#DC2626] border-[1.5px] border-[#F87171] border-b-4 border-b-[#B91C1C] text-white hover:brightness-105')
+                        ? 'bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
                         : 'bg-white border-[1.5px] border-slate-200 border-b-4 border-b-slate-300 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -2958,10 +2952,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <button
                       type="button"
                       disabled
-                      className={`inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition-opacity sm:px-3 ${isClassTime
-                        ? 'border-slate-200 bg-slate-50 text-slate-400'
-                        : 'border-red-200 bg-red-50 text-red-300 opacity-50'
-                        }`}
+                      className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition-opacity sm:px-3 border-slate-200 bg-slate-50 text-slate-400 opacity-70"
                       aria-label={isClassTime ? 'Lớp học đang diễn ra nhưng chưa có link' : 'Lớp học chưa đến giờ'}
                       title={isClassTime ? 'Buổi học đang diễn ra nhưng chưa có link lớp' : 'Lớp học chưa đến giờ'}
                     >
@@ -3032,7 +3023,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             />
                             <div className="min-w-0">
                               <h3 className="truncate text-[13px] font-black text-slate-800">{formatDisplayName(peerProfile?.name || activeConv.user.name)}</h3>
-                              <p className="text-[10px] font-semibold text-red-600">Giảng viên</p>
+                              <p className="text-[10px] font-semibold text-emerald-600">Giảng viên</p>
                               <p className="text-[10px] text-slate-500">{getUserStatusText(activeConv.user.id, isUserOnline(activeConv.user.id))}</p>
                             </div>
                           </div>
@@ -4002,9 +3993,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {showCreateGroup && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[24px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-280 max-h-[min(92dvh,720px)] flex flex-col">
-            <div className="px-5 py-4 bg-gradient-to-br from-emerald-700 to-red-900 text-white flex items-center justify-between shrink-0">
+            <div className="px-5 py-4 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Users size={18} className="text-red-200 shrink-0" />
+                <Users size={18} className="text-emerald-200 shrink-0" />
                 <h3 className="font-semibold text-base tracking-tight truncate">Tạo nhóm chat mới</h3>
               </div>
               <button type="button" onClick={() => setShowCreateGroup(false)} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors" aria-label="Đóng"><X size={18} /></button>
@@ -4051,11 +4042,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     .map(u => {
                       const isSelected = selectedParticipants.some(p => p.userId === u.id);
                       return (
-                        <label key={u.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all group ${isSelected ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                        <label key={u.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all group ${isSelected ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
                           <div className="relative">
                             <input
                               type="checkbox"
-                              className="w-5 h-5 rounded-md border-2 border-slate-200 text-red-600 focus:ring-emerald-500 transition-all cursor-pointer"
+                              className="w-5 h-5 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
                               checked={isSelected}
                               onChange={(e) => {
                                 if (e.target.checked) setSelectedParticipants([...selectedParticipants, { userId: u.id, name: u.name, role: u.role }]);

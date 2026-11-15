@@ -198,6 +198,25 @@ async function summary(studentId) {
   return present(doc);
 }
 
+async function syncToDailyPracticeProfile(studentId, xp, { countsForStreak, today }) {
+  const dailyPracticeService = require('./dailyPracticeService');
+  const DailyPracticeProfile = require('../models/DailyPracticeProfile');
+  const dpRules = require('./dailyPracticeRules');
+
+  const dpProfile = await dailyPracticeService.adjustProfileXp(studentId, xp, { source: 'reward' });
+  if (!countsForStreak || !dpProfile) return 0;
+  if (dpProfile.lastPlayedDay === today) return dpProfile.streak || 0;
+  const dpStreak = dpRules.nextStreak(dpProfile, today);
+  await DailyPracticeProfile.updateOne(
+    { studentId },
+    {
+      $set: { streak: dpStreak, lastPlayedDay: today },
+      $max: { bestStreak: dpStreak },
+    },
+  );
+  return dpStreak;
+}
+
 async function grantXp({ studentId, amount, reason, sourceKey, countsForStreak = true }) {
   const xp = Math.floor(Number(amount) || 0);
   const key = String(sourceKey || '').trim();
@@ -236,7 +255,17 @@ async function grantXp({ studentId, amount, reason, sourceKey, countsForStreak =
     update,
     { upsert: true, new: true },
   );
-  if (countsForStreak) await grantStreakBonuses(studentId, streak, progress.streakStartedOn);
+  let syncedStreak = 0;
+  if (reason !== 'welcome') {
+    syncedStreak = await syncToDailyPracticeProfile(studentId, xp, { countsForStreak, today });
+  }
+  if (countsForStreak) {
+    const effectiveStreak = Math.max(streak, syncedStreak || 0);
+    const bonusAnchor = effectiveStreak > streak
+      ? shiftDayKey(today, -(effectiveStreak - 1))
+      : progress.streakStartedOn;
+    await grantStreakBonuses(studentId, effectiveStreak, bonusAnchor);
+  }
   return present(updated);
 }
 

@@ -3,6 +3,7 @@
  */
 const FormDefinition = require('../models/FormDefinition');
 const FormSubmission = require('../models/FormSubmission');
+const { sanitizeCsvField } = require('../shared/utils/csv');
 
 const FIELD_TYPES = ['text', 'textarea', 'number', 'select', 'checkbox', 'date', 'email', 'phone'];
 
@@ -192,12 +193,13 @@ function submissionsToCsv(form, submissions) {
   const headers = ['submittedAt', 'submittedBy', ...fields.map((f) => f.key)];
   const lines = [headers.join(',')];
   for (const s of submissions) {
+    const submittedBySafe = sanitizeCsvField(s.submittedBy || '').replace(/"/g, '""');
     const row = [
       s.createdAt ? new Date(s.createdAt).toISOString() : '',
-      s.submittedBy || '',
+      '"' + submittedBySafe + '"',
       ...fields.map((f) => {
         const v = s.answers?.[f.key];
-        const str = v == null ? '' : String(v).replace(/"/g, '""');
+        const str = v == null ? '' : sanitizeCsvField(String(v)).replace(/"/g, '""');
         return '"' + str + '"';
       }),
     ];

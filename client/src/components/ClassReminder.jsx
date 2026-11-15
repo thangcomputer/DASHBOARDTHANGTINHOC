@@ -52,7 +52,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
         }
       `}</style>
 
-      <div className={`${isLive ? 'bg-gradient-to-r from-green-600 to-green-500' : isUrgent ? 'bg-gradient-to-r from-red-700 to-red-600' : 'bg-gradient-to-r from-red-600 to-orange-500'} text-white shadow-2xl`}>
+      <div className={`${isLive ? 'bg-gradient-to-r from-emerald-600 to-emerald-500' : isUrgent ? 'bg-gradient-to-r from-amber-600 to-orange-500' : 'bg-gradient-to-r from-emerald-700 to-teal-600'} text-white shadow-2xl`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           {/* Left */}
           <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -86,7 +86,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
                 href={linkHoc}
                 target="_blank"
                 rel="noreferrer"
-                className={`${isLive ? 'bg-white text-green-700' : 'bg-white text-red-600'} px-4 py-2 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 hover:opacity-90 transition-all shadow-lg`}
+                className="bg-white text-emerald-700 px-4 py-2 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
               >
                 <Video size={16} />  Vào lớp ngay
               </a>

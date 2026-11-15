@@ -76,7 +76,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
               onClick={() => toggleOption('all')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border-2 transition-all ${
                 options.all
-                  ? 'border-emerald-500 bg-red-50'
+                  ? 'border-red-500 bg-red-50'
                   : 'border-slate-100 hover:border-slate-200'
               }`}
             >
@@ -133,7 +133,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
                 value={phrase}
                 onChange={(e) => setPhrase(e.target.value)}
                 placeholder="XOA_DU_LIEU"
-                className="w-full border-2 border-slate-100 rounded-xl px-3 py-2 font-mono text-center text-xs font-black outline-none focus:border-emerald-500 transition focus:bg-red-50 text-slate-700 placeholder:text-slate-300"
+                className="w-full border-2 border-slate-100 rounded-xl px-3 py-2 font-mono text-center text-xs font-black outline-none focus:border-red-500 transition focus:bg-red-50 text-slate-700 placeholder:text-slate-300"
               />
               <div className="relative">
                 <Key size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -142,7 +142,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Mật khẩu Super Admin"
-                  className="w-full border-2 border-slate-100 rounded-xl pl-9 pr-3 py-2 text-xs font-black outline-none focus:border-emerald-500 transition focus:bg-red-50 text-slate-700 placeholder:text-slate-300"
+                  className="w-full border-2 border-slate-100 rounded-xl pl-9 pr-3 py-2 text-xs font-black outline-none focus:border-red-500 transition focus:bg-red-50 text-slate-700 placeholder:text-slate-300"
                 />
               </div>
             </div>

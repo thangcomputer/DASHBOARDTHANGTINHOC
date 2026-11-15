@@ -8,7 +8,7 @@ export function StudentNoteModal({ schedule, onClose, onSubmit }) {
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-600 px-6 py-6 text-center text-white relative">
            <h3 className="text-xl font-black  tracking-tight">Ghi Chú & Phản Hồi</h3>
-           <p className="text-red-100 text-xs mt-1 font-medium">Gửi trực tiếp cho Giảng viên trên lịch này</p>
+           <p className="text-emerald-100 text-xs mt-1 font-medium">Gửi trực tiếp cho Giảng viên trên lịch này</p>
         </div>
         <div className="p-6">
            <textarea
@@ -19,7 +19,7 @@ export function StudentNoteModal({ schedule, onClose, onSubmit }) {
              placeholder="Nhập nội dung ghi chú (VD: Em xin học bù vào thứ 7, Xin đến trễ 10p, ...)"
            />
            <div className="flex gap-3 mt-6">
-             <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 transition-colors">Hủy</button>
+             <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">Hủy</button>
              <button type="button" onClick={() => onSubmit(note)} disabled={!note.trim()} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-colors shadow-lg shadow-emerald-600/30">
                {hasExistingNote ? 'Cập nhật' : 'Gửi Ghi Chú'}
              </button>
@@ -28,7 +28,7 @@ export function StudentNoteModal({ schedule, onClose, onSubmit }) {
              <button
                type="button"
                onClick={() => onSubmit('')}
-               className="w-full mt-3 py-2.5 text-sm font-bold rounded-xl bg-white border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition-colors"
+               className="w-full mt-3 py-2.5 text-sm font-bold rounded-xl bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 transition-colors"
              >
                Xóa ghi chú
              </button>

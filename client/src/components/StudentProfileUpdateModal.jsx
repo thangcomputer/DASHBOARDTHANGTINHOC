@@ -50,15 +50,11 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-100 ${
-          isBrandStudent ? 'bg-red-50' : 'bg-teal-50'
-        }`}>
-          <h3 className={`font-black flex items-center gap-2 ${
-            isBrandStudent ? 'text-red-700' : 'text-teal-800'
-          }`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-emerald-50">
+          <h3 className="font-black flex items-center gap-2 text-emerald-800">
             <User size={18} /> Cập nhật Hồ sơ Cá nhân
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-red-500 bg-white rounded-full p-1.5 shadow-sm transition">
+          <button onClick={onClose} className="text-gray-400 hover:text-emerald-600 bg-white rounded-full p-1.5 shadow-sm transition">
             <X size={16} />
           </button>
         </div>
@@ -71,12 +67,10 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               autoComplete="off"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none transition ${
-                isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
-              }`}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none transition focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               readOnly
             />
-            <p className="text-[9px] text-red-500 mt-1 pl-1 italic">* Tên không thể tự sửa. Vui lòng liên hệ Admin.</p>
+            <p className="text-[9px] text-amber-600 mt-1 pl-1 italic">* Tên không thể tự sửa. Vui lòng liên hệ Admin.</p>
           </div>
 
           <div>
@@ -86,9 +80,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: 'male' })}
                 className={`select-none flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
-                    ? (isBrandStudent
-                        ? 'bg-red-50 text-red-700 border-red-300 ring-2 ring-red-400/20 shadow-sm'
-                        : 'bg-teal-50 text-teal-700 border-teal-300 ring-2 ring-teal-400/20 shadow-sm')
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-2 ring-emerald-400/20 shadow-sm'
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                   }`}
               >
@@ -98,7 +90,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: 'female' })}
                 className={`select-none flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
-                    ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-2 ring-emerald-400/20 shadow-sm'
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                   }`}
               >
@@ -117,14 +109,12 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="Chưa có"
-                  className={`w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                    isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
-                  }`}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   readOnly
                 />
                 <Phone size={14} className="absolute left-3 top-3.5 text-gray-400" />
               </div>
-              <p className="text-[9px] text-red-500 mt-1 pl-1 italic">* Liên hệ Admin để đổi SĐT.</p>
+              <p className="text-[9px] text-amber-600 mt-1 pl-1 italic">* Liên hệ Admin để đổi SĐT.</p>
             </div>
             <div>
               <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">SĐT Liên hệ 2</label>
@@ -136,9 +126,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                   value={formData.zalo}
                   onChange={e => setFormData({ ...formData, zalo: e.target.value })}
                   placeholder="Số điện thoại"
-                  className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                    isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
-                  }`}
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 />
                 <Phone size={14} className="absolute left-3 top-3.5 text-blue-400" />
               </div>
@@ -153,9 +141,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 autoComplete="off"
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                  isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
-                }`}
+                className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 placeholder="Ví dụ: nguyenvan@gmail.com"
               />
               <Mail size={14} className="absolute left-3 top-3.5 text-gray-400" />
@@ -169,9 +155,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
                 type="text"
                 value={formData.address}
                 onChange={e => setFormData({ ...formData, address: e.target.value })}
-                className={`w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition ${
-                  isBrandStudent ? 'focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500'
-                }`}
+                className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium outline-none transition focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 placeholder="Nhập địa chỉ của bạn"
               />
               <MapPin size={14} className="absolute left-3 top-3.5 text-gray-400" />
@@ -181,7 +165,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
           <button
             type="submit"
             disabled={loading}
-            className={`duo-btn duo-btn--primary ${isBrandStudent ? 'duo-btn--danger' : 'duo-btn--emerald'} duo-btn--lg duo-btn--full mt-4`}
+            className="duo-btn duo-btn--primary duo-btn--emerald duo-btn--lg duo-btn--full mt-4"
           >
             {loading ? (
               <span className="duo-btn__label">Đang lưu...</span>

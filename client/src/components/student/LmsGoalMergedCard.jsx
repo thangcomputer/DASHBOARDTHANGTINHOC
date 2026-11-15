@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Check, ChevronLeft, ChevronRight, Crown, Flame, Gamepad2,
@@ -16,6 +16,7 @@ import {
   periodLabel,
 } from '../../utils/learningGoal';
 import { lmsBtn } from '../../utils/lmsButtonClass';
+import { gameSounds } from '../../utils/sound';
 
 /* ─── constants ──────────────────────────────────────────── */
 const SEEN_KEY = 'lms-progress-level-seen';
@@ -38,6 +39,47 @@ function shiftMonth(month, delta) {
 }
 function pct(v, t) { return !t ? 0 : Math.min(100, Math.round(((v || 0) / t) * 100)); }
 
+function DailyGoalRing({ percent = 0, done = false }) {
+  const clamped = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+  const r = 21;
+  const circumference = 2 * Math.PI * r;
+  const dashOffset = circumference * (1 - clamped / 100);
+  return (
+    <div className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center" aria-hidden="true">
+      <svg className="h-[52px] w-[52px] -rotate-90" viewBox="0 0 52 52">
+        <circle
+          cx="26"
+          cy="26"
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4.5"
+          className="text-slate-200 dark:text-slate-700"
+        />
+        <circle
+          cx="26"
+          cy="26"
+          r={r}
+          fill="none"
+          stroke={done ? '#10B981' : '#F59E0B'}
+          strokeWidth="4.5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center">
+        {done ? (
+          <Check size={16} strokeWidth={3} className="text-emerald-600" />
+        ) : (
+          <span className="text-[11px] font-black tabular-nums text-slate-800">{clamped}%</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 /* ─── main component ─────────────────────────────────────── */
 export default function LmsGoalMergedCard({ hideMissions = false, compact = false } = {}) {
   const navigate = useNavigate();
@@ -46,6 +88,7 @@ export default function LmsGoalMergedCard({ hideMissions = false, compact = fals
   /* LMS */
   const [lms, setLms] = useState(null);
   const [celebrate, setCelebrate] = useState(false);
+  const celebrateSoundRef = useRef(false);
   const [tab, setTab] = useState('goal');
   const [board, setBoard] = useState(null);
   const [period, setPeriod] = useState('week');
@@ -55,7 +98,14 @@ export default function LmsGoalMergedCard({ hideMissions = false, compact = fals
     apiFetch(`/lms-progress/me${q}`).then(r => r.json()).then(body => {
       if (!body?.success || !body.data) return;
       setLms(body.data);
-      if ((body.data.level || 1) > Number(localStorage.getItem(SEEN_KEY) || 0)) setCelebrate(true);
+      const nextLevel = body.data.level || 1;
+      if (nextLevel > Number(localStorage.getItem(SEEN_KEY) || 0)) {
+        setCelebrate(true);
+        if (!celebrateSoundRef.current) {
+          celebrateSoundRef.current = true;
+          gameSounds.complete();
+        }
+      }
     }).catch(() => { });
   };
   useEffect(() => { loadLms(); }, []);
@@ -130,7 +180,7 @@ export default function LmsGoalMergedCard({ hideMissions = false, compact = fals
       {celebrate && lms?.level > 1 && (
         <button
           type="button"
-          onClick={() => { localStorage.setItem(SEEN_KEY, String(lms.level)); setCelebrate(false); }}
+          onClick={() => { gameSounds.tap(); localStorage.setItem(SEEN_KEY, String(lms.level)); setCelebrate(false); }}
           className="flex w-full items-center gap-2 border-b border-amber-100/80 bg-amber-50/90 px-3 py-2 text-left text-xs font-bold text-amber-900 hover:bg-amber-100 transition"
         >
           <span aria-hidden="true">🎉</span>
@@ -175,7 +225,7 @@ export default function LmsGoalMergedCard({ hideMissions = false, compact = fals
               type="button"
               role="tab"
               aria-selected={tab === id}
-              onClick={() => setTab(id)}
+              onClick={() => { gameSounds.tap(); setTab(id); }}
               className={`rounded-[10px] px-1.5 py-1.5 text-[11px] font-extrabold transition ${tab === id
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
@@ -228,8 +278,8 @@ function GoalContent({
 }) {
   if (!goal) {
     return (
-      <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-red-200 bg-red-50/60 p-2.5">
-        <Target size={18} className="shrink-0 text-red-500" aria-hidden="true" />
+      <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 p-2.5">
+        <Target size={18} className="shrink-0 text-emerald-500" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-black text-slate-900">Chưa đặt mục tiêu học</p>
           <p className="text-[11px] text-slate-500">Theo dõi giờ học mỗi ngày.</p>
@@ -237,7 +287,7 @@ function GoalContent({
         <button
           type="button"
           onClick={openLearningGoal}
-          className={lmsBtn('danger', { size: 'sm', className: 'shrink-0 !text-[11px]' })}
+          className={lmsBtn('primary', { size: 'sm', className: 'shrink-0 !text-[11px]' })}
         >
           Đặt ngay
         </button>
@@ -254,7 +304,7 @@ function GoalContent({
         <button
           type="button"
           onClick={openLearningGoal}
-          className="shrink-0 rounded-[10px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white px-2.5 py-0.5 text-[11px] font-extrabold text-[#DC2626] hover:bg-[#FEF2F2] active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none"
+          className="shrink-0 rounded-[10px] border-[1.5px] border-[#A7F3D0] border-b-4 border-b-[#10B981] bg-white px-2.5 py-0.5 text-[11px] font-extrabold text-[#059669] hover:bg-[#ECFDF5] active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none"
         >
           {goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}
         </button>
@@ -264,36 +314,34 @@ function GoalContent({
       </div>
 
       <div
-        className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5"
+        className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-2.5"
         title="Giờ học tính khi làm bài, ôn thi hoặc xem video"
       >
-        <div className="mb-1.5 flex items-end justify-between gap-2">
-          <div className="flex items-baseline gap-1.5">
-            <span className={`text-2xl font-black tabular-nums leading-none ${todayDone ? 'text-emerald-600' : 'text-slate-900'}`}>
-              {todayPct}%
-            </span>
+        <DailyGoalRing percent={todayPct} done={todayDone} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex items-end justify-between gap-2">
             {todayDone ? (
-              <span className="text-[10px] font-bold text-emerald-600">Đạt hôm nay</span>
+              <span className="text-[11px] font-extrabold text-emerald-600">Đạt hôm nay</span>
             ) : (
-              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-orange-500">
-                <Flame size={11} aria-hidden="true" /> Hôm nay
+              <span className="flex items-center gap-0.5 text-[11px] font-bold text-orange-500">
+                <Flame size={12} aria-hidden="true" /> Hôm nay
               </span>
             )}
+            <span className="text-right text-[11px] font-bold tabular-nums text-slate-600">
+              {formatStudyMinutes(p.todayMinutes)}
+              <span className="font-semibold text-slate-400"> / {goal.hoursPerDay}h</span>
+            </span>
           </div>
-          <span className="text-right text-[11px] font-bold text-slate-600">
-            {formatStudyMinutes(p.todayMinutes)}
-            <span className="font-semibold text-slate-400"> / {goal.hoursPerDay}h</span>
-          </span>
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`}
+              style={{ width: `${todayPct}%` }}
+            />
+          </div>
+          <p className="mt-1.5 text-[10px] font-medium tabular-nums text-slate-400">
+            Cả kỳ {formatStudyMinutes(p.periodMinutes)} · {periodPct}%
+          </p>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`}
-            style={{ width: `${todayPct}%` }}
-          />
-        </div>
-        <p className="mt-1.5 text-[10px] font-medium text-slate-400">
-          Cả kỳ {formatStudyMinutes(p.periodMinutes)} · {periodPct}%
-        </p>
       </div>
 
       {hideMissions ? (
@@ -458,7 +506,7 @@ function RankList({ board, period, onPeriod }) {
               {row.avatar ? (
                 <img src={resolveMediaUrl(row.avatar)} alt="" className="h-7 w-7 rounded-full object-cover" />
               ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-[10px] font-black text-red-700">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-black text-emerald-700">
                   {String(row.name || '?').trim()[0]}
                 </span>
               )}

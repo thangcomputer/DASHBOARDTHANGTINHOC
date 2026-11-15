@@ -45,7 +45,7 @@ function highlightChunk(chunk, highlight, keyPrefix) {
   if (!needle) return [chunk];
   const parts = String(chunk).split(new RegExp(`(${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig'));
   return parts.map((part, index) => part && part.toLocaleLowerCase() === needle.toLocaleLowerCase()
-    ? <mark key={`${keyPrefix}-hit-${index}`} className="rounded bg-red-100 px-0.5 text-inherit">{part}</mark>
+    ? <mark key={`${keyPrefix}-hit-${index}`} className="rounded bg-emerald-100 px-0.5 text-inherit">{part}</mark>
     : part);
 }
 

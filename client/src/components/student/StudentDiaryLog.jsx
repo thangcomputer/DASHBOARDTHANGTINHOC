@@ -123,9 +123,7 @@ export default function StudentDiaryLog({
     <section className="bg-white rounded-[24px] border border-slate-200/80 shadow-sm overflow-hidden" aria-label="Nhật ký học tập">
       <div className="p-4 sm:p-5 space-y-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-            isFree ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
-          }`}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-emerald-50 text-emerald-600 border-emerald-100">
             <BookText size={18} />
           </div>
           <h3 className="text-base font-black text-slate-900 tracking-tight">
@@ -144,8 +142,8 @@ export default function StudentDiaryLog({
                   onClick={() => setFilter(tab.value)}
                   className={`min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
                     active
-                      ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-emerald-600 text-white border border-emerald-600')
-                      : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-emerald-500 hover:bg-red-50/60')
+                      ? 'bg-emerald-600 text-white border border-emerald-600'
+                      : 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60'
                   }`}
                 >
                   {tab.label}
@@ -160,8 +158,8 @@ export default function StudentDiaryLog({
               onClick={() => setFilter('Chưa điểm danh')}
               className={`w-full min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
                 filter === 'Chưa điểm danh'
-                  ? (isFree ? 'bg-emerald-600 text-white border border-emerald-600' : 'bg-emerald-600 text-white border border-emerald-600')
-                  : (isFree ? 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60' : 'bg-white text-red-600 border border-emerald-500 hover:bg-red-50/60')
+                  ? 'bg-emerald-600 text-white border border-emerald-600'
+                  : 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60'
               }`}
             >
               Chưa điểm danh
@@ -208,7 +206,7 @@ export default function StudentDiaryLog({
               return (
                 <div
                   key={item._id || item.id || `${item.date}-${item.startTime}`}
-                  className="rounded-[20px] border border-slate-100 bg-[#F8FAFC] p-3.5 sm:p-4 space-y-2 transition hover:border-red-200 hover:bg-white shadow-xs"
+                  className="rounded-[20px] border border-slate-100 bg-[#F8FAFC] p-3.5 sm:p-4 space-y-2 transition hover:border-emerald-200 hover:bg-white shadow-xs"
                 >
                   <div>
                     <h4 className="text-sm font-black text-slate-900 leading-snug">
@@ -230,9 +228,7 @@ export default function StudentDiaryLog({
                           href={meetingUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className={`inline-flex min-h-[34px] items-center justify-center rounded-xl active:scale-95 px-4 py-1.5 text-xs font-black text-white transition ${
-                            isFree ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'
-                          }`}
+                          className="inline-flex min-h-[34px] items-center justify-center rounded-xl active:scale-95 px-4 py-1.5 text-xs font-black text-white transition bg-emerald-600 hover:bg-emerald-700"
                         >
                           Vào lớp
                         </a>
@@ -242,11 +238,7 @@ export default function StudentDiaryLog({
                         <button
                           type="button"
                           onClick={() => onOpenSession(item)}
-                          className={`inline-flex min-h-[34px] items-center justify-center rounded-xl border bg-white active:scale-95 px-4 py-1.5 text-xs font-black transition ${
-                            isFree
-                              ? 'border-emerald-600 text-emerald-600 hover:bg-emerald-50'
-                              : 'border-emerald-600 text-red-600 hover:bg-red-50'
-                          }`}
+                          className="inline-flex min-h-[34px] items-center justify-center rounded-xl border bg-white active:scale-95 px-4 py-1.5 text-xs font-black transition border-emerald-600 text-emerald-600 hover:bg-emerald-50"
                         >
                           Ghi chú / Đổi lịch
                         </button>
@@ -260,8 +252,8 @@ export default function StudentDiaryLog({
                     </div>
                   ) : null}
                   {item.studentNote ? (
-                    <div className="rounded-xl bg-red-50/60 p-2.5 text-xs text-red-700 border border-red-100">
-                      <span className="font-bold text-red-800">Ghi chú của bạn:</span> {item.studentNote}
+                    <div className="rounded-xl bg-emerald-50/60 p-2.5 text-xs text-emerald-700 border border-emerald-100">
+                      <span className="font-bold text-emerald-800">Ghi chú của bạn:</span> {item.studentNote}
                     </div>
                   ) : null}
                   {item.grade != null && (

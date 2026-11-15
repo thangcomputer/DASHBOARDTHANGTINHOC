@@ -36,13 +36,75 @@ function getProjectId() {
     || '';
 }
 
+export type MobilePushCategory = 'schedule' | 'message' | 'promo' | 'default' | 'calls';
+
+export const MOBILE_NOTIFICATION_ACTIONS = {
+  OPEN_SCHEDULE: 'OPEN_SCHEDULE',
+  JOIN_MEET: 'JOIN_MEET',
+  OPEN_MESSAGE: 'OPEN_MESSAGE',
+  OPEN_PROMO: 'OPEN_PROMO',
+} as const;
+
+async function configureNotificationCategories() {
+  if (Platform.OS === 'web' || !nativeNotifications) return;
+  try {
+    await Promise.all([
+      nativeNotifications.setNotificationCategoryAsync('schedule', [
+        {
+          identifier: MOBILE_NOTIFICATION_ACTIONS.JOIN_MEET,
+          buttonTitle: 'Vào Meet ngay',
+          options: { opensAppToForeground: true },
+        },
+        {
+          identifier: MOBILE_NOTIFICATION_ACTIONS.OPEN_SCHEDULE,
+          buttonTitle: 'Xem lịch học',
+          options: { opensAppToForeground: true },
+        },
+      ]),
+      nativeNotifications.setNotificationCategoryAsync('message', [
+        {
+          identifier: MOBILE_NOTIFICATION_ACTIONS.OPEN_MESSAGE,
+          buttonTitle: 'Trả lời ngay',
+          options: { opensAppToForeground: true },
+        },
+      ]),
+      nativeNotifications.setNotificationCategoryAsync('promo', [
+        {
+          identifier: MOBILE_NOTIFICATION_ACTIONS.OPEN_PROMO,
+          buttonTitle: 'Xem ưu đãi',
+          options: { opensAppToForeground: true },
+        },
+      ]),
+    ]);
+  } catch (error) {
+    console.warn('Không thể đăng ký nút hành động nhanh cho thông báo đẩy.', error);
+  }
+}
+
 async function configureAndroidChannels() {
   if (Platform.OS !== 'android' || !nativeNotifications) return;
   await nativeNotifications.setNotificationChannelAsync('default', {
-    name: 'Thông báo',
+    name: 'Thông báo chung',
     importance: nativeNotifications.AndroidImportance.HIGH,
     sound: 'default',
     vibrationPattern: [0, 250, 250, 250],
+  });
+  await nativeNotifications.setNotificationChannelAsync('schedule', {
+    name: 'Lịch học & Lớp Meet',
+    importance: nativeNotifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 300, 150, 300],
+  });
+  await nativeNotifications.setNotificationChannelAsync('message', {
+    name: 'Tin nhắn & Trao đổi',
+    importance: nativeNotifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 220, 120, 220],
+  });
+  await nativeNotifications.setNotificationChannelAsync('promo', {
+    name: 'Khuyến mãi & Sự kiện',
+    importance: nativeNotifications.AndroidImportance.DEFAULT,
+    sound: 'default',
   });
   await nativeNotifications.setNotificationChannelAsync('silent', {
     name: 'Thông báo (không âm thanh)',
@@ -70,6 +132,7 @@ export async function registerMobilePushNotifications(requestPermission = false)
   }
 
   await configureAndroidChannels();
+  await configureNotificationCategories();
   let permission = await nativeNotifications.getPermissionsAsync();
   if (permission.status !== 'granted' && requestPermission) {
     permission = await nativeNotifications.requestPermissionsAsync();
@@ -146,4 +209,34 @@ export async function unregisterMobilePushNotifications() {
   });
   registeredExpoPushToken = '';
   registeredSessionKey = '';
+}
+
+export async function scheduleCategorizedLocalNotification(options: {
+  category: MobilePushCategory;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  secondsDelay?: number;
+}) {
+  if (Platform.OS === 'web' || !nativeNotifications) return null;
+  await configureAndroidChannels();
+  await configureNotificationCategories();
+  const categoryIdentifier = options.category === 'schedule' || options.category === 'message' || options.category === 'promo'
+    ? options.category
+    : undefined;
+  return nativeNotifications.scheduleNotificationAsync({
+    content: {
+      title: options.title,
+      body: options.body,
+      categoryIdentifier,
+      data: {
+        category: options.category,
+        ...(options.data || {}),
+      },
+      ...(Platform.OS === 'android' ? { channelId: options.category } : {}),
+    },
+    trigger: options.secondsDelay && options.secondsDelay > 0
+      ? { type: nativeNotifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.max(1, options.secondsDelay) }
+      : null,
+  });
 }

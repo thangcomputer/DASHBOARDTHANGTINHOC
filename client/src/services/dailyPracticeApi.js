@@ -70,6 +70,8 @@ const dailyPracticeApi = {
       return parse(await apiFetch(`/daily-practice/my/related-topics?${query}`));
     },
     buyXp: async (packId) => parse(await apiFetch('/daily-practice/my/xp/purchase', json('POST', { packId }))),
+    startSpacedReview: async () => parse(await apiFetch('/daily-practice/my/spaced-review/start', json('POST'))),
+    redeemReferral: async (code) => parse(await apiFetch('/daily-practice/my/referral/redeem', json('POST', { code }))),
     xpPurchaseStatus: async (sessionId) => parse(await apiFetch(`/daily-practice/my/xp/purchase/${encodeURIComponent(sessionId)}`, { cache: 'no-store' }), true),
     simulateXpPaid: async (sessionId) => parse(await apiFetch(`/daily-practice/my/xp/purchase/${encodeURIComponent(sessionId)}/simulate-paid`, json('POST')), true),
   },

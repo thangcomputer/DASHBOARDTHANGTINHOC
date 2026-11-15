@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Image, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Image, Linking, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput,
   useWindowDimensions, View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,11 +14,13 @@ import {
   addMobileNotificationResponseReceivedListener,
   clearMobileLastNotificationResponseAsync,
   getMobileLastNotificationResponseAsync,
+  MOBILE_NOTIFICATION_ACTIONS,
   type MobileNotificationResponse,
 } from '../services/mobilePushNotifications';
+import { openDeepLinkInApp } from './linking';
 import {
   BookOpen, Building2, CalendarDays, CheckSquare, FileBox, FileText, Gamepad2, GraduationCap,
-  DollarSign, Headphones, House, LayoutDashboard, Lock, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
+  DollarSign, Headphones, House, LayoutDashboard, Lock, LogOut, Maximize2, Menu, MessageCircle, Minimize2, Newspaper, Phone, PhoneOff, Radio, Search, Sparkles, Star, Target, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +28,9 @@ import { useAuth } from '../app/AuthContext';
 import { emit, SOCKET_EVENTS } from '../services/socketService';
 import { colors, droplet, radius, spacing, typography } from '../theme/tokens';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
+import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
+import { useMobileFocusMode, setMobileFocusMode } from '../utils/focusMode';
+import { triggerMobileHaptic } from '../components/dailyPractice/useGameSounds';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { messageService, notificationService, scheduleService, teacherFinanceService } from '../services/mockService';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -140,6 +145,8 @@ type IncomingCallPrompt = {
 
 export function RootNavigator() {
   const { user, isRestoringSession, signOut, subscription, refreshUser, refreshSubscription } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { focusMode } = useMobileFocusMode();
   const [notificationOverlayVisible, setNotificationOverlayVisible] = useState(false);
   const [freeLockModalVisible, setFreeLockModalVisible] = useState(false);
   const [surveyDismissed, setSurveyDismissed] = useState(false);
@@ -158,6 +165,26 @@ export function RootNavigator() {
     const state = navigationRef.getRootState();
     return state?.routes[state.index ?? 0]?.name;
   });
+  useEffect(() => {
+    const isStudyDestination = Boolean(
+      (stackRouteName && ['DailyPractice', 'CourseVideos', 'StudentLearning', 'LearningLesson', 'CertPrepPlayer'].includes(stackRouteName))
+      || ((!stackRouteName || stackRouteName === 'MainTabs') && ['DailyPractice', 'CourseVideos'].includes(activeTab)),
+    );
+    if (!isStudyDestination) {
+      setMobileFocusMode(false);
+    }
+  }, [stackRouteName, activeTab]);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !user) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOverlayVisible((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [user]);
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:open-notifications', () => setNotificationOverlayVisible(true));
     const lockSub = DeviceEventEmitter.addListener(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT, () => setFreeLockModalVisible(true));
@@ -191,37 +218,100 @@ export function RootNavigator() {
   }, []);
   useEffect(() => {
     if (!pendingPushResponse || !user || isRestoringSession || !navigationRef.isReady()) return;
-    const data = pendingPushResponse.notification.request.content.data;
-    if (!data) {
-      navigationRef.navigate('NotificationCenter');
-      setPendingPushResponse(null);
-      return;
-    }
-    if (data.event === 'call:incoming') {
-      const caller = data.caller as { id?: unknown; role?: unknown; name?: unknown } | undefined;
-      const callId = typeof data.callId === 'string' ? data.callId : '';
-      const conversationId = typeof data.conversationId === 'string' ? data.conversationId : '';
-      const callerId = typeof caller?.id === 'string' ? caller.id : '';
-      const callerRole = typeof caller?.role === 'string' ? caller.role : '';
-      const rolesMatch = (user.role === 'student' && callerRole === 'teacher')
-        || (user.role === 'teacher' && callerRole === 'student');
-      if (callId && conversationId && callerId && rolesMatch) {
-        setIncomingCall({
-          callId,
-          conversationId,
-          callerId,
-          callerRole,
-          callerName: typeof caller?.name === 'string' ? caller.name : 'Người gọi',
-        });
-      } else {
+    const actionId = pendingPushResponse.actionIdentifier;
+    const data = pendingPushResponse.notification.request.content.data as Record<string, unknown> | undefined;
+    const routeByNotification = async () => {
+      if (!data) {
         navigationRef.navigate('NotificationCenter');
+        return;
       }
-    } else {
+      if (data.event === 'call:incoming') {
+        const caller = data.caller as { id?: unknown; role?: unknown; name?: unknown } | undefined;
+        const callId = typeof data.callId === 'string' ? data.callId : '';
+        const conversationId = typeof data.conversationId === 'string' ? data.conversationId : '';
+        const callerId = typeof caller?.id === 'string' ? caller.id : '';
+        const callerRole = typeof caller?.role === 'string' ? caller.role : '';
+        const rolesMatch = (user.role === 'student' && callerRole === 'teacher')
+          || (user.role === 'teacher' && callerRole === 'student');
+        if (callId && conversationId && callerId && rolesMatch) {
+          setIncomingCall({
+            callId,
+            conversationId,
+            callerId,
+            callerRole,
+            callerName: typeof caller?.name === 'string' ? caller.name : 'Người gọi',
+          });
+          return;
+        }
+      }
+
+      const category = typeof data.category === 'string' ? data.category : '';
+      const deepLinkUrl = typeof data.deepLink === 'string'
+        ? data.deepLink
+        : typeof data.url === 'string'
+          ? data.url
+          : '';
+      const meetUrl = typeof data.meetUrl === 'string' ? data.meetUrl : '';
+
+      if (actionId === MOBILE_NOTIFICATION_ACTIONS.JOIN_MEET && meetUrl) {
+        await Linking.openURL(meetUrl).catch(() => undefined);
+        return;
+      }
+      if (actionId === MOBILE_NOTIFICATION_ACTIONS.OPEN_SCHEDULE || category === 'schedule') {
+        navigationRef.navigate('MainTabs', {
+          screen: 'Schedule',
+          params: typeof data.scheduleId === 'string' ? { focusScheduleId: data.scheduleId } : undefined,
+        });
+        return;
+      }
+      if (actionId === MOBILE_NOTIFICATION_ACTIONS.OPEN_MESSAGE || category === 'message') {
+        if (typeof data.conversationId === 'string' && data.conversationId) {
+          navigationRef.navigate('Conversation', { conversationId: data.conversationId });
+        } else {
+          navigationRef.navigate('MainTabs', { screen: 'Messages' });
+        }
+        return;
+      }
+      if (actionId === MOBILE_NOTIFICATION_ACTIONS.OPEN_PROMO || category === 'promo') {
+        const promoUrl = typeof data.promoUrl === 'string' ? data.promoUrl : '';
+        if (promoUrl && promoUrl.startsWith('http')) {
+          await Linking.openURL(promoUrl).catch(() => undefined);
+          return;
+        }
+        navigationRef.navigate('Tuition');
+        return;
+      }
+      if (deepLinkUrl) {
+        const handled = await openDeepLinkInApp(deepLinkUrl);
+        if (handled) return;
+      }
+      if (typeof data.courseId === 'string' && typeof data.unitId === 'string' && typeof data.lessonId === 'string') {
+        navigationRef.navigate('LearningLesson', {
+          courseId: data.courseId,
+          unitId: data.unitId,
+          lessonId: data.lessonId,
+        });
+        return;
+      }
+      if (typeof data.topicId === 'string') {
+        navigationRef.navigate('MainTabs', {
+          screen: 'DailyPractice',
+          params: { topicId: data.topicId, practice: 'stage' },
+        });
+        return;
+      }
+      if (typeof data.conversationId === 'string' && data.conversationId) {
+        navigationRef.navigate('Conversation', { conversationId: data.conversationId });
+        return;
+      }
       navigationRef.navigate('NotificationCenter');
-    }
-    setPendingPushResponse(null);
-    void clearMobileLastNotificationResponseAsync().catch((error: unknown) => {
-      console.warn('Không thể xóa trạng thái mở thông báo đẩy.', error);
+    };
+
+    void routeByNotification().finally(() => {
+      setPendingPushResponse(null);
+      void clearMobileLastNotificationResponseAsync().catch((error: unknown) => {
+        console.warn('Không thể xóa trạng thái mở thông báo đẩy.', error);
+      });
     });
   }, [isRestoringSession, pendingPushResponse, user]);
   useEffect(() => {
@@ -526,13 +616,14 @@ export function RootNavigator() {
         />
       ) : null}
       {!examRoomActive
+        && !focusMode
         && stackRouteName !== 'Conversation'
         && stackRouteName !== 'Call'
         && activeTab !== 'Support'
         && (user.role === 'student' || user.role === 'teacher') ? (
         <FloatingSupportButton />
       ) : null}
-      {!examRoomActive && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? (
+      {!examRoomActive && !focusMode && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? (
         <PersistentTabBar
           role={user.role}
           activeTab={activeTab}
@@ -542,13 +633,37 @@ export function RootNavigator() {
           freeLocked={isFreePortalLocked(user)}
         />
       ) : null}
+      {focusMode && stackRouteName !== 'DailyPractice' && activeTab !== 'DailyPractice' ? (
+        <Pressable
+          onPress={() => {
+            triggerMobileHaptic('light');
+            setMobileFocusMode(false);
+          }}
+          style={({ pressed }) => [
+            styles.focusExitPill,
+            { top: insets.top + 8 },
+            pressed && { opacity: 0.85 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Thoát chế độ tập trung"
+        >
+          <Minimize2 size={15} color="#047857" />
+          <Text style={styles.focusExitText}>Thoát tập trung</Text>
+        </Pressable>
+      ) : null}
       {notificationOverlayVisible ? (
         <NotificationsScreen
           overlay
           onClose={() => setNotificationOverlayVisible(false)}
         />
       ) : null}
-      {searchOverlayVisible ? <GlobalSearchOverlay onClose={() => setSearchOverlayVisible(false)} /> : null}
+      {searchOverlayVisible ? (
+        <GlobalSearchOverlay
+          role={user.role}
+          freeMenu={isFreePortalMenu(user)}
+          onClose={() => setSearchOverlayVisible(false)}
+        />
+      ) : null}
       <MobilePopupBanner role={user?.role || 'student'} />
       <Modal
         visible={Boolean(incomingCall)}
@@ -595,15 +710,170 @@ export function RootNavigator() {
   );
 }
 
-function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
+function normalizeSearchQuery(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+type CommandEntry = {
+  id: string;
+  label: string;
+  subtitle: string;
+  keywords: string;
+  icon: LucideIcon;
+  active?: boolean;
+  locked?: boolean;
+  onSelect: () => void;
+};
+
+function GlobalSearchOverlay({
+  onClose,
+  role,
+  freeMenu,
+}: {
+  onClose: () => void;
+  role: 'student' | 'teacher';
+  freeMenu: boolean;
+}) {
+  const { user } = useAuth();
+  const { focusMode } = useMobileFocusMode();
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [query, setQuery] = useState('');
+  const freeLocked = role === 'student' && isFreePortalLocked(user);
+
+  useEffect(() => {
+    let active = true;
+    getMobileSoundEnabled()
+      .then((enabled) => { if (active) setSoundEnabled(enabled); })
+      .catch(() => { });
+    const unsub = subscribeToMobileSoundPreference((enabled) => setSoundEnabled(enabled));
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+
+  const quickActions: CommandEntry[] = [
+    {
+      id: 'act-sound',
+      label: soundEnabled ? 'Tắt âm thanh hiệu ứng' : 'Bật âm thanh hiệu ứng',
+      subtitle: soundEnabled ? 'Đang bật âm thanh & rung phản hồi' : 'Đang tắt âm thanh & rung',
+      keywords: 'am thanh sound mute loa rung haptic',
+      icon: soundEnabled ? Volume2 : VolumeX,
+      active: soundEnabled,
+      onSelect: () => {
+        const next = !soundEnabled;
+        if (next) triggerMobileHaptic('light');
+        void setMobileSoundEnabled(next).then(() => setSoundEnabled(next)).catch(() => { });
+      },
+    },
+    {
+      id: 'act-focus',
+      label: focusMode ? 'Thoát chế độ tập trung' : 'Bật chế độ tập trung',
+      subtitle: focusMode ? 'Hiện lại thanh điều hướng & hỗ trợ' : 'Ẩn thanh điều hướng & nút nổi khi học',
+      keywords: 'che do tap trung focus mode an thanh dieu huong',
+      icon: focusMode ? Minimize2 : Maximize2,
+      active: focusMode,
+      onSelect: () => {
+        triggerMobileHaptic('light');
+        setMobileFocusMode(!focusMode);
+        onClose();
+      },
+    },
+    ...(role === 'student' ? [{
+      id: 'act-goal',
+      label: 'Đặt mục tiêu học tập',
+      subtitle: 'Cài đặt số giờ học mỗi ngày',
+      keywords: 'muc tieu hoc tap goal streak gio hoc',
+      icon: Target,
+      onSelect: () => {
+        triggerMobileHaptic('light');
+        onClose();
+        DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT);
+      },
+    }] : []),
+  ];
+
+  const navigateTab = (screen: keyof MainTabsParamList, locked = false) => {
+    triggerMobileHaptic('light');
+    onClose();
+    if (locked) {
+      DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+      return;
+    }
+    navigationRef.navigate('MainTabs', { screen });
+  };
+
+  const destinations: CommandEntry[] = role === 'teacher'
+    ? [
+      { id: 'nav-home', label: 'Tổng quan', subtitle: 'Bảng điều khiển giảng viên', keywords: 'tong quan home dashboard', icon: House, onSelect: () => navigateTab('Home') },
+      { id: 'nav-schedule', label: 'Lịch dạy & điểm danh', subtitle: 'Xem ca dạy hôm nay', keywords: 'lich day diem danh schedule', icon: CalendarDays, onSelect: () => navigateTab('Schedule') },
+      { id: 'nav-messages', label: 'Hộp thư', subtitle: 'Nhắn tin với học viên', keywords: 'hop thu tin nhan chat messages', icon: MessageCircle, onSelect: () => navigateTab('Messages') },
+      { id: 'nav-feed', label: 'Bảng tin', subtitle: 'Thông báo & bài đăng trung tâm', keywords: 'bang tin feed', icon: Radio, onSelect: () => navigateTab('Feed') },
+      { id: 'nav-finance', label: 'Tài chính', subtitle: 'Thu nhập & đối soát', keywords: 'tai chinh luong finance', icon: DollarSign, onSelect: () => navigateTab('Finance') },
+      {
+        id: 'nav-students',
+        label: 'Quản lý học viên',
+        subtitle: 'Danh sách lớp & học viên',
+        keywords: 'hoc vien lop students',
+        icon: Users,
+        onSelect: () => {
+          triggerMobileHaptic('light');
+          onClose();
+          navigationRef.navigate('Students');
+        },
+      },
+      { id: 'nav-support', label: 'Hỗ trợ', subtitle: 'Trợ giúp & tài liệu giảng viên', keywords: 'ho tro support', icon: Headphones, onSelect: () => navigateTab('Support') },
+      { id: 'nav-profile', label: 'Hồ sơ cá nhân', subtitle: 'Thông tin & cài đặt', keywords: 'ho so profile cai dat', icon: UserRound, onSelect: () => navigateTab('Profile') },
+    ]
+    : [
+      { id: 'nav-home', label: 'Tổng quan', subtitle: 'Tiến độ & lịch học hôm nay', keywords: 'tong quan home dashboard', icon: House, onSelect: () => navigateTab('Home') },
+      { id: 'nav-dp', label: 'Luyện tập hằng ngày', subtitle: 'Lộ trình XP & câu hỏi ngắn', keywords: 'luyen tap daily practice xp lo trinh', icon: Gamepad2, onSelect: () => navigateTab('DailyPractice') },
+      ...(!freeMenu ? [
+        { id: 'nav-videos', label: 'Bài giảng', subtitle: 'Video & thực hành bài học', keywords: 'bai giang video thuc hanh course', icon: BookOpen, onSelect: () => navigateTab('CourseVideos') },
+        { id: 'nav-schedule', label: 'Lịch học', subtitle: 'Lịch học trực tuyến qua Meet', keywords: 'lich hoc meet schedule', icon: CalendarDays, onSelect: () => navigateTab('Schedule') },
+      ] : []),
+      { id: 'nav-messages', label: 'Hộp thư', subtitle: 'Trao đổi với giảng viên', keywords: 'hop thu tin nhan chat messages', icon: MessageCircle, locked: freeLocked, onSelect: () => navigateTab('Messages', freeLocked) },
+      { id: 'nav-feed', label: 'Bảng tin', subtitle: 'Cộng đồng & thông báo mới', keywords: 'bang tin feed', icon: Radio, locked: freeLocked, onSelect: () => navigateTab('Feed', freeLocked) },
+      {
+        id: 'nav-support',
+        label: 'Hỗ trợ',
+        subtitle: 'Liên hệ & giải đáp thắc mắc',
+        keywords: 'ho tro support',
+        icon: Headphones,
+        locked: freeLocked,
+        onSelect: () => {
+          triggerMobileHaptic('light');
+          onClose();
+          if (freeLocked) {
+            DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+            return;
+          }
+          navigationRef.navigate('Support');
+        },
+      },
+      { id: 'nav-profile', label: 'Hồ sơ cá nhân', subtitle: 'Tài khoản & khóa thiết bị', keywords: 'ho so profile cai dat', icon: UserRound, onSelect: () => navigateTab('Profile') },
+    ];
+
+  const normalizedQuery = normalizeSearchQuery(query);
+  const matches = (entry: CommandEntry) => {
+    if (!normalizedQuery) return true;
+    const hay = normalizeSearchQuery(`${entry.label} ${entry.subtitle} ${entry.keywords}`);
+    return hay.includes(normalizedQuery);
+  };
+  const filteredActions = quickActions.filter(matches);
+  const filteredDestinations = destinations.filter(matches);
+  const firstMatch = filteredDestinations[0] || filteredActions[0] || null;
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.searchOverlay}>
         <Pressable style={styles.searchOverlayBackdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm" />
         <View style={styles.searchOverlayCard}>
           <View style={styles.searchOverlayHeader}>
-            <Text style={styles.searchOverlayTitle}>Tìm kiếm</Text>
+            <View style={styles.searchOverlayTitleRow}>
+              <Sparkles size={17} color={colors.brand} />
+              <Text style={styles.searchOverlayTitle}>Tìm kiếm & tác vụ nhanh</Text>
+            </View>
             <Pressable onPress={onClose} style={styles.searchOverlayClose} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
               <X size={20} color={colors.muted} />
             </Pressable>
@@ -614,12 +884,18 @@ function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
               autoFocus
               value={query}
               onChangeText={setQuery}
-              placeholder="Tìm bất cứ gì"
+              placeholder="Tìm màn hình, bật âm thanh, chế độ tập trung…"
               placeholderTextColor={colors.muted}
               style={styles.searchOverlayTextInput}
-              accessibilityLabel="Tìm bất cứ gì"
-              returnKeyType="done"
-              onSubmitEditing={onClose}
+              accessibilityLabel="Tìm màn hình hoặc tác vụ nhanh"
+              returnKeyType="go"
+              onSubmitEditing={() => {
+                if (normalizedQuery && firstMatch) {
+                  firstMatch.onSelect();
+                } else {
+                  onClose();
+                }
+              }}
             />
             {query ? (
               <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Xóa nội dung tìm kiếm">
@@ -627,6 +903,60 @@ function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
               </Pressable>
             ) : null}
           </View>
+          <ScrollView style={styles.commandListScroll} contentContainerStyle={styles.commandListContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {filteredActions.length > 0 ? (
+              <View style={styles.commandSection}>
+                <Text style={styles.commandSectionLabel}>TÁC VỤ NHANH</Text>
+                {filteredActions.map((entry) => {
+                  const Icon = entry.icon;
+                  return (
+                    <Pressable
+                      key={entry.id}
+                      onPress={entry.onSelect}
+                      style={({ pressed }) => [styles.commandRow, entry.active && styles.commandRowActive, pressed && styles.commandRowPressed]}
+                      accessibilityRole="button"
+                    >
+                      <View style={[styles.commandIconBox, entry.active && styles.commandIconBoxActive]}>
+                        <Icon size={16} color={entry.active ? '#FFFFFF' : colors.brand} />
+                      </View>
+                      <View style={styles.commandTextCol}>
+                        <Text style={styles.commandLabel} numberOfLines={1}>{entry.label}</Text>
+                        <Text style={styles.commandSubtitle} numberOfLines={1}>{entry.subtitle}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+            {filteredDestinations.length > 0 ? (
+              <View style={styles.commandSection}>
+                <Text style={styles.commandSectionLabel}>ĐI TỚI NHANH</Text>
+                {filteredDestinations.map((entry) => {
+                  const Icon = entry.icon;
+                  return (
+                    <Pressable
+                      key={entry.id}
+                      onPress={entry.onSelect}
+                      style={({ pressed }) => [styles.commandRow, pressed && styles.commandRowPressed]}
+                      accessibilityRole="button"
+                    >
+                      <View style={styles.commandIconBox}>
+                        <Icon size={16} color={colors.brand} />
+                      </View>
+                      <View style={styles.commandTextCol}>
+                        <Text style={styles.commandLabel} numberOfLines={1}>{entry.label}</Text>
+                        <Text style={styles.commandSubtitle} numberOfLines={1}>{entry.subtitle}</Text>
+                      </View>
+                      {entry.locked ? <Lock size={14} color="#D97706" /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+            {filteredActions.length === 0 && filteredDestinations.length === 0 ? (
+              <Text style={styles.commandEmptyText}>Không tìm thấy màn hình hay tác vụ phù hợp.</Text>
+            ) : null}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -1564,14 +1894,30 @@ function useNavigationBarVisibility() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
-  searchOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.4)' },
+  searchOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.48)' },
   searchOverlayBackdrop: { ...StyleSheet.absoluteFill },
-  searchOverlayCard: { width: '100%', maxWidth: 440, padding: spacing.lg, borderWidth: 1, borderColor: colors.line, borderRadius: 22, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
+  searchOverlayCard: { width: '100%', maxWidth: 460, maxHeight: '84%', padding: spacing.lg, borderWidth: 1, borderColor: colors.line, borderRadius: 22, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
   searchOverlayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  searchOverlayTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchOverlayTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' },
   searchOverlayClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  searchOverlayInput: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: 16, backgroundColor: colors.canvas },
+  searchOverlayInput: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1.5, borderColor: colors.line, borderRadius: 16, backgroundColor: colors.canvas },
   searchOverlayTextInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.body, paddingVertical: spacing.sm },
+  commandListScroll: { marginTop: spacing.md, maxHeight: 380 },
+  commandListContent: { gap: spacing.md, paddingBottom: spacing.xs },
+  commandSection: { gap: 6 },
+  commandSectionLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, paddingHorizontal: 4 },
+  commandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+  commandRowActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  commandRowPressed: { opacity: 0.82 },
+  commandIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' },
+  commandIconBoxActive: { backgroundColor: '#059669' },
+  commandTextCol: { flex: 1, minWidth: 0 },
+  commandLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  commandSubtitle: { color: colors.muted, fontSize: 11, fontWeight: '500', marginTop: 1 },
+  commandEmptyText: { color: colors.muted, fontSize: 13, fontWeight: '600', textAlign: 'center', paddingVertical: spacing.lg },
+  focusExitPill: { position: 'absolute', right: 14, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: '#A7F3D0', backgroundColor: 'rgba(255,255,255,0.96)', shadowColor: '#047857', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  focusExitText: { color: '#047857', fontSize: 12, fontWeight: '800' },
   incomingCallBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.62)' },
   incomingCallCard: { width: '100%', maxWidth: 360, alignItems: 'center', padding: spacing.xl, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   incomingCallIcon: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 29, backgroundColor: '#16A34A', marginBottom: spacing.md },
@@ -1590,7 +1936,7 @@ const styles = StyleSheet.create({
   navItem: { alignSelf: 'stretch', marginHorizontal: 3, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
   navItemCard: { borderColor: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.45)', boxShadow: droplet.button },
   navItemActive: { borderColor: 'rgba(167,243,208,0.8)', backgroundColor: 'rgba(236,253,245,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(236,253,245,0.8) 100%)', boxShadow: droplet.navItemActive },
-  navItemActiveBrand: { borderColor: 'rgba(254,202,202,0.8)', backgroundColor: 'rgba(254,242,242,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(254,242,242,0.8) 100%)', boxShadow: droplet.navItemActive },
+  navItemActiveBrand: { borderColor: 'rgba(167,243,208,0.8)', backgroundColor: 'rgba(236,253,245,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(236,253,245,0.8) 100%)', boxShadow: droplet.navItemActive },
   navTile: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderBottomWidth: 3, borderBottomColor: '#CBD5E1', borderRadius: 14, backgroundColor: '#FFFFFF' },
   navTileActive: { borderColor: '#059669', borderBottomColor: '#047857', borderBottomWidth: 3, backgroundColor: '#10B981' },
   navTileActiveBrand: { borderColor: '#059669', borderBottomColor: '#065F46', borderBottomWidth: 3, backgroundColor: '#10B981' },
@@ -1610,7 +1956,7 @@ const styles = StyleSheet.create({
   floatingSupportLabel: { paddingHorizontal: 2 },
   floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
   floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand, boxShadow: 'inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' },
-  floatingSupportIconBrand: { backgroundColor: '#059669', boxShadow: 'inset 2px 2px 4px rgba(185, 28, 28, 0.35), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' } as never,
+  floatingSupportIconBrand: { backgroundColor: '#059669', boxShadow: 'inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' } as never,
   drawerOverlay: { flex: 1, flexDirection: 'row' },
   drawerBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
@@ -1653,7 +1999,7 @@ const styles = StyleSheet.create({
   drawerSectionItems: { gap: 4 },
   drawerItem: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: 12, borderWidth: 1, borderColor: 'transparent', borderRadius: 14 },
   drawerItemActive: { borderColor: 'rgba(52, 211, 153, 0.4)', borderBottomWidth: 3, borderBottomColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.16)' },
-  drawerItemActiveBrand: { borderColor: 'rgba(248, 113, 113, 0.4)', borderBottomWidth: 3, borderBottomColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.16)' },
+  drawerItemActiveBrand: { borderColor: 'rgba(52, 211, 153, 0.4)', borderBottomWidth: 3, borderBottomColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.16)' },
   drawerItemPressed: { backgroundColor: 'rgba(255,255,255,0.12)' },
   drawerItemIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
   drawerItemIconActive: { backgroundColor: '#10B981' },

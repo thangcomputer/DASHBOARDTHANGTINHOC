@@ -94,7 +94,7 @@ export default function CertPrepCatalogPage() {
       <div className="cms-toolbar">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-gray-800 inline-flex items-center gap-2">
-            <BookOpen size={20} className="text-red-600" aria-hidden="true" /> Ôn thi MOS/IC3
+            <BookOpen size={20} className="text-emerald-600" aria-hidden="true" /> Ôn thi MOS/IC3
           </h2>
           <p className="text-sm text-slate-500 mt-0.5">Luyện tập và kiểm tra kiến thức theo từng cấp độ.</p>
         </div>

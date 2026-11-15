@@ -459,7 +459,9 @@ export function VideoPlayerFrame({
   }, []);
 
   const source = useMemo(() => {
+    const isLocalFile = String(videoUrl || '').startsWith('file://');
     const apiOrigin = new URL(getMobileApiBaseUrl()).origin;
+    const fileDir = isLocalFile ? videoUrl.slice(0, Math.max(0, videoUrl.lastIndexOf('/') + 1)) : apiOrigin;
     return {
       html: createPlayerHtml({
         videoUrl,
@@ -468,13 +470,13 @@ export function VideoPlayerFrame({
         lessonId,
         antiSeekEnabled,
         done,
-        origin: apiOrigin,
+        origin: isLocalFile ? 'file://' : apiOrigin,
         brandedChrome,
         initialVolume: volume,
         initialMuted: muted,
         chromeBg: surfaceBg,
       }),
-      baseUrl: apiOrigin,
+      baseUrl: fileDir || apiOrigin,
     };
   }, [videoUrl, embeddedUrl, title, lessonId, antiSeekEnabled, done, brandedChrome, prefsReady, surfaceBg]);
   onProgressRef.current = onProgress;
@@ -645,6 +647,10 @@ export function VideoPlayerFrame({
           mediaPlaybackRequiresUserAction={false}
           javaScriptEnabled
           domStorageEnabled
+          allowFileAccess
+          allowFileAccessFromFileURLs
+          allowUniversalAccessFromFileURLs
+          allowingReadAccessToURL={source.baseUrl}
           originWhitelist={['*']}
           startInLoadingState
         />

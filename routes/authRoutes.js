@@ -36,6 +36,8 @@ const freePortalSocial = require('../services/freePortalSocial');
 const freePortalOtp = require('../services/freePortalOtp');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
+const deviceSessionService = require('../services/deviceSessionService');
+const adminOtp2faService = require('../services/adminOtp2faService');
 const {
   normalizeVNPhone,
   phoneLookupVariants,
@@ -156,12 +158,13 @@ async function revokePreviousMobileSessions({ userId, role, io }) {
 // Tự động dọn dẹp sau 5 phút
 const captchaStore = new Map();
 const CAPTCHA_TTL = 5 * 60 * 1000; // 5 phút
-setInterval(() => {
+const captchaCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [id, c] of captchaStore.entries()) {
     if (c.expiresAt < now) captchaStore.delete(id);
   }
 }, 60000);
+if (typeof captchaCleanupTimer.unref === 'function') captchaCleanupTimer.unref();
 
 /** So sánh refresh token đã lưu DB (chống timing attack) */
 function safeEqualRefresh(stored, incoming) {
@@ -326,17 +329,117 @@ function issueUserMfaChallenge(user, deviceFingerprint = null) {
   };
 }
 
+/** Thử thách 2FA OTP Zalo/Email cho Super Admin */
+async function issueAdminOtpMfaChallenge(sysSettings, audience = 'internal', deviceFingerprint = null) {
+  const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
+  const phone = sysSettings?.adminOtp2faPhone || process.env.MASTER_ADMIN_PHONE || '';
+  const email = sysSettings?.adminOtp2faEmail || process.env.MASTER_ADMIN_EMAIL || '';
+  const channel = sysSettings?.adminOtp2faChannel || 'both';
+  const sent = await adminOtp2faService.createAndSendOtpChallenge({
+    userId: 'admin',
+    role: 'admin',
+    purpose: 'login_otp',
+    channel,
+    phone,
+    email,
+    userName: dbAdminName,
+  });
+  const mfaToken = jwt.sign(
+    {
+      purpose: 'mfa',
+      method: 'otp_zalo_email',
+      challengeId: sent.challengeId,
+      id: 'admin',
+      role: 'admin',
+      adminRole: 'SUPER_ADMIN',
+      aud: audience,
+      fp: deviceFingerprint || undefined,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' },
+  );
+  return {
+    success: true,
+    mfaRequired: true,
+    mfaMethod: 'otp_zalo_email',
+    mfaToken,
+    data: {
+      mfaRequired: true,
+      mfaMethod: 'otp_zalo_email',
+      channel,
+      maskedPhone: sent.maskedPhone,
+      maskedEmail: sent.maskedEmail,
+      sentVia: sent.sentVia,
+      deliveryOk: sent.deliveryOk,
+      expiresIn: sent.expiresIn,
+      resendAfterSec: sent.resendAfterSec,
+      mfaToken,
+      name: dbAdminName,
+    },
+  };
+}
+
+/** Thử thách 2FA OTP Zalo/Email cho tài khoản admin/staff trong DB */
+async function issueUserOtpMfaChallenge(user, deviceFingerprint = null) {
+  const phone = user.otp2faPhone || user.zalo || user.phone || '';
+  const email = user.email || '';
+  const channel = user.otp2faChannel || 'both';
+  const sent = await adminOtp2faService.createAndSendOtpChallenge({
+    userId: String(user._id),
+    role: user.role,
+    purpose: 'login_otp',
+    channel,
+    phone,
+    email,
+    userName: user.name,
+  });
+  const mfaToken = jwt.sign(
+    {
+      purpose: 'mfa',
+      method: 'otp_zalo_email',
+      challengeId: sent.challengeId,
+      id: String(user._id),
+      role: user.role,
+      adminRole: user.adminRole || null,
+      aud: 'internal',
+      fp: deviceFingerprint || undefined,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' },
+  );
+  return {
+    success: true,
+    mfaRequired: true,
+    mfaMethod: 'otp_zalo_email',
+    mfaToken,
+    data: {
+      mfaRequired: true,
+      mfaMethod: 'otp_zalo_email',
+      channel,
+      maskedPhone: sent.maskedPhone,
+      maskedEmail: sent.maskedEmail,
+      sentVia: sent.sentVia,
+      deliveryOk: sent.deliveryOk,
+      expiresIn: sent.expiresIn,
+      resendAfterSec: sent.resendAfterSec,
+      mfaToken,
+      name: user.name,
+    },
+  };
+}
+
 /**
  * Hoàn tất đăng nhập nội bộ cho tài khoản DB: gắn fingerprint, tăng tokenVersion,
  * ký token aud='internal' và lưu refresh token.
  * Dùng chung bởi /login/internal và /mfa/verify.
  */
-async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
+async function completeInternalLogin(user, userRole, deviceFingerprint, io, req = null) {
   if (deviceFingerprint) user.deviceFingerprint = deviceFingerprint;
   disconnectUserSockets(io, user._id);
 
   const newTokenVersion = (user.tokenVersion || 0) + 1;
   user.tokenVersion = newTokenVersion;
+  const dsid = deviceSessionService.createDeviceSessionId();
 
   const tokenPayload = {
     id: user._id, role: userRole, name: user.name,
@@ -345,6 +448,7 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
     branchId: user.branchId || null,
     branchCode: user.branchCode || '',
     tokenVersion: newTokenVersion,
+    dsid,
   };
   const { accessToken, refreshToken } = generateTokens(tokenPayload, 'internal');
 
@@ -354,6 +458,17 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
   if (user.lockUntil) user.lockUntil = undefined;
   user.markModified('tokenVersion');
   await user.save({ validateModifiedOnly: true });
+
+  await deviceSessionService.recordWebDeviceSession({
+    sessionId: dsid,
+    userId: String(user._id),
+    userName: user.name,
+    role: userRole,
+    adminRole: user.adminRole || '',
+    req,
+    fingerprint: deviceFingerprint || '',
+    loginChannel: 'internal',
+  });
 
   return {
     success: true,
@@ -371,12 +486,14 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
         status: user.status,
         isFirstLogin: !!user.isFirstLogin,
       },
-      accessToken, refreshToken,
+      accessToken,
+      refreshToken,
+      deviceSessionId: dsid,
     },
   };
 }
 
-async function issueAdminTokens(sysSettings, audience = 'public', io) {
+async function issueAdminTokens(sysSettings, audience = 'public', io, req = null) {
   const dbAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : 'Admin';
   const dbAdminAvatar = sysSettings?.adminAvatar || '';
   const versionSettings = await SystemSettings.findOneAndUpdate(
@@ -386,6 +503,7 @@ async function issueAdminTokens(sysSettings, audience = 'public', io) {
   ).select('adminTokenVersion');
   const tokenVersion = versionSettings?.adminTokenVersion || 1;
   disconnectUserSockets(io, 'admin');
+  const dsid = deviceSessionService.createDeviceSessionId();
   const { accessToken, refreshToken } = generateTokens(
     {
       id: 'admin',
@@ -396,9 +514,19 @@ async function issueAdminTokens(sysSettings, audience = 'public', io) {
       branchId: null,
       branchCode: '',
       tokenVersion,
+      dsid,
     },
     audience,
   );
+  await deviceSessionService.recordWebDeviceSession({
+    sessionId: dsid,
+    userId: 'admin',
+    userName: dbAdminName,
+    role: 'admin',
+    adminRole: 'SUPER_ADMIN',
+    req,
+    loginChannel: audience,
+  });
   return {
     success: true,
     data: {
@@ -411,6 +539,7 @@ async function issueAdminTokens(sysSettings, audience = 'public', io) {
       avatar: dbAdminAvatar,
       accessToken,
       refreshToken,
+      deviceSessionId: dsid,
       user: {
         _id: 'admin',
         id: 'admin',
@@ -549,6 +678,14 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
       });
     }
 
+    if (decoded.dsid && (await deviceSessionService.isDeviceSessionRevoked(decoded.dsid))) {
+      return res.status(401).json({
+        success: false,
+        code: 'SESSION_REVOKED',
+        message: 'Phiên thiết bị đã bị đăng xuất từ xa. Vui lòng đăng nhập lại.',
+      });
+    }
+
     const aud = decoded.aud || 'public';
     const id = decoded.id;
     const expSec = decoded.exp ? Math.max(1, decoded.exp - Math.floor(Date.now() / 1000)) : 86400 * 30;
@@ -562,6 +699,7 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
       branchId: decoded.branchId || null,
       branchCode: decoded.branchCode || '',
       tokenVersion: decoded.tokenVersion,
+      ...(decoded.dsid ? { dsid: decoded.dsid } : {}),
     };
 
     // Tài khoản admin cứng - không lưu refresh trong DB, chỉ ký JWT
@@ -581,7 +719,9 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
         name: decoded.name || 'Admin',
         adminRole: 'SUPER_ADMIN',
         tokenVersion: decoded.tokenVersion,
+        ...(decoded.dsid ? { dsid: decoded.dsid } : {}),
       }, aud);
+      if (decoded.dsid) deviceSessionService.touchDeviceSession(decoded.dsid, req);
       return res.json({ success: true, accessToken, refreshToken: newRefresh });
     }
 
@@ -704,6 +844,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     // ⭐ Fix 1: Increment tokenVersion → vô hiệu token cũ trên thiết bị khác
     const newTokenVersion = (user.tokenVersion || 0) + 1;
     user.tokenVersion = newTokenVersion;
+    const dsid = deviceSessionService.createDeviceSessionId();
 
     // ── Tạo tokens ────────────────────────────────────────────────
     const tokenPayload = {
@@ -715,6 +856,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
       branchId: user.branchId || null,
       branchCode: user.branchCode || '',
       tokenVersion: newTokenVersion,                // ⭐ Embed version in JWT
+      dsid,
     };
 
     const { accessToken, refreshToken } = generateTokens(tokenPayload);
@@ -726,6 +868,16 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     if (user.lockUntil) user.lockUntil = undefined;
     user.markModified('tokenVersion');  // Force Mongoose to persist new field
     await user.save({ validateModifiedOnly: true });
+    await deviceSessionService.recordWebDeviceSession({
+      sessionId: dsid,
+      userId: String(user._id),
+      userName: user.name,
+      role: userRole,
+      adminRole: user.adminRole || '',
+      req,
+      fingerprint: fp1 || '',
+      loginChannel: 'legacy',
+    });
     fireStudentDeviceAlert(req, user, userRole, knownDevice1);
 
     // ── Chuẩn bị response data (không trả password) ───────────────
@@ -771,6 +923,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
         user: userData,
         accessToken,
         refreshToken,
+        deviceSessionId: dsid,
         expiresIn: process.env.JWT_EXPIRES_IN || '8h',
       },
     });
@@ -908,11 +1061,13 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     // ⭐ Fix 1: tokenVersion
     const newTokenVersion = (user.tokenVersion || 0) + 1;
     user.tokenVersion = newTokenVersion;
+    const dsid = deviceSessionService.createDeviceSessionId();
 
     const tokenPayload = {
       id: user._id, role: userRole, name: user.name,
       adminRole: null, permissions: [], branchId: null, branchCode: '',
       tokenVersion: newTokenVersion,
+      dsid,
     };
     const { accessToken, refreshToken } = generateTokens(tokenPayload, 'public');
 
@@ -920,6 +1075,16 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     user.loginAttempts = 0;
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
+    await deviceSessionService.recordWebDeviceSession({
+      sessionId: dsid,
+      userId: String(user._id),
+      userName: user.name,
+      role: userRole,
+      adminRole: '',
+      req,
+      fingerprint: fp2 || '',
+      loginChannel: 'public',
+    });
     fireStudentDeviceAlert(req, user, userRole, knownDevice2);
 
     return res.json({
@@ -953,7 +1118,9 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
             ...freePortalFlags(user),
           }),
         },
-        accessToken, refreshToken,
+        accessToken,
+        refreshToken,
+        deviceSessionId: dsid,
       },
     });
   } catch (err) {
@@ -1167,7 +1334,7 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     const masterPhone = normalizeVNPhone(process.env.MASTER_ADMIN_PHONE);
     if (masterPhone && phone === masterPhone) {
       const sysSettings = await SystemSettings.findOne({ _key: 'main' })
-        .select('+adminMfaSecret adminPasswordHash adminName adminMfaEnabled');
+        .select('+adminMfaSecret adminPasswordHash adminName adminMfaEnabled adminOtp2faEnabled adminOtp2faChannel adminOtp2faPhone adminOtp2faEmail');
       const adminPasswordMatch = await verifyAdminPassword(password, sysSettings);
       if (!adminPasswordMatch) {
         return res.status(401).json(INVALID_CREDENTIALS);
@@ -1183,13 +1350,17 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
       if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
         return res.json(issueAdminMfaChallenge(sysSettings, 'internal'));
       }
-      const tokens = await issueAdminTokens(sysSettings, 'internal', req.app.get('io'));
+      if (sysSettings?.adminOtp2faEnabled && (sysSettings.adminOtp2faPhone || sysSettings.adminOtp2faEmail || process.env.MASTER_ADMIN_PHONE || process.env.MASTER_ADMIN_EMAIL)) {
+        return res.json(await issueAdminOtpMfaChallenge(sysSettings, 'internal'));
+      }
+      const tokens = await issueAdminTokens(sysSettings, 'internal', req.app.get('io'), req);
       return res.json({
         success: true,
         data: {
           user: tokens.data.user,
           accessToken: tokens.data.accessToken,
           refreshToken: tokens.data.refreshToken,
+          deviceSessionId: tokens.data.deviceSessionId,
         },
       });
     }
@@ -1224,21 +1395,24 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     // Lần đăng nhập nội bộ mới cũng thay thế phiên trước đó trên thiết bị khác.
     const { deviceFingerprint: fp3 } = req.body;
 
-    // Bước 5: MFA - nếu tài khoản đã bật TOTP thì dừng ở đây, chưa cấp token
+    // Bước 5: MFA - nếu tài khoản đã bật TOTP hoặc OTP Zalo/Email thì dừng ở đây, chưa cấp token
     if (user.mfaEnabled && user.mfaSecret) {
       return res.json(issueUserMfaChallenge(user, fp3));
     }
+    if (user.otp2faEnabled && (user.otp2faPhone || user.zalo || user.phone || user.email)) {
+      return res.json(await issueUserOtpMfaChallenge(user, fp3));
+    }
 
-    return res.json(await completeInternalLogin(user, userRole, fp3, req.app.get('io')));
+    return res.json(await completeInternalLogin(user, userRole, fp3, req.app.get('io'), req));
   } catch (err) {
     logger.error('[AUTH] login/internal error:', err);
     res.status(500).json({ success: false, message: 'Lỗi server. Vui lòng thử lại.' });
   }
 });
 
-// ─── MFA (Super Admin TOTP) ───────────────────────────────────────────────────
+// ─── MFA (Super Admin TOTP & 2FA OTP Zalo/Email) ───────────────────────────────
 
-/** Xác thực mã MFA sau bước mật khẩu */
+/** Xác thực mã MFA sau bước mật khẩu (hỗ trợ cả TOTP app và OTP Zalo/Email) */
 router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (req, res) => {
   try {
     const { mfaToken, code } = req.body || {};
@@ -1255,7 +1429,36 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
       return res.status(401).json({ success: false, message: 'Token MFA không hợp lệ' });
     }
 
-    // Tài khoản admin/staff trong DB
+    if (decoded.method === 'otp_zalo_email') {
+      const check = adminOtp2faService.verifyOtpChallenge(decoded.challengeId, code, decoded.id, 'login_otp');
+      if (!check.ok) {
+        return res.status(check.status || 401).json({ success: false, message: check.message });
+      }
+      if (decoded.id !== 'admin') {
+        const user = await Teacher.findById(decoded.id).select('+refreshToken');
+        if (!user || !['admin', 'staff'].includes(user.role)) {
+          return res.status(403).json({ success: false, message: 'Tài khoản không có quyền truy cập khu vực quản trị.' });
+        }
+        return res.json(await completeInternalLogin(user, user.role, decoded.fp || null, req.app.get('io'), req));
+      }
+      const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
+      const audience = decoded.aud === 'internal' ? 'internal' : 'public';
+      const tokens = await issueAdminTokens(sysSettings, audience, req.app.get('io'), req);
+      if (audience === 'internal') {
+        return res.json({
+          success: true,
+          data: {
+            user: tokens.data.user,
+            accessToken: tokens.data.accessToken,
+            refreshToken: tokens.data.refreshToken,
+            deviceSessionId: tokens.data.deviceSessionId,
+          },
+        });
+      }
+      return res.json(tokens);
+    }
+
+    // Tài khoản admin/staff trong DB (TOTP Authenticator)
     if (decoded.id !== 'admin') {
       const user = await Teacher.findById(decoded.id).select('+refreshToken +mfaSecret');
       if (!user || !user.mfaEnabled || !user.mfaSecret) {
@@ -1268,7 +1471,7 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
         if (user.incLoginAttempts) await user.incLoginAttempts();
         return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
       }
-      return res.json(await completeInternalLogin(user, user.role, decoded.fp || null, req.app.get('io')));
+      return res.json(await completeInternalLogin(user, user.role, decoded.fp || null, req.app.get('io'), req));
     }
 
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
@@ -1279,7 +1482,7 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
       return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
     }
     const audience = decoded.aud === 'internal' ? 'internal' : 'public';
-    const tokens = await issueAdminTokens(sysSettings, audience, req.app.get('io'));
+    const tokens = await issueAdminTokens(sysSettings, audience, req.app.get('io'), req);
     if (audience === 'internal') {
       return res.json({
         success: true,
@@ -1287,6 +1490,7 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
           user: tokens.data.user,
           accessToken: tokens.data.accessToken,
           refreshToken: tokens.data.refreshToken,
+          deviceSessionId: tokens.data.deviceSessionId,
         },
       });
     }
@@ -1294,6 +1498,44 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
   } catch (err) {
     logger.error('[AUTH] mfa/verify error:', err);
     res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+/** Gửi lại OTP qua Zalo / Email trong bước xác thực 2FA khi đăng nhập */
+router.post('/mfa/otp-resend', loginLimiter, async (req, res) => {
+  try {
+    const { mfaToken } = req.body || {};
+    if (!mfaToken) return res.status(400).json({ success: false, message: 'Thiếu mfaToken' });
+    let decoded;
+    try {
+      decoded = jwt.verify(mfaToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Phiên MFA đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+    if (decoded.purpose !== 'mfa' || decoded.method !== 'otp_zalo_email' || !decoded.challengeId) {
+      return res.status(400).json({ success: false, message: 'Phiên OTP không hợp lệ' });
+    }
+    const resent = await adminOtp2faService.resendOtpChallenge(decoded.challengeId);
+    if (!resent.ok) {
+      return res.status(resent.status || 429).json({
+        success: false,
+        retryAfterSec: resent.retryAfterSec,
+        message: resent.message,
+      });
+    }
+    return res.json({
+      success: true,
+      data: {
+        sentVia: resent.sentVia,
+        deliveryOk: resent.deliveryOk,
+        maskedPhone: resent.maskedPhone,
+        maskedEmail: resent.maskedEmail,
+        resendAfterSec: resent.resendAfterSec,
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] mfa/otp-resend error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
 
@@ -1434,11 +1676,221 @@ router.get('/mfa/status', authMiddleware, policyShadowAuth('mfa_status'), async 
     return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
   }
   if (req.user?.id !== 'admin') {
-    const dbUser = await Teacher.findById(req.user.id).select('mfaEnabled').lean();
-    return res.json({ success: true, data: { enabled: !!dbUser?.mfaEnabled } });
+    const dbUser = await Teacher.findById(req.user.id).select('mfaEnabled otp2faEnabled otp2faChannel').lean();
+    return res.json({
+      success: true,
+      data: {
+        enabled: !!dbUser?.mfaEnabled,
+        otp2faEnabled: !!dbUser?.otp2faEnabled,
+        otp2faChannel: dbUser?.otp2faChannel || 'both',
+      },
+    });
   }
   const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
-  res.json({ success: true, data: { enabled: !!sysSettings?.adminMfaEnabled } });
+  res.json({
+    success: true,
+    data: {
+      enabled: !!sysSettings?.adminMfaEnabled,
+      otp2faEnabled: !!sysSettings?.adminOtp2faEnabled,
+      otp2faChannel: sysSettings?.adminOtp2faChannel || 'both',
+    },
+  });
+});
+
+// ─── 2FA OTP qua Zalo OA / Email cho Admin & Staff (Mục 4.3.2) ────────────────
+function canManageInternalOtp2fa(req) {
+  return req.user?.id === 'admin' || ['admin', 'staff'].includes(req.user?.role);
+}
+
+router.get('/mfa/otp-config', authMiddleware, async (req, res) => {
+  try {
+    if (!canManageInternalOtp2fa(req)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được 2FA OTP' });
+    }
+    const readiness = adminOtp2faService.getChannelReadiness();
+    if (req.user.id !== 'admin') {
+      const dbUser = await Teacher.findById(req.user.id)
+        .select('name phone zalo email otp2faEnabled otp2faChannel otp2faPhone')
+        .lean();
+      if (!dbUser) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+      const phone = dbUser.otp2faPhone || dbUser.zalo || dbUser.phone || '';
+      return res.json({
+        success: true,
+        data: {
+          enabled: !!dbUser.otp2faEnabled,
+          channel: dbUser.otp2faChannel || 'both',
+          phone,
+          email: dbUser.email || '',
+          maskedPhone: phone ? maskPhone(phone) : '',
+          maskedEmail: dbUser.email ? adminOtp2faService.maskEmail(dbUser.email) : '',
+          ...readiness,
+        },
+      });
+    }
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
+    const phone = sysSettings?.adminOtp2faPhone || normalizeVNPhone(process.env.MASTER_ADMIN_PHONE) || '';
+    const email = sysSettings?.adminOtp2faEmail || process.env.MASTER_ADMIN_EMAIL || '';
+    return res.json({
+      success: true,
+      data: {
+        enabled: !!sysSettings?.adminOtp2faEnabled,
+        channel: sysSettings?.adminOtp2faChannel || 'both',
+        phone,
+        email,
+        maskedPhone: phone ? maskPhone(phone) : '',
+        maskedEmail: email ? adminOtp2faService.maskEmail(email) : '',
+        ...readiness,
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] mfa/otp-config error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.post('/mfa/otp-setup/send', authMiddleware, sensitiveFlowLimiter, async (req, res) => {
+  try {
+    if (!canManageInternalOtp2fa(req)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được 2FA OTP' });
+    }
+    const { channel = 'both', phone: rawPhone, email: rawEmail } = req.body || {};
+    if (!['zalo', 'email', 'both'].includes(channel)) {
+      return res.status(400).json({ success: false, message: 'Kênh OTP phải là zalo, email hoặc both' });
+    }
+    const cleanPhone = rawPhone ? (normalizeVNPhone(rawPhone) || String(rawPhone).trim()) : '';
+    const cleanEmail = String(rawEmail || '').trim().toLowerCase();
+
+    if ((channel === 'zalo' || channel === 'both') && !cleanPhone) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại nhận OTP Zalo' });
+    }
+    if ((channel === 'email' || channel === 'both') && (!cleanEmail || !cleanEmail.includes('@'))) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập Gmail / Email hợp lệ nhận OTP' });
+    }
+
+    const userName = req.user.name || (req.user.id === 'admin' ? 'Super Admin' : 'Quản trị viên');
+    const sent = await adminOtp2faService.createAndSendOtpChallenge({
+      userId: String(req.user.id),
+      role: req.user.role || 'admin',
+      purpose: 'setup_otp',
+      channel,
+      phone: cleanPhone,
+      email: cleanEmail,
+      userName,
+      meta: { channel, phone: cleanPhone, email: cleanEmail },
+    });
+
+    const setupToken = jwt.sign(
+      { purpose: 'otp_setup', challengeId: sent.challengeId, id: String(req.user.id) },
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' },
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        setupToken,
+        sentVia: sent.sentVia,
+        deliveryOk: sent.deliveryOk,
+        maskedPhone: sent.maskedPhone,
+        maskedEmail: sent.maskedEmail,
+        expiresIn: sent.expiresIn,
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] mfa/otp-setup/send error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.post('/mfa/otp-setup/verify', authMiddleware, async (req, res) => {
+  try {
+    if (!canManageInternalOtp2fa(req)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được 2FA OTP' });
+    }
+    const { setupToken, code } = req.body || {};
+    if (!setupToken || !code) {
+      return res.status(400).json({ success: false, message: 'Thiếu setupToken hoặc mã OTP' });
+    }
+    let decoded;
+    try {
+      decoded = jwt.verify(setupToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Phiên xác thực thiết lập đã hết hạn' });
+    }
+    if (decoded.purpose !== 'otp_setup' || String(decoded.id) !== String(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'Token thiết lập không hợp lệ' });
+    }
+    const verify = adminOtp2faService.verifyOtpChallenge(decoded.challengeId, code, String(req.user.id), 'setup_otp');
+    if (!verify.ok) {
+      return res.status(verify.status || 401).json({ success: false, message: verify.message });
+    }
+
+    const { channel, phone, email } = verify.meta || {};
+    if (req.user.id !== 'admin') {
+      const update = {
+        otp2faEnabled: true,
+        otp2faChannel: channel || 'both',
+      };
+      if (phone) update.otp2faPhone = phone;
+      if (email) update.email = email;
+      await Teacher.findByIdAndUpdate(req.user.id, { $set: update });
+    } else {
+      await SystemSettings.findOneAndUpdate(
+        { _key: 'main' },
+        {
+          $set: {
+            adminOtp2faEnabled: true,
+            adminOtp2faChannel: channel || 'both',
+            ...(phone ? { adminOtp2faPhone: phone } : {}),
+            ...(email ? { adminOtp2faEmail: email } : {}),
+          },
+        },
+        { upsert: true },
+      );
+      await invalidateSettingsCache();
+    }
+    return res.json({ success: true, message: 'Đã kích hoạt xác thực 2 lớp qua OTP Zalo/Email' });
+  } catch (err) {
+    logger.error('[AUTH] mfa/otp-setup/verify error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.post('/mfa/otp-disable', authMiddleware, async (req, res) => {
+  try {
+    if (!canManageInternalOtp2fa(req)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được 2FA OTP' });
+    }
+    const { password } = req.body || {};
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu để tắt 2FA OTP' });
+    }
+
+    if (req.user.id !== 'admin') {
+      const dbUser = await Teacher.findById(req.user.id).select('+password');
+      if (!dbUser || !(await dbUser.comparePassword(password))) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+      }
+      dbUser.otp2faEnabled = false;
+      await dbUser.save({ validateModifiedOnly: true });
+      return res.json({ success: true, message: 'Đã tắt xác thực 2 lớp qua OTP Zalo/Email' });
+    }
+
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('adminPasswordHash');
+    const pwOk = await verifyAdminPassword(password, sysSettings);
+    if (!pwOk) return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+
+    await SystemSettings.findOneAndUpdate(
+      { _key: 'main' },
+      { $set: { adminOtp2faEnabled: false } },
+      { upsert: true },
+    );
+    await invalidateSettingsCache();
+    return res.json({ success: true, message: 'Đã tắt xác thực 2 lớp qua OTP Zalo/Email' });
+  } catch (err) {
+    logger.error('[AUTH] mfa/otp-disable error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
 });
 
 // ─── POST /api/auth/logout ────────────────────────────────────────────────────
@@ -1566,6 +2018,18 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
     }
 
     // Chỉ xóa phiên DB nếu token logout vẫn thuộc phiên hiện tại.
+    if (verifiedIdentity) {
+      const logoutDsid = verifiedAccessClaims?.dsid || verifiedRefreshClaims?.dsid;
+      if (logoutDsid) {
+        await deviceSessionService.revokeDeviceSession({
+          sessionId: logoutDsid,
+          actor: { id: userId, role },
+          reason: 'user_logout',
+          io: req.app.get('io'),
+        }).catch(() => {});
+      }
+    }
+
     if (verifiedIdentity && userId && userId !== 'admin') {
       const uid = String(userId);
       const Model = role === 'student' ? Student : Teacher;
@@ -1589,6 +2053,109 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
 
     return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
   } catch {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── Thiết bị đang đăng nhập & Đăng xuất từ xa (Mục 4.3.2) ───────────────────
+function canViewAllDeviceSessions(user) {
+  if (!user) return false;
+  if (user.id === 'admin' || user.adminRole === 'SUPER_ADMIN' || user.adminRole === 'HIGH_ADMIN' || user.role === 'admin') {
+    return true;
+  }
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  return user.role === 'staff' && (perms.includes('settings') || perms.includes('logs'));
+}
+
+function canManageAllDeviceSessions(user) {
+  if (!user) return false;
+  if (user.id === 'admin' || user.adminRole === 'SUPER_ADMIN' || user.adminRole === 'HIGH_ADMIN' || user.role === 'admin') {
+    return true;
+  }
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  return user.role === 'staff' && perms.includes('settings');
+}
+
+router.get('/device-sessions', authMiddleware, async (req, res) => {
+  try {
+    const requestedScope = req.query.scope === 'mine' ? 'mine' : 'all';
+    const effectiveScope = canViewAllDeviceSessions(req.user) ? requestedScope : 'mine';
+    const data = await deviceSessionService.listDeviceSessions({
+      scope: effectiveScope,
+      roleFilter: String(req.query.role || '').trim(),
+      statusFilter: String(req.query.status || 'active').trim(),
+      search: String(req.query.search || '').trim(),
+      limit: Number(req.query.limit) || 100,
+      currentSessionId: req.deviceSessionId || req.sessionId || '',
+      currentUserId: String(req.user.id),
+    });
+    return res.json({
+      success: true,
+      data: {
+        ...data,
+        scope: effectiveScope,
+        currentSessionId: req.deviceSessionId || req.sessionId || '',
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] device-sessions list error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.post('/device-sessions/revoke-others', authMiddleware, async (req, res) => {
+  try {
+    const requestedScope = req.body?.scope === 'all' ? 'all' : 'mine';
+    const scope = (requestedScope === 'all' && canManageAllDeviceSessions(req.user)) ? 'all' : 'mine';
+    const result = await deviceSessionService.revokeOtherDeviceSessions({
+      currentSessionId: req.deviceSessionId || req.sessionId || '',
+      userId: String(req.user.id),
+      scope,
+      actor: req.user,
+      io: req.app.get('io'),
+    });
+    return res.json({
+      success: true,
+      message: `Đã đăng xuất từ xa ${result.revokedCount} thiết bị khác`,
+      data: result,
+    });
+  } catch (err) {
+    logger.error('[AUTH] device-sessions revoke-others error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.post('/device-sessions/:sessionId/revoke', authMiddleware, async (req, res) => {
+  try {
+    const targetSessionId = String(req.params.sessionId || '').trim();
+    if (!targetSessionId) {
+      return res.status(400).json({ success: false, message: 'Thiếu sessionId' });
+    }
+    const canManageAll = canManageAllDeviceSessions(req.user);
+    if (!canManageAll) {
+      const ownList = await deviceSessionService.listDeviceSessions({
+        scope: 'mine',
+        statusFilter: 'all',
+        currentUserId: String(req.user.id),
+      });
+      const ownsTarget = ownList.items.some((s) => s.sessionId === targetSessionId);
+      if (!ownsTarget) {
+        return res.status(403).json({ success: false, message: 'Bạn chỉ có thể đăng xuất thiết bị của chính mình' });
+      }
+    }
+    const result = await deviceSessionService.revokeDeviceSession({
+      sessionId: targetSessionId,
+      clientType: req.body?.clientType || '',
+      actor: req.user,
+      reason: 'remote_logout_by_admin',
+      io: req.app.get('io'),
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ success: false, message: result.message });
+    }
+    return res.json({ success: true, message: 'Đã đăng xuất thiết bị từ xa thành công' });
+  } catch (err) {
+    logger.error('[AUTH] device-sessions revoke error:', err);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
@@ -2653,4 +3220,6 @@ module.exports._test = {
   socialOAuthDisabled,
   trackStudentKnownDevice,
   enforceStudentDeviceLockIfNeeded,
+  canViewAllDeviceSessions,
+  canManageAllDeviceSessions,
 };

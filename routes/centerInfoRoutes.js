@@ -21,16 +21,43 @@ const SECTIONS = CenterInfoItem.SECTIONS || [
   'staff', 'branch', 'social', 'service', 'exam_venue', 'certificate',
 ];
 
-function canManage(user) {
+async function canManage(user) {
   if (!user) return false;
   if (user.id === 'admin' || user._id === 'admin' || user.username === 'admin') return true;
   if (user.adminRole === 'SUPER_ADMIN') return true;
-  return userHasPermission(user, PERMISSIONS.MANAGE_CENTER_INFO);
+  return Boolean(await userHasPermission(user, PERMISSIONS.MANAGE_CENTER_INFO));
 }
 
-function manageOnly(req, res, next) {
-  if (canManage(req.user)) return next();
-  return res.status(403).json({ success: false, message: 'Chỉ Super Admin / quyền Quản trị Thông tin trung tâm' });
+async function manageOnly(req, res, next) {
+  try {
+    if (await canManage(req.user)) return next();
+    return res.status(403).json({ success: false, message: 'Chỉ Super Admin / quyền Quản trị Thông tin trung tâm' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+function sanitizeCenterHtml(html) {
+  let s = String(html || '');
+  s = s.replace(/<(script|iframe|object|embed|form|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+  s = s.replace(/<\/?(script|iframe|object|embed|form|meta|link|style|base|svg)[^>]*>/gi, '');
+  s = s.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  s = s.replace(/javascript\s*:/gi, '');
+  s = s.replace(/vbscript\s*:/gi, '');
+  s = s.replace(/data\s*:\s*text\/html/gi, '');
+  return s.slice(0, 200000);
+}
+
+function sanitizeSafeUrl(raw, { allowRelativeUploads = true } = {}) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (allowRelativeUploads && /^\/uploads\/[a-zA-Z0-9._\-/%]+$/i.test(s) && !s.includes('..')) {
+    return s;
+  }
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) {
+    return s;
+  }
+  return '';
 }
 
 async function getOrCreateOverview() {
@@ -128,6 +155,10 @@ function pickItemBody(body = {}) {
   if (out.sortOrder != null) out.sortOrder = Number(out.sortOrder) || 0;
   if (out.showEmail != null) out.showEmail = Boolean(out.showEmail);
   if (out.isActive != null) out.isActive = Boolean(out.isActive);
+  if (out.detailHtml !== undefined) out.detailHtml = sanitizeCenterHtml(out.detailHtml);
+  for (const urlKey of ['imageUrl', 'url', 'mapsUrl', 'verifyUrl']) {
+    if (out[urlKey] !== undefined) out[urlKey] = sanitizeSafeUrl(out[urlKey]);
+  }
   if (out.status && !['draft', 'published', 'archived'].includes(out.status)) {
     delete out.status;
   }
@@ -145,10 +176,16 @@ function pickOverviewBody(body = {}) {
   for (const k of OVERVIEW_FIELDS) {
     if (body[k] !== undefined) out[k] = body[k];
   }
-  if (out.galleryUrls != null && !Array.isArray(out.galleryUrls)) {
-    out.galleryUrls = String(out.galleryUrls || '')
-      .split('\n')
-      .map((s) => s.trim())
+  if (out.detailHtml !== undefined) out.detailHtml = sanitizeCenterHtml(out.detailHtml);
+  for (const urlKey of ['logoUrl', 'bannerUrl', 'website', 'introVideoUrl']) {
+    if (out[urlKey] !== undefined) out[urlKey] = sanitizeSafeUrl(out[urlKey]);
+  }
+  if (out.galleryUrls != null) {
+    const rawGallery = Array.isArray(out.galleryUrls)
+      ? out.galleryUrls
+      : String(out.galleryUrls || '').split('\n');
+    out.galleryUrls = rawGallery
+      .map((s) => sanitizeSafeUrl(s))
       .filter(Boolean);
   }
   if (out.status && !['draft', 'published', 'archived'].includes(out.status)) {
@@ -161,25 +198,40 @@ function pickOverviewBody(body = {}) {
 const uploadDir = path.join(__dirname, '..', 'uploads', 'center-info');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
+const ALLOWED_CENTER_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const ALLOWED_CENTER_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+function centerImageFileFilter(_req, file, cb) {
+  const mime = String(file?.mimetype || '').toLowerCase();
+  const ext = path.extname(file?.originalname || '').toLowerCase();
+  if (ALLOWED_CENTER_IMAGE_MIMES.has(mime) && ALLOWED_CENTER_IMAGE_EXT.has(ext)) {
+    return cb(null, true);
+  }
+  return cb(new Error('Chỉ cho phép file ảnh JPG, JPEG, PNG, WEBP hoặc GIF'));
+}
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '') || '.jpg';
-      cb(null, `center_${Date.now()}_${Math.round(Math.random() * 1e6)}${ext}`);
+      const rawExt = path.extname(file.originalname || '').toLowerCase();
+      if (!ALLOWED_CENTER_IMAGE_EXT.has(rawExt)) {
+        return cb(new Error('Định dạng ảnh không được phép'));
+      }
+      cb(null, `center_${Date.now()}_${Math.round(Math.random() * 1e6)}${rawExt}`);
     },
   }),
   limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (String(file.mimetype || '').startsWith('image/')) return cb(null, true);
-    return cb(new Error('Chỉ cho phép file ảnh'));
-  },
+  fileFilter: centerImageFileFilter,
 });
 
 // ── Public (authenticated) ──────────────────────────────────────────────────
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const overview = await getOrCreateOverview();
+    const [overview, userCanManage] = await Promise.all([
+      getOrCreateOverview(),
+      canManage(req.user),
+    ]);
     const publishedOnly = overview.status === 'published';
     const items = publishedOnly
       ? await CenterInfoItem.find({
@@ -200,7 +252,7 @@ router.get('/', authMiddleware, async (req, res) => {
         overview: publishedOnly ? serializeOverview(overview) : null,
         published: publishedOnly,
         sections: bySection,
-        canManage: canManage(req.user),
+        canManage: userCanManage,
       },
     });
   } catch (err) {
@@ -324,5 +376,15 @@ router.post('/manage/upload', authMiddleware, manageOnly, (req, res) => {
     return res.json({ success: true, imageUrl });
   });
 });
+
+router._test = {
+  canManage,
+  manageOnly,
+  sanitizeCenterHtml,
+  sanitizeSafeUrl,
+  centerImageFileFilter,
+  pickItemBody,
+  pickOverviewBody,
+};
 
 module.exports = router;

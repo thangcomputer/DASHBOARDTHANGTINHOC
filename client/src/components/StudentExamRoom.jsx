@@ -664,12 +664,12 @@ const StudentExamRoom = ({
             type="button"
             onClick={() => setRoomTab('quiz')}
             className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'quiz'
-                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
-                : 'bg-white border-slate-100 hover:border-emerald-300'
+              ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
+              : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-rose-600 to-red-800 text-white shadow-lg shadow-red-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
                 <span className="absolute -right-5 -top-5 h-10 w-10 rounded-full bg-white/35 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" />
                 <Trophy size={32} strokeWidth={2.1} className="relative drop-shadow-md" aria-hidden="true" />
               </span>
@@ -683,8 +683,8 @@ const StudentExamRoom = ({
             type="button"
             onClick={() => setRoomTab('cert')}
             className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'cert'
-                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
-                : 'bg-white border-slate-100 hover:border-emerald-300'
+              ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
+              : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
@@ -702,8 +702,8 @@ const StudentExamRoom = ({
             type="button"
             onClick={() => setRoomTab('scores')}
             className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'scores'
-                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
-                : 'bg-white border-slate-100 hover:border-emerald-300'
+              ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
+              : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
@@ -721,8 +721,8 @@ const StudentExamRoom = ({
             type="button"
             onClick={() => setRoomTab('mos-ic3')}
             className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 active:translate-y-0 ${roomTab === 'mos-ic3'
-                ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
-                : 'bg-white border-slate-100 hover:border-emerald-300'
+              ? 'bg-white border-emerald-500 ring-2 ring-emerald-100 shadow-emerald-100/70'
+              : 'bg-white border-slate-100 hover:border-emerald-300'
               }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
@@ -732,7 +732,7 @@ const StudentExamRoom = ({
               </span>
               <div className="min-w-0">
                 <p className="font-black text-slate-800 text-base">MOS / IC3</p>
-                <p className="text-xs text-slate-500 mt-1 font-medium">Ôn tập và luyện thi chứng chỉ</p>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Ôn tập và luyện thi chứng nhận</p>
               </div>
             </div>
           </button>
@@ -815,12 +815,12 @@ const StudentExamRoom = ({
                     type="button"
                     onClick={() => setFilterStatus(filterStatus === f.value ? 'all' : f.value)}
                     className={`px-3 py-1.5 rounded-full text-xs font-black  tracking-wide border transition-all ${filterStatus === f.value
-                        ? f.value === 'rot'
+                      ? f.value === 'rot'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : f.value === 'da_thi'
                           ? 'bg-emerald-600 text-white border-emerald-600'
-                          : f.value === 'da_thi'
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-600 text-white border-emerald-600')
-                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                          : (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student') ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-600 text-white border-emerald-600')
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                       }`}
                   >
                     {f.label} ({statusCounts[f.value] || 0})

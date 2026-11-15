@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-family-sans: 'Be Vietnam Pro', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
 
     --font-size-xs: clamp(14px, 13.5px + 0.12vw, 15px);
     --font-size-sm: clamp(15px, 14.5px + 0.14vw, 16px);
@@ -28,6 +28,173 @@
     --letter-spacing-normal: 0;
     --color-text-primary: #172033;
     --color-text-secondary: #64748b;
+
+    /* Giai đoạn 1: Design Tokens chuẩn hóa (khớp mobile tokens.ts) */
+    --brand-50: #ecfdf5;
+    --brand-100: #d1fae5;
+    --brand-200: #a7f3d0;
+    --brand-300: #6ee7b7;
+    --brand-400: #34d399;
+    --brand-500: #10b981;
+    --brand-600: #059669;
+    --brand-700: #047857;
+    --brand-800: #065f46;
+    --brand-900: #064e3b;
+
+    --accent-50: #fffbeb;
+    --accent-500: #f59e0b;
+    --accent-600: #d97706;
+
+    --info-50: #f0f9ff;
+    --info-500: #0ea5e9;
+    --info-600: #0284c7;
+
+    --danger-50: #fef2f2;
+    --danger-500: #ef4444;
+    --danger-600: #dc2626;
+    --danger-700: #b91c1c;
+
+    --surface-0: #ffffff;
+    --surface-1: #f8fafc;
+    --surface-2: #f1f5f9;
+    --surface-canvas: #f4fbf8;
+
+    --ink-900: #0f172a;
+    --ink-700: #334155;
+    --ink-600: #475569;
+    --ink-400: #94a3b8;
+
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1.25rem;
+  }
+
+  /* Giai đoạn 2: Dark Mode thật theo Design Tokens (chỉ áp dụng @media screen, giữ nguyên trang in) */
+  @media screen {
+    html[data-theme="dark"] {
+      --color-text-primary: #f8fafc;
+      --color-text-secondary: #94a3b8;
+
+      --surface-0: #111827;
+      --surface-1: #0b1018;
+      --surface-2: #1e293b;
+      --surface-canvas: #0b1018;
+
+      --ink-900: #f8fafc;
+      --ink-700: #e2e8f0;
+      --ink-600: #cbd5e1;
+      --ink-400: #94a3b8;
+
+      --brand-50: rgba(16, 185, 129, 0.14);
+      --brand-100: rgba(16, 185, 129, 0.22);
+      --brand-500: #34d399;
+      --brand-600: #10b981;
+
+      --cms-primary: #34d399;
+      --cms-secondary: #38bdf8;
+      --cms-success: #34d399;
+      --cms-warning: #fbbf24;
+      --cms-info: #38bdf8;
+      --cms-neutral-50: #0f172a;
+      --cms-neutral-100: #1e293b;
+      --cms-neutral-200: #334155;
+      --cms-neutral-500: #94a3b8;
+      --cms-neutral-800: #e2e8f0;
+      --cms-neutral-900: #f8fafc;
+      --cms-surface: #111827;
+      --cms-surface-2: #1e293b;
+      --cms-border: rgba(148, 163, 184, 0.18);
+      --cms-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.35);
+      --cms-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    html[data-theme="dark"] body,
+    html[data-theme="dark"] .student-canvas-bg {
+      background-color: var(--surface-canvas) !important;
+      color: var(--ink-900);
+    }
+
+    html[data-theme="dark"] .cms-topbar {
+      background: rgba(17, 24, 39, 0.9) !important;
+      border-bottom-color: var(--cms-border) !important;
+    }
+
+    html[data-theme="dark"] .cms-topbar__title {
+      color: #f8fafc !important;
+    }
+
+    html[data-theme="dark"] .cms-sheet {
+      background: #111827 !important;
+      border-color: var(--cms-border) !important;
+      color: #f8fafc;
+    }
+
+    html[data-theme="dark"] .cms-page :is(.bg-white, .bg-slate-50, .bg-gray-50):not([data-keep-light] *):not(.invoice-paper *):not(.invoice-paper):not(#invoice-template):not(#invoice-template *) {
+      background-color: var(--surface-0) !important;
+    }
+
+    html[data-theme="dark"] .cms-page :is(.border-slate-100, .border-slate-200, .border-gray-100, .border-gray-200):not([data-keep-light] *):not(.invoice-paper *):not(.invoice-paper):not(#invoice-template):not(#invoice-template *) {
+      border-color: var(--cms-border) !important;
+    }
+
+    html[data-theme="dark"] .cms-page :is(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800):not([data-keep-light] *):not(.invoice-paper *):not(#invoice-template *) {
+      color: #f8fafc !important;
+    }
+
+    html[data-theme="dark"] .cms-page :is(.text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600):not([data-keep-light] *):not(.invoice-paper *):not(#invoice-template *) {
+      color: #cbd5e1 !important;
+    }
+
+    html[data-theme="dark"] .cms-page :is(.text-slate-500, .text-slate-400, .text-gray-500):not([data-keep-light] *):not(.invoice-paper *):not(#invoice-template *) {
+      color: #94a3b8 !important;
+    }
+
+    html[data-theme="dark"] .cms-skeleton {
+      background-color: rgba(148, 163, 184, 0.16) !important;
+    }
+
+    html[data-theme="dark"] .cms-skeleton::after {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+    }
+  }
+
+  /* Giai đoạn 3: Chế độ Tập trung (Focus Mode) — ẩn sidebar, nav đáy & chat nổi khi làm bài/học */
+  html[data-focus-mode="true"] aside.cms-sidebar-glass,
+  html[data-focus-mode="true"] aside.cms-sidebar-glass + div[aria-hidden="true"],
+  html[data-focus-mode="true"] .cms-mobile-bottom-nav,
+  html[data-focus-mode="true"] .cms-fm-root {
+    display: none !important;
+  }
+}
+
+/* Giai đoạn 1: GPU-composited utilities & Skeleton shimmer (chống giật lag / CLS) */
+.gpu-smooth {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+@keyframes cms-shimmer {
+  0% {
+    transform: translate3d(-100%, 0, 0);
+  }
+  100% {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+.cms-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translate3d(-100%, 0, 0);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: cms-shimmer 1.35s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cms-skeleton::after {
+    animation: none;
   }
 }
 
@@ -1398,11 +1565,11 @@
   }
 
   .cms-lms-attention__item--notification {
-    @apply bg-red-50 text-red-700 hover:bg-red-100;
+    @apply bg-emerald-50 text-emerald-700 hover:bg-emerald-100;
   }
 
   .cms-lms-attention__item--notification strong {
-    @apply bg-red-600 text-white;
+    @apply bg-emerald-600 text-white;
   }
 
   .cms-lms-attention__item--message {
@@ -1516,7 +1683,7 @@
   }
 
   .cms-fm-head__badge {
-    @apply absolute -top-0.5 -right-0.5 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white;
+    @apply absolute -top-0.5 -right-0.5 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-emerald-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white;
   }
 
   .cms-fm-head__online {
@@ -1544,7 +1711,7 @@
   }
 
   .cms-fm-fab {
-    @apply relative w-14 h-14 rounded-full bg-red-600 text-white shadow-2xl flex items-center justify-center hover:bg-red-700 transition active:scale-95;
+    @apply relative w-14 h-14 rounded-full bg-emerald-600 text-white shadow-2xl flex items-center justify-center hover:bg-emerald-700 transition active:scale-95;
   }
 
   .cms-fm-support-fab {
@@ -1693,11 +1860,11 @@
   }
 
   .cms-fm-fab__badge.is-unread {
-    @apply bg-amber-400 text-slate-900 ring-red-600;
+    @apply bg-amber-400 text-slate-900 ring-emerald-600;
   }
 
   .cms-fm-unread-pill {
-    @apply inline-flex items-center px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-black;
+    @apply inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-black;
   }
 
   /* Mascot hỗ trợ nhanh (Bảng tin) */
@@ -1775,12 +1942,12 @@
   }
 
   .cms-feed-support-card {
-    @apply rounded-2xl border border-red-100 bg-gradient-to-br from-white via-white to-red-50 shadow-sm overflow-visible;
+    @apply rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-white to-emerald-50 shadow-sm overflow-visible;
     min-height: 72px;
   }
 
   .cms-feed-support-cta {
-    @apply w-full flex items-center gap-3 sm:gap-4 px-2 sm:px-3 py-2 sm:py-3 rounded-xl bg-white/90 border border-red-100 hover:border-red-300 hover:bg-red-50/70 text-left transition;
+    @apply w-full flex items-center gap-3 sm:gap-4 px-2 sm:px-3 py-2 sm:py-3 rounded-xl bg-white/90 border border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/70 text-left transition;
   }
 
   .cms-fm-support {
@@ -1801,7 +1968,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 9999px;
-    background: #fef2f2;
+    background: #ecfdf5;
     color: #059669;
   }
 
@@ -1829,14 +1996,14 @@
   }
 
   .cms-fm-resize {
-    @apply absolute z-20 w-4 h-4 text-slate-400 hover:text-red-600;
+    @apply absolute z-20 w-4 h-4 text-slate-400 hover:text-emerald-600;
     left: 4px;
     top: 4px;
     cursor: nw-resize;
   }
 
   .cms-fm-copy {
-    @apply w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100;
+    @apply w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100;
   }
 
   .cms-fm-window__head {
@@ -1879,15 +2046,15 @@
   }
 
   .cms-fm-attach {
-    @apply w-9 h-9 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-600 flex items-center justify-center transition shrink-0 disabled:opacity-40;
+    @apply w-9 h-9 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-emerald-600 flex items-center justify-center transition shrink-0 disabled:opacity-40;
   }
 
   .cms-fm-input {
-    @apply flex-1 min-w-0 h-10 px-3 rounded-xl bg-slate-100 border-0 text-[13px] font-medium text-slate-800 outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-60;
+    @apply flex-1 min-w-0 h-10 px-3 rounded-xl bg-slate-100 border-0 text-[13px] font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60;
   }
 
   .cms-fm-send {
-    @apply w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center disabled:opacity-40 hover:bg-red-700 transition shrink-0;
+    @apply w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center disabled:opacity-40 hover:bg-emerald-700 transition shrink-0;
   }
 
   .cms-fm-icon-btn {
@@ -1901,7 +2068,7 @@
   }
 
   .cms-fm-bubble.is-mine {
-    @apply bg-red-600 text-white rounded-br-md;
+    @apply bg-emerald-600 text-white rounded-br-md;
   }
 
   .cms-fm-bubble.is-theirs {
@@ -2059,7 +2226,7 @@
   }
 
   .cms-students-btn-primary {
-    @apply cms-students-btn bg-red-600 text-white border border-red-600 hover:bg-red-700 shadow-sm shadow-red-200/60;
+    @apply cms-students-btn bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-200/60;
   }
 
   .cms-students-card {
@@ -2106,7 +2273,7 @@
   }
 
   .cms-students-badge-primary {
-    @apply cms-students-badge bg-red-50 text-red-600;
+    @apply cms-students-badge bg-emerald-50 text-emerald-600;
   }
 
   .safe-pad-top {
@@ -2576,31 +2743,7 @@ html.cms-app-shell #root {
   overscroll-behavior: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --cms-primary: #34d399;
-    --cms-secondary: #38bdf8;
-    --cms-success: #34d399;
-    --cms-warning: #fbbf24;
-    --cms-info: #38bdf8;
-    --cms-neutral-50: #0f172a;
-    --cms-neutral-100: #1e293b;
-    --cms-neutral-200: #334155;
-    --cms-neutral-500: #94a3b8;
-    --cms-neutral-800: #e2e8f0;
-    --cms-neutral-900: #f8fafc;
-    --cms-surface: #0f172a;
-    --cms-surface-2: #1e293b;
-    --cms-border: #334155;
-    --cms-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35);
-    --cms-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
-  }
 
-  body {
-    background-color: #020617;
-    color: var(--cms-neutral-800);
-  }
-}
 
 .cms-btn {
   display: inline-flex;
@@ -2977,8 +3120,8 @@ span.duo-btn {
 }
 
 .duo-btn--meet-live {
-  background: #dc2626;
-  border-bottom-color: #991b1b;
+  background: #059669;
+  border-bottom-color: #065f46;
   animation: duo-meet-glow 1.35s ease-in-out infinite;
 }
 
@@ -3004,7 +3147,7 @@ span.duo-btn {
   z-index: 1;
   width: min(24rem, 100%);
   border-radius: 1.5rem;
-  border: 2px solid #fecaca;
+  border: 2px solid #a7f3d0;
   background: #fff;
   padding: 1.35rem 1.25rem 1.15rem;
   text-align: center;
@@ -3032,7 +3175,7 @@ span.duo-btn {
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #dc2626;
+  color: #059669;
 }
 
 .meet-start-alert__title {
@@ -3068,8 +3211,8 @@ span.duo-btn {
   gap: 0.4rem;
   min-height: 2.75rem;
   border-radius: 16px;
-  border-bottom: 4px solid #991b1b;
-  background: #dc2626;
+  border-bottom: 4px solid #065f46;
+  background: #059669;
   color: #fff;
   font-size: 0.95rem;
   font-weight: 900;
@@ -3082,12 +3225,22 @@ span.duo-btn {
   border-bottom-width: 1px;
 }
 
-.meet-start-alert__later,
-.meet-start-alert__nolink {
+.meet-start-alert__later {
   border: 0;
   background: transparent;
   color: #64748b;
   font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.meet-start-alert__nolink {
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -3150,55 +3303,14 @@ span.duo-btn {
 html[data-free-portal-student] .cms-btn-primary:not(.cms-btn-blue),
 html[data-free-portal-student] .cms-btn-brand,
 html[data-free-portal-student] .btn-primary,
-html[data-free-portal-student] .btn-primary-blue,
-html[data-free-portal-student] button.bg-red-600:not(.cms-btn-danger):not(.duo-btn--danger),
-html[data-free-portal-student] a.bg-red-600:not(.cms-btn-danger):not(.duo-btn--danger):not(.meet-start-alert__join),
-html[data-free-portal-student] button.bg-red-500:not(.cms-btn-danger):not(.duo-btn--danger),
-html[data-free-portal-student] button.border-red-600.bg-red-600 {
+html[data-free-portal-student] .btn-primary-blue {
   background-color: #10b981 !important;
   background-image: none !important;
   border-bottom-color: #047857 !important;
   color: #ffffff !important;
 }
 
-html[data-free-portal-student] :is(button, a):is(.from-red-400, .from-red-500, .from-red-600, .from-red-700, .to-red-500, .to-red-600, .to-red-700, .to-rose-600, .to-rose-700):not(.cms-btn-danger):not(.duo-btn--danger):not(.meet-start-alert__join) {
-  background-color: #10b981 !important;
-  background-image: none !important;
-  border-bottom-color: #047857 !important;
-  color: #ffffff !important;
-}
-
-html[data-free-portal-student] :not(button):not(a):is(.from-red-400, .from-red-500, .from-red-600, .from-red-700) {
-  --tw-gradient-from: #34d399 var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgb(5 150 105 / 0) var(--tw-gradient-to-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
-}
-
-html[data-free-portal-student] :not(button):not(a):is(.via-red-500, .via-red-600, .via-red-700) {
-  --tw-gradient-via: #059669 var(--tw-gradient-via-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
-}
-
-html[data-free-portal-student] :not(button):not(a):is(.to-red-500, .to-red-600, .to-red-700, .to-rose-600, .to-rose-700) {
-  --tw-gradient-to: #047857 var(--tw-gradient-to-position) !important;
-}
-
-html[data-free-portal-student] button[role='radio'].border-red-500 {
-  border-color: #059669 !important;
-  background-color: #ecfdf5 !important;
-  color: #047857 !important;
-}
-
-html[data-free-portal-student] button[role='radio'].border-red-500 .text-red-600 {
-  color: #047857 !important;
-}
-
-html[data-free-portal-student] span.bg-red-600,
-html[data-free-portal-student] div.bg-red-600:not([role='alert']) {
-  background-color: #10b981 !important;
-}
-
-/* Nút chính Duo: khóa học giữ đỏ, cổng miễn phí giữ xanh lá. Cả hai đều có đế 3D. */
+/* Nút chính Duo dùng xanh Emerald thống nhất kèm đế 3D. */
 [data-student-shell]:not([data-free-portal-student]) .duo-btn--primary:not(.duo-btn--emerald) {
   background: #10b981;
   color: #ffffff;
@@ -3213,13 +3325,6 @@ html[data-free-portal-student] div.bg-red-600:not([role='alert']) {
 
 html[data-free-portal-student] .duo-btn--primary,
 [data-student-shell][data-free-portal-student] .duo-btn--primary {
-  background: #10b981 !important;
-  border-bottom-color: #059669 !important;
-  color: #ffffff !important;
-}
-
-html[data-free-portal-student] .duo-btn--danger:not([data-destructive]),
-[data-student-shell][data-free-portal-student] .duo-btn--danger:not([data-destructive]) {
   background: #10b981 !important;
   border-bottom-color: #059669 !important;
   color: #ffffff !important;
@@ -3259,14 +3364,6 @@ body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
 }
 
 /* Nút tô màu thương hiệu phẳng mềm mại trong khu học viên (chuẩn Mobile App, không khối 3D gờ dày). */
-[data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node) {
-  border-bottom-width: 1px;
-  border-style: solid;
-  border-color: #059669;
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.2);
-  transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
-}
-
 [data-student-shell] :is(button, a):is(.bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node) {
   border-bottom-width: 1px;
   border-style: solid;
@@ -3275,28 +3372,9 @@ body:has([data-role-teacher]) .cms-chat-composer-send:hover:not(:disabled) {
   transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-[data-student-shell] :is(button, a):is(.bg-red-600, .bg-red-500, .bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-red-500, .from-red-600, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-red-500, .to-red-600, .to-red-700, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(:disabled):not([aria-disabled='true']):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node):active {
+[data-student-shell] :is(button, a):is(.bg-emerald-600, .bg-emerald-500, .bg-teal-600, .bg-teal-500, .from-emerald-500, .from-emerald-600, .from-teal-500, .from-teal-600, .to-emerald-600, .to-emerald-700, .to-teal-600, .to-teal-700):not(:disabled):not([aria-disabled='true']):not(.cms-btn):not(.duo-btn):not(.dp-3d-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node):active {
   transform: scale(0.98);
   border-bottom-width: 1px;
-}
-
-[data-student-shell][data-free-portal-student] :is(button, a):is(.bg-red-600, .bg-red-500, .from-red-500, .from-red-600, .to-red-500, .to-red-600, .to-red-700):not(.cms-btn):not(.duo-btn):not(.cms-feed-post-btn):not(.select-none):not(.dp-node):not(.meet-start-alert__join):not(.cms-btn-danger):not(.duo-btn--danger) {
-  background: #10b981 !important;
-  background-image: none !important;
-  border-color: #059669 !important;
-  color: #ffffff !important;
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.2);
-}
-
-[data-student-shell][data-free-portal-student] button.dp-3d-btn:is(.bg-red-600, .from-red-500, .from-red-600) {
-  background: #10b981 !important;
-  background-image: none !important;
-  color: #ffffff !important;
-  box-shadow: 0 5px 0 #047857 !important;
-}
-
-[data-student-shell][data-free-portal-student] button.dp-3d-btn:is(.bg-red-600, .from-red-500, .from-red-600):active {
-  box-shadow: 0 1px 0 #047857 !important;
 }
 
 /* Nút Đăng bài FeedBoard 3D nổi bật */
@@ -3337,9 +3415,9 @@ html[data-free-portal-student] .cms-feed-post-btn {
 }
 
 .cms-feed-post-btn--danger {
-  background: #dc2626 !important;
-  border-color: #f87171 !important;
-  border-bottom-color: #991b1b !important;
+  background: #10b981 !important;
+  border-color: #34d399 !important;
+  border-bottom-color: #059669 !important;
   color: #ffffff !important;
 }
 
@@ -4214,7 +4292,7 @@ html[data-free-portal-student] .cms-feed-post-btn {
 }
 
 .cms-profile-soft {
-  background: #fef2f2;
+  background: #ecfdf5;
   color: #047857;
   border: 1px solid #a7f3d0;
 }
@@ -4247,7 +4325,7 @@ button.cms-profile-logout:hover,
 [data-student-shell] button.border-red-200.bg-white:hover,
 [data-student-shell] button.border-red-300.bg-white:hover,
 [data-student-shell] button.border-red-600.bg-white:hover {
-  background-color: #fef2f2 !important;
+  background-color: #ecfdf5 !important;
 }
 
 .cms-profile-logout:active,
@@ -4314,7 +4392,7 @@ button.cms-profile-logout:active,
 
 [data-student-shell]:not([data-free-portal-student]) .cms-course-card--active {
   border-color: #a7f3d0;
-  background: #fef2f2;
+  background: #ecfdf5;
   border-bottom-color: #059669;
 }
 
@@ -6267,7 +6345,7 @@ details[open]>summary .cms-rbac-accordion-chevron {
 }
 
 .cms-dash-link {
-  @apply text-[12px] sm:text-[13px] font-semibold text-red-600 hover:text-red-700 transition-colors duration-200 flex-shrink-0;
+  @apply text-[12px] sm:text-[13px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors duration-200 flex-shrink-0;
 }
 
 .cms-dash-list {
@@ -6298,7 +6376,7 @@ details[open]>summary .cms-rbac-accordion-chevron {
 }
 
 .cms-dash-badge-primary {
-  @apply bg-red-50 text-red-600;
+  @apply bg-emerald-50 text-emerald-600;
 }
 
 .cms-dash-badge-warning {
@@ -6362,7 +6440,7 @@ details[open]>summary .cms-rbac-accordion-chevron {
 }
 
 .cms-quick-primary .cms-quick-icon {
-  @apply bg-red-50 text-red-600;
+  @apply bg-emerald-50 text-emerald-600;
 }
 
 .cms-quick-neutral .cms-quick-icon {

@@ -135,7 +135,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
       title={hint}
       onClick={openConfirm}
       className={`flex flex-1 min-[360px]:flex-initial justify-center items-center gap-2 text-xs font-black px-4 py-3 sm:px-5 rounded-2xl transition-all  tracking-widest ${canFail
-          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-red-900/40'
+          ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/40'
           : 'bg-slate-100 text-slate-400 border-2 border-slate-200 cursor-not-allowed opacity-60'
         }`}
     >
@@ -709,7 +709,7 @@ export const StudentCard = ({
         ? 'Đã điểm danh - không thể hủy sau khi hết thời gian chờ'
         : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
-    'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2 font-extrabold cursor-pointer shadow-xs';
+    'bg-red-600 hover:bg-red-700 text-white border border-red-500 border-b-4 border-b-red-800 active:translate-y-[2px] active:border-b-2 font-extrabold cursor-pointer shadow-xs';
   const cancelButtonClassDisabled =
     'bg-slate-100 text-slate-400 border border-slate-200 border-b-2 border-b-slate-300 cursor-not-allowed opacity-60 font-semibold';
 

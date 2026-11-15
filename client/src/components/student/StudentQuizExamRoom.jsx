@@ -362,7 +362,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
-              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-500/20 text-red-400 border border-emerald-500/30'
+              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
                 }`}>
                 <Award size={40} />
               </div>
@@ -431,7 +431,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                             className={`rounded-xl border px-3 py-2 text-xs font-semibold ${correct
                               ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
                               : picked
-                                ? 'border-red-400/40 bg-emerald-500/10 text-red-200'
+                                ? 'border-red-400/40 bg-red-500/10 text-red-200'
                                 : 'border-white/10 bg-black/10 text-slate-300'
                               }`}
                           >
@@ -493,7 +493,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             <button
               type="button"
               onClick={() => setShowConfirmModal(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-red-900/30 flex items-center gap-1.5"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-900/30 flex items-center gap-1.5"
             >
               <Send size={14} /> Nộp bài
             </button>

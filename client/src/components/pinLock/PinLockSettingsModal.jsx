@@ -110,7 +110,7 @@ export default function PinLockSettingsModal({ userKey }) {
       <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-lg font-extrabold text-slate-900">
-            <KeyRound size={20} className="text-red-600" aria-hidden="true" /> Khóa mã PIN
+            <KeyRound size={20} className="text-emerald-600" aria-hidden="true" /> Khóa mã PIN
           </h2>
           <button type="button" onClick={close} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Đóng">
             <X size={18} />

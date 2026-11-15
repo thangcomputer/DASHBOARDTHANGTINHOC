@@ -383,10 +383,10 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                         )}
 
                         {s.studentNote && (
-                          <div className="text-[11px] font-bold text-red-200 mt-1 line-clamp-2 border-l-2 border-emerald-500 pl-2 bg-emerald-500/10 p-1 rounded-r flex gap-1 items-start">
-                            <MessageSquare size={11} className="mt-0.5 text-red-400 shrink-0" />
+                          <div className="text-[11px] font-bold text-emerald-200 mt-1 line-clamp-2 border-l-2 border-emerald-500 pl-2 bg-emerald-500/10 p-1 rounded-r flex gap-1 items-start">
+                            <MessageSquare size={11} className="mt-0.5 text-emerald-400 shrink-0" />
                             <div className="leading-tight flex-1">
-                              Học viên nhắn: <span className="italic font-normal text-red-200">"{s.studentNote}"</span>
+                              Học viên nhắn: <span className="italic font-normal text-emerald-100">"{s.studentNote}"</span>
                             </div>
                           </div>
                         )}
@@ -403,7 +403,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                           {isCancellable && (
                             <button
                               onClick={() => { setCancelTarget(s); setCancelReason(''); }}
-                              className="px-2 py-1 rounded-lg bg-emerald-600/40 hover:bg-emerald-600 text-red-200 text-[10px] font-bold transition flex items-center gap-1"
+                              className="px-2 py-1 rounded-lg bg-red-600/40 hover:bg-red-600 text-red-200 text-[10px] font-bold transition flex items-center gap-1"
                             >
                               <Trash2 size={11} /> Hủy ca
                             </button>

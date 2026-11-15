@@ -77,13 +77,9 @@ export default function LearningGoalCard() {
 
   if (!goal) {
     return (
-      <section className={`flex h-full min-w-0 flex-col justify-center gap-3 overflow-hidden rounded-2xl border p-4 ${
-        isFree ? 'border-emerald-100 bg-gradient-to-r from-emerald-50 to-white' : 'border-red-100 bg-gradient-to-r from-red-50 to-white'
-      }`}>
+      <section className="flex h-full min-w-0 flex-col justify-center gap-3 overflow-hidden rounded-2xl border p-4 border-emerald-100 bg-gradient-to-r from-emerald-50 to-white">
         <div className="flex items-center gap-3">
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-xs ${
-            isFree ? 'bg-emerald-600' : 'bg-emerald-600'
-          }`}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-xs bg-emerald-600">
             <Target size={20} />
           </span>
           <div>
@@ -94,7 +90,7 @@ export default function LearningGoalCard() {
         <button
           type="button"
           onClick={openLearningGoal}
-          className={`cms-btn ${isFree ? '!bg-emerald-600 hover:!bg-emerald-700 !border-b-[#059669]' : 'cms-btn-primary'} self-start !py-1.5 !px-3 text-xs`}
+          className="cms-btn !bg-emerald-600 hover:!bg-emerald-700 !border-b-[#059669] self-start !py-1.5 !px-3 text-xs text-white"
         >
           Đặt mục tiêu
         </button>
@@ -114,9 +110,7 @@ export default function LearningGoalCard() {
       {/* 1. Tiêu đề + Nút Đổi */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-            isFree ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-          }`}>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
             <Target size={20} />
           </span>
           <div className="min-w-0">
@@ -131,11 +125,7 @@ export default function LearningGoalCard() {
         <button
           type="button"
           onClick={openLearningGoal}
-          className={`shrink-0 rounded-[12px] border-[1.5px] border-b-4 bg-white px-2.5 py-1 text-xs font-extrabold active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none ${
-            isFree
-              ? 'border-[#A7F3D0] border-b-[#34D399] text-[#059669] hover:bg-[#ECFDF5]'
-              : 'border-[#FECACA] border-b-[#F87171] text-[#DC2626] hover:bg-[#FEF2F2]'
-          }`}
+          className="shrink-0 rounded-[12px] border-[1.5px] border-b-4 bg-white px-2.5 py-1 text-xs font-extrabold active:translate-y-[2px] active:border-b-[1.5px] transition-all cursor-pointer !shadow-none border-[#A7F3D0] border-b-[#34D399] text-[#059669] hover:bg-[#ECFDF5]"
         >
           {goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}
         </button>

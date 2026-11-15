@@ -2,7 +2,7 @@ import { BookOpen, FastForward, Play } from 'lucide-react';
 import { unitStageCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 
 function darken(hex, amount = 0.28) {
-  const value = String(hex || '#B91C1C').replace('#', '');
+  const value = String(hex || '#047857').replace('#', '');
   const channel = (start) => Math.max(0, Math.round(parseInt(value.slice(start, start + 2), 16) * (1 - amount)));
   return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
 }

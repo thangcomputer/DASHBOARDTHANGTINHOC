@@ -60,7 +60,7 @@ export default function WelcomeBackModal({
       >
         <span className="dp-twinkle absolute left-5 top-5 text-lg text-amber-400" aria-hidden="true">✦</span>
         <span className="dp-twinkle dp-twinkle-late absolute right-6 top-8 text-sm text-orange-400" aria-hidden="true">✦</span>
-        <span className="dp-twinkle absolute bottom-12 right-5 text-xs text-red-400 [animation-delay:0.3s]" aria-hidden="true">✦</span>
+        <span className="dp-twinkle absolute bottom-12 right-5 text-xs text-emerald-400 [animation-delay:0.3s]" aria-hidden="true">✦</span>
         <div className="dp-fly-in relative">
           <span className="absolute inset-2 animate-ping rounded-full bg-amber-200/50" aria-hidden="true" />
           <Mascot mood="energy" size={156} className="relative" />

@@ -9,6 +9,7 @@ import {
   Check, ChevronLeft, ChevronRight, Crown, Flame, Gamepad2,
   Lock, Medal, PlayCircle, Sparkles, Target, Trophy,
 } from 'lucide-react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../app/AuthContext';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
 import { getStudyResumePoint } from '../services/courseVideoApi';
@@ -17,9 +18,42 @@ import {
   formatStudyMinutes, getLearningGoal, periodLabel,
   type LearningGoalData,
 } from '../services/learningGoalApi';
+import { triggerMobileHaptic } from './dailyPractice/useGameSounds';
 import { DuoButton } from './duo/DuoButton';
 import { colors } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
+
+function DailyGoalRing({ pctValue = 0, done = false, size = 44 }: { pctValue?: number; done?: boolean; size?: number }) {
+  const safe = Math.max(0, Math.min(100, Number(pctValue) || 0));
+  const stroke = 4;
+  const radiusValue = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radiusValue;
+  const offset = circumference * (1 - safe / 100);
+  const ringColor = done ? '#10B981' : '#F97316';
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle cx={size / 2} cy={size / 2} r={radiusValue} stroke="#E2E8F0" strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radiusValue}
+          stroke={ringColor}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={offset}
+          fill="none"
+        />
+      </Svg>
+      <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 10, fontWeight: '900', color: done ? '#047857' : '#C2410C', fontVariant: ['tabular-nums'] }}>
+          {`${Math.round(safe)}%`}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 /* ─── types ─────────────────────────────────────────── */
 type LmsItem = { id: string; amount: number; label: string; at?: string };
@@ -81,7 +115,11 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
         calendar: raw.calendar || null,
         badges: (raw.badges || []).map((b: any) => ({ key: String(b.key || ''), title: String(b.title || ''), description: String(b.description || ''), earned: Boolean(b.earned) })),
       };
-      if (prevLvl.current !== null && next.level > prevLvl.current) { setCelebLevel(next.level); setTimeout(() => setCelebLevel(null), 4000); }
+      if (prevLvl.current !== null && next.level > prevLvl.current) {
+        triggerMobileHaptic('celebration');
+        setCelebLevel(next.level);
+        setTimeout(() => setCelebLevel(null), 4000);
+      }
       prevLvl.current = next.level;
       setLms(next);
     } catch { /* skip */ }
@@ -189,7 +227,10 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
             return (
               <Pressable
                 key={id}
-                onPress={() => setTab(id)}
+                onPress={() => {
+                  triggerMobileHaptic('light');
+                  setTab(id);
+                }}
                 style={[s.pill, a && s.pillActive]}
                 accessibilityRole="button"
               >
@@ -215,7 +256,7 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
               <>
                 {/* Header */}
                 <View style={s.row}>
-                  <View style={s.icon}><Target size={18} color="#059669" /></View>
+                  <DailyGoalRing pctValue={todayPct} done={todayDone} />
                   <View style={s.f1}>
                     <Text numberOfLines={1} style={s.goalTitle}>Mục tiêu: {goal.hoursPerDay} giờ/ngày</Text>
                     <Text numberOfLines={1} style={s.goalMeta}>
@@ -359,7 +400,14 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
                 const lbs = { week: 'Tuần', month: 'Tháng', all: 'Tất cả' } as const;
                 const a = period === p;
                 return (
-                  <Pressable key={p} onPress={() => setPeriod(p)} style={[s.pill, a && s.pillActive]}>
+                  <Pressable
+                    key={p}
+                    onPress={() => {
+                      triggerMobileHaptic('light');
+                      setPeriod(p);
+                    }}
+                    style={[s.pill, a && s.pillActive]}
+                  >
                     <Text style={[s.pillTxt, a && s.pillTxtActive]}>{lbs[p]}</Text>
                   </Pressable>
                 );

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminTab } from '../AdminTabContext';
 import { useBranch } from '../../../context/BranchContext';
@@ -64,7 +64,7 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
   return (
     <div
       className={`p-4 sm:p-5 transition-all duration-200 border-l-4 rounded-xl mb-4 ${
-        ev.read ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-emerald-500 bg-red-50/70 shadow-md ring-1 ring-red-100'
+        ev.read ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-emerald-500 bg-emerald-50/70 shadow-md ring-1 ring-emerald-100'
       }`}
     >
       <div className="flex flex-col gap-4 min-w-0">
@@ -74,7 +74,7 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
               <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">Mới</span>
             )}
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-              ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+              ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
             }`}>
               {ev.milestone === 'lesson_1' ? 'Buổi đầu tiên'
                 : ev.milestone === 'course_end_center' ? 'Cuối khóa - trung tâm'
@@ -98,7 +98,7 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
           )}
           <CriteriaChips criteria={ev.criteria} />
           <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100 relative mt-2 shadow-sm min-h-[64px] flex items-start">
-            <div className="absolute -left-2 -top-2 bg-red-50 rounded-full p-1.5 border border-red-100 shadow-sm text-red-500">
+            <div className="absolute -left-2 -top-2 bg-emerald-50 rounded-full p-1.5 border border-emerald-100 shadow-sm text-emerald-500">
               <MessageSquare size={14} aria-hidden="true" />
             </div>
             <p className="text-[13px] text-slate-700 font-medium leading-relaxed italic pl-3 mt-1">
@@ -175,9 +175,9 @@ export default function AdminEvaluationsTab() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-5 sm:px-6 sm:py-6 border-b border-slate-100 bg-gradient-to-r from-red-50 to-white">
+        <div className="px-5 py-5 sm:px-6 sm:py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white">
           <h2 className="text-xl font-black text-slate-800 flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
               <AlertTriangle size={18} aria-hidden="true" />
             </div>
             Báo cáo đánh giá chất lượng nội bộ

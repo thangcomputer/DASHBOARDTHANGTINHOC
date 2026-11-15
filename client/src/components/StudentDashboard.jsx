@@ -749,7 +749,7 @@ const StudentDashboard = () => {
               <h3 className="font-bold text-base sm:text-lg text-slate-800 flex items-center gap-2 min-w-0">
                 <FileUp size={20} className="text-blue-600" /> Nộp bài tập
               </h3>
-              <button onClick={() => setActiveAssignment(null)} className="text-slate-400 hover:text-red-500 transition-colors p-1 bg-white hover:bg-emerald-50 rounded-xl">
+              <button onClick={() => setActiveAssignment(null)} className="text-slate-400 hover:text-emerald-600 transition-colors p-1 bg-white hover:bg-emerald-50 rounded-xl">
                 <XCircle size={24} />
               </button>
             </div>

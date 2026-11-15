@@ -106,18 +106,24 @@ function safeDownloadFilename(name) {
 
 const { uploadsAuthMiddleware } = require('./middleware/uploadsAuth');
 
-app.use('/uploads', uploadsAuthMiddleware, (req, res, next) => {
+function applyUploadSecurityHeaders(req, res) {
   res.setHeader('Cache-Control', 'private, max-age=3600');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  const forceDownload = req.query.download === '1' || req.query.download === 'true' || !!req.query.downloadAs;
-  const isArchive = /\.(zip|rar|7z|tar)$/i.test(req.path);
-  const isViewable = /\.(pdf|png|jpe?g|gif|webp|mp4|webm)$/i.test(req.path);
-  const isOffice = /\.(docx?|xlsx?|pptx?)$/i.test(req.path);
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox",
+  );
+  const reqPath = String(req.path || '');
+  const forceDownload = req.query?.download === '1' || req.query?.download === 'true' || !!req.query?.downloadAs;
+  const isScriptable = /\.(html?|xhtml|svg|xml|js|mjs)$/i.test(reqPath);
+  const isArchive = /\.(zip|rar|7z|tar)$/i.test(reqPath);
+  const isViewable = /\.(pdf|png|jpe?g|gif|webp|mp4|webm)$/i.test(reqPath);
+  const isOffice = /\.(docx?|xlsx?|pptx?)$/i.test(reqPath);
 
-  if (forceDownload || isArchive) {
-    const diskName = decodeURIComponent(req.path.split('/').pop() || 'file');
-    const customName = safeDownloadFilename(req.query.downloadAs);
+  if (forceDownload || isArchive || isScriptable) {
+    const diskName = decodeURIComponent(reqPath.split('/').pop() || 'file');
+    const customName = safeDownloadFilename(req.query?.downloadAs);
     const useName = customName || diskName;
     const asciiFallback = useName.replace(/[^\x20-\x7E]/g, '_') || diskName;
     res.setHeader(
@@ -127,6 +133,10 @@ app.use('/uploads', uploadsAuthMiddleware, (req, res, next) => {
   } else if (isViewable || isOffice) {
     res.setHeader('Content-Disposition', 'inline');
   }
+}
+
+app.use('/uploads', uploadsAuthMiddleware, (req, res, next) => {
+  applyUploadSecurityHeaders(req, res);
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
@@ -450,6 +460,7 @@ io.on('connection', (socket) => {
     const mRole = getMessagingRole(socket.user);
     if (uid) socket.join(uid);
     if (socket.sessionId) socket.join(`session:${socket.sessionId}`);
+    if (socket.deviceSessionId) socket.join(`dsid:${socket.deviceSessionId}`);
     socket.join('feed_room');
     if (mRole) {
       const uRole = mRole.toUpperCase();
@@ -1114,7 +1125,7 @@ io.on('connection', (socket) => {
 
     const studentId = data?.studentId ? String(data.studentId) : '';
     if (studentId) {
-      const courseLabel = data.course ? String(data.course) : 'chứng chỉ';
+      const courseLabel = data.course ? String(data.course) : 'chứng nhận';
       const reasonTxt = data.reason ? String(data.reason) : 'vi phạm giám sát';
       NotificationService.send(io, {
         type: 'EXAM',
@@ -1502,6 +1513,10 @@ if (!isTest) cron.schedule('* * * * *', async () => {
       reminderSent: { $ne: true },
     }).lean();
 
+    if (typeof scheduleRoutes.attachFallbackScheduleLinks === 'function') {
+      await scheduleRoutes.attachFallbackScheduleLinks(todaySchedules);
+    }
+
     for (const sched of todaySchedules) {
       const sDateObj = new Date(sched.date);
       const sVnDate = new Date(sDateObj.getTime() + 7 * 3600 * 1000);
@@ -1525,36 +1540,41 @@ if (!isTest) cron.schedule('* * * * *', async () => {
           ? `🔴 Đã đến giờ vào lớp dạy! Môn: ${sched.course} (${sched.startTime} - ${sched.endTime})`
           : `⏰ Sắp đến giờ dạy học (còn 1 phút)! Môn: ${sched.course} lúc ${sched.startTime}`;
 
+        const resolvedLinkHoc = String(sched.linkHoc || '').trim();
+        const reminderPayloadBase = {
+          scheduleId: sched._id,
+          course: sched.course,
+          teacherName: sched.teacherName,
+          studentName: sched.studentName,
+          studentId: sched.studentId,
+          teacherId: sched.teacherId,
+          day: sDayStr,
+          startTime: sched.startTime,
+          endTime: sched.endTime,
+          linkHoc: resolvedLinkHoc,
+          isLive,
+        };
+
         // 1. Gửi notification real-time qua socket và mobile push
         if (sched.studentId) {
           app.notifyUser('student', sched.studentId, 'class:reminder', {
-            scheduleId: sched._id,
-            course: sched.course,
-            teacherName: sched.teacherName,
-            studentName: sched.studentName,
-            startTime: sched.startTime,
-            endTime: sched.endTime,
-            linkHoc: sched.linkHoc,
+            ...reminderPayloadBase,
             message: studentMsg,
-            isLive,
           });
         }
         if (sched.teacherId) {
           app.notifyUser('teacher', sched.teacherId, 'class:reminder', {
-            scheduleId: sched._id,
-            course: sched.course,
-            teacherName: sched.teacherName,
-            studentName: sched.studentName,
-            startTime: sched.startTime,
-            endTime: sched.endTime,
-            linkHoc: sched.linkHoc,
+            ...reminderPayloadBase,
             message: teacherMsg,
-            isLive,
           });
         }
 
-        // 2. Đánh dấu đã gửi
-        await Schedule.updateOne({ _id: sched._id }, { $set: { reminderSent: true, reminderSentAt: new Date() } });
+        // 2. Đánh dấu đã gửi (và lưu linkHoc dự phòng nếu có)
+        const reminderUpdate = { reminderSent: true, reminderSentAt: new Date() };
+        if (resolvedLinkHoc) {
+          reminderUpdate.linkHoc = resolvedLinkHoc;
+        }
+        await Schedule.updateOne({ _id: sched._id }, { $set: reminderUpdate });
         logger.info(`[CRON] Đã gửi nhắc lịch học ca ${sched.startTime} môn ${sched.course} cho HV: ${sched.studentName} & GV: ${sched.teacherName}`);
       }
     }
@@ -1622,6 +1642,10 @@ app.use((err, req, res, next) => {
       message: `Định dạng ID không hợp lệ: ${err.value}`,
     });
   }
+
+  try {
+    require('./services/telemetryService').captureBackendError(err, req);
+  } catch { /* ignore telemetry hook errors */ }
 
   res.status(500).json({
     success: false,

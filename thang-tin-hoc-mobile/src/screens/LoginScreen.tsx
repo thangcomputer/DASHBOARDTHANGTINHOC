@@ -20,10 +20,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
   AlertCircle, Award, BookOpen, CheckCircle2, Eye, EyeOff, GraduationCap, Headphones, KeyRound, Lock, LogIn,
-  MessageCircle, Monitor, Phone, Share2, Sparkles, UserPlus, UserRound, X,
+  MessageCircle, Monitor, Phone, ScanFace, Share2, ShieldCheck, Sparkles, UserPlus, UserRound, X,
 } from 'lucide-react-native';
 import { useAuth } from '../app/AuthContext';
 import { mobileApiRequest } from '../services/apiClient';
+import { getBiometricAvailability, type BiometricAvailability } from '../services/biometricAuth';
 import { getWebLogoUrl } from '../services/webSettingsApi';
 import type { UserRole } from '../types';
 
@@ -95,7 +96,7 @@ function openAdminZalo(message = '') {
 }
 
 export function LoginScreen() {
-  const { signIn, isSigningIn, authError } = useAuth();
+  const { signIn, signInWithBiometrics, isSigningIn, authError } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [role, setRole] = useState<UserRole>('student');
   const [fullName, setFullName] = useState('');
@@ -109,6 +110,8 @@ export function LoginScreen() {
   const [logoUrl, setLogoUrl] = useState('');
   const [logoFailed, setLogoFailed] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [biometricInfo, setBiometricInfo] = useState<BiometricAvailability | null>(null);
+  const [saveBiometric, setSaveBiometric] = useState(true);
 
   const glowAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -135,6 +138,7 @@ export function LoginScreen() {
   useEffect(() => {
     let alive = true;
     getWebLogoUrl().then((url) => { if (alive) setLogoUrl(url); }).catch(() => { });
+    getBiometricAvailability().then((info) => { if (alive) setBiometricInfo(info); }).catch(() => { });
     return () => { alive = false; };
   }, []);
 
@@ -218,9 +222,20 @@ export function LoginScreen() {
       return;
     }
     try {
-      await signIn(role, contact.value, password);
+      await signIn(role, contact.value, password, {
+        saveBiometric: Boolean(biometricInfo?.enrolled && saveBiometric),
+      });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập.');
+    }
+  };
+
+  const submitBiometric = async () => {
+    setError('');
+    try {
+      await signInWithBiometrics();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập bằng sinh trắc học.');
     }
   };
 
@@ -405,10 +420,25 @@ export function LoginScreen() {
             </View>
 
             {mode === 'login' ? (
-              <Pressable onPress={() => setForgotOpen(true)} style={styles.forgotLink} accessibilityRole="button">
-                <KeyRound size={12} color={palette.muted} />
-                <Text style={styles.forgotLinkText}>Quên mật khẩu?</Text>
-              </Pressable>
+              <View style={styles.loginAuxRow}>
+                {biometricInfo?.enrolled ? (
+                  <Pressable
+                    onPress={() => setSaveBiometric((prev) => !prev)}
+                    style={styles.biometricRememberRow}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: saveBiometric }}
+                  >
+                    <View style={[styles.biometricCheckbox, saveBiometric && styles.biometricCheckboxChecked]}>
+                      {saveBiometric ? <CheckCircle2 size={12} color={palette.white} /> : null}
+                    </View>
+                    <Text style={styles.biometricRememberText}>Lưu {biometricInfo.label}</Text>
+                  </Pressable>
+                ) : <View />}
+                <Pressable onPress={() => setForgotOpen(true)} style={styles.forgotLink} accessibilityRole="button">
+                  <KeyRound size={12} color={palette.muted} />
+                  <Text style={styles.forgotLinkText}>Quên mật khẩu?</Text>
+                </Pressable>
+              </View>
             ) : (
               <View style={styles.registerSpacer} />
             )}
@@ -433,6 +463,25 @@ export function LoginScreen() {
                 </>
               )}
             </Pressable>
+
+            {mode === 'login' && biometricInfo?.hasSavedCredential && biometricInfo.enrolled ? (
+              <Pressable
+                onPress={() => { void submitBiometric(); }}
+                disabled={busy}
+                style={({ pressed }) => [styles.biometricButton, (pressed || busy) && styles.submitPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Đăng nhập nhanh bằng ${biometricInfo.label}`}
+              >
+                <ScanFace size={18} color="#34D399" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.biometricButtonText}>Đăng nhập bằng {biometricInfo.label}</Text>
+                  <Text style={styles.biometricButtonSub} numberOfLines={1}>
+                    {biometricInfo.savedDisplayName || biometricInfo.savedContact}
+                  </Text>
+                </View>
+                <ShieldCheck size={16} color="#6EE7B7" />
+              </Pressable>
+            ) : null}
           </View>
 
           <View style={styles.highlights}>
@@ -831,8 +880,40 @@ const styles = StyleSheet.create({
     boxShadow: '0px 0px 0px 4px rgba(16, 185, 129, 0.16), inset 0px 2px 6px rgba(0, 0, 0, 0.45)',
   },
   input: { flex: 1, color: palette.white, fontSize: 16, fontWeight: '600', paddingVertical: 12, outlineStyle: 'none' } as never,
-  forgotLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', paddingVertical: 4, marginBottom: 16 },
+  loginAuxRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 8 },
+  biometricRememberRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  biometricCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+  },
+  biometricCheckboxChecked: {
+    backgroundColor: palette.brand,
+    borderColor: '#34D399',
+  },
+  biometricRememberText: { color: palette.text, fontSize: 12, fontWeight: '700' },
+  forgotLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   forgotLinkText: { color: palette.muted, fontSize: 12, fontWeight: '700' },
+  biometricButton: {
+    marginTop: 10,
+    minHeight: 50,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  biometricButtonText: { color: '#ECFDF5', fontSize: 13, fontWeight: '800' },
+  biometricButtonSub: { color: '#6EE7B7', fontSize: 11, fontWeight: '600', marginTop: 1 },
   submit: {
     minHeight: 56,
     borderRadius: 20,

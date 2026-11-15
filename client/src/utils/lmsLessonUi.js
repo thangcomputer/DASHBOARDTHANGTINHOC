@@ -265,7 +265,7 @@ export function lessonStatusToneClass(tone, surface = 'dark') {
   switch (tone) {
     case 'active': return 'text-emerald-600';
     case 'success': return 'text-emerald-600';
-    case 'info': return 'text-red-700';
+    case 'info': return 'text-emerald-700';
     case 'warn': return 'text-amber-700';
     default: return 'text-slate-500';
   }

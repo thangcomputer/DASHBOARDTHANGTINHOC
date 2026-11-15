@@ -13,7 +13,7 @@ export default function DailyPracticeQuickStats({ stats, pathTopic, freeTopicNam
     { icon: BookOpen, label: 'Môn / chủ đề', value: subject, tone: 'text-sky-700 bg-sky-50' },
     { icon: Route, label: 'Tiến độ lộ trình', value: stageLine, tone: 'text-violet-700 bg-violet-50' },
     { icon: Flame, label: 'Chuỗi hiện tại', value: `${stats?.streak || 0} ngày`, tone: 'text-orange-700 bg-orange-50' },
-    { icon: Trophy, label: 'XP luyện', value: `${stats?.xpTotal || 0} XP`, tone: 'text-red-700 bg-red-50' },
+    { icon: Trophy, label: 'XP luyện', value: `${stats?.xpTotal || 0} XP`, tone: 'text-emerald-700 bg-emerald-50' },
   ];
 
   return (

@@ -162,6 +162,15 @@ async function socketAuthMiddleware(socket, next) {
       socket.sessionId = decoded.sid;
     }
 
+    if (decoded.dsid) {
+      const revoked = await require('../services/deviceSessionService').isDeviceSessionRevoked(decoded.dsid);
+      if (revoked) {
+        releaseIpSlot();
+        return next(new Error('Authentication error: Device session revoked'));
+      }
+      socket.deviceSessionId = decoded.dsid;
+    }
+
     if (!decoded.sid && !(await verifyTokenVersion(decoded))) {
       releaseIpSlot();
       return next(new Error('Authentication error: Token version mismatch'));

@@ -46,7 +46,6 @@ function isFreePortalRequestBlocked(req, student) {
   const hidden = [
     '/api/schedules',
     '/api/evaluations',
-    '/api/center-info',
   ];
   if (hidden.some((prefix) => url === prefix || url.startsWith(`${prefix}/`))) return true;
   if (student.freeUnlocked === true) return false;
@@ -117,6 +116,19 @@ const authMiddleware = async (req, res, next) => {
       }
       req.sessionId = decoded.sid;
       req.authSession = session;
+    }
+
+    if (decoded.dsid) {
+      const deviceSessionService = require('../services/deviceSessionService');
+      if (await deviceSessionService.isDeviceSessionRevoked(decoded.dsid)) {
+        return res.status(401).json({
+          success: false,
+          code: 'SESSION_REVOKED',
+          message: 'Phiên thiết bị đã bị đăng xuất từ xa. Vui lòng đăng nhập lại.',
+        });
+      }
+      req.deviceSessionId = decoded.dsid;
+      deviceSessionService.touchDeviceSession(decoded.dsid, req);
     }
 
     if (decoded.id === 'admin') {
@@ -665,4 +677,5 @@ module.exports = {
   requireInternalToken,
   isSubscriptionExpired,
   isAllowedWhenExpired,
+  isFreePortalRequestBlocked,
 };

@@ -2,9 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle2, Clapperboard, ExternalLink, Loader2, Lock, Play,
+  Bot, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, ExternalLink, Loader2, Lock, Play, StickyNote,
 } from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
+import { NotesPanel } from '../../lms/LmsPlayerTabs';
+import LessonAiAssistantPanel from '../../lms/LessonAiAssistantPanel';
+import { lmsStoreKey } from '../../../hooks/useLmsLocalStore';
+import { resolveCurrentStudentId, saveLastStudySession } from '../../../utils/resumeLearning';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
@@ -25,16 +29,16 @@ function isDirectVideo(url) {
 }
 
 /** Video không phải YouTube: file trực tiếp (theo dõi 2/3 thời lượng) hoặc Vimeo (đánh dấu sau khi mở đủ lâu). */
-/** Màn chờ kiểu cửa sổ video: nền xám đậm, nút phát đỏ tròn lớn ở giữa. */
+/** Màn chờ kiểu cửa sổ video: nền xám đậm, nút phát xanh lá tròn lớn ở giữa. */
 function BigPlayOverlay({ onPlay }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'radial-gradient(circle at 50% 45%, rgba(239,68,68,0.10) 0%, #23262E 55%, #1C1F26 100%)' }}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'radial-gradient(circle at 50% 45%, rgba(16,185,129,0.12) 0%, #23262E 55%, #1C1F26 100%)' }}>
       <button
         type="button"
         onClick={onPlay}
         aria-label="Phát video"
         className="flex h-20 w-20 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 sm:h-28 sm:w-28 !shadow-none"
-        style={{ background: '#EF3B36', boxShadow: '0 0 32px rgba(220,38,38,0.45), 0 8px 24px rgba(0,0,0,0.35)' }}
+        style={{ background: '#10B981', boxShadow: '0 0 32px rgba(16,185,129,0.45), 0 8px 24px rgba(0,0,0,0.35)' }}
       >
         <Play size={40} className="ml-1.5 text-white" fill="white" />
       </button>
@@ -131,13 +135,38 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   const [grading, setGrading] = useState(false);
   const [hintStep, setHintStep] = useState(false);
   const [markingWatched, setMarkingWatched] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
+  const [aiOpen, setAiOpen] = useState(false);
   const playerApiRef = useRef(null);
+  const mediaElRef = useRef(null);
   const passedRef = useRef(passedKeys);
   const gateRef = useRef(null);
   const currentRef = useRef(null);
   const eligibleRef = useRef(false);
   const syncedSectionRef = useRef(new Set());
   useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
+
+  const getVideoCurrentTime = () => {
+    try {
+      if (playerApiRef.current?.getCurrentTime) return Number(playerApiRef.current.getCurrentTime()) || 0;
+      if (mediaElRef.current) return Number(mediaElRef.current.currentTime) || 0;
+    } catch {
+      /* ignore player time error */
+    }
+    return 0;
+  };
+
+  const seekVideoTo = (sec) => {
+    const targetSec = Math.max(0, Math.floor(Number(sec) || 0));
+    if (playerApiRef.current?.seekTo) {
+      playerApiRef.current.seekTo(targetSec);
+      return;
+    }
+    if (mediaElRef.current) {
+      mediaElRef.current.currentTime = targetSec;
+      mediaElRef.current.play?.().catch?.(() => {});
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -204,6 +233,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   };
 
   const onMediaTick = (time, media) => {
+    if (media) mediaElRef.current = media;
     const video = currentRef.current;
     if (!video || video.source === 'lesson') return;
     if (gateRef.current) {
@@ -224,8 +254,31 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   useEffect(() => {
     eligibleRef.current = false;
     gateRef.current = null;
+    mediaElRef.current = null;
     setGate(null);
   }, [current?.id]);
+
+  useEffect(() => {
+    if (!unit?.id || !current?.id) return undefined;
+    const persistResume = () => {
+      saveLastStudySession({
+        kind: 'daily_practice',
+        unitId: String(unit.id),
+        unitTitle: unit.title || '',
+        lessonId: String(current.id),
+        lessonTitle: current.title || unit.title || 'Video chặng DewSkill',
+        sectionLabel: `Chặng ${unit.index || 1} · Video bài học`,
+        atSec: Math.floor(getVideoCurrentTime()),
+        href: '/student/daily-practice?watch=stage',
+      });
+    };
+    persistResume();
+    const timer = window.setInterval(persistResume, 5000);
+    return () => {
+      persistResume();
+      window.clearInterval(timer);
+    };
+  }, [unit?.id, unit?.index, unit?.title, current?.id, current?.title]);
 
   // Nếu video đã được đánh dấu watched từ trước nhưng chưa đồng bộ completedSections của bài học theo cấp độ
   useEffect(() => {
@@ -434,7 +487,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
             Chặng {unit.index} · {unit.title}
           </span>
           <h2 className="flex min-w-0 flex-1 items-center justify-start gap-1.5 text-left text-xs sm:text-base font-black text-white" title={current?.title || ''}>
-            <Clapperboard size={15} className="shrink-0 text-red-400" aria-hidden="true" />
+            <Clapperboard size={15} className="shrink-0 text-emerald-400" aria-hidden="true" />
             <span className="line-clamp-1 sm:line-clamp-2 break-words">{current?.title || 'Video của chặng'}</span>
           </h2>
           <button type="button" onClick={onClose} aria-label="Đóng" className="cms-btn cms-btn-primary cms-btn-brand shrink-0 !min-h-0 !h-auto !rounded-lg !py-1 !px-2.5 sm:!py-1.5 sm:!px-3 text-[11px] sm:text-xs font-black">
@@ -571,6 +624,63 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {current && (
+            <div className="mx-3 my-3 sm:mx-4 rounded-2xl border border-white/10 bg-[#16181E] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setNotesOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none"
+              >
+                <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-400">
+                  <StickyNote size={14} aria-hidden="true" />
+                  Ghi chú theo mốc thời gian video
+                </span>
+                {notesOpen
+                  ? <ChevronUp size={15} className="text-white/50" />
+                  : <ChevronDown size={15} className="text-white/50" />}
+              </button>
+              {notesOpen && (
+                <div className="border-t border-white/10 p-3 sm:p-4">
+                  <NotesPanel
+                    storageKey={lmsStoreKey('notes', resolveCurrentStudentId(), `dp_${unit.id}`)}
+                    lessonId={current.id}
+                    lessonTitle={current.title || unit.title}
+                    courseTitle={unit.title || 'Luyện tập DewSkill'}
+                    getCurrentTime={getVideoCurrentTime}
+                    onSeekTo={seekVideoTo}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {current && (
+            <div className="mx-3 mb-3 sm:mx-4 rounded-2xl border border-emerald-400/20 bg-[#16181E] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setAiOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none"
+              >
+                <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-300">
+                  <Bot size={14} aria-hidden="true" />
+                  Trợ lý AI trong bài học · Công thức Excel &amp; Hỏi đáp
+                </span>
+                {aiOpen
+                  ? <ChevronUp size={15} className="text-white/50" />
+                  : <ChevronDown size={15} className="text-white/50" />}
+              </button>
+              {aiOpen && (
+                <div className="border-t border-white/10 p-3 sm:p-4">
+                  <LessonAiAssistantPanel
+                    lessonTitle={current.title}
+                    unitTitle={unit.title}
+                    courseTitle={lesson?.title || unit.title || 'Tin học Văn phòng'}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

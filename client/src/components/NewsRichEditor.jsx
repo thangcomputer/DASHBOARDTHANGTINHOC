@@ -510,8 +510,8 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
             [&_h2]:text-xl [&_h2]:font-black [&_h2]:mt-4 [&_h2]:mb-2
             [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-3 [&_h3]:mb-1.5
             [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
-            [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600
-            [&_a]:text-red-600 [&_a]:underline
+            [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600
+            [&_a]:text-emerald-600 [&_a]:underline
             [&_img]:max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[22rem] [&_img]:rounded-xl [&_img]:my-2 [&_img]:inline-block"
         />
         {imgBox && !disabled && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import * as XLSX from 'xlsx';
+import { loadXlsx } from '../utils/loadXlsx';
 import {
   DollarSign, PlayCircle, Download, Calendar as CalendarIcon,
   Clock, TrendingUp, CreditCard,
@@ -220,6 +220,7 @@ const TeacherFinanceAndTraining = () => {
       rows.push([]);
       rows.push(['TỔNG TOÀN BỘ HỌC VIÊN', '', '', `${sessionsThisMonth.length} buổi`, totalAmount]);
 
+      const XLSX = await loadXlsx();
       const worksheet = XLSX.utils.aoa_to_sheet(rows);
       worksheet['!cols'] = [
         { wch: 28 },
@@ -363,7 +364,7 @@ const TeacherFinanceAndTraining = () => {
               <div className="bg-white shadow-sm border border-slate-100 rounded-2xl p-4">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex min-w-0 items-center gap-2">
-                    <CalendarIcon size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
+                    <CalendarIcon size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
                     <p className="text-slate-500 text-[10px] tracking-wider font-semibold">Tổng buổi đã dạy</p>
                   </div>
                   <button
@@ -379,7 +380,7 @@ const TeacherFinanceAndTraining = () => {
                       : <FileSpreadsheet size={16} aria-hidden="true" />}
                   </button>
                 </div>
-                <p className="text-xl sm:text-3xl font-black mt-1 text-rose-500 tabular-nums">{totalSessions}</p>
+                <p className="text-xl sm:text-3xl font-black mt-1 text-emerald-600 tabular-nums">{totalSessions}</p>
                 <div className="flex items-center gap-1.5 mt-2 text-slate-400">
                   <CalendarIcon size={12} aria-hidden="true" />
                   <span className="text-[11px] sm:text-xs">{exportingMonthlyExcel ? 'Đang tạo file Excel…' : 'Tất cả các tháng · Excel tháng này'}</span>
@@ -692,7 +693,7 @@ const TeacherFinanceAndTraining = () => {
                     activeCourse.files.map((file, idx) => (
                       <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:border-green-200 transition-colors">
                         <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${file.type === 'PDF' ? 'bg-red-500' : file.type === 'DOCX' ? 'bg-red-500' : 'bg-green-500'}`}>{file.type}</div>
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${file.type === 'PDF' ? 'bg-red-500' : file.type === 'DOCX' ? 'bg-blue-500' : 'bg-green-500'}`}>{file.type}</div>
                           <div>
                             <h4 className="font-bold text-slate-700">{file.title}</h4>
                             <p className="text-xs text-slate-400 mt-1 font-semibold">{file.size}</p>

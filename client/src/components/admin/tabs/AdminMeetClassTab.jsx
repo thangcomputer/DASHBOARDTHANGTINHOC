@@ -370,7 +370,7 @@ export default function AdminMeetClassTab() {
         <>
       <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="mb-1 flex items-center gap-2 text-base font-black text-slate-900">
-          <Video size={18} className="text-red-600" /> Xếp lịch Meet
+          <Video size={18} className="text-emerald-600" /> Xếp lịch Meet
         </h2>
         <p className="mb-4 text-sm font-semibold text-slate-500">Dán link Google Meet. Chỉ học viên Dewskill đã mua gói Meet - không gồm học viên THANGTINHOC.</p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -415,7 +415,7 @@ export default function AdminMeetClassTab() {
             Tất cả HV cổng miễn phí đang có gói Meet
             {inviteMode === 'all' && eligibleLoading ? <Loader2 size={14} className="animate-spin text-slate-400" /> : null}
             {inviteMode === 'all' && !eligibleLoading && eligibleCount != null ? (
-              <span className="text-xs font-bold text-red-600">({eligibleCount} người, tối đa 100/buổi)</span>
+              <span className="text-xs font-bold text-emerald-600">({eligibleCount} người, tối đa 100/buổi)</span>
             ) : null}
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">

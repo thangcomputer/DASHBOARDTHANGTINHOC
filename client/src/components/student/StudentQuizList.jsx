@@ -71,7 +71,7 @@ export default function StudentQuizList() {
       <div className="flex items-start gap-2 bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm sm:text-lg font-bold text-slate-800 flex items-start gap-2">
-            <Award className="text-red-600 shrink-0 mt-0.5" size={18} />
+            <Award className="text-emerald-600 shrink-0 mt-0.5" size={18} />
             <span className="leading-snug break-words">Trắc nghiệm bài học từ Giảng viên</span>
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
@@ -90,7 +90,7 @@ export default function StudentQuizList() {
 
       {loading ? (
         <div className="py-12 text-center text-slate-400">
-          <RefreshCw className="animate-spin mx-auto mb-2 text-red-600" size={24} />
+          <RefreshCw className="animate-spin mx-auto mb-2 text-emerald-600" size={24} />
           <p className="text-xs font-bold">Đang tải danh sách bài trắc nghiệm...</p>
         </div>
       ) : quizzes.length === 0 ? (

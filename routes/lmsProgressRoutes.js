@@ -31,6 +31,7 @@ router.put('/settings', ...requireAdmin, async (req, res) => {
     const data = await service.saveSettings({
       videoRatio: req.body?.videoRatio,
       amounts: req.body?.amounts,
+      badges: req.body?.badges,
     });
     return res.json({ success: true, data });
   } catch (err) {

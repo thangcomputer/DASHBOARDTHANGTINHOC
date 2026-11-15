@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
+import { saveLastStudySession } from '../../../utils/resumeLearning';
 
 const DEFAULT_SECTION_ORDER = ['content', 'file', 'video', 'practice'];
 const DIFFICULTY_STEP_MAP = { easy: 'learn', medium: 'practice', hard: 'challenge' };
@@ -58,7 +59,7 @@ const SECTION_META = {
     title: 'Video bài giảng',
     defaultSub: 'Xem video bài giảng',
     icon: Clapperboard,
-    iconBg: 'bg-red-50 text-red-700 ring-red-200',
+    iconBg: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   },
   practice: {
     title: 'Luyện tập',
@@ -207,6 +208,21 @@ export default function MilestoneHubModal({
   const progressPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
 
   const currentTabMeta = DIFFICULTY_TABS.find((t) => t.key === activeDiff) || DIFFICULTY_TABS[0];
+
+  useEffect(() => {
+    if (!unit?.id || !node?.key) return;
+    saveLastStudySession({
+      kind: 'daily_practice',
+      unitId: String(unit.id),
+      unitTitle: unit.title || '',
+      lessonId: String(node.key),
+      lessonTitle: node.label || unit.title || 'Bài học DewSkill',
+      sectionId: `${activeDiff}:${activeSection || 'hub'}`,
+      sectionLabel: `Chặng ${unit.index || 1} · ${currentTabMeta.label}`,
+      progressPct,
+      href: '/student/daily-practice',
+    });
+  }, [unit?.id, unit?.index, unit?.title, node?.key, node?.label, activeDiff, activeSection, currentTabMeta.label, progressPct]);
 
   const toggleSectionDone = async (secKey, nextDone) => {
     setSavingSection(true);

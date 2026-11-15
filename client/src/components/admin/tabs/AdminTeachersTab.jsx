@@ -219,7 +219,7 @@ export default function AdminTeachersTab() {
         <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3 shrink-0">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <h2 className="text-base font-semibold text-slate-900 flex items-start gap-2 min-w-0">
-              <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+              <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
                 <GraduationCap size={18} aria-hidden="true" />
               </span>
               <span className="min-w-0 break-words leading-snug">Quản lý Giảng viên</span>

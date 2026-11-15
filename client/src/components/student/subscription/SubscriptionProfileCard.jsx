@@ -27,12 +27,12 @@ export default function SubscriptionProfileCard() {
   return (
     <section className="cms-sd-card !p-0 overflow-hidden">
       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 lg:px-5 lg:py-3.5">
-        <Crown size={16} className={`shrink-0 ${isBrandStudent ? 'text-red-500' : 'text-amber-500'}`} aria-hidden="true" />
+        <Crown size={16} className="shrink-0 text-amber-500" aria-hidden="true" />
         <span className="text-sm font-extrabold text-slate-800 lg:text-base">{heading}</span>
       </div>
       <div className="space-y-3 px-4 py-3 lg:px-5 lg:py-4">
         <div className={`flex items-center gap-3 rounded-2xl p-3 ${
-          isBrandStudent ? 'bg-red-50/50 ring-1 ring-red-100' : (expiring ? 'bg-amber-50 ring-1 ring-amber-200' : 'bg-slate-50 ring-1 ring-slate-100')
+          isBrandStudent ? 'bg-emerald-50/50 ring-1 ring-emerald-100' : (expiring ? 'bg-amber-50 ring-1 ring-amber-200' : 'bg-slate-50 ring-1 ring-slate-100')
         }`}>
           <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${
             isBrandStudent ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : (expiring ? 'bg-gradient-to-br from-amber-400 to-orange-600' : 'cms-profile-mark')
@@ -43,7 +43,7 @@ export default function SubscriptionProfileCard() {
             <p className="text-sm font-black text-slate-900">
               {freeTier ? 'Miễn phí' : (isBrandStudent ? 'Gói Khóa học' : `Gói ${subscription.planLabel}`)}
             </p>
-            <p className={`text-xs font-semibold ${isBrandStudent ? 'text-red-600' : (expiring ? 'text-orange-600' : 'text-slate-500')}`}>
+            <p className={`text-xs font-semibold ${isBrandStudent ? 'text-emerald-600' : (expiring ? 'text-orange-600' : 'text-slate-500')}`}>
               {freeTier
                 ? xpText
                 : isBrandStudent

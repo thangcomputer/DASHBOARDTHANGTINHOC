@@ -18,8 +18,10 @@ const LazyStudentTrainingTab = lazy(() => import('./tabs/AdminStudentTrainingTab
 const LazyCertPrepTab = lazy(() => import('./tabs/AdminCertPrepTab'));
 const LazyLessonPracticeTab = lazy(() => import('./tabs/AdminLessonPracticeTab'));
 const LazyDailyPracticeTab = lazy(() => import('./tabs/AdminDailyPracticeTab'));
+const LazyLmsXpSettingsTab = lazy(() => import('./tabs/AdminLmsXpSettings'));
 const LazySubscriptionTab = lazy(() => import('./tabs/AdminSubscriptionTab'));
 const LazyMeetClassTab = lazy(() => import('./tabs/AdminMeetClassTab'));
+const LazyDeviceSecurityTab = lazy(() => import('./tabs/AdminDeviceSecurityTab'));
 
 const EXTERNAL_TABS = {
   settings: LazySystemSettingsTab,
@@ -110,10 +112,18 @@ export function AdminLazyDailyPracticeTab() {
   return <LazyAdminTab Component={LazyDailyPracticeTab} />;
 }
 
+export function AdminLazyLmsXpSettingsTab() {
+  return <LazyAdminTab Component={LazyLmsXpSettingsTab} />;
+}
+
 export function AdminLazySubscriptionTab() {
   return <LazyAdminTab Component={LazySubscriptionTab} />;
 }
 
 export function AdminLazyMeetClassTab() {
   return <LazyAdminTab Component={LazyMeetClassTab} />;
+}
+
+export function AdminLazyDeviceSecurityTab() {
+  return <LazyAdminTab Component={LazyDeviceSecurityTab} />;
 }

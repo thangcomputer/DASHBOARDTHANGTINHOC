@@ -43,7 +43,7 @@ export default function ScreenCaptureGuideModal({
               <p id="screen-capture-guide-title" className="text-base font-black">
                 Hướng dẫn chụp màn hình
               </p>
-              <p className="text-xs text-red-100/90 mt-0.5">
+              <p className="text-xs text-emerald-100/90 mt-0.5">
                 {isRegion ? 'Làm theo số đỏ trên hình - rồi kéo chọn vùng' : 'Làm theo số đỏ trên hình, rất nhanh'}
               </p>
             </div>
@@ -84,7 +84,7 @@ export default function ScreenCaptureGuideModal({
               type="checkbox"
               checked={!!skipNext}
               onChange={(e) => onSkipNextChange?.(e.target.checked)}
-              className="rounded border-slate-300 text-red-600 focus:ring-emerald-500"
+              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
             />
             <span className="text-xs font-semibold text-slate-600">Không hiện hướng dẫn lần sau</span>
           </label>

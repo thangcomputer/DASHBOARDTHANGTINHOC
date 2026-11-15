@@ -489,7 +489,7 @@ export default function TeacherTeachingLog({
                     </p>
                     {variant === 'teacher' && studentNote ? (
                       <p
-                        className="shrink-0 max-w-[42%] text-right text-xs text-red-700 font-medium leading-relaxed line-clamp-2"
+                        className="shrink-0 max-w-[42%] text-right text-xs text-emerald-700 font-medium leading-relaxed line-clamp-2"
                         title={studentNote}
                       >
                         Ghi chú: {studentNote}

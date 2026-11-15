@@ -418,7 +418,7 @@ class CourseApplicationService {
           name: 'Ôn Luyện Chứng Chỉ MOS',
           category: 'chung-chi',
           description: 'Nắm vững kỹ năng tin học văn phòng theo chuẩn quốc tế Microsoft Office Specialist (MOS).',
-          shortDescription: 'Chuẩn bị thi chứng chỉ MOS Word, Excel, PowerPoint',
+          shortDescription: 'Chuẩn bị thi chứng nhận MOS Word, Excel, PowerPoint',
           price: 4500000,
           totalSessions: 15,
           duration: '5 tuần',

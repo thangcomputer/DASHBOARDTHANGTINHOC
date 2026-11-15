@@ -1,17 +1,59 @@
+/**
+ * Design tokens dùng chung cho app Mobile — đồng bộ với hệ CSS Variables bên Web (`client/src/index.css`).
+ */
+export const brandScale = {
+  50: '#ECFDF5',
+  100: '#D1FAE5',
+  200: '#A7F3D0',
+  300: '#6EE7B7',
+  400: '#34D399',
+  500: '#10B981',
+  600: '#059669',
+  700: '#047857',
+  800: '#065F46',
+  900: '#064E3B',
+} as const;
+
+export const surface = {
+  surface0: '#FFFFFF',
+  surface1: '#F8FAFC',
+  surface2: '#F1F5F9',
+  canvas: '#F4FBF8',
+} as const;
+
+export const ink = {
+  ink900: '#0F172A',
+  ink700: '#334155',
+  ink600: '#475569',
+  ink400: '#94A3B8',
+} as const;
+
+export const semantic = {
+  brand: brandScale[600],
+  brandDark: brandScale[700],
+  brandSoft: brandScale[50],
+  accent: '#F59E0B',
+  accentSoft: '#FFFBEB',
+  info: '#0EA5E9',
+  infoSoft: '#F0F9FF',
+  danger: '#DC2626',
+  dangerSoft: '#FEF2F2',
+} as const;
+
 export const colors = {
-  brand: '#059669', // DewSkill Emerald (dew-600)
-  brandDark: '#047857', // DewSkill Deep Emerald (dew-700)
-  brandSoft: '#ECFDF5', // DewSkill Soft Mint Tint (dew-50)
-  ink: '#0F172A',
+  brand: semantic.brand, // DewSkill Emerald (brand-600)
+  brandDark: semantic.brandDark, // DewSkill Deep Emerald (brand-700)
+  brandSoft: semantic.brandSoft, // DewSkill Soft Mint Tint (brand-50)
+  ink: ink.ink900,
   muted: '#64748B',
-  canvas: '#F4FBF8', // DewSkill Soft Mint Canvas (khớp web app #f4fbf8)
-  surface: '#FFFFFF',
+  canvas: surface.canvas, // DewSkill Soft Mint Canvas (khớp web app #f4fbf8)
+  surface: surface.surface0,
   line: '#E2F1EB', // Viền xanh mint nhẹ
-  gold: '#F59E0B',
+  gold: semantic.accent,
   goldSoft: '#FEF3C7',
-  green: '#10B981',
-  greenSoft: '#D1FAE5',
-  red: '#EF4444',
+  green: brandScale[500],
+  greenSoft: brandScale[100],
+  red: semantic.danger,
   redSoft: '#FEE2E2',
   blue: '#3B82F6',
   blueSoft: '#EFF6FF',
@@ -20,13 +62,12 @@ export const colors = {
   overlay: 'rgba(15, 23, 42, 0.32)',
 } as const;
 
-/** Bảng màu tone đỏ cho học viên đăng ký theo khóa (đồng bộ web app). Học viên miễn phí / giảng viên giữ tone xanh. */
 export type Palette = { [K in keyof typeof colors]: string };
 export const brandColors: Palette = {
   ...colors,
-  brand: '#059669',
-  brandDark: '#047857',
-  brandSoft: '#ECFDF5',
+  brand: brandScale[600],
+  brandDark: brandScale[700],
+  brandSoft: brandScale[50],
 };
 
 /** Cờ theme hiện tại, AuthContext cập nhật mỗi lần user đổi. */
@@ -37,37 +78,7 @@ export const theme: Palette = new Proxy({} as Palette, {
   get: (_target, key: string) => (themeState.brand ? brandColors : colors)[key as keyof Palette],
 });
 
-const GREEN_TO_RED: Record<string, string> = {
-  '#059669': '#DC2626',
-  '#10b981': '#EF4444',
-  '#047857': '#B91C1C',
-  '#34d399': '#F87171',
-  '#ecfdf5': '#FEF2F2',
-  '#d1fae5': '#FEE2E2',
-  '#a7f3d0': '#FECACA',
-  '#065f46': '#991B1B',
-};
-
-function remapGreenToRed(value: unknown): unknown {
-  if (typeof value === 'string') {
-    const direct = GREEN_TO_RED[value.toLowerCase()];
-    if (direct) return direct;
-    return value
-      .replace(/rgba\(5,\s*150,\s*105/g, 'rgba(220, 38, 38')
-      .replace(/rgba\(16,\s*185,\s*129/g, 'rgba(239, 68, 68')
-      .replace(/rgba\(4,\s*120,\s*87/g, 'rgba(185, 28, 28');
-  }
-  if (Array.isArray(value)) return value.map(remapGreenToRed);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, remapGreenToRed(v)]));
-  }
-  return value;
-}
-
-/**
- * StyleSheet có hai phiên bản (xanh/đỏ), chọn theo 	hemeState mỗi lần đọc style.
- * emapGreen: với bản đỏ, đổi luôn các mã màu xanh viết cứng sang đỏ (chỉ dùng cho màn hình mà xanh là màu trang trí, không phải màu đúng/sai).
- */
+/** Tạo StyleSheet dùng bảng màu thống nhất từ design tokens. */
 export function createThemedStyles<T extends object>(factory: (palette: Palette) => T, _options?: { remapGreen?: boolean }): T {
   let base: T | undefined;
   return new Proxy({} as T, {
@@ -77,6 +88,7 @@ export function createThemedStyles<T extends object>(factory: (palette: Palette)
     },
   });
 }
+
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -104,7 +116,7 @@ export const droplet = {
   navTileActive: 'inset 2px 2px 5px rgba(4, 120, 87, 0.32), inset -2px -2px 5px rgba(255, 255, 255, 0.18)',
   logo: '0px 4px 12px rgba(15, 23, 42, 0.12), 0px 1px 2px rgba(15, 23, 42, 0.08), inset 0px 2px 3px rgba(255, 255, 255, 1), inset 0px -3px 6px rgba(148, 163, 184, 0.22)',
   navHome: '0px 5px 16px rgba(4, 120, 87, 0.32), 0px 0px 0px 3px rgba(167, 243, 208, 0.6), inset 0px 3px 5px rgba(255, 255, 255, 0.5), inset 0px -5px 8px rgba(4, 120, 87, 0.5)',
-  navHomeBrand: '0px 5px 16px rgba(185, 28, 28, 0.35), 0px 0px 0px 3px rgba(254, 202, 202, 0.75), inset 0px 3px 5px rgba(255, 255, 255, 0.5), inset 0px -5px 8px rgba(153, 27, 27, 0.5)',
+  navHomeBrand: '0px 5px 16px rgba(4, 120, 87, 0.32), 0px 0px 0px 3px rgba(167, 243, 208, 0.6), inset 0px 3px 5px rgba(255, 255, 255, 0.5), inset 0px -5px 8px rgba(4, 120, 87, 0.5)',
 } as const;
 
 export const typography = {
@@ -158,3 +170,19 @@ export const surfaces = {
     backgroundColor: '#F8FAFC',
   },
 } as const;
+
+export const darkColors = {
+  canvas: '#0B1018',
+  surface: '#111827',
+  surfaceElevated: '#1E293B',
+  line: 'rgba(148, 163, 184, 0.22)',
+  ink: '#F8FAFC',
+  muted: '#94A3B8',
+  brand: '#34D399',
+  brandDark: '#10B981',
+  brandSoft: 'rgba(16, 185, 129, 0.16)',
+} as const;
+
+export const tabularNums = {
+  fontVariant: ['tabular-nums'] as const,
+};

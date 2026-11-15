@@ -3,14 +3,30 @@
     "name": "Thắng Tin Học",
     "slug": "thang-tin-hoc-mobile",
     "version": "1.0.0",
+    "scheme": "thangtinhoc",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/63dc6f6a-3364-4638-b926-79d5484efdee"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "vn.thangcomputer.thangtinhoc.mobile",
+      "associatedDomains": [
+        "applinks:thangtinhoc.vn",
+        "applinks:www.thangtinhoc.vn",
+        "applinks:thangtinhoc.edu.vn"
+      ],
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Cho phép sử dụng micro để gọi thoại với giảng viên hoặc học viên.",
+        "NSFaceIDUsageDescription": "Cho phép sử dụng Face ID để đăng nhập nhanh và bảo vệ tài khoản Thắng Tin Học.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "bitcode": false
@@ -27,7 +43,39 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "thangtinhoc"
+            },
+            {
+              "scheme": "https",
+              "host": "thangtinhoc.vn",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.thangtinhoc.vn",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "thangtinhoc.edu.vn",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -52,7 +100,13 @@
           "microphonePermission": "Cho phép sử dụng micro để gọi thoại với giảng viên hoặc học viên."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Cho phép sử dụng Face ID để đăng nhập nhanh vào ứng dụng Thắng Tin Học."
+        }
+      ]
     ],
     "extra": {
       "eas": {

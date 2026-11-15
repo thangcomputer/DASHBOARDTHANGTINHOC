@@ -554,50 +554,153 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
   }
 });
 
+function extractRefId(value) {
+  return String(value?._id || value?.id || value || '').trim();
+}
+
+function pickEnrollmentLink(enrollments, { tid = '', enrId = '', courseName = '' } = {}) {
+  const list = Array.isArray(enrollments) ? enrollments : [];
+  const withLink = (e) => Boolean(String(e?.linkHoc || '').trim());
+  const searchPool = (pool) => (
+    (enrId && pool.find((e) => extractRefId(e) === enrId && withLink(e)))
+    || (tid && courseName && pool.find((e) => (
+      extractRefId(e?.teacherId) === tid
+      && String(e?.courseName || '').trim().toLowerCase() === courseName
+      && withLink(e)
+    )))
+    || (tid && pool.find((e) => extractRefId(e?.teacherId) === tid && withLink(e)))
+    || (courseName && pool.find((e) => (
+      String(e?.courseName || '').trim().toLowerCase() === courseName
+      && withLink(e)
+    )))
+    || pool.find((e) => e?.isPrimary && withLink(e))
+    || pool.find(withLink)
+  );
+  const activePool = list.filter((e) => !['cancelled', 'refunded'].includes(String(e?.status || '').toLowerCase()));
+  return String((searchPool(activePool) || searchPool(list))?.linkHoc || '').trim();
+}
+
+/** Bổ sung link Meet dự phòng từ hồ sơ/khóa học HV hoặc phòng Meet quen thuộc của GV. */
 async function attachFallbackScheduleLinks(schedules) {
   if (!Array.isArray(schedules) || schedules.length === 0) return;
+  const isOid = (id) => /^[a-f\d]{24}$/i.test(id);
+  const missing = schedules.filter((sch) => sch && !String(sch.linkHoc || '').trim());
+  if (!missing.length) return;
+
   const missingStudentIds = Array.from(new Set(
-    schedules
-      .filter((sch) => !String(sch?.linkHoc || '').trim())
-      .map((sch) => String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || ''))
-      .filter((id) => /^[a-f\d]{24}$/i.test(id)),
+    missing.map((sch) => extractRefId(sch.studentId)).filter(isOid),
   ));
-  if (!missingStudentIds.length) return;
-  const students = await Student.find({ _id: { $in: missingStudentIds } })
-    .select('linkHoc online_meeting_url enrollments')
-    .lean();
-  const studentMap = new Map(students.map((s) => [String(s._id), s]));
+  if (missingStudentIds.length > 0) {
+    const students = await Student.find({ _id: { $in: missingStudentIds } })
+      .select('linkHoc online_meeting_url enrollments')
+      .lean();
+    const studentMap = new Map(students.map((s) => [String(s._id), s]));
+    missing.forEach((sch) => {
+      const sid = extractRefId(sch.studentId);
+      const st = studentMap.get(sid);
+      if (!st) return;
+      const fallbackLink = String(
+        pickEnrollmentLink(st.enrollments, {
+          tid: extractRefId(sch.teacherId),
+          enrId: extractRefId(sch.enrollmentId),
+          courseName: String(sch.course || '').trim().toLowerCase(),
+        })
+        || st.linkHoc
+        || st.online_meeting_url
+        || '',
+      ).trim();
+      if (fallbackLink) {
+        sch.linkHoc = fallbackLink;
+      }
+    });
+  }
+
+  let stillMissing = missing.filter((sch) => !String(sch.linkHoc || '').trim());
+  if (!stillMissing.length) return;
+
+  const inBatchStudentLink = new Map();
+  const inBatchTeacherLink = new Map();
   schedules.forEach((sch) => {
-    if (String(sch?.linkHoc || '').trim()) return;
-    const sid = String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || '');
-    const st = studentMap.get(sid);
-    if (!st) return;
-    const tid = String(sch?.teacherId?._id || sch?.teacherId?.id || sch?.teacherId || '');
-    const enrId = String(sch?.enrollmentId?._id || sch?.enrollmentId?.id || sch?.enrollmentId || '');
-    const courseName = String(sch?.course || '').trim().toLowerCase();
-    const enrollments = Array.isArray(st.enrollments) ? st.enrollments : [];
-    const matchedEnrollment = (enrId && enrollments.find((e) => String(e?._id || e?.id || '') === enrId && String(e?.linkHoc || '').trim()))
-      || (tid && courseName && enrollments.find((e) => (
-        String(e?.teacherId?._id || e?.teacherId || '') === tid
-        && String(e?.courseName || '').trim().toLowerCase() === courseName
-        && String(e?.linkHoc || '').trim()
-      )))
-      || (tid && enrollments.find((e) => (
-        String(e?.teacherId?._id || e?.teacherId || '') === tid
-        && String(e?.linkHoc || '').trim()
-      )))
-      || (courseName && enrollments.find((e) => (
-        String(e?.courseName || '').trim().toLowerCase() === courseName
-        && String(e?.linkHoc || '').trim()
-      )))
-      || enrollments.find((e) => e?.isPrimary && String(e?.linkHoc || '').trim())
-      || enrollments.find((e) => String(e?.linkHoc || '').trim());
-    const fallbackLink = String(
-      matchedEnrollment?.linkHoc
-      || st.linkHoc
-      || st.online_meeting_url
-      || '',
-    ).trim();
+    const link = String(sch?.linkHoc || '').trim();
+    if (!link) return;
+    const sid = extractRefId(sch.studentId);
+    const tid = extractRefId(sch.teacherId);
+    if (sid && !inBatchStudentLink.has(sid)) inBatchStudentLink.set(sid, link);
+    if (tid && !inBatchTeacherLink.has(tid)) inBatchTeacherLink.set(tid, link);
+  });
+
+  stillMissing.forEach((sch) => {
+    const sid = extractRefId(sch.studentId);
+    const tid = extractRefId(sch.teacherId);
+    const link = inBatchStudentLink.get(sid) || inBatchTeacherLink.get(tid) || '';
+    if (link) sch.linkHoc = link;
+  });
+
+  stillMissing = stillMissing.filter((sch) => !String(sch.linkHoc || '').trim());
+  if (!stillMissing.length) return;
+
+  const remStudentIds = Array.from(new Set(stillMissing.map((s) => extractRefId(s.studentId)).filter(isOid)));
+  const remTeacherIds = Array.from(new Set(stillMissing.map((s) => extractRefId(s.teacherId)).filter(isOid)));
+  if (!remStudentIds.length && !remTeacherIds.length) return;
+
+  const scheduleOr = [];
+  if (remStudentIds.length) scheduleOr.push({ studentId: { $in: remStudentIds } });
+  if (remTeacherIds.length) scheduleOr.push({ teacherId: { $in: remTeacherIds } });
+
+  const [recentWithLink, teacherStudents] = await Promise.all([
+    Schedule.find({ $or: scheduleOr, status: { $ne: 'cancelled' }, linkHoc: { $nin: ['', null] } })
+      .sort({ date: -1, createdAt: -1 })
+      .limit(50)
+      .select('studentId teacherId linkHoc')
+      .lean(),
+    remTeacherIds.length
+      ? Student.find({
+        $or: [
+          { teacherId: { $in: remTeacherIds } },
+          { 'enrollments.teacherId': { $in: remTeacherIds } },
+        ],
+      })
+        .select('teacherId linkHoc online_meeting_url enrollments')
+        .lean()
+      : Promise.resolve([]),
+  ]);
+
+  const recentByStudent = new Map();
+  const recentByTeacher = new Map();
+  (recentWithLink || []).forEach((row) => {
+    const link = String(row?.linkHoc || '').trim();
+    if (!link) return;
+    const sid = extractRefId(row.studentId);
+    const tid = extractRefId(row.teacherId);
+    if (sid && !recentByStudent.has(sid)) recentByStudent.set(sid, link);
+    if (tid && !recentByTeacher.has(tid)) recentByTeacher.set(tid, link);
+  });
+
+  const teacherStudentLink = new Map();
+  const recordTeacherLink = (tid, link) => {
+    if (tid && link && !teacherStudentLink.has(tid)) {
+      teacherStudentLink.set(tid, link);
+    }
+  };
+  (teacherStudents || []).forEach((st) => {
+    const direct = String(st?.linkHoc || st?.online_meeting_url || '').trim();
+    const enrollments = Array.isArray(st?.enrollments) ? st.enrollments : [];
+    const active = enrollments.filter((e) => !['cancelled', 'refunded'].includes(String(e?.status || '').toLowerCase()));
+    const inactive = enrollments.filter((e) => ['cancelled', 'refunded'].includes(String(e?.status || '').toLowerCase()));
+    active.forEach((e) => recordTeacherLink(extractRefId(e?.teacherId), String(e?.linkHoc || direct || '').trim()));
+    recordTeacherLink(extractRefId(st?.teacherId), direct);
+    inactive.forEach((e) => recordTeacherLink(extractRefId(e?.teacherId), String(e?.linkHoc || direct || '').trim()));
+  });
+
+  stillMissing.forEach((sch) => {
+    const sid = extractRefId(sch.studentId);
+    const tid = extractRefId(sch.teacherId);
+    const fallbackLink = (
+      recentByStudent.get(sid)
+      || recentByTeacher.get(tid)
+      || teacherStudentLink.get(tid)
+      || ''
+    );
     if (fallbackLink) {
       sch.linkHoc = fallbackLink;
     }
@@ -886,16 +989,19 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       ? studentForEnrollment.enrollments
       : [];
     const requestedEnrollmentId = String(enrollmentIdInput || '').trim();
-    const selectedEnrollment = requestedEnrollmentId
-      ? enrollments.find((e) => String(e._id) === requestedEnrollmentId)
-      : enrollments.find((e) => String(e.courseName || '').trim().toLowerCase() === String(courseFinal || '').trim().toLowerCase());
+    const isActiveEnrollment = (e) => !['cancelled', 'refunded'].includes(String(e?.status || '').toLowerCase());
     const matchingEnrollments = enrollments.filter(
       (e) => String(e.courseName || '').trim().toLowerCase() === String(courseFinal || '').trim().toLowerCase(),
     );
+    const activeMatchingEnrollments = matchingEnrollments.filter(isActiveEnrollment);
+    const preferredMatches = activeMatchingEnrollments.length > 0 ? activeMatchingEnrollments : matchingEnrollments;
+    const selectedEnrollment = requestedEnrollmentId
+      ? enrollments.find((e) => String(e._id) === requestedEnrollmentId)
+      : preferredMatches[0];
     if (requestedEnrollmentId && !selectedEnrollment) {
       return res.status(400).json({ success: false, message: 'Enrollment của học viên không hợp lệ' });
     }
-    if (!requestedEnrollmentId && matchingEnrollments.length > 1) {
+    if (!requestedEnrollmentId && preferredMatches.length > 1) {
       return res.status(400).json({
         success: false,
         code: 'ENROLLMENT_REQUIRED',
@@ -1026,6 +1132,18 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       paymentStatus: paymentStatus,
       branchId: studentDoc?.branchId || null,
     });
+
+    if (!String(schedule.linkHoc || '').trim()) {
+      try {
+        await attachFallbackScheduleLinks([schedule]);
+        const resolvedFallback = String(schedule.linkHoc || '').trim();
+        if (resolvedFallback) {
+          await Schedule.updateOne({ _id: schedule._id }, { $set: { linkHoc: resolvedFallback } });
+        }
+      } catch (linkErr) {
+        logger.warn('[SCHEDULE] Fallback link resolve error:', linkErr.message);
+      }
+    }
 
     // Ghi bản ghi ScheduleHistory kèm tên học viên
     try {
@@ -2249,5 +2367,7 @@ router.get('/:scheduleId', [authMiddleware, ...schedulesGuard('list')], async (r
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+router.attachFallbackScheduleLinks = attachFallbackScheduleLinks;
 
 module.exports = router;

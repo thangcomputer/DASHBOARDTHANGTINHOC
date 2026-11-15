@@ -43,19 +43,19 @@ const VARIANTS = {
   },
 };
 
-/** Màu thẻ chào: brand = LMS đỏ; emerald = cổng tự đăng ký & giảng viên (khớp mobile). */
+/** Màu thẻ chào: thống nhất emerald (khớp mobile). */
 const ACCENT = {
   brand: {
-    section: 'bg-gradient-to-br from-white via-red-50/80 to-amber-50 shadow-[0_10px_30px_rgba(185,28,28,0.08)] ring-red-100',
-    blob: 'bg-gradient-to-br from-emerald-500/20 via-orange-400/15 to-amber-300/25',
-    glow: 'bg-red-200/30',
-    dotGrid: 'rgba(220,38,38,0.25)',
-    eyebrow: 'text-red-700 bg-red-50 border border-red-200',
-    name: 'bg-gradient-to-r from-emerald-700 via-emerald-600 to-orange-500 bg-clip-text text-transparent',
-    chipIcon: 'text-red-500',
-    chipLive: 'bg-red-600 text-white border border-red-500 border-b-2 border-b-red-800 font-black',
-    join: 'bg-emerald-600 border border-emerald-500 border-b-4 border-b-red-800',
-    joinPing: 'bg-red-400/60',
+    section: 'border border-emerald-200/70 bg-gradient-to-br from-white via-[#ECFDF5] to-[#D1FAE5]/40 shadow-[0_10px_24px_rgba(4,120,87,0.06)] ring-1 ring-emerald-100',
+    blob: 'bg-gradient-to-br from-emerald-500/20 via-emerald-400/15 to-teal-300/20',
+    glow: 'bg-emerald-200/30',
+    dotGrid: 'rgba(5,150,105,0.18)',
+    eyebrow: 'text-emerald-800 bg-emerald-50 border border-emerald-200/90',
+    name: 'bg-gradient-to-r from-emerald-800 via-emerald-600 to-teal-600 bg-clip-text text-transparent',
+    chipIcon: 'text-emerald-600',
+    chipLive: 'bg-[#10B981] text-white border border-[#34D399] border-b-2 border-b-[#059669] font-black',
+    join: 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669]',
+    joinPing: 'bg-emerald-400/55',
   },
   emerald: {
     section: 'border border-emerald-200/70 bg-gradient-to-br from-white via-[#ECFDF5] to-[#D1FAE5]/40 shadow-[0_10px_24px_rgba(4,120,87,0.06)] ring-1 ring-emerald-100',
@@ -133,7 +133,7 @@ export default function WelcomeHero({
 
       <div className="relative min-h-[226px] min-w-0 px-5 py-5 pr-[148px] sm:min-h-[248px] sm:px-7 sm:py-6 sm:pr-[200px] lg:pr-[290px]">
         <p className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-black tracking-wider shadow-xs ${theme.eyebrow} ${effectiveAccent === 'emerald' ? 'uppercase' : ''}`}>
-          <EyebrowIcon size={13} aria-hidden="true" className={effectiveAccent === 'emerald' ? 'text-emerald-700' : 'text-red-700'} /> {eyebrowLabel}
+          <EyebrowIcon size={13} aria-hidden="true" className="text-emerald-700" /> {eyebrowLabel}
         </p>
         <p className="mt-3 text-sm font-bold text-slate-500">{greetingFor(hour)} 👋</p>
         <h1 className="mt-0.5 break-words text-[26px] font-black leading-tight tracking-tight sm:text-[32px]">

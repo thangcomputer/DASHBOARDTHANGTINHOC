@@ -92,7 +92,7 @@ export default function CourseSubjectSelector({
                   onClick={() => toggleSubject(subject.id)}
                   className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition ${
                     checked
-                      ? accent === 'red' ? 'border-red-200 bg-red-50 text-red-700' : 'border-sky-200 bg-sky-50 text-sky-700'
+                      ? accent === 'red' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-sky-200 bg-sky-50 text-sky-700'
                       : 'border-slate-100 bg-slate-50/70 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                   }`}
                 >

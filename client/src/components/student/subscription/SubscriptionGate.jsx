@@ -74,9 +74,9 @@ function ExpiredScreen({ overview, onRenewed }) {
   const subscription = overview?.subscription;
   const neverActivated = subscription && !subscription.activated;
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-red-50 via-white to-amber-50 px-4 py-8">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-4 py-8">
       <div className="mx-auto max-w-5xl space-y-5">
-        <div className="flex flex-col items-center gap-3 rounded-[28px] bg-white p-6 text-center shadow-sm ring-1 ring-red-100">
+        <div className="flex flex-col items-center gap-3 rounded-[28px] bg-white p-6 text-center shadow-sm ring-1 ring-emerald-100">
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-lg">
             <CalendarX2 size={30} aria-hidden="true" />
           </span>
@@ -137,7 +137,7 @@ function ExpiringReminder({ subscription, studentId, onRenew }) {
   return createPortal(
     <div className="fixed inset-0 z-[9450] flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
       <div className="w-full max-w-sm overflow-hidden rounded-[24px] bg-white text-center shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="sub-reminder-title">
-        <div className="bg-gradient-to-br from-amber-50 via-white to-red-50 px-6 pb-4 pt-6">
+        <div className="bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-6 pb-4 pt-6">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-amber-400 to-orange-600 text-white shadow-lg">
             <AlarmClock size={26} aria-hidden="true" />
           </span>

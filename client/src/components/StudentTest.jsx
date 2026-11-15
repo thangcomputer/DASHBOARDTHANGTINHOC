@@ -1034,7 +1034,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                 onClick={() => beginOrResumeExam()}
                 className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${canStartExam
                   ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/30 hover:bg-emerald-600 hover:scale-[1.02] active:scale-95'
-                  : 'bg-emerald-50 text-red-400 border-2 border-emerald-200 cursor-not-allowed'
+                  : 'bg-slate-100 text-slate-400 border-2 border-slate-200 cursor-not-allowed'
                   }`}>
                 {questionsLoading
                   ? 'Đang tải đề thi...'
@@ -1228,7 +1228,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
               </span>
               <span
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all ${timeLeft < 300
-                  ? 'border-emerald-500/45 bg-red-950/60 text-red-200 animate-pulse'
+                  ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
                   : 'border-white/15 bg-black/35 text-white'
                   }`}
               >
@@ -1505,7 +1505,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                             type="button"
                             disabled={tuLuanSubmitting || !uploadFile}
                             onClick={trySubmitTuLuan}
-                            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/25 transition hover:from-emerald-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
+                            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/25 transition hover:from-emerald-700 hover:to-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             <Send size={18} /> {tuLuanSubmitting ? 'Đang tải lên…' : uploadFile ? 'Nộp bài' : 'Chọn file'}
                           </button>

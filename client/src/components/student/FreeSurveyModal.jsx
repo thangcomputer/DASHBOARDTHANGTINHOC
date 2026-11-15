@@ -90,7 +90,7 @@ function Choice({ selected, onClick, children }) {
       onClick={onClick}
       className={`flex min-h-[4.5rem] w-full items-center justify-center gap-2 rounded-2xl px-3 py-3 text-center text-sm font-semibold ring-1 transition ${
         selected
-          ? 'bg-red-50 text-red-700 ring-red-300'
+          ? 'bg-emerald-50 text-emerald-700 ring-emerald-300'
           : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'
       }`}
     >
@@ -162,7 +162,7 @@ export default function FreeSurveyModal({ open, onDone }) {
   return (
     <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/70 p-4">
       <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between gap-4 bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 px-6 py-4 text-white">
+        <div className="flex items-center justify-between gap-4 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 px-6 py-4 text-white">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
               <UserRound size={22} aria-hidden="true" />

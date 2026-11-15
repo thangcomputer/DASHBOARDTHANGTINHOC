@@ -148,7 +148,7 @@ function RankList({ board, period, onPeriod }) {
               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${row.rank <= 3 ? 'bg-amber-400 text-amber-950' : 'bg-slate-100 text-slate-500'}`}>
                 {row.rank === 1 ? <Trophy size={12} /> : row.rank}
               </span>
-              {row.avatar ? <img src={resolveMediaUrl(row.avatar)} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-[11px] font-black text-red-700">{String(row.name || '?').trim().slice(0, 1)}</span>}
+              {row.avatar ? <img src={resolveMediaUrl(row.avatar)} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-[11px] font-black text-emerald-700">{String(row.name || '?').trim().slice(0, 1)}</span>}
               <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-800">{row.name}</span>
               <span className="shrink-0 text-[10px] font-semibold text-slate-400">Cấp {row.level}</span>
               <span className="shrink-0 text-xs font-black text-slate-700">{row.xp}</span>

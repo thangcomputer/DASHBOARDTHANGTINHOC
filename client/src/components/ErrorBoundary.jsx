@@ -16,6 +16,11 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
+    import('../utils/telemetry')
+      .then(({ captureClientError }) => {
+        captureClientError(error, { componentStack: errorInfo?.componentStack || '' });
+      })
+      .catch(() => {});
   }
 
   handleReset = () => {

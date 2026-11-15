@@ -26,7 +26,9 @@ const AdminLoginPage = ({ onLogin }) => {
   const [deviceConflict, setDeviceConflict] = useState(false);
   const [forceTicket, setForceTicket] = useState(null);
   const [mfaToken, setMfaToken] = useState(null);
+  const [mfaMeta, setMfaMeta] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
+  const [otpResendWait, setOtpResendWait] = useState(0);
 
   /** Base gốc API (domain backend hoặc '' để dùng proxy Vite /api) */
   const API = SOCKET_BASE;
@@ -69,6 +71,42 @@ const AdminLoginPage = ({ onLogin }) => {
     const timer = window.setTimeout(() => generateCaptcha(), 0);
     return () => window.clearTimeout(timer);
   }, [generateCaptcha]);
+
+  React.useEffect(() => {
+    if (otpResendWait <= 0) return undefined;
+    const t = window.setTimeout(() => setOtpResendWait((w) => Math.max(0, w - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [otpResendWait]);
+
+  const handleResendOtp = async () => {
+    if (!mfaToken || otpResendWait > 0) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const csrf = await ensureCsrfToken();
+      const response = await fetch(`${API_BASE}/auth/mfa/otp-resend`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        },
+        body: JSON.stringify({ mfaToken }),
+      });
+      const resData = await response.json().catch(() => ({}));
+      if (resData.success) {
+        setOtpResendWait(Number(resData.data?.resendAfterSec || 30));
+        toast.success(`Đã gửi lại OTP qua ${resData.data?.sentVia?.join(' & ').toUpperCase() || 'Zalo/Email'}`);
+      } else {
+        if (resData.retryAfterSec) setOtpResendWait(Number(resData.retryAfterSec));
+        toast.error(resData.message || 'Không gửi lại được OTP');
+      }
+    } catch {
+      toast.error('Lỗi kết nối khi gửi lại OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e, forceDevice = false) => {
     if (e?.preventDefault) e.preventDefault();
@@ -128,10 +166,18 @@ const AdminLoginPage = ({ onLogin }) => {
       }
 
       if (data.success && (data.mfaRequired || data.data?.mfaRequired)) {
-        setMfaToken(data.mfaToken || data.data?.mfaToken);
+        const meta = data.data || data;
+        setMfaToken(data.mfaToken || meta.mfaToken);
+        setMfaMeta(meta);
         setMfaCode('');
+        setOtpResendWait(Number(meta.resendAfterSec || 0));
         setLoading(false);
-        toast.success('Nhập mã OTP từ ứng dụng Authenticator');
+        if (meta.mfaMethod === 'otp_zalo_email') {
+          const dest = meta.maskedPhone || meta.maskedEmail || 'Zalo / Email';
+          toast.success(`Đã gửi mã OTP qua ${meta.sentVia?.length ? meta.sentVia.join(' & ').toUpperCase() : 'Zalo/Email'} (${dest})`);
+        } else {
+          toast.success('Nhập mã OTP từ ứng dụng Authenticator');
+        }
         return;
       }
 
@@ -237,7 +283,7 @@ const AdminLoginPage = ({ onLogin }) => {
             <div className="space-y-4">
               <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
                 LMS <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-rose-400 to-emerald-700">Central</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500">Central</span>
               </h1>
               <p className="text-slate-400 text-lg lg:text-xl font-medium max-w-xl leading-relaxed">
                 Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng.
@@ -278,7 +324,11 @@ const AdminLoginPage = ({ onLogin }) => {
                 </div>
                 <h2 className="text-fluid-2xl font-black text-white">Cổng Admin</h2>
                 <p className="text-sm text-slate-400 font-medium">
-                  {mfaToken ? 'Nhập mã 6 số từ Google Authenticator / Authy' : 'Xác thực quyền truy cập hệ thống'}
+                  {mfaToken
+                    ? (mfaMeta?.mfaMethod === 'otp_zalo_email'
+                      ? `Nhập mã OTP 6 số đã gửi qua Zalo/Email (${mfaMeta.maskedPhone || mfaMeta.maskedEmail || 'đã đăng ký'})`
+                      : 'Nhập mã 6 số từ Google Authenticator / Authy')
+                    : 'Xác thực quyền truy cập hệ thống'}
                 </p>
               </div>
 
@@ -307,20 +357,32 @@ const AdminLoginPage = ({ onLogin }) => {
                         aria-label="Mã xác thực 2 bước"
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => { setMfaToken(null); setMfaCode(''); setError(null); }}
-                      className="text-xs font-bold text-slate-400 hover:text-white underline"
-                    >
-                      Quay lại đăng nhập
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setMfaToken(null); setMfaMeta(null); setMfaCode(''); setError(null); }}
+                        className="text-xs font-bold text-slate-400 hover:text-white underline"
+                      >
+                        Quay lại đăng nhập
+                      </button>
+                      {mfaMeta?.mfaMethod === 'otp_zalo_email' && (
+                        <button
+                          type="button"
+                          onClick={handleResendOtp}
+                          disabled={loading || otpResendWait > 0}
+                          className="text-xs font-bold text-emerald-400 hover:text-emerald-300 disabled:text-slate-500"
+                        >
+                          {otpResendWait > 0 ? `Gửi lại OTP (${otpResendWait}s)` : 'Gửi lại OTP'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <>
                     <div className="space-y-1.5">
                       <label htmlFor="admin-phone" className="text-xs font-bold text-slate-400 block ml-1">Số điện thoại</label>
                       <div className="cms-login-field group">
-                        <User size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                        <User size={18} className="shrink-0 text-slate-400 group-focus-within:text-emerald-500 transition-colors" aria-hidden="true" />
                         <input
                           id="admin-phone"
                           type="tel"
@@ -339,7 +401,7 @@ const AdminLoginPage = ({ onLogin }) => {
                     <div className="space-y-1.5">
                       <label htmlFor="admin-password" className="text-xs font-bold text-slate-400 block ml-1">Mật khẩu quản trị</label>
                       <div className="cms-login-field group">
-                        <Lock size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                        <Lock size={18} className="shrink-0 text-slate-400 group-focus-within:text-emerald-500 transition-colors" aria-hidden="true" />
                         <input
                           id="admin-password"
                           type={showPassword ? 'text' : 'password'}

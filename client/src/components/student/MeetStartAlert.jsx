@@ -62,6 +62,41 @@ function dayLabel(day) {
   }
 }
 
+function extractRefId(value) {
+  return String(value?._id || value?.id || value || '').trim();
+}
+
+function resolveScheduleFallbackLink(scheduleRow, allRows, role, session) {
+  const targetStudentId = extractRefId(scheduleRow?.studentId);
+  const nonCancelled = (Array.isArray(allRows) ? allRows : []).filter(
+    (other) => String(other?.status || '').toLowerCase() !== 'cancelled',
+  );
+  const sameStudentWithLink = targetStudentId
+    ? nonCancelled.find((other) => (
+      extractRefId(other?.studentId) === targetStudentId
+      && resolveMeetJoinLink(other.linkHoc, other.meetingUrl, other.joinClassUrl)
+    ))
+    : null;
+  const anyTeacherScheduleWithLink = role === 'teacher'
+    ? nonCancelled.find((other) => resolveMeetJoinLink(other.linkHoc, other.meetingUrl, other.joinClassUrl))
+    : null;
+  return resolveMeetJoinLink(
+    scheduleRow?.linkHoc,
+    scheduleRow?.meetingUrl,
+    scheduleRow?.joinClassUrl,
+    scheduleRow?.studentId?.linkHoc,
+    scheduleRow?.studentId?.online_meeting_url,
+    sameStudentWithLink?.linkHoc,
+    sameStudentWithLink?.meetingUrl,
+    sameStudentWithLink?.joinClassUrl,
+    anyTeacherScheduleWithLink?.linkHoc,
+    anyTeacherScheduleWithLink?.meetingUrl,
+    anyTeacherScheduleWithLink?.joinClassUrl,
+    session?.linkHoc,
+    session?.online_meeting_url,
+  );
+}
+
 /**
  * Popup giữa màn hình + chuông khi đến giờ vào lớp học / dạy học theo lịch.
  * Hỗ trợ cả Học viên (role === 'student') và Giảng viên (role === 'teacher').
@@ -69,6 +104,7 @@ function dayLabel(day) {
 export default function MeetStartAlert({ role = 'student', session = null }) {
   const [item, setItem] = useState(null);
   const audioRef = useRef(null);
+  const tickRef = useRef(null);
   const isFreePortal = role === 'student' && (
     session?.freePortal === true ||
     (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
@@ -110,13 +146,16 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         }
         return current || incoming;
       });
+      if (!incoming.linkHoc) {
+        tickRef.current?.();
+      }
     };
 
     window.addEventListener('class:live-reminder', onClassReminder);
     return () => window.removeEventListener('class:live-reminder', onClassReminder);
   }, [role, session]);
 
-  // Quét định kỳ lịch học hôm nay từ API (mỗi 15 giây)
+  // Quét định kỳ lịch học hôm nay từ API
   useEffect(() => {
     let active = true;
 
@@ -126,11 +165,12 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         const todayStr = clock.day;
 
         // 1. Quét lịch từ Schedule (Lịch 1 kèm 1 / lịch theo khóa - chỉ với GV hoặc học viên chính quy)
+        let allSch = [];
         let scheduleRows = [];
         if (!isFreePortal) {
           try {
             const schRes = await api.schedules.getAll({ limit: 100 });
-            const allSch = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
+            allSch = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
             scheduleRows = allSch.filter((s) => {
               const sDate = normalizeScheduleDate(s.date);
               const st = String(s.status || '').toLowerCase();
@@ -164,7 +204,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
             endTime: s.endTime,
             nowDay: clock.day,
             nowMinutes: clock.minutes,
-            earlyMinutes: 1,
+            earlyMinutes: 2,
           });
 
           if (inWindow) {
@@ -176,13 +216,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
               nowMinutes: clock.minutes,
             });
 
-            const link = resolveMeetJoinLink(
-              s.linkHoc,
-              s.meetingUrl,
-              s.joinClassUrl,
-              session?.linkHoc,
-              session?.online_meeting_url,
-            );
+            const link = resolveScheduleFallbackLink(s, allSch, role, session);
             const person = role === 'teacher'
               ? `Học viên: ${s.studentName || s.studentId?.name || 'Học viên'}`
               : `Giảng viên: ${s.teacherName || s.teacherId?.name || 'Giảng viên'}`;
@@ -214,7 +248,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
             endTime: m.endTime,
             nowDay: clock.day,
             nowMinutes: clock.minutes,
-            earlyMinutes: 1,
+            earlyMinutes: 2,
           });
 
           if (inWindow) {
@@ -264,10 +298,12 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
       }
     };
 
+    tickRef.current = tick;
     tick();
     const timer = setInterval(tick, 45000); // Quét lại mỗi 45 giây thay vì 15 giây
     return () => {
       active = false;
+      tickRef.current = null;
       clearInterval(timer);
     };
   }, [role, isFreePortal, session]);
@@ -332,12 +368,12 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
         </h2>
 
         <p className="meet-start-alert__meta">
-          <Clock size={16} className="text-red-500 shrink-0" aria-hidden="true" />
+          <Clock size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
           <span>{item.startTime} {item.endTime ? `– ${item.endTime}` : ''}</span>
         </p>
 
         <p className="meet-start-alert__meta">
-          <Calendar size={16} className="text-red-500 shrink-0" aria-hidden="true" />
+          <Calendar size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
           <span>{dayLabel(item.day)}</span>
         </p>
 
@@ -358,6 +394,19 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
             >
               <Video size={18} aria-hidden="true" />
               <span>{isTeacher ? 'Vào lớp dạy ngay' : 'Vào lớp ngay'}</span>
+            </a>
+          ) : isTeacher ? (
+            <a
+              className="meet-start-alert__join bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+              href="/teacher/students"
+              onClick={(e) => {
+                e.preventDefault();
+                closeQuiet();
+                window.location.assign('/teacher/students');
+              }}
+            >
+              <Video size={18} aria-hidden="true" />
+              <span>Cấu hình link &amp; vào lớp</span>
             </a>
           ) : (
             <p className="meet-start-alert__nolink text-xs font-semibold text-amber-600 bg-amber-50 py-2 px-3 rounded-lg border border-amber-200">

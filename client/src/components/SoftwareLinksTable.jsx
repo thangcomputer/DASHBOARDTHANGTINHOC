@@ -62,7 +62,7 @@ export default function SoftwareLinksTable({
           </button>
 
           <header className="space-y-3 border-b border-slate-100 pb-5">
-            <p className="text-[11px] font-black  tracking-wider text-red-600">
+            <p className="text-[11px] font-black  tracking-wider text-emerald-600">
               Hướng dẫn cài đặt
             </p>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
@@ -96,8 +96,8 @@ export default function SoftwareLinksTable({
               [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-3
               [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-3
               [&_li]:mb-1
-              [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3 [&_blockquote]:italic
-              [&_a]:text-red-600 [&_a]:underline
+              [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-3 [&_blockquote]:italic
+              [&_a]:text-emerald-600 [&_a]:underline
               [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:mx-auto [&_img]:block [&_img]:shadow-sm [&_img]:border [&_img]:border-slate-100"
             dangerouslySetInnerHTML={{ __html: bodyHtml }}
           />

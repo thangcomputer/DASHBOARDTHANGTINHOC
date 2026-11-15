@@ -24,7 +24,7 @@
 | Liên hệ Trung tâm | CenterInfo | Partial: center overview and section inventory; published content and section detail navigation are not connected. |
 | Hồ sơ / học phí | Profile, Tuition | Partial: local profile edit fields and a tuition route. Payment and profile persistence are not enabled. |
 | Thông báo | Notifications | Partial: local all/unread/read filters and read state; no synchronized state or target navigation. |
-| Thi / chứng chỉ | MobileMenu notice | **WEB-ONLY TẠM THỜI**. No attempt, camera, proctor, fullscreen, or exam session is implemented. |
+| Thi / chứng nhận | MobileMenu notice | **WEB-ONLY TẠM THỜI**. No attempt, camera, proctor, fullscreen, or exam session is implemented. |
 
 ## Teacher screens and flows reviewed
 

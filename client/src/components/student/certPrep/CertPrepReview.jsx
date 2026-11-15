@@ -67,7 +67,7 @@ export default function CertPrepReview({ questions = [] }) {
                 const idx = visible.findIndex((row) => row.questionId === q.questionId);
                 if (idx >= 0) setCurrent(idx);
               }}
-              className={`min-h-11 rounded-xl text-xs font-black border ${active ? 'ring-2 ring-red-600 ' : ''}${cls} ${hidden ? 'opacity-30' : ''}`}
+              className={`min-h-11 rounded-xl text-xs font-black border ${active ? 'ring-2 ring-emerald-600 ' : ''}${cls} ${hidden ? 'opacity-30' : ''}`}
             >
               {i + 1} {mark}
             </button>

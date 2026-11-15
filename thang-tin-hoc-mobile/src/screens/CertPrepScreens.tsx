@@ -54,14 +54,14 @@ export function CertPrepCatalogScreen() {
       // Demo mode: dữ liệu giả
       setCatalog([
         {
-          id: 'mos-word', name: 'MOS Word 2019', description: 'Ôn thi chứng chỉ Word',
+          id: 'mos-word', name: 'MOS Word 2019', description: 'Ôn thi chứng nhận Word',
           levels: [
             { id: 'mos-word-basic', title: 'Cơ bản', courseId: 'mos-word' },
             { id: 'mos-word-advanced', title: 'Nâng cao', courseId: 'mos-word' },
           ],
         },
         {
-          id: 'mos-excel', name: 'MOS Excel 2019', description: 'Ôn thi chứng chỉ Excel',
+          id: 'mos-excel', name: 'MOS Excel 2019', description: 'Ôn thi chứng nhận Excel',
           levels: [
             { id: 'mos-excel-basic', title: 'Cơ bản', courseId: 'mos-excel' },
           ],

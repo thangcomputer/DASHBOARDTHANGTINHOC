@@ -204,8 +204,12 @@ router.get('/reports/:id/export', adminGuard('report_export'), async (req, res) 
   try {
     const data = await reportService.runReport(req.params.id, { limit: req.query.limit || 2000 });
     const csv = reportService.rowsToCsv(data.columns, data.rows);
+    const safeFileName = String(data.report.name || 'export')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'export';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="report-' + (data.report.name || 'export') + '.csv"');
+    res.setHeader('Content-Disposition', `attachment; filename="report-${safeFileName}.csv"`);
     res.send('\uFEFF' + csv);
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });

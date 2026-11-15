@@ -8,8 +8,10 @@ import { FinanceProvider } from './context/FinanceContext';
 import { DataProvider } from './context/DataContext';
 import { ToastProvider } from './utils/toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
-import LoginPage from './components/LoginPage';
-import FreePortalPage from './components/FreePortalPage';
+// Giai đoạn 1 (hiệu năng): trang đăng nhập/đăng ký tách chunk riêng,
+// người đã đăng nhập không phải tải các trang này.
+const LoginPage = lazy(() => import('./components/LoginPage'));
+const FreePortalPage = lazy(() => import('./components/FreePortalPage'));
 
 const DEWSKILL_PORTAL_HOSTS = new Set(
   String(import.meta.env.VITE_DEWSKILL_HOSTS || 'giasutinhoc.com,www.giasutinhoc.com,giasutinhoc24h.com,www.giasutinhoc24h.com')
@@ -22,8 +24,8 @@ function isDewSkillPortalHost() {
   if (typeof window === 'undefined') return false;
   return DEWSKILL_PORTAL_HOSTS.has(String(window.location.hostname || '').toLowerCase());
 }
-import AdminLoginPage from './components/AdminLoginPage';
-import RegistrationForm from './components/RegistrationForm';
+const AdminLoginPage = lazy(() => import('./components/AdminLoginPage'));
+const RegistrationForm = lazy(() => import('./components/RegistrationForm'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard'));
 const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
@@ -224,7 +226,7 @@ function StudentTestWrapper({ session }) {
           <button
             type="button"
             onClick={() => nav('/student/exam')}
-            className="mt-5 w-full min-h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm"
+            className="mt-5 w-full min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm"
           >
             Về Phòng thi (xem điểm)
           </button>
@@ -467,7 +469,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/center-info" element={
           <ErrorBoundary inline>
-            <FreeHiddenRoute session={session}><CenterInfoPage session={session} role="student" /></FreeHiddenRoute>
+            <CenterInfoPage session={session} role="student" />
           </ErrorBoundary>
         } />
         <Route path="/student/support" element={
@@ -658,16 +660,43 @@ function App() {
 
   useEffect(() => {
     if (!session) return undefined;
-    const onSessionReplaced = (event) => {
-      const currentToken = session.token || session.accessToken;
-      if (!currentToken || event.detail?.token !== currentToken) return;
+    const decodeDsid = (jwtStr) => {
+      try {
+        const part = String(jwtStr || '').split('.')[1];
+        if (!part) return '';
+        const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(json)?.dsid || '';
+      } catch {
+        return '';
+      }
+    };
+    const clearAndRedirect = () => {
       clearTokens(session.role);
       localStorage.removeItem(`${session.role || 'student'}_user`);
       setSession(null);
       navigate('/login');
     };
+    const onSessionReplaced = (event) => {
+      const currentToken = session.token || session.accessToken;
+      if (!currentToken || event.detail?.token !== currentToken) return;
+      clearAndRedirect();
+    };
+    const onForceLogout = (event) => {
+      const currentToken = session.token || session.accessToken;
+      if (!currentToken || event.detail?.token !== currentToken) return;
+      const targetDsid = event.detail?.deviceSessionId;
+      if (targetDsid) {
+        const currentDsid = decodeDsid(currentToken);
+        if (currentDsid && currentDsid !== targetDsid) return;
+      }
+      clearAndRedirect();
+    };
     window.addEventListener('cms:session-replaced', onSessionReplaced);
-    return () => window.removeEventListener('cms:session-replaced', onSessionReplaced);
+    window.addEventListener('cms:force-logout', onForceLogout);
+    return () => {
+      window.removeEventListener('cms:session-replaced', onSessionReplaced);
+      window.removeEventListener('cms:force-logout', onForceLogout);
+    };
   }, [navigate, session]);
 
   const handleLogout = useCallback(async () => {

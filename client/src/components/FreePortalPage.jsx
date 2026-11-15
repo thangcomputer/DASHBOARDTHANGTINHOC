@@ -528,7 +528,7 @@ export default function FreePortalPage({ onLogin }) {
               <div className="space-y-3">
                 {[
                   'Bài tập tình huống thực tế chuẩn văn phòng',
-                  'Tích lũy XP, giữ chuỗi Streak & thi thử chứng chỉ',
+                  'Tích lũy XP, giữ chuỗi Streak & thi thử chứng nhận',
                   'Miễn phí 100%, bắt đầu học ngay trong 60 giây',
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-3 text-sm font-medium text-slate-200">
@@ -647,8 +647,8 @@ export default function FreePortalPage({ onLogin }) {
                       type="button"
                       onClick={() => { setMode(tab.id); setError(''); }}
                       className={`dewskill-tab rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${mode === tab.id
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-white'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
                         }`}
                     >
                       {tab.label}
@@ -718,7 +718,7 @@ export default function FreePortalPage({ onLogin }) {
 
                   {/* Thông báo lỗi */}
                   {error && (
-                    <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
+                    <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
                       <span className="shrink-0 text-rose-400 font-bold">⚠</span>
                       <span>{error}</span>
                     </div>
@@ -819,7 +819,7 @@ export default function FreePortalPage({ onLogin }) {
 
                   {/* Error message */}
                   {error && (
-                    <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
+                    <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
                       <span className="shrink-0 text-rose-400 font-bold">⚠</span>
                       <span>{error}</span>
                     </div>

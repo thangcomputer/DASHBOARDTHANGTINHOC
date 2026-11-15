@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { CalendarClock, CalendarX2, ChevronDown, Crown, History, KeyRound, LogOut, Ticket, X } from 'lucide-react-native';
+import { Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CalendarClock, CalendarX2, Check, ChevronDown, Crown, History, KeyRound, LogOut, Ticket } from 'lucide-react-native';
 import { useAuth } from '../../app/AuthContext';
 import { CoursePaymentModal, type CoursePaymentCheckout } from '../CoursePaymentModal';
 import {
@@ -12,17 +12,18 @@ import {
   type SubscriptionPlan,
 } from '../../services/subscriptionApi';
 import { DuoButton } from '../duo/DuoButton';
+import { StandardBottomSheet } from '../StandardBottomSheet';
 import { isFreePortalMenu } from '../../utils/freePortalHelper';
-import { colors, radius, spacing } from '../../theme/tokens';
+import { colors, radius, spacing, tabularNums } from '../../theme/tokens';
 import { DAILY_PRACTICE_STATS_EVENT, dailyPracticeApi, type DpStats } from '../../services/dailyPracticeApi';
 import { resolveTodayXpSidebar } from '../../../../shared/subscription/xpDailyLine.mjs';
 
-const PLAN_TONES: Record<string, [string, string]> = {
-  '1m': ['#38BDF8', '#2563EB'],
-  '3m': ['#34D399', '#0D9488'],
-  '6m': ['#A78BFA', '#7C3AED'],
-  '12m': ['#FBBF24', '#EA580C'],
-  lifetime: ['#10B981', '#BE123C'],
+const PLAN_HINTS: Record<string, string> = {
+  '1m': 'Làm quen',
+  '3m': 'Nền tảng vững',
+  '6m': 'Học chắc',
+  '12m': 'Tiết kiệm nhất',
+  lifetime: 'Học đến khi thành thạo',
 };
 const gradient = (from: string, to: string) => ({ backgroundColor: to, backgroundImage: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` } as never);
 const formatVnd = (value: number) => `${Math.round(Number(value) || 0).toLocaleString('vi-VN')}đ`;
@@ -34,6 +35,44 @@ export function SubscriptionRenewPanel({ overview, onRenewed }: { overview: Subs
   const [busyPlan, setBusyPlan] = useState('');
   const [checkout, setCheckout] = useState<CoursePaymentCheckout | null>(null);
   const isLifetime = overview.subscription.state === 'lifetime';
+
+  const extOverview = overview as SubscriptionOverview & {
+    xpConfig?: { freeAccountXp?: number; resetCycle?: string; planXp?: Record<string, number> };
+    subscription: SubscriptionOverview['subscription'] & { resetCycle?: string };
+  };
+  const extPlans = (overview.plans || []) as Array<SubscriptionPlan & { dailyXp?: number; resetCycle?: string }>;
+  const [selectedPlanId, setSelectedPlanId] = useState<string>(() => (
+    extPlans.find((p) => p.id === '3m' && Number(p.price) > 0)?.id
+    || extPlans.find((p) => Number(p.price) > 0)?.id
+    || extPlans[0]?.id
+    || '3m'
+  ));
+
+  useEffect(() => {
+    if (!extPlans.length) return;
+    if (!extPlans.some((p) => p.id === selectedPlanId)) {
+      const next = extPlans.find((p) => p.id === '3m' && Number(p.price) > 0)?.id
+        || extPlans.find((p) => Number(p.price) > 0)?.id
+        || extPlans[0].id;
+      setSelectedPlanId(next);
+    }
+  }, [extPlans, selectedPlanId]);
+
+  const xpCfg = extOverview.xpConfig;
+  const resetCycle = xpCfg?.resetCycle || extPlans[0]?.resetCycle || extOverview.subscription?.resetCycle || 'daily';
+  const cycleText = resetCycle === 'monthly' ? 'mỗi tháng' : resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+  const freeXp = xpCfg?.freeAccountXp ?? 60;
+  const planXps = extPlans
+    .map((p) => Number(xpCfg?.planXp?.[p.id] ?? p.dailyXp))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  const minXp = planXps.length ? Math.min(...planXps) : 400;
+  const maxXp = planXps.length ? Math.max(...planXps) : 1000;
+  const rangeText = minXp === maxXp ? `${minXp} XP` : `${minXp}–${maxXp} XP`;
+
+  const selectedPlan = extPlans.find((p) => p.id === selectedPlanId && Number(p.price) > 0)
+    || extPlans.find((p) => p.id === '3m' && Number(p.price) > 0)
+    || extPlans.find((p) => Number(p.price) > 0)
+    || null;
 
   const redeem = async () => {
     if (code.length < 13 || redeeming) return;
@@ -66,64 +105,82 @@ export function SubscriptionRenewPanel({ overview, onRenewed }: { overview: Subs
   return (
     <View style={styles.gap}>
       {!isLifetime ? (
-        (() => {
-          const extOverview = overview as SubscriptionOverview & {
-            xpConfig?: { freeAccountXp?: number; resetCycle?: string; planXp?: Record<string, number> };
-            subscription: SubscriptionOverview['subscription'] & { resetCycle?: string };
-          };
-          const extPlans = overview.plans as Array<SubscriptionPlan & { dailyXp?: number; resetCycle?: string }>;
-          const xpCfg = extOverview.xpConfig;
-          const resetCycle = xpCfg?.resetCycle || extPlans[0]?.resetCycle || extOverview.subscription?.resetCycle || 'daily';
-          const cycleText = resetCycle === 'monthly' ? 'mỗi tháng' : resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
-          const freeXp = xpCfg?.freeAccountXp ?? 60;
-          const planXps = extPlans
-            .map((p) => Number(xpCfg?.planXp?.[p.id] ?? p.dailyXp))
-            .filter((n) => Number.isFinite(n) && n >= 0);
-          const minXp = planXps.length ? Math.min(...planXps) : 400;
-          const maxXp = planXps.length ? Math.max(...planXps) : 1000;
-          const rangeText = minXp === maxXp ? `${minXp} XP` : `${minXp}–${maxXp} XP`;
-          return (
-            <View style={styles.gapSm}>
-              <View style={styles.headRow}><Crown size={16} color="#F59E0B" /><Text style={styles.sectionTitle}>Chọn gói học Meet</Text></View>
-              <View style={styles.planGrid}>
-                {extPlans.map((plan) => {
-                  const sellable = Number(plan.price) > 0;
-                  const [from, to] = PLAN_TONES[plan.id] || PLAN_TONES['1m'];
-                  const planXp = xpCfg?.planXp?.[plan.id] ?? plan.dailyXp;
-                  const planCycleKey = xpCfg?.resetCycle || plan.resetCycle || resetCycle;
-                  const planCycle = planCycleKey === 'monthly' ? 'mỗi tháng' : planCycleKey === 'never' ? 'tặng kèm' : 'mỗi ngày';
-                  const subtitle = planXp != null
-                    ? `Meet · ${planXp} XP ${planCycle}`
-                    : (plan.months ? `${plan.months} tháng học` : 'Học mãi mãi');
-                  return (
-                    <View key={plan.id} style={[styles.plan, plan.id === 'lifetime' && styles.planHighlight]}>
-                      <View style={[styles.planHead, gradient(from, to)]}>
-                        <Text style={styles.planLabel}>{plan.label}</Text>
-                        <Text style={styles.planSub}>{subtitle}</Text>
-                      </View>
-                      <View style={styles.planBody}>
-                        <Text style={[styles.planPrice, !sellable && styles.planPriceMuted]}>{sellable ? formatVnd(plan.price) : 'Kích hoạt bằng mã'}</Text>
-                        <DuoButton
-                          variant="primary"
-                          size="md"
-                          fullWidth
-                          text="Gia hạn"
-                          loading={busyPlan === plan.id}
-                          disabled={!sellable || Boolean(busyPlan)}
-                          onPress={() => { void buy(plan); }}
-                          accessibilityLabel={`Gia hạn gói ${plan.label}`}
-                        />
-                      </View>
+        <View style={styles.gapSm}>
+          <View style={styles.headRow}><Crown size={16} color="#F59E0B" /><Text style={styles.sectionTitle}>Chọn gói học Meet</Text></View>
+          <View style={styles.planGrid}>
+            {extPlans.map((plan) => {
+              const sellable = Number(plan.price) > 0;
+              const isPopular = plan.id === '3m';
+              const isSelected = Boolean(sellable && selectedPlan?.id === plan.id);
+              const planXp = xpCfg?.planXp?.[plan.id] ?? plan.dailyXp;
+              const planCycleKey = xpCfg?.resetCycle || plan.resetCycle || resetCycle;
+              const planCycle = planCycleKey === 'monthly' ? 'mỗi tháng' : planCycleKey === 'never' ? 'tặng kèm' : 'mỗi ngày';
+              const hint = PLAN_HINTS[plan.id] || (plan.months ? `${plan.months} tháng học` : 'Trọn khóa');
+              const xpText = planXp != null ? `Meet · ${planXp} XP ${planCycle}` : 'Học qua Google Meet';
+
+              return (
+                <Pressable
+                  key={plan.id}
+                  onPress={() => { if (sellable) setSelectedPlanId(plan.id); }}
+                  disabled={!sellable}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected, disabled: !sellable }}
+                  accessibilityLabel={`${plan.label}, ${sellable ? formatVnd(plan.price) : 'Kích hoạt bằng mã'}`}
+                  style={({ pressed }) => [
+                    styles.planCard,
+                    isSelected && styles.planCardSelected,
+                    !sellable && styles.planCardDisabled,
+                    pressed && sellable && styles.planCardPressed,
+                  ]}
+                >
+                  {isPopular ? (
+                    <View style={styles.planPopularBadge}>
+                      <Text style={styles.planPopularBadgeText}>★ Nên chọn</Text>
                     </View>
-                  );
-                })}
-              </View>
-              <Text style={styles.muted}>
-                {`Thanh toán hoặc nhập mã đều kích hoạt gói Meet. Thời gian mới cộng tiếp từ hạn hiện tại. Trong hạn gói, ${cycleText === 'tặng kèm' ? `nhận ${rangeText} tặng kèm` : `${cycleText} có ${rangeText}`}. Hết hạn thì tài khoản Dewskill về ${freeXp} XP ${cycleText}. XP đã mua vẫn được giữ.`}
-              </Text>
-            </View>
-          );
-        })()
+                  ) : null}
+
+                  <View style={styles.planCardTop}>
+                    <View style={[styles.planRadio, isSelected && styles.planRadioActive]}>
+                      {isSelected ? <Check size={11} color="#FFFFFF" strokeWidth={3} /> : null}
+                    </View>
+                    <Text style={[styles.planLabelText, isSelected && styles.planLabelTextActive]} numberOfLines={1}>
+                      {plan.label}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.planHintPill, isSelected && styles.planHintPillActive]}>
+                    <Text style={[styles.planHintText, isSelected && styles.planHintTextActive]} numberOfLines={1}>
+                      {hint}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.planXpText} numberOfLines={1}>
+                    {xpText}
+                  </Text>
+
+                  <Text style={[styles.planPriceText, !sellable && styles.planPriceMuted]}>
+                    {sellable ? formatVnd(plan.price) : 'Nhập mã'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <DuoButton
+            variant="primary"
+            size="lg"
+            fullWidth
+            text={selectedPlan ? `Gia hạn ${selectedPlan.label} (${formatVnd(selectedPlan.price)}) →` : 'Chọn gói để gia hạn'}
+            loading={Boolean(busyPlan)}
+            disabled={!selectedPlan || Boolean(busyPlan)}
+            onPress={() => { if (selectedPlan) void buy(selectedPlan); }}
+            accessibilityLabel={selectedPlan ? `Gia hạn gói ${selectedPlan.label}` : 'Gia hạn'}
+          />
+
+          <Text style={styles.muted}>
+            {`Thanh toán hoặc nhập mã đều kích hoạt gói Meet. Thời gian mới cộng tiếp từ hạn hiện tại. Trong hạn gói, ${cycleText === 'tặng kèm' ? `nhận ${rangeText} tặng kèm` : `${cycleText} có ${rangeText}`}. Hết hạn thì tài khoản Dewskill về ${freeXp} XP ${cycleText}. XP đã mua vẫn được giữ.`}
+          </Text>
+        </View>
       ) : null}
 
       <View style={styles.codeBox}>
@@ -338,27 +395,21 @@ export function SubscriptionStatusCard({
           </View>
         </View>
 
-        <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-          <View style={styles.sheetBackdrop}>
-            <View style={styles.sheet}>
-              <View style={styles.sheetHead}>
-                <Text style={styles.sheetTitle}>{actionLabel} tài khoản</Text>
-                <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng">
-                  <X size={20} color={colors.muted} />
-                </Pressable>
-              </View>
-              <ScrollView contentContainerStyle={styles.sheetBody}>
-                <SubscriptionRenewPanel
-                  overview={subscription}
-                  onRenewed={() => {
-                    setOpen(false);
-                    void refreshSubscription();
-                  }}
-                />
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+        <StandardBottomSheet
+          visible={open}
+          onClose={() => setOpen(false)}
+          title={`${actionLabel} tài khoản`}
+          subtitle="Chọn gói phù hợp hoặc nhập mã kích hoạt"
+          icon={<Crown size={18} color={colors.brand} />}
+        >
+          <SubscriptionRenewPanel
+            overview={subscription}
+            onRenewed={() => {
+              setOpen(false);
+              void refreshSubscription();
+            }}
+          />
+        </StandardBottomSheet>
       </>
     );
   }
@@ -369,7 +420,7 @@ export function SubscriptionStatusCard({
     <>
       {compact ? (
         <View style={[styles.statusCard, styles.statusCardCompact, expiring && styles.statusCardExpiring]}>
-          <View style={[styles.statusIcon, isBrandStudent ? gradient('#10B981', '#059669') : isLifetime ? gradient('#10B981', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
+          <View style={[styles.statusIcon, isBrandStudent ? gradient('#10B981', '#059669') : isLifetime ? gradient('#10B981', '#047857') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
             <CalendarClock size={16} color="#FFFFFF" />
           </View>
           <View style={styles.flex}>
@@ -390,7 +441,7 @@ export function SubscriptionStatusCard({
           </View>
 
           <View style={[styles.profileSubInnerBox, expiring && styles.statusCardExpiring]}>
-            <View style={[styles.profileSubIcon, isBrandStudent ? gradient('#10B981', '#059669') : isLifetime ? gradient('#10B981', '#BE123C') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
+            <View style={[styles.profileSubIcon, isBrandStudent ? gradient('#10B981', '#059669') : isLifetime ? gradient('#10B981', '#047857') : expiring ? gradient('#FBBF24', '#EA580C') : gradient('#10B981', '#059669')]}>
               <CalendarClock size={22} color="#FFFFFF" />
             </View>
             <View style={styles.flex}>
@@ -443,25 +494,21 @@ export function SubscriptionStatusCard({
           ) : null}
         </View>
       )}
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={styles.sheetBackdrop}>
-          <View style={styles.sheet}>
-            <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>{actionLabel} tài khoản</Text>
-              <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng"><X size={20} color={colors.muted} /></Pressable>
-            </View>
-            <ScrollView contentContainerStyle={styles.sheetBody}>
-              <SubscriptionRenewPanel
-                overview={subscription}
-                onRenewed={() => {
-                  setOpen(false);
-                  void refreshSubscription();
-                }}
-              />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <StandardBottomSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        title={`${actionLabel} tài khoản`}
+        subtitle="Chọn gói phù hợp hoặc nhập mã kích hoạt"
+        icon={<Crown size={18} color={colors.brand} />}
+      >
+        <SubscriptionRenewPanel
+          overview={subscription}
+          onRenewed={() => {
+            setOpen(false);
+            void refreshSubscription();
+          }}
+        />
+      </StandardBottomSheet>
     </>
   );
 }
@@ -471,16 +518,112 @@ const styles = StyleSheet.create({
   gap: { gap: spacing.lg },
   gapSm: { gap: spacing.sm },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 15 },
-  planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  plan: { width: '48%', flexGrow: 1, overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
-  planHighlight: { borderColor: '#A7F3D0' },
-  planHead: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center' },
-  planLabel: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
-  planSub: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '700' },
-  planBody: { padding: spacing.sm, gap: spacing.xs, alignItems: 'stretch' },
-  planPrice: { color: colors.ink, fontSize: 15, fontWeight: '900', textAlign: 'center' },
+  sectionTitle: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingTop: 8 },
+  planCard: {
+    position: 'relative',
+    width: '47%',
+    flexGrow: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: 14,
+    paddingBottom: spacing.md,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    gap: 6,
+  },
+  planCardSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  planCardDisabled: {
+    opacity: 0.55,
+  },
+  planCardPressed: {
+    transform: [{ scale: 0.985 }],
+  },
+  planPopularBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  planPopularBadgeText: {
+    color: '#92400E',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  planCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  planRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planRadioActive: {
+    borderColor: '#10B981',
+    backgroundColor: '#10B981',
+  },
+  planLabelText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  planLabelTextActive: {
+    color: '#065F46',
+  },
+  planHintPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: '#F1F5F9',
+  },
+  planHintPillActive: {
+    backgroundColor: '#D1FAE5',
+  },
+  planHintText: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  planHintTextActive: {
+    color: '#047857',
+  },
+  planXpText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '500',
+    ...tabularNums,
+  },
+  planPriceText: {
+    color: '#047857',
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 2,
+    ...tabularNums,
+  },
   planPriceMuted: { color: '#94A3B8', fontSize: 12 },
   primary: {
     minHeight: 42,
@@ -494,21 +637,21 @@ const styles = StyleSheet.create({
     borderBottomColor: '#059669',
     paddingHorizontal: spacing.md,
   },
-  primaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  primaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   disabled: { opacity: 0.5 },
   codeBox: { gap: spacing.sm, padding: spacing.md, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
   codeRow: { flexDirection: 'row', gap: spacing.sm },
   codeInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-  codeInput: { flex: 1, minHeight: 40, color: colors.ink, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  codeInput: { flex: 1, minHeight: 40, color: colors.ink, fontSize: 14, fontWeight: '700', letterSpacing: 1 },
   codeButton: { minWidth: 108 },
   screen: { flex: 1, backgroundColor: '#ECFDF5' },
   screenContent: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
   hero: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#A7F3D0' },
   heroIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  heroTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  heroTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   heroText: { color: '#475569', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   outline: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line },
-  outlineText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  outlineText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
   card: { padding: spacing.lg, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   statusCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
   statusCardCompact: { padding: spacing.sm, borderRadius: 12 },
@@ -593,6 +736,7 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     fontWeight: '500',
+    ...tabularNums,
   },
   historyToggleBtn: {
     marginTop: 6,
@@ -612,9 +756,9 @@ const styles = StyleSheet.create({
   chevronRotated: {
     transform: [{ rotate: '180deg' }],
   },
-  statusTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  statusTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', ...tabularNums },
   statusText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  statusDaysGreen: { color: '#059669', fontSize: 12, fontWeight: '700', marginTop: 2 },
+  statusDaysGreen: { color: '#059669', fontSize: 12, fontWeight: '700', marginTop: 2, ...tabularNums },
   statusTextExpiring: { color: '#EA580C' },
   renewChip: {
     paddingHorizontal: 13,
@@ -631,12 +775,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  renewChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 0.3 },
-  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2, 6, 23, 0.5)' },
-  sheet: { maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.sm },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  sheetBody: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl },
+  renewChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
 
   /* Drawer Glass Styles */
   drawerSubCard: {
@@ -680,7 +819,7 @@ const styles = StyleSheet.create({
   drawerSubCtaText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 12,
   },
   drawerSubCardLifetime: {
@@ -693,7 +832,7 @@ const styles = StyleSheet.create({
   },
   drawerSubCardBrand: {
     backgroundColor: 'rgba(16, 185, 129, 0.14)',
-    borderColor: 'rgba(248, 113, 113, 0.35)',
+    borderColor: 'rgba(52, 211, 153, 0.35)',
   },
   drawerSubCardActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -721,7 +860,7 @@ const styles = StyleSheet.create({
   },
   drawerSubTitle: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#F8FAFC',
     lineHeight: 14,
   },
@@ -735,6 +874,7 @@ const styles = StyleSheet.create({
     color: '#34D399',
     lineHeight: 14,
     flexShrink: 0,
+    ...tabularNums,
   },
   drawerSubDaysFlex: {
     flex: 1,
@@ -758,7 +898,7 @@ const styles = StyleSheet.create({
   drawerSubTagText: {
     color: '#FDE68A',
     fontSize: 9,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   drawerRenewBtn: {
@@ -774,7 +914,7 @@ const styles = StyleSheet.create({
   drawerRenewBtnText: {
     color: '#78350F',
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.3,
   },
 });

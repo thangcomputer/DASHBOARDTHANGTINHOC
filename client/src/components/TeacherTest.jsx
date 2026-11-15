@@ -166,12 +166,12 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
   if (!passed) {
     return (
       <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
-        <div className="bg-white rounded-[40px] p-8 sm:p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-emerald-600 animate-in zoom-in duration-300">
+        <div className="bg-white rounded-[40px] p-8 sm:p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600 animate-in zoom-in duration-300">
           <div className="text-6xl sm:text-7xl mb-3 leading-none select-none" role="img" aria-label="Buồn">😢</div>
           <h2 className="text-2xl sm:text-3xl font-black text-red-600  italic">Chưa đạt</h2>
 
           <div className="relative mx-auto mt-6 mb-2">
-            <div className="mx-auto w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center border-[6px] border-emerald-600 bg-red-50 shadow-inner">
+            <div className="mx-auto w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center border-[6px] border-red-600 bg-red-50 shadow-inner">
               <span className="text-5xl sm:text-6xl font-black tracking-tighter text-red-600">{total}</span>
             </div>
             <p className="text-[10px] sm:text-xs font-black text-slate-400  tracking-[0.2em] mt-2">Điểm / 100</p>
@@ -1938,7 +1938,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
                       });
                     }
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-sm font-black text-white shadow-md hover:from-emerald-700 hover:to-red-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-sm font-black text-white shadow-md hover:from-emerald-700 hover:to-emerald-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} />
                   {submitting ? 'Đang nộp bài…' : 'Nộp bài kiểm tra'}

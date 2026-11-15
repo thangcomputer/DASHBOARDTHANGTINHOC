@@ -13,6 +13,7 @@ const DailyPracticePathProgress = require('../models/DailyPracticePathProgress')
 const Student = require('../models/Student');
 const PaymentSession = require('../models/PaymentSession');
 const DailyPracticeXpPackPrice = require('../models/DailyPracticeXpPackPrice');
+const LmsXpGrant = require('../models/LmsXpGrant');
 const rules = require('./dailyPracticeRules');
 const pathService = require('./dailyPracticePathService');
 const learningGoalService = require('./learningGoalService');
@@ -21,6 +22,143 @@ const subscriptionService = require('./subscriptionService');
 const logger = require('../config/logger');
 
 const { httpError } = rules;
+
+const SPACED_INTERVAL_DAYS = [1, 3, 7];
+const SPACED_REVIEW_PASS_PERCENT = 70;
+const SPACED_REVIEW_REWARD_XP = 15;
+const SPACED_QUEUE_MAX = 120;
+
+function shiftVnDayKey(dayKey, deltaDays) {
+  const [y, m, d] = String(dayKey || learningGoalService.vnDayKey()).split('-').map(Number);
+  if (!y || !m || !d) return learningGoalService.vnDayKey();
+  return new Date(Date.UTC(y, m - 1, d + (Number(deltaDays) || 0))).toISOString().slice(0, 10);
+}
+
+function buildReferralCode(student) {
+  const idStr = String(student?._id || student || '').trim();
+  const suffix = idStr.slice(-6).toUpperCase();
+  return suffix ? `DEW-${suffix}` : '';
+}
+
+function spacedSummaryFromQueue(queue, today) {
+  const list = Array.isArray(queue) ? queue : [];
+  const due = list.filter((item) => !item.dueDay || String(item.dueDay) <= today);
+  const upcoming = list
+    .filter((item) => item.dueDay && String(item.dueDay) > today)
+    .map((item) => String(item.dueDay))
+    .sort();
+  return {
+    totalQueued: list.length,
+    dueCount: due.length,
+    nextDueDay: due.length > 0 ? '' : (upcoming[0] || ''),
+    rewardXp: SPACED_REVIEW_REWARD_XP,
+  };
+}
+
+/** Tự động gom tối đa 15 câu từng làm sai gần nhất nếu học viên chưa có hàng đợi ôn tập. */
+async function ensureSpacedQueue(studentId, profile, today) {
+  const existing = Array.isArray(profile?.spacedQueue) ? profile.spacedQueue : [];
+  if (profile?.spacedBackfilled || existing.length > 0) return profile;
+  const recentSessions = await DailyPracticeSession.find({
+    studentId,
+    status: 'finished',
+    spacedReview: { $ne: true },
+  })
+    .sort({ finishedAt: -1 })
+    .limit(20)
+    .select('answers day')
+    .lean();
+  const seen = new Set();
+  const seeded = [];
+  for (const sess of recentSessions) {
+    for (const ans of sess.answers || []) {
+      if (ans?.correct !== false || !ans?.questionId) continue;
+      const qid = String(ans.questionId);
+      if (seen.has(qid)) continue;
+      seen.add(qid);
+      seeded.push({
+        questionId: ans.questionId,
+        stage: 0,
+        dueDay: shiftVnDayKey(sess.day || today, 1),
+        wrongCount: 1,
+        lastReviewedDay: '',
+      });
+      if (seeded.length >= 15) break;
+    }
+    if (seeded.length >= 15) break;
+  }
+  const updated = await DailyPracticeProfile.findOneAndUpdate(
+    { studentId },
+    { $set: { spacedBackfilled: true, ...(seeded.length ? { spacedQueue: seeded } : {}) } },
+    { new: true },
+  ).lean();
+  return updated || { ...profile, spacedBackfilled: true, spacedQueue: seeded };
+}
+
+function computeNextSpacedQueue({ existingQueue = [], finished, day }) {
+  const queueMap = new Map();
+  for (const item of existingQueue) {
+    if (!item?.questionId) continue;
+    queueMap.set(String(item.questionId), { ...item });
+  }
+  const answers = finished?.answers || [];
+  const wrongIds = new Set(answers.filter((a) => !a.correct && a.questionId).map((a) => String(a.questionId)));
+  const correctIds = new Set(answers.filter((a) => a.correct && a.questionId).map((a) => String(a.questionId)));
+
+  if (finished?.spacedReview === true) {
+    for (const rawId of finished.questionIds || []) {
+      const qid = String(rawId);
+      const prev = queueMap.get(qid);
+      if (correctIds.has(qid)) {
+        const nextStage = (Number(prev?.stage) || 0) + 1;
+        if (nextStage >= SPACED_INTERVAL_DAYS.length) {
+          queueMap.delete(qid);
+        } else {
+          queueMap.set(qid, {
+            questionId: prev?.questionId || rawId,
+            stage: nextStage,
+            dueDay: shiftVnDayKey(day, SPACED_INTERVAL_DAYS[nextStage]),
+            wrongCount: Number(prev?.wrongCount) || 1,
+            lastReviewedDay: day,
+          });
+        }
+      } else {
+        queueMap.set(qid, {
+          questionId: prev?.questionId || rawId,
+          stage: 0,
+          dueDay: shiftVnDayKey(day, SPACED_INTERVAL_DAYS[0]),
+          wrongCount: (Number(prev?.wrongCount) || 0) + (wrongIds.has(qid) ? 1 : 0),
+          lastReviewedDay: day,
+        });
+      }
+    }
+  } else {
+    for (const qid of wrongIds) {
+      const prev = queueMap.get(qid);
+      queueMap.set(qid, {
+        questionId: prev?.questionId || qid,
+        stage: 0,
+        dueDay: shiftVnDayKey(day, SPACED_INTERVAL_DAYS[0]),
+        wrongCount: (Number(prev?.wrongCount) || 0) + 1,
+        lastReviewedDay: prev?.lastReviewedDay || '',
+      });
+    }
+  }
+  return Array.from(queueMap.values()).slice(-SPACED_QUEUE_MAX);
+}
+
+function referralSummaryView(profile, student, settings) {
+  const configured = Number(settings?.amounts?.referral);
+  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 100;
+  return {
+    code: buildReferralCode(student),
+    rewardXp,
+    referralCount: Number(profile?.referralCount) || 0,
+    referralXpEarned: Number(profile?.referralXpEarned) || 0,
+    redeemed: Boolean(profile?.referredByStudentId),
+    referredByCode: profile?.referredByCode || '',
+  };
+}
 
 async function listXpPacks() {
   const doc = await DailyPracticeXpPackPrice.findOne({ key: 'default' }).lean();
@@ -383,15 +521,29 @@ async function sumRecoveryXpEarnedToday(studentId, day = learningGoalService.vnD
   return rows.reduce((sum, row) => sum + Math.max(0, (Number(row.xp) || 0) + (Number(row.bonusXp) || 0)), 0);
 }
 
-/** XP luyện hôm nay (mọi lượt hoàn thành) — hero / quest, không dùng cho sidebar. */
+/** XP luyện hôm nay (mọi lượt hoàn thành + XP học bài) — hero / quest, không dùng cho sidebar. */
 async function sumTodayPracticeDisplayXp(studentId, day = learningGoalService.vnDayKey()) {
   const sid = requireId(studentId, 'Học viên');
-  const rows = await DailyPracticeSession.find({
-    studentId: sid,
-    status: 'finished',
-    day,
-  }).select('xp bonusXp stakeXp mode status recovery answers testOut review').lean();
-  return rows.reduce((sum, row) => sum + rules.sessionTodayDisplayXp(row), 0);
+  const dayStart = new Date(`${day}T00:00:00.000+07:00`);
+  const validDay = Number.isFinite(dayStart.getTime());
+  const dayEnd = validDay ? new Date(dayStart.getTime() + 86400000) : null;
+  const [rows, studyGrants] = await Promise.all([
+    DailyPracticeSession.find({
+      studentId: sid,
+      status: 'finished',
+      day,
+    }).select('xp bonusXp stakeXp mode status recovery answers testOut review').lean(),
+    validDay
+      ? LmsXpGrant.find({
+        studentId: sid,
+        reason: { $ne: 'welcome' },
+        createdAt: { $gte: dayStart, $lt: dayEnd },
+      }).select('amount').lean()
+      : Promise.resolve([]),
+  ]);
+  const sessionXp = rows.reduce((sum, row) => sum + rules.sessionTodayDisplayXp(row), 0);
+  const studyXp = studyGrants.reduce((sum, row) => sum + Math.max(0, Number(row?.amount) || 0), 0);
+  return sessionXp + studyXp;
 }
 
 function profileView(profile, today, recoveryXpEarnedToday = 0) {
@@ -511,15 +663,21 @@ async function countTodayPlayers(today) {
 async function getOverview(studentId) {
   const sid = requireId(studentId, 'Học viên');
   const today = learningGoalService.vnDayKey();
+  const lmsProgressService = require('./lmsProgressService');
   const topics = await DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  const [freeCounts, profile, todayXp, todaySessions, todayPlayers, recoveryEarned] = await Promise.all([
+  const [freeCounts, rawProfile, student, lmsSettings, todayXp, todaySessions, todayPlayers, recoveryEarned] = await Promise.all([
     questionCounts(topics.map((topic) => topic._id), { freeOnly: true }),
     getProfile(sid),
+    Student.findById(sid).select('_id name studentCode').lean(),
+    lmsProgressService.loadSettings(),
     sumTodayPracticeDisplayXp(sid, today),
     DailyPracticeSession.countDocuments({ studentId: sid, status: 'finished', day: today }),
     countTodayPlayers(today),
     sumRecoveryXpEarnedToday(sid, today),
   ]);
+  const profile = await ensureSpacedQueue(sid, rawProfile, today);
+  const spacedRepetition = spacedSummaryFromQueue(profile?.spacedQueue, today);
+  const referral = referralSummaryView(profile, student || { _id: sid }, lmsSettings);
   return {
     /** Luyện tự do: chỉ câu chưa xếp chặng (không dùng câu lộ trình). */
     topics: topics
@@ -532,7 +690,11 @@ async function getOverview(studentId) {
       todaySessions,
       todayXp,
       todayPlayers,
+      spacedRepetition,
+      referral,
     },
+    spacedRepetition,
+    referral,
   };
 }
 
@@ -639,6 +801,160 @@ async function startSession(studentId, { topicId, difficulty, mode, unitId, step
     mandatory: false,
     xpDisabled: true,
     checkpointFailPenalty: 0,
+  };
+}
+
+/** Bắt đầu phiên Ôn tập ngắt quãng (Spaced Repetition 1-3-7 ngày), tối đa 10 câu, không trừ XP cược. */
+async function startSpacedReviewSession(studentId) {
+  const sid = requireId(studentId, 'Học viên');
+  const today = learningGoalService.vnDayKey();
+  const profile = await ensureSpacedQueue(sid, await getProfile(sid), today);
+  const queue = Array.isArray(profile?.spacedQueue) ? profile.spacedQueue : [];
+  if (!queue.length) throw httpError(400, 'Bạn chưa có câu hỏi nào trong hàng đợi ôn tập.');
+
+  const ranked = [...queue].sort((a, b) => {
+    const aDue = !a.dueDay || String(a.dueDay) <= today ? 0 : 1;
+    const bDue = !b.dueDay || String(b.dueDay) <= today ? 0 : 1;
+    if (aDue !== bDue) return aDue - bDue;
+    const dayCmp = String(a.dueDay || '').localeCompare(String(b.dueDay || ''));
+    if (dayCmp !== 0) return dayCmp;
+    return (Number(b.wrongCount) || 0) - (Number(a.wrongCount) || 0);
+  });
+
+  const candidateIds = ranked.map((item) => item.questionId).filter(Boolean);
+  const published = await DailyPracticeQuestion.find({
+    _id: { $in: candidateIds },
+    status: 'published',
+  }).lean();
+  const qById = new Map(published.map((q) => [String(q._id), q]));
+
+  // Dọn các câu đã bị xóa / ẩn khỏi hàng đợi.
+  const validQueue = queue.filter((item) => qById.has(String(item.questionId)));
+  if (validQueue.length !== queue.length) {
+    await DailyPracticeProfile.updateOne({ studentId: sid }, { $set: { spacedQueue: validQueue } });
+  }
+
+  const picked = [];
+  for (const item of ranked) {
+    const q = qById.get(String(item.questionId));
+    if (!q) continue;
+    picked.push(q);
+    if (picked.length >= rules.SESSION_SIZE) break;
+  }
+  if (!picked.length) throw httpError(400, 'Hiện chưa có câu hỏi hợp lệ để ôn tập ngắt quãng.');
+
+  const firstQuestion = picked[0];
+  const topicDoc = await DailyPracticeTopic.findById(firstQuestion.topicId).lean();
+  const difficulty = rules.DIFFICULTIES.includes(firstQuestion.difficulty) ? firstQuestion.difficulty : 'medium';
+  const session = await DailyPracticeSession.create({
+    studentId: sid,
+    topicId: firstQuestion.topicId,
+    difficulty,
+    mode: 'free',
+    review: true,
+    spacedReview: true,
+    questionIds: picked.map((q) => q._id),
+    stakeXp: 0,
+    recovery: false,
+  });
+
+  return {
+    id: String(session._id),
+    topic: topicDoc ? topicView(topicDoc) : {
+      id: String(firstQuestion.topicId),
+      name: 'Ôn tập ngắt quãng',
+      icon: 'book',
+      color: 'green',
+    },
+    difficulty,
+    total: picked.length,
+    mode: 'free',
+    review: true,
+    spacedReview: true,
+    spacedRewardXp: SPACED_REVIEW_REWARD_XP,
+    questions: picked.map((q) => rules.publicQuestion(q)),
+    profileXp: rules.clampXp(profile?.xpTotal),
+    stakeXp: 0,
+    sessionStakeXp: 0,
+    mandatory: false,
+    xpDisabled: true,
+    checkpointFailPenalty: 0,
+  };
+}
+
+/** Nhập mã giới thiệu bạn bè: cộng thưởng XP đôi (Admin cấu hình tại Mức XP) cho cả người giới thiệu & người được giới thiệu. */
+async function redeemReferralCode(studentId, rawCode) {
+  const sid = requireId(studentId, 'Học viên');
+  const code = String(rawCode || '').trim().toUpperCase();
+  if (!code) throw httpError(400, 'Vui lòng nhập mã giới thiệu.');
+
+  const myProfile = await getProfile(sid);
+  if (myProfile?.referredByStudentId) {
+    throw httpError(409, 'Tài khoản của bạn đã áp dụng mã giới thiệu trước đó.');
+  }
+
+  const students = await Student.find({ status: { $nin: ['suspended', 'inactive'] } })
+    .select('_id name studentCode')
+    .lean();
+  const meDoc = students.find((s) => String(s._id) === String(sid)) || { _id: sid };
+  const referrer = students.find((s) => {
+    const built = buildReferralCode(s);
+    const sc = String(s.studentCode || '').trim().toUpperCase();
+    return built === code || (sc && sc === code);
+  });
+  if (!referrer) throw httpError(404, 'Mã giới thiệu không tồn tại hoặc không hợp lệ.');
+  if (String(referrer._id) === String(sid)) {
+    throw httpError(400, 'Bạn không thể tự nhập mã giới thiệu của chính mình.');
+  }
+
+  const lmsProgressService = require('./lmsProgressService');
+  const lmsSettings = await lmsProgressService.loadSettings();
+  const configured = Number(lmsSettings?.amounts?.referral);
+  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 100;
+  const referrerCode = buildReferralCode(referrer);
+
+  const claimed = await DailyPracticeProfile.findOneAndUpdate(
+    {
+      studentId: sid,
+      $or: [{ referredByStudentId: null }, { referredByStudentId: { $exists: false } }],
+    },
+    { $set: { referredByStudentId: referrer._id, referredByCode: referrerCode } },
+    { new: true },
+  ).lean();
+  if (!claimed) throw httpError(409, 'Tài khoản của bạn đã áp dụng mã giới thiệu trước đó.');
+
+  await getProfile(referrer._id);
+  await DailyPracticeProfile.updateOne(
+    { studentId: referrer._id },
+    { $inc: { referralCount: 1, referralXpEarned: rewardXp } },
+  );
+
+  if (rewardXp > 0) {
+    await Promise.all([
+      lmsProgressService.grantXp({
+        studentId: sid,
+        amount: rewardXp,
+        reason: 'referral',
+        sourceKey: `referral:referee:${sid}`,
+        countsForStreak: false,
+      }),
+      lmsProgressService.grantXp({
+        studentId: referrer._id,
+        amount: rewardXp,
+        reason: 'referral',
+        sourceKey: `referral:referrer:${referrer._id}:${sid}`,
+        countsForStreak: false,
+      }),
+    ]);
+  }
+
+  const updatedProfile = await getProfile(sid);
+  return {
+    rewardXp,
+    referrerName: referrer.name || 'Học viên',
+    code: referrerCode,
+    profileXp: rules.clampXp(updatedProfile?.xpTotal),
+    referral: referralSummaryView(updatedProfile, meDoc, lmsSettings),
   };
 }
 
@@ -909,7 +1225,27 @@ async function finishSession(studentId, sessionId) {
     else if (passed) gainedXp = rewardXp - stakeXp;
     else gainedXp = -lostXp;
   }
-  if (rewardXp > 0) await adjustProfileXp(session.studentId, rewardXp, { source: 'reward' });
+  const nextSpacedQueue = computeNextSpacedQueue({
+    existingQueue: before?.spacedQueue || [],
+    finished,
+    day,
+  });
+  let spacedRewardXp = 0;
+  if (finished.spacedReview === true && total > 0 && scorePercent >= SPACED_REVIEW_PASS_PERCENT) {
+    const lmsProgressService = require('./lmsProgressService');
+    await lmsProgressService.grantXp({
+      studentId: session.studentId,
+      amount: SPACED_REVIEW_REWARD_XP,
+      reason: 'spaced_review',
+      sourceKey: `spaced:${finished._id}`,
+      countsForStreak: false,
+    });
+    spacedRewardXp = SPACED_REVIEW_REWARD_XP;
+    rewardXp = spacedRewardXp;
+    gainedXp = spacedRewardXp;
+  } else if (rewardXp > 0) {
+    await adjustProfileXp(session.studentId, rewardXp, { source: 'reward' });
+  }
   if (perQuestionStake) stakeXp = answerLossXp;
   await DailyPracticeSession.updateOne(
     { _id: finished._id },
@@ -919,7 +1255,7 @@ async function finishSession(studentId, sessionId) {
     { studentId: session.studentId },
     {
       $inc: { sessionsCount: 1 },
-      $set: { streak, lastPlayedDay: day },
+      $set: { streak, lastPlayedDay: day, spacedQueue: nextSpacedQueue, spacedBackfilled: true },
       $max: { bestStreak: streak },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
@@ -931,6 +1267,7 @@ async function finishSession(studentId, sessionId) {
   const finishedAt = finished.finishedAt ? new Date(finished.finishedAt) : new Date();
   const durationSeconds = Math.max(1, Math.round((finishedAt - new Date(finished.createdAt || finishedAt)) / 1000));
   learningGoalService.trackStudyDuration(session.studentId, durationSeconds);
+  const spacedRepetition = spacedSummaryFromQueue(profile?.spacedQueue, day);
   return {
     path,
     maxCombo: maxComboOf(finished.answers),
@@ -938,6 +1275,8 @@ async function finishSession(studentId, sessionId) {
     firstToday: before?.lastPlayedDay !== day,
     week: await weekActivity(session.studentId, day),
     relatedLesson,
+    spacedReview: finished.spacedReview === true,
+    spacedRepetition,
     total,
     correctCount: correct,
     scorePercent,
@@ -949,7 +1288,7 @@ async function finishSession(studentId, sessionId) {
     hintPenaltyXp,
     failPenaltyXp: lostXp,
     gainedXp,
-    xpDisabled: xpOff,
+    xpDisabled: spacedRewardXp > 0 ? false : xpOff,
     streakIncreased: streak > rules.liveStreak(before, day),
     stats: {
       ...(await (async () => {
@@ -958,6 +1297,7 @@ async function finishSession(studentId, sessionId) {
         return {
           ...profileView(profile, day, recoveryEarned),
           todayXp: todayXpDone,
+          spacedRepetition,
         };
       })()),
     },
@@ -1262,6 +1602,8 @@ module.exports = {
   publishDrafts,
   getOverview,
   startSession,
+  startSpacedReviewSession,
+  redeemReferralCode,
   answerQuestion,
   useHint,
   finishSession,

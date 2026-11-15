@@ -3,9 +3,10 @@ import { ActivityIndicator, Alert, DeviceEventEmitter, KeyboardAvoidingView, Lin
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  Ban, Bell, BookOpen, BookText, CalendarDays, Camera, Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileSpreadsheet,
-  FileText, Film, GraduationCap, KeyRound, Landmark, Link2, Lock, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Sparkles, Table2, Target, Trash2, UserRound, Users, WalletCards, X,
+  Award, Ban, Bell, BookOpen, BookText, CalendarDays, Camera, Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileSpreadsheet,
+  FileText, Film, GraduationCap, KeyRound, Landmark, Laptop, Link2, Lock, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Save, ScanFace, Search, Send, Settings, Shield, Smartphone, Sparkles, Table2, Target, Trash2, UserRound, Users, WalletCards, X,
 } from 'lucide-react-native';
+import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,7 +31,9 @@ import type { AppNotification, Assignment, Conversation, DemoGradeRecord, DemoSt
 import type { TeacherProfile, TeacherProfileUpdate } from '../services/teacherApi';
 import { updateStudentProfile } from '../services/studentApi';
 import { buildDirectConversationId } from '../services/messageApi';
-import { enableMobilePushNotifications, requestWebNotificationPermission } from '../services/mobilePushNotifications';
+import { enableMobilePushNotifications, requestWebNotificationPermission, scheduleCategorizedLocalNotification } from '../services/mobilePushNotifications';
+import { clearBiometricCredential, getBiometricAvailability, type BiometricAvailability } from '../services/biometricAuth';
+import { checkAndApplyOtaUpdate, getOtaUpdateInfo, reloadAppForOtaUpdate } from '../services/otaUpdates';
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
 import { SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
 import { DuoButton } from '../components/duo/DuoButton';
@@ -4259,10 +4262,26 @@ export function ProfileScreen() {
   const [showPinSettings, setShowPinSettings] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState<{ title: string; message: string } | null>(null);
+  const [biometricInfo, setBiometricInfo] = useState<BiometricAvailability | null>(null);
+  const [checkingOta, setCheckingOta] = useState(false);
+  const otaInfo = useMemo(() => getOtaUpdateInfo(), []);
+  useEffect(() => {
+    let alive = true;
+    getBiometricAvailability().then((info) => { if (alive) setBiometricInfo(info); }).catch(() => { });
+    return () => { alive = false; };
+  }, []);
   const [previewStudentUpdates, setPreviewStudentUpdates] = useState<Record<string, string>>({});
   const [openStudentSections, setOpenStudentSections] = useState({
     courses: false,
+    devices: false,
   });
+  const [certificateEnrollment, setCertificateEnrollment] = useState<{
+    id: string;
+    courseName: string;
+    teacherName?: string;
+    progress?: number;
+    avgGrade?: number;
+  } | null>(null);
   const studentProfileLoader = useCallback(
     async () => {
       if (isTeacher) {
@@ -4450,17 +4469,32 @@ export function ProfileScreen() {
                 </View>
                 <ChevronDown size={17} color={colors.muted} style={openStudentSections.courses ? styles.studentProfileChevronOpen : undefined} />
               </Pressable>
-              {openStudentSections.courses ? enrollments.length ? enrollments.map((enrollment) => (
-                <View key={enrollment.id} style={styles.profileCourse}>
-                  <View style={styles.rowBetween}><Text style={styles.cardTitle}>{enrollment.courseName}</Text><StatusBadge label={enrollment.status} /></View>
-                  <Text style={styles.metaText}>GV: {enrollment.teacherName || 'Chưa phân công'}{enrollment.registeredAt ? ` · ${enrollment.registeredAt}` : ''}</Text>
-                  {enrollment.progress != null ? <ProgressBar value={enrollment.progress} /> : null}
-                  <View style={styles.studentCourseProgressMeta}>
-                    <Text style={styles.metaText}>{enrollment.completedSessions ?? 0}/{enrollment.totalSessions ?? 0} buổi · Tiến độ {enrollment.progress ?? 0}%</Text>
-                    <Text style={styles.studentCourseGrade}>{enrollment.avgGrade ?? 0} TB</Text>
+              {openStudentSections.courses ? enrollments.length ? enrollments.map((enrollment) => {
+                const isDone = (enrollment.progress ?? 0) >= 100
+                  || String(enrollment.status || '').toLowerCase().includes('hoàn thành');
+                return (
+                  <View key={enrollment.id} style={styles.profileCourse}>
+                    <View style={styles.rowBetween}><Text style={styles.cardTitle}>{enrollment.courseName}</Text><StatusBadge label={enrollment.status} /></View>
+                    <Text style={styles.metaText}>GV: {enrollment.teacherName || 'Chưa phân công'}{enrollment.registeredAt ? ` · ${enrollment.registeredAt}` : ''}</Text>
+                    {enrollment.progress != null ? <ProgressBar value={enrollment.progress} /> : null}
+                    <View style={styles.studentCourseProgressMeta}>
+                      <Text style={styles.metaText}>{enrollment.completedSessions ?? 0}/{enrollment.totalSessions ?? 0} buổi · Tiến độ {enrollment.progress ?? 0}%</Text>
+                      <Text style={styles.studentCourseGrade}>{enrollment.avgGrade ?? 0} TB</Text>
+                    </View>
+                    {isDone ? (
+                      <Pressable
+                        onPress={() => setCertificateEnrollment(enrollment)}
+                        style={styles.profileCertButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Xem chứng nhận QR khóa ${enrollment.courseName}`}
+                      >
+                        <QrCode size={14} color="#047857" />
+                        <Text style={styles.profileCertButtonText}>Xem chứng nhận QR</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
-                </View>
-              )) : <EmptyState title="Chưa có khóa học" message="Khóa học được phân công sẽ hiển thị tại đây." /> : null}
+                );
+              }) : <EmptyState title="Chưa có khóa học" message="Khóa học được phân công sẽ hiển thị tại đây." /> : null}
             </Card>
           )}
         </>
@@ -4471,13 +4505,61 @@ export function ProfileScreen() {
           <MenuRow icon={<KeyRound size={18} color={theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
           <MenuRow icon={<Users size={18} color={theme.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
         </Card>
-      ) : (
-        <Card style={styles.menuCard}>
-          <MenuRow icon={<Settings size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
-          <MenuRow icon={<KeyRound size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
-          <MenuRow icon={<Target size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} borderless />
-        </Card>
-      )}
+      ) : (() => {
+        const deviceOsLabel = Platform.OS === 'ios'
+          ? 'iPhone / iPad (iOS)'
+          : Platform.OS === 'android'
+            ? 'Thiết bị Android'
+            : 'Trình duyệt Web';
+        const DeviceIcon = Platform.OS === 'ios' || Platform.OS === 'android' ? Smartphone : Laptop;
+        const deviceCount = Math.min(3, Math.max(1, Number(profileStudent?.knownDeviceCount) || 1));
+        const deviceSummary = typeof profileStudent?.knownDeviceSummary === 'string'
+          ? profileStudent.knownDeviceSummary.trim()
+          : '';
+        return (
+          <Card style={styles.menuCard}>
+            <MenuRow icon={<Settings size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
+            <MenuRow icon={<KeyRound size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
+            <MenuRow icon={<Target size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} />
+            <MenuRow icon={<Users size={18} color={isBrandStudent ? '#10B981' : theme.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
+            <MenuRow
+              icon={<Shield size={18} color={isBrandStudent ? '#10B981' : theme.brand} />}
+              title="Thiết bị đã đăng nhập"
+              subtitle={`${deviceCount}/3 thiết bị được phép • Bảo vệ tài khoản`}
+              onPress={() => toggleStudentSection('devices')}
+              borderless={!openStudentSections.devices}
+            />
+            {openStudentSections.devices ? (
+              <View style={styles.devicePanelWrap}>
+                <View style={styles.deviceCurrentCard}>
+                  <View style={styles.deviceIconBox}>
+                    <DeviceIcon size={17} color="#059669" />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.deviceTitle}>{deviceOsLabel}</Text>
+                    <Text style={styles.deviceSub}>Phiên thiết bị hiện tại</Text>
+                  </View>
+                  <View style={styles.deviceActivePill}>
+                    <View style={styles.deviceActiveDot} />
+                    <Text style={styles.deviceActiveText}>Đang hoạt động</Text>
+                  </View>
+                </View>
+                {deviceSummary ? (
+                  <Text style={styles.deviceSummaryText}>
+                    <Text style={styles.deviceSummaryLabel}>Thiết bị đã ghi nhận: </Text>
+                    {deviceSummary}
+                  </Text>
+                ) : null}
+                <View style={styles.deviceNoticeBox}>
+                  <Text style={styles.deviceNoticeText}>
+                    Hệ thống tự động ghi nhớ tối đa 3 thiết bị quen thuộc ({deviceCount}/3 đang dùng) để bảo vệ tiến độ học tập và ngăn đăng nhập trái phép.
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+          </Card>
+        );
+      })()}
       {showPinSettings && user ? (
         <PinLockSettingsModal userKey={pinUserKey(user)} onClose={() => setShowPinSettings(false)} isBrandStudent={isBrandStudent} />
       ) : null}
@@ -4489,6 +4571,85 @@ export function ProfileScreen() {
             title={enablingPush ? 'Đang bật thông báo…' : 'Bật thông báo trên thiết bị'}
             subtitle={Platform.OS === 'web' ? 'Bật quyền thông báo cho trình duyệt này' : 'Chỉ hỏi quyền khi bạn chọn bật'}
             onPress={() => { void enablePush(); }}
+          />
+          {Platform.OS !== 'web' ? (
+            <MenuRow
+              icon={<Sparkles size={18} color="#2563EB" />}
+              title="Thử thông báo phân loại & nút nhanh"
+              subtitle="Gửi thử kênh Lịch học có nút Vào Meet / Xem lịch"
+              onPress={() => {
+                void scheduleCategorizedLocalNotification({
+                  category: 'schedule',
+                  title: 'Nhắc lịch học sắp bắt đầu',
+                  body: 'Lớp Thực hành Excel buổi tối bắt đầu sau 15 phút.',
+                  data: { category: 'schedule', deepLink: 'thangtinhoc://schedule' },
+                }).then(() => {
+                  Alert.alert('Đã gửi thông báo thử', 'Hãy kiểm tra khay thông báo của điện thoại để thấy nút hành động nhanh.');
+                }).catch((err: unknown) => {
+                  Alert.alert('Thông báo', err instanceof Error ? err.message : 'Chưa bật quyền thông báo.');
+                });
+              }}
+            />
+          ) : null}
+          {Platform.OS !== 'web' ? (
+            <MenuRow
+              icon={<ScanFace size={18} color="#059669" />}
+              title={`Đăng nhập ${biometricInfo?.label || 'Vân tay / Face ID'}`}
+              subtitle={
+                biometricInfo?.hasSavedCredential
+                  ? `Đang bật cho ${biometricInfo.savedDisplayName || biometricInfo.savedContact} • Chạm để quản lý`
+                  : biometricInfo?.enrolled
+                    ? 'Chưa kích hoạt — Chọn "Lưu Vân tay/Face ID" khi đăng nhập lại'
+                    : 'Thiết bị chưa bật Face ID / Vân tay'
+              }
+              onPress={() => {
+                if (biometricInfo?.hasSavedCredential) {
+                  Alert.alert(
+                    'Quản lý đăng nhập sinh trắc học',
+                    `Đang lưu đăng nhập nhanh cho ${biometricInfo.savedContact}.`,
+                    [
+                      { text: 'Đóng', style: 'cancel' },
+                      {
+                        text: 'Tắt & xóa dữ liệu lưu',
+                        style: 'destructive',
+                        onPress: () => {
+                          void clearBiometricCredential().then(() => getBiometricAvailability()).then((next) => {
+                            setBiometricInfo(next);
+                          });
+                        },
+                      },
+                    ],
+                  );
+                } else {
+                  Alert.alert(
+                    'Đăng nhập sinh trắc học',
+                    biometricInfo?.enrolled
+                      ? 'Khi đăng xuất và đăng nhập bằng mật khẩu, hãy giữ chọn "Lưu Face ID / Vân tay" để mở khóa 1 chạm ở lần sau.'
+                      : 'Hãy cài đặt Face ID hoặc Vân tay trong phần Cài đặt của điện thoại trước.',
+                  );
+                }
+              }}
+            />
+          ) : null}
+          <MenuRow
+            icon={<RefreshCw size={18} color="#7C3AED" />}
+            title={checkingOta ? 'Đang kiểm tra bản cập nhật OTA…' : 'Cập nhật ứng dụng (EAS Update OTA)'}
+            subtitle={`Phiên bản ${otaInfo.appVersion} • Kênh ${otaInfo.channel}${otaInfo.updateId ? ` (${otaInfo.updateId.slice(0, 8)})` : ''}`}
+            onPress={() => {
+              if (checkingOta) return;
+              setCheckingOta(true);
+              void checkAndApplyOtaUpdate().then((res) => {
+                if (res.requiresReload) {
+                  Alert.alert('Có bản cập nhật mới', res.message, [
+                    { text: 'Để sau', style: 'cancel' },
+                    { text: 'Khởi động lại ngay', onPress: () => { void reloadAppForOtaUpdate(); } },
+                  ]);
+                } else {
+                  Alert.alert('EAS Update OTA', res.message);
+                }
+              }).finally(() => setCheckingOta(false));
+            }}
+            borderless={configuredLinks.length === 0}
           />
           {configuredLinks.map((item, index) => (
             <MenuRow
@@ -4570,6 +4731,18 @@ export function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      <DigitalCertificateModal
+        visible={Boolean(certificateEnrollment)}
+        onClose={() => setCertificateEnrollment(null)}
+        studentName={studentText('name', user?.name || 'Học viên')}
+        studentCode={typeof profileStudent?.studentCode === 'string' ? profileStudent.studentCode : (user?.code || '')}
+        studentId={String(user?.id || user?._id || '')}
+        courseId={certificateEnrollment?.id || ''}
+        courseTitle={certificateEnrollment?.courseName || ''}
+        instructorName={certificateEnrollment?.teacherName || 'Trung tâm Thắng Tin Học'}
+        completionRate={certificateEnrollment?.progress ?? 100}
+        avgGrade={certificateEnrollment?.avgGrade ?? null}
+      />
     </AppScreen>
   );
 }
@@ -6374,4 +6547,67 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   resourceLockedDesc: { fontSize: 13, lineHeight: 20, color: '#64748B', textAlign: 'center', marginBottom: 20 },
   resourceLockedCtaBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B981', borderBottomWidth: 3, borderBottomColor: '#059669' },
   resourceLockedCtaText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  profileCertButton: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  profileCertButtonText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  devicePanelWrap: { gap: 10, paddingTop: 6 },
+  deviceCurrentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  deviceIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  deviceTitle: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
+  deviceSub: { color: '#64748B', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  deviceActivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  deviceActiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
+  deviceActiveText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  deviceSummaryText: { color: '#334155', fontSize: 12, lineHeight: 18 },
+  deviceSummaryLabel: { fontWeight: '800', color: '#0F172A' },
+  deviceNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  deviceNoticeText: { flex: 1, color: '#1E3A8A', fontSize: 11, lineHeight: 16, fontWeight: '600' },
 }));

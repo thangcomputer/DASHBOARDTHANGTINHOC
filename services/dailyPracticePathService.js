@@ -10,6 +10,7 @@ const LessonUnit = require('../models/LessonUnit');
 const Student = require('../models/Student');
 const rules = require('./dailyPracticeRules');
 const lessonPracticeService = require('./lessonPracticeService');
+const lmsProgressService = require('./lmsProgressService');
 const subscriptionService = require('./subscriptionService');
 const logger = require('../config/logger');
 
@@ -1601,7 +1602,40 @@ async function claimUnitChest(studentId, unitId) {
   };
 }
 
-async function markVideoWatched(studentId, { unitId, videoId } = {}) {
+const SECTION_ACTIVITY_MAP = {
+  content: 'theory',
+  file: 'assignment',
+  video: 'video',
+  practice: 'practice',
+};
+
+async function checkAndGrantPathMilestoneXp(studentId, unit, { precomputedTopicCompleted = false } = {}) {
+  if (!unit?.topicId) return;
+  let topicDone = precomputedTopicCompleted;
+  if (!topicDone) {
+    const { path } = await topicPathForUnit(studentId, unit);
+    topicDone = path.units.length > 0 && path.units.every((item) => item.state === 'completed');
+  }
+  if (!topicDone) return;
+  await lmsProgressService.grantActivity({
+    studentId,
+    activity: 'subject',
+    sourceKey: `dp:subject:${studentId}:${unit.topicId}`,
+  });
+  const overview = await getPath(studentId);
+  const allTopics = overview?.topics || [];
+  const allCompleted = allTopics.length > 0
+    && allTopics.every((topic) => topic.units.length > 0 && topic.units.every((item) => item.state === 'completed'));
+  if (allCompleted) {
+    await lmsProgressService.grantActivity({
+      studentId,
+      activity: 'course',
+      sourceKey: `dp:course:${studentId}:all`,
+    });
+  }
+}
+
+async function markVideoWatched(studentId, { unitId, videoId, watchRatio } = {}) {
   const sid = requireId(studentId, 'Học viên');
   const unit = await DailyPracticeUnit.findOne({ _id: requireId(unitId, 'Chặng'), active: true }).lean();
   if (!unit) throw httpError(404, 'Không tìm thấy chặng');
@@ -1690,6 +1724,15 @@ async function markVideoWatched(studentId, { unitId, videoId } = {}) {
     if (err?.code !== 11000) throw err;
     await DailyPracticePathProgress.updateOne(filter, update);
   }
+  await lmsProgressService.grantActivity({
+    studentId: sid,
+    activity: 'video',
+    sourceKey: `dp:video:${sid}:${unit._id}:${storageId}`,
+    watchRatio: watchRatio !== undefined ? Number(watchRatio) : 1,
+  });
+  if (extraSectionKeys.length) {
+    await checkAndGrantPathMilestoneXp(sid, unit);
+  }
   return { unitId: String(unit._id), videoId: storageId, watched: true };
 }
 
@@ -1718,6 +1761,19 @@ async function toggleSectionProgress(studentId, { unitId, nodeKey, difficulty, s
       if (err?.code !== 11000) throw err;
       await DailyPracticePathProgress.updateOne(filter, update);
     }
+    const activity = SECTION_ACTIVITY_MAP[cleanSection];
+    if (activity) {
+      const sourceKey = activity === 'video'
+        ? `dp:video:${sid}:${unit._id}:${cleanNodeKey}:level:${cleanDiff}`
+        : `dp:${activity}:${sid}:${unit._id}:${cleanNodeKey}:${cleanDiff}`;
+      await lmsProgressService.grantActivity({
+        studentId: sid,
+        activity,
+        sourceKey,
+        ...(activity === 'video' ? { watchRatio: 1 } : {}),
+      });
+    }
+    await checkAndGrantPathMilestoneXp(sid, unit);
   } else {
     await DailyPracticePathProgress.updateOne(filter, { $pull: { completedSections: key } });
   }
@@ -1790,6 +1846,19 @@ async function recordPathResult(session) {
         ).catch(() => {});
       }
     }
+    const diff = STEP_DIFFICULTY_MAP[session.step] || session.step;
+    if (session.testOut) {
+      await lmsProgressService.grantExam(studentId, `dp-testout:${unit._id}`, scorePercent);
+    } else {
+      await lmsProgressService.grantActivity({
+        studentId,
+        activity: 'practice',
+        sourceKey: `dp:practice:${studentId}:${unit._id}:${nodeKey}:${diff}`,
+      });
+      if (scorePercent >= 80) {
+        await lmsProgressService.grantExam(studentId, `dp-step:${unit._id}:${nodeKey}:${diff}`, scorePercent);
+      }
+    }
   }
 
   const { path } = await topicPathForUnit(studentId, unit);
@@ -1797,6 +1866,10 @@ async function recordPathResult(session) {
   const position = path.units.findIndex((item) => item.id === String(unit._id));
   const following = position >= 0 ? path.units[position + 1] : null;
   const pathNode = (after?.pathNodes || []).find((item) => item.key === nodeKey);
+  const topicCompleted = path.units.length > 0 && path.units.every((item) => item.state === 'completed');
+  if (passed && topicCompleted) {
+    await checkAndGrantPathMilestoneXp(studentId, unit, { precomputedTopicCompleted: true });
+  }
   return {
     unitId: String(unit._id),
     unitTitle: unit.title,
@@ -1812,7 +1885,7 @@ async function recordPathResult(session) {
     unlockedUnit: passed && after?.state === 'completed' && following && following.state !== 'locked'
       ? { id: following.id, title: following.title, index: following.index }
       : null,
-    topicCompleted: path.units.length > 0 && path.units.every((item) => item.state === 'completed'),
+    topicCompleted,
     next: path.next,
   };
 }

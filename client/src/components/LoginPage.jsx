@@ -422,9 +422,9 @@ const LoginPage = ({ onLogin }) => {
                     <label className="text-xs font-bold text-gray-400  block mb-2">Vai trò</label>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setForgotRole('student')}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'student' ? 'border-emerald-500 bg-emerald-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Học viên</button>
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'student' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Học viên</button>
                       <button type="button" onClick={() => setForgotRole('teacher')}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'teacher' ? 'border-emerald-500 bg-emerald-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Giảng viên</button>
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'teacher' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Giảng viên</button>
                     </div>
                   </div>
                   <div>
@@ -452,9 +452,9 @@ const LoginPage = ({ onLogin }) => {
                     </div>
                   )}
 
-                  {forgotError && <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-2 text-red-400 text-sm font-bold"><AlertCircle size={14} /> {forgotError}</div>}
+                  {forgotError && <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center gap-2 text-red-400 text-sm font-bold"><AlertCircle size={14} /> {forgotError}</div>}
                   <button type="button" onClick={handleCheckPhone} disabled={forgotLoading || !forgotConfirmLine}
-                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-orange-600 text-white font-black rounded-xl  tracking-wider text-sm hover:from-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black rounded-xl  tracking-wider text-sm hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
                     {forgotLoading
                       ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       : <><CheckCircle2 size={16} /> Xác nhận</>}

@@ -670,7 +670,7 @@ const ExamMonitor = forwardRef(({
                 <span className="text-sm font-black text-red-600">{warningOverlay.count}/{warningOverlay.max}</span>
               </div>
               <div className="h-5 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-1">
-                <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000" style={{ width: `${(warningOverlay.count / warningOverlay.max) * 100}%` }} />
+                <div className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full transition-all duration-1000" style={{ width: `${(warningOverlay.count / warningOverlay.max) * 100}%` }} />
               </div>
             </div>
           )}
@@ -680,7 +680,7 @@ const ExamMonitor = forwardRef(({
             </button>
           ) : (
             <div className="pt-4">
-              <div className="w-12 h-12 border-4 border-red-200 border-t-emerald-600 rounded-full animate-spin mx-auto" />
+              <div className="w-12 h-12 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mx-auto" />
             </div>
           )}
         </div>

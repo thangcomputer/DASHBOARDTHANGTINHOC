@@ -128,6 +128,12 @@ const systemSettingsSchema = new mongoose.Schema({
   /** Secret tạm khi setup MFA (chưa enable) */
   adminMfaPendingSecret: { type: String, default: '', select: false },
 
+  // ── Super Admin 2FA OTP qua Zalo OA / Email (Mục 4.3.2) ────────────────
+  adminOtp2faEnabled: { type: Boolean, default: false },
+  adminOtp2faChannel: { type: String, enum: ['zalo', 'email', 'both'], default: 'both' },
+  adminOtp2faPhone: { type: String, default: '' },
+  adminOtp2faEmail: { type: String, default: '' },
+
   // ── Khung Banner Quảng Cáo Học viên & Giảng viên (Carousel) ─────────────────────────────
   studentBanners: [{
     imageUrl: { type: String, default: '' },

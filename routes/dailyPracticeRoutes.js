@@ -115,6 +115,7 @@ router.post(['/my/path/videos/hint', '/path/videos/hint'], ...requireStudent, ha
 router.post('/my/path/videos/watched', ...requireStudent, handle((req) => pathService.markVideoWatched(userId(req), {
   unitId: req.body?.unitId,
   videoId: String(req.body?.videoId || ''),
+  watchRatio: req.body?.watchRatio,
 })));
 router.post('/my/path/units/:unitId/sections/complete', ...requireStudent, handle((req) => pathService.toggleSectionProgress(userId(req), {
   unitId: req.params.unitId,
@@ -142,6 +143,8 @@ router.post('/my/sessions/:id/hint', ...requireStudent, handle((req) => service.
 })));
 router.post('/my/sessions/:id/finish', ...requireStudent, handle((req) => service.finishSession(userId(req), req.params.id)));
 router.post('/my/sessions/:id/abandon', ...requireStudent, handle((req) => service.abandonSession(userId(req), req.params.id)));
+router.post('/my/spaced-review/start', ...requireStudent, handle((req) => service.startSpacedReviewSession(userId(req))));
+router.post('/my/referral/redeem', ...requireStudent, handle((req) => service.redeemReferralCode(userId(req), req.body?.code)));
 router.get('/my/related-topics', ...requireStudent, handle((req) => service.relatedTopics({
   subjectId: String(req.query?.subjectId || ''),
   unitId: String(req.query?.unitId || ''),

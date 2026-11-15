@@ -82,7 +82,7 @@ const CircularProgress = ({ progress, size = 112 }) => {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
   let strokeColor = 'text-slate-100';
-  let pathColor = 'text-red-500';
+  let pathColor = 'text-emerald-500';
   if (progress === 0) pathColor = 'text-slate-200';
   else if (progress === 100) pathColor = 'text-emerald-500';
 
@@ -819,7 +819,7 @@ const AdminProgressPanel = ({ courseId }) => {
 
   return (
     <div className="bg-white rounded-[32px] border border-gray-100 overflow-hidden">
-      <div className="px-8 py-6 bg-gradient-to-r from-red-900 to-slate-900 flex items-center justify-between">
+      <div className="px-8 py-6 bg-gradient-to-r from-emerald-800 to-slate-900 flex items-center justify-between">
         <div className="flex items-center gap-3 text-white">
           <Users size={20} />
           <h3 className="font-black text-base  tracking-wide">Tiến độ Giảng viên</h3>
@@ -837,7 +837,7 @@ const AdminProgressPanel = ({ courseId }) => {
         <div className="divide-y divide-gray-50">
           {data.map(t => (
             <div key={t.teacherId} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-              <div className="w-10 h-10 bg-red-100 rounded-2xl flex items-center justify-center font-black text-red-700 text-sm flex-shrink-0">
+              <div className="w-10 h-10 bg-emerald-100 rounded-2xl flex items-center justify-center font-black text-emerald-700 text-sm flex-shrink-0">
                 {(t.teacherName || 'GV')[0]}
               </div>
               <div className="flex-1 min-w-0">
@@ -1262,7 +1262,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             {isAdmin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-red-100'}`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
               >
                 <BarChart2 size={16} /> Xem tiến độ
               </button>
@@ -1280,7 +1280,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
         {/* TOP TABS FOR TEACHER */}
         <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-3 mb-6 mt-1 sm:gap-3">
           {[
-            { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length, tone: 'from-emerald-500 via-rose-500 to-emerald-700' },
+            { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length, tone: 'from-emerald-500 via-teal-500 to-emerald-700' },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0, tone: 'from-sky-400 via-blue-500 to-indigo-700' },
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0, tone: 'from-amber-400 via-orange-500 to-emerald-600' },
             { key: 'software', icon: Link2, label: 'Phần mềm', count: visibleTraining?.softwareLinks?.length || 0, tone: 'from-emerald-400 via-teal-500 to-cyan-700' },
@@ -1288,7 +1288,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             <button key={t.key} onClick={() => setMainTab(t.key)}
               className={`group relative flex min-h-[4.75rem] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-1 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 sm:min-h-[5.5rem] sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${mainTab === t.key
                   ? 'border-emerald-500 bg-emerald-50 text-slate-800 shadow-md shadow-emerald-100'
-                  : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-red-200'
+                  : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-emerald-200'
                 }`}>
               <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br ${t.tone} text-white shadow-lg ring-2 ring-white transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2 sm:h-12 sm:w-12 sm:rounded-2xl`}>
                 <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/45 blur-md" aria-hidden="true" />
@@ -1324,7 +1324,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                 const gradients = [
-                  "from-emerald-600 to-red-800",
+                  "from-emerald-600 to-teal-800",
                   "from-teal-500 to-emerald-600",
                   "from-violet-600 to-fuchsia-600",
                   "from-emerald-500 to-emerald-700"
@@ -1376,7 +1376,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                           <span>{lessonCount}  Bài học</span>
                         </div>
 
-                        <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
+                        <div className="flex items-center gap-1 text-sm font-semibold text-emerald-600 group-hover:translate-x-1 transition-transform">
                           <span>Vào học</span>
                           <ChevronRight size={14} />
                         </div>
@@ -1393,7 +1393,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
         {mainTab === 'guides' && (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
             <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-              <FileText className="text-red-600" /> Quy trình & Hướng dẫn
+              <FileText className="text-emerald-600" /> Quy trình & Hướng dẫn
             </h2>
             <div className="grid grid-cols-1 gap-4 w-full max-w-full">
               {visibleTraining?.guides?.map((guide, idx) => {
@@ -1407,16 +1407,16 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                 return (
                   <div
                     key={gKey}
-                    className="p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-red-200 hover:bg-red-50/50 transition-all flex gap-4 sm:gap-5 items-start w-full"
+                    className="p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all flex gap-4 sm:gap-5 items-start w-full"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center text-2xl shrink-0">{guide.icon || '📄'}</div>
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-2xl shrink-0">{guide.icon || '📄'}</div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-slate-800">{guide.title}</h3>
                       {emptyBody ? (
                         <p className="text-xs text-slate-400 mt-1">Chưa có nội dung chi tiết.</p>
                       ) : expanded && hasHtml ? (
                         <div
-                          className="text-sm text-slate-600 mt-2 leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-red-600 [&_a]:underline"
+                          className="text-sm text-slate-600 mt-2 leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-emerald-600 [&_a]:underline"
                           dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(descHtml) }}
                         />
                       ) : (
@@ -1428,7 +1428,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                         <button
                           type="button"
                           onClick={() => setExpandedGuideKey(expanded ? null : gKey)}
-                          className="text-[11px] font-bold text-emerald-600 hover:text-red-800 mt-1"
+                          className="text-[11px] font-bold text-emerald-600 hover:text-emerald-800 mt-1"
                         >
                           {expanded ? 'Thu gọn' : 'Xem thêm'}
                         </button>
@@ -1448,7 +1448,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
         {mainTab === 'files' && (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
             <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-3">
-              <Download className="text-red-600" /> Tài liệu Đào tạo
+              <Download className="text-emerald-600" /> Tài liệu Đào tạo
             </h2>
             {!visibleTraining?.files || visibleTraining.files.length === 0 ? (
               <p className="text-slate-400 text-sm">Chưa có tài liệu nào.</p>
@@ -1470,7 +1470,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                       const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
                         || /^https?:\/\//i.test(String(rawUrl));
                       return (
-                        <tr key={file.id || file._id || idx} className="hover:bg-red-50/40 transition-colors">
+                        <tr key={file.id || file._id || idx} className="hover:bg-emerald-50/40 transition-colors">
                           <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
                           <td className="px-4 py-3 font-bold text-slate-800">{file.title}</td>
                           <td className="px-4 py-3">
@@ -1501,7 +1501,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                                       toast.error(err?.message || 'Không tải được tài liệu');
                                     }
                                   }}
-                                  className={lmsBtn('danger', { size: 'sm', className: 'text-xs' })}
+                                  className={lmsBtn('primary', { size: 'sm', className: 'text-xs' })}
                                 >
                                   Tải xuống
                                 </button>

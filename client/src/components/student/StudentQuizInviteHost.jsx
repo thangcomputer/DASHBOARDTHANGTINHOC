@@ -206,29 +206,29 @@ export default function StudentQuizInviteHost() {
           >
             <X size={18} />
           </button>
-          <p className="text-[11px] font-bold  tracking-wide text-red-100 flex items-center gap-1.5">
+          <p className="text-[11px] font-bold  tracking-wide text-emerald-100 flex items-center gap-1.5">
             <Award size={14} aria-hidden="true" /> Bài trắc nghiệm mới
           </p>
           <h2 id="quiz-invite-title" className="text-lg font-extrabold mt-1 leading-snug pr-8">
             {invite.title}
           </h2>
           {invite.courseName ? (
-            <p className="text-xs text-red-100/90 mt-1 font-medium truncate">{invite.courseName}</p>
+            <p className="text-xs text-emerald-100/90 mt-1 font-medium truncate">{invite.courseName}</p>
           ) : null}
         </div>
 
         <div className="px-5 py-4 space-y-3">
           <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-600">
             <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5">
-              <Clock size={14} className="text-red-600" aria-hidden="true" />
+              <Clock size={14} className="text-emerald-600" aria-hidden="true" />
               {invite.timeLimitMinutes} phút
             </span>
             <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5">
-              <HelpCircle size={14} className="text-red-600" aria-hidden="true" />
+              <HelpCircle size={14} className="text-emerald-600" aria-hidden="true" />
               {invite.questionsCount} câu hỏi
             </span>
             <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5">
-              <User size={14} className="text-red-600" aria-hidden="true" />
+              <User size={14} className="text-emerald-600" aria-hidden="true" />
               GV: {invite.teacherName}
             </span>
           </div>

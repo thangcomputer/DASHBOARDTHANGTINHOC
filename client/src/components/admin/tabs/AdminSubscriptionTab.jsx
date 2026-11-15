@@ -19,7 +19,7 @@ function Card({ icon: Icon, title, children, right }) {
   return (
     <section className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><Icon size={16} className="text-red-600" /> {title}</h3>
+        <h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><Icon size={16} className="text-emerald-600" /> {title}</h3>
         {right}
       </div>
       {children}
@@ -231,7 +231,7 @@ function XpConfigCard() {
                     onClick={() => setConfig((prev) => ({ ...prev, resetCycle: item.id }))}
                     className={`text-left p-2.5 rounded-xl border transition cursor-pointer ${
                       active
-                        ? 'border-emerald-500 bg-emerald-50/70 text-red-950 ring-2 ring-red-200'
+                        ? 'border-emerald-500 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-200'
                         : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 text-slate-700'
                     }`}
                   >
@@ -556,12 +556,12 @@ function StudentRenewCard() {
     <Card icon={UserCog} title="Gia hạn tay cho học viên">
       {selectedId ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/50 p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-sm font-black text-white">
               {String(selected?.name || 'H').trim().charAt(0).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-red-600">Học viên</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Học viên</p>
               <p className="truncate text-sm font-black text-slate-900">{selected?.name || 'Học viên'}</p>
               {studentMeta(selected) && <p className="truncate text-xs text-slate-500">{studentMeta(selected)}</p>}
             </div>
@@ -634,14 +634,14 @@ export default function AdminSubscriptionTab() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-red-50 to-amber-50 p-4 ring-1 ring-red-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-amber-50 p-4 ring-1 ring-emerald-100">
         <div>
           <h2 className="text-base font-black text-slate-900">Mã kích hoạt &amp; gói tài khoản</h2>
           <p className="mt-0.5 text-xs text-slate-600">
             Quản lý giá gói Meet (SePay), giá gói XP luyện, mức XP theo tài khoản, mã kích hoạt và gia hạn thủ công.
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5 rounded-xl bg-white p-1 ring-1 ring-red-100 shadow-xs">
+        <div className="flex flex-wrap gap-1.5 rounded-xl bg-white p-1 ring-1 ring-emerald-100 shadow-xs">
           {TABS.map((tab) => (
             <button
               key={tab.key}

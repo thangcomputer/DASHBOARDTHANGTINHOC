@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { X, AlertCircle, CheckCircle, Info, HelpCircle } from 'lucide-react';
+import StandardModal from '../components/ui/StandardModal.jsx';
+
+export { StandardModal };
 
 const ModalContext = createContext(null);
 
@@ -17,7 +20,11 @@ export const ModalProvider = ({ children }) => {
     setModal(null);
   }, []);
 
-  const confirmAsync = useCallback(({ title = 'Xác nhận', content, type = 'warning', confirmText = 'Chắc chắn', cancelText = 'Hủy', confirmButtonClass = 'bg-red-600 hover:bg-red-700 text-white shadow-sm' }) => {
+  const confirmAsync = useCallback(({ title = 'Xác nhận', content, type = 'warning', confirmText = 'Chắc chắn', cancelText = 'Hủy', confirmButtonClass }) => {
+    const resolvedBtnClass = confirmButtonClass
+      || (['info', 'success', 'question'].includes(type)
+        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+        : 'bg-red-600 hover:bg-red-700 text-white shadow-sm');
     return new Promise((resolve) => {
       showModal({
         title,
@@ -25,7 +32,7 @@ export const ModalProvider = ({ children }) => {
         type,
         confirmText,
         cancelText,
-        confirmButtonClass,
+        confirmButtonClass: resolvedBtnClass,
         onConfirm: () => resolve(true),
         onCancel: () => resolve(false),
       });
@@ -34,7 +41,15 @@ export const ModalProvider = ({ children }) => {
 
   useEffect(() => {
     window.cmsConfirm = (content) => confirmAsync({ content });
-    window.cmsAlert = (content, type = 'info') => confirmAsync({ content, type, cancelText: null, confirmText: 'Đã hiểu' });
+    window.cmsAlert = (content, type = 'info') => confirmAsync({
+      content,
+      type,
+      cancelText: null,
+      confirmText: 'Đã hiểu',
+      confirmButtonClass: type === 'error'
+        ? 'bg-red-600 hover:bg-red-700 text-white shadow-sm'
+        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
+    });
     window.cmsConfirmAdvanced = confirmAsync;
     return () => {
       delete window.cmsConfirm;
@@ -155,7 +170,7 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
             type="button"
             onClick={onCancel}
             aria-label="Đóng"
-            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="cms-sheet-header__side bg-slate-100/80 text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 transition-colors"
           >
             <X size={18} />
           </button>

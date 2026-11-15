@@ -17,7 +17,6 @@ import {
   Award,
 } from 'lucide-react';
 import { TEACHER_WELCOME_CHIPS, STUDENT_WELCOME_CHIPS } from '../utils/aiSupport';
-import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 
 const TEACHER_FAQS = [
   {
@@ -81,20 +80,6 @@ export default function SupportEntryPage() {
     return false;
   })();
 
-  const isFreeStudent = (() => {
-    try {
-      if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) {
-        return true;
-      }
-      const u = JSON.parse(localStorage.getItem('student_user') || 'null');
-      return Boolean(u?.freePortal === true || isFreePortalSelfRegistrationStudent(u));
-    } catch {
-      return false;
-    }
-  })();
-
-  const isGreenTheme = isTeacher || isFreeStudent;
-
   const chooseSupport = (mode, prompt = '') => {
     window.dispatchEvent(new CustomEvent('cms:open-support-choice', { detail: { mode, prompt } }));
   };
@@ -109,20 +94,14 @@ export default function SupportEntryPage() {
   return (
     <div className="mx-auto w-full max-w-5xl pt-4 pb-12 px-3 sm:px-6 space-y-6">
       {/* ─── Hero Header ─── */}
-      <section className={`rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm ${isGreenTheme
-          ? 'bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white border-emerald-200/80'
-          : 'bg-gradient-to-br from-red-50/90 via-rose-50/40 to-white border-red-200/80'
-        }`}>
+      <section className="rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white border-emerald-200/80">
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-          <div className={`w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${isGreenTheme
-              ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white'
-              : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] text-white'
-            }`}>
+          <div className="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-md bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white">
             <Headphones size={32} strokeWidth={2.3} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-2 bg-white/90 border border-slate-200/80 text-slate-700 shadow-xs">
-              <span className={`w-2 h-2 rounded-full animate-ping ${isGreenTheme ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              <span className="w-2 h-2 rounded-full animate-ping bg-emerald-500" />
               Trung tâm Chăm sóc & Hỗ trợ Tin học
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -158,7 +137,7 @@ export default function SupportEntryPage() {
             </div>
 
             <p className="text-sm text-slate-600 leading-relaxed mb-4">
-              Giải đáp nhanh mọi kiến thức về Word, Excel, PowerPoint, chứng chỉ MOS, IC3, cách giải bài tập và hướng dẫn thao tác trên hệ thống.
+              Giải đáp nhanh mọi kiến thức về Word, Excel, PowerPoint, chứng nhận MOS, IC3, cách giải bài tập và hướng dẫn thao tác trên hệ thống.
             </p>
 
             {/* Quick Prompt Chips */}
@@ -186,10 +165,7 @@ export default function SupportEntryPage() {
           <button
             type="button"
             onClick={() => chooseSupport('ai')}
-            className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 ${isGreenTheme
-                ? 'bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105'
-                : 'bg-[#DC2626] border border-[#F87171] border-b-4 border-b-[#B91C1C] hover:brightness-105'
-              }`}
+            className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105"
           >
             <Bot size={18} strokeWidth={2.4} />
             <span>Hỏi Trợ lý AI ngay</span>
@@ -255,7 +231,7 @@ export default function SupportEntryPage() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-slate-500">Hotline / Zalo hỗ trợ</p>
-            <a href="tel:0984623486" className="text-sm font-extrabold text-slate-800 hover:text-red-600 transition">
+            <a href="tel:0984623486" className="text-sm font-extrabold text-slate-800 hover:text-emerald-600 transition">
               0984623486
             </a>
           </div>
@@ -267,7 +243,7 @@ export default function SupportEntryPage() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-slate-500">Email liên hệ</p>
-            <a href="mailto:support@thangtinhoc.edu.vn" className="text-sm font-extrabold text-slate-800 hover:text-red-600 transition truncate block">
+            <a href="mailto:support@thangtinhoc.edu.vn" className="text-sm font-extrabold text-slate-800 hover:text-emerald-600 transition truncate block">
               support@thangtinhoc.edu.vn
             </a>
           </div>
@@ -289,7 +265,7 @@ export default function SupportEntryPage() {
       {/* ─── Frequently Asked Questions (FAQ) ─── */}
       <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-sm">
         <div className="flex items-center gap-2.5 mb-5 pb-3 border-b border-slate-100">
-          <HelpCircle size={22} className={isTeacher ? 'text-emerald-600' : 'text-red-600'} />
+          <HelpCircle size={22} className="text-emerald-600" />
           <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
             Câu hỏi thường gặp (FAQ)
           </h2>

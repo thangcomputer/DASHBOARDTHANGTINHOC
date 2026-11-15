@@ -228,10 +228,29 @@ function serializeTopic(doc) {
 const blogDir = path.join(__dirname, '..', 'uploads', 'blog');
 if (!fs.existsSync(blogDir)) fs.mkdirSync(blogDir, { recursive: true });
 
+const ALLOWED_BLOG_EXT = new Set([
+  '.jpg', '.jpeg', '.png', '.webp', '.gif',
+  '.mp4', '.webm',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.rar',
+]);
+const ALLOWED_BLOG_MIME_RE = /^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm)|application\/(pdf|msword|zip|x-zip-compressed|x-rar-compressed|vnd\.rar|x-7z-compressed|octet-stream|vnd\.[a-z0-9.+-]+))$/i;
+
+function blogFileFilter(_req, file, cb) {
+  const ext = path.extname(file?.originalname || '').toLowerCase();
+  const mime = String(file?.mimetype || '').toLowerCase();
+  if (ALLOWED_BLOG_EXT.has(ext) && ALLOWED_BLOG_MIME_RE.test(mime)) {
+    return cb(null, true);
+  }
+  return cb(new Error('Loại file không được hỗ trợ'));
+}
+
 const blogStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, blogDir),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '';
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ALLOWED_BLOG_EXT.has(ext)) {
+      return cb(new Error('Loại file không được hỗ trợ'));
+    }
     cb(null, `blog_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
   },
 });
@@ -239,11 +258,7 @@ const blogStorage = multer.diskStorage({
 const upload = multer({
   storage: blogStorage,
   limits: { fileSize: 80 * 1024 * 1024, files: 8 },
-  fileFilter: (_req, file, cb) => {
-    const ok = /^(image|video|application|text)\//.test(file.mimetype)
-      || /\.(pdf|docx?|xlsx?|pptx?|zip|rar)$/i.test(file.originalname);
-    cb(ok ? null : new Error('Loại file không được hỗ trợ'), ok);
-  },
+  fileFilter: blogFileFilter,
 });
 
 /**
@@ -690,6 +705,7 @@ async function notifyPublished(io, post) {
 
 /** Tự động đồng bộ các bản ghi thông báo tin tức cũ trong DB cho đúng receivers */
 async function syncOldBlogNotifications() {
+  if (mongoose.connection.readyState !== 1) return;
   try {
     const Notification = require('../models/Notification');
     const notifs = await Notification.find({ 'payload.action': 'blog_published' }).lean();
@@ -726,9 +742,16 @@ async function syncOldBlogNotifications() {
 }
 
 // Gọi đồng bộ ngay khi load module
-setTimeout(syncOldBlogNotifications, 2000);
+const syncOldBlogTimer = setTimeout(syncOldBlogNotifications, 2000);
+if (typeof syncOldBlogTimer.unref === 'function') syncOldBlogTimer.unref();
 
 // silence unused helper warning in some linters
 void escapeHtml;
+
+router._test = {
+  blogFileFilter,
+  ALLOWED_BLOG_EXT,
+  ALLOWED_BLOG_MIME_RE,
+};
 
 module.exports = router;

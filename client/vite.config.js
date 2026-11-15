@@ -84,29 +84,19 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
+        // Giai đoạn 1 (hiệu năng): chỉ gom thư viện lõi dùng ở mọi trang.
+        // Thư viện nặng (xlsx, jspdf, html2canvas...) để Rolldown tự tách theo import động
+        // -> không còn bị modulepreload ở lần tải đầu.
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'vendor-react';
-            }
-            if (id.includes('lucide-react')) {
-              return 'vendor-ui';
-            }
-            if (id.includes('socket.io-client')) {
-              return 'vendor-socket';
-            }
-            if (id.includes('recharts')) {
-              return 'vendor-chart';
-            }
-            // Heavy libs - chỉ tải khi user xuất Excel/PDF
-            if (id.includes('node_modules/xlsx')) {
-              return 'vendor-xlsx';
-            }
-            if (id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
-              return 'vendor-pdf';
-            }
-            return 'vendor';
+          const p = id.replace(/\\/g, '/');
+          if (!p.includes('/node_modules/')) return undefined;
+          if (/\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom)\//.test(p)) {
+            return 'vendor-react';
           }
+          if (/\/node_modules\/(socket\.io-client|engine\.io-client|socket\.io-parser|engine\.io-parser)\//.test(p)) {
+            return 'vendor-socket';
+          }
+          return undefined;
         }
       },
     },

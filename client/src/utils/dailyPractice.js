@@ -38,7 +38,7 @@ export function vnTodayKey(date = new Date()) {
   }).format(date);
 }
 
-export const topicColor = (key) => TOPIC_COLORS[key] || TOPIC_COLORS.red;
+export const topicColor = (key) => TOPIC_COLORS[key] || TOPIC_COLORS.green;
 
 /** Mỗi chặng lộ trình một màu (xoay vòng) - giống các "phần" của Duolingo. */
 export const UNIT_COLORS = [
@@ -92,7 +92,7 @@ export function playQuestionHeaderChips({ path, typeLabel, levelMeta }) {
       ? `Chặng ${path.unitIndex} · Kiểm tra vượt`
       : [`Chặng ${path.unitIndex}`, path.pathNodeLabel, path.stepLabel].filter(Boolean).join(' · ');
     return [
-      { id: 'path', text: pathText, soft: '#FEF2F2', color: '#B91C1C' },
+      { id: 'path', text: pathText, soft: '#ECFDF5', color: '#047857' },
       { id: 'type', text: typeLabel, ...TYPE_CHIP },
     ];
   }

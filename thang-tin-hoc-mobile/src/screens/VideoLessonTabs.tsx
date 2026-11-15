@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
-import { Clock3, Download, FileBox, MessageSquare, Plus, Search, Star, Trash2 } from 'lucide-react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Linking, Platform, Pressable, Share, Text, TextInput, View } from 'react-native';
+import { Check, Clock3, Copy, Download, FileBox, MessageSquare, Plus, Search, Share2, Star, Trash2 } from 'lucide-react-native';
 import {
   createCourseLessonQuestion,
   getCourseLessonQuestions,
@@ -15,6 +15,8 @@ import {
 import { SOCKET_EVENTS } from '../services/socketService';
 import { resolveMobilePublicUrl } from '../services/apiClient';
 import { colors, radius, spacing, typography, theme } from '../theme/tokens';
+
+const NOTE_QUICK_TAGS = ['📌 Quan trọng', '💡 Mẹo hay', '❓ Cần ôn lại', '⌨️ Phím tắt'] as const;
 
 type VideoLessonTab = 'qa' | 'notes' | 'reviews' | 'resources';
 type VideoLessonNote = {
@@ -38,6 +40,7 @@ type VideoLessonTabsProps = {
   resources: LessonPracticeResource[];
   currentTime: number;
   videoDuration: number;
+  onSeekTo?: (sec: number) => void;
 };
 
 function messageFromError(error: unknown, fallback: string) {
@@ -69,6 +72,7 @@ export function VideoLessonTabs({
   resources,
   currentTime,
   videoDuration,
+  onSeekTo,
 }: VideoLessonTabsProps) {
   const [questions, setQuestions] = useState<CourseLessonQuestion[]>([]);
   const [questionSearch, setQuestionSearch] = useState('');
@@ -84,6 +88,8 @@ export function VideoLessonTabs({
   const [notes, setNotes] = useState<VideoLessonNote[]>([]);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteFilter, setNoteFilter] = useState<'current' | 'all'>('current');
+  const [noteSearch, setNoteSearch] = useState('');
+  const [notesCopied, setNotesCopied] = useState(false);
   const [noteError, setNoteError] = useState('');
   const [resourceError, setResourceError] = useState('');
   const [reviews, setReviews] = useState<CourseReview[]>([]);
@@ -184,10 +190,50 @@ export function VideoLessonTabs({
     setNoteDraft('');
   };
 
+  const appendNoteTag = (tag: string) => {
+    setNoteDraft((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return `${tag} `;
+      return trimmed.includes(tag) ? prev : `${tag} · ${prev}`;
+    });
+  };
+
   const visibleNotes = useMemo(() => {
     const sorted = [...notes].sort((a, b) => b.createdAt - a.createdAt);
-    return noteFilter === 'current' ? sorted.filter((note) => note.lessonId === lessonId) : sorted;
-  }, [lessonId, noteFilter, notes]);
+    const scoped = noteFilter === 'current' ? sorted.filter((note) => note.lessonId === lessonId) : sorted;
+    const needle = noteSearch.trim().toLocaleLowerCase('vi');
+    if (!needle) return scoped;
+    return scoped.filter((note) => (
+      `${note.text} ${note.lessonTitle || ''}`.toLocaleLowerCase('vi').includes(needle)
+    ));
+  }, [lessonId, noteFilter, noteSearch, notes]);
+
+  const handleExportOrShareNotes = async () => {
+    if (!visibleNotes.length) return;
+    const heading = `# Sổ tay ghi chú: ${courseTitle || lessonTitle || 'Khóa học Thắng Tin Học'}\n\n`;
+    const body = visibleNotes.map((n) => (
+      `- [${formatTime(n.atSec)}]${n.lessonTitle ? ` **${n.lessonTitle}**:` : ''} ${n.text}`
+    )).join('\n');
+    const markdown = `${heading}${body}`;
+    if (Platform.OS !== 'web') {
+      try {
+        await Share.share({
+          title: `Ghi chú · ${courseTitle || lessonTitle || 'Khóa học'}`,
+          message: markdown,
+        });
+      } catch {
+        // dismissed share sheet
+      }
+      return;
+    }
+    try {
+      await globalThis.navigator?.clipboard?.writeText(markdown);
+      setNotesCopied(true);
+      setTimeout(() => setNotesCopied(false), 2200);
+    } catch {
+      Alert.alert('Nội dung ghi chú', markdown);
+    }
+  };
 
   const loadReviews = useCallback(async () => {
     if (!enabled || !courseId) {
@@ -375,15 +421,32 @@ export function VideoLessonTabs({
               const canReply = enabled && question.askerId === userId && dialogue.length > 0;
               return (
                 <View key={question.id} style={styles.questionCard}>
+                  <View style={styles.formHeading}>
+                    <Pressable
+                      onPress={() => setExpandedQuestionId(expanded ? '' : question.id)}
+                      style={styles.flex}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded }}
+                    >
+                      <Text style={styles.questionTitle}>{question.title}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => onSeekTo?.(question.atSec)}
+                      disabled={!onSeekTo}
+                      style={styles.timeBadge}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Nhảy tới ${formatTime(question.atSec)}`}
+                      hitSlop={6}
+                    >
+                      <Clock3 size={11} color="#047857" />
+                      <Text style={styles.timeText}>{formatTime(question.atSec)}</Text>
+                    </Pressable>
+                  </View>
                   <Pressable
                     onPress={() => setExpandedQuestionId(expanded ? '' : question.id)}
                     accessibilityRole="button"
                     accessibilityState={{ expanded }}
                   >
-                    <View style={styles.formHeading}>
-                      <Text style={styles.questionTitle}>{question.title}</Text>
-                      <Text style={styles.timeText}>{formatTime(question.atSec)}</Text>
-                    </View>
                     <Text style={styles.metaText}>
                       {question.askerName || 'Học viên'} · {question.status === 'answered' ? 'Đã trả lời' : 'Chờ trả lời'} · {relativeTime(question.createdAt)}
                     </Text>
@@ -457,18 +520,61 @@ export function VideoLessonTabs({
             <Plus size={18} color="#047857" />
           </Pressable>
         </View>
-        <View style={styles.filterRow}>
-          {(['current', 'all'] as const).map((filter) => (
+        <View style={styles.quickTagRow}>
+          {NOTE_QUICK_TAGS.map((tag) => (
             <Pressable
-              key={filter}
-              onPress={() => setNoteFilter(filter)}
-              style={[styles.filterButton, noteFilter === filter && styles.filterButtonActive]}
+              key={tag}
+              onPress={() => appendNoteTag(tag)}
+              style={styles.quickTagChip}
+              accessibilityRole="button"
+              accessibilityLabel={`Chèn thẻ ${tag}`}
             >
-              <Text style={[styles.filterText, noteFilter === filter && styles.filterTextActive]}>
-                {filter === 'current' ? 'Bài hiện tại' : 'Tất cả bài giảng'}
-              </Text>
+              <Text style={styles.quickTagText}>{tag}</Text>
             </Pressable>
           ))}
+        </View>
+        <View style={styles.searchBox}>
+          <View style={styles.searchIcon}><Search size={14} color="#64748B" /></View>
+          <TextInput
+            value={noteSearch}
+            onChangeText={setNoteSearch}
+            placeholder="Tìm nhanh trong ghi chú..."
+            placeholderTextColor="#64748B"
+            style={styles.searchInput}
+            accessibilityLabel="Tìm nhanh trong ghi chú"
+          />
+        </View>
+        <View style={styles.notesToolbar}>
+          <View style={styles.filterRow}>
+            {(['current', 'all'] as const).map((filter) => (
+              <Pressable
+                key={filter}
+                onPress={() => setNoteFilter(filter)}
+                style={[styles.filterButton, noteFilter === filter && styles.filterButtonActive]}
+              >
+                <Text style={[styles.filterText, noteFilter === filter && styles.filterTextActive]}>
+                  {filter === 'current' ? 'Bài hiện tại' : 'Tất cả bài giảng'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {visibleNotes.length > 0 ? (
+            <Pressable
+              onPress={() => { void handleExportOrShareNotes(); }}
+              style={styles.exportNotesButton}
+              accessibilityRole="button"
+              accessibilityLabel="Chia sẻ hoặc xuất sổ tay ghi chú"
+            >
+              {Platform.OS === 'web' ? (
+                notesCopied ? <Check size={13} color="#047857" /> : <Copy size={13} color="#047857" />
+              ) : (
+                <Share2 size={13} color="#047857" />
+              )}
+              <Text style={styles.exportNotesText}>
+                {Platform.OS === 'web' && notesCopied ? 'Đã sao chép' : 'Xuất sổ tay'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
         {noteError ? <Text style={styles.errorText}>{noteError}</Text> : null}
         {visibleNotes.length ? (
@@ -476,8 +582,18 @@ export function VideoLessonTabs({
             {visibleNotes.map((note) => (
               <View key={note.id} style={styles.questionCard}>
                 <View style={styles.formHeading}>
-                  <Text style={styles.timeText}>{formatTime(note.atSec)}</Text>
-                  {noteFilter === 'all' && note.lessonTitle ? <Text style={styles.metaText}>{note.lessonTitle}</Text> : null}
+                  <Pressable
+                    onPress={() => onSeekTo?.(note.atSec)}
+                    disabled={!onSeekTo}
+                    style={styles.timeBadge}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Xem lại tại ${formatTime(note.atSec)}`}
+                    hitSlop={6}
+                  >
+                    <Clock3 size={11} color="#047857" />
+                    <Text style={styles.timeText}>{formatTime(note.atSec)}</Text>
+                  </Pressable>
+                  {noteFilter === 'all' && note.lessonTitle ? <Text numberOfLines={1} style={[styles.metaText, styles.flex]}>{note.lessonTitle}</Text> : <View style={styles.flex} />}
                   <Pressable
                     onPress={() => void saveNotes(notes.filter((item) => item.id !== note.id))}
                     accessibilityRole="button"
@@ -493,7 +609,11 @@ export function VideoLessonTabs({
             ))}
           </View>
         ) : (
-          <Text style={styles.emptyText}>Nhấp vào ô “Tạo ghi chú mới” hoặc nút + để tạo ghi chú đầu tiên của bạn.</Text>
+          <Text style={styles.emptyText}>
+            {noteSearch.trim()
+              ? 'Không tìm thấy ghi chú khớp từ khóa.'
+              : 'Nhấp vào ô “Tạo ghi chú mới” hoặc nút + để tạo ghi chú đầu tiên của bạn.'}
+          </Text>
         )}
       </View>
     );
@@ -676,5 +796,11 @@ const styles = {
   ratingValue: { color: '#0F172A', fontSize: typography.display, lineHeight: 34, fontWeight: '900' as const },
   reviewCount: { color: '#64748B', fontSize: typography.micro, fontWeight: '600' as const },
   starRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 2 },
+  quickTagRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.xs },
+  quickTagChip: { paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 999, backgroundColor: '#ECFDF5' },
+  quickTagText: { color: '#047857', fontSize: typography.micro, fontWeight: '700' as const },
+  notesToolbar: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, flexWrap: 'wrap' as const, gap: spacing.xs },
+  exportNotesButton: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 10, backgroundColor: '#ECFDF5' },
+  exportNotesText: { color: '#047857', fontSize: typography.micro, fontWeight: '800' as const },
   flex: { flex: 1 },
 };

@@ -18,7 +18,7 @@ const KIND_CELL = {
   completed: 'bg-emerald-50 border-emerald-200 text-emerald-700 font-extrabold',
   cancelled: 'bg-slate-50 border-slate-200 text-slate-400',
   ongoing: 'bg-green-100 border-green-300 text-green-800 font-black ring-1 ring-green-400',
-  upcoming: 'bg-red-50/70 border-red-200 text-red-700 font-extrabold',
+  upcoming: 'bg-sky-50 border-sky-200 text-sky-700 font-extrabold',
   pending_attendance: 'bg-orange-50 border-orange-200 text-orange-700 font-extrabold',
   overdue_attendance: 'bg-red-50 border-red-200 text-red-700 font-extrabold',
   past_pending: 'bg-orange-50 border-orange-200 text-orange-700 font-extrabold',
@@ -107,9 +107,7 @@ export default function StudentWeeklyScheduleGrid({
     <div className="bg-white rounded-[24px] border border-slate-200/80 shadow-sm overflow-hidden" aria-label="Lịch học theo tuần">
       <div className="p-4 sm:p-5 space-y-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-            isFree ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
-          }`}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-emerald-50 text-emerald-600 border-emerald-100">
             <Table2 size={18} />
           </div>
           <h3 className="text-base font-black text-slate-900 tracking-tight">
@@ -127,12 +125,10 @@ export default function StudentWeeklyScheduleGrid({
               }`}
             >
               <span className="text-slate-400 font-bold shrink-0">Khóa học</span>
-              <span className={`flex-1 truncate font-black uppercase tracking-wide text-xs sm:text-sm text-center sm:text-left pl-2 ${
-                isFree ? 'text-[#059669]' : 'text-[#DC2626]'
-              }`}>
+              <span className="flex-1 truncate font-black uppercase tracking-wide text-xs sm:text-sm text-center sm:text-left pl-2 text-[#059669]">
                 {currentCourse}
               </span>
-              <ChevronDown size={16} className={`transition-transform ${isFree ? 'text-emerald-600' : 'text-red-600'} ${showCoursePicker ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`transition-transform text-emerald-600 ${showCoursePicker ? 'rotate-180' : ''}`} />
             </button>
             {showCoursePicker && (
               <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
@@ -146,7 +142,7 @@ export default function StudentWeeklyScheduleGrid({
                       }}
                       className={`w-full rounded-xl px-3 py-2 text-left text-xs font-bold transition ${
                         name === currentCourse
-                          ? (isFree ? 'bg-emerald-50 text-emerald-700 font-black' : 'bg-red-50 text-red-700 font-black')
+                          ? 'bg-emerald-50 text-emerald-700 font-black'
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
@@ -159,12 +155,8 @@ export default function StudentWeeklyScheduleGrid({
           </div>
         )}
 
-        {/* ── Thanh dải tuần liền mạch màu hồng nhạt chuẩn Mobile App (hoặc xanh cho Free) ── */}
-        <div className={`flex items-center justify-between rounded-[12px] px-3 py-1.5 border ${
-          isFree
-            ? 'bg-emerald-50/70 border-emerald-100 text-[#059669]'
-            : 'bg-[#FFF5F5] border-red-100/80 text-[#DC2626]'
-        }`}>
+        {/* ── Thanh dải tuần liền mạch màu xanh ngọc chuẩn Mobile App ── */}
+        <div className="flex items-center justify-between rounded-[12px] px-3 py-1.5 border bg-emerald-50/70 border-emerald-100 text-[#059669]">
           <button
             type="button"
             onClick={() => setWeekStart((d) => addDays(startOfWeekMonday(d), -7))}
@@ -197,21 +189,21 @@ export default function StudentWeeklyScheduleGrid({
                   <th
                     key={key}
                     className={`px-2 py-2 text-center min-w-[5rem] transition-colors border-r border-slate-100 last:border-r-0 ${
-                      isToday ? (isFree ? 'bg-emerald-50' : 'bg-[#FEF2F2]') : 'bg-white'
+                      isToday ? 'bg-emerald-50' : 'bg-white'
                     }`}
                   >
                     <div className={`text-[11px] font-black ${
-                      isToday ? (isFree ? 'text-[#059669]' : 'text-[#DC2626]') : 'text-slate-800'
+                      isToday ? 'text-[#059669]' : 'text-slate-800'
                     }`}>
                       {SHORT_WEEKDAY_NAMES[i] || `T${i + 2}`}
                     </div>
                     <div className={`text-[10px] font-bold ${
-                      isToday ? (isFree ? 'text-[#059669]' : 'text-[#DC2626]') : 'text-slate-500'
+                      isToday ? 'text-[#059669]' : 'text-slate-500'
                     }`}>
                       {key.slice(8, 10)}/{key.slice(5, 7)}
                     </div>
                     <div className={`text-[9px] font-bold tracking-wider ${
-                      isToday ? (isFree ? 'text-[#059669]' : 'text-[#DC2626]') : 'text-slate-400'
+                      isToday ? 'text-[#059669]' : 'text-slate-400'
                     }`}>
                       Giờ
                     </div>
@@ -228,7 +220,7 @@ export default function StudentWeeklyScheduleGrid({
                 if (!sch) {
                   return (
                     <td key={dateKey} className={`px-1 py-3 text-center border-r border-slate-100 last:border-r-0 ${
-                      isToday ? (isFree ? 'bg-emerald-50/30' : 'bg-[#FEF2F2]/50') : ''
+                      isToday ? 'bg-emerald-50/30' : ''
                     }`}>
                       <div className="w-full flex items-center justify-center text-xs font-bold text-slate-400">
                         -
@@ -245,7 +237,7 @@ export default function StudentWeeklyScheduleGrid({
 
                 return (
                   <td key={dateKey} className={`px-1 py-2 border-r border-slate-100 last:border-r-0 ${
-                    isToday ? (isFree ? 'bg-emerald-50/30' : 'bg-[#FEF2F2]/50') : ''
+                    isToday ? 'bg-emerald-50/30' : ''
                   }`}>
                     <button
                       type="button"

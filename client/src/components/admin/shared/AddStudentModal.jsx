@@ -586,7 +586,7 @@ export default function AddStudentModal({
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
         <div className="cms-sheet-header">
-          <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
+          <span className="cms-sheet-header__side bg-emerald-50 text-emerald-600" aria-hidden="true">
             <Plus size={18} />
           </span>
           <h3 className="cms-sheet-header__title">Thêm học viên mới</h3>
@@ -594,7 +594,7 @@ export default function AddStudentModal({
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
           >
             <X size={18} />
           </button>
@@ -670,7 +670,7 @@ export default function AddStudentModal({
               </div>
 
               <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 md:mt-auto">
-                <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-emerald-500 shrink-0" />
+                <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0" />
                 <span className="min-w-0">
                   <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
                   <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp - hoặc dùng &quot;Lưu chưa thanh toán&quot; nếu thu sau</span>

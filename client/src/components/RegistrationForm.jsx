@@ -467,7 +467,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
               <img src="/logo-thang-tin-hoc.svg" alt="Thắng Tin Học" className="h-10 brightness-0 invert" />
               <div>
                 <h1 className="text-white text-lg font-bold tracking-wide">Trung tâm Thắng Tin Học</h1>
-                <p className="text-red-100 text-xs">Đăng ký khóa học trực tuyến</p>
+                <p className="text-emerald-100 text-xs">Đăng ký khóa học trực tuyến</p>
               </div>
             </div>
           </div>
@@ -490,7 +490,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             {/* ===== BƯỚC 1 ===== */}
             {step === 1 && (
               <div className="space-y-5">
-                <h2 className="text-2xl font-bold text-red-700 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-emerald-700 flex items-center gap-2">
                   <GraduationCap size={28} />  Đăng ký khóa học
                 </h2>
                 {isReEnroll && (
@@ -518,7 +518,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, gender: 'male' }))}
                       className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
-                        ? 'bg-red-50 text-red-700 border-emerald-500 shadow-sm'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-sm'
                         : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                         }`}
                     >
@@ -528,7 +528,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, gender: 'female' }))}
                       className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
-                        ? 'bg-rose-50 text-rose-700 border-emerald-500 shadow-sm'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-sm'
                         : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                         }`}
                     >
@@ -609,14 +609,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
 
                 {/* Hiệu ứng marketing giá */}
                 {formData.course && (
-                  <div className="rounded-2xl overflow-hidden border-2 border-red-200 shadow-sm">
+                  <div className="rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm">
                     {formData.discountPercent > 0 ? (
                       <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-4">
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className="bg-yellow-400 text-red-800 text-xs font-black px-2.5 py-1 rounded-full animate-pulse">
+                          <span className="bg-yellow-400 text-emerald-950 text-xs font-black px-2.5 py-1 rounded-full animate-pulse">
                             ⚡ Giảm {formData.discountPercent}%
                           </span>
-                          <span className="line-through text-red-200 text-base">
+                          <span className="line-through text-emerald-100/80 text-base">
                             {formData.price.toLocaleString('vi-VN')}đ
                           </span>
                         </div>
@@ -624,15 +624,15 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                           <span className="text-white text-3xl font-black">
                             {formData.effectivePrice.toLocaleString('vi-VN')} VNĐ
                           </span>
-                          <span className="text-red-200 text-sm">
+                          <span className="text-emerald-100 text-sm">
                             (tiết kiệm {(formData.price - formData.effectivePrice).toLocaleString('vi-VN')}đ)
                           </span>
                         </div>
                       </div>
                     ) : (
-                      <div className="bg-red-50 border border-red-100 px-5 py-4 flex justify-between items-center">
+                      <div className="bg-emerald-50 border border-emerald-200 px-5 py-4 flex justify-between items-center">
                         <span className="text-sm text-gray-600 font-medium">Học phí:</span>
-                        <span className="text-2xl font-bold text-red-700">{formData.price.toLocaleString('vi-VN')} VNĐ</span>
+                        <span className="text-2xl font-bold text-emerald-700">{formData.price.toLocaleString('vi-VN')} VNĐ</span>
                       </div>
                     )}
                   </div>
@@ -700,7 +700,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 <div className="bg-gray-50 rounded-xl p-5 text-left space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-gray-500">Học viên:</span><span className="font-bold">{formData.name}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">Khóa học:</span><span className="font-semibold text-blue-700">{formData.course}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">Học phí:</span><span className="font-bold text-red-700">{(formData.effectivePrice || formData.price).toLocaleString('vi-VN')} VNĐ</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Học phí:</span><span className="font-bold text-emerald-700">{(formData.effectivePrice || formData.price).toLocaleString('vi-VN')} VNĐ</span></div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Trạng thái:</span>
                     <span className="font-bold text-green-600 flex items-center gap-1"><CheckCircle size={14} />  Đã thanh toán</span>

@@ -29,7 +29,7 @@ export default function CertPrepQuestionNavigator({
               const ok = gradeCertPrepQuestion(q, answers[q.id]);
               btnStyle = ok
                 ? 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold'
-                : 'bg-emerald-500/25 border-emerald-500/50 text-red-200 font-bold';
+                : 'bg-red-500/25 border-red-500/50 text-red-200 font-bold';
             } else if (done) {
               btnStyle = 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold';
             }
@@ -92,7 +92,7 @@ export default function CertPrepQuestionNavigator({
               : 'border-red-400 bg-red-50 text-red-700';
           }
           if (current) {
-            tone = 'border-emerald-600 bg-white text-red-700 ring-2 ring-red-600 shadow-sm';
+            tone = 'border-emerald-600 bg-white text-emerald-700 ring-2 ring-emerald-600 shadow-sm';
           }
           return (
             <button

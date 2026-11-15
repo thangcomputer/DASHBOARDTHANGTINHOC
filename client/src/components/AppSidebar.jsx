@@ -19,6 +19,7 @@ import { hasFeedPostAccess, resolveTodayXpSidebar, subscriptionShortLabel } from
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../services/dailyPracticeApi';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
+import { prefetchRouteByPath } from '../utils/routePrefetch';
 
 const INBOX_FOOTER_HIDE_MS = 1500;
 
@@ -126,6 +127,7 @@ const MENU_CONFIG = {
       { key: 'cert-prep', section: 'HỌC VIÊN', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
 
       { key: 'daily-practice', section: 'DEWSKILL', icon: Gamepad2, label: 'Luyện tập & Tài nguyên', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'lms-xp-settings', section: 'DEWSKILL', icon: Award, label: 'Điểm XP học bài', path: '/admin', hash: 'lms-xp-settings', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'subscription-codes', section: 'DEWSKILL', icon: Ticket, label: 'Mã kích hoạt & Gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
       { key: 'meet-classes', section: 'DEWSKILL', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
 
@@ -152,6 +154,7 @@ const MENU_CONFIG = {
         isGroup: true,
         children: [
           { key: 'logs', icon: Lock, label: 'Nhật ký hệ thống', path: '/admin', hash: 'logs', permission: PERMISSIONS.VIEW_LOGS },
+          { key: 'device-security', icon: KeyRound, label: 'Thiết bị & 2FA', path: '/admin', hash: 'device-security', permission: PERMISSIONS.SYSTEM_SETTINGS },
           { key: 'files', icon: HardDrive, label: 'Quản lý file', path: '/admin/files', permission: PERMISSIONS.SYSTEM_SETTINGS },
           { key: 'backups', icon: Archive, label: 'Sao lưu dữ liệu', path: '/admin/backups', superAdminOnly: true },
           { key: 'monitoring', icon: Activity, label: 'Monitoring', path: '/admin/monitoring', permission: PERMISSIONS.VIEW_LOGS },
@@ -1030,6 +1033,8 @@ const AppSidebar = ({
                   <button
                     type="button"
                     onClick={() => !isLocked && handleClick(navItem)}
+                    onMouseEnter={() => !isLocked && !itemFreeLocked(navItem) && navItem.path && prefetchRouteByPath(navItem.path)}
+                    onFocus={() => !isLocked && !itemFreeLocked(navItem) && navItem.path && prefetchRouteByPath(navItem.path)}
                     disabled={isLocked}
                     aria-current={active ? 'page' : undefined}
                     title={isLocked ? 'Bạn chưa phải là giáo viên chính thức nên chưa được mở' : undefined}
@@ -1184,6 +1189,8 @@ const AppSidebar = ({
               key={item.key}
               type="button"
               onClick={() => handleClick(item)}
+              onMouseEnter={() => !item.isLogout && !item.isChangePassword && !item.isPinLock && !itemFreeLocked(item) && item.path && prefetchRouteByPath(item.path)}
+              onFocus={() => !item.isLogout && !item.isChangePassword && !item.isPinLock && !itemFreeLocked(item) && item.path && prefetchRouteByPath(item.path)}
               className={`cms-sidebar-glass__nav-item w-full flex items-center rounded-[14px] transition-all min-h-11 box-border
                 ${isStudentNav ? 'gap-[10px] px-[10px] py-2' : 'gap-3 px-3 py-1.5'}
                 ${item.isLogout
@@ -1318,6 +1325,9 @@ const AppSidebar = ({
                   key={item.key}
                   type="button"
                   onClick={() => handleClick(item)}
+                  onTouchStart={() => !itemFreeLocked(item) && item.path && prefetchRouteByPath(item.path)}
+                  onMouseEnter={() => !itemFreeLocked(item) && item.path && prefetchRouteByPath(item.path)}
+                  onFocus={() => !itemFreeLocked(item) && item.path && prefetchRouteByPath(item.path)}
                   aria-current={active ? 'page' : undefined}
                   aria-label={item.label}
                   tabIndex={footerShown ? 0 : -1}

@@ -9,7 +9,7 @@ import api, { resolveMediaUrl } from '../services/api';
 const PUBLIC_ICON = '/favicon.svg';
 const ADMIN_ICON = '/favicon-admin.svg';
 const PUBLIC_THEME = '#0f172a';
-const ADMIN_THEME = '#991b1b';
+const ADMIN_THEME = '#10B981';
 
 function detectIconType(href) {
   const h = String(href || '').split('?')[0].toLowerCase();

@@ -115,6 +115,7 @@ export function QuizAnswerOption({
       type="button"
       disabled={locked || eliminated}
       onClick={onSelect}
+      title={!locked && !eliminated ? `Phím tắt: ${index + 1} hoặc ${letter}` : undefined}
       data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
       className={`${CHIP} group relative flex h-full min-h-[62px] w-full items-center gap-3.5 !rounded-2xl !px-4 !py-3.5 text-left text-[15px] transition-all duration-200 sm:!px-5 ${isCorrect
           ? 'dp-option-select border-emerald-500 bg-gradient-to-r from-[#ECFDF5] via-[#E6F9EF] to-[#ECFDF5] text-emerald-950 !shadow-[0_3px_0_#34D399,0_8px_20px_-6px_rgba(16,185,129,0.22)]'
@@ -144,7 +145,7 @@ export function QuizAnswerOption({
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect
             ? 'bg-emerald-500 text-white shadow-2xs'
             : isWrongPick
-              ? 'bg-emerald-500 text-white shadow-2xs'
+              ? 'bg-red-500 text-white shadow-2xs'
               : eliminated
                 ? 'bg-slate-100 text-slate-300'
                 : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 group-hover:border-emerald-500 group-hover:bg-emerald-500 group-hover:text-white'
@@ -167,7 +168,7 @@ export function QuizAnswerOption({
       )}
       {isWrongPick && (
         <span
-          className="dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs"
+          className="dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500 text-white shadow-xs"
           aria-label="Sai"
         >
           <X size={16} strokeWidth={3} />

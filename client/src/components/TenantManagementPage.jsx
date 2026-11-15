@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import {
   Building2, Loader2, Plus, RefreshCw, Users, GraduationCap, Calendar,
@@ -84,7 +84,7 @@ export default function TenantManagementPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <Building2 className="text-red-600" size={22} /> Multi-tenant
+            <Building2 className="text-emerald-600" size={22} /> Multi-tenant
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
             Tổ chức · chi nhánh · chuyển ngữ cảnh bằng dropdown trên topbar
@@ -120,7 +120,7 @@ export default function TenantManagementPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-gray-900 truncate">
                   {t.code} - {t.name}
-                  {t.isDefault && <span className="ml-1 text-[10px] text-red-600">Default</span>}
+                  {t.isDefault && <span className="ml-1 text-[10px] text-emerald-600">Default</span>}
                 </p>
                 <p className="text-[10px] text-gray-400 font-bold ">{t.status} · {t.branchCount ?? 0} chi nhánh</p>
               </div>

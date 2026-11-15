@@ -411,7 +411,7 @@ export default function TeacherQuizManager({
                 <Award className="text-emerald-600" size={20} /> Quản lý Trắc nghiệm mỗi buổi học
               </h2>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Tạo câu hỏi trắc nghiệm, gán cho học viên và chấm điểm tự động theo chuẩn phòng thi chứng chỉ.
+                Tạo câu hỏi trắc nghiệm, gán cho học viên và chấm điểm tự động theo chuẩn phòng thi chứng nhận.
               </p>
             </div>
             <button
@@ -713,7 +713,7 @@ export default function TeacherQuizManager({
                       placeholder="Chủ đề câu hỏi AI * (prompt tạo câu hỏi)"
                       aria-label="Chủ đề câu hỏi AI, prompt tạo câu hỏi"
                       aria-invalid={aiTopicError}
-                      className={`w-full rounded-xl border bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-violet-400 ${aiTopicError ? 'border-emerald-500 ring-2 ring-red-100' : 'border-violet-100'}`}
+                      className={`w-full rounded-xl border bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-violet-400 ${aiTopicError ? 'border-red-500 ring-2 ring-red-100' : 'border-violet-100'}`}
                     />
                     {aiTopicError && <p className="-mt-2 text-[10px] font-bold text-red-600">Nhập chủ đề câu hỏi để AI tạo câu hỏi.</p>}
                     <div className="space-y-2">
@@ -784,7 +784,7 @@ export default function TeacherQuizManager({
                         <button
                           type="button"
                           onClick={() => removeQuestion(qIdx)}
-                          className="text-red-500 hover:text-emerald-700 text-xs font-bold flex items-center gap-1"
+                          className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"
                         >
                           <Trash2 size={13} /> Xóa câu
                         </button>

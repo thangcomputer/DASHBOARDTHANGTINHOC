@@ -3,7 +3,46 @@ import { Platform, Vibration } from 'react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { getMobileSoundEnabled, subscribeToMobileSoundPreference } from '../../services/soundPreferences';
 
-export type GameSound = 'tap' | 'pick' | 'drop' | 'correct' | 'wrong' | 'hint' | 'win' | 'sad' | 'lightning' | 'mascotVictory';
+export type GameSound = 'tap' | 'pick' | 'drop' | 'correct' | 'wrong' | 'hint' | 'win' | 'sad' | 'lightning' | 'mascotVictory' | 'streak';
+export type HapticKind = 'light' | 'medium' | 'success' | 'error' | 'celebration';
+
+let mobileSoundEnabledCache = true;
+getMobileSoundEnabled().then((enabled) => { mobileSoundEnabledCache = enabled; }).catch(() => { });
+subscribeToMobileSoundPreference((enabled) => { mobileSoundEnabledCache = enabled; });
+
+/** Phản hồi rung đa cấp độ theo thao tác; tôn trọng cài đặt âm thanh/rung và prefers-reduced-motion. */
+export function triggerMobileHaptic(kind: HapticKind = 'light') {
+  if (!mobileSoundEnabledCache) return;
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return;
+      }
+      const nav = typeof navigator !== 'undefined' ? navigator : null;
+      if (nav && typeof nav.vibrate === 'function') {
+        const webPatterns: Record<HapticKind, number | number[]> = {
+          light: 8,
+          medium: 14,
+          success: [12, 35, 18],
+          error: [28, 45, 36],
+          celebration: [18, 40, 22, 40, 32],
+        };
+        nav.vibrate(webPatterns[kind] ?? 8);
+      }
+      return;
+    }
+    const nativePatterns: Record<HapticKind, number | number[]> = {
+      light: 10,
+      medium: 16,
+      success: [0, 14, 35, 20],
+      error: 110,
+      celebration: [0, 24, 45, 30, 45, 50],
+    };
+    Vibration.vibrate(nativePatterns[kind] ?? 10);
+  } catch {
+    /* thiết bị không hỗ trợ rung - bỏ qua */
+  }
+}
 
 type Note = { freq: number; at?: number; dur?: number; slideTo?: number };
 const WEB_NOTES: Record<GameSound, [Note[], OscillatorType, number]> = {
@@ -39,6 +78,7 @@ const WEB_NOTES: Record<GameSound, [Note[], OscillatorType, number]> = {
     'triangle',
     0.24,
   ],
+  streak: [[{ freq: 587.33, dur: 0.08 }, { freq: 783.99, at: 0.06, dur: 0.09 }, { freq: 1174.66, at: 0.12, dur: 0.18 }], 'triangle', 0.14],
 };
 
 let webCtx: AudioContext | null = null;
@@ -98,21 +138,20 @@ export function useGameSounds() {
   }, []);
 
   return useCallback((name: GameSound) => {
-    if (Platform.OS !== 'web') {
-      if (name === 'wrong' || name === 'sad') {
-        Vibration.vibrate(name === 'wrong' ? 120 : [0, 80, 60, 80]);
-      } else if (name === 'lightning') {
-        Vibration.vibrate([0, 50, 40, 100]);
-      } else if (name === 'mascotVictory') {
-        Vibration.vibrate([0, 100, 60, 140]);
-      }
-    }
     if (!enabledRef.current) return;
+    mobileSoundEnabledCache = enabledRef.current;
+    if (name === 'tap' || name === 'hint') triggerMobileHaptic('light');
+    else if (name === 'pick' || name === 'drop') triggerMobileHaptic('medium');
+    else if (name === 'correct') triggerMobileHaptic('success');
+    else if (name === 'wrong' || name === 'sad') triggerMobileHaptic('error');
+    else if (name === 'win' || name === 'lightning' || name === 'mascotVictory' || name === 'streak') triggerMobileHaptic('celebration');
+
     if (Platform.OS === 'web') {
       playWeb(name);
       return;
     }
-    const player = playersRef.current[name as keyof typeof playersRef.current] || playersRef.current.win;
+    const fallback = name === 'streak' ? playersRef.current.correct : playersRef.current.win;
+    const player = playersRef.current[name as keyof typeof playersRef.current] || fallback;
     void player.seekTo(0).then(() => player.play()).catch(() => { });
   }, []);
 }

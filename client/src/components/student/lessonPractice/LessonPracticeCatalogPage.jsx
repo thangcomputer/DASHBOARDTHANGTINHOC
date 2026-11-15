@@ -77,10 +77,10 @@ function CourseCatalogCard({
         className={`flex min-h-0 w-full flex-1 flex-col rounded-t-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${blockUnregisteredInstructorPreview ? 'cursor-default' : ''}`}
       >
         <span
-          className={`relative flex h-24 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-3 sm:h-28 sm:p-4 ${course.bannerColorStart || course.bannerColorEnd ? '' : 'bg-gradient-to-br from-rose-700 via-red-700 to-red-900'
+          className={`relative flex h-24 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-3 sm:h-28 sm:p-4 ${course.bannerColorStart || course.bannerColorEnd ? '' : 'bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800'
             }`}
           style={course.bannerColorStart || course.bannerColorEnd ? {
-            background: `linear-gradient(135deg, ${course.bannerColorStart || '#be123c'}, ${course.bannerColorEnd || '#7f1d1d'})`,
+            background: `linear-gradient(135deg, ${course.bannerColorStart || '#059669'}, ${course.bannerColorEnd || '#065f46'})`,
           } : undefined}
         >
           {course.thumbnail ? (
@@ -236,8 +236,8 @@ function CourseCatalogCard({
                       <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Bài tự luận được AI đánh giá và phản hồi.</span></li>
                       <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Đăng ký một lần, học trọn đời.</span></li>
                     </ul>
-                    <p className="mt-3 border-t border-red-100 pt-2 text-xs font-bold leading-relaxed text-slate-900">
-                      <span className="text-red-700">Lưu ý:</span> Khóa học trên <em className="text-red-700">không phải là học 1 kèm 1</em>; không hoàn phí nếu đã đăng ký.
+                    <p className="mt-3 border-t border-amber-200/80 pt-2 text-xs font-bold leading-relaxed text-slate-900">
+                      <span className="text-amber-700">Lưu ý:</span> Khóa học trên <em className="text-amber-700">không phải là học 1 kèm 1</em>; không hoàn phí nếu đã đăng ký.
                     </p>
                   </>
                 )}
@@ -277,7 +277,7 @@ function CourseCatalogCard({
             onClick={onSelect}
             aria-haspopup={directSubject ? undefined : 'dialog'}
             aria-expanded={selected}
-            className={`inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-xs font-black shadow-sm transition-colors ${course.enrolled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-700 hover:bg-emerald-600 hover:text-white'}`}
+            className="inline-flex min-h-9 items-center gap-2 rounded-full bg-emerald-50 px-4 text-xs font-black text-emerald-700 shadow-sm transition-colors hover:bg-emerald-600 hover:text-white"
           >
             {course.enrolled
               ? courseProgressPercent > 0 && courseProgressPercent < 100
@@ -356,7 +356,7 @@ function CourseSubjectsModal({
             type="button"
             onClick={onClose}
             aria-label="Quay lại danh sách khóa học"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 sm:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 sm:hidden"
           >
             <ArrowLeft size={18} />
           </button>
@@ -771,7 +771,7 @@ export default function LessonPracticeCatalogPage() {
                   aria-selected={filter === filterOption.id}
                   onClick={() => { setFilter(filterOption.id); setSelectedCourseId(''); }}
                   className={`relative flex min-h-[68px] min-w-0 flex-1 flex-col items-center justify-center gap-1 border-b-2 border-transparent px-0.5 py-2 text-center text-[10px] font-bold leading-tight transition-colors md:min-h-0 md:flex-row md:shrink-0 md:flex-initial md:gap-2 md:rounded-xl md:border-0 md:px-3.5 md:py-2.5 md:text-sm md:text-left md:transition md:px-4 ${filter === filterOption.id
-                    ? 'border-b-red-600 text-red-700 md:bg-emerald-600 md:text-white md:shadow-sm'
+                    ? 'border-b-emerald-600 text-emerald-700 md:bg-emerald-600 md:text-white md:shadow-sm'
                     : 'text-slate-500 hover:text-slate-900 md:text-slate-600 md:hover:bg-slate-100'
                     }`}
                 >
@@ -793,7 +793,7 @@ export default function LessonPracticeCatalogPage() {
             {filter === 'guide' ? (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
                 <div className="mb-5 flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                     <CircleHelp size={22} />
                   </span>
                   <div>

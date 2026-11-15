@@ -667,8 +667,10 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 
   const [cancelEnrModal, setCancelEnrModal] = useState(null); // { enr, reason, refundAmount }
   const [ledgerCard, setLedgerCard] = useState(null);
+  const [showFreeSurveyDetail, setShowFreeSurveyDetail] = useState(false);
 
   useEffect(() => {
+    setShowFreeSurveyDetail(false);
     if (!studentId) return;
     let cancelled = false;
     api.finance.studentCard(studentId)
@@ -1457,11 +1459,35 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                           : ''}
                       </span>
                     )}
+                    {data.student.freeSurvey?.answeredAt && (
+                      <button
+                        type="button"
+                        onClick={() => setShowFreeSurveyDetail((prev) => !prev)}
+                        aria-expanded={showFreeSurveyDetail}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors shrink-0 cursor-pointer"
+                      >
+                        <ClipboardList size={12} className="shrink-0" />
+                        <span>{showFreeSurveyDetail ? 'Ẩn khảo sát' : 'Xem khảo sát'}</span>
+                        <ChevronRight
+                          size={12}
+                          className={`shrink-0 transition-transform ${showFreeSurveyDetail ? 'rotate-90' : ''}`}
+                        />
+                      </button>
+                    )}
                   </div>
 
-                  {data.student.freeSurvey?.answeredAt && (
+                  {data.student.freeSurvey?.answeredAt && showFreeSurveyDetail && (
                     <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-[12px] text-amber-950">
-                      <p className="font-bold">Khảo sát tài khoản miễn phí</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-bold">Khảo sát tài khoản miễn phí</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowFreeSurveyDetail(false)}
+                          className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 underline cursor-pointer"
+                        >
+                          Ẩn
+                        </button>
+                      </div>
                       <p>Biết qua: {SURVEY_SOURCE_LABELS[data.student.freeSurvey.source] || data.student.freeSurvey.source}{data.student.freeSurvey.sourceNote ? ` (${data.student.freeSurvey.sourceNote})` : ''}</p>
                       <p>Trình độ: {SURVEY_LEVEL_LABELS[data.student.freeSurvey.level] || data.student.freeSurvey.level}</p>
                       <p>Lo nhất: {SURVEY_FEAR_LABELS[data.student.freeSurvey.fear] || data.student.freeSurvey.fear}</p>
@@ -2520,7 +2546,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       {/* Trắc nghiệm Giảng viên giao */}
                       <div className="flex flex-col min-h-0">
                         <h3 className="font-black text-slate-900 text-xs sm:text-sm  tracking-wider flex items-center gap-2 min-w-0 shrink-0">
-                          <Award size={16} className="text-red-500 shrink-0" /> <span className="leading-snug">Trắc nghiệm Giảng viên giao</span>
+                          <Award size={16} className="text-emerald-600 shrink-0" /> <span className="leading-snug">Trắc nghiệm Giảng viên giao</span>
                         </h3>
                         <div className="flex-1 min-h-0 max-h-[35vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3 mt-2">
                           {loadingStudentQuizzes ? (

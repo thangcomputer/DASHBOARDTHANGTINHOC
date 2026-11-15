@@ -82,10 +82,10 @@ export default function StudentAttendanceConfirmModal({
   };
 
   let headerTone = 'bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-700';
-  let eyebrowTone = 'text-red-100/90';
-  let titleTone = 'text-red-50';
-  let fractionTone = 'text-red-100/90';
-  let courseTone = 'text-red-50/95';
+  let eyebrowTone = 'text-emerald-100/90';
+  let titleTone = 'text-emerald-50';
+  let fractionTone = 'text-emerald-100/90';
+  let courseTone = 'text-emerald-50/95';
   let eyebrow = 'Xác nhận điểm danh';
   if (waiting) {
     headerTone = 'bg-gradient-to-br from-amber-700 via-amber-600 to-orange-700';

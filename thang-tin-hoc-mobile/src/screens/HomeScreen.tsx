@@ -14,6 +14,13 @@ import { LearningLeaderboardCard } from '../components/LearningLeaderboardCard';
 import { pickActivePathTopic } from '../utils/pickActivePathTopic';
 import { pathTopicHasLearningProgress, pathTopicNextLinePrefix } from '../../../shared/dailyPractice/lastPathTopic.mjs';
 import { resolveSavedPathTopicId, syncLastPathTopicFromServer } from '../utils/lastPathTopic';
+import {
+  LAST_STUDY_UPDATED_EVENT,
+  formatLmsTimestamp,
+  formatResumeTimeAgo,
+  readLastStudySession,
+  type LastStudySession,
+} from '../utils/resumeLearning';
 import { isMeetEnded, isMeetLiveNow, meetLessonName, vnScheduleClock } from '../utils/meetJoin';
 import { DailyPracticeOverviewCard } from '../components/DailyPracticeOverviewCard';
 import { FreeMeetPlanModal, isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
@@ -36,6 +43,9 @@ import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { DuoButton } from '../components/duo/DuoButton';
 import { DuoHeroCard } from '../components/duo/DuoHeroCard';
 import { DuoDailyQuestsCard } from '../components/duo/DuoDailyQuestsCard';
+import { MobileHomeWidgetCard } from '../components/MobileHomeWidgetCard';
+import { listOfflineVideos } from '../services/offlineVideos';
+import { saveHomeWidgetSnapshot } from '../services/widgetSync';
 import { DuoScheduleCard } from '../components/duo/DuoScheduleCard';
 
 type RootNavigation = NativeStackNavigationProp<AppStackParamList>;
@@ -179,6 +189,7 @@ export function HomeScreen() {
   const [meetClasses, setMeetClasses] = useState<MeetClassRow[]>([]);
   const [lmsSubjects, setLmsSubjects] = useState<LmsSubjectProgress[]>([]);
   const [savedPathTopicId, setSavedPathTopicId] = useState('');
+  const [lastStudy, setLastStudy] = useState<LastStudySession | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 30_000);
@@ -188,6 +199,7 @@ export function HomeScreen() {
   useFocusEffect(useCallback(() => {
     if (isTeacher || !user || user.previewMode) return;
     const userKey = String(user.id || user._id || '').trim();
+    void readLastStudySession(userKey).then(setLastStudy);
     dailyPracticeApi.overview().then(setPractice).catch(() => { });
     dailyPracticeApi.path()
       .then((data) => {
@@ -253,6 +265,7 @@ export function HomeScreen() {
   }, [isTeacher, user]));
   useEffect(() => {
     if (isTeacher || !user || user.previewMode) return undefined;
+    const userKey = String(user.id || user._id || '').trim();
     const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: { stats?: Partial<DpStats>; xpTotal?: number | null }) => {
       if (!detail) return;
       setPractice((prev) => {
@@ -262,7 +275,15 @@ export function HomeScreen() {
         return prev;
       });
     });
-    return () => sub.remove();
+    const resumeSub = DeviceEventEmitter.addListener(LAST_STUDY_UPDATED_EVENT, (sessionData?: LastStudySession) => {
+      if (!sessionData) return;
+      if (userKey && sessionData.studentId && sessionData.studentId !== userKey) return;
+      setLastStudy(sessionData);
+    });
+    return () => {
+      sub.remove();
+      resumeSub.remove();
+    };
   }, [isTeacher, user]);
   const schedulesLoader = useCallback(() => (
     isTeacher
@@ -628,6 +649,14 @@ export function HomeScreen() {
     .filter((quiz) => !quiz.mySubmission && (!quiz.deadline || deadlineOf(quiz.deadline) > nowMs))
     .sort((a, b) => deadlineOf(a.deadline) - deadlineOf(b.deadline));
   const practiceStats = practice?.stats;
+  const [offlineVideosCount, setOfflineVideosCount] = useState(0);
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    void listOfflineVideos().then((items) => {
+      if (alive) setOfflineVideosCount(items.length);
+    }).catch(() => { });
+    return () => { alive = false; };
+  }, []));
   const studentTasks: OverviewTask[] = [];
   if (nextHomework) {
     studentTasks.push({
@@ -694,6 +723,50 @@ export function HomeScreen() {
         ? 'purchase'
         : 'default')
     : 'default';
+
+  const widgetPrimaryClass = todayMobileClasses[0];
+  const widgetNextTime = widgetPrimaryClass
+    ? widgetPrimaryClass.time
+    : firstSchedule
+      ? (firstSchedule.startTime && firstSchedule.endTime
+        ? `${firstSchedule.startTime} - ${firstSchedule.endTime}`
+        : firstSchedule.startTime || firstSchedule.time || '')
+      : (nextMeetForEmpty?.startTime || '');
+  const widgetNextLabel = widgetPrimaryClass
+    ? widgetPrimaryClass.title
+    : firstSchedule
+      ? (firstSchedule.title || firstSchedule.courseName || firstSchedule.subject || 'Buổi học')
+      : (nextMeetForEmpty ? meetLessonName(nextMeetForEmpty) : 'Không có lịch học hôm nay');
+  const widgetNextLive = Boolean(widgetPrimaryClass?.live || (firstSchedule && scheduleIsLive(firstSchedule)));
+
+  useEffect(() => {
+    if (isTeacher || !user) return;
+    void saveHomeWidgetSnapshot({
+      userId: String(user.id || user._id || ''),
+      studentName: user.name || 'Học viên',
+      streak: Number(practiceStats?.streak || 0),
+      playedToday: Boolean(practiceStats?.playedToday),
+      todayXp: Number(practiceStats?.todayXp || 0),
+      xp: Number(practiceStats?.xpTotal || 0),
+      todayClassesCount: todayMobileClasses.length,
+      nextClassLabel: widgetNextLabel,
+      nextClassTime: widgetNextTime,
+      nextClassLive: widgetNextLive,
+      offlineVideosCount,
+    });
+  }, [
+    isTeacher,
+    offlineVideosCount,
+    practiceStats?.playedToday,
+    practiceStats?.streak,
+    practiceStats?.todayXp,
+    practiceStats?.xpTotal,
+    todayMobileClasses.length,
+    user,
+    widgetNextLabel,
+    widgetNextLive,
+    widgetNextTime,
+  ]);
 
   return (
     <AppScreen
@@ -835,8 +908,63 @@ export function HomeScreen() {
         </>
       ) : (
         <View style={styles.duoStudentContainer}>
+          <MobileHomeWidgetCard
+            streak={Number(practiceStats?.streak || 0)}
+            playedToday={Boolean(practiceStats?.playedToday)}
+            todayXp={Number(practiceStats?.todayXp || 0)}
+            todayClassesCount={todayMobileClasses.length}
+            nextClassLabel={widgetNextLabel}
+            nextClassTime={widgetNextTime}
+            nextClassLive={widgetNextLive}
+            offlineVideosCount={offlineVideosCount}
+            onPressPractice={() => tabNavigation.navigate('DailyPractice')}
+            onPressSchedule={() => {
+              if (!freeMenu) tabNavigation.navigate('Schedule');
+              else setMeetPlanOpen(true);
+            }}
+            onPressOffline={() => tabNavigation.navigate('CourseVideos')}
+          />
           <View style={isWide ? styles.duoGridWide : styles.studentGridStack}>
             <View style={isWide ? styles.duoColLeft : styles.studentColStack}>
+              {!isTeacher && lastStudy ? (
+                <View style={styles.resumeCard}>
+                  <View style={styles.resumeHeaderRow}>
+                    <View style={styles.resumeBadge}>
+                      <Text style={styles.resumeBadgeText}>HỌC TIẾP 1 CHẠM</Text>
+                    </View>
+                    <Text style={styles.resumeAgoText}>{formatResumeTimeAgo(lastStudy.updatedAt)}</Text>
+                  </View>
+                  <Text style={styles.resumeTitle} numberOfLines={2}>
+                    {lastStudy.unitTitle || lastStudy.courseTitle}
+                  </Text>
+                  <Text style={styles.resumeMeta} numberOfLines={1}>
+                    {[lastStudy.courseTitle, lastStudy.sectionLabel].filter(Boolean).join(' • ')}
+                  </Text>
+                  <View style={styles.resumeTimeRow}>
+                    <Text style={styles.resumeTimeText}>
+                      Mốc dừng: {formatLmsTimestamp(lastStudy.atSec)}
+                      {lastStudy.durationSec > 0 ? ` / ${formatLmsTimestamp(lastStudy.durationSec)}` : ''}
+                    </Text>
+                    <Text style={styles.resumePercentText}>
+                      {Math.min(100, Math.max(0, Math.round(lastStudy.progressPct || 0)))}%
+                    </Text>
+                  </View>
+                  <DuoButton
+                    variant="primary"
+                    size="md"
+                    text="Tiếp tục bài học"
+                    onPress={() =>
+                      tabNavigation.navigate('CourseVideos', {
+                        resumeKey: Date.now(),
+                        resumeCourseId: lastStudy.courseId,
+                        resumeSubjectId: lastStudy.subjectId,
+                        resumeUnitId: lastStudy.unitId,
+                        resumeSectionId: lastStudy.sectionId,
+                      })
+                    }
+                  />
+                </View>
+              ) : null}
               <DuoScheduleCard
                 todayClasses={todayMobileClasses}
                 firstSchedule={firstSchedule}
@@ -1334,4 +1462,29 @@ const styles = StyleSheet.create({
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.sm },
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   sheetBody: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl },
+  resumeCard: {
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#FFFFFF',
+    padding: spacing.lg,
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  resumeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  resumeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  resumeBadgeText: { color: '#047857', fontSize: 11, fontWeight: '900' },
+  resumeAgoText: { color: '#64748B', fontSize: 12, fontWeight: '700' },
+  resumeTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900', lineHeight: 22 },
+  resumeMeta: { color: '#475569', fontSize: 13, fontWeight: '600' },
+  resumeTimeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 2, paddingBottom: 4 },
+  resumeTimeText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  resumePercentText: { color: '#059669', fontSize: 12, fontWeight: '900' },
 });

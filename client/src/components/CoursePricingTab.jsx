@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import { loadXlsx } from '../utils/loadXlsx';
 import CmsSelect from './ui/CmsSelect';
 import {
   Plus, Edit2, Trash2, Save, X, Loader2, AlertCircle,
@@ -53,7 +53,8 @@ const normalizeSpreadsheetHeader = (value) => String(value || '')
 
 const normalizeCourseName = (value) => normalizeSpreadsheetHeader(value);
 
-function downloadCourseWorkbook(rows, filename) {
+async function downloadCourseWorkbook(rows, filename) {
+  const XLSX = await loadXlsx();
   const worksheet = XLSX.utils.aoa_to_sheet([
     COURSE_IMPORT_COLUMNS.map(({ header }) => header),
     ...rows.map((row) => COURSE_IMPORT_COLUMNS.map(({ key }) => row[key] ?? '')),
@@ -502,7 +503,7 @@ function CourseModal({
                       <label
                         key={option.id}
                         className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-blue-300 ${selected
-                            ? 'border-emerald-500 bg-red-50 text-red-800'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
                             : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200'
                           }`}
                       >
@@ -514,7 +515,7 @@ function CourseModal({
                           onChange={() => setForm((current) => ({ ...current, deliveryMode: option.id }))}
                           className="sr-only"
                         />
-                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-red-100 text-red-700' : 'bg-white text-gray-500'
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-gray-500'
                           }`}>
                           <option.Icon size={20} />
                         </span>
@@ -541,8 +542,8 @@ function CourseModal({
                 </div>
                 <div>
                   <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Giảm giá (%)</label>
-                  <div className="flex items-center bg-gray-50 border-2 border-transparent focus-within:border-red-400 focus-within:bg-white rounded-[20px] px-4 py-4 transition-all shadow-sm gap-1">
-                    <Percent size={14} className="text-red-400 flex-shrink-0" />
+                  <div className="flex items-center bg-gray-50 border-2 border-transparent focus-within:border-emerald-500 focus-within:bg-white rounded-[20px] px-4 py-4 transition-all shadow-sm gap-1">
+                    <Percent size={14} className="text-emerald-500 flex-shrink-0" />
                     <input
                       type="number"
                       value={form.discountPercent}
@@ -606,7 +607,7 @@ function CourseModal({
                 </div>
                 <div>
                   <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Giá thu thực tế</label>
-                  <div className={`rounded-[20px] px-4 py-3 border-2 min-h-[56px] flex flex-col justify-center shadow-sm transition ${hasDiscount ? 'border-red-200 bg-red-50' : 'border-transparent bg-gray-50'
+                  <div className={`rounded-[20px] px-4 py-3 border-2 min-h-[56px] flex flex-col justify-center shadow-sm transition ${hasDiscount ? 'border-emerald-200 bg-emerald-50' : 'border-transparent bg-gray-50'
                     }`}>
                     {hasDiscount ? (
                       <>
@@ -616,7 +617,7 @@ function CourseModal({
                             -{form.discountPercent}%
                           </span>
                         </div>
-                        <span className="text-base font-black text-red-600 leading-tight">{fmt(effective)}đ</span>
+                        <span className="text-base font-black text-emerald-600 leading-tight">{fmt(effective)}đ</span>
                       </>
                     ) : (
                       <span className="text-base font-black text-blue-700 leading-tight">
@@ -710,8 +711,8 @@ function CourseModal({
                   className="mb-3 h-12 rounded-xl border border-black/5 shadow-inner"
                   style={{
                     background: form.bannerColorStart || form.bannerColorEnd
-                      ? `linear-gradient(135deg, ${form.bannerColorStart || '#be123c'}, ${form.bannerColorEnd || '#7f1d1d'})`
-                      : 'linear-gradient(135deg, #be123c, #7f1d1d)',
+                      ? `linear-gradient(135deg, ${form.bannerColorStart || '#059669'}, ${form.bannerColorEnd || '#065f46'})`
+                      : 'linear-gradient(135deg, #059669, #065f46)',
                   }}
                   aria-label="Xem trước màu banner"
                 />
@@ -719,7 +720,7 @@ function CourseModal({
                   <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
                     <input
                       type="color"
-                      value={form.bannerColorStart || '#be123c'}
+                      value={form.bannerColorStart || '#059669'}
                       onChange={(e) => setForm((f) => ({ ...f, bannerColorStart: e.target.value }))}
                       className="h-9 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
                       aria-label="Chọn màu đầu banner"
@@ -729,7 +730,7 @@ function CourseModal({
                   <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
                     <input
                       type="color"
-                      value={form.bannerColorEnd || '#7f1d1d'}
+                      value={form.bannerColorEnd || '#065f46'}
                       onChange={(e) => setForm((f) => ({ ...f, bannerColorEnd: e.target.value }))}
                       className="h-9 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
                       aria-label="Chọn màu cuối banner"
@@ -1120,7 +1121,7 @@ export default function CoursePricingTab() {
 
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
-  const exportCourses = () => {
+  const exportCourses = async () => {
     const rows = courses.map((course) => ({
       name: course.name || '',
       price: Number(course.price) || 0,
@@ -1137,11 +1138,17 @@ export default function CoursePricingTab() {
       bannerColorEnd: course.bannerColorEnd || '',
       status: course.status || 'published',
     }));
-    downloadCourseWorkbook(rows, `danh-sach-khoa-hoc-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    try {
+      await downloadCourseWorkbook(rows, `danh-sach-khoa-hoc-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      toast.error(err?.message || 'Không xuất được file Excel');
+      return;
+    }
     toast.success(`Đã xuất ${rows.length} khóa học`);
   };
 
-  const downloadImportTemplate = () => {
+  const downloadImportTemplate = async () => {
+    const XLSX = await loadXlsx();
     const worksheet = XLSX.utils.aoa_to_sheet([
       COURSE_IMPORT_COLUMNS.map(({ header }) => header),
     ]);
@@ -1167,6 +1174,7 @@ export default function CoursePricingTab() {
     if (!file || importing) return;
     setImporting(true);
     try {
+      const XLSX = await loadXlsx();
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       if (!sheet) throw new Error('File Excel không có sheet dữ liệu');
@@ -1549,7 +1557,7 @@ export default function CoursePricingTab() {
                     <div className="min-w-0 text-center">
                       <p className="text-[11px] text-slate-500 mb-0.5">Giảm giá</p>
                       {hasDiscount ? (
-                        <span className="inline-flex text-[12px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                        <span className="inline-flex text-[12px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
                           -{course.discountPercent}%
                         </span>
                       ) : (
@@ -1558,7 +1566,7 @@ export default function CoursePricingTab() {
                     </div>
                     <div className="min-w-0 text-right">
                       <p className="text-[11px] text-slate-500 mb-0.5">Giá áp dụng</p>
-                      <p className={`text-[13px] font-semibold tabular-nums leading-tight ${hasDiscount ? 'text-red-600' : 'text-blue-700'}`}>
+                      <p className={`text-[13px] font-semibold tabular-nums leading-tight ${hasDiscount ? 'text-emerald-600' : 'text-blue-700'}`}>
                         {fmt(ep)}đ
                       </p>
                     </div>
@@ -1617,7 +1625,7 @@ export default function CoursePricingTab() {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         {hasDiscount ? (
-                          <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 font-semibold text-[12px] px-2.5 py-1 rounded-full">
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 font-semibold text-[12px] px-2.5 py-1 rounded-full">
                             -{course.discountPercent}%
                           </span>
                         ) : (
@@ -1625,7 +1633,7 @@ export default function CoursePricingTab() {
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <span className={`font-mono font-semibold text-sm tabular-nums ${hasDiscount ? 'text-red-600' : 'text-blue-700'}`}>
+                        <span className={`font-mono font-semibold text-sm tabular-nums ${hasDiscount ? 'text-emerald-600' : 'text-blue-700'}`}>
                           {fmt(ep)}đ
                         </span>
                       </td>

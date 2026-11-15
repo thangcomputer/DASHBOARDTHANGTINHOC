@@ -175,7 +175,7 @@ export default function AdminTrainingTab({ section }) {
       {!section && (
         <div className="cms-toolbar">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
-            <BookOpen size={20} className="text-red-600" /> Quản lý Đào tạo Giảng viên
+            <BookOpen size={20} className="text-emerald-600" /> Quản lý Đào tạo Giảng viên
           </h2>
         </div>
       )}
@@ -292,9 +292,9 @@ export default function AdminTrainingTab({ section }) {
 
           {/* Add/Edit Form */}
           {trainingForm && (
-            <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-4 sm:p-6 space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 p-4 sm:p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 min-w-0">
+                <h3 className="text-lg font-bold text-emerald-700 flex items-center gap-2 min-w-0">
                   <Edit3 size={16} /> {trainingForm.id ? 'Chỉnh sửa' : 'Thêm mới'}
                 </h3>
                 <button type="button" onClick={() => setTrainingForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><X size={18} /></button>
@@ -421,7 +421,7 @@ export default function AdminTrainingTab({ section }) {
                     <div>
                       <label className="text-xs font-bold text-gray-500  block mb-1">Tải tệp</label>
                       <div className="flex flex-wrap items-center gap-2 min-h-[46px]">
-                        <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-red-300 bg-red-50/50 text-red-800 text-xs font-black  tracking-wide cursor-pointer hover:bg-red-100 transition-colors shrink-0 ${trainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                        <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 text-emerald-800 text-xs font-black  tracking-wide cursor-pointer hover:bg-emerald-100 transition-colors shrink-0 ${trainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                           {trainingFileUploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
                           {trainingFileUploading ? 'Đang tải...' : 'Tải tệp'}
                           <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar" onChange={(e) => handleTrainingDocUpload(e, 'teacher')} />
@@ -431,10 +431,10 @@ export default function AdminTrainingTab({ section }) {
                             href={buildMediaDownloadUrl(trainingForm.fileUrl, trainingForm.fileOriginalName)}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 max-w-[min(100%,14rem)] px-3 py-2 rounded-xl bg-red-100/80 border border-red-200 text-red-900 text-xs font-bold hover:bg-red-200/80 transition-colors truncate"
+                            className="inline-flex items-center gap-2 max-w-[min(100%,14rem)] px-3 py-2 rounded-xl bg-emerald-100/80 border border-emerald-200 text-emerald-900 text-xs font-bold hover:bg-emerald-200/80 transition-colors truncate"
                             title={trainingUploadDisplayName(trainingForm.fileUrl, trainingForm.fileOriginalName)}
                           >
-                            <FileText size={16} className="shrink-0 text-red-600" />
+                            <FileText size={16} className="shrink-0 text-emerald-600" />
                             <span className="truncate">{trainingUploadDisplayName(trainingForm.fileUrl, trainingForm.fileOriginalName)}</span>
                           </a>
                         )}
@@ -753,7 +753,7 @@ export default function AdminTrainingTab({ section }) {
                                       <button
                                         type="button"
                                         onClick={() => setGvReviewModal(t)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all border border-emerald-200 max-w-[200px] truncate"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition-all border border-emerald-200 max-w-[200px] truncate"
                                         title={practicalFileDisplayName(t.practicalFile)}
                                       >
                                         <Download size={12} className="shrink-0" />
@@ -1083,9 +1083,9 @@ export default function AdminTrainingTab({ section }) {
                   <div><label className="text-xs font-bold text-gray-500  block mb-1">Ngày thi</label><input type="datetime-local" value={erGvForm.testDate ? new Date(erGvForm.testDate).toISOString().slice(0, 16) : ''} onChange={e => setErGvForm({ ...erGvForm, testDate: new Date(e.target.value).toISOString() })} className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm" /></div>
                 </div>
               </div>
-              <div className="bg-red-50 rounded-2xl p-4 space-y-3 border border-red-100">
-                <p className="text-xs font-black text-red-700  tracking-widest">                    ✍️ Bài tự luận & ghi chú</p>
-                <div><label className="text-xs font-bold text-gray-500  block mb-1">Đánh giá chung (Ghi chú)</label><textarea value={erGvForm.testNotes || ''} onChange={e => setErGvForm({ ...erGvForm, testNotes: e.target.value })} rows={2} className="w-full border-2 border-red-100 rounded-xl p-3 focus:border-purple-500 outline-none text-sm resize-none" placeholder="Đánh giá kết quả của giảng viên..." /></div>
+              <div className="bg-emerald-50 rounded-2xl p-4 space-y-3 border border-emerald-100">
+                <p className="text-xs font-black text-emerald-700  tracking-widest">                    ✍️ Bài tự luận & ghi chú</p>
+                <div><label className="text-xs font-bold text-gray-500  block mb-1">Đánh giá chung (Ghi chú)</label><textarea value={erGvForm.testNotes || ''} onChange={e => setErGvForm({ ...erGvForm, testNotes: e.target.value })} rows={2} className="w-full border-2 border-emerald-100 rounded-xl p-3 focus:border-emerald-500 outline-none text-sm resize-none" placeholder="Đánh giá kết quả của giảng viên..." /></div>
               </div>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-gray-50 rounded-2xl p-4 border border-gray-100">
                 <p className="text-[15px] font-black text-gray-700 flex-1">Kết quả: Xét duyệt Giảng dạy?</p>
@@ -1097,7 +1097,7 @@ export default function AdminTrainingTab({ section }) {
                       }`}>Đạt (cấp quyền)</button>
                   <button onClick={() => setErGvForm({ ...erGvForm, status: 'Locked' })}
                     className={`flex-1 px-5 py-3 rounded-2xl text-[12px] font-black transition-all duration-300 border-2 ${erGvForm.status === 'Locked'
-                        ? 'bg-emerald-600 border-transparent text-white shadow-md scale-[1.02]'
+                        ? 'bg-red-600 border-transparent text-white shadow-md scale-[1.02]'
                         : 'bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 hover:bg-red-50/50 hover:scale-[1.02]'
                       }`}>Chưa đạt (khóa lại)</button>
                 </div>

@@ -203,6 +203,11 @@ const TeacherSchema = new mongoose.Schema(
     mfaEnabled: { type: Boolean, default: false },
     mfaSecret: { type: String, default: '', select: false },
     mfaPendingSecret: { type: String, default: '', select: false },
+
+    // ── 2FA OTP Zalo / Email - dành cho tài khoản nội bộ admin/staff ─
+    otp2faEnabled: { type: Boolean, default: false },
+    otp2faChannel: { type: String, enum: ['zalo', 'email', 'both'], default: 'both' },
+    otp2faPhone: { type: String, default: '' },
   },
   {
     timestamps: true,

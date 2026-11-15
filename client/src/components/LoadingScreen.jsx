@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import KineticDotsLoader from './ui/kinetic-dots-loader';
+import { TabContentSkeleton } from './ui/Skeleton';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -89,12 +90,24 @@ export default function LoadingScreen({
 
   if (!show && splash) return null;
 
+  // ─── Giao diện SKELETON (khung xương chống giật bố cục) ───
+  if (mode === 'skeleton') {
+    return (
+      <div className="w-full py-2 px-1" role="status" aria-busy="true" aria-label={message}>
+        <TabContentSkeleton />
+      </div>
+    );
+  }
+
   // ─── Giao diện TAB COMPACT (khi nạp tab bên trong dashboard) ───
   if (mode === 'tab') {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4 min-h-[200px] w-full animate-in fade-in duration-300 select-none">
-        <KineticDotsLoader dots={4} className="min-h-0 p-0" />
-        <p className="mt-3 text-sm md:text-base font-bold text-slate-700 tracking-wide">{message}</p>
+      <div className="w-full space-y-5 py-4 px-2 animate-in fade-in duration-300 select-none" role="status" aria-busy="true">
+        <div className="flex items-center justify-center gap-3 py-3">
+          <KineticDotsLoader dots={4} className="min-h-0 p-0 scale-75" />
+          <p className="text-sm md:text-base font-bold text-slate-700 tracking-wide">{message}</p>
+        </div>
+        <TabContentSkeleton stats={0} rows={4} />
       </div>
     );
   }

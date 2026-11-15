@@ -92,7 +92,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
 
         <div className="cms-sheet-header">
-          <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
+          <span className="cms-sheet-header__side bg-emerald-50 text-emerald-600" aria-hidden="true">
             <DollarSign size={18} />
           </span>
           <div className="min-w-0 px-1">
@@ -116,7 +116,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
             type="button"
             onClick={close}
             aria-label="Đóng"
-            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
           >
             <X size={18} />
           </button>
@@ -127,7 +127,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
             <div className="cms-sheet-body space-y-4">
               {pm.isLoading ? (
                 <div className="flex items-center justify-center py-12 gap-3 text-slate-500">
-                  <Loader2 size={20} className="animate-spin text-red-500" />
+                  <Loader2 size={20} className="animate-spin text-emerald-600" />
                   <span className="text-sm font-medium">Đang tải...</span>
                 </div>
               ) : (
@@ -270,7 +270,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                       min="0"
                       value={pm.amount}
                       onChange={(e) => setPayoutModal((prev) => ({ ...prev, amount: e.target.value }))}
-                      className="cms-input font-bold tabular-nums text-red-700 text-base"
+                      className="cms-input font-bold tabular-nums text-emerald-700 text-base"
                       placeholder="0"
                     />
                     {autoAmt > 0 && Number(pm.amount) !== autoAmt && (
@@ -353,7 +353,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                     </div>
                     <div className="flex justify-between items-center border-t border-slate-200 pt-2 mt-1">
                       <span className="font-semibold text-slate-800 text-sm">Tổng chuyển</span>
-                      <span className="text-base font-bold text-red-600 tabular-nums">
+                      <span className="text-base font-bold text-emerald-600 tabular-nums">
                         {Number(pm.amount || 0).toLocaleString('vi-VN')}đ
                       </span>
                     </div>
@@ -382,7 +382,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
               <div className="text-center">
                 <p className="font-semibold text-slate-900">Quét QR chuyển khoản</p>
                 <p className="text-sm text-slate-500 mt-1">
-                  <span className="font-bold text-red-600 tabular-nums">
+                  <span className="font-bold text-emerald-600 tabular-nums">
                     {Number(pm.amount).toLocaleString('vi-VN')}đ
                   </span>
                   <NavArrow size={14} className="inline-block align-middle mx-1 text-slate-400" />
@@ -433,7 +433,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                 ))}
                 <div className="flex justify-between gap-3 border-t border-slate-100 pt-2 items-center">
                   <span className="font-semibold text-slate-700">Số tiền</span>
-                  <span className="font-bold text-base text-red-600 tabular-nums">
+                  <span className="font-bold text-base text-emerald-600 tabular-nums">
                     {Number(pm.amount).toLocaleString('vi-VN')}đ
                   </span>
                 </div>

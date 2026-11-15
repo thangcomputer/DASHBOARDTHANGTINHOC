@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, BookOpen, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, Zap,
+  ArrowLeft, BookOpen, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Maximize2, Minimize2, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, Zap,
 } from 'lucide-react';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
+import { useFocusMode } from '../../../utils/focusMode';
 import { LEARNING_GOAL_CHANGED_EVENT, lessonResumeUrl } from '../../../utils/learningGoal';
 import {
   DIFFICULTIES, QUESTION_TYPES, QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, difficultyMeta, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage,
@@ -30,6 +31,8 @@ import PracticeFinishOverlay from './PracticeFinishOverlay';
 import ComboCelebrationOverlay from './ComboCelebrationOverlay';
 import { shouldNudgeHintButton, shouldShowComboCelebration } from './quizFeedbackOrchestration';
 import BuyXpModal from './BuyXpModal';
+import DigitalCertificateModal from '../DigitalCertificateModal';
+import PlacementTestModal, { readPlacementResult } from './PlacementTestModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import FreeMeetPlanModal, { isFreePortalAccount } from './FreeMeetPlanModal';
 import subscriptionApi from '../../../services/subscriptionApi';
@@ -77,8 +80,22 @@ function Confetti({ count = 22, spread = 160 }) {
   ));
 }
 
+function readStudentCertificateMeta() {
+  try {
+    const raw = localStorage.getItem('student_user') || localStorage.getItem('cms_student_user');
+    const u = JSON.parse(raw || '{}');
+    return {
+      studentId: String(u.id || u._id || '').trim(),
+      studentName: String(u.fullName || u.name || u.username || '').trim() || 'Học viên Thắng Tin Học',
+      studentCode: String(u.studentCode || u.code || '').trim(),
+    };
+  } catch {
+    return { studentId: '', studentName: 'Học viên Thắng Tin Học', studentCode: '' };
+  }
+}
+
 function HomeScreen({
-  overview, loading, error, onStart, starting, initialTopicId = '',
+  overview, loading, error, onStart, onStartSpacedReview, starting, initialTopicId = '',
   mode, onModeChange, path, pathLoading, pathError, onStartStep, onPathChanged, onBuyXpPaid,
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
@@ -86,6 +103,10 @@ function HomeScreen({
   const [activePathTopicId, setActivePathTopicId] = useState(initialTopicId);
   const [difficulty, setDifficulty] = useState('easy');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
+  const certStudent = useMemo(() => readStudentCertificateMeta(), []);
+  const [placementOpen, setPlacementOpen] = useState(false);
+  const [placementResult, setPlacementResult] = useState(() => readPlacementResult(certStudent.studentId));
   const topics = useMemo(() => overview?.topics || [], [overview]);
   const stats = overview?.stats || {};
   const xpEmpty = Boolean(stats.xpEmpty || (stats.xpTotal || 0) <= 0);
@@ -164,6 +185,7 @@ function HomeScreen({
         pathContinue={Boolean(pathContinue)}
         freeTopicName={selected?.name || topics[0]?.name || ''}
         onBuyXp={() => setBuyXpOpen(true)}
+        onOpenCertificate={() => setCertOpen(true)}
       />
 
       {xpEmpty && (
@@ -213,9 +235,7 @@ function HomeScreen({
                   onClick={() => { gameSounds.tap(); onModeChange(item.id); }}
                   className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-black transition !shadow-none ${
                     active
-                      ? (freePortal
-                        ? 'bg-white text-[#059669] shadow-sm ring-1 ring-emerald-200/60'
-                        : 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200')
+                      ? 'bg-white text-[#059669] shadow-sm ring-1 ring-emerald-200/60'
                       : 'text-[#64748B] hover:text-slate-700'
                   }`}
                 >
@@ -305,8 +325,90 @@ function HomeScreen({
           </section>
         </div>
 
-        <aside className="min-w-0 lg:col-span-4">
+        <aside className="min-w-0 space-y-4 lg:col-span-4">
           <DailyPracticeGoalPanel practiceStats={stats} />
+          {(() => {
+            const spaced = overview?.spacedRepetition || stats?.spacedRepetition || { dueCount: 0, totalQueued: 0, rewardXp: 15, nextDueDay: '' };
+            const dueCount = Number(spaced.dueCount) || 0;
+            const totalQueued = Number(spaced.totalQueued) || 0;
+            const rewardXp = Number(spaced.rewardXp) || 15;
+            return (
+              <section className="rounded-[24px] border border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/60 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black text-slate-900">🧠 Ôn tập ngắt quãng</h3>
+                    <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                      Chu kỳ 1–3–7 ngày · Đạt ≥ 70% nhận +{rewardXp} XP
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-black ${
+                      dueCount > 0
+                        ? 'bg-emerald-600 text-white'
+                        : totalQueued > 0
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {dueCount > 0
+                      ? `${dueCount} câu đến hạn`
+                      : totalQueued > 0
+                        ? `${totalQueued} câu chờ lịch`
+                        : 'Sạch lỗi'}
+                  </span>
+                </div>
+                <p className="mt-2.5 text-xs font-medium leading-relaxed text-slate-600">
+                  {totalQueued > 0
+                    ? dueCount > 0
+                      ? `Bạn có ${dueCount} câu từng làm sai đã tới lịch nhắc lại hôm nay (tổng ${totalQueued} câu đang theo dõi).`
+                      : `Chưa có câu đến hạn hôm nay (${totalQueued} câu sẽ nhắc lại${spaced.nextDueDay ? ` từ ${spaced.nextDueDay}` : ''}). Bạn vẫn có thể ôn sớm ngay!`
+                    : 'Các câu bạn làm sai trong quá trình luyện tập sẽ tự động vào đây để nhắc ôn sau 1, 3 và 7 ngày.'}
+                </p>
+                <button
+                  type="button"
+                  disabled={starting || totalQueued === 0}
+                  onClick={() => {
+                    gameSounds.tap();
+                    onStartSpacedReview?.();
+                  }}
+                  className="cms-btn cms-btn-primary mt-3 w-full !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {starting ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                  {dueCount > 0 ? `Ôn tập ngay (${Math.min(10, totalQueued)} câu)` : totalQueued > 0 ? 'Ôn sớm hàng đợi' : 'Chưa có câu cần ôn'}
+                </button>
+              </section>
+            );
+          })()}
+          <section className="rounded-[24px] border border-sky-200/80 bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/60 p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-slate-900">🎯 Lộ trình cá nhân hóa</h3>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                  {placementResult
+                    ? `Đạt ${placementResult.score}/${placementResult.total} · ${placementResult.recommendedLevel}`
+                    : 'Bài kiểm tra đầu vào 10 câu → AI gợi ý Word / Excel / PPT'}
+                </p>
+              </div>
+              {placementResult && (
+                <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800">
+                  Đã đánh giá
+                </span>
+              )}
+            </div>
+            {placementResult && (
+              <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 border border-sky-100">
+                Gợi ý ưu tiên: <strong className="text-emerald-700">{placementResult.matchedTopicName}</strong>
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => { gameSounds.tap(); setPlacementOpen(true); }}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-white px-3 py-2.5 text-xs font-black text-sky-700 transition hover:bg-sky-50 !shadow-none"
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              {placementResult ? 'Xem kết quả AI / Làm lại' : 'Kiểm tra đầu vào 10 câu'}
+            </button>
+          </section>
         </aside>
       </div>
 
@@ -316,6 +418,37 @@ function HomeScreen({
           onClose={() => setBuyXpOpen(false)}
           onPaid={(status) => {
             onBuyXpPaid?.(status);
+          }}
+        />
+      )}
+      {certOpen && (
+        <DigitalCertificateModal
+          open={certOpen}
+          onClose={() => setCertOpen(false)}
+          studentName={certStudent.studentName}
+          studentCode={certStudent.studentCode}
+          studentId={certStudent.studentId}
+          courseId={mode === 'path' ? (pathTopic?.topic?.id || topicId || 'dewskill') : (topicId || pathTopic?.topic?.id || 'dewskill')}
+          courseTitle={mode === 'path'
+            ? (pathTopic?.topic?.name || selected?.name || topics[0]?.name || 'Lộ trình Tin học DewSkill')
+            : (selected?.name || pathTopic?.topic?.name || 'Luyện tập Tin học DewSkill')}
+          instructorName="Trung tâm Thắng Tin Học"
+            completionRate={pathTopic?.totalUnits
+              ? Math.min(100, Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100))
+              : 100}
+          />
+      )}
+      {placementOpen && (
+        <PlacementTestModal
+          open={placementOpen}
+          onClose={() => setPlacementOpen(false)}
+          studentId={certStudent.studentId}
+          topics={(path?.topics || []).map((t) => t.topic).filter(Boolean).length
+            ? (path?.topics || []).map((t) => t.topic).filter(Boolean)
+            : topics}
+          onApplied={(res) => {
+            setPlacementResult(res);
+            if (res?.matchedTopicId) pickSubject(res.matchedTopicId);
           }}
         />
       )}
@@ -571,6 +704,107 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         : (isPerQuestion ? perQuestionStake : 0)))
     : 0;
 
+  const { focusMode, toggle: toggleFocus, setFocusMode } = useFocusMode();
+  useEffect(() => () => setFocusMode(false), [setFocusMode]);
+
+  const keyActionsRef = useRef({});
+  keyActionsRef.current = {
+    blocked: quitOpen || buyXpOpen || Boolean(comboCelebration),
+    busy,
+    question,
+    result,
+    reveal,
+    pending,
+    immediate,
+    retryBaselineKey,
+    submit,
+    askHint,
+    next,
+    clearImmediateResult: () => {
+      setResult(null);
+      setChosen(null);
+      setPending(null);
+    },
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof Element) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+      }
+      const s = keyActionsRef.current;
+      if (s.blocked || s.busy || !s.question) return;
+      const key = String(event.key || '');
+      const lower = key.toLowerCase();
+
+      if (s.result?.correct) {
+        if (key === 'Enter' || key === 'ArrowRight') {
+          event.preventDefault();
+          gameSounds.tap();
+          s.next();
+        }
+        return;
+      }
+
+      if (s.result && !s.result.correct) {
+        if (key === 'Enter') {
+          if (s.immediate) {
+            event.preventDefault();
+            gameSounds.tap();
+            s.clearImmediateResult();
+          } else if (canSubmitRetryAfterWrong({ pending: s.pending, retryBaselineKey: s.retryBaselineKey, questionType: s.question.type })) {
+            event.preventDefault();
+            s.submit(s.pending);
+          }
+        }
+        return;
+      }
+
+      if (lower === 'h' && !s.reveal) {
+        event.preventDefault();
+        s.askHint();
+        return;
+      }
+
+      if (s.question.type === 'mcq') {
+        const map = { '1': 0, '2': 1, '3': 2, '4': 3, a: 0, b: 1, c: 2, d: 3 };
+        if (Object.prototype.hasOwnProperty.call(map, lower)) {
+          const idx = map[lower];
+          const eliminated = new Set(s.reveal?.eliminate || []);
+          if (Array.isArray(s.question.options) && idx < s.question.options.length && !eliminated.has(idx)) {
+            event.preventDefault();
+            gameSounds.tap();
+            s.submit({ index: idx });
+          }
+        }
+        return;
+      }
+
+      if (s.question.type === 'truefalse') {
+        if (lower === '1' || lower === 'a' || lower === 'd') {
+          event.preventDefault();
+          gameSounds.tap();
+          s.submit({ value: true });
+        } else if (lower === '2' || lower === 'b' || lower === 's') {
+          event.preventDefault();
+          gameSounds.tap();
+          s.submit({ value: false });
+        }
+        return;
+      }
+
+      if (!s.immediate && s.pending && key === 'Enter') {
+        event.preventDefault();
+        s.submit(s.pending);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 pt-6 pb-12 sm:gap-6 sm:px-6 sm:pt-10">
       {/* Thanh trên: thoát · tiến độ · XP · âm thanh */}
@@ -617,6 +851,20 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
               <span className="dp-xp-hint-spend" aria-live="polite">−{hintChargedXp} XP</span>
             ) : null}
           </span>
+          <button
+            type="button"
+            onClick={() => { gameSounds.tap(); toggleFocus(); }}
+            aria-pressed={focusMode}
+            title={focusMode ? 'Thoát Chế độ Tập trung' : 'Bật Chế độ Tập trung (ẩn sidebar)'}
+            aria-label={focusMode ? 'Thoát Chế độ Tập trung' : 'Bật Chế độ Tập trung'}
+            className={`hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition ${
+              focusMode
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {focusMode ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+          </button>
           <SoundToggleButton compact />
         </div>
       </header>
@@ -747,6 +995,29 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             ) : null}
           </div>
         )}
+
+        <p className="mt-4 hidden items-center justify-center gap-2 text-[11px] font-medium text-slate-400 sm:flex">
+          <span>Phím tắt:</span>
+          {result?.correct ? (
+            <span>
+              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Enter</kbd>
+              {' hoặc '}
+              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">→</kbd>
+              {' sang câu tiếp'}
+            </span>
+          ) : result ? (
+            <span>
+              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Enter</kbd>
+              {' thử lại'}
+            </span>
+          ) : (
+            <span>
+              {question.type === 'mcq' || question.type === 'truefalse' ? '1–4 / A–D chọn đáp án · ' : ''}
+              {!reveal ? 'H gợi ý · ' : ''}
+              {!immediate ? 'Enter kiểm tra' : 'Chọn đáp án ở trên'}
+            </span>
+          )}
+        </p>
       </section>
 
       {quitOpen && (
@@ -787,16 +1058,12 @@ function RelatedLessonCard({ lesson }) {
   const navigate = useNavigate();
   const isFree = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) || isFreePortalAccount();
   return (
-    <section className={`dp-slide-up flex flex-col gap-3 rounded-[24px] p-4 sm:flex-row sm:items-center ${
-      isFree ? 'bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-100' : 'bg-gradient-to-r from-red-50 to-amber-50 ring-1 ring-red-100'
-    }`}>
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
-        isFree ? 'bg-emerald-600' : 'bg-emerald-600'
-      }`}>
+    <section className="dp-slide-up flex flex-col gap-3 rounded-[24px] p-4 sm:flex-row sm:items-center bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-100">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm bg-emerald-600">
         <PlayCircle size={26} aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className={`text-[11px] font-bold ${isFree ? 'text-emerald-700' : 'text-red-600'}`}>
+        <p className="text-[11px] font-bold text-emerald-700">
           {lesson.completed ? 'Ôn lại video liên quan' : 'Học tiếp video liên quan'} · {lesson.subjectName}
         </p>
         <p className="truncate text-sm font-black text-slate-900">{lesson.unitTitle}</p>
@@ -805,7 +1072,7 @@ function RelatedLessonCard({ lesson }) {
       <button
         type="button"
         onClick={() => navigate(lessonResumeUrl(lesson))}
-        className={`cms-btn ${isFree ? '!bg-emerald-600 hover:!bg-emerald-700 !border-b-[#059669]' : 'cms-btn-primary'} shrink-0 !py-2.5 text-white`}
+        className="cms-btn !bg-emerald-600 hover:!bg-emerald-700 !border-b-[#059669] shrink-0 !py-2.5 text-white"
       >
         <PlayCircle size={17} aria-hidden="true" /> Xem video liên quan
       </button>
@@ -1287,7 +1554,9 @@ export default function DailyPracticePage() {
     try {
       const data = pick.mode === 'path'
         ? await dailyPracticeApi.student.startPath(pick.unitId, pick.step, pick.testOut, pick.nodeKey || '')
-        : await dailyPracticeApi.student.start(pick.topicId, pick.difficulty);
+        : pick.mode === 'spaced'
+          ? await dailyPracticeApi.student.startSpacedReview()
+          : await dailyPracticeApi.student.start(pick.topicId, pick.difficulty);
       setLastPick(pick);
       setSummary(null);
       setSession({
@@ -1332,6 +1601,7 @@ export default function DailyPracticePage() {
     });
   };
   const start = (topicId, difficulty) => begin({ mode: 'free', topicId, difficulty });
+  const startSpacedReview = () => begin({ mode: 'spaced' });
   const startStep = (unitId, nodeKey, step, testOut = false, opts = {}) => queueBegin({
     mode: 'path', unitId, nodeKey, step, testOut, review: opts.review === true,
   });
@@ -1474,6 +1744,7 @@ export default function DailyPracticePage() {
           loading={loading}
           error={error}
           onStart={start}
+          onStartSpacedReview={startSpacedReview}
           starting={starting}
           initialTopicId={linkedTopicId}
           mode={mode}

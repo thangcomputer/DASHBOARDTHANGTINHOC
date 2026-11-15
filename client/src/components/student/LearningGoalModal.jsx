@@ -104,7 +104,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
         aria-modal="true"
         aria-labelledby="learning-goal-title"
       >
-        <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-red-50 via-white to-amber-50 px-4 sm:px-6 pb-3.5 sm:pb-4 pt-4 sm:pt-5 text-center">
+        <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-4 sm:px-6 pb-3.5 sm:pb-4 pt-4 sm:pt-5 text-center">
           <span className="cms-goal-droplet left-5 top-4 h-5 w-5 opacity-60" aria-hidden="true" />
           <span className="cms-goal-droplet cms-goal-droplet--amber left-12 top-10 h-2.5 w-2.5 opacity-60 [animation-delay:1.4s]" aria-hidden="true" />
           <span className="cms-goal-droplet right-12 top-8 h-3 w-3 opacity-60 [animation-delay:0.7s]" aria-hidden="true" />
@@ -123,7 +123,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
           <div className="relative mx-auto h-11 w-11 sm:h-13 sm:w-13">
             {!celebrate && <span className="cms-goal-ring" aria-hidden="true" />}
             {!celebrate && <span className="cms-goal-ring cms-goal-ring--late" aria-hidden="true" />}
-            <div className={`relative flex h-11 w-11 sm:h-13 sm:w-13 items-center justify-center rounded-full text-white ${celebrate ? 'cms-goal-pop bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_8px_18px_rgba(5,150,105,0.35),inset_0_2px_3px_rgba(255,255,255,0.45),inset_0_-3px_5px_rgba(6,78,59,0.45)]' : 'bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_8px_18px_rgba(185,28,28,0.35),inset_0_2px_3px_rgba(255,255,255,0.4),inset_0_-3px_5px_rgba(127,29,29,0.5)]'}`}>
+            <div className={`relative flex h-11 w-11 sm:h-13 sm:w-13 items-center justify-center rounded-full text-white ${celebrate ? 'cms-goal-pop bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_8px_18px_rgba(5,150,105,0.35),inset_0_2px_3px_rgba(255,255,255,0.45),inset_0_-3px_5px_rgba(6,78,59,0.45)]' : 'bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_8px_18px_rgba(5,150,105,0.35),inset_0_2px_3px_rgba(255,255,255,0.4),inset_0_-3px_5px_rgba(6,78,59,0.5)]'}`}>
               {celebrate ? <Check size={22} strokeWidth={3} aria-hidden="true" /> : <Target size={22} className="sm:scale-110" aria-hidden="true" />}
             </div>
           </div>
@@ -149,7 +149,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
                 aria-hidden="true"
               />
             ))}
-            <div className="cms-goal-pop mx-auto inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs sm:text-sm font-black text-red-700">
+            <div className="cms-goal-pop mx-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs sm:text-sm font-black text-emerald-700">
               <Target size={14} aria-hidden="true" /> {celebrate.label}
             </div>
             <p className="mt-2 sm:mt-2.5 flex items-center justify-center gap-1.5 text-xs sm:text-[13px] text-slate-600">
@@ -158,12 +158,12 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
             </p>
             {resume ? (
               <>
-                <div className="cms-goal-pop mt-3.5 flex w-full items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/70 p-2.5 text-left">
+                <div className="cms-goal-pop mt-3.5 flex w-full items-center gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50/70 p-2.5 text-left">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
                     <PlayCircle size={20} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] font-bold text-red-600">Đang học dở · {resume.subjectName}</span>
+                    <span className="block text-[10px] font-bold text-emerald-600">Đang học dở · {resume.subjectName}</span>
                     <span className="block truncate text-xs sm:text-sm font-black text-slate-900">{resume.unitTitle}</span>
                     {resume.itemTitle && <span className="block truncate text-[11px] text-slate-500">{resume.itemTitle}</span>}
                   </span>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Gift, Loader2, Lock, Sparkles, X, Zap } from 'lucide-react';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
@@ -253,13 +254,13 @@ export function UnitStageChest({
         <div className={boxClass}>{body}</div>
       )}
 
-      {/* Modal chúc mừng mở rương chặng nhận 50XP + lớp phủ trắng mờ sang trọng */}
-      {showCelebration && (
+      {/* Modal chúc mừng mở rương chặng nhận XP qua portal lên document.body để không bị stacking context chặng khác che */}
+      {showCelebration && typeof document !== 'undefined' && createPortal(
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Chúc mừng nhận 50 XP rương chặng"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/90 backdrop-blur-md transition-opacity duration-300"
+          aria-label={`Chúc mừng nhận ${claimedXp} XP rương chặng`}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/90 backdrop-blur-md transition-opacity duration-300"
         >
           {/* Backdrop click to dismiss */}
           <button
@@ -285,8 +286,8 @@ export function UnitStageChest({
             </button>
 
             {/* Tag danh hiệu */}
-            <div className="mx-auto mb-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-100/80 px-3 py-1 text-[11px] font-extrabold tracking-wide text-amber-900">
-              <Sparkles size={12} className="text-amber-600" />
+            <div className="mx-auto mt-4 mb-4 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200 bg-amber-100/80 px-3.5 py-1 text-[11px] font-extrabold tracking-wide text-amber-900">
+              <Sparkles size={12} className="shrink-0 text-amber-600" />
               <span>PHẦN THƯỞNG HOÀN THÀNH CHẶNG</span>
             </div>
 
@@ -305,7 +306,7 @@ export function UnitStageChest({
               Chúc mừng bạn đã chinh phục toàn bộ chặng học và nhận trọn vẹn phần thưởng!
             </p>
 
-            {/* Khung số XP nhảy số từ 1 đến 50 siêu nhanh & chuyên nghiệp */}
+            {/* Khung số XP nhảy số từ 1 đến XP nhận được siêu nhanh & chuyên nghiệp */}
             <div className="mx-auto my-4 flex items-center justify-center gap-2 rounded-2xl border-2 border-amber-200 bg-amber-50/90 px-6 py-2.5 shadow-inner">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-200 text-amber-700">
                 <Zap size={20} className="fill-amber-500 text-amber-600" />
@@ -316,7 +317,7 @@ export function UnitStageChest({
             </div>
 
             <p className="text-[11.5px] font-bold text-emerald-600">
-              {liveCounter >= claimedXp ? '✨ 50 XP đã được cộng vào tài khoản của bạn!' : 'Đang đồng bộ phần thưởng...'}
+              {liveCounter >= claimedXp ? `✨ ${claimedXp} XP đã được cộng vào tài khoản của bạn!` : 'Đang đồng bộ phần thưởng...'}
             </p>
 
             {/* Nút hành động 3D nổi bật */}
@@ -329,7 +330,8 @@ export function UnitStageChest({
               <span>Tuyệt vời · Nhận ngay</span>
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

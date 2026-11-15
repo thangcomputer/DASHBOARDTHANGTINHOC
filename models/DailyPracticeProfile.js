@@ -25,6 +25,21 @@ const dailyPracticeProfileSchema = new mongoose.Schema({
   sessionsCount: { type: Number, default: 0 },
   /** Chủ đề lộ trình học viên chọn gần nhất (đồng bộ web + mobile). */
   lastPathTopicId: { type: String, default: '' },
+  spacedBackfilled: { type: Boolean, default: false },
+  /** Hàng đợi câu làm sai cho Ôn tập ngắt quãng (Spaced Repetition 1-3-7 ngày). */
+  spacedQueue: [{
+    _id: false,
+    questionId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeQuestion', required: true },
+    stage: { type: Number, default: 0 }, // 0: mới sai (+1 ngày), 1: (+3 ngày), 2: (+7 ngày), >=3: hoàn tất
+    dueDay: { type: String, default: '' }, // YYYY-MM-DD (giờ VN)
+    wrongCount: { type: Number, default: 1 },
+    lastReviewedDay: { type: String, default: '' },
+  }],
+  /** Thông tin mã giới thiệu bạn bè (B4 Referral thưởng XP đôi). */
+  referredByStudentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
+  referredByCode: { type: String, default: '' },
+  referralCount: { type: Number, default: 0 },
+  referralXpEarned: { type: Number, default: 0 },
 }, { timestamps: true });
 
 module.exports = mongoose.models.DailyPracticeProfile || mongoose.model('DailyPracticeProfile', dailyPracticeProfileSchema);
