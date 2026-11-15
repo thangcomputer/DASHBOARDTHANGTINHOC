@@ -54,7 +54,7 @@ function RankBadge({ rank }) {
   );
 }
 
-function Avatar({ name, avatar, freePortal = false, frameClass = 'ring-2 ring-white' }) {
+function Avatar({ name, avatar, freePortal: _freePortal = false, frameClass = 'ring-2 ring-white' }) {
   const [failed, setFailed] = useState(false);
   const initial = String(name || '?').trim().split(/\s+/).pop()?.[0]?.toUpperCase() || '?';
   if (avatar && !failed) {

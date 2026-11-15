@@ -99,7 +99,7 @@ export default function WelcomeHero({
   name,
   chips = [],
   joinUrl = '',
-  joinHint = 'Chưa có link học',
+  joinHint: _joinHint = 'Chưa có link học',
   onJoin,
   showJoin = true,
   accent,

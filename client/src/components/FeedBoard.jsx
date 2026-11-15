@@ -180,7 +180,7 @@ export default function FeedBoard({ session, role }) {
     session?.freePortal === true
     || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))
   );
-  const isGreenTone = meRole === 'teacher' || isFreePortalStudent;
+  const _isGreenTone = meRole === 'teacher' || isFreePortalStudent;
   const postLocked = useMemo(
     () => isFeedPostLocked({
       role: meRole,

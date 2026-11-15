@@ -9,7 +9,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
   const { showModal } = useModal();
   const isFreePortal = isFreePortalSelfRegistrationStudent(student ? { ...student, role: 'student' } : null)
     || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
-  const isBrandStudent = !isFreePortal;
+  const _isBrandStudent = !isFreePortal;
   const [formData, setFormData] = useState({
     name: student.name || '',
     phone: student.phone && !String(student.phone).includes('@') ? student.phone : '',

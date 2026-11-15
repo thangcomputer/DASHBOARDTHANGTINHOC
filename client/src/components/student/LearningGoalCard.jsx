@@ -27,7 +27,7 @@ export default function LearningGoalCard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const freeMenu = useFreePortalMenu();
-  const isFree = Boolean(
+  const _isFree = Boolean(
     freeMenu
     || isFreePortalAccount()
     || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'))

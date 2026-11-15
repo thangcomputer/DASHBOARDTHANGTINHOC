@@ -63,6 +63,8 @@ class Phase15LiveHarness {
       RUN_OUTBOX_WORKER: '0',
       ENABLE_REDIS: 'false',
       RATE_LIMIT_LOGIN_MAX: '100',
+      RATE_LIMIT_LOGIN_BURST_MAX: '100',
+      RATE_LIMIT_LOGIN_ACCOUNT_MAX: '100',
       RATE_LIMIT_SENSITIVE_MAX: '100',
     };
     this.child = spawn(process.execPath, ['server.js'], {

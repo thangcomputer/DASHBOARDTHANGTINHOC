@@ -36,7 +36,7 @@ export default function EditableAvatar({
       try { return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true; } catch { return false; }
     })())
   );
-  const isBrandStudent = role === 'student' && !isFreePortal;
+  const _isBrandStudent = role === 'student' && !isFreePortal;
   const cameraBadgeBg = 'bg-[#10B981]';
 
   useEffect(() => {

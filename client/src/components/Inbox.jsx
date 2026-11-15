@@ -470,7 +470,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     const me = (students || []).find((s) => String(s?.id || s?._id) === String(currentUserId));
     return Boolean(me?.freePortal === true || isFreePortalSelfRegistrationStudent(me));
   }, [currentUserRole, currentUserId, currentUser, students]);
-  const isGreenTheme = currentUserRole === 'teacher' || isFreePortalStudent;
+  const _isGreenTheme = currentUserRole === 'teacher' || isFreePortalStudent;
   const [scheduleNow, setScheduleNow] = useState(() => new Date());
   const [activeConv, setActiveConv] = useState(null);
   // Hội thoại với Admin Super một chiều (server cũng chặn); HIGH_ADMIN và STAFF vẫn nhắn như cũ.

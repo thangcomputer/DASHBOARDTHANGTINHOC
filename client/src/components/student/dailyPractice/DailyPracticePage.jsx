@@ -1056,7 +1056,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
 // ── Màn kết quả ──────────────────────────────────────────────────────────────
 function RelatedLessonCard({ lesson }) {
   const navigate = useNavigate();
-  const isFree = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) || isFreePortalAccount();
+  const _isFree = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student')) || isFreePortalAccount();
   return (
     <section className="dp-slide-up flex flex-col gap-3 rounded-[24px] p-4 sm:flex-row sm:items-center bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-100">
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm bg-emerald-600">

@@ -14,10 +14,10 @@ test('thẻ chào mừng dùng chung (web): hình theo vai trò, nút vào lớp
   assert.ok(hero.includes("import teacherHero from '../assets/teacher-hero.png';"));
   assert.ok(hero.includes("joinLabel: 'Vào học ngay'"));
   assert.ok(hero.includes("joinLabel: 'Vào dạy ngay'"));
-  assert.ok(hero.includes('aria-disabled="true"'), 'chưa có link: nút mờ, không bấm được');
-  assert.ok(hero.includes('joinHint') || hero.includes('bg-white/35'), 'nút mờ trong suốt nhưng vẫn đọc được chữ');
+  assert.ok(hero.includes('showJoin && (onJoin || joinUrl)'), 'chỉ hiện nút vào lớp khi có link hoặc handler');
+  assert.ok(hero.includes('joinHint') || hero.includes('bg-white/35'), 'giữ prop joinHint tương thích');
   assert.ok(hero.includes('absolute bottom-0 right-3 flex flex-col items-center'), 'nút + nhân vật nằm trong thẻ, sát mép phải');
-  assert.ok(hero.indexOf('aria-disabled="true"') < hero.indexOf('<img src={variant.image}'), 'nút đặt trên đầu nhân vật');
+  assert.ok(hero.indexOf('variant.joinLabel') < hero.indexOf('<img src={variant.image}'), 'nút đặt trên đầu nhân vật');
   assert.ok(hero.includes('overflow-hidden') && (hero.includes('theme.section') || hero.includes('bg-gradient-to-br')), 'không tràn viền');
   for (const img of ['student-hero.png', 'teacher-hero.png']) {
     assert.ok(fs.existsSync(path.join(ROOT, 'client/src/assets', img)));

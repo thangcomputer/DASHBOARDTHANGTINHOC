@@ -60,7 +60,7 @@ function formatScheduleDateVi(dateVal) {
 export default function StudentDiaryLog({
   schedules = [],
   student,
-  isFree = false,
+  isFree: _isFree = false,
   onOpenSession,
 }) {
   const [filter, setFilter] = useState('Ngày');

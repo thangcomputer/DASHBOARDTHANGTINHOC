@@ -37,7 +37,7 @@ function slotLabel(sch) {
 export default function StudentWeeklyScheduleGrid({
   schedules = [],
   student,
-  isFree = false,
+  isFree: _isFree = false,
   enrollments = [],
   activeCourseName,
   onSelectCourse,
