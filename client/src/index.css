@@ -1013,13 +1013,8 @@
 
   @media (min-width: 768px) {
     .cms-topbar__brand {
-      position: static;
-      inset: auto;
-      margin: 0;
-      transform: none;
-      flex-shrink: 0;
-      width: 8.25rem;
-      max-width: 8.25rem;
+      width: 7.25rem;
+      max-width: 7.25rem;
       height: 2.85rem;
       padding: 0.125rem 0.2rem;
     }
