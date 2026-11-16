@@ -46,8 +46,13 @@ export default function DailyPracticeHero({
     && (pathTopic?.completedUnits || 0) >= pathTopic.totalUnits;
   const chapterCompleted = pathTopic?.completedUnits || 0;
   const chapterTotal = pathTopic?.totalUnits || 0;
+  const activeUnit = (pathTopic?.units || []).find((u) => u.state === 'active') || null;
+  const activeSteps = Array.isArray(activeUnit?.steps) ? activeUnit.steps : [];
+  const activeFraction = activeSteps.length
+    ? activeSteps.filter((s) => s.state === 'completed').length / activeSteps.length
+    : 0;
   const chapterPct = chapterTotal
-    ? Math.min(100, Math.round((chapterCompleted / chapterTotal) * 100))
+    ? Math.min(100, Math.round(((chapterCompleted + activeFraction) / chapterTotal) * 100))
     : 0;
 
   const courseCompleted = courseProgress?.completed ?? chapterCompleted;

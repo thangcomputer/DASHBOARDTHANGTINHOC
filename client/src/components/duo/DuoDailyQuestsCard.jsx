@@ -11,6 +11,7 @@ function QuestIcon({ quest, isDone }) {
 export function DuoDailyQuestsCard({
   quests,
   todayAnswers = 0,
+  todayVideos = 0,
   todayXp = 0,
   onOpenPractice,
 }) {
@@ -28,7 +29,7 @@ export function DuoDailyQuestsCard({
       id: 'video',
       icon: 'video',
       title: 'Xem 1 video bài học',
-      current: 0,
+      current: todayVideos,
       target: 1,
       unit: 'video',
       rewardXp: 15,
@@ -42,7 +43,7 @@ export function DuoDailyQuestsCard({
       unit: 'XP',
       rewardXp: 25,
     },
-  ], [quests, todayAnswers, todayXp]);
+  ], [quests, todayAnswers, todayVideos, todayXp]);
 
   const completedCount = resolvedQuests.filter((q) => q.current >= q.target).length;
 

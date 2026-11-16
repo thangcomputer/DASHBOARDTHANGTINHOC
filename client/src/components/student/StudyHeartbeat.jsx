@@ -17,6 +17,8 @@ export default function StudyHeartbeat() {
   const location = useLocation();
   const studying = isStudyLocation(location.pathname, location.hash);
   const lastActiveRef = useRef(Date.now());
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
 
   useEffect(() => {
     const touch = () => { lastActiveRef.current = Date.now(); };
@@ -30,7 +32,7 @@ export default function StudyHeartbeat() {
     lastActiveRef.current = Date.now();
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      const onDailyPractice = /^\/student\/daily-practice(\/|$)/.test(location.pathname);
+      const onDailyPractice = /^\/student\/daily-practice(\/|$)/.test(pathnameRef.current);
       if (onDailyPractice) {
         if (!isStudyMediaPlaying()) return;
       } else if (!isStudyMediaPlaying()) {

@@ -119,6 +119,12 @@ test('bằng chứng học được ghi ở mọi nơi HV làm bài / xem video'
   assert.ok(lessonService.includes("if (section === 'video' && marked.modifiedCount)"), 'mỗi video chỉ tính một lần');
   assert.ok(read('services/dailyPracticePathService.js').includes('learningGoalService.trackStudyActivity(sid, { videos: 1 })'), 'xem video lộ trình ghi nhận vào nhiệm vụ ngày');
   assert.ok(read('client/src/services/dailyPracticeApi.js').includes('LEARNING_GOAL_CHANGED_EVENT'), 'hoàn thành video tự làm mới mục tiêu học trên UI');
+  const questsCard = read('client/src/components/duo/DuoDailyQuestsCard.jsx');
+  assert.ok(questsCard.includes('current: todayVideos'), 'nhiệm vụ Xem 1 video đọc todayVideos thật');
+  assert.ok(!questsCard.includes('current: 0'), 'không hardcode 0 cho nhiệm vụ video');
+  const dpService = read('services/dailyPracticeService.js');
+  assert.ok(dpService.includes('syncDailyQuestRewards'), 'tự động cộng thưởng XP khi đạt nhiệm vụ ngày');
+  assert.ok(dpService.includes('todayVideos,'), 'getOverview trả về todayVideos trong stats');
   assert.ok(read('services/certPrepService.js').includes('trackStudyActivity(sid, { questions: newlyAnswered })'), 'ôn thi chỉ đếm câu mới trả lời');
   assert.ok(read('routes/quizRoutes.js').includes('trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(userAnswers) })'));
   assert.ok(read('routes/studentRoutes.js').includes('trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(req.body?.answers) })'));

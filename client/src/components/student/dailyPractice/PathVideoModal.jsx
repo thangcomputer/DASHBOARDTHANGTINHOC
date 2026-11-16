@@ -11,6 +11,7 @@ import { resolveCurrentStudentId, saveLastStudySession } from '../../../utils/re
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
+import { setStudyMediaPlaying } from '../../../utils/learningGoal';
 import { gameSounds } from '../../../utils/sound';
 import { VIDEO_CHECK_ANSWER_XP } from '../../../utils/dailyPractice';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
@@ -46,12 +47,18 @@ function BigPlayOverlay({ onPlay }) {
 
 function FallbackPlayer({ url, onWatched, onTick }) {
   const [started, setStarted] = useState(false);
+  const [ended, setEnded] = useState(false);
   const doneRef = useRef(false);
   const onWatchedRef = useRef(onWatched);
   const onTickRef = useRef(onTick);
   useEffect(() => { onWatchedRef.current = onWatched; }, [onWatched]);
   useEffect(() => { onTickRef.current = onTick; }, [onTick]);
   const vimeo = vimeoId(url);
+  useEffect(() => {
+    const key = `dp-fallback:${url}`;
+    setStudyMediaPlaying(key, Boolean(started && !ended && (vimeo || isDirectVideo(url))));
+    return () => setStudyMediaPlaying(key, false);
+  }, [started, ended, url, vimeo]);
   const markOnce = () => {
     if (doneRef.current) return;
     doneRef.current = true;
@@ -90,12 +97,13 @@ function FallbackPlayer({ url, onWatched, onTick }) {
         playsInline
         controlsList="nodownload"
         onContextMenu={(e) => e.preventDefault()}
+        onPlay={() => setEnded(false)}
         onTimeUpdate={(e) => {
           const { currentTime, duration } = e.currentTarget;
           onTickRef.current?.(currentTime, e.currentTarget);
           if (duration > 0 && currentTime / duration >= WATCH_REQUIRED_RATIO) markOnce();
         }}
-        onEnded={markOnce}
+        onEnded={() => { setEnded(true); markOnce(); }}
       />
     );
   }

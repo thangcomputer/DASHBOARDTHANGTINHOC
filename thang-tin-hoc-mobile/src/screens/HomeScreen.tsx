@@ -710,9 +710,17 @@ export function HomeScreen() {
       || pathTopic.units.find((u) => u.state !== 'locked' && u.state !== 'completed')
       || pathTopic.units[0];
   }, [pathTopic]);
-  const heroProgress = pathTopic?.totalUnits
+  const activeUnitSteps = Array.isArray(activePathUnit?.steps) ? activePathUnit.steps : [];
+  const activeUnitDoneSteps = activeUnitSteps.filter((s) => s.state === 'completed').length;
+  const activeUnitPct = activeUnitSteps.length
+    ? Math.round((activeUnitDoneSteps / activeUnitSteps.length) * 100)
+    : 0;
+  const topicUnitPct = pathTopic?.totalUnits
     ? Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100)
-    : (practiceStats?.playedToday ? 100 : 0);
+    : 0;
+  const heroProgress = activeUnitPct > 0
+    ? activeUnitPct
+    : (pathTopic?.totalUnits ? topicUnitPct : (practiceStats?.playedToday ? 100 : 0));
   const scheduleAccent = isBrandStudent ? '#059669' : '#059669';
   const portalSub = subscription?.subscription;
   const meetAccess = hasMeetAccessClient(portalSub);
@@ -1099,7 +1107,11 @@ export function HomeScreen() {
                       isBrandStudent={isBrandStudent}
                     />
                     <DuoDailyQuestsCard
-                      todayAnswers={practiceStats?.todaySessions ? practiceStats.todaySessions * 10 : (practiceStats?.playedToday ? 10 : 0)}
+                      todayAnswers={Math.max(
+                        Number((practiceStats as { todayQuestions?: number } | null)?.todayQuestions) || 0,
+                        practiceStats?.todaySessions ? practiceStats.todaySessions * 10 : (practiceStats?.playedToday ? 10 : 0),
+                      )}
+                      todayVideos={Number((practiceStats as { todayVideos?: number } | null)?.todayVideos) || 0}
                       todayXp={practiceStats?.todayXp ?? (user as typeof user & { lms?: { dailyXpToday?: number } })?.lms?.dailyXpToday ?? 0}
                       onOpenPractice={() => tabNavigation.navigate('DailyPractice')}
                       isBrandStudent={isBrandStudent}

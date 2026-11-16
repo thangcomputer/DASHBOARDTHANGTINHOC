@@ -538,12 +538,22 @@ export default function StudentOverviewTab({
       || pathTopic.units.find((u) => u.state !== 'locked' && u.state !== 'completed')
       || pathTopic.units[0];
   }, [pathTopic]);
-  const heroProgress = pathTopic?.totalUnits
+  const activeUnitSteps = Array.isArray(activePathUnit?.steps) ? activePathUnit.steps : [];
+  const activeUnitDoneSteps = activeUnitSteps.filter((s) => s.state === 'completed').length;
+  const activeUnitPct = activeUnitSteps.length
+    ? Math.round((activeUnitDoneSteps / activeUnitSteps.length) * 100)
+    : 0;
+  const topicUnitPct = pathTopic?.totalUnits
     ? Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100)
-    : (practiceStats?.playedToday ? 100 : 0);
-  const todayAnswers = practiceStats?.todaySessions
-    ? practiceStats.todaySessions * 10
-    : (practiceStats?.playedToday ? 10 : 0);
+    : 0;
+  const heroProgress = activeUnitPct > 0
+    ? activeUnitPct
+    : (pathTopic?.totalUnits ? topicUnitPct : (practiceStats?.playedToday ? 100 : 0));
+  const todayAnswers = Math.max(
+    Number(practiceStats?.todayQuestions) || 0,
+    practiceStats?.todaySessions ? practiceStats.todaySessions * 10 : (practiceStats?.playedToday ? 10 : 0),
+  );
+  const todayVideos = Number(practiceStats?.todayVideos) || 0;
   const todayXp = practiceStats?.todayXp ?? studentData?.lms?.dailyXpToday ?? 0;
 
   const effectiveLastStudy = useMemo(() => {
@@ -987,6 +997,7 @@ export default function StudentOverviewTab({
                 />
                 <DuoDailyQuestsCard
                   todayAnswers={todayAnswers}
+                  todayVideos={todayVideos}
                   todayXp={todayXp}
                   onOpenPractice={() => navigate('/student/daily-practice')}
                 />

@@ -523,13 +523,16 @@ async function sumRecoveryXpEarnedToday(studentId, day = learningGoalService.vnD
   return rows.reduce((sum, row) => sum + Math.max(0, (Number(row.xp) || 0) + (Number(row.bonusXp) || 0)), 0);
 }
 
-/** XP luyện hôm nay (mọi lượt hoàn thành + XP học bài) — hero / quest, không dùng cho sidebar. */
-async function sumTodayPracticeDisplayXp(studentId, day = learningGoalService.vnDayKey()) {
+/** XP luyện hôm nay (mọi lượt hoàn thành + XP học bài + mở rương) — hero / quest, không dùng cho sidebar. */
+async function sumTodayPracticeDisplayXp(studentId, day = learningGoalService.vnDayKey(), { includeQuestBonus = true } = {}) {
   const sid = requireId(studentId, 'Học viên');
   const dayStart = new Date(`${day}T00:00:00.000+07:00`);
   const validDay = Number.isFinite(dayStart.getTime());
   const dayEnd = validDay ? new Date(dayStart.getTime() + 86400000) : null;
-  const [rows, studyGrants] = await Promise.all([
+  const grantFilter = includeQuestBonus
+    ? { $ne: 'welcome' }
+    : { $nin: ['welcome', 'daily_quest'] };
+  const [rows, studyGrants, chestCount] = await Promise.all([
     DailyPracticeSession.find({
       studentId: sid,
       status: 'finished',
@@ -538,14 +541,62 @@ async function sumTodayPracticeDisplayXp(studentId, day = learningGoalService.vn
     validDay
       ? LmsXpGrant.find({
         studentId: sid,
-        reason: { $ne: 'welcome' },
+        reason: grantFilter,
         createdAt: { $gte: dayStart, $lt: dayEnd },
       }).select('amount').lean()
       : Promise.resolve([]),
+    validDay
+      ? DailyPracticePathProgress.countDocuments({
+        studentId: sid,
+        chestClaimedAt: { $gte: dayStart, $lt: dayEnd },
+      })
+      : Promise.resolve(0),
   ]);
   const sessionXp = rows.reduce((sum, row) => sum + rules.sessionTodayDisplayXp(row), 0);
   const studyXp = studyGrants.reduce((sum, row) => sum + Math.max(0, Number(row?.amount) || 0), 0);
-  return sessionXp + studyXp;
+  const chestXp = (Number(chestCount) || 0) * rules.UNIT_CHEST_REWARD_XP;
+  return Math.max(0, sessionXp + studyXp + chestXp);
+}
+
+/** Cộng thưởng XP nhiệm vụ hằng ngày (tối đa 1 lần/nhiệm vụ/ngày theo sourceKey). */
+async function syncDailyQuestRewards(
+  studentId,
+  day,
+  { todayQuestions = 0, todayVideos = 0, baseTodayXp = 0, hasPaidOrPathActivity = false } = {},
+) {
+  if (!mongoose.Types.ObjectId.isValid(String(studentId || '')) || !day) return;
+  const lmsProgressService = require('./lmsProgressService');
+  const grants = [];
+  if (todayQuestions >= 10 && hasPaidOrPathActivity) {
+    grants.push(lmsProgressService.grantXp({
+      studentId,
+      amount: 20,
+      reason: 'daily_quest',
+      sourceKey: `daily_quest:quiz:${studentId}:${day}`,
+      countsForStreak: false,
+    }));
+  }
+  if (todayVideos >= 1) {
+    grants.push(lmsProgressService.grantXp({
+      studentId,
+      amount: 15,
+      reason: 'daily_quest',
+      sourceKey: `daily_quest:video:${studentId}:${day}`,
+      countsForStreak: false,
+    }));
+  }
+  if (baseTodayXp >= 50) {
+    grants.push(lmsProgressService.grantXp({
+      studentId,
+      amount: 25,
+      reason: 'daily_quest',
+      sourceKey: `daily_quest:xp50:${studentId}:${day}`,
+      countsForStreak: false,
+    }));
+  }
+  if (grants.length) {
+    await Promise.all(grants);
+  }
 }
 
 function profileView(profile, today, recoveryXpEarnedToday = 0) {
@@ -667,15 +718,31 @@ async function getOverview(studentId) {
   const today = learningGoalService.vnDayKey();
   const lmsProgressService = require('./lmsProgressService');
   const topics = await DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  const [freeCounts, rawProfile, student, lmsSettings, todayXp, todaySessions, todayPlayers, recoveryEarned] = await Promise.all([
+  const [freeCounts, student, lmsSettings, baseTodayXp, todaySessions, todayPlayers, recoveryEarned, goalData] = await Promise.all([
     questionCounts(topics.map((topic) => topic._id), { freeOnly: true }),
-    getProfile(sid),
     Student.findById(sid).select('_id name studentCode').lean(),
     lmsProgressService.loadSettings(),
-    sumTodayPracticeDisplayXp(sid, today),
+    sumTodayPracticeDisplayXp(sid, today, { includeQuestBonus: false }),
     DailyPracticeSession.countDocuments({ studentId: sid, status: 'finished', day: today }),
     countTodayPlayers(today),
     sumRecoveryXpEarnedToday(sid, today),
+    learningGoalService.getLearningGoal(sid).catch(() => null),
+  ]);
+  const todayVideos = goalData?.progress?.todayVideos || 0;
+  const todayQuestions = Math.max(
+    goalData?.progress?.todayQuestions || 0,
+    (todaySessions || 0) * rules.SESSION_SIZE,
+  );
+  const todayMinutes = goalData?.progress?.todayMinutes || 0;
+  await syncDailyQuestRewards(sid, today, {
+    todayQuestions,
+    todayVideos,
+    baseTodayXp,
+    hasPaidOrPathActivity: baseTodayXp > 0 || todayVideos > 0,
+  });
+  const [rawProfile, todayXp] = await Promise.all([
+    getProfile(sid),
+    sumTodayPracticeDisplayXp(sid, today),
   ]);
   const profile = await ensureSpacedQueue(sid, rawProfile, today);
   const spacedRepetition = spacedSummaryFromQueue(profile?.spacedQueue, today);
@@ -691,6 +758,9 @@ async function getOverview(studentId) {
       xpPacks: await listXpPacks(),
       todaySessions,
       todayXp,
+      todayVideos,
+      todayQuestions,
+      todayMinutes,
       todayPlayers,
       spacedRepetition,
       referral,
@@ -1366,11 +1436,35 @@ async function finishSession(studentId, sessionId) {
     streakIncreased: streak > rules.liveStreak(before, day),
     stats: {
       ...(await (async () => {
-        const recoveryEarned = await sumRecoveryXpEarnedToday(session.studentId, day);
-        const todayXpDone = await sumTodayPracticeDisplayXp(session.studentId, day);
+        const [goalData, todaySessionsCount, baseTodayXp, recoveryEarned] = await Promise.all([
+          learningGoalService.getLearningGoal(session.studentId).catch(() => null),
+          DailyPracticeSession.countDocuments({ studentId: session.studentId, status: 'finished', day }),
+          sumTodayPracticeDisplayXp(session.studentId, day, { includeQuestBonus: false }),
+          sumRecoveryXpEarnedToday(session.studentId, day),
+        ]);
+        const todayVideos = goalData?.progress?.todayVideos || 0;
+        const todayQuestions = Math.max(
+          goalData?.progress?.todayQuestions || 0,
+          (todaySessionsCount || 0) * rules.SESSION_SIZE,
+        );
+        const todayMinutes = goalData?.progress?.todayMinutes || 0;
+        await syncDailyQuestRewards(session.studentId, day, {
+          todayQuestions,
+          todayVideos,
+          baseTodayXp,
+          hasPaidOrPathActivity: !isFree || baseTodayXp > 0 || todayVideos > 0,
+        });
+        const [latestProfile, todayXpDone] = await Promise.all([
+          getProfile(session.studentId),
+          sumTodayPracticeDisplayXp(session.studentId, day),
+        ]);
         return {
-          ...profileView(profile, day, recoveryEarned),
+          ...profileView(latestProfile, day, recoveryEarned),
+          todaySessions: todaySessionsCount,
           todayXp: todayXpDone,
+          todayVideos,
+          todayQuestions,
+          todayMinutes,
           spacedRepetition,
         };
       })()),

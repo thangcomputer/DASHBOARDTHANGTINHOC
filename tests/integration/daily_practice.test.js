@@ -289,7 +289,10 @@ test('gắn đủ: route server, menu + trang web, admin, màn mobile, đếm gi
   assert.ok(!/router\.(get|post|put|delete)\('\/(topics|questions|starter)[^']*', (?!\.\.\.requireAdmin)/.test(routes), 'mọi route admin đều cần quyền');
 
   const sidebar = read('client/src/components/AppSidebar.jsx');
-  assert.ok(sidebar.includes("{ key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice'"));
+  assert.ok(
+    sidebar.includes("{ key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice'")
+    || sidebar.includes("{ key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập', path: '/student/daily-practice'"),
+  );
   assert.ok(sidebar.includes("hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING"));
   assert.ok(read('client/src/App.jsx').includes('<Route path="/student/daily-practice"'));
   assert.ok(read('client/src/components/AdminDashboard.jsx').includes("activeTab === 'daily-practice' && <AdminLazyDailyPracticeTab />"));

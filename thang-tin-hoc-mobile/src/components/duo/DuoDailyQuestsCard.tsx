@@ -20,6 +20,7 @@ export type QuestItem = {
 interface DuoDailyQuestsCardProps {
   quests?: QuestItem[];
   todayAnswers?: number;
+  todayVideos?: number;
   todayXp?: number;
   onOpenPractice?: () => void;
   isBrandStudent?: boolean;
@@ -28,6 +29,7 @@ interface DuoDailyQuestsCardProps {
 export function DuoDailyQuestsCard({
   quests,
   todayAnswers = 0,
+  todayVideos = 0,
   todayXp = 0,
   onOpenPractice,
   isBrandStudent = false,
@@ -46,7 +48,7 @@ export function DuoDailyQuestsCard({
       id: 'video',
       icon: 'video',
       title: 'Xem 1 video bài học',
-      current: 0,
+      current: todayVideos,
       target: 1,
       unit: 'video',
       rewardXp: 15,

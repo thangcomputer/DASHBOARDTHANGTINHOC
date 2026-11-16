@@ -54,6 +54,7 @@ const REASON_LABELS = {
   streak30: 'Chuỗi 30 ngày',
   referral: 'Giới thiệu bạn bè',
   spaced_review: 'Ôn tập ngắt quãng',
+  daily_quest: 'Nhiệm vụ hằng ngày',
 };
 
 const BADGES = [
