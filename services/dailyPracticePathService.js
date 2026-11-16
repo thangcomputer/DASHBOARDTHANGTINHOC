@@ -11,6 +11,7 @@ const Student = require('../models/Student');
 const rules = require('./dailyPracticeRules');
 const lessonPracticeService = require('./lessonPracticeService');
 const lmsProgressService = require('./lmsProgressService');
+const learningGoalService = require('./learningGoalService');
 const subscriptionService = require('./subscriptionService');
 const logger = require('../config/logger');
 
@@ -1956,6 +1957,7 @@ async function markVideoWatched(studentId, { unitId, videoId, watchRatio } = {})
     if (err?.code !== 11000) throw err;
     await DailyPracticePathProgress.updateOne(filter, update);
   }
+  learningGoalService.trackStudyActivity(sid, { videos: 1 });
   await lmsProgressService.grantActivity({
     studentId: sid,
     activity: 'video',
@@ -2008,6 +2010,9 @@ async function toggleSectionProgress(studentId, { unitId, nodeKey, difficulty, s
     }
     const activity = SECTION_ACTIVITY_MAP[cleanSection];
     if (activity) {
+      if (activity === 'video') {
+        learningGoalService.trackStudyActivity(sid, { videos: 1 });
+      }
       const sourceKey = activity === 'video'
         ? `dp:video:${sid}:${unit._id}:${cleanNodeKey}:level:${cleanDiff}`
         : `dp:${activity}:${sid}:${unit._id}:${cleanNodeKey}:${cleanDiff}`;

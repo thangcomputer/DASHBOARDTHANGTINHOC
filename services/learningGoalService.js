@@ -3,6 +3,8 @@
 const mongoose = require('mongoose');
 const LearningGoal = require('../models/LearningGoal');
 const StudyTimeLog = require('../models/StudyTimeLog');
+const LmsXpGrant = require('../models/LmsXpGrant');
+const DailyPracticePathProgress = require('../models/DailyPracticePathProgress');
 
 const PERIOD_DAYS = { week: 7, month: 30, quarter: 90 };
 const MAX_HOURS_PER_DAY = 5;
@@ -35,6 +37,24 @@ async function goalWithProgress(studentId, goalDoc, now = new Date()) {
     todayQuestions: todayLog?.questions || 0,
     todayVideos: todayLog?.videos || 0,
   };
+  if (todayStats.todayVideos === 0) {
+    try {
+      const dayStart = new Date(`${today}T00:00:00+07:00`);
+      const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+      const [xpVideos, pathVideos] = await Promise.all([
+        LmsXpGrant.countDocuments({ studentId, reason: 'video', createdAt: { $gte: dayStart, $lt: dayEnd } }),
+        DailyPracticePathProgress.countDocuments({
+          studentId,
+          'watchedVideoIds.0': { $exists: true },
+          updatedAt: { $gte: dayStart, $lt: dayEnd },
+        }),
+      ]);
+      if (xpVideos > 0 || pathVideos > 0) {
+        todayStats.todayVideos = 1;
+        recordStudyActivity(studentId, { videos: 1 }, now).catch(() => {});
+      }
+    } catch { /* bỏ qua nếu DB chưa sẵn sàng */ }
+  }
   if (!goal) return { goal: null, progress: todayStats };
 
   const totalDays = PERIOD_DAYS[goal.period] || 7;

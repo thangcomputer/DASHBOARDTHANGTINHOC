@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import { LEARNING_GOAL_CHANGED_EVENT } from '../utils/learningGoal';
 
 export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
 
@@ -6,6 +7,13 @@ export function emitDailyPracticeStats(patch) {
   if (!patch || typeof window === 'undefined') return;
   try {
     window.dispatchEvent(new CustomEvent(DAILY_PRACTICE_STATS_EVENT, { detail: patch }));
+  } catch { /* ignore */ }
+}
+
+function emitLearningGoalChanged() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(LEARNING_GOAL_CHANGED_EVENT));
   } catch { /* ignore */ }
 }
 
@@ -47,8 +55,18 @@ const dailyPracticeApi = {
       body: JSON.stringify({ topicId }),
     })),
     unitVideos: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${unitId}/videos`, { cache: 'no-store' })),
-    videoWatched: async (unitId, videoId) => parse(await apiFetch('/daily-practice/my/path/videos/watched', json('POST', { unitId, videoId }))),
-    completeSection: async (unitId, body) => parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/sections/complete`, json('POST', body))),
+    videoWatched: async (unitId, videoId) => {
+      const data = await parse(await apiFetch('/daily-practice/my/path/videos/watched', json('POST', { unitId, videoId })));
+      emitLearningGoalChanged();
+      return data;
+    },
+    completeSection: async (unitId, body) => {
+      const data = await parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/sections/complete`, json('POST', body)));
+      if (body?.sectionKey === 'video' && body?.completed !== false) {
+        emitLearningGoalChanged();
+      }
+      return data;
+    },
     claimUnitChest: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/chest/claim`, json('POST', {})), true),
     answerVideoCheck: async (unitId, videoId, checkId, body) => parse(await apiFetch(
       `/daily-practice/my/path/units/${unitId}/videos/${encodeURIComponent(videoId)}/checks/${checkId}/answer`,

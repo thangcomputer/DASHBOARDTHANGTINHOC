@@ -117,6 +117,8 @@ test('bằng chứng học được ghi ở mọi nơi HV làm bài / xem video'
   assert.ok(read('routes/lessonPracticeRoutes.js').includes('if (data && !data.retry && data.alreadyConfirmed === false)'), 'chỉ câu luyện tập được chấp nhận lần đầu');
   const lessonService = read('services/lessonPracticeService.js');
   assert.ok(lessonService.includes("if (section === 'video' && marked.modifiedCount)"), 'mỗi video chỉ tính một lần');
+  assert.ok(read('services/dailyPracticePathService.js').includes('learningGoalService.trackStudyActivity(sid, { videos: 1 })'), 'xem video lộ trình ghi nhận vào nhiệm vụ ngày');
+  assert.ok(read('client/src/services/dailyPracticeApi.js').includes('LEARNING_GOAL_CHANGED_EVENT'), 'hoàn thành video tự làm mới mục tiêu học trên UI');
   assert.ok(read('services/certPrepService.js').includes('trackStudyActivity(sid, { questions: newlyAnswered })'), 'ôn thi chỉ đếm câu mới trả lời');
   assert.ok(read('routes/quizRoutes.js').includes('trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(userAnswers) })'));
   assert.ok(read('routes/studentRoutes.js').includes('trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(req.body?.answers) })'));

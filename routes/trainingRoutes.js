@@ -344,6 +344,9 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
           { userId, lessonId },
           { watchedSeconds: credited, lastWatchedAt: new Date() },
         );
+        if (req.user?.role === 'student') {
+          require('../services/learningGoalService').trackStudyActivity(userId, { videos: 1 });
+        }
       }
       return res.json({
         success: true,
@@ -458,6 +461,9 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       },
       { upsert: true, returnDocument: 'after' }
     );
+    if (req.user?.role === 'student') {
+      require('../services/learningGoalService').trackStudyActivity(userId, { videos: 1 });
+    }
 
     res.json({
       success: true,

@@ -309,10 +309,10 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     };
   }, [unit?.id, unit?.index, unit?.title, current?.id, current?.title]);
 
-  // Nếu video đã được đánh dấu watched từ trước nhưng chưa đồng bộ completedSections của bài học theo cấp độ
+  // Nếu video đã được đánh dấu watched từ trước, vẫn đồng bộ tiến độ mục tiêu học hôm nay khi mở lại
   useEffect(() => {
     if (!current || !watchedIds.has(current.id)) return;
-    if (!/:level:(easy|medium|hard)$/.test(current.id)) return;
+    if (current.source !== 'unit' && current.source !== 'step') return;
     if (syncedSectionRef.current.has(current.id)) return;
     if (pendingOf(current).length > 0) return;
     syncedSectionRef.current.add(current.id);
@@ -341,7 +341,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     const videoId = target.id;
     const alreadyWatched = watchedIds.has(videoId);
     if (alreadyWatched) {
-      if (/:level:(easy|medium|hard)$/.test(videoId) && !syncedSectionRef.current.has(videoId)) {
+      if (!syncedSectionRef.current.has(videoId)) {
         syncedSectionRef.current.add(videoId);
         try {
           await onWatched(videoId);
