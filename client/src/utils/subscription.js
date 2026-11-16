@@ -16,6 +16,7 @@ export function formatVnd(value) {
 export {
   formatDailyXpProgressLine,
   formatDailyXpWalletLine,
+  isDailyXpExhausted,
   resolveTodayXpSidebar,
 } from '../../../shared/subscription/xpDailyLine.mjs';
 
@@ -27,7 +28,9 @@ export function formatExpiryDate(iso) {
 /** Dòng ngắn cho sidebar / hồ sơ. */
 export function subscriptionShortLabel(subscription, options = {}) {
   if (!subscription) return '';
-  if (options.isCourseStudent === true) return 'Gói Khóa học · Khóa chính thức';
+  if (options.isCourseStudent === true) {
+    return options.xpLine ? `Gói Khóa học · ${options.xpLine}` : 'Gói Khóa học';
+  }
   const freePortal = options.freePortal === true;
   const hasActivePaid = subscription.state === 'active' || subscription.state === 'expiring' || Boolean(subscription.meetLifetime);
   if (!hasActivePaid && (subscription.freeTier || subscription.state === 'free' || (freePortal && !subscription.meetLifetime))) {

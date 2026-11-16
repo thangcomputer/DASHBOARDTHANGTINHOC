@@ -12,7 +12,7 @@ export function formatDailyXpWalletLine(balance, cap) {
   return `${current}/${limit} XP`;
 }
 
-/** Thẻ gói miễn phí (sidebar, drawer): xpTotal / hạn XP ngày của gói. */
+/** Thẻ gói (sidebar, drawer): xpTotal / hạn XP chu kỳ của gói. */
 export function resolveTodayXpSidebar(stats, subscription) {
   const cap = Math.max(
     1,
@@ -29,4 +29,16 @@ export function resolveTodayXpSidebar(stats, subscription) {
     Number(stats?.xpTotal ?? stats?.dailyXp ?? 0) || 0,
   );
   return { balance, cap, line: formatDailyXpWalletLine(balance, cap) };
+}
+
+/** Đã hết XP luyện (0 XP hoặc dưới ngưỡng stake tối thiểu của 1 lượt). */
+export function isDailyXpExhausted(stats) {
+  if (!stats || typeof stats !== 'object') return false;
+  const minNeed = Math.max(1, Number(stats.sessionStakeXp) || 50);
+  const hasBalance = stats.xpTotal != null || stats.dailyXp != null;
+  if (hasBalance) {
+    const balance = Math.max(0, Number(stats.xpTotal ?? stats.dailyXp ?? 0) || 0);
+    return balance <= 0 || balance < minNeed;
+  }
+  return Boolean(stats.xpEmpty);
 }

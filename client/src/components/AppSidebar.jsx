@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   LayoutDashboard, Home, BookOpen, Calendar, CalendarDays, MessageSquare, MessageCircle, UserRound,
   Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
   GraduationCap, Users, DollarSign, ClipboardList, CheckSquare, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Radio, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket, Crown,
+  Newspaper, Radio, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket, Crown, Zap,
 } from 'lucide-react';
 import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -15,7 +15,8 @@ import { hasLearningAccessEnrollment, isFreePortalSelfRegistrationStudent, isUnp
 import { visibleInboxUnread } from '../lib/inboxUnread';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
 import FreeFeatureLock, { useFreePortalLock, useFreePortalMenu, FREE_HIDDEN_KEYS } from './student/dailyPractice/FreeFeatureLock';
-import { hasFeedPostAccess, resolveTodayXpSidebar, subscriptionShortLabel } from '../utils/subscription';
+import BuyXpModal from './student/dailyPractice/BuyXpModal';
+import { hasFeedPostAccess, isDailyXpExhausted, resolveTodayXpSidebar, subscriptionShortLabel } from '../utils/subscription';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../services/dailyPracticeApi';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
@@ -300,6 +301,24 @@ const AppSidebar = ({
   } = useData();
   const studentSubscription = useStudentSubscription();
   const [dpSidebarStats, setDpSidebarStats] = useState(null);
+  const [buyXpOpen, setBuyXpOpen] = useState(false);
+
+  const refetchDailyPracticeStats = useCallback(() => {
+    if (session?.role !== 'student') return Promise.resolve(null);
+    return dailyPracticeApi.student.overview()
+      .then((data) => {
+        if (data?.stats) setDpSidebarStats(data.stats);
+        return data?.stats || null;
+      })
+      .catch(() => null);
+  }, [session?.role]);
+
+  const openBuyXpModal = useCallback(() => {
+    if (!dpSidebarStats?.xpPacks?.length) {
+      refetchDailyPracticeStats();
+    }
+    setBuyXpOpen(true);
+  }, [dpSidebarStats?.xpPacks?.length, refetchDailyPracticeStats]);
 
   useEffect(() => {
     if (session?.role !== 'student') return undefined;
@@ -310,14 +329,18 @@ const AppSidebar = ({
       })
       .catch(() => {});
     const onStats = (event) => {
-      if (event?.detail) setDpSidebarStats((prev) => ({ ...prev, ...event.detail }));
+      if (!event?.detail) return;
+      setDpSidebarStats((prev) => {
+        const merged = { ...prev, ...event.detail };
+        if (typeof merged.xpTotal === 'number') {
+          const minNeed = Math.max(1, Number(merged.sessionStakeXp) || 50);
+          merged.xpEmpty = merged.xpTotal < minNeed;
+        }
+        return merged;
+      });
     };
     const refetchOverview = () => {
-      dailyPracticeApi.student.overview()
-        .then((data) => {
-          if (data?.stats) setDpSidebarStats(data.stats);
-        })
-        .catch(() => {});
+      refetchDailyPracticeStats();
     };
     window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
     window.addEventListener('cms:subscription-updated', refetchOverview);
@@ -326,7 +349,7 @@ const AppSidebar = ({
       window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
       window.removeEventListener('cms:subscription-updated', refetchOverview);
     };
-  }, [session?.role]);
+  }, [session?.role, session?.id, refetchDailyPracticeStats]);
 
   // Session login/me có thể thiếu gender → bổ sung từ hồ sơ self (mọi role)
   const selfProfile = useMemo(() => {
@@ -833,8 +856,10 @@ const AppSidebar = ({
           const isLifetime = sub.state === 'lifetime' && (Boolean(sub.meetLifetime) || !freePortalAccount);
           const isFree = !hasActivePaid && !isLifetime;
           const expiring = sub.state === 'expiring';
-          const shortLabel = subscriptionShortLabel(sub, { freePortal: freePortalAccount, isCourseStudent });
-          const freeXpText = resolveTodayXpSidebar(dpSidebarStats, sub).line;
+          const xpSidebar = resolveTodayXpSidebar(dpSidebarStats, sub);
+          const freeXpText = dpSidebarStats ? xpSidebar.line : `--/${xpSidebar.cap} XP`;
+          const isXpExhausted = isDailyXpExhausted(dpSidebarStats);
+          const shortLabel = subscriptionShortLabel(sub, { freePortal: freePortalAccount, isCourseStudent, xpLine: freeXpText });
           const daysLeftNum = sub.daysLeft != null ? Number(sub.daysLeft) : null;
           const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : expiring;
           const actionLabel = isFree ? 'Nâng cấp' : isNearExpiry ? 'Gia hạn' : 'Đổi gói';
@@ -851,7 +876,7 @@ const AppSidebar = ({
           const daysLine = isFree
             ? freeXpText
             : isCourseStudent
-              ? 'Khóa chính thức'
+              ? freeXpText
               : isLifetime
                 ? freeXpText
                 : `Còn ${sub.daysLeft ?? 0} ngày`;
@@ -878,7 +903,17 @@ const AppSidebar = ({
                 )}
               </span>
             );
-            const actionChip = (isCourseStudent || isLifetime) ? null : (
+            const showBuyXpAction = (isCourseStudent || isLifetime) && isXpExhausted;
+            const actionChip = showBuyXpAction ? (
+              <button
+                type="button"
+                onClick={openBuyXpModal}
+                className="shrink-0 inline-flex items-center gap-1 min-h-[24px] rounded-[8px] border px-2 py-0.5 text-[10px] font-extrabold leading-none text-slate-950 transition hover:brightness-105 active:translate-y-px !shadow-none cursor-pointer bg-amber-400 border-amber-300 border-b-2 border-b-amber-600"
+              >
+                <Zap size={10} className="fill-amber-950 shrink-0" aria-hidden="true" />
+                Mua XP
+              </button>
+            ) : (isCourseStudent || isLifetime) ? null : (
               <button
                 type="button"
                 onClick={studentSubscription.openRenew}
@@ -907,9 +942,15 @@ const AppSidebar = ({
                 >
                   {planTitle}
                 </p>
-                <div className="col-start-2 row-start-2 flex min-h-[24px] min-w-0 items-baseline justify-between gap-1.5">
+                <div className="col-start-2 row-start-2 flex min-h-[24px] min-w-0 items-center justify-between gap-1.5">
                   <p className={`min-w-0 text-[11px] font-bold leading-[14px] tabular-nums ${
-                    isCourseStudent ? 'text-[#34D399]' : isLifetime ? 'text-[#FDE68A]' : 'text-[#34D399]'
+                    showBuyXpAction
+                      ? 'text-[#FCD34D]'
+                      : isCourseStudent
+                        ? 'text-[#34D399]'
+                        : isLifetime
+                          ? 'text-[#FDE68A]'
+                          : 'text-[#34D399]'
                   }`}
                   >
                     {daysLine}
@@ -1383,6 +1424,16 @@ const AppSidebar = ({
             <FreeFeatureLock session={session} onClose={() => setFreeLockOpen(false)} />
           </div>
         </div>
+      )}
+
+      {buyXpOpen && (
+        <BuyXpModal
+          packs={dpSidebarStats?.xpPacks || []}
+          onClose={() => setBuyXpOpen(false)}
+          onPaid={() => {
+            refetchDailyPracticeStats();
+          }}
+        />
       )}
 
     </>
