@@ -48,13 +48,24 @@ export type AppStackParamList = {
   CertPrepLevel: { levelId: string; courseName: string };
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
-  DailyPractice: { topicId?: string; watch?: 'stage'; practice?: 'stage' } | undefined;
+  DailyPractice: {
+    topicId?: string;
+    watch?: 'stage';
+    practice?: 'stage';
+    resumeKey?: number;
+    resumeUnitId?: string;
+    resumeNodeKey?: string;
+    resumeSectionId?: string;
+    resumeVideoId?: string;
+    resumeAtSec?: number;
+  } | undefined;
   CourseVideos: {
     resumeKey?: number;
     resumeSubjectId?: string;
     resumeCourseId?: string;
     resumeUnitId?: string;
     resumeSectionId?: string;
+    resumeAtSec?: number;
   } | undefined;
   Support: undefined;
 };
@@ -69,9 +80,20 @@ export type MainTabsParamList = {
     resumeCourseId?: string;
     resumeUnitId?: string;
     resumeSectionId?: string;
+    resumeAtSec?: number;
   } | undefined;
   Feed: { postId?: string; commentId?: string; parentCommentId?: string } | undefined;
-  DailyPractice?: { topicId?: string; watch?: 'stage'; practice?: 'stage' } | undefined;
+  DailyPractice?: {
+    topicId?: string;
+    watch?: 'stage';
+    practice?: 'stage';
+    resumeKey?: number;
+    resumeUnitId?: string;
+    resumeNodeKey?: string;
+    resumeSectionId?: string;
+    resumeVideoId?: string;
+    resumeAtSec?: number;
+  } | undefined;
   Support?: undefined;
   Notifications: undefined;
   Profile: undefined;

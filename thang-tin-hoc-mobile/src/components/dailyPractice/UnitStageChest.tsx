@@ -491,11 +491,11 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   backdropTint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
   },
   backdropWeb: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255, 255, 255, 0.90)',
     ...(Platform.OS === 'web' ? {
       backdropFilter: 'blur(16px)',

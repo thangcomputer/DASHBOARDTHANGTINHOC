@@ -837,7 +837,7 @@ export function ScheduleScreen() {
               </Text>
               <ChevronDown size={16} color={isBrandStudent ? '#059669' : theme.brand} />
             </Pressable>
-            <View style={[styles.teacherWeekRange, isBrandStudent && { backgroundColor: '#FFF5F5', borderColor: '#D1FAE5' }]}>
+            <View style={[styles.teacherWeekRange, isBrandStudent && { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
               <Pressable onPress={() => setWeekOffset((value) => value - 1)} style={styles.teacherWeekRangeArrow} accessibilityRole="button" accessibilityLabel="Tuần trước">
                 <ChevronLeft size={16} color={isBrandStudent ? '#059669' : theme.brand} />
               </Pressable>
@@ -894,7 +894,7 @@ export function ScheduleScreen() {
                       : item?.status === 'cancelled'
                         ? styles.weekGridCancelledCell
                         : item
-                          ? (isBrandStudent ? { backgroundColor: '#FFF5F5', borderColor: '#A7F3D0' } : styles.weekGridBookedCell)
+                          ? (isBrandStudent ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' } : styles.weekGridBookedCell)
                           : undefined;
                     const time = item?.time.match(/\d{1,2}:\d{2}/)?.[0];
                     return item ? (
@@ -905,7 +905,7 @@ export function ScheduleScreen() {
                           styles.teacherCompactDayCell,
                           styles.compactWeekSlotCell,
                           slotStatusStyle,
-                          day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#FFF5F5' } : styles.weekGridTodayColumn)
+                          day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#ECFDF5' } : styles.weekGridTodayColumn)
                         ]}
                         accessibilityRole="button"
                         accessibilityLabel={`${activeStudentCourse}, ${day.weekday} ${day.day}, ${item.time}, ${slotStatus}`}
@@ -917,7 +917,7 @@ export function ScheduleScreen() {
                       <View key={day.dateKey} style={[
                         styles.teacherCompactDayCell,
                         styles.compactWeekSlotCell,
-                        day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#FFF5F5' } : styles.weekGridTodayColumn)
+                        day.dateKey === todayKey && (isBrandStudent ? { backgroundColor: '#ECFDF5' } : styles.weekGridTodayColumn)
                       ]}>
                         <Text style={styles.teacherCompactTime}>-</Text>
                       </View>
@@ -3981,7 +3981,7 @@ export function AttendanceScreen() {
   const openAttendanceModal = () => setModalDismissed(false);
 
   return (
-    <AppScreen>
+    <AppScreen scroll={false}>
       {!selectedSession ? (
         <AppHeader title="Điểm danh" subtitle="Mở điểm danh từ cuộc trò chuyện với học viên" />
       ) : null}
@@ -4671,7 +4671,7 @@ export function ProfileScreen() {
         accessibilityRole="button"
         accessibilityLabel="Đăng xuất"
       >
-        <LogOut size={18} color={colors.red} />
+        <LogOut size={18} color="#059669" />
         <Text style={styles.profileSignOutText}>Đăng xuất</Text>
       </Pressable>
       {!isTeacher && showStudentProfileForm ? (
@@ -4976,7 +4976,7 @@ function StudentProfileEditModal({
             </View>
             <View style={{ marginTop: spacing.sm }}>
               <DuoButton
-                variant={isBrandStudent ? 'danger' : 'primary'}
+                variant="primary"
                 size="lg"
                 fullWidth
                 text={saving ? 'Đang lưu...' : 'Lưu thông tin'}
@@ -5103,7 +5103,7 @@ function ChangePasswordModal({
               style={{ flex: 1 }}
             />
             <DuoButton
-              variant={isBrandStudent ? 'danger' : 'primary'}
+              variant="primary"
               size="md"
               text={saving ? 'Đang lưu…' : 'Cập nhật mật khẩu'}
               icon={saving ? undefined : <Save size={16} color="#FFFFFF" />}
@@ -5590,7 +5590,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   scheduleStatUnit: { color: colors.muted, fontSize: typography.micro, fontWeight: '600' },
   scheduleViewToggle: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: radius.md, backgroundColor: '#EFF3F8' },
   scheduleViewTab: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: radius.sm, paddingHorizontal: spacing.sm },
-  scheduleViewTabActive: { backgroundColor: colors.brand, shadowColor: '#9F1239', shadowOpacity: 0.18, shadowRadius: 6, elevation: 2 },
+  scheduleViewTabActive: { backgroundColor: colors.brand, shadowColor: '#047857', shadowOpacity: 0.18, shadowRadius: 6, elevation: 2 },
   scheduleViewTabText: { color: colors.muted, fontSize: typography.caption, fontWeight: '800' },
   scheduleViewTabTextActive: { color: '#FFFFFF' },
   monthCalendarCard: { gap: spacing.md, padding: spacing.md },
@@ -5694,7 +5694,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#A7F3D0',
     borderBottomWidth: 3,
-    borderBottomColor: '#FCA5A5',
+    borderBottomColor: '#34D399',
   },
   calendarAttendanceActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   calendarAttendanceActionTextDisabled: { color: '#64748B' },
@@ -5773,7 +5773,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   rosterStatusText: { color: colors.muted, fontSize: typography.micro, fontWeight: '800' },
   rosterStatusTextActive: { color: colors.surface },
   rosterStatusCount: { color: colors.muted, fontSize: typography.micro, fontWeight: '800' },
-  rosterStatusCountActive: { color: '#FFE4E6' },
+  rosterStatusCountActive: { color: '#D1FAE5' },
   rosterSearchIconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DBEAFE', borderRadius: radius.sm, backgroundColor: '#EFF6FF' },
   rosterSearchIconButtonActive: { borderColor: '#A7F3D0', backgroundColor: colors.brandSoft },
   courseFilterSelect: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#DBE3EE', borderRadius: radius.sm, backgroundColor: colors.surface },
@@ -5951,7 +5951,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   weekCourseLabelCaption: { color: colors.muted, fontSize: typography.micro, fontWeight: '600' },
   weekCourseLabelName: { flex: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
   compactWeekGrid: { width: '100%', borderTopWidth: 1, borderLeftWidth: 1, borderColor: colors.line },
-  teacherWeekRange: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xs, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.line, backgroundColor: '#FFF7F7' },
+  teacherWeekRange: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xs, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.line, backgroundColor: '#ECFDF5' },
   teacherWeekRangeArrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   teacherWeekRangeLabel: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '800' },
   teacherCompactScroll: { width: '100%' },
@@ -5995,7 +5995,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   weekGridDate: { color: colors.muted, fontSize: typography.micro, fontWeight: '600' },
   weekGridTodayCell: { backgroundColor: colors.brandSoft },
   weekGridTodayText: { color: colors.brandDark },
-  weekGridTodayColumn: { backgroundColor: '#FFF7F7' },
+  weekGridTodayColumn: { backgroundColor: '#ECFDF5' },
   weekGridSort: { minHeight: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: spacing.xs, borderRadius: radius.pill, backgroundColor: '#F1F5F9' },
   weekGridSortActive: { backgroundColor: '#DBEAFE' },
   weekGridSortText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
@@ -6339,7 +6339,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     transform: [{ translateY: 3 }],
     borderBottomWidth: 1,
   },
-  profileSignOutText: { color: colors.red, fontSize: typography.small, fontWeight: '800' },
+  profileSignOutText: { color: '#059669', fontSize: typography.small, fontWeight: '800' },
   profilePushFeedbackButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.brand },
   profilePushFeedbackButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   studentProfileSectionText: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
@@ -6369,7 +6369,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   teacherProfileName: { color: '#FFFFFF', fontSize: typography.heading, fontWeight: '800', textAlign: 'center' },
   teacherProfileSubtitle: { color: '#D1FAE5', fontSize: typography.small, textAlign: 'center' },
   teacherProfileTags: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xs },
-  teacherProfileStatus: { color: '#FFFFFF', fontSize: typography.caption, paddingVertical: 6, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#FCA5A5', borderRadius: radius.pill },
+  teacherProfileStatus: { color: '#FFFFFF', fontSize: typography.caption, paddingVertical: 6, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.pill },
   teacherDetails: { gap: spacing.sm },
   teacherProfileEmpty: { color: colors.muted, fontSize: typography.caption, paddingVertical: spacing.xs },
   teacherProfileField: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },

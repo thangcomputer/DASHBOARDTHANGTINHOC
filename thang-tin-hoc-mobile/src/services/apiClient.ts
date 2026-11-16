@@ -15,12 +15,21 @@ export type MobileStoredSession<TUser> = {
 export class MobileApiError extends Error {
   status: number;
   code?: string;
+  currentXp?: number;
+  needXp?: number;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    extra?: { currentXp?: number; needXp?: number },
+  ) {
     super(message);
     this.name = 'MobileApiError';
     this.status = status;
     this.code = code;
+    if (typeof extra?.currentXp === 'number') this.currentXp = extra.currentXp;
+    if (typeof extra?.needXp === 'number') this.needXp = extra.needXp;
   }
 }
 
@@ -59,14 +68,26 @@ async function persistSessionTokens(nextTokens: MobileApiTokens) {
   await SecureStore.setItemAsync(sessionStorageKey, JSON.stringify({ ...session, tokens: nextTokens }));
 }
 
+function isLocalDevHostname(hostname: string) {
+  const host = hostname.trim().toLowerCase();
+  return host === 'localhost'
+    || host === '127.0.0.1'
+    || host === '::1'
+    || /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)
+    || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
+    || /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host);
+}
+
 export function getMobileApiBaseUrl() {
   const configuredBaseUrl = String(process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL || '').trim().replace(/\/+$/, '');
   if (__DEV__ && Platform.OS === 'web') {
     const webHost = globalThis.location?.hostname;
-    if (configuredBaseUrl && webHost) {
+    if (configuredBaseUrl) {
       try {
         const parsed = new URL(configuredBaseUrl);
-        parsed.hostname = webHost;
+        if (webHost && isLocalDevHostname(parsed.hostname)) {
+          parsed.hostname = webHost;
+        }
         return parsed.origin;
       } catch {
         // fallback below
@@ -137,12 +158,13 @@ async function fetchWithTimeout(url: string, init: RequestInit) {
   }
 }
 
+const BUSINESS_MESSAGE_STATUSES = new Set([400, 402, 403, 404, 409, 422]);
+
 function getSafeApiErrorMessage(status: number, payload: Record<string, unknown>) {
   if (status === 0) return 'Không thể kết nối máy chủ. Hãy kiểm tra Internet và thử lại.';
-  if (payload.publicMessage === true && typeof payload.message === 'string' && payload.message) return payload.message;
+  const serverMessage = typeof payload.message === 'string' ? payload.message.trim() : '';
+  if (payload.publicMessage === true && serverMessage) return serverMessage;
   if (payload.code === 'SUBSCRIPTION_EXPIRED') return 'Tài khoản đã hết hạn. Vui lòng gia hạn để tiếp tục học.';
-  if (status === 400) return 'Yêu cầu chưa hợp lệ. Vui lòng kiểm tra thông tin và thử lại.';
-  if (status === 401) return 'Thông tin đăng nhập hoặc phiên làm việc không hợp lệ.';
   if (status === 403) {
     if (payload.code === 'NEEDS_RE_ENROLL') {
       return 'Tài khoản học viên không còn khóa học đang học. Vui lòng liên hệ trung tâm để được hỗ trợ đăng ký khóa mới.';
@@ -153,11 +175,14 @@ function getSafeApiErrorMessage(status: number, payload: Record<string, unknown>
     if (payload.code === 'CSRF_INVALID') {
       return 'Phiên bảo mật đã hết hạn. Vui lòng tải lại ứng dụng rồi thử lại.';
     }
-    if (payload.message === 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.') {
+    if (serverMessage === 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.') {
       return 'Tài khoản hiện không thể đăng nhập. Vui lòng liên hệ quản trị.';
     }
-    return 'Bạn không có quyền thực hiện thao tác này.';
   }
+  if (BUSINESS_MESSAGE_STATUSES.has(status) && serverMessage) return serverMessage;
+  if (status === 400) return 'Yêu cầu chưa hợp lệ. Vui lòng kiểm tra thông tin và thử lại.';
+  if (status === 401) return 'Thông tin đăng nhập hoặc phiên làm việc không hợp lệ.';
+  if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
   if (status === 404) return 'Không tìm thấy nội dung yêu cầu.';
   if (status === 409) return 'Dữ liệu vừa thay đổi. Vui lòng tải lại và thử lại.';
   if (status === 422) return 'Thông tin chưa hợp lệ. Vui lòng kiểm tra và thử lại.';
@@ -185,6 +210,10 @@ async function parseResponse(response: Response) {
       getSafeApiErrorMessage(response.status, payload),
       response.status,
       typeof payload.code === 'string' ? payload.code : undefined,
+      {
+        currentXp: typeof payload.currentXp === 'number' ? payload.currentXp : undefined,
+        needXp: typeof payload.needXp === 'number' ? payload.needXp : undefined,
+      },
     );
   }
   return payload;

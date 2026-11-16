@@ -737,6 +737,21 @@ export default function LessonPracticeUnitsPage() {
     return () => { alive = false; };
   }, [subjectId, requestedCourseId]);
 
+  useEffect(() => {
+    const syncOnFocus = () => {
+      if (document.visibilityState && document.visibilityState !== 'visible') return;
+      void lessonPracticeApi.student.units(subjectId, requestedCourseId)
+        .then((res) => setPayload(res.data))
+        .catch(() => {});
+    };
+    window.addEventListener('focus', syncOnFocus);
+    document.addEventListener('visibilitychange', syncOnFocus);
+    return () => {
+      window.removeEventListener('focus', syncOnFocus);
+      document.removeEventListener('visibilitychange', syncOnFocus);
+    };
+  }, [subjectId, requestedCourseId]);
+
   const units = withSessionLocks(payload?.units || []);
   const openUnit = units.find((unit) => unit.id === openUnitId && !unit.locked) || null;
   const openUnitIndex = openUnit ? units.findIndex((unit) => unit.id === openUnit.id) : -1;

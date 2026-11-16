@@ -187,10 +187,10 @@ const styles = StyleSheet.create({
     boxShadow: '0px 10px 24px rgba(4, 120, 87, 0.08)',
   } as never,
   cardBrand: {
-    borderColor: '#FFE4E6',
-    backgroundColor: '#FFF5F5',
-    backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #FFF1F2 55%, #ECFDF5 100%)',
-    boxShadow: '0px 10px 24px rgba(225, 29, 72, 0.08)',
+    borderColor: '#A7F3D0',
+    backgroundColor: '#F4FBF8',
+    backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #ECFDF5 55%, #D1FAE5 100%)',
+    boxShadow: '0px 10px 24px rgba(4, 120, 87, 0.08)',
   } as never,
   decor: { ...StyleSheet.absoluteFill, borderRadius: 26, overflow: 'hidden' },
   blob: {
@@ -199,12 +199,12 @@ const styles = StyleSheet.create({
   } as never,
   blobBrand: {
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    backgroundImage: 'linear-gradient(135deg, rgba(16, 185, 129,0.18) 0%, rgba(244,63,94,0.14) 50%, rgba(245,158,11,0.18) 100%)',
+    backgroundImage: 'linear-gradient(135deg, rgba(16, 185, 129,0.18) 0%, rgba(5,150,105,0.14) 50%, rgba(245,158,11,0.18) 100%)',
   } as never,
   ring: { position: 'absolute', right: 18, bottom: -30, width: 140, height: 140, borderRadius: 70, borderWidth: 8, borderColor: 'rgba(255,255,255,0.7)' },
   glow: { position: 'absolute', left: -40, top: -50, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(167, 243, 208, 0.35)' },
   glowBrand: {
-    backgroundColor: 'rgba(254, 205, 211, 0.4)',
+    backgroundColor: 'rgba(167, 243, 208, 0.4)',
   },
   content: { paddingVertical: spacing.lg, paddingLeft: spacing.lg, paddingRight: FIGURE_RIGHT + (FIGURE_WIDTH + HERO_WIDTH) / 2 + 6, gap: 4 },
   eyebrow: {
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   },
   eyebrowBrand: {
     backgroundColor: '#ECFDF5',
-    borderColor: '#FECDD3',
+    borderColor: '#A7F3D0',
   },
   eyebrowText: { color: '#047857', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
   eyebrowTextBrand: { color: '#059669' },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#34D399', borderBottomWidth: 3.5, borderBottomColor: '#065F46',
   } as never,
   joinPulse: { ...StyleSheet.absoluteFill, borderRadius: 14, backgroundColor: 'rgba(52, 211, 153, 0.4)' },
-  joinPulseBrand: { backgroundColor: 'rgba(248, 113, 113, 0.4)' },
+  joinPulseBrand: { backgroundColor: 'rgba(52, 211, 153, 0.4)' },
   joinActiveText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   joinIdle: {
     flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: FIGURE_WIDTH, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,

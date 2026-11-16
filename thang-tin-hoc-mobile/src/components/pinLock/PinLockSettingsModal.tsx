@@ -172,7 +172,7 @@ export function PinLockSettingsModal({
                   </View>
                 ) : (
                   <DuoButton
-                    variant={isBrandStudent ? 'danger' : 'primary'}
+                    variant="primary"
                     size="lg"
                     fullWidth
                     text="Tạo mã PIN"

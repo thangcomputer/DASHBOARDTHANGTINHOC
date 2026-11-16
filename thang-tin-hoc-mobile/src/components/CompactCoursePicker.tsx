@@ -53,7 +53,7 @@ export function CompactCoursePicker({
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Đóng">
-          <Pressable style={styles.sheet} onPress={() => {}}>
+          <Pressable style={styles.sheet} onPress={() => { }}>
             <View style={styles.sheetHead}>
               <Text style={styles.sheetTitle}>Chọn khóa học</Text>
               <Pressable onPress={() => setOpen(false)} style={styles.close} accessibilityRole="button" accessibilityLabel="Đóng">
@@ -78,7 +78,7 @@ export function CompactCoursePicker({
                       </Text>
                       <View style={styles.barProgressRow}>
                         <View style={styles.track}>
-                          <View style={[styles.fill, { width: `${item.pct}%`, backgroundColor: item.completed ? '#10B981' : selected ? '#3B82F6' : colors.red }]} />
+                          <View style={[styles.fill, { width: `${item.pct}%`, backgroundColor: item.completed ? '#10B981' : selected ? '#3B82F6' : '#10B981' }]} />
                         </View>
                         <Text style={styles.progressText}>{`${item.done}/${item.total} · ${item.pct}%`}</Text>
                       </View>

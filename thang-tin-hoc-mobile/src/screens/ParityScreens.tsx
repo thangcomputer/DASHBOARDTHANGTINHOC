@@ -402,36 +402,7 @@ function getFeedRootComments(post: DemoFeedPost): Array<DemoFeedPost['comments']
 export function FeedScreen() {
   const { user, subscription } = useAuth();
   const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
-
-  if (user?.role === 'student' && isFreePortalLocked(user)) {
-    return (
-      <AppScreen contentStyle={styles.feedScreen}>
-        <AppHeader title="Bảng tin" icon={Radio} />
-        <View style={styles.feedLockedContainer}>
-          <View style={styles.feedLockedCard}>
-            <View style={styles.feedLockedIconCircle}>
-              <Lock size={34} color="#D97706" strokeWidth={2.4} />
-            </View>
-            <Text style={styles.feedLockedTitle}>Mục này đang khóa</Text>
-            <Text style={styles.feedLockedDesc}>
-              Đăng ký gói Meet để mở các mục đang khóa
-            </Text>
-            <Pressable
-              onPress={() => {
-                DeviceEventEmitter.emit('mobile:open-free-lock-modal');
-              }}
-              style={styles.feedLockedCtaBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Đăng ký gói Meet để mở khóa"
-            >
-              <Sparkles size={16} color="#FFFFFF" />
-              <Text style={styles.feedLockedCtaText}>Đăng ký gói Meet</Text>
-            </Pressable>
-          </View>
-        </View>
-      </AppScreen>
-    );
-  }
+  const isFreeLockedFeed = Boolean(user?.role === 'student' && isFreePortalLocked(user));
 
   const postLocked = user?.role === 'student' && !hasFeedPostAccess({
     role: user?.role,
@@ -463,21 +434,24 @@ export function FeedScreen() {
   const [reportQueueError, setReportQueueError] = useState('');
   const [resolvingReportId, setResolvingReportId] = useState('');
   const live = !!user && !user.previewMode;
-  const loader = useCallback(() => (live ? fetchFeedPosts() : feedService.posts()), [live]);
+  const loader = useCallback(
+    () => (isFreeLockedFeed ? Promise.resolve([]) : (live ? fetchFeedPosts() : feedService.posts())),
+    [isFreeLockedFeed, live],
+  );
   const resource = useMockResource(loader);
   const focusPostId = route.params?.postId || '';
   const focusCommentId = route.params?.commentId || '';
   const focusParentCommentId = route.params?.parentCommentId || '';
   const feedFocusKey = `${focusPostId}:${focusCommentId}:${focusParentCommentId}`;
   const loadPendingReports = useCallback(async () => {
-    if (!live || !canModerateFeed) return;
+    if (isFreeLockedFeed || !live || !canModerateFeed) return;
     try {
       setPendingReports(await fetchFeedReports());
       setReportQueueError('');
     } catch (error) {
       setReportQueueError(error instanceof Error ? error.message : 'Không thể tải báo cáo bài viết.');
     }
-  }, [canModerateFeed, live]);
+  }, [canModerateFeed, isFreeLockedFeed, live]);
   useEffect(() => { void loadPendingReports(); }, [loadPendingReports]);
   const hiddenPostsStorageKey = `mobile-feed-hidden:${user?.id || 'preview'}`;
   const personalPinsStorageKey = `mobile-feed-pins:${user?.id || 'preview'}`;
@@ -1092,7 +1066,7 @@ export function FeedScreen() {
             accessibilityRole="button"
             accessibilityLabel="Gửi bình luận"
           >
-            <Send size={18} color={canSubmit ? colors.red : colors.muted} />
+            <Send size={18} color={canSubmit ? colors.brand : colors.muted} />
           </Pressable>
         </View>
       </View>
@@ -1194,6 +1168,35 @@ export function FeedScreen() {
       </View>
     );
   };
+  if (isFreeLockedFeed) {
+    return (
+      <AppScreen contentStyle={styles.flex}>
+        <AppHeader title="Bảng tin" icon={Radio} />
+        <View style={styles.feedLockedContainer}>
+          <View style={styles.feedLockedCard}>
+            <View style={styles.feedLockedIconCircle}>
+              <Lock size={34} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <Text style={styles.feedLockedTitle}>Mục này đang khóa</Text>
+            <Text style={styles.feedLockedDesc}>
+              Đăng ký gói Meet để mở các mục đang khóa
+            </Text>
+            <Pressable
+              onPress={() => {
+                DeviceEventEmitter.emit('mobile:open-free-lock-modal');
+              }}
+              style={styles.feedLockedCtaBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Đăng ký gói Meet để mở khóa"
+            >
+              <Sparkles size={16} color="#FFFFFF" />
+              <Text style={styles.feedLockedCtaText}>Đăng ký gói Meet</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppScreen>
+    );
+  }
   return (
     <AppScreen scrollViewRef={scrollViewRef}>
       <View onTouchStart={Platform.OS !== 'web' ? closeCommentsOnOutsideTouch : undefined}>
@@ -3617,7 +3620,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   quizAssignmentChoiceList: { maxHeight: 196, borderRadius: radius.md },
   quizAssignmentChoices: { gap: 6 },
   quizAssignmentChoice: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingVertical: 7, paddingHorizontal: 9, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  quizAssignmentChoiceActive: { borderColor: '#FDA4AF', backgroundColor: '#FFF1F2' },
+  quizAssignmentChoiceActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   quizAssignmentChoiceText: { flex: 1, minWidth: 0, color: '#334155', fontSize: typography.micro, lineHeight: 16, fontWeight: '600' },
   quizAssignmentChoiceTextActive: { color: colors.brandDark, fontWeight: '800' },
   quizAssignmentChoiceCheck: { color: colors.brand, fontSize: typography.caption, fontWeight: '900' },
@@ -3718,18 +3721,18 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   quizDeleteText: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
   trainingTabs: { flexDirection: 'row', flexWrap: 'nowrap', gap: spacing.xs, paddingBottom: spacing.md, marginBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   trainingTab: { flex: 1, minWidth: 0, minHeight: 63, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 2, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: 13, backgroundColor: colors.surface },
-  trainingTabActive: { borderColor: '#FF4D5A', backgroundColor: '#FFF3F3', shadowColor: '#EF4056', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 2 },
+  trainingTabActive: { borderColor: '#10B981', backgroundColor: '#ECFDF5', shadowColor: '#059669', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 2 },
   trainingTabIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
   trainingTabText: { maxWidth: '100%', color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
   trainingTabTextActive: { color: colors.ink },
   trainingTabCount: { position: 'absolute', top: 3, right: 3, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: radius.pill, backgroundColor: '#EEF2F7' },
-  trainingTabCountActive: { backgroundColor: '#E11D2E' },
+  trainingTabCountActive: { backgroundColor: '#059669' },
   trainingTabCountText: { color: '#64748B', fontSize: typography.micro, lineHeight: 16, fontWeight: '800' },
   trainingTabCountTextActive: { color: '#FFFFFF' },
   trainingCard: { overflow: 'hidden' },
   trainingBanner: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: -spacing.lg, marginHorizontal: -spacing.lg, marginBottom: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.brandDark },
   trainingGuide: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  trainingGuideIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.redSoft },
+  trainingGuideIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.brandSoft },
   trainingGuideIconText: { fontSize: 22 },
   trainingGuideToggle: { marginTop: spacing.xs, color: colors.brand, fontSize: typography.micro, fontWeight: '800' },
   trainingFileType: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },

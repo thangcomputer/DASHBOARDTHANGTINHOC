@@ -2,19 +2,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter, Platform } from 'react-native';
 
 export type LastStudySession = {
-  kind: 'lesson_practice' | 'lms_video';
+  kind: 'lesson_practice' | 'lms_video' | 'daily_practice';
   studentId: string;
+  topicId?: string;
+  nodeKey?: string;
   courseId: string;
   courseTitle: string;
   subjectId: string;
   subjectName: string;
+  lessonId?: string;
+  lessonTitle?: string;
   unitId: string;
   unitTitle: string;
   sectionId: string;
   sectionLabel: string;
   atSec: number;
   durationSec: number;
-  progressPct: number;
+  progressPct: number | null;
+  href?: string;
   updatedAt: number;
 };
 
@@ -57,24 +62,40 @@ function normalizeSession(
   const courseId = String(raw.courseId || '').trim();
   const subjectId = String(raw.subjectId || '').trim();
   const unitId = String(raw.unitId || '').trim();
-  if (!courseId && !subjectId && !unitId) return null;
+  const lessonId = String(raw.lessonId || '').trim();
+  if (!courseId && !subjectId && !unitId && !lessonId) return null;
 
   const studentId = normalizeStudentId(raw.studentId) || normalizeStudentId(fallbackStudentId);
-  const progressRaw = Number(raw.progressPct);
+  const atSec = Math.max(0, Math.floor(Number(raw.atSec) || 0));
+  const durationSec = Math.max(0, Math.floor(Number(raw.durationSec) || 0));
+  const progressRaw = raw.progressPct != null ? Number(raw.progressPct) : Number.NaN;
+  const progressPct = Number.isFinite(progressRaw)
+    ? Math.min(100, Math.max(0, Math.round(progressRaw)))
+    : (durationSec > 0 ? Math.min(100, Math.max(0, Math.round((atSec / durationSec) * 100))) : null);
+
   return {
-    kind: raw.kind === 'lms_video' ? 'lms_video' : 'lesson_practice',
+    kind: raw.kind === 'lms_video'
+      ? 'lms_video'
+      : raw.kind === 'daily_practice'
+        ? 'daily_practice'
+        : 'lesson_practice',
     studentId,
+    topicId: String(raw.topicId || '').trim(),
+    nodeKey: String(raw.nodeKey || '').trim(),
     courseId,
     courseTitle: String(raw.courseTitle || '').trim(),
     subjectId,
     subjectName: String(raw.subjectName || '').trim(),
+    lessonId,
+    lessonTitle: String(raw.lessonTitle || '').trim(),
     unitId,
     unitTitle: String(raw.unitTitle || '').trim(),
     sectionId: String(raw.sectionId || '').trim(),
     sectionLabel: String(raw.sectionLabel || '').trim(),
-    atSec: Math.max(0, Math.floor(Number(raw.atSec) || 0)),
-    durationSec: Math.max(0, Math.floor(Number(raw.durationSec) || 0)),
-    progressPct: Number.isFinite(progressRaw) ? Math.min(100, Math.max(0, Math.round(progressRaw))) : 0,
+    atSec,
+    durationSec,
+    progressPct,
+    href: String(raw.href || '').trim(),
     updatedAt: Number(raw.updatedAt) > 0 ? Number(raw.updatedAt) : Date.now(),
   };
 }
@@ -86,8 +107,10 @@ export async function saveLastStudySession(
   const cached = memoryCache.get(storageKeyFor(sid)) || memoryCache.get(LATEST_KEY);
   const sameUnit =
     cached
+    && (!payload.kind || cached.kind === payload.kind)
     && (!payload.unitId || cached.unitId === String(payload.unitId).trim())
-    && (!payload.sectionId || cached.sectionId === String(payload.sectionId).trim());
+    && (!payload.sectionId || cached.sectionId === String(payload.sectionId).trim())
+    && (!payload.lessonId || cached.lessonId === String(payload.lessonId).trim());
 
   const merged: Partial<LastStudySession> = sameUnit
     ? {
@@ -153,12 +176,11 @@ export function formatResumeTimeAgo(updatedAt?: number): string {
   if (!ts) return 'Gần đây';
   const diffMs = Math.max(0, Date.now() - ts);
   const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return 'Vừa mới học';
+  if (mins < 1) return 'Vừa xong';
   if (mins < 60) return `${mins} phút trước`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours} giờ trước`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return 'Hôm qua';
   return `${days} ngày trước`;
 }
 

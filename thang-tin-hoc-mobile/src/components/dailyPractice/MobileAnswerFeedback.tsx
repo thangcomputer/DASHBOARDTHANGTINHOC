@@ -85,6 +85,8 @@ export function MobileAnswerFeedback({
   onRetry,
   canRetry = false,
   wrongTryCount = 0,
+  retryCooldownSec = 0,
+  xpDisabled = false,
   rewardKey = '',
   explainOpen: explainOpenProp,
   onExplainOpenChange,
@@ -99,6 +101,8 @@ export function MobileAnswerFeedback({
   onRetry?: () => void;
   canRetry?: boolean;
   wrongTryCount?: number;
+  retryCooldownSec?: number;
+  xpDisabled?: boolean;
   rewardKey?: string;
   explainOpen?: boolean;
   onExplainOpenChange?: (open: boolean) => void;
@@ -145,12 +149,20 @@ export function MobileAnswerFeedback({
     ]).start();
   }, [result, slideAnim, checkPop, xpPop]);
 
+  const practiceOnly = Boolean((result as { practiceOnly?: boolean }).practiceOnly);
+  const waitingCooldown = retryCooldownSec > 0;
   const bannerLabel = isCorrect ? 'Chính xác!' : 'Chưa chính xác';
   const conciseLine = isCorrect
     ? buildMobileConciseSummary(question, result)
     : resolveWrongEncouragement(wrongTryCount);
   const answerText = String(result.correctAnswer?.text || '').trim();
   const detailExplanation = normalizeExplanationBody(result.explanation, answerText);
+  const explainTitle = String(question?.prompt || '').replace(/\?+$/, '').trim();
+  const mascotMood = isCorrect
+    ? 'happy'
+    : wrongTryCount >= 3
+      ? 'studying'
+      : 'thinking';
 
   return (
     <Animated.View
@@ -174,7 +186,7 @@ export function MobileAnswerFeedback({
       {!isCorrect ? (
         <View style={styles.wrongBannerRow}>
           <View style={styles.mascotColCompact}>
-            <Mascot mood="thinking" size={40} />
+            <Mascot mood={mascotMood} size={40} />
           </View>
           <View style={styles.wrongBodyCol}>
             <View style={styles.titleRowCompact}>
@@ -201,7 +213,7 @@ export function MobileAnswerFeedback({
               >
                 {bannerLabel}
               </Text>
-              {result.wrongPenaltyXp && result.wrongPenaltyXp > 0 ? (
+              {!practiceOnly && !xpDisabled && result.wrongPenaltyXp && result.wrongPenaltyXp > 0 ? (
                 <View style={styles.xpPillMutedInline}>
                   <Zap size={11} color="#EF4444" fill="#FCA5A5" />
                   <Text style={styles.xpPillMutedText} maxFontSizeMultiplier={1.25}>{`-${result.wrongPenaltyXp} XP`}</Text>
@@ -213,22 +225,22 @@ export function MobileAnswerFeedback({
             </Text>
           </View>
           <Pressable
-            disabled={busy || !canRetry}
+            disabled={busy || !canRetry || waitingCooldown}
             onPress={() => {
               play('tap');
               onRetry?.();
             }}
             style={({ pressed }) => [
               styles.retryBannerBtn,
-              pressed && canRetry && styles.btnPressed,
-              !canRetry && !busy && { opacity: 0.38 },
+              pressed && canRetry && !waitingCooldown && styles.btnPressed,
+              (!canRetry || waitingCooldown) && !busy && { opacity: 0.45 },
               busy && { opacity: 0.5 },
             ]}
             accessibilityRole="button"
           >
             <RotateCcw size={15} color="#FFFFFF" />
             <Text style={styles.retryBannerBtnText} maxFontSizeMultiplier={1.2}>
-              {wrongTryCount > 0 ? 'Thử lại' : 'Kiểm tra'}
+              {waitingCooldown ? `Thử lại (${retryCooldownSec}s)` : wrongTryCount > 0 ? 'Thử lại' : 'Kiểm tra'}
             </Text>
           </Pressable>
         </View>
@@ -266,13 +278,17 @@ export function MobileAnswerFeedback({
               {conciseLine}
             </Text>
             <Animated.View style={[styles.xpRow, { transform: [{ scale: xpPop }] }]}>
-              {confirmedXp > 0 ? (
+              {practiceOnly ? (
+                <View style={{ backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+                  <Text style={{ color: '#075985', fontSize: 12, fontWeight: '800' }}>Ôn lại · không đổi XP</Text>
+                </View>
+              ) : confirmedXp > 0 ? (
                 <XPRewardBurst xpAmount={confirmedXp} burstKey={rewardKey} />
               ) : (
                 <View style={styles.xpPillGold}>
                   <Zap size={13} color="#F59E0B" fill="#FBBF24" />
                   <Text style={styles.xpPillGoldText} maxFontSizeMultiplier={1.25}>
-                    {feedbackTitle || 'Xuất sắc!'}
+                    {feedbackTitle || 'Ôn tập · 0 XP'}
                   </Text>
                 </View>
               )}
@@ -319,6 +335,11 @@ export function MobileAnswerFeedback({
 
       {explainOpen ? (
         <View style={[styles.explainPanel, isCorrect ? styles.explainPanelOk : styles.explainPanelBad]}>
+          {explainTitle ? (
+            <Text style={{ color: '#0F172A', fontSize: 14, fontWeight: '900' }} maxFontSizeMultiplier={1.3}>
+              {explainTitle.endsWith('?') || explainTitle.endsWith('？') ? explainTitle : `${explainTitle}?`}
+            </Text>
+          ) : null}
           {answerText ? (
             <Text style={styles.explainCorrectAns} maxFontSizeMultiplier={1.3}>{`✓ Đáp án đúng: ${answerText}`}</Text>
           ) : null}

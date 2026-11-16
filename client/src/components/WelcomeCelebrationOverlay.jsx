@@ -526,7 +526,7 @@ export default function WelcomeCelebrationOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="welcome-celebration-title"
@@ -539,8 +539,8 @@ export default function WelcomeCelebrationOverlay({
       />
 
       {/* 2. Card */}
-      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-[28px] border border-white/25 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.5)]">
-        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-700 px-6 pt-8 pb-10 text-center text-white">
+      <div className="relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-[24px] border border-white/25 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.5)] sm:rounded-[28px]">
+        <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-700 px-5 pt-5 pb-6 text-center text-white sm:px-6 sm:pt-8 sm:pb-10">
           <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-amber-300/20 blur-2xl" aria-hidden="true" />
           <div className="pointer-events-none absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
           <button
@@ -551,47 +551,48 @@ export default function WelcomeCelebrationOverlay({
           >
             <X size={18} />
           </button>
-          <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-amber-200/40 bg-white/15 shadow-inner backdrop-blur-sm">
-            <Sparkles size={30} className="text-amber-200" aria-hidden="true" />
+          <div className="relative mx-auto mb-2.5 flex h-12 w-12 items-center justify-center rounded-full border border-amber-200/40 bg-white/15 shadow-inner backdrop-blur-sm sm:mb-4 sm:h-16 sm:w-16">
+            <Sparkles size={24} className="text-amber-200 sm:hidden" aria-hidden="true" />
+            <Sparkles size={30} className="hidden text-amber-200 sm:block" aria-hidden="true" />
           </div>
-          <p className="relative text-[11px] font-bold  tracking-[0.28em] text-amber-100/95">
+          <p className="relative text-[10px] font-bold tracking-[0.22em] text-amber-100/95 sm:text-[11px] sm:tracking-[0.28em]">
             Trung tâm Tin học Thắng Tin Học
           </p>
-          <h2 id="welcome-celebration-title" className="relative mt-3 text-2xl sm:text-[1.7rem] font-black tracking-tight leading-tight">
+          <h2 id="welcome-celebration-title" className="relative mt-2 text-xl font-black tracking-tight leading-tight sm:mt-3 sm:text-[1.7rem]">
             {title}
           </h2>
           {name ? (
-            <p className="relative mt-2 text-sm font-medium text-emerald-50/95">
+            <p className="relative mt-1.5 text-xs font-medium text-emerald-50/95 sm:mt-2 sm:text-sm">
               Kính gửi <span className="font-bold text-white">{name}</span>
             </p>
           ) : null}
-          <p className="relative mt-3 text-base font-bold text-amber-100 tracking-wide">
+          <p className="relative mt-2 text-sm font-bold tracking-wide text-amber-100 sm:mt-3 sm:text-base">
             Chúc bạn thành công!
           </p>
         </div>
 
-        <div className="px-6 sm:px-8 py-6 sm:py-7 text-center space-y-4">
-          <p className="text-[15px] leading-relaxed text-slate-600">{body}</p>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-center space-y-3 sm:px-8 sm:py-7 sm:space-y-4">
+          <p className="text-xs leading-relaxed text-slate-600 sm:text-[15px]">{body}</p>
 
-          <blockquote className="rounded-2xl border border-amber-100 bg-gradient-to-b from-amber-50/80 to-white px-4 py-4">
-            <div className="space-y-1.5 text-[14px] italic leading-relaxed text-slate-700">
+          <blockquote className="rounded-2xl border border-amber-100 bg-gradient-to-b from-amber-50/80 to-white px-3.5 py-3 sm:px-4 sm:py-4">
+            <div className="space-y-1 text-xs italic leading-relaxed text-slate-700 sm:space-y-1.5 sm:text-[14px]">
               {poemLines.map((line) => (
                 <p key={line}>{line}</p>
               ))}
             </div>
-            <p className="mt-3 text-[11px] font-bold  tracking-wider text-amber-700/80">
+            <p className="mt-2 text-[10px] font-bold tracking-wider text-amber-700/80 sm:mt-3 sm:text-[11px]">
               Học đều · Luyện tập · Kiên trì
             </p>
           </blockquote>
 
           <div className="h-px w-16 mx-auto bg-gradient-to-r from-transparent via-emerald-200 to-transparent" aria-hidden="true" />
-          <p className="text-xs font-semibold tracking-wide text-slate-400 ">
+          <p className="text-[11px] font-semibold tracking-wide text-slate-400 sm:text-xs">
             Lời chào từ đội ngũ Thắng Tin Học
           </p>
           <button
             type="button"
             onClick={() => onClose?.()}
-            className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition tracking-wide"
+            className="w-full min-h-11 rounded-2xl bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition tracking-wide sm:min-h-12"
           >
             {isCourseComplete ? 'Tiếp tục hành trình' : 'Tiếp tục vào hệ thống'}
           </button>

@@ -77,7 +77,7 @@ export function DuoHeroCard({
 
       {/* Big Tactile 3D Action Button */}
       <DuoButton
-        variant={playedToday ? 'accent' : (isBrandStudent ? 'danger' : 'primary')}
+        variant={playedToday ? 'accent' : 'primary'}
         size="lg"
         fullWidth
         icon={<Play size={18} color="#FFFFFF" fill="#FFFFFF" />}

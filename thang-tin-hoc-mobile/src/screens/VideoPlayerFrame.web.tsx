@@ -99,6 +99,7 @@ export function VideoPlayerFrame({
   chromeRightSlot = null,
   appearance = 'default',
   chromeBg = '#080D19',
+  initialAtSec = 0,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -114,6 +115,7 @@ export function VideoPlayerFrame({
   chromeRightSlot?: React.ReactNode;
   appearance?: 'default' | 'window';
   chromeBg?: string;
+  initialAtSec?: number;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -271,7 +273,8 @@ export function VideoPlayerFrame({
         return 0;
       }
     };
-    const initialMaxPosition = doneRef.current ? 0 : readStoredNumber(watchStorageKey);
+    const initialResumeAt = Math.max(0, Math.floor(Number(initialAtSec) || 0));
+    const initialMaxPosition = Math.max(doneRef.current ? 0 : readStoredNumber(watchStorageKey), initialResumeAt);
     const initialWatchedSeconds = doneRef.current ? 0 : readStoredNumber(watchedStorageKey);
     const guard = createVideoWatchGuard(youtubeId ? 1.25 : 2, initialWatchedSeconds, initialMaxPosition);
     let youtubePlayer: YouTubePlayer | null = null;
@@ -367,8 +370,9 @@ export function VideoPlayerFrame({
       syncPlayerVolume(volumeRef.current, mutedRef.current);
       const onMetadata = () => {
         syncPlayerVolume(volumeRef.current, mutedRef.current);
-        if (!doneRef.current && initialMaxPosition > 0 && video.currentTime < initialMaxPosition) {
-          video.currentTime = Math.min(initialMaxPosition, Math.max(0, video.duration - 1));
+        const startTarget = initialResumeAt > 0 ? Math.max(initialResumeAt, doneRef.current ? 0 : initialMaxPosition) : (doneRef.current ? 0 : initialMaxPosition);
+        if (startTarget > 0 && video.currentTime < startTarget) {
+          video.currentTime = Math.min(startTarget, Math.max(0, video.duration - 1));
           return;
         }
         report(video.currentTime, video.duration, !video.paused, (position) => { video.currentTime = position; });
@@ -417,7 +421,7 @@ export function VideoPlayerFrame({
         mountRef.current.replaceChildren(playerFrame);
         const baseVars = buildYtBrandedPlayerVars({
           origin: window.location.origin,
-          start: Math.floor(initialMaxPosition),
+          start: Math.floor(Math.max(initialMaxPosition, initialResumeAt)),
         });
         youtubePlayer = new youtube.Player(playerFrame, {
           videoId: youtubeId,
@@ -459,8 +463,9 @@ export function VideoPlayerFrame({
               }
               const curQ = youtubePlayer.getPlaybackQuality?.();
               if (curQ && curQ !== 'unknown' && curQ !== 'default') setLiveQuality(curQ);
-              if (!doneRef.current && initialMaxPosition > 0) {
-                youtubePlayer.seekTo(initialMaxPosition, true);
+              const ytSeekTarget = initialResumeAt > 0 ? Math.max(initialResumeAt, doneRef.current ? 0 : initialMaxPosition) : (doneRef.current ? 0 : initialMaxPosition);
+              if (ytSeekTarget > 0) {
+                youtubePlayer.seekTo(ytSeekTarget, true);
               }
               if (appearance !== 'window') {
                 youtubePlayer.playVideo?.();

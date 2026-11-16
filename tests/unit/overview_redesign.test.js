@@ -47,4 +47,15 @@ test('Trang chủ mobile: cùng bố cục, bỏ khối trùng (thẻ lớp, KPI
   assert.ok(home.includes("navigation?.navigate('Assignments', { assignmentId: nextHomework.id })"));
   assert.ok(home.includes("navigation?.navigate('Attendance', { scheduleId: first.id })"));
   assert.ok(home.includes('showProgress={false}'), 'chọn khóa không lặp thanh tiến độ');
+  assert.ok(home.includes('effectiveLastStudy') && home.includes('HỌC TIẾP 1 CHẠM') && !home.includes('<MobileHomeWidgetCard'), 'áp dụng thẻ Học tiếp 1 chạm và bỏ widget mobile trùng');
+
+  const leaderboard = read('thang-tin-hoc-mobile/src/components/LearningLeaderboardCard.tsx');
+  assert.ok(leaderboard.includes('LEAGUE_TIERS') && leaderboard.includes('Hạng tuần:'), 'bảng xếp hạng tuần mobile có cấp hạng như web');
+
+  const courses = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
+  assert.ok(courses.includes('blockUnregisteredInstructorPreview') && courses.includes('Zalo tư vấn'), 'thẻ khóa giảng viên mobile khóa preview và dùng nút Zalo tư vấn như web');
+  assert.ok(courses.includes('resumeVideoAt'), 'hỗ trợ vào thẳng mốc video khóa học khi bấm Học tiếp ngay');
+
+  const dp = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
+  assert.ok(dp.includes('pendingResume') && dp.includes('initialAtSec'), 'bấm Học tiếp 1 chạm mở thẳng bài/video/quiz và seek tới mốc đang học');
 });

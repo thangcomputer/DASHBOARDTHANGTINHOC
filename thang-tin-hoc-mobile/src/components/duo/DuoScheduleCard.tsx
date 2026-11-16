@@ -119,7 +119,8 @@ export function DuoScheduleCard({
   }
 
   if (resolvedList.length === 0) {
-    const upcomingText = nextLesson.length
+    const safeNextLesson = Array.isArray(nextLesson) ? nextLesson : [];
+    const upcomingText = safeNextLesson.length
       ? ''
       : firstSchedule
       ? `Lịch tới: ${firstSchedule.title || 'Buổi học'} · ${firstSchedule.time} (${firstSchedule.dateLabel})`
@@ -139,7 +140,11 @@ export function DuoScheduleCard({
         </View>
         <View style={[styles.emptyCard, upsell && meetEmptyMode === 'purchase' && styles.emptyCardPurchase, upsell && meetEmptyMode === 'renew' && styles.emptyCardRenew]}>
           <View style={[styles.emptyIconBox, upsell && styles.emptyIconBoxUpsell]}>
-            <Video size={upsell ? 22 : 20} color={meetEmptyMode === 'renew' ? '#D97706' : upsell ? accentColor : '#94A3B8'} />
+            {meetEmptyMode === 'purchase' ? (
+              <Video size={22} color={accentColor} />
+            ) : (
+              <Calendar size={upsell ? 22 : 20} color={meetEmptyMode === 'renew' ? '#D97706' : '#94A3B8'} />
+            )}
           </View>
           {meetEmptyMode === 'purchase' ? (
             <>
@@ -177,7 +182,7 @@ export function DuoScheduleCard({
             <>
               <Text style={styles.emptyTitle}>Hôm nay không có lịch</Text>
               {upcomingText ? <Text style={styles.emptySub}>{upcomingText}</Text> : null}
-              {nextLesson.length > 0 ? <UpcomingLessons items={nextLesson} /> : null}
+              {safeNextLesson.length > 0 ? <UpcomingLessons items={safeNextLesson} /> : null}
               {onAll ? (
                 <DuoButton
                   variant="secondary"
@@ -240,43 +245,45 @@ export function DuoScheduleCard({
               </View>
             </View>
 
-            {item.ended ? (
-              <DuoButton
-                variant="secondary"
-                size="sm"
-                disabled
-                text="Đã kết thúc"
-              />
-            ) : item.meetLink && item.joinable ? (
-              <MeetJoinGlow>
+            <View style={styles.itemActionRow}>
+              {item.ended ? (
                 <DuoButton
-                  variant="danger"
+                  variant="secondary"
                   size="sm"
-                  icon={<Video size={14} color="#FFFFFF" />}
-                  text="Vào Meet"
-                  onPress={() => {
-                    if (item.meetLink) void Linking.openURL(item.meetLink);
-                  }}
+                  disabled
+                  text="Đã kết thúc"
                 />
-              </MeetJoinGlow>
-            ) : item.meetLink ? (
-              <DuoButton
-                variant="secondary"
-                size="sm"
-                disabled
-                icon={<Video size={14} color="#94A3B8" />}
-                text="Vào Meet"
-                accessibilityLabel={item.waitLabel || 'Chưa đến giờ vào lớp'}
-              />
-            ) : (
-              <View style={styles.noLinkPill}>
-                <Text style={styles.noLinkText}>Chưa có link</Text>
-              </View>
-            )}
+              ) : item.meetLink && item.joinable ? (
+                <MeetJoinGlow>
+                  <DuoButton
+                    variant={item.live ? 'primary' : 'blue'}
+                    size="sm"
+                    icon={<Video size={14} color="#FFFFFF" />}
+                    text="Vào Meet"
+                    onPress={() => {
+                      if (item.meetLink) void Linking.openURL(item.meetLink);
+                    }}
+                  />
+                </MeetJoinGlow>
+              ) : item.meetLink ? (
+                <DuoButton
+                  variant="secondary"
+                  size="sm"
+                  disabled
+                  icon={<Video size={14} color="#94A3B8" />}
+                  text="Vào Meet"
+                  accessibilityLabel={item.waitLabel || 'Chưa đến giờ vào lớp'}
+                />
+              ) : (
+                <View style={styles.noLinkPill}>
+                  <Text style={styles.noLinkText}>Chưa có link</Text>
+                </View>
+              )}
+            </View>
           </View>
         ))}
       </View>
-      {nextLesson.length > 0 ? <UpcomingLessons items={nextLesson} /> : null}
+      {(Array.isArray(nextLesson) && nextLesson.length > 0) ? <UpcomingLessons items={nextLesson} /> : null}
     </View>
   );
 }
@@ -423,8 +430,8 @@ const styles = StyleSheet.create({
     zIndex: 0,
     borderRadius: 18,
     borderWidth: 3,
-    borderColor: '#FCA5A5',
-    backgroundColor: 'rgba(248, 113, 113, 0.45)',
+    borderColor: '#34D399',
+    backgroundColor: 'rgba(16, 185, 129, 0.35)',
   },
   meetGlowButton: {
     zIndex: 2,
@@ -473,9 +480,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: 10,
     overflow: 'visible',
   },
@@ -484,8 +490,13 @@ const styles = StyleSheet.create({
     borderColor: '#BBF7D0',
   },
   itemInfoCol: {
-    flex: 1,
+    width: '100%',
     gap: 4,
+  },
+  itemActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   itemTitleRow: {
     flexDirection: 'row',
@@ -512,6 +523,7 @@ const styles = StyleSheet.create({
   },
   itemMetaRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
   },
@@ -519,6 +531,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
+    flexShrink: 0,
   },
   metaDot: {
     fontSize: 12,

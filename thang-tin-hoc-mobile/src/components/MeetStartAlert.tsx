@@ -379,7 +379,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
 
           {link ? (
             <DuoButton
-              variant="danger"
+              variant="primary"
               text={actionText}
               icon={<Video size={16} color="#FFFFFF" />}
               onPress={() => {

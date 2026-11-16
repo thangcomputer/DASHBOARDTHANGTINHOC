@@ -47,6 +47,31 @@ describe('lastPathTopic', () => {
       units: [{ state: 'active', steps: [{ state: 'completed' }], pathNodes: [] }],
     };
     assert.equal(pathTopicPrimaryCtaLabel(touched), 'Tiếp tục học');
+
+    const oneDoneRemainingLocked = {
+      completedUnits: 1,
+      totalUnits: 6,
+      next: null,
+      units: [
+        { state: 'completed', steps: [], pathNodes: [] },
+        { state: 'locked', requiresSubscription: true, steps: [], pathNodes: [] },
+      ],
+    };
+    assert.equal(pathTopicPrimaryCtaLabel(oneDoneRemainingLocked), 'Tiếp tục học');
+
+    const watchedVideo = {
+      completedUnits: 0,
+      totalUnits: 6,
+      units: [{ state: 'active', watchedVideoIds: ['vid-1'], steps: [], pathNodes: [] }],
+    };
+    assert.equal(pathTopicPrimaryCtaLabel(watchedVideo), 'Tiếp tục học');
+
+    const completedSection = {
+      completedUnits: 0,
+      totalUnits: 6,
+      units: [{ state: 'active', completedSections: ['l1:easy:content'], steps: [], pathNodes: [] }],
+    };
+    assert.equal(pathTopicPrimaryCtaLabel(completedSection), 'Tiếp tục học');
   });
 
   it('banner chặng: locked không CTA, completed Ôn lại, mới Bắt đầu', () => {

@@ -31,8 +31,15 @@ export function DailyPracticeOverviewCard({
   const totalUnits = pathTopic?.totalUnits || 0;
   const completedUnits = pathTopic?.completedUnits || 0;
   const topicDone = totalUnits > 0 && completedUnits >= totalUnits;
-  const pct = totalUnits > 0 ? Math.min(100, Math.round((completedUnits / totalUnits) * 100)) : 0;
-  const barWidth = Math.max(pct, completedUnits > 0 ? 6 : 0);
+  const activeUnit = (pathTopic?.units || []).find((u) => u.state === 'active') || null;
+  const activeSteps = Array.isArray(activeUnit?.steps) ? activeUnit.steps : [];
+  const activeFraction = activeSteps.length
+    ? activeSteps.filter((s) => s.state === 'completed').length / activeSteps.length
+    : 0;
+  const pct = totalUnits > 0
+    ? Math.min(100, Math.round(((completedUnits + activeFraction) / totalUnits) * 100))
+    : 0;
+  const barWidth = Math.max(pct, completedUnits > 0 || activeFraction > 0 ? 6 : 0);
   const topicName = pathTopic?.topic?.name || 'Lộ trình kỹ năng';
 
   const handlePractice = () => {
@@ -138,7 +145,7 @@ export function DailyPracticeOverviewCard({
 
       {/* Nút hành động 3D */}
       <DuoButton
-        variant={isBrandStudent ? 'danger' : 'primary'}
+        variant="primary"
         size="lg"
         fullWidth
         icon={<Play size={16} color="#FFFFFF" fill="#FFFFFF" />}

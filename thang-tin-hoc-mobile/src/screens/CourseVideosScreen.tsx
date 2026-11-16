@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Alert, Animated, AppState, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ArrowLeft, Award, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Download, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, ShieldCheck, Sparkles, Star, StickyNote, Trash2, Trophy, Volume2, VolumeX, WifiOff, X } from 'lucide-react-native';
+import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
 import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
 import RenderHtml from '@native-html/render';
 import type { MixedStyleDeclaration } from '@native-html/render';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { dailyPracticeApi, type DpTopic } from '../services/dailyPracticeApi';
@@ -59,7 +60,7 @@ const lessonHtmlTags: Record<string, MixedStyleDeclaration> = {
   h2: { marginTop: 8, marginBottom: 8, color: '#0F172A', fontSize: typography.subheading, fontWeight: '800' },
   h3: { marginTop: 8, marginBottom: 6, color: '#1E293B', fontSize: typography.heading, fontWeight: '800' },
   li: { marginBottom: 6 },
-  a: { color: '#E11D48', textDecorationLine: 'underline' },
+  a: { color: '#059669', textDecorationLine: 'underline' },
 };
 const practiceFireworkRays: Array<[number, string, number]> = [
   [0, '#0F766E', 16], [30, '#C4A35A', 22], [60, '#0F766E', 16], [90, '#C4A35A', 22],
@@ -393,6 +394,7 @@ export function CourseVideosScreen() {
   const [selectedUnit, setSelectedUnit] = useState<LessonPracticeUnit | null>(null);
   const [activeUnitDetails, setActiveUnitDetails] = useState<LessonPracticeUnit[]>([]);
   const [selectedLearningSectionId, setSelectedLearningSectionId] = useState<string | null>(null);
+  const [resumeVideoAt, setResumeVideoAt] = useState<{ unitId: string; sectionId: string; atSec: number } | null>(null);
   const [openingUnit, setOpeningUnit] = useState(false);
   const [unitNavOpen, setUnitNavOpen] = useState(false);
   const [lessonDrawerMounted, setLessonDrawerMounted] = useState(false);
@@ -494,13 +496,14 @@ export function CourseVideosScreen() {
   const openSubject = async (
     course: LessonPracticeCourse,
     subject: LessonPracticeSubject,
-    resume?: { unitId: string; sectionId: string },
+    resume?: { unitId: string; sectionId: string; atSec?: number },
   ) => {
     setSelectedCourse(course);
     setSelectedSubject(subject);
     setSelectedUnit(null);
     setActiveUnitDetails([]);
     setSelectedLearningSectionId(null);
+    setResumeVideoAt(resume?.unitId && resume?.atSec ? { unitId: resume.unitId, sectionId: resume.sectionId, atSec: resume.atSec } : null);
     setUnitNavOpen(false);
     setUnits([]);
     setUnitsError('');
@@ -576,6 +579,92 @@ export function CourseVideosScreen() {
       : current);
     setUnits(refreshedUnits.map((unit) => unit.id === unitId ? updatedUnit : unit));
   };
+
+  const foregroundSyncRef = useRef(false);
+  const resourceReloadRef = useRef(resource.reload);
+  resourceReloadRef.current = resource.reload;
+  const selectedCourseId = selectedCourse?.id || '';
+  const selectedSubjectId = selectedSubject?.id || '';
+  const selectedUnitId = selectedUnit?.id || '';
+  const activeUnitDetailIdsKey = activeUnitDetails.map((unit) => unit.id).join(',');
+
+  const syncForegroundProgress = useCallback(async () => {
+    if (foregroundSyncRef.current) return;
+    foregroundSyncRef.current = true;
+    try {
+      resourceReloadRef.current();
+      if (!selectedSubjectId || !selectedCourseId || isPreview) return;
+      const refreshedUnits = await getCourseSubjectUnits(selectedSubjectId, selectedCourseId);
+      const detailIds = Array.from(
+        new Set([
+          ...(selectedUnitId ? [selectedUnitId] : []),
+          ...(activeUnitDetailIdsKey ? activeUnitDetailIdsKey.split(',').filter(Boolean) : []),
+        ]),
+      );
+      if (!detailIds.length) {
+        setUnits(refreshedUnits);
+        return;
+      }
+      const details = await Promise.all(
+        detailIds.map((id) => openCourseVideoUnit(id).catch(() => null)),
+      );
+      const detailMap = new Map<string, LessonPracticeUnit>();
+      detailIds.forEach((id, idx) => {
+        const detail = details[idx];
+        if (!detail) return;
+        const base = refreshedUnits.find((unit) => unit.id === id);
+        detailMap.set(id, { ...base, ...detail });
+      });
+      setUnits(refreshedUnits.map((unit) => detailMap.get(unit.id) || unit));
+      if (selectedUnitId) {
+        const updatedSelected = detailMap.get(selectedUnitId);
+        if (updatedSelected) {
+          setSelectedUnit((current) => current?.id === selectedUnitId ? updatedSelected : current);
+        }
+      }
+      if (activeUnitDetailIdsKey) {
+        setActiveUnitDetails((current) => current.map((unit) => detailMap.get(unit.id) || unit));
+      }
+    } catch {
+      // Keep active UI state intact during silent background refresh.
+    } finally {
+      foregroundSyncRef.current = false;
+    }
+  }, [activeUnitDetailIdsKey, isPreview, selectedCourseId, selectedSubjectId, selectedUnitId]);
+
+  const didInitialFocusRef = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!didInitialFocusRef.current) {
+      didInitialFocusRef.current = true;
+      return;
+    }
+    void syncForegroundProgress();
+  }, [syncForegroundProgress]));
+
+  useEffect(() => {
+    const appSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void syncForegroundProgress();
+      }
+    });
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const onForeground = () => {
+        if (document.visibilityState !== 'hidden') {
+          void syncForegroundProgress();
+        }
+      };
+      window.addEventListener('focus', onForeground);
+      document.addEventListener('visibilitychange', onForeground);
+      return () => {
+        appSub.remove();
+        window.removeEventListener('focus', onForeground);
+        document.removeEventListener('visibilitychange', onForeground);
+      };
+    }
+    return () => {
+      appSub.remove();
+    };
+  }, [syncForegroundProgress]);
 
   const completeUnitSection = async (unitId: string, section: 'video' | 'note', itemId: string): Promise<boolean> => {
     try {
@@ -660,11 +749,12 @@ export function CourseVideosScreen() {
       || courses.find((item) => item.enrolled && hasSubject(item))
       || courses.find(hasSubject);
     const subject = course?.subjects.find((item) => item.id === subjectId);
-    tabNavigation.setParams({ resumeKey: undefined } as never);
+    tabNavigation.setParams({ resumeKey: undefined, resumeAtSec: undefined } as never);
     if (!course || !subject) return;
     void openSubject(course, subject, {
       unitId: resumeParams.resumeUnitId || '',
       sectionId: resumeParams.resumeSectionId || '',
+      atSec: resumeParams.resumeAtSec || 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openSubject đổi mỗi lần render
   }, [courses, resumeParams, tabNavigation]);
@@ -850,17 +940,29 @@ export function CourseVideosScreen() {
       {!resource.loading && !resource.error && filter !== 'guide' && sections.map((section) => (
         section.courses.length ? (
           <View key={section.id} style={styles.courseSection}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, section.id.startsWith('registered') ? styles.registeredIcon : section.id.startsWith('video') ? styles.videoIcon : styles.instructorIcon]}>
-                {section.id.startsWith('registered') ? <CheckCircle2 size={21} color="#059669" /> : section.id.startsWith('video') ? <Clapperboard size={21} color="#B45309" /> : <GraduationCap size={21} color="#0369A1" />}
-              </View>
-              <View style={styles.sectionCopy}>
-                <Text style={styles.eyebrow}>{section.id.startsWith('registered') ? 'Lộ trình của bạn' : section.id.startsWith('video') ? 'Chủ động học tập' : 'Học cùng giảng viên'}</Text>
-                <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitle}>{section.title}</Text>
-                  <Text style={[styles.sectionCount, section.id.startsWith('registered') ? styles.registeredCount : section.id.startsWith('video') ? styles.videoCount : styles.instructorCount]}>{section.courses.length}</Text>
+            <View style={styles.sectionHeaderWrap}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionIcon, section.id.startsWith('registered') ? styles.registeredIcon : section.id.startsWith('video') ? styles.videoIcon : styles.instructorIcon]}>
+                  {section.id.startsWith('registered') ? <CheckCircle2 size={21} color="#059669" /> : section.id.startsWith('video') ? <Clapperboard size={21} color="#B45309" /> : <GraduationCap size={21} color="#0369A1" />}
+                </View>
+                <View style={styles.sectionCopy}>
+                  <Text style={styles.eyebrow}>{section.id.startsWith('registered') ? 'LỘ TRÌNH CỦA BẠN' : section.id.startsWith('video') ? 'CHỦ ĐỘNG HỌC TẬP' : 'HỌC CÙNG GIẢNG VIÊN'}</Text>
+                  <View style={styles.sectionTitleRow}>
+                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                    <Text style={[styles.sectionCount, section.id.startsWith('registered') ? styles.registeredCount : section.id.startsWith('video') ? styles.videoCount : styles.instructorCount]}>{section.courses.length}</Text>
+                  </View>
                 </View>
               </View>
+              <View
+                style={[
+                  styles.sectionDivider,
+                  section.id.startsWith('registered')
+                    ? styles.registeredDivider
+                    : section.id.startsWith('video')
+                      ? styles.videoDivider
+                      : styles.instructorDivider,
+                ]}
+              />
             </View>
             <CourseList
               courses={section.courses}
@@ -1008,6 +1110,7 @@ export function CourseVideosScreen() {
                           enabled={!isPreview && Boolean(user?.id)}
                           resources={selectedCourse?.files || []}
                           selectedSectionId={selectedLearningSectionId}
+                          resumeVideoAt={resumeVideoAt?.unitId === unit.id ? resumeVideoAt : null}
                           contentWidth={lessonContentWidth}
                           onOpenVideo={(url) => void openVideo(url)}
                           onCompleteSection={completeUnitSection}
@@ -1223,6 +1326,28 @@ export function CourseVideosScreen() {
   );
 }
 
+function ZaloBadgeIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Rect x={1} y={1} width={22} height={22} rx={6} fill="#0068FF" />
+      <Path
+        d="M12 4.5c-4.4 0-8 3.1-8 6.9 0 2.1 1.1 4 2.9 5.3l-.7 2.8 3-1.4c.9.2 1.8.4 2.8.4 4.4 0 8-3.1 8-6.9S16.4 4.5 12 4.5z"
+        fill="#FFFFFF"
+      />
+      <SvgText
+        x={12}
+        y={13.5}
+        fontSize={6.2}
+        fontWeight="900"
+        fill="#0068FF"
+        textAnchor="middle"
+      >
+        Zalo
+      </SvgText>
+    </Svg>
+  );
+}
+
 function CourseCard({
   course,
   onOpen,
@@ -1239,8 +1364,17 @@ function CourseCard({
   const [isHovered, setIsHovered] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const isVideo = course.deliveryMode === 'video';
+  const blockUnregisteredInstructorPreview = !isVideo && !course.enrolled;
   const progress = courseProgress(course);
   const showTooltip = !course.enrolled && (isHovered || infoOpen);
+  const now = Date.now();
+  const cSale = course as LessonPracticeCourse & { discountStartsAt?: string; discountEndsAt?: string };
+  const startsAt = cSale.discountStartsAt ? new Date(cSale.discountStartsAt).getTime() : null;
+  const endsAt = cSale.discountEndsAt ? new Date(cSale.discountEndsAt).getTime() : null;
+  const saleActive = Boolean(course.originalPrice)
+    && (startsAt === null || now >= startsAt)
+    && (endsAt === null || now < endsAt);
+  const displayPrice = course.originalPrice && !saleActive ? course.originalPrice : course.price;
   return (
     <Pressable
       style={[styles.courseCardWrap, showTooltip ? styles.courseCardWrapActive : undefined]}
@@ -1248,11 +1382,37 @@ function CourseCard({
       onHoverOut={() => setIsHovered(false)}
     >
       <Card style={{ ...styles.courseCard, ...(isHovered ? styles.courseCardHovered : {}) }}>
-        <Pressable style={styles.courseCardContent} onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Mở khóa học ${course.name}`}>
-          <View style={[styles.courseBanner, { backgroundColor: course.bannerColorStart || '#BE123C' }]}>
+        <Pressable
+          style={styles.courseCardContent}
+          onPress={blockUnregisteredInstructorPreview ? () => setInfoOpen((current) => !current) : onOpen}
+          accessibilityRole="button"
+          accessibilityLabel={blockUnregisteredInstructorPreview ? `Xem thông tin khóa học ${course.name}` : `Mở khóa học ${course.name}`}
+        >
+          <View style={[styles.courseBanner, { backgroundColor: course.bannerColorStart || '#059669' }]}>
             {course.thumbnail ? <Image source={{ uri: course.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <View style={[styles.bannerRing, { borderColor: 'rgba(255,255,255,0.13)' }]} />}
-            {!course.enrolled ? <View style={styles.lockBadge}><Lock size={14} color="#854D0E" /></View> : null}
-            <View style={styles.courseMode}><Clapperboard size={16} color="#B45309" /><Text style={styles.courseModeText}>{isVideo ? 'Tự học qua video' : 'Học cùng giảng viên'}</Text></View>
+            {!course.enrolled ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  setInfoOpen((current) => !current);
+                }}
+                style={styles.lockBadge}
+                accessibilityRole="button"
+                accessibilityLabel={infoOpen ? 'Ẩn thông tin khóa học' : 'Xem thông tin khóa học'}
+              >
+                <Lock size={14} color="#854D0E" />
+              </Pressable>
+            ) : null}
+            <View style={styles.courseMode}>
+              <View style={[styles.courseModeIcon, !isVideo ? styles.courseModeIconInstructor : styles.courseModeIconVideo]}>
+                {!isVideo ? (
+                  <GraduationCap size={15} color="#047857" strokeWidth={2.3} />
+                ) : (
+                  <Clapperboard size={14} color="#B45309" strokeWidth={2.3} />
+                )}
+              </View>
+              <Text style={styles.courseModeText}>{isVideo ? 'Tự học qua video' : 'Học cùng giảng viên'}</Text>
+            </View>
             <View style={styles.offerBadge}><Text style={styles.offerText}>{course.offerType === 'single' ? 'Khóa lẻ' : 'Trọn gói'}</Text></View>
           </View>
           <View style={styles.courseInfo}>
@@ -1284,14 +1444,35 @@ function CourseCard({
               ) : (
                 <View style={styles.lessonCount}><Clock3 size={13} color={colors.muted} /><Text style={styles.muted}>{isVideo ? course.lessonCount || 0 : course.totalSessions || 0} {isVideo ? 'bài học' : 'buổi'}</Text></View>
               )}
-              {course.enrolled ? <Text style={styles.enrolledBadge}><CheckCircle2 size={13} color="#059669" /> Đã đăng ký</Text> : <Text style={styles.priceText}>{Number(course.price || 0).toLocaleString('vi-VN')}đ</Text>}
+              {course.enrolled ? (
+                <Text style={styles.enrolledBadge}><CheckCircle2 size={13} color="#059669" /> Đã đăng ký</Text>
+              ) : (
+                <View style={[styles.priceBox, saleActive && styles.priceBoxSale]}>
+                  {saleActive ? (
+                    <View style={styles.saleMetaRow}>
+                      <Text style={styles.originalPriceText}>{`${Number(course.originalPrice).toLocaleString('vi-VN')}đ`}</Text>
+                      {Number(course.discountPercent) > 0 ? (
+                        <Text style={styles.discountPctText}>{`-${course.discountPercent}%`}</Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  <Text style={[styles.priceText, saleActive && styles.priceTextSale]}>
+                    {`${Number(displayPrice || 0).toLocaleString('vi-VN')}đ`}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </Pressable>
-        <View style={styles.courseActions}>
+        <View style={[styles.courseActions, blockUnregisteredInstructorPreview && styles.courseActionsCentered]}>
           {!course.enrolled && isVideo ? (
             <Pressable onPress={onRegister} disabled={registering} style={[styles.registerButton, registering && { opacity: 0.6 }]} accessibilityRole="button">
               <Text style={styles.registerText}>{registering ? 'Đang tạo thanh toán…' : 'Đăng ký học'}</Text>
+            </Pressable>
+          ) : !course.enrolled && !isVideo ? (
+            <Pressable onPress={onRegister} style={styles.zaloButton} accessibilityRole="button" accessibilityLabel={`Tư vấn Zalo khóa học ${course.name}`}>
+              <ZaloBadgeIcon />
+              <Text style={styles.zaloButtonText}>Zalo tư vấn</Text>
             </Pressable>
           ) : course.enrolled && progress >= 100 && onOpenCertificate ? (
             <Pressable onPress={onOpenCertificate} style={styles.certButton} accessibilityRole="button" accessibilityLabel={`Xem chứng nhận QR khóa học ${course.name}`}>
@@ -1301,24 +1482,14 @@ function CourseCard({
           ) : (
             <View />
           )}
-          {!course.enrolled && !isVideo ? <Pressable onPress={onRegister} style={styles.registerButton} accessibilityRole="button"><Text style={styles.registerText}>Zalo tư vấn</Text></Pressable> : null}
-          <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
-            <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
-            <ChevronRight size={16} color={course.enrolled ? '#047857' : colors.red} />
-          </Pressable>
+          {!blockUnregisteredInstructorPreview ? (
+            <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
+              <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
+              <ChevronRight size={16} color="#047857" />
+            </Pressable>
+          ) : null}
         </View>
       </Card>
-      {!course.enrolled ? (
-        <Pressable
-          onPress={() => setInfoOpen((current) => !current)}
-          style={styles.courseInfoButton}
-          accessibilityRole="button"
-          accessibilityLabel={infoOpen ? 'Ẩn thông tin khóa học' : 'Xem thông tin khóa học'}
-          accessibilityState={{ expanded: showTooltip }}
-        >
-          <CircleHelp size={15} color="#475569" />
-        </Pressable>
-      ) : null}
       {showTooltip ? <CourseTooltip isVideo={isVideo} /> : null}
     </Pressable>
   );
@@ -1393,6 +1564,7 @@ function UnitDetails({
   enabled,
   resources,
   selectedSectionId,
+  resumeVideoAt = null,
   contentWidth,
   onOpenVideo,
   onCompleteSection,
@@ -1411,6 +1583,7 @@ function UnitDetails({
   enabled: boolean;
   resources: NonNullable<LessonPracticeCourse['files']>;
   selectedSectionId: string | null;
+  resumeVideoAt?: { unitId: string; sectionId: string; atSec: number } | null;
   contentWidth: number;
   onOpenVideo: (url: string) => void;
   onCompleteSection: (unitId: string, section: 'video' | 'note', itemId: string) => Promise<boolean>;
@@ -1756,6 +1929,7 @@ function UnitDetails({
           sectionId={section.id}
           sectionLabel={section.title}
           video={sectionVideo}
+          initialAtSec={resumeVideoAt && (!resumeVideoAt.sectionId || resumeVideoAt.sectionId === section.id) ? resumeVideoAt.atSec : 0}
           done={Boolean(sectionDone)}
           antiSeekEnabled={sectionVideo?.antiSeek ?? unit.antiSeek !== false}
           courseId={courseId}
@@ -2137,6 +2311,7 @@ function VideoLessonPane({
   sectionId = '',
   sectionLabel = '',
   video,
+  initialAtSec = 0,
   done,
   antiSeekEnabled,
   courseId,
@@ -2154,6 +2329,7 @@ function VideoLessonPane({
   sectionId?: string;
   sectionLabel?: string;
   video: { id: string; title: string; url: string } | undefined;
+  initialAtSec?: number;
   done: boolean;
   antiSeekEnabled: boolean;
   courseId: string;
@@ -2166,7 +2342,12 @@ function VideoLessonPane({
   onComplete: () => Promise<boolean>;
 }) {
   const [activeTab, setActiveTab] = useState<VideoLessonTab>('overview');
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(() => Boolean(initialAtSec > 0 && playableVideoUrl(video?.url || '')));
+  useEffect(() => {
+    if (initialAtSec > 0 && playableVideoUrl(video?.url || '')) {
+      setStarted(true);
+    }
+  }, [initialAtSec, video?.url]);
   const [videoProgress, setVideoProgress] = useState<VideoPlayerProgress>({
     currentTime: 0,
     duration: 0,
@@ -2335,6 +2516,7 @@ function VideoLessonPane({
             lessonId={`${userId || 'anon'}-${unit.id}-${video?.id || 'video'}`}
             antiSeekEnabled={antiSeekEnabled}
             done={done}
+            initialAtSec={initialAtSec}
             playerApiRef={playerApiRef}
             onProgress={handleVideoProgress}
             onWatched={onComplete}
@@ -2806,16 +2988,21 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   courseSection: { width: '100%', alignSelf: 'stretch', marginTop: spacing.xs, gap: spacing.md },
   courseList: { width: '100%', gap: spacing.md },
   registeredCourseCard: { width: '100%', alignSelf: 'stretch' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
+  sectionHeaderWrap: { gap: 8 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  sectionDivider: { height: 1, marginLeft: 54 },
+  registeredDivider: { backgroundColor: '#A7F3D0' },
+  videoDivider: { backgroundColor: '#FDE68A' },
+  instructorDivider: { backgroundColor: '#BAE6FD' },
   sectionIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
   registeredIcon: { backgroundColor: '#D1FAE5' },
   videoIcon: { backgroundColor: '#FEF3C7' },
   instructorIcon: { backgroundColor: '#E0F2FE' },
   sectionCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '900', letterSpacing: 1.4 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  sectionTitle: { flexShrink: 1, color: colors.ink, fontSize: typography.small, fontWeight: '900' },
-  sectionCount: { minWidth: 20, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, textAlign: 'center', fontSize: typography.micro, fontWeight: '800' },
+  eyebrow: { color: '#94A3B8', fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
+  sectionTitle: { flexShrink: 1, color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  sectionCount: { minWidth: 22, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, textAlign: 'center', fontSize: 11, fontWeight: '900' },
   registeredCount: { backgroundColor: '#D1FAE5', color: '#047857' },
   videoCount: { backgroundColor: '#FEF3C7', color: '#92400E' },
   instructorCount: { backgroundColor: '#E0F2FE', color: '#075985' },
@@ -2823,46 +3010,57 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   courseCard: { flex: 1, gap: 0, overflow: 'hidden', padding: 0 },
   courseCardContent: { flex: 1 },
   courseCardHovered: { borderColor: '#CBD5E1', shadowColor: '#0F172A', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
-  courseBanner: { height: 94, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  courseBanner: { height: 98, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   bannerRing: { position: 'absolute', width: 142, height: 142, right: -38, top: -49, borderWidth: 18, borderRadius: 80 },
-  lockBadge: { position: 'absolute', left: 10, top: 10, width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#FEF3C7' },
-  courseMode: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.96)' },
-  courseModeText: { color: colors.ink, fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.4 },
-  offerBadge: { position: 'absolute', top: 9, right: 9, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.95)' },
-  offerText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
-  courseInfo: { height: 180, padding: spacing.md, paddingBottom: spacing.sm },
-  courseTitle: { minHeight: 34, color: colors.ink, fontSize: typography.caption, lineHeight: 16, fontWeight: '900' },
-  subjectChips: { minHeight: 35, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 4, marginTop: 5 },
+  lockBadge: { position: 'absolute', left: 12, top: 12, width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FEF3C7' },
+  courseMode: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, paddingLeft: 6, paddingRight: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.85)', borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.96)' },
+  courseModeIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  courseModeIconInstructor: { backgroundColor: '#D1FAE5' },
+  courseModeIconVideo: { backgroundColor: '#FEF3C7' },
+  courseModeText: { color: '#1E293B', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
+  offerBadge: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.95)' },
+  offerText: { color: '#334155', fontSize: 10, fontWeight: '800' },
+  courseInfo: { minHeight: 168, padding: spacing.md, paddingBottom: spacing.sm },
+  courseTitle: { minHeight: 34, color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '900' },
+  subjectChips: { minHeight: 35, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 4, marginTop: 6 },
   subjectLabel: { paddingTop: 4, color: colors.muted, fontSize: typography.micro },
   subjectChip: { maxWidth: 140, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', borderRadius: 5, backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: typography.micro },
   subjectChipRose: { backgroundColor: '#FFF1F2', color: '#E11D48' },
   subjectChipViolet: { backgroundColor: '#F5F3FF', color: '#7C3AED' },
   subjectChipAmber: { backgroundColor: '#FFFBEB', color: '#D97706' },
-  courseFooter: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 'auto', paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },
+  courseFooter: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 'auto', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   progressCircle: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#D1DCE7', borderRadius: 13 },
   progressText: { color: colors.ink, fontSize: typography.micro, fontWeight: '900' },
   lessonCount: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   enrolledBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: '#ECFDF5', color: '#047857', fontSize: typography.micro, fontWeight: '900' },
-  priceText: { color: colors.ink, fontSize: typography.small, fontWeight: '900' },
-  courseActions: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },
-  courseInfoButton: { position: 'absolute', top: 10, left: 42, width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 1, borderColor: 'rgba(255,255,255,0.75)', backgroundColor: 'rgba(255,255,255,0.94)' },
+  priceBox: { alignItems: 'flex-end', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', paddingHorizontal: 9, paddingVertical: 5 },
+  priceBoxSale: { borderColor: '#FFE4E6', backgroundColor: '#FFF1F2' },
+  saleMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  originalPriceText: { fontSize: 9, fontWeight: '600', color: '#94A3B8', textDecorationLine: 'line-through' },
+  discountPctText: { fontSize: 8, fontWeight: '900', color: '#BE123C', backgroundColor: '#FFE4E6', borderRadius: 999, paddingHorizontal: 4, paddingVertical: 1 },
+  priceText: { color: '#1E293B', fontSize: 14, fontWeight: '900' },
+  priceTextSale: { color: '#BE123C' },
+  courseActions: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: 8, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  courseActionsCentered: { justifyContent: 'center' },
+  zaloButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#D6ECFF' },
+  zaloButtonText: { color: '#075985', fontSize: 12, fontWeight: '900' },
   courseTooltip: { position: 'absolute', top: 76, left: 10, right: 10, zIndex: 30, gap: 7, padding: spacing.md, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
   tooltipTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   tooltipHeading: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   tooltipLine: { color: '#475569', fontSize: typography.caption, lineHeight: 16 },
   tooltipWarning: { marginTop: 2, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#D1FAE5', color: colors.ink, fontSize: typography.micro, lineHeight: 15, fontWeight: '700' },
-  registerButton: { minHeight: 32, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#ECFDF5' },
-  registerText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
-  openButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#ECFDF5' },
+  registerButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#ECFDF5' },
+  registerText: { color: '#047857', fontSize: 12, fontWeight: '900' },
+  openButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#ECFDF5' },
   openButtonActive: { backgroundColor: '#ECFDF5' },
   openButtonText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
   openButtonTextActive: { color: '#047857' },
   modalBackdrop: { flex: 1, justifyContent: 'flex-start', backgroundColor: 'rgba(15,23,42,0.55)' },
   modalCard: { width: '100%', height: '100%', maxHeight: '100%', paddingTop: spacing.md, borderRadius: 0, backgroundColor: colors.surface },
   modalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  modalBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.md, backgroundColor: '#FFF7F7' },
+  modalBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.md, backgroundColor: '#ECFDF5' },
   headerLessonNav: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  headerLessonNavOpen: { borderColor: '#A7F3D0', backgroundColor: '#FFF7F7' },
+  headerLessonNavOpen: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   headerLessonNavText: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '900' },
   modalTitle: { marginTop: 3, color: colors.ink, fontSize: typography.heading, fontWeight: '900' },
   muted: { color: colors.muted, fontSize: typography.micro },
@@ -2880,7 +3078,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   progressTrack: { height: 5, marginTop: 7, overflow: 'hidden', borderRadius: 3, backgroundColor: colors.line },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: '#10B981' },
   unitsIntro: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.md, backgroundColor: '#F8FAFC' },
-  unitsIntroIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFF1F2' },
+  unitsIntroIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#ECFDF5' },
   unitsIntroTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   unitRow: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: colors.surface },
   unitRowLocked: { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
@@ -2906,8 +3104,8 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   lessonDrawerTitle: { marginBottom: spacing.sm, color: colors.ink, fontSize: typography.body, fontWeight: '900' },
   unitNavTopScroll: { flexGrow: 0, flexShrink: 1, maxHeight: '42%' },
   unitNavToggle: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  unitNavToggleOpen: { borderColor: '#A7F3D0', backgroundColor: '#FFF7F7' },
-  unitNavToggleIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#FFF1F2' },
+  unitNavToggleOpen: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  unitNavToggleIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#ECFDF5' },
   unitNavToggleTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   unitNavToggleSubtitle: { marginTop: 2, color: colors.muted, fontSize: typography.micro },
   unitNavList: { gap: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
@@ -2995,7 +3193,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   practiceStreak: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderRadius: radius.pill, backgroundColor: '#FFFBEB' },
   practiceStreakText: { color: '#92400E', fontSize: typography.micro, fontWeight: '800' },
   practiceClock: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.pill, backgroundColor: '#F8FAFC' },
-  practiceClockWarning: { borderColor: '#FCA5A5', backgroundColor: '#ECFDF5' },
+  practiceClockWarning: { borderColor: '#34D399', backgroundColor: '#ECFDF5' },
   practiceClockText: { color: '#334155', fontSize: typography.micro, fontWeight: '900', fontVariant: ['tabular-nums'] },
   practiceProgressText: { marginTop: 3, color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   practiceSoundButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.sm, backgroundColor: '#FFFFFF' },
@@ -3014,7 +3212,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   practiceQuestionTitle: { color: colors.ink, fontSize: typography.body, lineHeight: 22, fontWeight: '900' },
   practiceOption: { color: colors.muted, fontSize: typography.caption, lineHeight: 20 },
   practiceChoice: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.sm, backgroundColor: '#FFFFFF' },
-  practiceChoiceSelected: { borderColor: colors.brand, backgroundColor: '#FEF2F2' },
+  practiceChoiceSelected: { borderColor: colors.brand, backgroundColor: '#ECFDF5' },
   practiceChoiceWrong: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
   practiceChoiceCorrect: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
   practiceOptionNumber: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.pill, backgroundColor: '#FFFFFF' },
@@ -3051,7 +3249,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   practiceFeedbackSparkleTwo: { right: 22, bottom: 7 },
   practiceModalOverlay: { ...StyleSheet.absoluteFill, zIndex: 30, alignItems: 'center', justifyContent: 'center', padding: spacing.md, borderRadius: radius.md, backgroundColor: 'rgba(15,23,42,0.2)' },
   practiceStartModal: { width: '100%', maxWidth: 380, alignItems: 'center', padding: spacing.lg, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
-  practiceStartIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm, borderWidth: 3, borderColor: '#FCA5A5', borderRadius: 18, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.22, shadowRadius: 10, elevation: 3 },
+  practiceStartIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm, borderWidth: 3, borderColor: '#A7F3D0', borderRadius: 18, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.22, shadowRadius: 10, elevation: 3 },
   practiceTimeoutIcon: { borderColor: '#A7F3D0', backgroundColor: '#059669' },
   practiceStartTitle: { color: '#0F172A', fontSize: typography.body, fontWeight: '900', textAlign: 'center' },
   practiceStartCopy: { marginTop: spacing.xs, color: '#475569', fontSize: typography.caption, lineHeight: 18, textAlign: 'center' },

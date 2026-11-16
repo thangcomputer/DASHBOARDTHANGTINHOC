@@ -1,4 +1,12 @@
 import { apiFetch, uploadWithAuth } from './api';
+import { LEARNING_GOAL_CHANGED_EVENT } from '../utils/learningGoal';
+
+function emitLearningGoalChanged() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(LEARNING_GOAL_CHANGED_EVENT));
+  } catch { /* ignore */ }
+}
 
 async function parse(res) {
   const data = await res.json().catch(() => ({}));
@@ -45,8 +53,24 @@ const lessonPracticeApi = {
       `/lesson-practice/my/subjects/${subjectId}/units${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`,
     )),
     unit: async (unitId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}`)),
-    markSection: async (unitId, section, itemId, extra = {}) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/sections/${section}`, { method: 'POST', body: JSON.stringify({ itemId, ...extra }) })),
-    confirm: async (itemId, body) => parse(await apiFetch(`/lesson-practice/my/items/${itemId}/confirm`, { method: 'POST', body: JSON.stringify(body) })),
+    markSection: async (unitId, section, itemId, extra = {}) => {
+      const watchRatio = extra?.watchRatio ?? (section === 'video' ? 1 : undefined);
+      const body = { itemId, ...extra, ...(watchRatio !== undefined ? { watchRatio } : {}) };
+      const res = await parse(await apiFetch(`/lesson-practice/my/units/${unitId}/sections/${section}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }));
+      if (section === 'video') emitLearningGoalChanged();
+      return res;
+    },
+    confirm: async (itemId, body) => {
+      const res = await parse(await apiFetch(`/lesson-practice/my/items/${itemId}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }));
+      if (res?.data && !res.data.retry) emitLearningGoalChanged();
+      return res;
+    },
     resetPractice: async (unitId, practiceGroupId = '') => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/reset-practice`, {
       method: 'POST',
       body: JSON.stringify({ practiceGroupId }),

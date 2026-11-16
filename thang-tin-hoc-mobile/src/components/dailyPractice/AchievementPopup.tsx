@@ -57,7 +57,7 @@ function StatTile({
 }: {
   label: string;
   tone: string;
-  Icon: typeof CheckCircle2;
+  Icon: typeof Award;
   value: React.ReactNode;
   bodyBg: string;
   delay: number;
@@ -213,7 +213,7 @@ export function AchievementPopup({
 
         {xpDisplay.caption ? (
           <View style={[styles.xpPill, { maxWidth: cardWidth - 32 }]}>
-            <Text style={styles.xpPillText} numberOfLines={3} textAlign="center">
+            <Text style={styles.xpPillText} numberOfLines={3}>
               {xpDisplay.caption}
             </Text>
           </View>
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1FAE5',
   },
-  xpPillText: { color: '#065F46', fontSize: 11, fontWeight: '700', lineHeight: 15 },
+  xpPillText: { color: '#065F46', fontSize: 11, fontWeight: '700', lineHeight: 15, textAlign: 'center' },
   statsRow: { flexDirection: 'row', gap: 6, marginTop: 12, width: '100%', alignItems: 'stretch' },
   statPressable: { flex: 1, minWidth: 0 },
   statTile: { flex: 1, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9' },

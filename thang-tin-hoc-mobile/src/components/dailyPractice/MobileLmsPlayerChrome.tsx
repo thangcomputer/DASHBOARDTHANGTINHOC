@@ -132,6 +132,19 @@ export function MobileLmsPlayerChrome({
           accessibilityRole="button"
           accessibilityLabel="Phát video"
         >
+          {onToggleFullscreen ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onToggleFullscreen();
+              }}
+              style={styles.startFullscreenBtn}
+              accessibilityRole="button"
+              accessibilityLabel={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+            >
+              {isFullscreen ? <Minimize2 size={16} color="#FFFFFF" /> : <Maximize2 size={16} color="#FFFFFF" />}
+            </Pressable>
+          ) : null}
           <View style={[styles.centerPlay, styles.centerPlayWindow]}>
             <Play size={40} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 6 }} />
           </View>
@@ -417,6 +430,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 18,
     backgroundColor: '#23262E',
+  },
+  startFullscreenBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 19,
   },
   centerPlay: {
     width: 76,

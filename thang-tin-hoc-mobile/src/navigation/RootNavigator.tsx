@@ -1447,7 +1447,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                 ) : null}
               </Pressable>
               <Pressable onPress={() => { closeMenu(); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
-                <View style={styles.drawerItemIcon}><LogOut size={18} color="#FCA5A5" /></View>
+                <View style={styles.drawerItemIcon}><LogOut size={18} color="#34D399" /></View>
                 <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Đăng xuất</Text>
               </Pressable>
               <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'} accessibilityState={{ checked: soundEnabled }}>
@@ -1929,11 +1929,11 @@ const styles = StyleSheet.create({
   rejectCallButton: { backgroundColor: '#059669' },
   acceptCallButton: { backgroundColor: '#16A34A' },
   incomingCallButtonText: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '700' },
-  persistentTabBar: { position: 'absolute', zIndex: 15, left: 8, right: 8, bottom: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingHorizontal: 6, paddingTop: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.65)', boxShadow: droplet.navBar },
+  persistentTabBar: { position: 'absolute', zIndex: 15, left: 6, right: 6, bottom: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingHorizontal: 2, paddingTop: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.65)', boxShadow: droplet.navBar },
   navigationGlassBackground: { ...StyleSheet.absoluteFill, borderRadius: 24, overflow: 'hidden' },
   navigationGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.65)', backgroundImage: 'linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(241,245,249,0.66) 100%)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24 },
   persistentTabItem: { flex: 1, minWidth: 0, height: 64, alignItems: 'stretch', justifyContent: 'flex-start' },
-  navItem: { alignSelf: 'stretch', marginHorizontal: 3, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
+  navItem: { alignSelf: 'stretch', marginHorizontal: 1, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 0, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
   navItemCard: { borderColor: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.45)', boxShadow: droplet.button },
   navItemActive: { borderColor: 'rgba(167,243,208,0.8)', backgroundColor: 'rgba(236,253,245,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(236,253,245,0.8) 100%)', boxShadow: droplet.navItemActive },
   navItemActiveBrand: { borderColor: 'rgba(167,243,208,0.8)', backgroundColor: 'rgba(236,253,245,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(236,253,245,0.8) 100%)', boxShadow: droplet.navItemActive },
@@ -1943,7 +1943,7 @@ const styles = StyleSheet.create({
   navItemHome: { gap: 0, paddingVertical: 0 },
   navTileHome: { width: 56, height: 56, borderWidth: 3, borderBottomWidth: 5, borderColor: '#FFFFFF', borderBottomColor: '#047857', borderRadius: 28, backgroundColor: '#10B981', backgroundImage: 'linear-gradient(160deg, #34D399 0%, #059669 55%, #047857 100%)', boxShadow: droplet.navHome },
   navTileHomeBrand: { width: 56, height: 56, borderWidth: 3, borderBottomWidth: 5, borderColor: '#FFFFFF', borderBottomColor: '#065F46', borderRadius: 28, backgroundColor: '#10B981', backgroundImage: 'linear-gradient(160deg, #34D399 0%, #10B981 55%, #059669 100%)', boxShadow: droplet.navHomeBrand },
-  navLabel: { maxWidth: '100%', color: colors.muted, fontSize: 10, lineHeight: 13, fontWeight: '700', textAlign: 'center' },
+  navLabel: { maxWidth: '100%', color: colors.muted, fontSize: 8.5, lineHeight: 11.5, letterSpacing: -0.3, fontWeight: '700', textAlign: 'center' },
   navLabelActive: { color: '#047857', fontWeight: '900' },
   navLabelActiveBrand: { color: '#059669', fontWeight: '900' },
   persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: colors.brand, color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },

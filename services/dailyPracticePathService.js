@@ -1021,6 +1021,7 @@ function computeUnits(units, progressByUnit, { hasFullPathAccess = true, require
       canTestOut: !unitRequiresSub && !completed,
       chestClaimed: Boolean(progress?.chestClaimedAt),
       chestRewardXp: rules.UNIT_CHEST_REWARD_XP,
+      watchedVideoIds: progress?.watchedVideoIds || [],
       completedSections: progress?.completedSections || [],
       pathNodes,
       steps,
@@ -1892,7 +1893,12 @@ async function markVideoWatched(studentId, { unitId, videoId, watchRatio } = {})
     if (!list.some((video) => String(video._id) === parsed.mongoId)) throw httpError(404, 'Không tìm thấy video');
     storageId = stepVideoId(parsed.nodeKey, parsed.stepKey, parsed.mongoId);
     const diff = STEP_DIFFICULTY_MAP[parsed.stepKey];
-    if (diff) extraSectionKeys.push(`${parsed.nodeKey}:${diff}:video`);
+    if (diff) {
+      extraSectionKeys.push(`${parsed.nodeKey}:${diff}:video`);
+      if (node?.levelConfigs?.[diff]?.video?.url) {
+        extraWatchedIds.push(`${parsed.nodeKey}:level:${diff}`);
+      }
+    }
   } else if (!(unit.videos || []).some((video) => String(video._id) === rawId)) {
     throw httpError(404, 'Không tìm thấy video');
   }
@@ -2000,8 +2006,13 @@ async function toggleSectionProgress(studentId, { unitId, nodeKey, difficulty, s
 
   const key = `${cleanNodeKey}:${cleanDiff}:${cleanSection}`;
   const filter = { studentId: sid, unitId: unit._id };
+  const levelVideoSyncId = cleanSection === 'video' && targetCfg?.video?.url
+    ? `${cleanNodeKey}:level:${cleanDiff}`
+    : '';
   if (completed !== false) {
-    const update = { $addToSet: { completedSections: key }, $setOnInsert: { topicId: unit.topicId } };
+    const addSet = { completedSections: key };
+    if (levelVideoSyncId) addSet.watchedVideoIds = levelVideoSyncId;
+    const update = { $addToSet: addSet, $setOnInsert: { topicId: unit.topicId } };
     try {
       await DailyPracticePathProgress.updateOne(filter, update, { upsert: true });
     } catch (err) {
@@ -2025,7 +2036,9 @@ async function toggleSectionProgress(studentId, { unitId, nodeKey, difficulty, s
     }
     await checkAndGrantPathMilestoneXp(sid, unit);
   } else {
-    await DailyPracticePathProgress.updateOne(filter, { $pull: { completedSections: key } });
+    const pullSet = { completedSections: key };
+    if (levelVideoSyncId) pullSet.watchedVideoIds = levelVideoSyncId;
+    await DailyPracticePathProgress.updateOne(filter, { $pull: pullSet });
   }
   const doc = await DailyPracticePathProgress.findOne(filter).select('completedSections').lean();
   return { unitId: String(unit._id), completedSections: doc?.completedSections || [] };

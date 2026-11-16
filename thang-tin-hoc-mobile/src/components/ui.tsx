@@ -15,6 +15,7 @@ import {
   TextInput,
   type ImageSourcePropType,
   type TextStyle,
+  useWindowDimensions,
   View,
   type TextInputProps,
   type ViewStyle,
@@ -185,6 +186,8 @@ export function AppScreen({
 }
 
 function BrandingTopBar() {
+  const { width: windowWidth } = useWindowDimensions();
+  const compactTopBar = windowWidth < 380;
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const auth = useAuth();
@@ -253,19 +256,29 @@ function BrandingTopBar() {
         },
       ]}
     >
-      <BlurView intensity={Platform.OS === 'android' ? 65 : 48} tint="light" style={styles.brandingTopBar}>
-        <Pressable
-          onPress={() => DeviceEventEmitter.emit(MOBILE_OPEN_MENU_EVENT)}
-          style={({ pressed }) => [styles.topBarMenu, pressed && styles.topBarNeoPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Mở danh mục"
-        >
-          <Menu size={20} color="#475569" />
-          <Text style={styles.topBarMenuLabel}>Menu</Text>
-        </Pressable>
+      <BlurView
+        intensity={Platform.OS === 'android' ? 65 : 48}
+        tint="light"
+        style={[styles.brandingTopBar, compactTopBar && styles.brandingTopBarCompact]}
+      >
+        <View style={styles.topBarSideLeft}>
+          <Pressable
+            onPress={() => DeviceEventEmitter.emit(MOBILE_OPEN_MENU_EVENT)}
+            style={({ pressed }) => [
+              styles.topBarMenu,
+              compactTopBar && styles.topBarMenuCompact,
+              pressed && styles.topBarNeoPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Mở danh mục"
+          >
+            <Menu size={20} color="#475569" />
+            {!compactTopBar ? <Text style={styles.topBarMenuLabel}>Menu</Text> : null}
+          </Pressable>
+        </View>
         <Pressable
           onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
-          style={styles.brandingHomeCentered}
+          style={[styles.brandingHomeCentered, compactTopBar && styles.brandingHomeCompact]}
           accessibilityRole="button"
           accessibilityLabel="Về trang tổng quan"
         >
@@ -693,14 +706,18 @@ export const uiStyles = StyleSheet.create({
 const styles = createThemedStyles((colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
   brandingTopBarContainer: { overflow: 'hidden' },
-  brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
-  brandingHomeCentered: { position: 'absolute', left: '50%', top: '50%', width: 168, height: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 16, backgroundColor: '#FFFFFF', ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)' } : {}), boxShadow: droplet.logo, transform: [{ translateX: -84 }, { translateY: -23 }] },
-  brandingLogo: { width: 140, height: 40 },
+  brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
+  brandingTopBarCompact: { paddingHorizontal: spacing.md, gap: 4 },
+  topBarSideLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
+  brandingHomeCentered: { width: 112, height: 38, flexShrink: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 14, backgroundColor: '#FFFFFF', ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)' } : {}), boxShadow: droplet.logo },
+  brandingHomeCompact: { width: 96, height: 34 },
+  brandingLogo: { width: '96%', height: 34, transform: [{ scale: 1.04 }] },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
   topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
+  topBarMenuCompact: { width: 42, height: 42, minWidth: 42, paddingHorizontal: 0 },
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  topBarActionsRow: { zIndex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  topBarAction: { zIndex: 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
+  topBarActionsRow: { zIndex: 1, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },
   notificationBell: { position: 'relative' },
   notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },

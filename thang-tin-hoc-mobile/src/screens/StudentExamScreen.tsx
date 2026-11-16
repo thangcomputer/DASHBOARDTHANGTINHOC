@@ -262,7 +262,7 @@ export function StudentExamScreen() {
   };
 
   const tabs: Array<{ key: RoomTab; title: string; subtitle: string; Icon: typeof Trophy; tone: string }> = [
-    { key: 'quiz', title: 'Trắc nghiệm buổi học', subtitle: 'Bài do giảng viên giao theo buổi học', Icon: Trophy, tone: '#E11D48' },
+    { key: 'quiz', title: 'Trắc nghiệm buổi học', subtitle: 'Bài do giảng viên giao theo buổi học', Icon: Trophy, tone: '#059669' },
     { key: 'cert', title: 'Thi chứng nhận môn học', subtitle: 'Thi có camera · theo tiến độ khóa học', Icon: Monitor, tone: '#2563EB' },
     { key: 'scores', title: 'Xem điểm của tôi', subtitle: 'Nhật ký điểm trắc nghiệm & chứng nhận', Icon: Award, tone: '#EA580C' },
     { key: 'mos-ic3', title: 'MOS / IC3', subtitle: 'Ôn tập và luyện thi chứng nhận', Icon: GraduationCap, tone: '#7C3AED' },
@@ -770,7 +770,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   quizGrid: { gap: spacing.md },
   quizGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
   quizCard: { gap: spacing.sm },
-  notificationQuizCard: { borderColor: colors.brand, borderWidth: 2, backgroundColor: '#FFF7F5' },
+  notificationQuizCard: { borderColor: colors.brand, borderWidth: 2, backgroundColor: '#ECFDF5' },
   notificationQuizLabel: { color: colors.brand, fontSize: typography.micro, fontWeight: '900' },
   quizCardWide: { width: '48%' },
   quizCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },

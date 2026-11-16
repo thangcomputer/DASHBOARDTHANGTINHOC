@@ -79,11 +79,14 @@ function Chip({ label, selected, locked, state }: { label: string; selected?: bo
 }
 
 // ── Trắc nghiệm ──────────────────────────────────────────────────────────────
-export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }: {
+export function McqQuestion({ question, reveal, result, chosen, pending = null, retryCooldownSec = 0, onChange, onSubmit, play }: {
   question: DpQuestion;
   reveal: DpReveal | null;
   result: DpAnswerResult | null;
   chosen: number | null;
+  pending?: DpAnswer | null;
+  retryCooldownSec?: number;
+  onChange?: (answer: DpAnswer | null) => void;
   onSubmit: (answer: DpAnswer) => void;
   play: (sound: GameSound) => void;
 }) {
@@ -100,16 +103,21 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
     return options.length > 0 && options.every((opt) => String(opt || '').length <= 24);
   }, [width, question.options]);
   const eliminated = new Set(reveal?.eliminate || []);
+  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
+  const retrying = Boolean(result && !result.correct);
+  const pendingIdx = pending && 'index' in pending ? pending.index : null;
+  const activeChoice = pendingIdx ?? chosen;
 
   return (
     <View style={[styles.mcqList, twoColumns && styles.mcqGrid]}>
       {(question.options || []).map((option, index) => {
-        const isCorrect = Boolean(result?.correct) && (
+        const revealSolution = Boolean(result?.correct);
+        const isCorrect = revealSolution && (
           result?.correctAnswer?.correctIndex === index
           || (result?.correct && chosen === index)
         );
-        const isWrong = Boolean(result) && chosen === index && !result?.correct;
-        const isChosen = chosen === index;
+        const isWrong = Boolean(result && !result.correct) && chosen === index && pendingIdx == null;
+        const isChosen = activeChoice === index && !isCorrect && !isWrong;
         const out = eliminated.has(index);
         return (
           <View
@@ -117,38 +125,39 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
             style={twoColumns ? styles.optionHalf : styles.optionFull}
           >
             <Pressable
-              disabled={Boolean(result?.correct) || out}
+              disabled={locked || out}
               onPress={() => {
                 play('tap');
-                onSubmit({ index });
+                if (retrying && onChange) onChange({ index });
+                else onSubmit({ index });
               }}
               style={({ pressed }) => [
                 styles.option,
-                isChosen && !result && styles.optionSelected,
+                isChosen && styles.optionSelected,
                 isCorrect && styles.optionCorrect,
                 isWrong && styles.optionWrong,
                 out && styles.optionOut,
-                pressed && !result && !out && styles.optionPressed,
+                pressed && !locked && !out && styles.optionPressed,
               ]}
               accessibilityRole="button"
             >
               {isCorrect ? <OptionBurstRays /> : null}
               <View style={[
                 styles.letter,
-                isChosen && !result && { backgroundColor: '#DCFCE7', borderColor: '#34D399' },
+                isChosen && { backgroundColor: '#DCFCE7', borderColor: '#34D399' },
                 isCorrect && { backgroundColor: '#10B981', borderColor: '#059669' },
                 isWrong && { backgroundColor: '#EF4444', borderColor: '#DC2626' },
               ]}>
                 <Text style={[
                   styles.letterText,
-                  isChosen && !result && { color: '#047857' },
+                  isChosen && { color: '#047857' },
                   (isCorrect || isWrong) && { color: '#FFFFFF' },
                 ]}>{String.fromCharCode(65 + index)}</Text>
               </View>
               <Text
                 style={[
                   styles.optionText,
-                  isChosen && !result && { color: '#065F46', fontWeight: '700' },
+                  isChosen && { color: '#065F46', fontWeight: '700' },
                   isCorrect && { color: '#064E3B', fontWeight: '800' },
                   isWrong && { color: '#991B1B', fontWeight: '800' },
                   out && styles.optionTextOut,
@@ -173,27 +182,41 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
 }
 
 // ── Đúng / Sai ───────────────────────────────────────────────────────────────
-export function TrueFalseQuestion({ result, chosen, onSubmit, play }: {
+export function TrueFalseQuestion({ result, chosen, pending = null, retryCooldownSec = 0, onChange, onSubmit, play }: {
   result: DpAnswerResult | null;
   chosen: boolean | null;
+  pending?: DpAnswer | null;
+  retryCooldownSec?: number;
+  onChange?: (answer: DpAnswer | null) => void;
   onSubmit: (answer: DpAnswer) => void;
   play: (sound: GameSound) => void;
 }) {
+  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
+  const retrying = Boolean(result && !result.correct);
+  const pendingBool = pending && 'value' in pending ? pending.value : null;
+  const activeChoice = pendingBool ?? chosen;
   return (
     <View style={styles.row}>
       {[true, false].map((value) => {
-        const isCorrect = Boolean(result?.correct) && result?.correctAnswer.answerBool === value;
-        const isWrong = Boolean(result) && chosen === value && !result?.correct;
+        const revealSolution = Boolean(result?.correct);
+        const isCorrect = revealSolution && result?.correctAnswer.answerBool === value;
+        const isWrong = Boolean(result && !result.correct) && chosen === value && pendingBool == null;
+        const isPicked = activeChoice === value && !locked && retrying;
         return (
           <Pressable
             key={String(value)}
-            disabled={Boolean(result?.correct)}
-            onPress={() => { play('tap'); onSubmit({ value }); }}
+            disabled={locked}
+            onPress={() => {
+              play('tap');
+              if (retrying && onChange) onChange({ value });
+              else onSubmit({ value });
+            }}
             style={({ pressed }) => [
               styles.tf,
+              isPicked && styles.optionSelected,
               isCorrect && styles.chipOk,
               isWrong && styles.chipBad,
-              pressed && !result?.correct && styles.optionPressed,
+              pressed && !locked && styles.optionPressed,
             ]}
             accessibilityRole="button"
           >

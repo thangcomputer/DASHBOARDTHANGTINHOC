@@ -742,7 +742,7 @@ export default function FreePortalPage({ onLogin }) {
                     <button
                       type="button"
                       onClick={() => { setOtpStep(false); setError(''); }}
-                      className="font-bold text-slate-500 hover:text-slate-800 hover:underline transition cursor-pointer"
+                      className="font-bold text-slate-300 hover:text-white hover:underline transition cursor-pointer"
                     >
                       ← Đổi email khác
                     </button>
@@ -751,7 +751,7 @@ export default function FreePortalPage({ onLogin }) {
                       type="button"
                       disabled={countdown > 0 || loading}
                       onClick={handleResendOtp}
-                      className="inline-flex items-center gap-1 font-extrabold text-emerald-700 hover:text-emerald-800 hover:underline transition disabled:opacity-50 disabled:no-underline cursor-pointer"
+                      className="inline-flex items-center gap-1 font-extrabold text-emerald-400 hover:text-emerald-300 hover:underline transition disabled:opacity-50 disabled:no-underline cursor-pointer"
                     >
                       {countdown > 0 ? (
                         <span>Gửi lại sau ({countdown}s)</span>

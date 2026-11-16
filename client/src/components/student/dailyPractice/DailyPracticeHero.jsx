@@ -25,7 +25,7 @@ export default function DailyPracticeHero({
   primaryDisabled,
   primaryLabel,
   pathTopic = null,
-  pathContinue = false,
+  pathContinue: _pathContinue = false,
   courseProgress = null,
   _freeTopicName = '',
   _onBuyXp,
@@ -66,7 +66,7 @@ export default function DailyPracticeHero({
     ? 'Tiếp tục hành trình chinh phục Tin học nhé!'
     : 'Chọn chủ đề, hoàn thành lượt luyện và nhận XP mỗi ngày.';
 
-  const ctaLabel = pathMode && pathContinue
+  const ctaLabel = pathMode && !chapterDone
     ? pathTopicPrimaryCtaLabel(pathTopic)
     : primaryLabel;
 

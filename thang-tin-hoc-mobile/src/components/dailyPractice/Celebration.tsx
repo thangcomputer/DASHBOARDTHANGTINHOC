@@ -121,7 +121,7 @@ function DoneStage({
         onContinue={onNext}
         onReviewResults={onReviewResults || onNext}
         onReplay={onReplay}
-        onClose={onClose || onNext}
+        onDismiss={onClose || onNext}
       />
     </View>
   );

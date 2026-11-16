@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
+  ActivityIndicator, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
-import { CheckCircle2, Clapperboard, Lock, Play } from 'lucide-react-native';
-import { VideoPlayerFrame, type VideoPlayerApi } from '../../screens/VideoPlayerFrame';
+import { Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock, Lightbulb, Lock, Play, Send, StickyNote, X, Zap } from 'lucide-react-native';
+import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from '../../screens/VideoPlayerFrame';
+import { PathLessonAiAssistantPanel, VideoTimelineNotesPanel } from './PathVideoPanels';
 import { resolveMobilePublicUrl } from '../../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../../utils/videoSource';
 import {
+  DAILY_PRACTICE_STATS_EVENT,
   dailyPracticeApi,
   type DpNodeState,
   type DpPathUnit,
@@ -16,10 +18,13 @@ import {
   type DpUnitVideos,
 } from '../../services/dailyPracticeApi';
 import { noteStudyMediaProgress } from '../../services/studyActivity';
+import { saveLastStudySession } from '../../utils/resumeLearning';
 import type { GameSound } from './useGameSounds';
 import { DuoButton } from '../duo/DuoButton';
 import { spacing } from '../../theme/tokens';
 import { PATH_VIDEO_MODAL_LAYOUT } from '../../../../shared/dailyPractice/lmsBrandedVideoPlayer.mjs';
+
+const VIDEO_CHECK_ANSWER_XP = 5;
 
 type VideoCheck = {
   id?: string;
@@ -30,6 +35,8 @@ type VideoCheck = {
   choices?: string[];
   options?: string[];
   hintCostXp?: number;
+  reviewHint?: string;
+  reviewAnswer?: string;
 };
 
 type PlaylistItem =
@@ -46,21 +53,37 @@ function checkId(check: VideoCheck) {
 export function PathVideoModal({
   unit,
   initialVideoId = '',
+  initialAtSec = 0,
+  topicId = '',
+  nodeKey = '',
   color,
   userId,
+  lessonTitle,
+  courseTitle,
+  xpTotal = null,
   singleVideoOnly = false,
   play,
   onClose,
   onWatched,
+  onChecksChanged,
+  onBuyXp,
 }: {
   unit: DpPathUnit;
   initialVideoId?: string;
+  initialAtSec?: number;
+  topicId?: string;
+  nodeKey?: string;
   color: { from: string; to: string };
   userId: string;
+  lessonTitle?: string;
+  courseTitle?: string;
+  xpTotal?: number | null;
   singleVideoOnly?: boolean;
   play: (s: GameSound) => void;
   onClose: () => void;
   onWatched: (videoId: string) => Promise<void>;
+  onChecksChanged?: () => void;
+  onBuyXp?: () => void;
 }) {
   const [data, setData] = useState<DpUnitVideos | null>(null);
   const [error, setError] = useState('');
@@ -75,10 +98,14 @@ export function PathVideoModal({
   const [hintStep, setHintStep] = useState(false);
   const [checkBusy, setCheckBusy] = useState(false);
   const [checkError, setCheckError] = useState('');
+  const [xpShortage, setXpShortage] = useState(false);
+  const [walletXp, setWalletXp] = useState<number | null>(typeof xpTotal === 'number' ? xpTotal : null);
   const [missed, setMissed] = useState(false);
   const [cheer, setCheer] = useState(false);
   const [grading, setGrading] = useState(false);
   const [markingWatched, setMarkingWatched] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const { width, height } = useWindowDimensions();
   const isCompact = width < 480;
   const isLandscape = width > height;
@@ -89,25 +116,85 @@ export function PathVideoModal({
   const currentRef = useRef<PlaylistItem | null>(null);
   const eligibleRef = useRef(false);
   const syncedSectionRef = useRef<Set<string>>(new Set());
+  const lastKnownTimeRef = useRef(0);
+  const dataRef = useRef<DpUnitVideos | null>(null);
 
   useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
-
+  useEffect(() => { dataRef.current = data; }, [data]);
+  useEffect(() => { setCurrentId(initialVideoId); }, [initialVideoId, unit.id]);
+  useEffect(() => {
+    if (typeof xpTotal === 'number') setWalletXp(xpTotal);
+  }, [xpTotal]);
   useEffect(() => {
     let alive = true;
-    dailyPracticeApi.unitVideos(unit.id)
+    void dailyPracticeApi.overview()
       .then((res) => {
-        if (!alive) return;
+        if (alive && typeof res?.stats?.xpTotal === 'number') {
+          setWalletXp(res.stats.xpTotal);
+        }
+      })
+      .catch(() => {});
+    const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: { xpTotal?: number | null }) => {
+      if (typeof detail?.xpTotal === 'number') {
+        setWalletXp(detail.xpTotal);
+      }
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
+
+  const syncUnitVideos = useCallback((silent = false) => {
+    let active = true;
+    void dailyPracticeApi.unitVideos(unit.id)
+      .then((res) => {
+        if (!active) return;
         setData(res);
         setWatchedIds(new Set(res.videos.filter((video) => video.state === 'completed').map((video) => video.id)));
-        setPassedKeys(new Set(res.passedCheckIds || []));
+        const nextPassed = new Set(res.passedCheckIds || []);
+        passedRef.current = nextPassed;
+        setPassedKeys(nextPassed);
+        setError('');
       })
       .catch((err: unknown) => {
-        if (alive) setError(err instanceof Error ? err.message : 'Không tải được video của chặng');
+        if (!active) return;
+        if (!silent || !dataRef.current) {
+          setError(err instanceof Error ? err.message : 'Không tải được video của chặng');
+        }
       });
-    return () => { alive = false; };
+    return () => { active = false; };
   }, [unit.id]);
 
-  const isSingleMode = Boolean(singleVideoOnly || /:level:(easy|medium|hard)$/.test(String(initialVideoId || '')));
+  useEffect(() => {
+    const cancel = syncUnitVideos(false);
+    const appSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        syncUnitVideos(true);
+      }
+    });
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const onForeground = () => {
+        if (document.visibilityState !== 'hidden') {
+          syncUnitVideos(true);
+        }
+      };
+      window.addEventListener('focus', onForeground);
+      document.addEventListener('visibilitychange', onForeground);
+      return () => {
+        cancel();
+        appSub.remove();
+        window.removeEventListener('focus', onForeground);
+        document.removeEventListener('visibilitychange', onForeground);
+      };
+    }
+    return () => {
+      cancel();
+      appSub.remove();
+    };
+  }, [syncUnitVideos]);
+
+  const isSingleMode = Boolean(singleVideoOnly || /:(level|practice):(easy|medium|hard)$/.test(String(initialVideoId || '')));
 
   const playlist = useMemo<PlaylistItem[]>(() => {
     const all: PlaylistItem[] = [
@@ -139,8 +226,8 @@ export function PathVideoModal({
   currentRef.current = current;
 
   const currentWatched = current
-    ? ((current.source === 'unit' || current.source === 'step') && watchedIds.has(current.id))
-  : false;
+    ? ((current.source === 'unit' || current.source === 'step') && (watchedIds.has(current.id) || current.state === 'completed'))
+    : false;
 
   const rawUrl = current?.url || '';
   const url = playableVideoUrl(rawUrl) || (rawUrl.startsWith('/uploads/') ? rawUrl : '');
@@ -150,7 +237,23 @@ export function PathVideoModal({
   const pendingOf = useCallback((video: PlaylistItem | null) => {
     if (!video || video.source === 'lesson') return [] as VideoCheck[];
     const checks = ((video as DpPathVideo).checks || []) as VideoCheck[];
-    return checks.filter((check) => !passedRef.current.has(`${video.id}:${checkId(check)}`));
+    return checks.filter((check) => {
+      const key = `${video.id}:${checkId(check)}`;
+      return !passedRef.current.has(key) && !passedKeys.has(key);
+    });
+  }, [passedKeys]);
+
+  const getVideoCurrentTime = useCallback(() => {
+    const apiTime = Number(playerApiRef.current?.getCurrentTime?.() ?? NaN);
+    if (Number.isFinite(apiTime) && apiTime >= 0) return apiTime;
+    return lastKnownTimeRef.current || 0;
+  }, []);
+
+  const seekVideoTo = useCallback((sec: number) => {
+    const target = Math.max(0, Math.floor(Number(sec) || 0));
+    lastKnownTimeRef.current = target;
+    playerApiRef.current?.seekTo?.(target);
+    playerApiRef.current?.play?.();
   }, []);
 
   const openGate = useCallback((check: VideoCheck) => {
@@ -166,12 +269,21 @@ export function PathVideoModal({
     setCheckHint('');
     setPaidHint('');
     setCheckError('');
+    setXpShortage(false);
     setMissed(false);
     setCheer(false);
     setHintStep(false);
   }, []);
 
+  const dismissGate = useCallback(() => {
+    gateRef.current = null;
+    setGate(null);
+    setXpShortage(false);
+    playerApiRef.current?.play?.();
+  }, []);
+
   const onMediaTick = useCallback((time: number) => {
+    lastKnownTimeRef.current = Number(time) || 0;
     const video = currentRef.current;
     if (!video || video.source === 'lesson') return;
     if (gateRef.current) {
@@ -188,18 +300,47 @@ export function PathVideoModal({
 
   useEffect(() => {
     eligibleRef.current = false;
+    lastKnownTimeRef.current = 0;
     gateRef.current = null;
     setGate(null);
   }, [current?.id]);
 
   useEffect(() => {
+    if (!unit?.id || !current?.id) return undefined;
+    const persistResume = () => {
+      void saveLastStudySession({
+        kind: 'daily_practice',
+        studentId: userId,
+        topicId: topicId || '',
+        nodeKey: nodeKey || '',
+        courseTitle: courseTitle || '',
+        unitId: String(unit.id),
+        unitTitle: unit.title || '',
+        lessonId: String(current.id),
+        lessonTitle: current.title || unit.title || 'Video chặng DewSkill',
+        sectionId: 'video',
+        sectionLabel: `Chặng ${unit.index || 1} · Video bài học`,
+        atSec: Math.floor(getVideoCurrentTime()),
+        progressPct: null,
+        href: '/student/daily-practice?watch=stage',
+      });
+    };
+    persistResume();
+    const timer = setInterval(persistResume, 5000);
+    return () => {
+      persistResume();
+      clearInterval(timer);
+    };
+  }, [unit?.id, unit?.index, unit?.title, current?.id, current?.title, userId, topicId, nodeKey, courseTitle, getVideoCurrentTime]);
+
+  useEffect(() => {
     if (!current || !watchedIds.has(current.id)) return;
-    if (!/:level:(easy|medium|hard)$/.test(current.id)) return;
+    if (current.source !== 'unit' && current.source !== 'step') return;
     if (syncedSectionRef.current.has(current.id)) return;
     if (pendingOf(current).length > 0) return;
     syncedSectionRef.current.add(current.id);
     void Promise.resolve(onWatched(current.id)).catch(() => {});
-  }, [current, watchedIds, onWatched]);
+  }, [current, watchedIds, pendingOf, onWatched]);
 
   const markWatched = async () => {
     eligibleRef.current = true;
@@ -214,7 +355,7 @@ export function PathVideoModal({
     }
     const videoId = cur.id;
     if (watchedIds.has(videoId)) {
-      if (/:level:(easy|medium|hard)$/.test(videoId) && !syncedSectionRef.current.has(videoId)) {
+      if ((cur.source === 'unit' || cur.source === 'step') && !syncedSectionRef.current.has(videoId)) {
         syncedSectionRef.current.add(videoId);
         try {
           await onWatched(videoId);
@@ -257,6 +398,7 @@ export function PathVideoModal({
     setGate(null);
     setCheer(false);
     setMissed(false);
+    onChecksChanged?.();
     playerApiRef.current?.play?.();
     if (eligibleRef.current) void markWatched();
   };
@@ -281,6 +423,11 @@ export function PathVideoModal({
         { text: answerText, checkId: id, imageDataUrl },
       );
       if (res.correct) {
+        const key = `${current.id}:${id}`;
+        const nextPassed = new Set(passedRef.current);
+        nextPassed.add(key);
+        passedRef.current = nextPassed;
+        setPassedKeys(nextPassed);
         setMissed(false);
         play('win');
         setCheer(true);
@@ -297,7 +444,13 @@ export function PathVideoModal({
       }
     } catch (err: unknown) {
       setMissed(false);
-      setCheckError(err instanceof Error ? err.message : 'Chưa gửi được câu trả lời');
+      const status = (err as { status?: number })?.status;
+      if (status === 402) {
+        setXpShortage(true);
+        setCheckError(err instanceof Error ? err.message : 'Bạn không đủ XP. Hãy nạp thêm XP để tiếp tục.');
+      } else {
+        setCheckError(err instanceof Error ? err.message : 'Chưa gửi được câu trả lời');
+      }
     } finally {
       setCheckBusy(false);
     }
@@ -333,14 +486,33 @@ export function PathVideoModal({
     if (!gate || !current || checkBusy) return;
     setCheckBusy(true);
     setCheckError('');
+    setXpShortage(false);
     try {
       const id = checkId(gate);
       const checks = (current.source === 'lesson' ? [] : ((current as DpPathVideo).checks || [])) as VideoCheck[];
       const checkIndex = Math.max(0, checks.findIndex((c) => checkId(c) === id));
-      const res = await dailyPracticeApi.buyVideoHint(unit.id, current.id, checkIndex);
+      const cost = Number(gate.hintCostXp) || 0;
+      if (cost > 0) {
+        try {
+          const ov = await dailyPracticeApi.overview();
+          const xp = Number(ov?.stats?.xpTotal ?? walletXp ?? 0);
+          if (typeof ov?.stats?.xpTotal === 'number') setWalletXp(ov.stats.xpTotal);
+          if (xp < cost) {
+            setXpShortage(true);
+            setCheckError(`Cần ${cost} XP để xem gợi ý. Bạn hiện có ${xp} XP.`);
+            return;
+          }
+        } catch {
+          // Server still guards XP balance cleanly.
+        }
+      }
+      const res = await dailyPracticeApi.buyVideoHint(unit.id, current.id, checkIndex, id);
+      if (typeof res?.profileXp === 'number') setWalletXp(res.profileXp);
       setPaidHint(res.hint || '');
       setHintStep(true);
     } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (status === 402) setXpShortage(true);
       setCheckError(err instanceof Error ? err.message : 'Chưa đổi được gợi ý');
     } finally {
       setCheckBusy(false);
@@ -355,22 +527,39 @@ export function PathVideoModal({
 
   const unitChipLabel = `Chặng ${unit.index} · ${unit.title}`;
 
+  const currentIdx = current ? playlist.findIndex((v) => v.id === current.id) : -1;
+  const nextVideo = currentIdx >= 0
+    ? playlist.slice(currentIdx + 1).find((v) => !v.locked) || null
+    : null;
+  const handleContinueAfterVideo = () => {
+    if (!isSingleMode && nextVideo) {
+      setCurrentId(nextVideo.id);
+      return;
+    }
+    onClose();
+  };
+
   const watchStatusControl = current && (current.source === 'unit' || current.source === 'step') ? (
-    isSingleMode && currentWatched ? (
-      <View style={styles.watchedPill}>
-        <CheckCircle2 size={13} color="#6EE7B7" />
-        <Text style={styles.watchedText}>Đã xem</Text>
-      </View>
-    ) : !currentWatched && pendingOf(current).length === 0 ? (
+    currentWatched ? (
       <Pressable
-        onPress={() => { void markWatched(); }}
-        disabled={markingWatched}
-        style={[styles.markWatchedBtn, markingWatched && { opacity: 0.6 }]}
+        onPress={handleContinueAfterVideo}
+        style={styles.markWatchedBtn}
+        accessibilityRole="button"
       >
         <CheckCircle2 size={13} color="#FFFFFF" />
-        <Text style={styles.markWatchedText}>{markingWatched ? 'Đang lưu…' : 'Đánh dấu đã xem'}</Text>
+        <Text style={styles.markWatchedText}>
+          {!isSingleMode && nextVideo ? 'Tiếp tục bài kế tiếp' : 'Tiếp tục'}
+        </Text>
+        <ChevronRight size={13} color="#FFFFFF" />
       </Pressable>
-    ) : null
+    ) : (
+      <View style={styles.watchLockedPill}>
+        <Lock size={12} color="rgba(255,255,255,0.8)" />
+        <Text style={styles.watchLockedText}>
+          {markingWatched ? 'Đang lưu…' : (isCompact ? 'Xem ≥70% để mở khóa' : 'Xem đủ 70% để mở khóa')}
+        </Text>
+      </View>
+    )
   ) : null;
 
   return (
@@ -419,9 +608,10 @@ export function PathVideoModal({
                   brandedChrome
                   appearance="window"
                   chromeBg={PATH_VIDEO_MODAL_LAYOUT.videoAreaBg}
-                  chromeRightSlot={watchStatusControl}
+                  chromeRightSlot={!isCompact ? watchStatusControl : null}
+                  initialAtSec={!initialVideoId || current.id === initialVideoId ? initialAtSec : 0}
                   playerApiRef={playerApiRef}
-                  onProgress={(progress) => {
+                  onProgress={(progress: VideoPlayerProgress) => {
                     noteStudyMediaProgress(progress.playing);
                     onMediaTick(progress.currentTime);
                   }}
@@ -432,96 +622,15 @@ export function PathVideoModal({
                   <Text style={styles.startLabel}>Liên kết video chưa đúng định dạng. Trung tâm sẽ cập nhật sớm.</Text>
                 </View>
               )}
-
-              {cheer ? (
-                <View style={styles.cheerHud} pointerEvents="none">
-                  <Text style={styles.cheerText}>Chính xác!</Text>
-                </View>
-              ) : null}
-
-              {gate && !cheer ? (
-                <View style={styles.gateOverlay}>
-                  <View style={styles.gateCard}>
-                    <Text style={styles.gateEyebrow}>{`DỪNG Ở GIÂY ${gate.atSec || 0}`}</Text>
-                    {missed ? (
-                      <Text style={styles.gateMissed}>
-                        {gate.kind === 'screen'
-                          ? 'AI chưa chấp nhận. Mất 5 XP. Hãy tải đáp án mới.'
-                          : 'Chưa đúng. Mất 5 XP. Hãy thử lại.'}
-                      </Text>
-                    ) : null}
-                    <Text style={styles.gatePrompt}>{gate.prompt}</Text>
-
-                    {hintStep && paidHint ? (
-                      <>
-                        <Text style={styles.gateHintPaid}>{paidHint}</Text>
-                        <DuoButton variant="primary" size="sm" text="Tiếp tục xem" onPress={() => finishCheck(checkId(gate))} />
-                      </>
-                    ) : (
-                      <>
-                        {gate.kind === 'choice' || gateChoices.length > 0 ? (
-                          <View style={styles.gateChoices}>
-                            {gateChoices.map((choice, index) => (
-                              <Pressable
-                                key={`${choice}-${index}`}
-                                onPress={() => setPicked(index)}
-                                style={[styles.choiceBtn, picked === index && styles.choiceBtnActive]}
-                              >
-                                <Text style={[styles.choiceText, picked === index && styles.choiceTextActive]}>{choice}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        ) : null}
-                        {gate.kind === 'text' ? (
-                          <TextInput
-                            value={answerText}
-                            onChangeText={setAnswerText}
-                            placeholder="Nhập đáp án"
-                            placeholderTextColor="#94A3B8"
-                            style={styles.gateInput}
-                          />
-                        ) : null}
-                        {gate.kind === 'screen' ? (
-                          <DuoButton
-                            variant="accent"
-                            size="sm"
-                            fullWidth
-                            text={grading ? 'Đang chấm…' : missed ? 'Tải đáp án mới' : 'Gửi ảnh'}
-                            onPress={pickScreenshot}
-                            disabled={grading || checkBusy}
-                          />
-                        ) : null}
-                        {checkHint ? <Text style={styles.gateHint}>{checkHint}</Text> : null}
-                        {checkError ? <Text style={styles.gateError}>{checkError}</Text> : null}
-                        <View style={styles.gateActions}>
-                          {gate.kind !== 'screen' ? (
-                            <DuoButton
-                              variant="primary"
-                              size="sm"
-                              text={checkBusy ? 'Đang chấm…' : 'Trả lời'}
-                              disabled={checkBusy || (gateChoices.length > 0 ? picked === null : !answerText.trim())}
-                              onPress={() => submitCheck('')}
-                            />
-                          ) : null}
-                          <DuoButton variant="secondary" size="sm" text="Thôi" onPress={() => { gateRef.current = null; setGate(null); playerApiRef.current?.play?.(); }} />
-                          {Number(gate.hintCostXp) > 0 ? (
-                            <DuoButton variant="accent" size="sm" text={`Gợi ý · ${gate.hintCostXp} XP`} onPress={buyHint} disabled={checkBusy} />
-                          ) : null}
-                        </View>
-                      </>
-                    )}
-                  </View>
-                </View>
-              ) : null}
             </View>
 
             {!isSingleMode && playlist.length > 0 ? (
               <View style={styles.listBlock}>
                 <Text style={styles.listTitle}>{`DANH SÁCH VIDEO (${playlist.length})`}</Text>
                 {playlist.map((video, index) => {
-                  const active = current?.id === video.id;
-                  const done = (video.source === 'unit' || video.source === 'step') && watchedIds.has(video.id);
-                  return (
+                      const active = current?.id === video.id;
+                      const done = (video.source === 'unit' || video.source === 'step') && (watchedIds.has(video.id) || video.state === 'completed');
+                      return (
                     <Pressable
                       key={video.id}
                       onPress={() => select(video)}
@@ -553,11 +662,229 @@ export function PathVideoModal({
                 })}
               </View>
             ) : null}
+
+            {current ? (
+              <View style={styles.accordionsWrap}>
+                <View style={styles.accordionCard}>
+                  <Pressable
+                    onPress={() => setNotesOpen((prev) => {
+                      const next = !prev;
+                      if (next) setAiOpen(false);
+                      return next;
+                    })}
+                    style={styles.accordionHeader}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: notesOpen }}
+                  >
+                    <View style={styles.accordionTitleRow}>
+                      <StickyNote size={15} color="#34D399" />
+                      <Text style={styles.accordionTitle}>Ghi chú theo mốc thời gian video</Text>
+                    </View>
+                    {notesOpen ? (
+                      <ChevronUp size={16} color="#94A3B8" />
+                    ) : (
+                      <ChevronDown size={16} color="#94A3B8" />
+                    )}
+                  </Pressable>
+                  {notesOpen ? (
+                    <VideoTimelineNotesPanel
+                      unitId={unit.id}
+                      unitTitle={unit.title}
+                      userId={userId}
+                      lessonId={current.id}
+                      lessonTitle={current.title || unit.title}
+                      getCurrentTime={getVideoCurrentTime}
+                      onSeekTo={playable ? seekVideoTo : undefined}
+                    />
+                  ) : null}
+                </View>
+
+                <View style={styles.accordionCard}>
+                  <Pressable
+                    onPress={() => setAiOpen((prev) => {
+                      const next = !prev;
+                      if (next) setNotesOpen(false);
+                      return next;
+                    })}
+                    style={styles.accordionHeader}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: aiOpen }}
+                  >
+                    <View style={styles.accordionTitleRow}>
+                      <Bot size={15} color="#34D399" />
+                      <Text style={styles.accordionTitle}>Trợ lý AI trong bài học · Công thức Excel & Hỏi đáp</Text>
+                    </View>
+                    {aiOpen ? (
+                      <ChevronUp size={16} color="#94A3B8" />
+                    ) : (
+                      <ChevronDown size={16} color="#94A3B8" />
+                    )}
+                  </Pressable>
+                  {aiOpen ? (
+                    <PathLessonAiAssistantPanel
+                      key={current.id}
+                      lessonTitle={current.title || lesson?.title || lessonTitle}
+                      unitTitle={unit.title}
+                      courseTitle={courseTitle || lesson?.title || unit.title || 'Tin học Văn phòng'}
+                      guide={current.source !== 'lesson' ? (current as DpPathVideo).guide : null}
+                    />
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
           </ScrollView>
 
-          {!playable && watchStatusControl ? (
+          {(!playable || isCompact) && watchStatusControl ? (
             <View style={styles.footer}>
               {watchStatusControl}
+            </View>
+          ) : null}
+
+          {cheer ? (
+            <View style={styles.cheerHud} pointerEvents="none">
+              <Text style={styles.cheerText}>Chính xác!</Text>
+            </View>
+          ) : null}
+
+          {gate && !cheer ? (
+            <View style={styles.gateOverlay}>
+              <ScrollView
+                style={styles.gateScroll}
+                contentContainerStyle={styles.gateScrollInner}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.gateCard}>
+                  <View style={styles.gateHeaderRow}>
+                    <View style={styles.gateBadgeRow}>
+                      <View style={styles.gateClockPill}>
+                        <Clock size={11} color="#92400E" />
+                        <Text style={styles.gateClockText}>{`Giây ${gate.atSec || 0}`}</Text>
+                      </View>
+                      {currentWatched ? (
+                        <View style={styles.gateReviewPill}>
+                          <Text style={styles.gateReviewPillText}>Ôn lại · Miễn phí XP</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View style={styles.gateXpPill}>
+                            <Zap size={10} color="#047857" fill="#10B981" />
+                            <Text style={styles.gateXpPillText}>{`+${VIDEO_CHECK_ANSWER_XP} XP`}</Text>
+                          </View>
+                          {typeof walletXp === 'number' ? (
+                            <View style={styles.gateWalletPill}>
+                              <Text style={styles.gateWalletText}>{`Ví: ${walletXp} XP`}</Text>
+                            </View>
+                          ) : null}
+                        </>
+                      )}
+                    </View>
+                    <Pressable onPress={dismissGate} style={styles.gateCloseBtn} accessibilityRole="button" accessibilityLabel="Đóng câu hỏi">
+                      <X size={16} color="#64748B" />
+                    </Pressable>
+                  </View>
+
+                  {!currentWatched && missed ? (
+                    <Text style={styles.gateMissed}>
+                      {gate.kind === 'screen'
+                        ? `AI chưa chấp nhận (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy gửi ảnh mới.`
+                        : gate.kind === 'text'
+                          ? `Chưa đúng ý (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy nhập lại.`
+                          : `Chưa đúng (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy chọn lại.`}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.gatePrompt}>{gate.prompt}</Text>
+
+                  {currentWatched ? (
+                    <>
+                      <View style={styles.gateReviewCard}>
+                        <View style={styles.gateReviewRow}>
+                          <Lightbulb size={16} color="#0284C7" style={{ marginTop: 2 }} />
+                          <Text style={styles.gateReviewBody}>
+                            {gate.reviewHint || gate.reviewAnswer || 'Video này bạn đã hoàn thành. Hãy xem lại đoạn hướng dẫn rồi tiếp tục nhé.'}
+                          </Text>
+                        </View>
+                        {gate.reviewHint && gate.reviewAnswer && gate.reviewAnswer !== gate.reviewHint ? (
+                          <Text style={styles.gateReviewAnswer}>{`Đáp án gợi ý: ${gate.reviewAnswer}`}</Text>
+                        ) : null}
+                      </View>
+                      <DuoButton
+                        variant="primary"
+                        size="sm"
+                        fullWidth
+                        text="Tiếp tục xem video"
+                        onPress={() => finishCheck(checkId(gate))}
+                      />
+                    </>
+                  ) : hintStep && paidHint ? (
+                    <>
+                      <Text style={styles.gateHintPaid}>{paidHint}</Text>
+                      <DuoButton variant="primary" size="sm" fullWidth text="Tiếp tục xem video" onPress={() => finishCheck(checkId(gate))} />
+                    </>
+                  ) : (
+                    <>
+                      {(gate.kind === 'choice' || (!gate.kind && gateChoices.length > 0)) && gateChoices.length > 0 ? (
+                        <View style={styles.gateChoices}>
+                          {gateChoices.map((choice, index) => (
+                            <Pressable
+                              key={`${choice}-${index}`}
+                              onPress={() => setPicked(index)}
+                              style={[styles.choiceBtn, picked === index && styles.choiceBtnActive]}
+                            >
+                              <Text style={[styles.choiceText, picked === index && styles.choiceTextActive]}>{choice}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : null}
+                      {gate.kind === 'text' ? (
+                        <TextInput
+                          value={answerText}
+                          onChangeText={setAnswerText}
+                          onSubmitEditing={() => {
+                            if (!checkBusy && answerText.trim()) void submitCheck('');
+                          }}
+                          placeholder="Nhập câu trả lời của bạn…"
+                          placeholderTextColor="#94A3B8"
+                          style={styles.gateInput}
+                        />
+                      ) : null}
+                      {gate.kind === 'screen' ? (
+                        <DuoButton
+                          variant="accent"
+                          size="sm"
+                          fullWidth
+                          text={grading ? 'Đang chấm…' : missed ? 'Chọn ảnh bài làm mới' : 'Tải ảnh chụp bài làm'}
+                          onPress={pickScreenshot}
+                          disabled={grading || checkBusy}
+                        />
+                      ) : null}
+                      {checkHint ? <Text style={styles.gateHint}>{checkHint}</Text> : null}
+                      {checkError ? <Text style={styles.gateError}>{checkError}</Text> : null}
+                      {xpShortage && onBuyXp ? (
+                        <DuoButton variant="gold" size="sm" fullWidth text="Mua thêm XP" onPress={onBuyXp} />
+                      ) : null}
+                      <View style={styles.gateActions}>
+                        {gate.kind !== 'screen' ? (
+                          <DuoButton
+                            variant="primary"
+                            size="sm"
+                            icon={<Send size={13} color="#FFFFFF" />}
+                            text={checkBusy ? 'Đang chấm…' : 'Trả lời'}
+                            disabled={checkBusy || (gateChoices.length > 0 ? picked === null : !answerText.trim())}
+                            onPress={() => submitCheck('')}
+                          />
+                        ) : null}
+                        <DuoButton variant="secondary" size="sm" text="Thôi" onPress={dismissGate} />
+                        {Number(gate.hintCostXp) > 0 ? (
+                          <DuoButton variant="accent" size="sm" text={`Gợi ý · ${gate.hintCostXp} XP`} onPress={buyHint} disabled={checkBusy} />
+                        ) : null}
+                      </View>
+                      <Text style={styles.gateFootNote}>
+                        {`Đúng lần đầu +${VIDEO_CHECK_ANSWER_XP} XP · Sai −${VIDEO_CHECK_ANSWER_XP} XP rồi ${gate.kind === 'screen' ? 'gửi lại' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}`}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </ScrollView>
             </View>
           ) : null}
         </View>
@@ -614,7 +941,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   unitChipGradient: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   unitChip: {
     color: '#FFFFFF',
@@ -672,20 +1003,101 @@ const styles = StyleSheet.create({
   cheerText: { color: '#6EE7B7', fontSize: 28, fontWeight: '900' },
   gateOverlay: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(2,6,23,0.68)',
+    zIndex: 60,
+  },
+  gateScroll: {
+    flex: 1,
+  },
+  gateScrollInner: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
     padding: spacing.md,
   },
   gateCard: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 420,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: spacing.md,
     gap: 10,
   },
-  gateEyebrow: { fontSize: 11, fontWeight: '900', color: '#B45309', letterSpacing: 0.4 },
+  gateHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  gateBadgeRow: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  gateClockPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
+  },
+  gateClockText: { fontSize: 11, fontWeight: '900', color: '#92400E' },
+  gateReviewPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  gateReviewPillText: { fontSize: 11, fontWeight: '800', color: '#0369A1' },
+  gateXpPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  gateXpPillText: { fontSize: 11, fontWeight: '800', color: '#047857' },
+  gateWalletPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#F1F5F9',
+  },
+  gateWalletText: { fontSize: 11, fontWeight: '800', color: '#334155' },
+  gateCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  gateReviewCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    gap: 6,
+  },
+  gateReviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  gateReviewBody: { flex: 1, fontSize: 13, fontWeight: '600', color: '#0C4A6E', lineHeight: 19 },
+  gateReviewAnswer: { fontSize: 12, fontWeight: '800', color: '#047857', paddingLeft: 24 },
+  gateFootNote: { fontSize: 11, fontWeight: '500', color: '#94A3B8', textAlign: 'center', marginTop: 2 },
   gateMissed: { fontSize: 13, fontWeight: '800', color: '#BE123C' },
   gatePrompt: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
   gateChoices: { gap: 6 },
@@ -729,13 +1141,25 @@ const styles = StyleSheet.create({
   markWatchedBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: '#059669',
+    backgroundColor: '#10B981',
   },
   markWatchedText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  watchLockedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  watchLockedText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
   watchedPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -746,4 +1170,38 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16,185,129,0.15)',
   },
   watchedText: { color: '#6EE7B7', fontSize: 12, fontWeight: '900' },
+  accordionsWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    gap: 10,
+  },
+  accordionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.28)',
+    backgroundColor: 'rgba(15,23,42,0.88)',
+    overflow: 'hidden',
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  accordionTitleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  accordionTitle: {
+    flex: 1,
+    color: '#34D399',
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });

@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   xpPill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: '#D1FAE5' },
   xpPillText: { color: '#047857', fontSize: 10, fontWeight: '900' },
   countPill: { color: '#1D4ED8', fontSize: 10, fontWeight: '900', backgroundColor: '#DBEAFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  countPillLive: { color: '#FFFFFF', backgroundColor: '#DC2626' },
+  countPillLive: { color: '#FFFFFF', backgroundColor: '#059669' },
   streakValue: { color: '#9A3412', fontSize: 18, fontWeight: '900', marginTop: 2 },
   scheduleTime: { color: '#1E3A8A', fontSize: 15, fontWeight: '900', marginTop: 2 },
   tileTitle: { color: '#334155', fontSize: typography.micro, fontWeight: '700' },

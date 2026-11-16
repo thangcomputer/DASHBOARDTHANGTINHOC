@@ -46,8 +46,9 @@ export function LearningGoalCard() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   useEffect(() => {
-    const changed = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next: LearningGoalData) => {
-      if (next) setData(next);
+    const changed = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next?: LearningGoalData | null) => {
+      if (next && typeof next === 'object' && 'progress' in next) setData(next);
+      else load();
     });
     const minute = DeviceEventEmitter.addListener(STUDY_MINUTE_EVENT, (result: { todayMinutes?: number }) => {
       const todayMinutes = Number(result?.todayMinutes);
@@ -65,7 +66,7 @@ export function LearningGoalCard() {
       changed.remove();
       minute.remove();
     };
-  }, []);
+  }, [load]);
 
   if (!data) return null;
   const { goal, progress } = data;
@@ -124,7 +125,7 @@ export function LearningGoalCard() {
           })}
           accessibilityRole="button"
         >
-          <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>{goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>{goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}</Text>
         </Pressable>
       </View>
 

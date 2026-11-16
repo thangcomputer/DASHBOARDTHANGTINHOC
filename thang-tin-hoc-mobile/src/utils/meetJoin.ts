@@ -45,11 +45,13 @@ export function isMeetJoinWindow({
 }
 
 /** Tên buổi HV thấy: ghi chú admin/GV, không dùng nhãn mặc định «Học Meet». */
-export function meetLessonName(row?: { note?: string; title?: string } | null) {
+export function meetLessonName(row?: { note?: string | null; title?: string | null; slotLabel?: string | null } | null) {
   const note = String(row?.note || '').trim();
   if (note) return note;
   const title = String(row?.title || '').trim();
   if (title && title !== 'Học Meet') return title;
+  const slotLabel = String(row?.slotLabel || '').trim();
+  if (slotLabel) return slotLabel;
   return 'Buổi Meet';
 }
 

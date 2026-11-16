@@ -276,7 +276,7 @@ export function LoginScreen() {
               />
             ) : (
               <Image
-                source={require('../../assets/logo.png')}
+                source={require('../../assets/logo.webp')}
                 style={styles.logo}
                 resizeMode="contain"
                 accessibilityLabel="DewSkill"
@@ -771,9 +771,9 @@ const styles = StyleSheet.create({
   },
   logoDroplet: {
     alignSelf: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: 26,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
     marginBottom: 22,
     overflow: 'hidden',
@@ -788,7 +788,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0))',
   } as never,
-  logo: { width: 176, height: 46 },
+  logo: { width: 120, height: 40, transform: [{ scale: 1.06 }] },
   logoFallback: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoMark: { width: 38, height: 38, borderRadius: 12, backgroundColor: palette.brand, alignItems: 'center', justifyContent: 'center' },
   logoText: { color: palette.brand, fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },

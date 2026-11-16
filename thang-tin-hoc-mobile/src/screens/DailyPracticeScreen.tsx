@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, DeviceEventEmitter, Easing, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
+  ActivityIndicator, Animated, AppState, DeviceEventEmitter, Easing, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
+  type ImageStyle, type TextStyle,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Gift, Globe,
-  HelpCircle, Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Maximize2, Minimize2, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
+  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Circle, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Gift, Globe,
+  HelpCircle, Image as ImageIcon, Info, Keyboard, Layers, Lightbulb, Lock, LogOut, Mail, Maximize2, Minimize2, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
   ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, Volume2, VolumeX, X, XCircle, Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle, Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList } from '../navigation/types';
 import { AppScreen, ChromeScrollView } from '../components/ui';
@@ -36,8 +37,16 @@ import { MobileComboCelebrationOverlay } from '../components/dailyPractice/Mobil
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
 import { UnitStageChest } from '../components/dailyPractice/UnitStageChest';
 import { MobileAnswerFeedback } from '../components/dailyPractice/MobileAnswerFeedback';
-import { VideoPlayerFrame, type VideoPlayerApi } from './VideoPlayerFrame';
-import { resolveMobilePublicUrl } from '../services/apiClient';
+import * as VideoPlayerMod from './VideoPlayerFrame';
+import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
+import { DailyPracticeHero } from '../components/dailyPractice/DailyPracticeHero';
+import { WelcomeBackModal, takeWelcomeBackTurn } from '../components/dailyPractice/WelcomeBackModal';
+import { FreeMeetPlanModal } from '../components/FreePortalModals';
+import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
+import { buildVietQrUrl, getCenterBankAccount, type CenterBankAccount } from '../services/courseVideoApi';
+import { subscriptionApi } from '../services/subscriptionApi';
+import { reviewItemFollowUpLine } from '../../../shared/dailyPractice/reviewDisplay.mjs';
+import { resolveMobilePublicUrl, getMobileImageSource } from '../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/videoSource';
 import { useAuth } from '../app/AuthContext';
 import { isFreePortalMenu } from '../utils/freePortalHelper';
@@ -46,14 +55,13 @@ import { useGameSounds, type GameSound } from '../components/dailyPractice/useGa
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { useMobileFocusMode } from '../utils/focusMode';
 import { DuoButton } from '../components/duo/DuoButton';
-import { getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
-import { getMobileImageSource } from '../services/apiClient';
+import { formatStudyMinutes, getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
 import {
   DAILY_PRACTICE_STATS_EVENT, DP_DIFFICULTIES, DP_PLAN_XP_CAP, DP_PLANS, DP_TOPIC_COLORS, DP_TYPES,
   QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP,
   dailyPracticeApi, dpIsPro, dpXpCapReached, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage, unitColor,
-  type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpPlanType, type DpStepKey,
-  type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath, type DpXpCheckout, type DpXpPack,
+  type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpLevelSectionConfig, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpPlanType, type DpSectionKey, type DpSpacedRepetitionSummary, type DpStepKey,
+  type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath, type DpXpCheckout, type DpXpPack, type DpXpPurchaseStatus,
 } from '../services/dailyPracticeApi';
 import { colors, radius, spacing, theme, createThemedStyles } from '../theme/tokens';
 import {
@@ -62,13 +70,17 @@ import {
   resolveSavedPathTopicId,
   syncLastPathTopicFromServer,
 } from '../utils/lastPathTopic';
-import { unitStageCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
+import { pathTopicPrimaryCtaLabel, unitStageCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
 import { shouldNudgeHintButton } from '../../../shared/dailyPractice/quizWrongEncouragement.mjs';
 import { PLAY_QUESTION_CHROME } from '../../../shared/dailyPractice/playQuestionChrome.mjs';
 import { VietnamJourneyStage } from '../components/dailyPractice/VietnamJourneyStage';
 import { LevelUnlockBanner } from '../components/dailyPractice/LevelUnlockBanner';
 import { useNewlyUnlockedUnit } from '../components/dailyPractice/useNewlyUnlockedUnit';
 import MilestoneHubModal from '../components/dailyPractice/MilestoneHubModal';
+import { PlacementEntryCard, SpacedReviewCard } from '../components/dailyPractice/DailyPracticeSideCards';
+import { PlacementTestModal, readPlacementResult, type PlacementResult } from '../components/dailyPractice/PlacementTestModal';
+
+const VideoPlayerFrame = (VideoPlayerMod as unknown as { VideoPlayerFrame: React.ComponentType<Record<string, unknown>> }).VideoPlayerFrame;
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
@@ -120,28 +132,82 @@ function useShake(trigger: unknown) {
 
 // ── Màn chọn ─────────────────────────────────────────────────────────────────
 const MODES: Array<{ id: PracticeMode; label: string; icon: LucideIcon }> = [
-  { id: 'path', label: 'Lộ trình', icon: Route },
+  { id: 'path', label: 'Theo lộ trình', icon: Route },
   { id: 'free', label: 'Luyện tự do', icon: Shuffle },
   { id: 'goal', label: 'Mục tiêu', icon: Target },
 ];
 type PracticeMode = 'path' | 'free' | 'goal';
 
-const GOAL_KEY_PREFIX = 'daily_practice_goal_v1';
+const MISSION_QUESTIONS = 10;
+const MISSION_VIDEOS = 1;
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+function goalPct(value: number, target: number) {
+  if (!target) return 0;
+  return Math.min(100, Math.round((value / target) * 100));
+}
+
+function GoalMissionRow({
+  icon: Icon,
+  title,
+  done,
+  detail,
+  onPress,
+}: {
+  icon: LucideIcon;
+  title: string;
+  done: boolean;
+  detail: string;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.missionRowCard,
+        done
+          ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
+          : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+      ]}
+      accessibilityRole="button"
+    >
+      <View
+        style={[
+          styles.missionSquareIcon,
+          { backgroundColor: done ? '#10B981' : '#FFFFFF', borderWidth: done ? 0 : 1, borderColor: '#E2E8F0' },
+        ]}
+      >
+        {done ? <Check size={18} strokeWidth={3} color="#FFFFFF" /> : <Icon size={18} color="#334155" />}
+      </View>
+      <View style={styles.flex}>
+        <Text style={[styles.missionRowTitle, { color: '#0F172A', fontWeight: '800' }]}>{title}</Text>
+        <Text style={[styles.missionRowSub, { color: done ? '#047857' : '#64748B', fontWeight: '700' }]}>{detail}</Text>
+      </View>
+      {done ? (
+        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center' }}>
+          <Check size={14} strokeWidth={3} color="#FFFFFF" />
+        </View>
+      ) : (
+        <Circle size={22} color="#CBD5E1" />
+      )}
+    </Pressable>
+  );
+}
 
 function DailyPracticeGoalPanel({
   stats,
-  userId,
+  canSetGoal = true,
   onWatchVideo,
   onGoPractice,
+  onViewProgress,
 }: {
   stats: DpStats | null;
   userId?: string;
+  canSetGoal?: boolean;
   onWatchVideo?: () => void;
   onGoPractice?: () => void;
+  onViewProgress?: () => void;
 }) {
-  const storageKey = `${GOAL_KEY_PREFIX}:${userId || 'guest'} `;
-  const [goal, setGoal] = useState<{ dailyTarget: number; pace: 'self' | 'guided' }>({ dailyTarget: 1, pace: 'self' });
   const [goalData, setGoalData] = useState<LearningGoalData | null>(null);
 
   useEffect(() => {
@@ -165,44 +231,18 @@ function DailyPracticeGoalPanel({
     return () => { sub1.remove(); sub2.remove(); };
   }, []);
 
-  useEffect(() => {
-    AsyncStorage.getItem(storageKey)
-      .then((raw) => {
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.dailyTarget === 'number') {
-          setGoal({
-            dailyTarget: Math.min(5, Math.max(1, Number(parsed.dailyTarget) || 1)),
-            pace: parsed.pace === 'guided' ? 'guided' : 'self',
-          });
-        }
-      })
-      .catch(() => undefined);
-  }, [storageKey]);
-
-  const updateGoal = (patch: Partial<{ dailyTarget: number; pace: 'self' | 'guided' }>) => {
-    setGoal((prev) => {
-      const next = { ...prev, ...patch };
-      AsyncStorage.setItem(storageKey, JSON.stringify(next)).catch(() => undefined);
-      return next;
-    });
-  };
-
-  const todaySessions = stats?.todaySessions || (stats?.playedToday ? 1 : 0);
   const streak = stats?.streak || 0;
-  const bestStreak = stats?.bestStreak || 0;
   const playedToday = Boolean(stats?.playedToday);
-  const todayProgress = Math.min(100, Math.round((todaySessions / Math.max(1, goal.dailyTarget)) * 100));
 
   const progress: Partial<LearningGoalProgress> = goalData?.progress || {};
-  const todayQuestions = progress.todayQuestions ?? (stats?.playedToday ? 10 : 0);
+  const goal = goalData?.goal || null;
+  const todayQuestions = progress.todayQuestions ?? 0;
   const todayVideos = progress.todayVideos ?? 0;
-  const qDone = todayQuestions >= 10;
-  const vDone = todayVideos >= 1;
-  const missionDoneCount = (qDone ? 1 : 0) + (vDone ? 1 : 0);
-  const periodQuestions = progress.periodQuestions ?? todayQuestions;
-  const periodVideos = progress.periodVideos ?? todayVideos;
-  const period = goalData?.goal?.period || 'month';
+  const learnDone = todayVideos >= MISSION_VIDEOS;
+  const practiceDone = todayQuestions >= MISSION_QUESTIONS || playedToday;
+  const activityDone = (learnDone ? 1 : 0) + (practiceDone ? 1 : 0);
+  const activityTarget = 2;
+
   const todayIdx = useMemo(() => {
     try {
       const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'short' }).format(new Date());
@@ -214,214 +254,200 @@ function DailyPracticeGoalPanel({
     return (new Date().getDay() + 6) % 7;
   }, []);
 
+  const minutePct = goal ? goalPct(progress.todayMinutes || 0, progress.dailyTargetMinutes || (goal.hoursPerDay * 60)) : 0;
+
   return (
     <View style={styles.gapMd}>
-      {/* Mục tiêu hôm nay */}
+      {/* Mục tiêu hôm nay — đồng bộ Web DailyPracticeGoalPanel */}
       <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
             <View style={[styles.goalIconBox, { backgroundColor: theme.brandSoft }]}>
               <Target size={17} color={theme.brand} />
             </View>
-            <View>
-              <Text style={styles.goalCardTitle}>Mục tiêu hôm nay</Text>
-              <Text style={styles.goalCardSub}>Kế hoạch rèn luyện hằng ngày</Text>
+            <Text style={styles.goalCardTitle}>Mục tiêu hôm nay</Text>
+          </View>
+          <CheckCircle2 size={18} color="#10B981" />
+        </View>
+
+        {!goal ? (
+          <View style={{ gap: 10 }}>
+            <Text style={styles.goalCardSub}>
+              {canSetGoal
+                ? 'Chưa đặt mục tiêu giờ học. Vẫn theo dõi XP và chuỗi luyện tập bên dưới.'
+                : 'Hoàn thành bài học đầu tiên để mở khóa đặt mục tiêu học.'}
+            </Text>
+            {canSetGoal ? (
+              <DuoButton
+                variant="secondary"
+                size="sm"
+                text="Đặt mục tiêu học"
+                onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)}
+              />
+            ) : null}
+          </View>
+        ) : (
+          <View style={{ gap: 10 }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#334155' }}>
+              {`Hoàn thành ${activityTarget} hoạt động học tập${goal.hoursPerDay ? ` · mục tiêu ${goal.hoursPerDay} giờ/ngày` : ''}.`}
+            </Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={[styles.pathTrack, { height: 10 }]}>
+                <View style={[styles.pathFill, { width: `${Math.round((activityDone / activityTarget) * 100)}%`, backgroundColor: '#10B981' }]} />
+              </View>
+              <Text style={styles.goalValueSmall}>{`${activityDone} / ${activityTarget}`}</Text>
             </View>
-          </View>
-          <View style={[styles.goalBadge, todayProgress >= 100 ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#F1F5F9' }]}>
-            <Text style={[styles.goalBadgeText, { color: todayProgress >= 100 ? '#047857' : '#334155' }]}>{`${todayProgress}% `}</Text>
-          </View>
-        </View>
 
-        <View style={[styles.pathTrack, { height: 8 }]}>
-          <View style={[styles.pathFill, { width: `${todayProgress}% `, backgroundColor: todayProgress >= 100 ? '#10B981' : '#10B981' }]} />
-        </View>
+            <View style={{ gap: 8 }}>
+              <GoalMissionRow
+                icon={Gamepad2}
+                title="Luyện tập"
+                done={practiceDone}
+                detail={`${Math.min(todayQuestions, MISSION_QUESTIONS)}/${MISSION_QUESTIONS} câu`}
+                onPress={onGoPractice}
+              />
+              <GoalMissionRow
+                icon={PlayCircle}
+                title="Xem video"
+                done={learnDone}
+                detail={`${Math.min(todayVideos, MISSION_VIDEOS)}/${MISSION_VIDEOS} video`}
+                onPress={onWatchVideo}
+              />
+            </View>
 
-        <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={[styles.goalInfoTitle, { color: '#1E3A8A' }]}>Kế hoạch học tập</Text>
-            <Pressable
-              onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)}
-              hitSlop={8}
-              accessibilityRole="button"
-              style={({ pressed }) => ({
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 10,
-                borderWidth: 1.5,
-                borderColor: '#A7F3D0',
-                borderBottomWidth: pressed ? 1.5 : 3.5,
-                borderBottomColor: '#34D399',
-                backgroundColor: pressed ? '#ECFDF5' : '#FFFFFF',
-                transform: [{ translateY: pressed ? 2 : 0 }],
-              })}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>
-                {goalData?.goal?.expired ? 'Đặt lại mục tiêu' : goalData?.goal ? 'Đổi mục tiêu' : 'Đặt mục tiêu'}
-              </Text>
-            </Pressable>
-          </View>
-          <Text style={[styles.goalInfoSub, { color: '#1D4ED8', marginTop: 2 }]}>
-            {goalData?.goal
-              ? `Mục tiêu giờ học: ${goalData.goal.hoursPerDay} giờ/ngày · ${periodLabel(goalData.goal.period)}${goalData.goal.expired ? ' (Đã kết thúc)' : ''}`
-              : 'Chọn số bài mỗi ngày để xây dựng thói quen học tập đều đặn.'}
-          </Text>
-        </View>
-
-        <View style={{ gap: 8 }}>
-          <View style={styles.goalHeaderRow}>
-            <Text style={styles.goalLabelSmall}>Số lượt luyện mỗi ngày</Text>
-            <Text style={styles.goalValueSmall}>{`${goal.dailyTarget} lượt`}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {[1, 2, 3, 4, 5].map((n) => {
-              const active = goal.dailyTarget === n;
-              return (
+            <View style={[styles.goalInfoBox, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', gap: 6 }]}>
+              <View style={styles.goalHeaderRow}>
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#475569' }}>Giờ học hôm nay</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#0F172A' }}>
+                  {`${formatStudyMinutes(progress.todayMinutes)} / ${goal.hoursPerDay} giờ`}
+                </Text>
+              </View>
+              <View style={[styles.pathTrack, { height: 8, backgroundColor: '#FFFFFF' }]}>
+                <View style={[styles.pathFill, { width: `${minutePct}%`, backgroundColor: minutePct >= 100 ? '#10B981' : '#FB923C' }]} />
+              </View>
+              <View style={[styles.goalHeaderRow, { marginTop: 4, gap: 8 }]}>
+                <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#64748B' }}>
+                  {`${periodLabel(goal.period)}${!goal.expired ? ` · còn ${progress.daysLeft ?? 0} ngày` : ' · đã hết hạn'}`}
+                </Text>
                 <Pressable
-                  key={n}
-                  onPress={() => updateGoal({ dailyTarget: n })}
-                  style={[styles.goalTargetBtn, active && styles.goalTargetBtnActive]}
+                  onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)}
+                  hitSlop={8}
                   accessibilityRole="button"
+                  style={({ pressed }) => ({
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: '#A7F3D0',
+                    borderBottomWidth: pressed ? 1.5 : 3.5,
+                    borderBottomColor: '#34D399',
+                    backgroundColor: pressed ? '#ECFDF5' : '#FFFFFF',
+                    transform: [{ translateY: pressed ? 2 : 0 }],
+                  })}
                 >
-                  <Text style={[styles.goalTargetBtnText, active && { color: '#FFFFFF', fontWeight: '800' }]}>{n}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#059669' }}>
+                    {goal.expired ? 'Đặt mục tiêu mới' : 'Đổi mục tiêu'}
+                  </Text>
                 </Pressable>
-              );
-            })}
+              </View>
+            </View>
           </View>
-        </View>
-
-        <View style={{ gap: 8, marginTop: 4 }}>
-          <View style={styles.goalHeaderRow}>
-            <Text style={styles.goalLabelSmall}>Nhiệm vụ học hôm nay</Text>
-            <Text style={styles.goalValueSmall}>{`${missionDoneCount}/2 hoàn thành`}</Text>
-          </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {/* Cột 1: Luyện tập (Xanh lá) */}
-          <Pressable
-            onPress={onGoPractice}
-            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Luyện tập: ${qDone ? 'Hoàn thành' : `${todayQuestions}/10 câu`}`}
-          >
-            <View style={[styles.missionSquareIcon, { backgroundColor: '#10B981' }]}>
-              <Gamepad2 size={20} color="#FFFFFF" />
-              {qDone ? (
-                <View style={styles.missionCheckBadge}>
-                  <Check size={10} strokeWidth={3.5} color="#059669" />
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.flex}>
-              <Text style={[styles.missionRowTitle, { color: '#065F46' }]}>Luyện tập</Text>
-              <Text style={[styles.missionRowSub, { color: '#059669' }]}>
-                {qDone ? `Hoàn thành · ${todayQuestions} câu` : `${todayQuestions}/10 câu`}
-              </Text>
-              <View style={[styles.missionRowTrack, { backgroundColor: '#D1FAE5' }]}>
-                <View style={[styles.missionRowFill, { width: `${Math.min(100, Math.round((todayQuestions / 10) * 100))}%`, backgroundColor: '#10B981' }]} />
-              </View>
-            </View>
-          </Pressable>
-
-          {/* Cột 2: Xem video */}
-          <Pressable
-            onPress={onWatchVideo}
-            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Xem video: ${todayVideos}/1 video`}
-          >
-            <View style={[styles.missionCircleIcon, { backgroundColor: '#8B5CF6' }]}>
-              <PlayCircle size={22} color="#FFFFFF" />
-            </View>
-            <View style={styles.flex}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={[styles.missionRowTitle, { color: '#0F172A' }]}>Xem video</Text>
-                <ChevronRight size={14} color="#94A3B8" />
-              </View>
-              <Text style={[styles.missionRowSub, { color: '#64748B' }]}>
-                {`${todayVideos}/1 video`}
-              </Text>
-              <View style={[styles.missionRowTrack, { backgroundColor: '#F1F5F9' }]}>
-                <View style={[styles.missionRowFill, { width: `${Math.min(100, Math.round(todayVideos * 100))}%`, backgroundColor: '#8B5CF6' }]} />
-              </View>
-            </View>
-          </Pressable>
-        </View>
-
-        <Text style={styles.missionFooterText}>
-          {`Cả ${periodLabel(period)}: ${periodQuestions} câu · ${periodVideos} video`}
-        </Text>
-        </View>
-
-        <View style={styles.goalFooterBox}>
-          <Calendar size={15} color="#64748B" />
-          <Text style={styles.goalFooterText}>
-            {'Đã hoàn thành '}
-            <Text style={{ fontWeight: '700', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text>
-            {' lượt bài hôm nay'}
-          </Text>
-        </View>
+        )}
       </View>
 
-      {/* Chuỗi luyện tập */}
+      {/* Chuỗi học tập */}
       <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED' }]}>
-              <Flame size={17} color="#EA580C" />
-            </View>
-            <View>
-              <Text style={styles.goalCardTitle}>Chuỗi học tập</Text>
-              <Text style={styles.goalCardSub}>{`Kỷ lục cao nhất: ${bestStreak} ngày`}</Text>
-            </View>
+            <Flame size={18} color="#F97316" fill="#FB923C" />
+            <Text style={styles.goalCardTitle}>Chuỗi học tập</Text>
           </View>
-          <View style={styles.inline}>
-            <Flame size={15} color="#EA580C" fill="#FB923C" />
-            <Text style={{ fontSize: 14, fontWeight: '800', color: '#EA580C' }}>{`${streak} ngày`}</Text>
-          </View>
+          <Calendar size={17} color="#64748B" />
         </View>
+
+        <Text style={{ fontSize: 24, fontWeight: '900', color: '#EA580C' }}>{`${streak} ngày`}</Text>
+        <Text style={styles.goalCardSub}>Học đều mỗi ngày để duy trì chuỗi và nhận thưởng lớn hơn!</Text>
+        <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500' }}>
+          {playedToday
+            ? 'Hôm nay bạn đã hoàn thành ít nhất một lượt luyện tập.'
+            : 'Hôm nay chưa có lượt luyện tập. Hoàn thành 10 câu để giữ chuỗi.'}
+        </Text>
 
         <View style={{ flexDirection: 'row', gap: 6 }}>
           {WEEK_DAYS.map((label, idx) => {
             const isToday = idx === todayIdx;
             const active = (isToday && playedToday) || (idx < todayIdx && streak >= (todayIdx - idx + (playedToday ? 1 : 0)));
             return (
-              <View
-                key={label}
-                style={[
-                  styles.weekCell,
-                  active
-                    ? { borderColor: '#FDBA74', backgroundColor: '#FFF7ED' }
-                    : isToday
-                      ? { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }
-                      : { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-                ]}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
-                <Flame size={15} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
+              <View key={label} style={{ flex: 1, alignItems: 'center' }}>
+                <View
+                  style={[
+                    {
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    active
+                      ? { backgroundColor: '#F97316' }
+                      : isToday
+                        ? { borderWidth: 2, borderStyle: 'dashed', borderColor: '#FB923C', backgroundColor: '#FFF7ED' }
+                        : { backgroundColor: '#F1F5F9' },
+                  ]}
+                >
+                  {active ? (
+                    <Flame size={15} color="#FFFFFF" fill="#FDE68A" />
+                  ) : (
+                    <Text style={{ fontSize: 10.5, fontWeight: '900', color: isToday ? '#C2410C' : '#94A3B8' }}>{label}</Text>
+                  )}
+                </View>
               </View>
             );
           })}
         </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 }}>
+          <Gift size={14} color="#059669" />
+          <Text style={{ flex: 1, fontSize: 11.5, fontWeight: '700', color: '#065F46' }}>
+            Học liên tục 7 ngày để nhận thưởng đặc biệt!
+          </Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
+          <Info size={12} color="#94A3B8" style={{ marginTop: 2 }} />
+          <Text style={{ flex: 1, fontSize: 10.5, lineHeight: 15, color: '#94A3B8' }}>
+            Lịch tuần hiển thị các ngày đạt chuỗi; hoàn thành ít nhất một lượt luyện tập mỗi ngày để giữ lửa.
+          </Text>
+        </View>
+
+        {onViewProgress ? (
+          <Pressable onPress={onViewProgress} accessibilityRole="button">
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#047857' }}>Xem tiến độ học tập</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
 }
 
-/** Hàng môn — cố định trên tab Lộ trình / Luyện tự do. */
+/** Hàng môn — đồng bộ Web DailyPracticeSubjectBar (Khóa / Sẵn sàng / Đang soạn + tỷ lệ chặng). */
 function PracticeSubjectStrip({
   pathTopics,
   freeTopics,
+  variant = 'path',
   activeId,
   onSelect,
   play,
 }: {
   pathTopics: DpTopicPath[];
   freeTopics: DpTopic[];
+  variant?: 'path' | 'free';
   activeId: string;
   onSelect: (id: string) => void;
   play: (s: GameSound) => void;
 }) {
-  const usePathList = pathTopics.length > 0;
+  const usePathList = variant === 'path' ? pathTopics.length > 0 : (pathTopics.length > 0 && freeTopics.length === 0);
   if (!usePathList && !freeTopics.length) return null;
 
   return (
@@ -436,6 +462,10 @@ function PracticeSubjectStrip({
           const Icon = TOPIC_ICONS[item.topic.icon] || BookOpen;
           const tone = DP_TOPIC_COLORS[item.topic.color] || DP_TOPIC_COLORS.red;
           const active = item.topic.id === activeId;
+          const locked = Boolean((item as { locked?: boolean }).locked)
+            || (Array.isArray(item.units) && item.units.length > 0 && item.units.every((u) => u.state === 'locked'));
+          const metaPrimary = locked ? 'Đã khóa' : (item.totalUnits > 0 ? 'Đã sẵn sàng' : 'Đang soạn');
+          const metaColor = locked ? '#D97706' : '#059669';
           return (
             <Pressable
               key={item.topic.id}
@@ -445,9 +475,17 @@ function PracticeSubjectStrip({
               accessibilityState={{ selected: active }}
             >
               <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
-              <View>
-                <Text style={styles.chipName}>{item.topic.name}</Text>
-                <Text style={styles.chipMeta}>{`${item.completedUnits}/${item.totalUnits} chặng`}</Text>
+              <View style={{ minWidth: 0, flexShrink: 1 }}>
+                <Text numberOfLines={1} style={styles.chipName}>{item.topic.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  {locked ? <Lock size={10} color="#D97706" /> : null}
+                  <Text numberOfLines={1} style={[styles.chipMeta, { color: metaColor, fontWeight: '700' }]}>
+                    {metaPrimary}
+                    {item.totalUnits > 0 ? (
+                      <Text style={{ color: '#94A3B8', fontWeight: '600' }}>{` · ${item.completedUnits}/${item.totalUnits}`}</Text>
+                    ) : null}
+                  </Text>
+                </View>
               </View>
             </Pressable>
           );
@@ -466,9 +504,9 @@ function PracticeSubjectStrip({
               accessibilityState={{ selected: active }}
             >
               <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
-              <View>
-                <Text style={styles.chipName}>{topic.name}</Text>
-                <Text style={styles.chipMeta}>{`${total} câu hỏi`}</Text>
+              <View style={{ minWidth: 0, flexShrink: 1 }}>
+                <Text numberOfLines={1} style={styles.chipName}>{topic.name}</Text>
+                <Text numberOfLines={1} style={styles.chipMeta}>{total > 0 ? `${total} câu` : 'Chưa có câu'}</Text>
               </View>
             </Pressable>
           );
@@ -477,10 +515,23 @@ function PracticeSubjectStrip({
   );
 }
 
+type PendingPathResume = {
+  key: number;
+  topicId?: string;
+  unitId?: string;
+  nodeKey?: string;
+  sectionId?: string;
+  videoId?: string;
+  atSec?: number;
+  watchStage?: boolean;
+};
+
 function HomeView({
   topics, stats, loading, error, starting, onStart, play, initialTopicId = '',
-  mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onQuickStart, onPathChanged, onBuyXp,
-  initialWatchStage = false, pathActiveTopicId = '',
+  mode, onModeChange, pathTopics, pathLoading, pathError, pathCanTestOut = true, onStartStep, onQuickStart, onPathChanged, onBuyXp, onOpenUpgrade, onViewProgress, onScrollToPath,
+  initialWatchStage = false, onContinueVideoOpened, pendingResume = null, onResumeConsumed, pathActiveTopicId = '',
+  requestedLesson = null, onRequestedLessonOpened,
+  spacedRepetition, onStartSpacedReview, placementResult, onOpenPlacement, recommendedTopic,
 }: {
   topics: DpTopic[];
   stats: DpStats | null;
@@ -495,27 +546,53 @@ function HomeView({
   pathTopics: DpTopicPath[];
   pathLoading: boolean;
   pathError: string;
+  pathCanTestOut?: boolean;
   onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean, opts?: { review?: boolean }) => void;
   onQuickStart: (activeTopic?: DpTopicPath | null) => void;
   onPathChanged: () => void;
   /** Điều hướng đến màn mua gói XP. */
   onBuyXp: () => void;
+  onOpenUpgrade: () => void;
+  onViewProgress: () => void;
+  onScrollToPath?: () => void;
   initialWatchStage?: boolean;
+  onContinueVideoOpened?: () => void;
+  pendingResume?: PendingPathResume | null;
+  onResumeConsumed?: () => void;
   pathActiveTopicId?: string;
+  requestedLesson?: { unit: DpPathUnit; level?: DpPathStep | null; nodeKey: string } | null;
+  onRequestedLessonOpened?: () => void;
+  spacedRepetition?: DpSpacedRepetitionSummary | null;
+  onStartSpacedReview: () => void;
+  placementResult: PlacementResult | null;
+  onOpenPlacement: () => void;
+  recommendedTopic?: { id: string; seq: number } | null;
 }) {
   const { user } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 1024;
+  const freePortal = isFreePortalMenu(user);
   const [topicId, setTopicId] = useState('');
-  const [selectedPathTopicId, setSelectedPathTopicId] = useState('');
+  const [selectedPathTopicId, setSelectedPathTopicId] = useState(initialTopicId);
   const [difficulty, setDifficulty] = useState<DpDifficulty>('easy');
   const [continueVideo, setContinueVideo] = useState(Boolean(initialWatchStage));
+  const [focusLessonSeq, setFocusLessonSeq] = useState(0);
+  const [certOpen, setCertOpen] = useState(false);
 
   useEffect(() => {
     if (initialWatchStage) {
       setContinueVideo(true);
     }
   }, [initialWatchStage]);
+  useEffect(() => {
+    const serverId = String(pathActiveTopicId || '').trim();
+    if (serverId) setSelectedPathTopicId(serverId);
+  }, [pathActiveTopicId]);
+  useEffect(() => {
+    if (!recommendedTopic?.id) return;
+    setTopicId(recommendedTopic.id);
+    setSelectedPathTopicId(recommendedTopic.id);
+  }, [recommendedTopic?.id, recommendedTopic?.seq]);
   const selected = topics.find((t) => t.id === topicId);
   useEffect(() => {
     if (topicId || !topics.length) return;
@@ -523,77 +600,94 @@ function HomeView({
     setTopicId(linked ? linked.id : topics[0].id);
   }, [topicId, topics, initialTopicId]);
 
-  const activePathTopic = useMemo(
-    () => pickActivePathTopic(
+  const activePathTopic = useMemo(() => {
+    if (selectedPathTopicId) {
+      const found = (pathTopics || []).find((item) => item.topic.id === selectedPathTopicId);
+      if (found) return found;
+    }
+    return pickActivePathTopic(
       { topics: pathTopics, activeTopicId: pathActiveTopicId },
       initialTopicId,
-      selectedPathTopicId || pathActiveTopicId,
-    ),
-    [pathTopics, initialTopicId, selectedPathTopicId, pathActiveTopicId],
-  );
-  const activeTopicTitle = mode === 'path'
-    ? activePathTopic?.topic.name || topics[0]?.name || 'Lộ trình'
-    : selected?.name || topics[0]?.name || 'Chủ đề';
-  const completedUnits = activePathTopic?.completedUnits || 0;
-  const totalUnits = activePathTopic?.totalUnits || 0;
+      pathActiveTopicId,
+    );
+  }, [pathTopics, initialTopicId, selectedPathTopicId, pathActiveTopicId]);
 
-  const mascotMood: MascotMood = stats?.playedToday
-    ? 'happy'
-    : stats?.streakState === 'lost'
-      ? 'sad'
-      : stats?.streakState === 'at_risk'
-        ? 'determined'
-        : 'idle';
+  const hasCompletedFirstNode = useMemo(() => (pathTopics || []).some((t) => {
+    const firstUnit = t?.units?.[0];
+    const firstNode = firstUnit?.pathNodes?.[0];
+    if (firstNode) return firstNode.state === 'completed';
+    return firstUnit?.state === 'completed';
+  }), [pathTopics]);
+
+  const pathContinue = activePathTopic?.next
+    ? {
+      unitId: activePathTopic.next.unitId,
+      nodeKey: activePathTopic.next.nodeKey || 'study',
+      step: activePathTopic.next.step,
+    }
+    : null;
+  const topicPathDone = Boolean(
+    activePathTopic?.totalUnits && (activePathTopic.completedUnits || 0) >= activePathTopic.totalUnits,
+  );
+  const heroLabel = mode === 'free'
+    ? 'Bắt đầu luyện tập'
+    : (topicPathDone
+      ? 'Ôn lại lộ trình'
+      : (activePathTopic ? pathTopicPrimaryCtaLabel(activePathTopic) : 'Xem chi tiết lộ trình'));
+  const heroAction = () => {
+    play('tap');
+    if (mode === 'free') {
+      if (topicId) onStart(topicId, difficulty);
+      return;
+    }
+    if (mode === 'goal') onModeChange('path');
+    if (pathContinue) {
+      setFocusLessonSeq((n) => n + 1);
+    } else {
+      onScrollToPath?.();
+    }
+  };
+
+  const sideCards = (
+    <View style={{ gap: 12 }}>
+      <SpacedReviewCard
+        spaced={spacedRepetition}
+        starting={starting}
+        onStart={() => { play('tap'); onStartSpacedReview(); }}
+      />
+      <PlacementEntryCard
+        placementResult={placementResult}
+        onPress={() => { play('tap'); onOpenPlacement(); }}
+      />
+    </View>
+  );
+
+  const rawUser = user as { id?: string; _id?: string; name?: string; fullName?: string; username?: string; studentCode?: string; code?: string } | null;
+  const studentName = String(rawUser?.fullName || rawUser?.name || rawUser?.username || '').trim() || 'bạn';
+  const studentCode = String(rawUser?.studentCode || rawUser?.code || '').trim();
+  const studentId = String(rawUser?.id || rawUser?._id || '').trim();
+  const subjectBarActiveId = mode === 'path'
+    ? (activePathTopic?.topic.id || selectedPathTopicId || pathActiveTopicId || topicId)
+    : (topicId || selectedPathTopicId || activePathTopic?.topic.id || '');
 
   return (
     <View style={styles.gapMd}>
-      {/* Top Gamification Bar: Title + Streak Pill + XP Pill */}
-      <View style={styles.topGamifiedBar}>
-        <View style={styles.topTitleRow}>
-          <Sparkles size={18} color={theme.brand} />
-          <Text style={styles.topPageTitle}>Luyện tập</Text>
-        </View>
-        <View style={styles.topBadgesRow}>
-          <View style={styles.streakBadgePill}>
-            <Flame size={15} color="#EA580C" fill="#FB923C" />
-            <Text style={styles.streakBadgeText}>{`${stats?.streak || 0} ngày`}</Text>
-          </View>
-          <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.xpBadgePill} accessibilityRole="button">
-            <Zap size={14} color="#D97706" fill="#F59E0B" />
-            <Text style={styles.xpBadgeText}>{`${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP`}</Text>
-          </Pressable>
-        </View>
-      </View>
+      <DailyPracticeHero
+        stats={stats}
+        displayName={studentName}
+        mode={mode}
+        onPrimaryAction={heroAction}
+        primaryDisabled={mode === 'free' ? (!topicId || starting) : starting}
+        primaryLabel={heroLabel}
+        starting={starting}
+        pathTopic={mode === 'path' ? activePathTopic : null}
+        pathContinue={Boolean(pathContinue)}
+        onBuyXp={onBuyXp}
+        onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
+        play={play}
+      />
 
-      <View style={styles.mascotMotivationCard}>
-        <View style={styles.mascotWrapCompact}>
-          <Mascot mood={mascotMood} size={54} />
-        </View>
-        <View style={styles.mascotContent}>
-          <Text style={styles.mascotHeadline} numberOfLines={1}>
-            {stats?.playedToday ? 'Đã hoàn thành hôm nay 🎉' : 'Tiếp tục chuỗi luyện tập 🔥'}
-          </Text>
-          <Text style={styles.mascotSub} numberOfLines={1}>
-            {`${activeTopicTitle} · ${totalUnits ? `${completedUnits}/${totalUnits} chặng` : 'Khám phá ngay'}`}
-          </Text>
-          {totalUnits > 0 ? (
-            <View style={styles.mascotProgressTrack}>
-              <View style={[styles.mascotProgressFill, { width: `${Math.min(100, Math.round((completedUnits / totalUnits) * 100))}%` }]} />
-            </View>
-          ) : null}
-        </View>
-        <DuoButton
-          variant="accent"
-          size="sm"
-          text="Luyện"
-          icon={<Play size={13} color="#FFFFFF" fill="#FFFFFF" />}
-          loading={starting}
-          disabled={starting}
-          onPress={() => { play('tap'); onQuickStart(activePathTopic); }}
-        />
-      </View>
-
-      {/* Banner hết XP luyện tập - chỉ hiện khi xpEmpty hoặc xpTotal <= 0 */}
+      {/* Banner hết XP để luyện - khớp Web */}
       {stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
         <View style={styles.xpEmptyBanner}>
           <View style={[styles.inline, { flex: 1 }]}>
@@ -601,9 +695,9 @@ function HomeView({
               <Zap size={18} color="#FFFFFF" />
             </View>
             <View style={styles.flex}>
-              <Text style={styles.xpEmptyTitle}>Hết XP luyện tập</Text>
+              <Text style={styles.xpEmptyTitle}>Hết XP để luyện</Text>
               <Text style={styles.xpEmptyDesc}>
-                {`Hệ thống tự bù về ${stats.dailyAllowanceXp ?? 50} XP lúc 0h hằng ngày.`}
+                {`Mua thêm để luyện tiếp trong hôm nay. Ngày mai bạn được lại ${stats.dailyAllowanceXp || stats.dailyRefillXp || 200} XP, XP đã mua vẫn được giữ.`}
               </Text>
             </View>
           </View>
@@ -618,7 +712,8 @@ function HomeView({
       <PracticeSubjectStrip
         pathTopics={pathTopics}
         freeTopics={topics}
-        activeId={mode === 'path' ? (selectedPathTopicId || topicId || pathActiveTopicId) : (topicId || selectedPathTopicId)}
+        variant={pathTopics.length ? 'path' : 'free'}
+        activeId={subjectBarActiveId}
         onSelect={(id) => {
           setTopicId(id);
           setSelectedPathTopicId(id);
@@ -626,10 +721,11 @@ function HomeView({
         play={play}
       />
 
-      {/* Segmented Mode Tabs: Lộ trình | Luyện tự do | Mục tiêu */}
+      {/* Segmented Mode Tabs: Theo lộ trình (hoặc Lộ trình khi freePortal) | Luyện tự do | Mục tiêu */}
       <View style={styles.modeTabs} accessibilityRole="tablist">
         {MODES.map(({ id, label, icon: Icon }) => {
           const active = mode === id;
+          const displayLabel = freePortal && id === 'path' ? 'Lộ trình' : label;
           return (
             <Pressable
               key={id}
@@ -639,7 +735,7 @@ function HomeView({
               accessibilityState={{ selected: active }}
             >
               <Icon size={15} color={active ? theme.brandDark : colors.muted} />
-              <Text style={[styles.modeTabText, active && styles.modeTabTextActive]}>{label}</Text>
+              <Text style={[styles.modeTabText, active && styles.modeTabTextActive]}>{displayLabel}</Text>
             </Pressable>
           );
         })}
@@ -655,14 +751,26 @@ function HomeView({
               activeTopicId={selectedPathTopicId || pathActiveTopicId}
               loading={pathLoading}
               error={pathError}
+              canTestOut={pathCanTestOut}
               starting={starting}
               play={play}
               initialTopicId={initialTopicId}
               onTopicChange={setSelectedPathTopicId}
               onStartStep={onStartStep}
               onPathChanged={onPathChanged}
+              onOpenUpgrade={onOpenUpgrade}
               continueVideo={continueVideo}
-              onContinueVideoOpened={() => setContinueVideo(false)}
+              onContinueVideoOpened={() => {
+                setContinueVideo(false);
+                onContinueVideoOpened?.();
+              }}
+              pendingResume={pendingResume}
+              onResumeConsumed={onResumeConsumed}
+              requestedLesson={requestedLesson}
+              onRequestedLessonOpened={onRequestedLessonOpened}
+              focusLessonSeq={focusLessonSeq}
+              xpTotal={stats?.xpTotal ?? null}
+              onBuyXp={onBuyXp}
             />
           ) : null}
 
@@ -671,21 +779,22 @@ function HomeView({
           {mode === 'free' && !loading && !topics.length && !error ? (
             <View style={styles.empty}>
               <Mascot mood="thinking" size={72} />
-              <Text style={styles.emptyTitle}>Trung tâm đang soạn câu hỏi luyện tập.</Text>
-              <Text style={styles.muted}>Quay lại sau nhé!</Text>
+              <Text style={styles.emptyTitle}>Chưa có câu Luyện tự do.</Text>
+              <Text style={[styles.muted, styles.center]}>Trung tâm cần soạn ngân hàng riêng (không dùng câu lộ trình). Quay lại sau nhé!</Text>
             </View>
           ) : null}
 
           {mode === 'free' && topics.length ? (
             <View style={[styles.card, { gap: 14 }]}>
               <View style={styles.freeModeNotice}>
-                <Text style={styles.freeModeNoticeBold}>Chế độ luyện tự do - Ôn tập không tính XP: </Text>
                 <Text style={styles.freeModeNoticeText}>
-                  Chỉ gồm câu hỏi trắc nghiệm để bạn ôn nhanh. Không cộng và không trừ XP; muốn nhận XP và mở khóa bài học hãy chuyển sang tab Theo lộ trình.
+                  {'Luyện tự do chỉ '}
+                  <Text style={styles.freeModeNoticeBold}>trắc nghiệm ôn</Text>
+                  {', không tính XP, không video, không dùng câu đã gắn chặng.'}
                 </Text>
               </View>
 
-              <Text style={styles.sectionTitle}>Độ khó (chỉ trắc nghiệm · 0 XP)</Text>
+              <Text style={styles.sectionTitle}>Chọn độ khó</Text>
               <View style={styles.row}>
                 {DP_DIFFICULTIES.map((level) => {
                   const active = level.id === difficulty;
@@ -701,7 +810,7 @@ function HomeView({
                         {[1, 2, 3].map((n) => <Star key={n} size={14} color={n <= level.stars ? level.color : '#CBD5E1'} fill={n <= level.stars ? level.color : 'transparent'} />)}
                       </View>
                       <Text style={[styles.levelLabel, active && { color: level.color }]}>{level.label}</Text>
-                      <Text style={styles.levelMeta}>{`Ôn tập · 0 XP · ${selected?.counts[level.id] || 0} câu`}</Text>
+                      <Text style={styles.levelMeta}>{`${selected?.counts[level.id] || 0} câu · không tính XP`}</Text>
                     </Pressable>
                   );
                 })}
@@ -714,7 +823,7 @@ function HomeView({
                 disabled={!topicId || starting}
                 loading={starting}
                 icon={<Play size={18} color="#FFFFFF" />}
-                text="BẮT ĐẦU ÔN TỰ DO (0 XP)"
+                text="Bắt đầu luyện tập"
                 onPress={() => topicId && onStart(topicId, difficulty)}
                 style={{ marginTop: 8 }}
               />
@@ -725,6 +834,8 @@ function HomeView({
             <DailyPracticeGoalPanel
               stats={stats}
               userId={user?.id}
+              canSetGoal={hasCompletedFirstNode}
+              onViewProgress={onViewProgress}
               onWatchVideo={() => {
                 play('tap');
                 onModeChange('path');
@@ -737,13 +848,18 @@ function HomeView({
               }}
             />
           ) : null}
+
+          {mode !== 'free' && error ? <Text style={styles.error}>{error}</Text> : null}
+          {mode === 'goal' ? sideCards : null}
         </View>
 
         {isWide && mode !== 'goal' ? (
-          <View style={{ flex: 4, minWidth: 290 }}>
+          <View style={{ flex: 4, minWidth: 290, gap: 12 }}>
             <DailyPracticeGoalPanel
               stats={stats}
               userId={user?.id}
+              canSetGoal={hasCompletedFirstNode}
+              onViewProgress={onViewProgress}
               onWatchVideo={() => {
                 play('tap');
                 onModeChange('path');
@@ -758,6 +874,24 @@ function HomeView({
           </View>
         ) : null}
       </View>
+
+      {certOpen ? (
+        <DigitalCertificateModal
+          visible={certOpen}
+          onClose={() => setCertOpen(false)}
+          studentName={studentName === 'bạn' ? 'Học viên Thắng Tin Học' : studentName}
+          studentCode={studentCode}
+          studentId={studentId}
+          courseId={mode === 'path' ? (activePathTopic?.topic?.id || topicId || 'dewskill') : (topicId || activePathTopic?.topic?.id || 'dewskill')}
+          courseTitle={mode === 'path'
+            ? (activePathTopic?.topic?.name || selected?.name || topics[0]?.name || 'Lộ trình Tin học DewSkill')
+            : (selected?.name || activePathTopic?.topic?.name || 'Luyện tập Tin học DewSkill')}
+          instructorName="Trung tâm Thắng Tin Học"
+          completionRate={activePathTopic?.totalUnits
+            ? Math.min(100, Math.round(((activePathTopic.completedUnits || 0) / activePathTopic.totalUnits) * 100))
+            : 0}
+        />
+      ) : null}
     </View>
   );
 }
@@ -781,11 +915,26 @@ function collectNodeVideos(unit: DpPathUnit, node: DpPathNode): DpPathVideo[] {
   const completedSet = new Set(unit.completedSections || []);
   const watchedSet = new Set(unit.watchedVideoIds || []);
   const nodeUnlocked = unit.state !== 'locked' && node.state !== 'locked';
+  const isSectionOpen = (
+    cfg: DpLevelSectionConfig | undefined,
+    diffKey: 'easy' | 'medium' | 'hard',
+    secKey: DpSectionKey,
+    order: DpSectionKey[],
+  ) => {
+    const lock = cfg?.sectionLocks?.[secKey];
+    if (lock === 'locked') return false;
+    if (lock === 'unlocked') return true;
+    if (unit.testedOut || cfg?.sequentialSections === false) return true;
+    const idx = order.indexOf(secKey);
+    if (idx <= 0) return idx === 0;
+    return order.slice(0, idx).every((prev) => completedSet.has(`${node.key}:${diffKey}:${prev}`));
+  };
   const isLevelDone = (diff: 'easy' | 'medium' | 'hard') => {
     const cfg = node.levelConfigs?.[diff];
     const hidden = new Set(cfg?.hiddenSections || []);
+    const locks = cfg?.sectionLocks || {};
     const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : VIDEO_DEFAULT_ORDER)
-      .filter((k) => !hidden.has(k));
+      .filter((k) => !hidden.has(k) && locks[k] !== 'locked');
     return !order.length || order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
   };
   const easyDone = isLevelDone('easy');
@@ -793,45 +942,67 @@ function collectNodeVideos(unit: DpPathUnit, node: DpPathNode): DpPathVideo[] {
 
   const items: DpPathVideo[] = [];
   const seenUrls = new Set<string>();
-  const hasLevelConfigVideo = VIDEO_DIFF_META.some((d) => Boolean(node.levelConfigs?.[d.key]?.video?.url));
+  const hasLevelConfigVideo = VIDEO_DIFF_META.some(
+    (d) => Boolean(node.levelConfigs?.[d.key]?.video?.url || node.levelConfigs?.[d.key]?.practice?.video?.url),
+  );
 
   for (const d of VIDEO_DIFF_META) {
     const cfg = node.levelConfigs?.[d.key];
-    const vid = cfg?.video;
-    if (!vid?.url) continue;
-    const hidden = new Set(cfg?.hiddenSections || []);
-    if (hidden.has('video')) continue;
+    if (!cfg) continue;
+    const hidden = new Set(cfg.hiddenSections || []);
+    const locks = cfg.sectionLocks || {};
     const diffUnlocked = Boolean(unit.testedOut) || d.key === 'easy'
       || (d.key === 'medium' && easyDone)
       || (d.key === 'hard' && easyDone && mediumDone);
-    const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : VIDEO_DEFAULT_ORDER)
-      .filter((k) => !hidden.has(k));
-    const idx = order.indexOf('video');
-    const seqUnlocked = Boolean(unit.testedOut) || cfg?.sequentialSections === false
-      || idx <= 0
-      || order.slice(0, idx).every((secKey) => completedSet.has(`${node.key}:${d.key}:${secKey}`));
-    const unlocked = nodeUnlocked && diffUnlocked && seqUnlocked;
-    const id = `${node.key}:level:${d.key}`;
-    const watched = completedSet.has(`${node.key}:${d.key}:video`) || watchedSet.has(id);
-    seenUrls.add(String(vid.url).trim());
-    items.push({
-      id,
-      title: vid.title || `${node.label} (${d.label})`,
-      url: unlocked ? vid.url : '',
-      stepLabel: d.label,
-      state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
-    });
+    const order = (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : VIDEO_DEFAULT_ORDER)
+      .filter((k) => !hidden.has(k) && locks[k] !== 'locked');
+
+    const vid = cfg.video;
+    if (vid?.url && !hidden.has('video')) {
+      const unlocked = nodeUnlocked && diffUnlocked && isSectionOpen(cfg, d.key, 'video', order);
+      const id = `${node.key}:level:${d.key}`;
+      const watched = unlocked && (completedSet.has(`${node.key}:${d.key}:video`) || watchedSet.has(id) || unit.state === 'completed');
+      seenUrls.add(String(vid.url).trim());
+      items.push({
+        id,
+        title: vid.title || `${node.label} (${d.label})`,
+        url: unlocked ? vid.url : '',
+        antiSeek: vid.antiSeek,
+        checks: vid.checks,
+        guide: vid.guide,
+        stepLabel: d.label,
+        state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
+      });
+    }
+
+    const pracVid = cfg.practice?.video;
+    if (pracVid?.url && !hidden.has('practice')) {
+      const unlocked = nodeUnlocked && diffUnlocked && isSectionOpen(cfg, d.key, 'practice', order);
+      const id = `${node.key}:practice:${d.key}`;
+      const watched = unlocked && (completedSet.has(`${node.key}:${d.key}:practice`) || watchedSet.has(id) || unit.state === 'completed');
+      seenUrls.add(String(pracVid.url).trim());
+      items.push({
+        id,
+        title: pracVid.title || `Video luyện tập · ${node.label} (${d.label})`,
+        url: unlocked ? pracVid.url : '',
+        antiSeek: pracVid.antiSeek,
+        checks: pracVid.checks,
+        guide: pracVid.guide,
+        stepLabel: d.label,
+        state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
+      });
+    }
   }
 
   for (const level of node.levels || []) {
     const mappedDiff = VIDEO_DIFF_META.find((d) => d.step === level.key)?.key;
-    if (hasLevelConfigVideo && (node.kind === 'study' || Boolean(mappedDiff && node.levelConfigs?.[mappedDiff]?.video?.url))) {
+    if (hasLevelConfigVideo && (node.kind === 'study' || Boolean(mappedDiff && (node.levelConfigs?.[mappedDiff]?.video?.url || node.levelConfigs?.[mappedDiff]?.practice?.video?.url)))) {
       continue;
     }
     for (const video of level.videos || []) {
       if (!video?.id) continue;
       if (video.url && seenUrls.has(String(video.url).trim())) continue;
-      const unlocked = nodeUnlocked && level.state !== 'locked';
+      const unlocked = nodeUnlocked && (Boolean(unit.testedOut) || level.state !== 'locked');
       items.push({
         ...video,
         state: !unlocked ? 'locked' : video.state,
@@ -1126,9 +1297,11 @@ function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0
       const diff = LEVEL_DOTS[i].diff;
       const cfg = node.levelConfigs?.[diff];
       const hidden = new Set(cfg?.hiddenSections || []);
+      const locks = cfg?.sectionLocks || {};
       const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length
         ? cfg.sectionOrder
-        : ['content', 'file', 'video', 'practice']).filter((k) => !hidden.has(k));
+        : (['content', 'file', 'video', 'practice'] as DpSectionKey[]))
+        .filter((k) => !hidden.has(k as DpSectionKey) && locks[k as DpSectionKey] !== 'locked');
       return order.length > 0 && order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
     }
     return levels[i]?.state === 'completed';
@@ -1268,7 +1441,9 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }: {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.hubLevelTitle}>{`Nấc ${index + 1} · ${STEP_LABELS[step.key] || step.label}`}</Text>
                     <Text style={styles.hubLevelXp}>
-                      {done ? 'Đã xong · Ôn lại (0 XP)' : `Cần đúng ${step.passPercent}% · 5 XP/câu (tối đa 50 XP)`}
+                      {done
+                        ? `Đã xong · Ôn lại (0 XP) · cần đúng ${step.passPercent}%`
+                        : `Cần đúng ${step.passPercent}% · ${QUESTION_STAKE_XP} XP/câu`}
                     </Text>
                   </View>
                   {!locked ? (
@@ -1462,7 +1637,12 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [grading, setGrading] = useState(false);
 
+  const initialWatched = Boolean(
+    step.state === 'completed'
+    || (stepVideo?.id && (unit.watchedVideoIds || []).includes(stepVideo.id)),
+  );
   const [done, setDone] = useState(step.state === 'completed');
+  const [watchedEnough, setWatchedEnough] = useState(initialWatched);
   const [finishing, setFinishing] = useState(false);
   const [errMsg, setErrMsg] = useState('');
 
@@ -1471,18 +1651,51 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   const embedded = embeddedVideoUrl(rawUrl);
   const playable = Boolean(embedded || isDirectVideoUrl(rawUrl) || rawUrl.startsWith('/uploads/'));
 
-  useEffect(() => {
-    if (!unit.id) return undefined;
+  const syncStepVideoProgress = useCallback(() => {
+    if (!unit.id) return () => {};
     let alive = true;
     dailyPracticeApi.unitVideos(unit.id)
       .then((res: any) => {
-        if (alive && Array.isArray(res?.passedCheckIds)) {
+        if (!alive) return;
+        if (Array.isArray(res?.passedCheckIds)) {
           setPassedKeys(new Set(res.passedCheckIds));
+        }
+        if (stepVideo?.id && Array.isArray(res?.videos)) {
+          const matched = res.videos.find((v: any) => v.id === stepVideo.id);
+          if (matched) {
+            const watchedOnServer = matched.state === 'completed';
+            setWatchedEnough(watchedOnServer);
+            setDone(watchedOnServer);
+          }
         }
       })
       .catch(() => { });
     return () => { alive = false; };
-  }, [unit.id]);
+  }, [unit.id, stepVideo?.id]);
+
+  useEffect(() => {
+    const cancel = syncStepVideoProgress();
+    const appSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') syncStepVideoProgress();
+    });
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const onForeground = () => {
+        if (document.visibilityState !== 'hidden') syncStepVideoProgress();
+      };
+      window.addEventListener('focus', onForeground);
+      document.addEventListener('visibilitychange', onForeground);
+      return () => {
+        cancel();
+        appSub.remove();
+        window.removeEventListener('focus', onForeground);
+        document.removeEventListener('visibilitychange', onForeground);
+      };
+    }
+    return () => {
+      cancel();
+      appSub.remove();
+    };
+  }, [syncStepVideoProgress]);
 
   const onTick = (time: number) => {
     if (!stepVideo || !checks.length) return;
@@ -1536,17 +1749,18 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
         { text: answerText, checkId, imageDataUrl: imageDataUrl || '' },
       );
       if (res.correct) {
+        setPassedKeys((prev) => {
+          const next = new Set(prev);
+          next.add(`${stepVideo.id}:${checkId}`);
+          next.add(checkId);
+          return next;
+        });
         setMissed(false);
         play('correct');
         setCheer(true);
         setTimeout(() => {
-          setPassedKeys((prev) => {
-            const next = new Set(prev);
-            next.add(`${stepVideo.id}:${checkId}`);
-            next.add(checkId);
-            return next;
-          });
           closeGate();
+          onCompleted();
         }, 1200);
       } else if (res.needsReview) {
         setMissed(false);
@@ -1625,26 +1839,38 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
     }
   };
 
-  const finishLesson = async () => {
-    setFinishing(true);
-    try {
-      if (stepVideo?.id) {
-        await dailyPracticeApi.videoWatched(unit.id, stepVideo.id);
-      }
-      setDone(true);
-      play('tap');
-      onCompleted();
-    } catch {
-      // ignore
-    } finally {
-      setFinishing(false);
-    }
-  };
-
   const pendingChecksCount = checks.filter((c: any) => {
     const id = String(c._id || c.id || '');
     return !passedKeys.has(`${stepVideo?.id}:${id}`) && !passedKeys.has(id);
   }).length;
+
+  const canFinish = !finishing && !done && pendingChecksCount === 0 && (!stepVideo?.url || !playable || watchedEnough);
+
+  const finishLesson = async () => {
+    if (pendingChecksCount > 0) {
+      setErrMsg('Hãy hoàn thành hết câu hỏi kiểm tra trong video trước.');
+      return;
+    }
+    if (stepVideo?.url && playable && !watchedEnough && !done) {
+      setErrMsg('Hãy xem đủ 70% thời lượng video trước khi đánh dấu đã học.');
+      return;
+    }
+    setFinishing(true);
+    setErrMsg('');
+    try {
+      if (stepVideo?.id) {
+        await dailyPracticeApi.videoWatched(unit.id, stepVideo.id);
+      }
+      setWatchedEnough(true);
+      setDone(true);
+      play('tap');
+      onCompleted();
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : 'Chưa lưu được tiến độ bài học.');
+    } finally {
+      setFinishing(false);
+    }
+  };
 
   const gateChoices: string[] = gate
     ? (Array.isArray(gate.choices) ? gate.choices : Array.isArray(gate.options) ? gate.options : [])
@@ -1713,16 +1939,22 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                   embeddedUrl={embedded}
                   title={stepVideo.title || step.title || step.label}
                   lessonId={`dp-lesson-${stepVideo.id}`}
-                  antiSeekEnabled={false}
-                  done={done}
+                  antiSeekEnabled={!done && !watchedEnough && (stepVideo as { antiSeek?: boolean })?.antiSeek !== false}
+                  done={done || watchedEnough}
                   brandedChrome
                   playerApiRef={playerApiRef}
-                  onProgress={(progress) => onTick(progress.currentTime)}
+                  onProgress={(progress: VideoPlayerProgress) => onTick(progress.currentTime)}
                   onWatched={async () => {
+                    setWatchedEnough(true);
                     if (stepVideo?.id) {
-                      await dailyPracticeApi.videoWatched(unit.id, stepVideo.id);
-                      setDone(true);
-                      onCompleted();
+                      try {
+                        await dailyPracticeApi.videoWatched(unit.id, stepVideo.id);
+                        setDone(true);
+                        onCompleted();
+                      } catch (err) {
+                        setErrMsg(err instanceof Error ? err.message : 'Chưa lưu được tiến độ xem video.');
+                        return false;
+                      }
                     }
                     return true;
                   }}
@@ -1756,8 +1988,8 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                               <Mascot mood="sad" size={32} />
                               <Text style={[styles.videoGateMissedText, { flex: 1 }]}>
                                 {gate.kind === 'screen'
-                                  ? 'AI chưa chấp nhận (mất 2 XP). Hãy tải đáp án mới.'
-                                  : `Chưa đúng (mất 2 XP). Hãy ${gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'} nhé!`}
+                                  ? 'AI chưa chấp nhận (−5 XP). Hãy tải đáp án mới.'
+                                  : `Chưa đúng (−5 XP). Hãy ${gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'} nhé!`}
                               </Text>
                             </View>
                           ) : null}
@@ -1873,7 +2105,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                           </View>
 
                           <Text style={styles.videoGateFootNote}>
-                            {`Đúng lần đầu +5 XP và xem tiếp. Sai mất 2 XP rồi ${gate.kind === 'screen' ? 'tải đáp án mới' : gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'}.`}
+                            {`Đúng lần đầu +5 XP và xem tiếp. Sai mất 5 XP rồi ${gate.kind === 'screen' ? 'tải đáp án mới' : gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'}.`}
                           </Text>
                         </>
                       )}
@@ -1909,7 +2141,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                 text={done ? 'Đã học xong' : 'Đánh dấu đã học'}
                 icon={finishing ? undefined : <CheckCircle2 size={16} color={done ? '#059669' : '#FFFFFF'} />}
                 loading={finishing}
-                disabled={finishing}
+                disabled={!canFinish}
                 onPress={() => { void finishLesson(); }}
               />
             </View>
@@ -2011,12 +2243,18 @@ function CourseTrophyCeremonyModal({ current, play, onClose }: {
   play: (s: GameSound) => void;
   onClose: () => void;
 }) {
+  const [burstKey, setBurstKey] = useState(0);
+  const completedUnits = current.completedUnits || 0;
+  const totalUnits = current.totalUnits || 0;
+  const isCompleted = totalUnits > 0 && completedUnits >= totalUnits;
+  const coursePct = isCompleted ? 100 : (totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0);
+
   useEffect(() => { play('win'); }, [play]);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.quitBackdrop}>
         <View style={[styles.quitCard, styles.finaleModalCard]}>
-          <Confetti count={34} spread={210} />
+          <Confetti key={burstKey} count={34} spread={210} />
           <View style={styles.finaleBadge}>
             <Award size={14} color="#FEF3C7" />
             <Text style={styles.finaleBadgeText}>CHỨNG NHẬN CHINH PHỤC LỘ TRÌNH</Text>
@@ -2036,34 +2274,50 @@ function CourseTrophyCeremonyModal({ current, play, onClose }: {
             </View>
             <Mascot mood="celebrate" size={82} />
           </View>
-          <Text style={styles.finaleDoneTitle}>CHÚC MỪNG HOÀN THÀNH KHÓA HỌC!</Text>
+          <Text style={styles.finaleDoneTitle}>
+            {isCompleted ? 'CHÚC MỪNG HOÀN THÀNH KHÓA HỌC!' : 'CÚP VÀNG VINH DANH CUỐI KHÓA'}
+          </Text>
           <Text style={styles.finaleModalTopic}>{current.topic.name}</Text>
           <Text style={styles.finaleDoneSub}>
-            {`Bạn đã kiên trì vượt qua toàn bộ ${current.totalUnits}/${current.totalUnits} chặng học và thử thách. Chiếc Cúp Vàng này là minh chứng cho nỗ lực tuyệt vời của bạn!`}
+            {isCompleted
+              ? `Bạn đã kiên trì vượt qua toàn bộ ${totalUnits}/${totalUnits} chặng học và thử thách. Chiếc Cúp Vàng này là minh chứng cho nỗ lực tuyệt vời của bạn!`
+              : `Hoàn thành đủ ${totalUnits} chặng để thắp sáng Cúp Vàng Vinh Danh (${completedUnits}/${totalUnits} chặng)!`}
           </Text>
           <View style={styles.finaleStatsRow}>
             <View style={styles.finaleStatBox}>
-              <Text style={styles.finaleStatVal}>100%</Text>
-              <Text style={styles.finaleStatLbl}>Hoàn thành</Text>
+              <Text style={styles.finaleStatVal}>{`${coursePct}%`}</Text>
+              <Text style={styles.finaleStatLbl}>Khóa học</Text>
             </View>
             <View style={styles.finaleStatBox}>
-              <Text style={styles.finaleStatVal}>{`${current.totalUnits}/${current.totalUnits}`}</Text>
-              <Text style={styles.finaleStatLbl}>Chặng đã vượt</Text>
+              <Text style={styles.finaleStatVal}>{`${completedUnits}/${totalUnits}`}</Text>
+              <Text style={styles.finaleStatLbl}>Chặng đạt</Text>
             </View>
             <View style={styles.finaleStatBox}>
               <Text style={styles.finaleStatVal}>Cúp Vàng</Text>
               <Text style={styles.finaleStatLbl}>Danh hiệu</Text>
             </View>
           </View>
-          <View style={{ width: '100%', marginTop: 8 }}>
-            <DuoButton
-              variant="gold"
-              size="lg"
-              fullWidth
-              text="Tuyệt vời! Tiếp tục chinh phục"
-              icon={<Trophy size={18} color="#FFFFFF" />}
-              onPress={onClose}
-            />
+          <View style={{ width: '100%', marginTop: 8, flexDirection: 'row', gap: 10 }}>
+            <View style={styles.flex}>
+              <DuoButton
+                variant="secondary"
+                size="md"
+                fullWidth
+                text="Bắn pháo hoa"
+                icon={<Sparkles size={15} color="#D97706" />}
+                onPress={() => { play('win'); setBurstKey((k) => k + 1); }}
+              />
+            </View>
+            <View style={styles.flex}>
+              <DuoButton
+                variant="gold"
+                size="md"
+                fullWidth
+                text="Tuyệt vời!"
+                icon={<Trophy size={16} color="#FFFFFF" />}
+                onPress={onClose}
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -2091,7 +2345,7 @@ function UnitStageRoadmapModal({
 }: {
   unit: DpPathUnit;
   tone: { from: string; to: string };
-  play: (key: string) => void;
+  play: (s: GameSound) => void;
   onClose: () => void;
   onPickNode: (nodeKey: string) => void;
   onOpenVideo?: () => void;
@@ -2207,7 +2461,9 @@ function UnitStageHeader({
   progress,
   onOpenRoadmap,
   onToggleTestOut,
+  onStartUnit,
   onStageAction,
+  onUpgrade,
   isStarted = false,
 }: {
   unit: DpPathUnit;
@@ -2219,7 +2475,9 @@ function UnitStageHeader({
   progress: number;
   onOpenRoadmap: () => void;
   onToggleTestOut: () => void;
+  onStartUnit?: () => void;
   onStageAction?: () => void;
+  onUpgrade?: () => void;
   isStarted?: boolean;
 }) {
   const hasRoadmap = (unit.pathNodes || []).length > 0;
@@ -2227,65 +2485,101 @@ function UnitStageHeader({
   const activeAndStarted = !locked && (doneSteps > 0 || Boolean(isStarted));
   const isColored = done || activeAndStarted;
   const statusLabel = done
-    ? (unit.testedOut ? 'Đã vượt' : 'Hoàn thành')
+    ? 'Đã vượt'
     : activeAndStarted
       ? 'Đang học'
-      : locked
-        ? 'Chưa mở'
-        : 'Chưa bắt đầu';
+      : locked && unit.requiresSubscription
+        ? 'Cần đăng ký gói'
+        : locked
+          ? 'Chưa mở'
+          : 'Chưa bắt đầu';
 
   const ctaLabel = unitStageCtaLabel(unit, { isNextUnit });
+  const bannerBody = (
+    <View
+      style={[
+        styles.unitHeaderBanner,
+        !isColored
+          ? gradient('#94A3B8', '#64748B')
+          : gradient(tone.from, tone.to),
+        {
+          boxShadow: `0px 4px 0px ${!isColored ? '#475569' : darken(tone.to, 0.22)}`,
+        } as never,
+      ]}
+    >
+      <View style={styles.unitHeaderLeft}>
+        {!locked && !isColored && onStartUnit ? (
+          <Pressable onPress={onStartUnit} accessibilityRole="button" accessibilityLabel={`Mở ${unit.title}`}>
+            <Text style={styles.unitHeaderEyebrow}>{`Chặng ${unit.index} · ${statusLabel}`}</Text>
+            <Text numberOfLines={2} style={styles.unitHeaderTitle}>{unit.title}</Text>
+            {unit.description ? <Text numberOfLines={2} style={styles.unitHeaderDesc}>{unit.description}</Text> : null}
+            <View style={styles.unitHeaderProgressWrap}>
+              <View style={styles.unitHeaderProgressTrack}>
+                <View style={[styles.unitHeaderProgressFill, { width: `${Math.round(progress * 100)}%` }]} />
+              </View>
+              <Text style={styles.unitHeaderProgressCount}>{`${doneSteps}/${totalSteps}`}</Text>
+            </View>
+          </Pressable>
+        ) : (
+          <>
+            <Text style={styles.unitHeaderEyebrow}>{`Chặng ${unit.index} · ${statusLabel}`}</Text>
+            <Text numberOfLines={2} style={styles.unitHeaderTitle}>{unit.title}</Text>
+            {unit.description ? <Text numberOfLines={2} style={styles.unitHeaderDesc}>{unit.description}</Text> : null}
+            <View style={styles.unitHeaderProgressWrap}>
+              <View style={styles.unitHeaderProgressTrack}>
+                <View style={[styles.unitHeaderProgressFill, { width: `${Math.round(progress * 100)}%` }]} />
+              </View>
+              <Text style={styles.unitHeaderProgressCount}>{`${doneSteps}/${totalSteps}`}</Text>
+            </View>
+          </>
+        )}
+      </View>
+      <View style={styles.unitHeaderRight}>
+        {ctaLabel && onStageAction ? (
+          <Pressable
+            onPress={() => {
+              onStageAction();
+            }}
+            style={styles.unitHeaderCtaBtn}
+            accessibilityRole="button"
+            accessibilityLabel={ctaLabel}
+          >
+            <Play size={14} color="#047857" fill="#047857" />
+            <Text style={styles.unitHeaderCtaText}>{ctaLabel}</Text>
+          </Pressable>
+        ) : null}
+        {hasRoadmap ? (
+          <Pressable
+            onPress={() => {
+              onOpenRoadmap();
+            }}
+            style={[styles.unitHeaderGuideBtn, styles.unitHeaderGuideBtnLit]}
+            accessibilityRole="button"
+            accessibilityLabel="Lộ trình mốc trong chặng"
+          >
+            <BookOpen size={20} color="#047857" strokeWidth={2.4} />
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.unitHeaderOuter}>
       {/* Banner chặng đồng bộ Web */}
-      <View
-        style={[
-          styles.unitHeaderBanner,
-          !isColored
-            ? gradient('#94A3B8', '#64748B')
-            : gradient(tone.from, tone.to),
-          {
-            boxShadow: `0px 4px 0px ${!isColored ? '#475569' : darken(tone.to, 0.22)}`,
-          } as never,
-        ]}
-      >
-        <View style={styles.unitHeaderLeft}>
-          <Text style={styles.unitHeaderEyebrow}>{`Chặng ${unit.index} · ${statusLabel}`}</Text>
-          <Text numberOfLines={2} style={styles.unitHeaderTitle}>{unit.title}</Text>
-          {unit.description ? <Text numberOfLines={2} style={styles.unitHeaderDesc}>{unit.description}</Text> : null}
-          <View style={styles.unitHeaderProgressWrap}>
-            <View style={styles.unitHeaderProgressTrack}>
-              <View style={[styles.unitHeaderProgressFill, { width: `${Math.round(progress * 100)}%` }]} />
-            </View>
-            <Text style={styles.unitHeaderProgressCount}>{`${doneSteps}/${totalSteps}`}</Text>
-          </View>
+      {bannerBody}
+      {locked && unit.requiresSubscription && onUpgrade ? (
+        <View style={{ alignItems: 'center', marginTop: 8 }}>
+          <Pressable
+            onPress={onUpgrade}
+            style={[styles.unitStageTestOut, { backgroundColor: '#F59E0B' }]}
+            accessibilityRole="button"
+          >
+            <Crown size={13} color="#FFFFFF" />
+            <Text style={styles.unitStageTestOutText}>{`Đăng ký gói để mở Chặng ${unit.index}`}</Text>
+          </Pressable>
         </View>
-        <View style={styles.unitHeaderRight}>
-          {ctaLabel && onStageAction ? (
-            <Pressable
-              onPress={onStageAction}
-              style={styles.unitHeaderCtaBtn}
-              accessibilityRole="button"
-              accessibilityLabel={ctaLabel}
-            >
-              <Play size={14} color="#047857" fill="#047857" />
-              <Text style={styles.unitHeaderCtaText}>{ctaLabel}</Text>
-            </Pressable>
-          ) : null}
-          {hasRoadmap ? (
-            <Pressable
-              onPress={onOpenRoadmap}
-              style={[styles.unitHeaderGuideBtn, styles.unitHeaderGuideBtnLit]}
-              accessibilityRole="button"
-              accessibilityLabel="Lộ trình mốc trong chặng"
-            >
-              <BookOpen size={20} color="#047857" strokeWidth={2.4} />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-      {locked && unit.canTestOut ? (
+      ) : locked && unit.canTestOut ? (
         <View style={{ alignItems: 'center', marginTop: 8 }}>
           <Pressable onPress={onToggleTestOut} style={styles.unitStageTestOut} accessibilityRole="button">
             <FastForward size={13} color="#FFFFFF" />
@@ -2297,15 +2591,17 @@ function UnitStageHeader({
   );
 }
 
-/** Bảng bắt đầu bật ngay dưới nút (giống Duolingo). */
-function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }: {
+/** Bảng bắt đầu bật ngay dưới nút (giống Duolingo / Web StepPopover). */
+function StepPopover({ unit, step, testOut, canTestOut = true, color, starting, onClose, onStart, onUpgrade }: {
   unit: DpPathUnit;
   step: DpPathStep;
   testOut: boolean;
+  canTestOut?: boolean;
   color: { from: string; to: string };
   starting: boolean;
   onClose: () => void;
   onStart: () => void;
+  onUpgrade?: () => void;
 }) {
   const order = unit.steps.findIndex((item) => item.key === step.key) + 1;
   const pop = useRef(new Animated.Value(0)).current;
@@ -2324,18 +2620,39 @@ function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }:
             <Text style={styles.popoverMeta}>
               {testOut ? `Chặng ${unit.index} · Đạt ${step.passPercent}% để vượt chặng` : `Bước ${order}/${unit.steps.length} · Cần đúng ${step.passPercent}%`}
             </Text>
-            <Text style={styles.popoverHint}>{testOut ? 'Hoàn thành chặng này và mọi chặng trước đó nếu đạt yêu cầu.' : STEP_HINTS[step.key]}</Text>
-            <Pressable
-              onPress={onStart}
-              disabled={starting}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.popoverButton, { transform: [{ translateY: pressed ? 3 : 0 }], boxShadow: `0px ${pressed ? 1 : 4}px 0px rgba(15,23,42,0.18)` } as never]}
-            >
-              {starting ? <ActivityIndicator color={color.to} /> : <Play size={16} color={color.to} />}
-              <Text style={[styles.popoverButtonText, { color: color.to }]}>
-                {`${step.state === 'completed' && !testOut ? 'LUYỆN LẠI' : 'BẮT ĐẦU'} +${maxXpFor(step)} XP`}
-              </Text>
-            </Pressable>
+            <Text style={styles.popoverHint}>
+              {testOut
+                ? (!canTestOut
+                  ? 'Đặc quyền chỉ dành cho học viên mua khóa / gói Google Meet (+300 XP/ngày). Học viên miễn phí không thể thi vượt chặng.'
+                  : `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`)
+                : step.state === 'completed'
+                  ? 'Ôn lại miễn phí: làm sai không trừ XP, thoát giữa chừng không mất XP.'
+                  : `${QUESTION_STAKE_XP} XP/câu · Đạt % yêu cầu nhận +${QUESTION_STAKE_XP} XP/câu đúng (ôn lại không mất XP).`}
+            </Text>
+            {testOut && !canTestOut ? (
+              <Pressable
+                onPress={onUpgrade}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.popoverButton, { backgroundColor: '#FBBF24', transform: [{ translateY: pressed ? 3 : 0 }] }]}
+              >
+                <Crown size={16} color="#451A03" />
+                <Text style={[styles.popoverButtonText, { color: '#451A03' }]}>Nâng cấp gói để vượt</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={onStart}
+                disabled={starting}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.popoverButton, { transform: [{ translateY: pressed ? 3 : 0 }], boxShadow: `0px ${pressed ? 1 : 4}px 0px rgba(15,23,42,0.18)` } as never]}
+              >
+                {starting ? <ActivityIndicator color={color.to} /> : <Play size={16} color={color.to} />}
+                <Text style={[styles.popoverButtonText, { color: color.to }]}>
+                  {step.state === 'completed' && !testOut
+                    ? 'Ôn lại · Miễn phí XP'
+                    : `Bắt đầu · ${testOut ? `${TEST_OUT_XP} XP` : `${QUESTION_STAKE_XP}/câu`}`}
+                </Text>
+              </Pressable>
+            )}
           </Animated.View>
         </Pressable>
       </Pressable>
@@ -2343,11 +2660,35 @@ function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }:
   );
 }
 
+/** Bài đang mở của chặng: bài học thì vào bài, câu hỏi thì vào đúng nấc — đồng bộ Web PathView. */
+function continuePracticeTarget(topic: DpTopicPath | null | undefined) {
+  const next = topic?.next;
+  if (!next?.unitId) return null;
+  const unit = (topic?.units || []).find((item) => item.id === next.unitId);
+  if (!unit || unit.state === 'locked') return null;
+  const node = (unit.pathNodes || []).find((item) => item.key === next.nodeKey);
+  const level = (node?.levels || []).find((item) => item.key === next.step)
+    || (node?.levels || []).find((item) => item.state === 'active')
+    || null;
+  if (level?.state === 'locked') return null;
+  return {
+    topicId: topic?.topic?.id || '',
+    unit,
+    level,
+    kind: level?.kind || next.kind || 'quiz',
+    nodeKey: node?.key || next.nodeKey || 'study',
+    step: level?.key || next.step || 'learn',
+  };
+}
+
+const STARTED_UNITS_STORAGE_KEY = 'cms_started_path_units';
+
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 function PathView({
   topics,
   loading,
   error,
+  canTestOut = true,
   starting,
   play,
   initialTopicId = '',
@@ -2355,32 +2696,89 @@ function PathView({
   onTopicChange,
   onStartStep,
   onPathChanged,
+  onOpenUpgrade,
   continueVideo = false,
   onContinueVideoOpened,
+  pendingResume = null,
+  onResumeConsumed,
+  requestedLesson = null,
+  onRequestedLessonOpened,
+  focusLessonSeq = 0,
+  xpTotal = null,
+  onBuyXp,
 }: {
   topics: DpTopicPath[];
   activeTopicId?: string;
   loading: boolean;
   error: string;
+  canTestOut?: boolean;
   starting: boolean;
   play: (s: GameSound) => void;
   initialTopicId?: string;
   onTopicChange?: (topicId: string) => void;
   onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean, opts?: { review?: boolean }) => void;
   onPathChanged: () => void;
+  onOpenUpgrade?: () => void;
   continueVideo?: boolean;
   onContinueVideoOpened?: () => void;
+  pendingResume?: PendingPathResume | null;
+  onResumeConsumed?: () => void;
+  requestedLesson?: { unit: DpPathUnit; level?: DpPathStep | null; nodeKey: string } | null;
+  onRequestedLessonOpened?: () => void;
+  focusLessonSeq?: number;
+  xpTotal?: number | null;
+  onBuyXp?: () => void;
 }) {
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { user } = useAuth();
   const [topicId, setTopicId] = useState('');
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  const [videoOpen, setVideoOpen] = useState<{ unit: DpPathUnit; videoId: string; singleVideoOnly?: boolean } | null>(null);
+  const [videoOpen, setVideoOpen] = useState<{
+    unit: DpPathUnit;
+    videoId: string;
+    nodeKey?: string;
+    singleVideoOnly?: boolean;
+    initialAtSec?: number;
+  } | null>(null);
   const [roadmapOpen, setRoadmapOpen] = useState<DpPathUnit | null>(null);
   const [lessonOpen, setLessonOpen] = useState<{ unit: DpPathUnit; step: DpPathStep } | null>(null);
-  const [milestoneOpen, setMilestoneOpen] = useState<{ unitId: string; nodeKey: string } | null>(null);
+  const [milestoneOpen, setMilestoneOpen] = useState<{
+    unitId: string;
+    nodeKey: string;
+    initialDifficulty?: DpDifficulty | null;
+    initialSection?: DpSectionKey | null;
+  } | null>(null);
   const [trophyCeremonyOpen, setTrophyCeremonyOpen] = useState(false);
+  const [startedUnitIds, setStartedUnitIds] = useState<string[]>([]);
   const targetAppliedRef = useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STARTED_UNITS_STORAGE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setStartedUnitIds(parsed.filter((v) => typeof v === 'string'));
+      })
+      .catch(() => { });
+  }, []);
+
+  const markUnitStarted = useCallback((unitId: string) => {
+    if (!unitId) return;
+    setStartedUnitIds((prev) => {
+      if (prev.includes(unitId)) return prev;
+      const next = [...prev, unitId];
+      AsyncStorage.setItem(STARTED_UNITS_STORAGE_KEY, JSON.stringify(next)).catch(() => { });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!requestedLesson?.unit || !requestedLesson?.level) return;
+    const nodeKey = requestedLesson.nodeKey || 'study';
+    markUnitStarted(requestedLesson.unit.id);
+    setPopover(null);
+    setMilestoneOpen({ unitId: requestedLesson.unit.id, nodeKey });
+    onRequestedLessonOpened?.();
+  }, [requestedLesson, markUnitStarted, onRequestedLessonOpened]);
 
   useEffect(() => {
     if (!continueVideo) {
@@ -2405,6 +2803,110 @@ function PathView({
     onContinueVideoOpened?.();
     setVideoOpen({ unit: target.unit, videoId: target.videoId });
   }, [continueVideo, topics, topicId, videoOpen, lessonOpen, onContinueVideoOpened]);
+
+  useEffect(() => {
+    if (!pendingResume || !topics.length) return;
+    const byTopic = pendingResume.topicId
+      ? topics.find((item) => item.topic.id === pendingResume.topicId)
+      : null;
+    const byUnit = pendingResume.unitId
+      ? topics.find((item) => item.units?.some((u) => u.id === pendingResume.unitId))
+      : null;
+    const targetTopic = byTopic
+      || byUnit
+      || pickActivePathTopic({ topics, activeTopicId }, initialTopicId, activeTopicId)
+      || topics[0];
+    if (!targetTopic) {
+      onResumeConsumed?.();
+      return;
+    }
+    if (topicId !== targetTopic.topic.id) {
+      setTopicId(targetTopic.topic.id);
+      return;
+    }
+    onResumeConsumed?.();
+    setLessonOpen(null);
+    setVideoOpen(null);
+    setRoadmapOpen(null);
+    setMilestoneOpen(null);
+    setPopover(null);
+
+    const targetUnit = (pendingResume.unitId
+      && targetTopic.units.find((u) => u.id === pendingResume.unitId && u.state !== 'locked'))
+      || (targetTopic.next?.unitId
+        && targetTopic.units.find((u) => u.id === targetTopic.next?.unitId && u.state !== 'locked'))
+      || targetTopic.units.find((u) => u.state === 'active')
+      || targetTopic.units.find((u) => u.state !== 'locked');
+    if (!targetUnit) return;
+
+    const wantsVideo = Boolean(
+      pendingResume.watchStage
+      || pendingResume.sectionId === 'video'
+      || pendingResume.videoId,
+    );
+    if (wantsVideo) {
+      const unitVideos = collectUnitVideos(targetUnit);
+      const exactVideo = pendingResume.videoId
+        ? unitVideos.find((v) => v.id === pendingResume.videoId && v.state !== 'locked')
+        : null;
+      const stageFallback = continueStageTarget(targetTopic);
+      const resolvedUnit = exactVideo ? targetUnit : (stageFallback?.unit || targetUnit);
+      const resolvedVideoId = exactVideo?.id
+        || stageFallback?.videoId
+        || unitVideos.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id
+        || unitVideos.find((v) => v.state !== 'locked')?.id
+        || '';
+      if (resolvedVideoId || resolvedUnit.lesson) {
+        markUnitStarted(resolvedUnit.id);
+        setPopover(null);
+        setMilestoneOpen(null);
+        setVideoOpen({
+          unit: resolvedUnit,
+          videoId: resolvedVideoId,
+          nodeKey: pendingResume.nodeKey || '',
+          initialAtSec: pendingResume.atSec || 0,
+        });
+        return;
+      }
+    }
+
+    const desiredNodeKey = pendingResume.nodeKey
+      || (targetTopic.next?.unitId === targetUnit.id ? targetTopic.next?.nodeKey : '')
+      || targetUnit.pathNodes?.find((n) => n.state === 'active')?.key
+      || targetUnit.pathNodes?.[0]?.key
+      || 'study';
+    const targetNode = targetUnit.pathNodes?.find((n) => n.key === desiredNodeKey);
+    if (targetNode && (targetNode.kind === 'study' || targetNode.icon === 'book')) {
+      const [rawDiff, rawSec] = String(pendingResume.sectionId || '').split(':');
+      const initialDifficulty: DpDifficulty | null = (rawDiff === 'easy' || rawDiff === 'medium' || rawDiff === 'hard')
+        ? rawDiff
+        : null;
+      const initialSection: DpSectionKey | null = (rawSec === 'content' || rawSec === 'file' || rawSec === 'video' || rawSec === 'practice')
+        ? rawSec
+        : null;
+      markUnitStarted(targetUnit.id);
+      setPopover(null);
+      setMilestoneOpen({
+        unitId: targetUnit.id,
+        nodeKey: targetNode.key,
+        initialDifficulty,
+        initialSection,
+      });
+      return;
+    }
+
+    if (targetNode) {
+      markUnitStarted(targetUnit.id);
+      if (targetTopic.next?.unitId === targetUnit.id && targetTopic.next?.nodeKey === targetNode.key) {
+        onStartStep(targetUnit.id, targetNode.key, targetTopic.next.step || 'learn', false);
+        return;
+      }
+      setPopover({ unitId: targetUnit.id, nodeKey: targetNode.key, testOut: false });
+      return;
+    }
+
+    openUnitStageAction(targetUnit, targetTopic.next?.unitId === targetUnit.id);
+  }, [pendingResume, topics, topicId, activeTopicId, initialTopicId, markUnitStarted, onResumeConsumed, onStartStep]);
 
   useEffect(() => {
     if (topicId && topics.some((item) => item.topic.id === topicId)) return;
@@ -2450,8 +2952,29 @@ function PathView({
     () => (newlyUnlockedUnitId ? current?.units?.find((u) => u.id === newlyUnlockedUnitId) || null : null),
     [current, newlyUnlockedUnitId],
   );
-  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
-  const color = DP_TOPIC_COLORS[current?.topic.color || 'red'] || DP_TOPIC_COLORS.red;
+  const topicsRef = useRef(topics);
+  const currentRef = useRef(current);
+  topicsRef.current = topics;
+  currentRef.current = current;
+
+  useEffect(() => {
+    if (!focusLessonSeq) return;
+    const list = topicsRef.current || [];
+    const topic = (currentRef.current?.next ? currentRef.current : list.find((item) => item.next)) || currentRef.current;
+    const next = topic?.next;
+    if (!topic || !next) return;
+    if (next.unitId) markUnitStarted(next.unitId);
+    if (topic.topic.id !== currentRef.current?.topic?.id) setTopicId(topic.topic.id);
+    const targetKey = next.nodeKey || 'study';
+    const targetUnit = (topic.units || []).find((u) => u.id === next.unitId);
+    const targetNode = (targetUnit?.pathNodes || []).find((n) => n.key === targetKey);
+    if (targetNode && (targetNode.kind === 'study' || targetNode.icon === 'book')) {
+      setPopover(null);
+      setMilestoneOpen({ unitId: next.unitId, nodeKey: targetKey });
+    } else {
+      setPopover({ unitId: next.unitId, nodeKey: targetKey, testOut: false });
+    }
+  }, [focusLessonSeq, markUnitStarted]);
 
   if (loading && !topics.length) return <ActivityIndicator color={theme.brand} />;
   if (!topics.length) {
@@ -2469,10 +2992,12 @@ function PathView({
 
   const toggleTestOut = (unit: DpPathUnit) => {
     play('tap');
+    if (unit?.id) markUnitStarted(unit.id);
     setPopover((prev) => (prev && prev.unitId === unit.id && prev.testOut ? null : { unitId: unit.id, testOut: true, stepKey: 'challenge' }));
   };
   const toggleHub = (unit: DpPathUnit, nodeKey: string) => {
     play('tap');
+    if (unit?.id) markUnitStarted(unit.id);
     const node = unit.pathNodes?.find((n) => n.key === nodeKey);
     if (node && (node.kind === 'study' || node.icon === 'book')) {
       setPopover(null);
@@ -2483,6 +3008,7 @@ function PathView({
   };
   const openUnitStageAction = (unit: DpPathUnit, isNextUnit: boolean) => {
     play('tap');
+    markUnitStarted(unit.id);
     let nodeKey = 'study';
     if (unit.state === 'completed') {
       nodeKey = unit.pathNodes?.[0]?.key || 'study';
@@ -2501,11 +3027,12 @@ function PathView({
     setPopover({ unitId: unit.id, nodeKey, testOut: false });
   };
 
-  const activePopoverUnit = popover && !popover.testOut && current
-    ? current.units.find((u) => u.id === popover.unitId) || null
+  const activeHubPopover = popover && !popover.testOut ? popover : null;
+  const activePopoverUnit = activeHubPopover && current
+    ? current.units.find((u) => u.id === activeHubPopover.unitId) || null
     : null;
-  const activePopoverNode = activePopoverUnit
-    ? activePopoverUnit.pathNodes?.find((n) => n.key === popover.nodeKey) || null
+  const activePopoverNode = activePopoverUnit && activeHubPopover
+    ? activePopoverUnit.pathNodes?.find((n) => n.key === activeHubPopover.nodeKey) || null
     : null;
 
   return (
@@ -2554,24 +3081,44 @@ function PathView({
                     doneSteps={doneSteps}
                     totalSteps={totalSteps}
                     progress={progress}
-                    onOpenRoadmap={() => { play('tap'); setPopover(null); setRoadmapOpen(unit); }}
+                    isStarted={startedUnitIds.includes(unit.id)}
+                    onStartUnit={() => openUnitStageAction(unit, isNextUnit)}
+                    onOpenRoadmap={() => {
+                      play('tap');
+                      setPopover(null);
+                      if (unit.requiresSubscription) {
+                        onOpenUpgrade?.();
+                        return;
+                      }
+                      setRoadmapOpen(unit);
+                    }}
                     onToggleTestOut={() => toggleTestOut(unit)}
                     onStageAction={() => openUnitStageAction(unit, isNextUnit)}
+                    onUpgrade={() => {
+                      play('tap');
+                      setPopover(null);
+                      onOpenUpgrade?.();
+                    }}
                   />
                   {testOutOpen && testOutStep ? (
                     <StepPopover
                       unit={unit}
                       step={testOutStep}
                       testOut
+                      canTestOut={canTestOut}
                       color={{ from: '#64748B', to: '#334155' }}
                       starting={starting}
                       onClose={() => setPopover(null)}
+                      onUpgrade={() => {
+                        setPopover(null);
+                        onOpenUpgrade?.();
+                      }}
                       onStart={() => onStartStep(unit.id, 'study', 'challenge', true)}
                     />
                   ) : null}
                   <View style={styles.nodeSnakeWrap}>
                     <VietnamJourneyStage
-                      pathItems={pathItems}
+                      pathItems={pathItems as never}
                       laneWidthPx={NODE_LANE_WIDTH}
                       nextIdx={nextIdx}
                       locked={locked}
@@ -2583,18 +3130,19 @@ function PathView({
                         unitState: unit.state,
                       }}
                       renderNode={(item, { hubNext, index }) => {
-                        const hubSelected = item.kind === 'hub' && popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === item.node.key;
-                        const nodeTone = pathNodeColor(item.node, index, { mapDuo: true });
+                        const rawItem = item as unknown as { kind?: string; node: DpPathNode };
+                        const hubSelected = rawItem.kind === 'hub' && popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === rawItem.node.key;
+                        const nodeTone = pathNodeColor(rawItem.node, index, { mapDuo: true });
                         return (
                           <View style={styles.nodeSlot}>
                             <PracticeHubNode
-                              node={item.node}
+                              node={rawItem.node}
                               color={nodeTone}
                               isNext={hubNext}
                               selected={Boolean(hubSelected)}
                               nodeIndex={index}
                               completedSections={unit.completedSections}
-                              onPress={() => toggleHub(unit, item.node.key)}
+                              onPress={() => toggleHub(unit, rawItem.node.key)}
                             />
                           </View>
                         );
@@ -2663,12 +3211,18 @@ function PathView({
           return (
             <MilestoneHubModal
               visible={Boolean(mUnit && mNode)}
+              suspended={Platform.OS !== 'web' && Boolean(videoOpen)}
+              userId={String(user?.id || '')}
+              topicId={current?.topic?.id || ''}
+              courseTitle={current?.topic?.name || ''}
+              initialDifficulty={milestoneOpen.initialDifficulty ?? null}
+              initialSection={milestoneOpen.initialSection ?? null}
               unit={mUnit}
               node={mNode}
               milestoneIndex={mIdx >= 0 ? mIdx : 0}
               onClose={() => setMilestoneOpen(null)}
               onProgressChanged={onPathChanged}
-              onOpenVideo={(targetUnit, videoId) => setVideoOpen({ unit: targetUnit, videoId, singleVideoOnly: true })}
+              onOpenVideo={(targetUnit, videoId) => setVideoOpen({ unit: targetUnit, videoId, nodeKey: mNode?.key || '', singleVideoOnly: true })}
               onStartPractice={(stepKey) => {
                 if (!mUnit || !mNode) return;
                 const practiceNodeKey = mNode.key || 'study';
@@ -2680,61 +3234,78 @@ function PathView({
         })() : null
       }
       {
-        lessonOpen ? (
-          <PathLessonModal
-            unit={lessonOpen.unit}
-            step={lessonOpen.step}
-            color={unitColor(lessonOpen.unit.index)}
-            play={play}
-            onClose={() => setLessonOpen(null)}
-            onCompleted={onPathChanged}
-            onOpenVideo={(videoId) => setVideoOpen({ unit: lessonOpen.unit, videoId })}
-          />
-        ) : null
+        lessonOpen ? (() => {
+          const liveUnit = current?.units.find((u) => u.id === lessonOpen.unit.id) || lessonOpen.unit;
+          return (
+            <PathLessonModal
+              unit={liveUnit}
+              step={lessonOpen.step}
+              color={unitColor(liveUnit.index)}
+              play={play}
+              onClose={() => setLessonOpen(null)}
+              onCompleted={onPathChanged}
+              onOpenVideo={(videoId) => setVideoOpen({ unit: liveUnit, videoId })}
+            />
+          );
+        })() : null
       }
       {
-        roadmapOpen ? (
-          <UnitStageRoadmapModal
-            unit={roadmapOpen}
-            tone={unitColor(roadmapOpen.index)}
-            play={play}
-            onClose={() => setRoadmapOpen(null)}
-            onPickNode={(nodeKey) => {
-              const unit = roadmapOpen;
-              const pickedNode = unit.pathNodes?.find((n) => n.key === nodeKey);
-              setRoadmapOpen(null);
-              if (pickedNode && (pickedNode.kind === 'study' || pickedNode.icon === 'book')) {
-                setMilestoneOpen({ unitId: unit.id, nodeKey });
-              } else {
-                setPopover({ unitId: unit.id, nodeKey, testOut: false });
-              }
-            }}
-            onOpenVideo={() => {
-              const unit = roadmapOpen;
-              const unitVideos = collectUnitVideos(unit);
-              const preferredVideoId = unitVideos.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id || unitVideos[0]?.id || '';
-              setRoadmapOpen(null);
-              setVideoOpen({ unit, videoId: preferredVideoId });
-            }}
-          />
-        ) : null
+        roadmapOpen ? (() => {
+          const liveUnit = current?.units.find((u) => u.id === roadmapOpen.id) || roadmapOpen;
+          return (
+            <UnitStageRoadmapModal
+              unit={liveUnit}
+              tone={unitColor(liveUnit.index)}
+              play={play}
+              onClose={() => setRoadmapOpen(null)}
+              onPickNode={(nodeKey) => {
+                const pickedNode = liveUnit.pathNodes?.find((n) => n.key === nodeKey);
+                setRoadmapOpen(null);
+                if (pickedNode && (pickedNode.kind === 'study' || pickedNode.icon === 'book')) {
+                  setMilestoneOpen({ unitId: liveUnit.id, nodeKey });
+                } else {
+                  setPopover({ unitId: liveUnit.id, nodeKey, testOut: false });
+                }
+              }}
+              onOpenVideo={() => {
+                const unitVideos = collectUnitVideos(liveUnit);
+                const preferredVideoId = unitVideos.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id || unitVideos[0]?.id || '';
+                setRoadmapOpen(null);
+                setVideoOpen({ unit: liveUnit, videoId: preferredVideoId });
+              }}
+            />
+          );
+        })() : null
       }
       {
-        videoOpen ? (
-          <PathVideoModal
-            unit={videoOpen.unit}
-            initialVideoId={videoOpen.videoId}
-            singleVideoOnly={Boolean(videoOpen.singleVideoOnly)}
-            color={unitColor(videoOpen.unit.index)}
-            userId={String(user?.id || '')}
-            play={play}
-            onClose={() => setVideoOpen(null)}
-            onWatched={async (videoId) => {
-              await dailyPracticeApi.videoWatched(videoOpen.unit.id, videoId);
-              onPathChanged();
-            }}
-          />
-        ) : null
+        videoOpen ? (() => {
+          const liveUnit = current?.units.find((u) => u.id === videoOpen.unit.id) || videoOpen.unit;
+          return (
+            <PathVideoModal
+              unit={liveUnit}
+              initialVideoId={videoOpen.videoId}
+              initialAtSec={videoOpen.initialAtSec || 0}
+              topicId={current?.topic?.id || ''}
+              nodeKey={videoOpen.nodeKey || ''}
+              singleVideoOnly={Boolean(videoOpen.singleVideoOnly)}
+              color={unitColor(liveUnit.index)}
+              userId={String(user?.id || '')}
+              courseTitle={current?.topic?.name || ''}
+              xpTotal={xpTotal}
+              play={play}
+              onClose={() => setVideoOpen(null)}
+              onWatched={async (videoId) => {
+                await dailyPracticeApi.videoWatched(liveUnit.id, videoId);
+                onPathChanged();
+              }}
+              onChecksChanged={onPathChanged}
+              onBuyXp={onBuyXp ? () => {
+                setVideoOpen(null);
+                onBuyXp();
+              } : undefined}
+            />
+          );
+        })() : null
       }
     </View >
   );
@@ -2748,13 +3319,15 @@ function PathResultCard({ result }: { result: DpPathResult }) {
   let text: string;
   if (!passed) {
     title = `Chưa qua ${result.testOut ? 'bài kiểm tra vượt chặng' : `bước ${result.stepLabel}`}`;
-    text = `Bạn đạt ${result.scorePercent}%, cần từ ${result.passPercent}%. Ôn lại rồi thử lần nữa nhé!`;
+    text = result.testOut
+      ? `Bạn đạt ${result.scorePercent}% (cần ${result.passPercent}%). Mất ${TEST_OUT_XP} XP. Ôn lại rồi thử lại nhé!`
+      : `Bạn đạt ${result.scorePercent}%, cần từ ${result.passPercent}%. Sai −${QUESTION_STAKE_XP}/câu và không nhận XP câu đúng. Thử lại nhé!`;
   } else if (isCourseComplete) {
-    title = 'CHÚC MỪNG HOÀN THÀNH KHÓA HỌC!';
-    text = `Bạn đã chinh phục trọn vẹn lộ trình và xuất sắc nhận Cúp Vàng Vinh Danh tại chặng “${result.unitTitle}”!`;
+    title = 'Hoàn thành toàn bộ lộ trình!';
+    text = 'Bạn đã chinh phục mọi chặng của chủ đề này và giành Cúp Vàng Vinh Danh. Tuyệt vời!';
   } else if (result.testOut) {
     title = 'Vượt chặng thành công!';
-    text = `Đã hoàn thành đến chặng “${result.unitTitle}”.`;
+    text = `Đã hoàn thành đến chặng “${result.unitTitle}”. Bạn được +${TEST_OUT_XP} XP.`;
   } else if (result.unitCompleted && (result.step === 'challenge' || result.step === 'checkpoint')) {
     title = `Hoàn thành chặng “${result.unitTitle}”!`;
     text = result.unlockedUnit ? `Đã mở khóa Chặng ${result.unlockedUnit.index}: ${result.unlockedUnit.title}` : 'Tiếp tục giữ phong độ nhé!';
@@ -2808,38 +3381,63 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
   packs?: DpXpPack[];
   play: (s: GameSound) => void;
   onClose: () => void;
-  onPurchased: () => void;
+  onPurchased: (status?: DpXpPurchaseStatus) => void;
 }) {
   const list = packs?.length ? packs : DEFAULT_XP_PACKS;
   const [selectedXp, setSelectedXp] = useState<number>(list[0]?.xp || 100);
   const [checkout, setCheckout] = useState<DpXpCheckout | null>(null);
+  const [bank, setBank] = useState<CenterBankAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [paid, setPaid] = useState(false);
   const [errMsg, setErrMsg] = useState('');
+  const firedRef = useRef(false);
+  const onPurchasedRef = useRef(onPurchased);
+  onPurchasedRef.current = onPurchased;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const selectedPack = list.find((p) => p.xp === selectedXp) || list[0];
   const sessionKey = checkout?.sessionId || checkout?.orderCode || '';
 
   useEffect(() => {
+    let cancelled = false;
+    getCenterBankAccount()
+      .then((account) => { if (!cancelled) setBank(account); })
+      .catch(() => { if (!cancelled) setBank(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     if (!sessionKey || paid) return undefined;
+    let closeTimer: ReturnType<typeof setTimeout> | null = null;
+    const markComplete = (res: DpXpPurchaseStatus) => {
+      if (firedRef.current) return;
+      firedRef.current = true;
+      setPaid(true);
+      play('win');
+      onPurchasedRef.current(res);
+      closeTimer = setTimeout(() => onCloseRef.current(), 2800);
+    };
     const timer = setInterval(() => {
       dailyPracticeApi.xpPurchaseStatus(sessionKey)
         .then((res) => {
-          if (res.status === 'paid') {
-            setPaid(true);
-            play('win');
-            onPurchased();
+          if (res.paid || res.status === 'paid') {
+            markComplete(res);
           }
         })
         .catch(() => { });
     }, 3000);
-    return () => clearInterval(timer);
-  }, [sessionKey, onPurchased, paid, play]);
+    return () => {
+      clearInterval(timer);
+      if (closeTimer) clearTimeout(closeTimer);
+    };
+  }, [sessionKey, paid, play]);
 
   const createOrder = async () => {
     setBusy(true);
     setErrMsg('');
+    firedRef.current = false;
     try {
       const packId = selectedPack?.id || `xp_${selectedXp}`;
       const data = await dailyPracticeApi.buyXp(packId);
@@ -2852,15 +3450,18 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
   };
 
   const simulatePaid = async () => {
-    if (!sessionKey || simulating) return;
+    if (!sessionKey || simulating || paid) return;
     setSimulating(true);
     setErrMsg('');
     try {
       const res = await dailyPracticeApi.simulateXpPaid(sessionKey);
-      if (res.status === 'paid') {
-        setPaid(true);
-        play('win');
-        onPurchased();
+      if (res.paid || res.status === 'paid') {
+        if (!firedRef.current) {
+          firedRef.current = true;
+          setPaid(true);
+          play('win');
+          onPurchased(res);
+        }
       }
     } catch (err) {
       setErrMsg(err instanceof Error ? err.message : 'Không xác nhận được thanh toán thử');
@@ -2869,10 +3470,14 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
     }
   };
 
-  const qrUrl = checkout?.payment?.qrUrl || checkout?.qrUrl || '';
-  const bankName = checkout?.payment?.bankName || checkout?.bankName || '';
-  const accountNo = checkout?.payment?.accountNo || checkout?.accountNo || '';
-  const transferContent = checkout?.payment?.transferContent || checkout?.transferContent || checkout?.orderCode || '';
+  const transferContent = checkout?.payment?.transferContent || checkout?.transferContent || checkout?.ref || checkout?.orderCode || '';
+  const directQr = checkout?.payment?.qrUrl || checkout?.qrUrl || '';
+  const generatedQr = !directQr && bank?.bankCode && bank?.accountNumber && checkout
+    ? buildVietQrUrl(bank, checkout.amount, transferContent)
+    : '';
+  const qrUrl = directQr || generatedQr;
+  const bankName = checkout?.payment?.bankName || checkout?.bankName || bank?.bankName || bank?.bankCode || '';
+  const accountNo = checkout?.payment?.accountNo || checkout?.accountNo || bank?.accountNumber || '';
   const canSimulate = Boolean(checkout?.payment?.canSimulate || checkout?.canSimulate || __DEV__);
 
   return (
@@ -3001,10 +3606,25 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
 }
 
 // ── Xác nhận mức cược XP trước khi vào bài ───────────────────────────────────
-function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, onConfirm, onBuyXp }: {
+function StakeSessionConfirm({
+  variant = 'rematch',
+  stakeXp,
+  xpTotal,
+  testOut = false,
+  testOutLocked = false,
+  review = false,
+  busy,
+  play,
+  onCancel,
+  onConfirm,
+  onBuyXp,
+}: {
+  variant?: 'start' | 'rematch';
   stakeXp: number;
-  xpTotal: number;
-  testOut: boolean;
+  xpTotal?: number | null;
+  testOut?: boolean;
+  testOutLocked?: boolean;
+  review?: boolean;
   busy: boolean;
   play: (s: GameSound) => void;
   onCancel: () => void;
@@ -3013,15 +3633,19 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
 }) {
   const { user } = useAuth();
   const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
-  const notEnough = xpTotal < stakeXp;
+  const isStart = variant === 'start';
+  const notEnough = typeof xpTotal === 'number' && xpTotal < stakeXp;
+  const isBlockedFreeTestOut = testOut && testOutLocked;
+  const canAutoStart = !isBlockedFreeTestOut && !notEnough;
   const COUNTDOWN_MS = 3000;
   const [remainingMs, setRemainingMs] = useState(COUNTDOWN_MS);
   const onConfirmRef = useRef(onConfirm);
   onConfirmRef.current = onConfirm;
   const triggeredRef = useRef(false);
 
+  useEffect(() => { play('pick'); }, [play]);
   useEffect(() => {
-    if (notEnough || busy) return undefined;
+    if (!canAutoStart || busy) return undefined;
     triggeredRef.current = false;
     const startedAt = Date.now();
     const timer = setInterval(() => {
@@ -3035,57 +3659,67 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
       }
     }, 50);
     return () => clearInterval(timer);
-  }, [notEnough, busy, play]);
+  }, [canAutoStart, busy, play]);
 
   const pct = Math.max(0, Math.min(100, (remainingMs / COUNTDOWN_MS) * 100));
   const secLeft = Math.max(1, Math.ceil(remainingMs / 1000));
+  const showXpPill = !(review || stakeXp === 0);
+
+  let title = 'Bắt đầu lượt luyện?';
+  let body = '';
+  if (isBlockedFreeTestOut) {
+    title = 'Đặc quyền học viên gói Meet';
+    body = 'Kiểm tra vượt chặng là tính năng chỉ dành riêng cho học viên đã mua khóa / gói Google Meet. Vui lòng nâng cấp gói để mở khóa đặc quyền này và nhận thêm XP theo gói!';
+  } else if (review || stakeXp === 0) {
+    title = 'Chuẩn bị ôn lại';
+    body = 'Ôn lại bài đã qua hoàn toàn miễn phí, không trừ XP.';
+  } else if (notEnough) {
+    title = 'Không đủ XP để làm bài';
+    body = `Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet hoặc mua thêm XP để tiếp tục!`;
+  } else if (isStart) {
+    title = testOut ? 'Cược để vượt chặng?' : 'Chuẩn bị vào luyện tập';
+    body = testOut
+      ? `Đặt ${stakeXp} XP. Đạt đủ điểm thì vượt chặng và nhận lại XP. Không đạt hoặc thoát giữa chừng thì mất trắng.`
+      : `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay, đạt % yêu cầu sẽ nhận +${QUESTION_STAKE_XP} XP/câu đúng.`;
+  } else {
+    title = 'Làm lại lượt luyện tập?';
+    body = `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay, đạt % yêu cầu sẽ nhận +${QUESTION_STAKE_XP} XP/câu đúng.`;
+  }
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onCancel(); }}>
       <View style={styles.quitBackdrop}>
         <View style={[styles.quitCard, { maxWidth: 380, borderRadius: 26, borderWidth: 1, borderColor: '#D1FAE5' }]}>
           <View style={[styles.quitHero, { backgroundColor: '#ECFDF5', paddingBottom: 14 }]}>
-            <Mascot mood={notEnough ? 'thinking' : 'determined'} size={86} />
-            <Text style={styles.quitTitle}>
-              {notEnough ? 'Không đủ XP để làm bài' : testOut ? 'Kiểm tra vượt chặng' : 'Chuẩn bị vào luyện tập'}
-            </Text>
-            {notEnough ? (
-              <>
-                <Text style={styles.quitText}>
-                  {`Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet (+300 XP/ngày) hoặc mua thêm XP để tiếp tục!`}
+            <Mascot mood={isBlockedFreeTestOut || notEnough ? 'thinking' : 'determined'} size={86} />
+            <Text style={styles.quitTitle}>{title}</Text>
+            <Text style={[styles.quitText, { marginTop: 4 }]}>{body}</Text>
+            {showXpPill ? (
+              <View style={[styles.quitProgress, { marginTop: 10 }]}>
+                <Zap size={13} color="#D97706" fill="#FCD34D" />
+                <Text style={styles.quitProgressText}>
+                  {testOut ? `Cược ${stakeXp} XP` : `${QUESTION_STAKE_XP} XP/câu · tối đa ${stakeXp} XP`}
+                  {typeof xpTotal === 'number' ? ` · đang có ${xpTotal}` : ''}
                 </Text>
-                <View style={styles.quitProgress}>
-                  <Zap size={13} color="#D97706" fill="#FCD34D" />
-                  <Text style={styles.quitProgressText}>{`5 XP/câu · tối đa ${stakeXp} XP · đang có ${xpTotal}`}</Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.quitText, { marginTop: 4 }]}>
-                  {`Mỗi câu 5 XP: sai trừ ngay. Đạt % yêu cầu mới nhận +5 XP/câu đúng.`}
-                </Text>
-                <View style={[styles.quitProgress, { marginTop: 10 }]}>
-                  <Zap size={13} color="#D97706" fill="#FCD34D" />
-                  <Text style={styles.quitProgressText}>{`5 XP/câu · tối đa ${stakeXp} XP · đang có ${xpTotal}`}</Text>
-                </View>
-              </>
-            )}
+              </View>
+            ) : null}
           </View>
-          {notEnough ? (
+          {isBlockedFreeTestOut || notEnough ? (
             <View style={[styles.quitActions, { gap: 10 }]}>
               <DuoButton
                 variant="gold"
                 size="lg"
                 fullWidth
-                text="Nâng cấp gói Meet (+300 XP/ngày)"
+                text="Nâng cấp gói"
                 icon={<Crown size={16} color="#FFFFFF" />}
-                onPress={() => { play('tap'); onBuyXp(); }}
+                onPress={() => { play('tap'); onCancel(); onBuyXp(); }}
               />
               <DuoButton
                 variant="secondary"
                 size="md"
                 fullWidth
                 text="Để sau"
+                disabled={busy}
                 onPress={onCancel}
               />
             </View>
@@ -3123,18 +3757,21 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
 }
 
 // ── Xác nhận thoát ───────────────────────────────────────────────────────────
-function QuitConfirm({ stats, answered, total, busy, play, onStay, onQuit }: {
-  stats: DpStats | null;
+function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, busy, play, onStay, onQuit }: {
+  stats?: DpStats | null;
   answered: number;
   total: number;
+  stakeXp?: number;
+  quitLossXp?: number;
+  mandatory?: boolean;
   busy?: boolean;
   play: (s: GameSound) => void;
   onStay: () => void;
   onQuit: () => void;
 }) {
-  const keptToday = Boolean(stats?.playedToday);
-  const streak = stats?.streak || 0;
   const left = Math.max(0, total - answered);
+  const lossOnQuit = Math.max(stakeXp, quitLossXp);
+  const loseXp = lossOnQuit > 0;
   useEffect(() => { play('sad'); }, [play]);
 
   return (
@@ -3142,15 +3779,21 @@ function QuitConfirm({ stats, answered, total, busy, play, onStay, onQuit }: {
       <View style={styles.quitBackdrop}>
         <View style={styles.quitCard} accessibilityViewIsModal>
           <View style={styles.quitHero}>
-            <Mascot mood="sad" size={92} />
-            <Text style={styles.quitTitle}>{keptToday ? 'Thoát lượt chơi này?' : 'Bạn sẽ mất chuỗi hôm nay!'}</Text>
+            <Mascot mood="quit" size={92} />
+            <Text style={styles.quitTitle}>{loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?'}</Text>
             <Text style={styles.quitText}>
-              {keptToday
-                ? 'Kết quả và XP của lượt này sẽ không được tính.'
-                : streak > 0
-                  ? `Thoát bây giờ, chuỗi 🔥 ${streak} ngày của bạn sẽ về 0 lúc nửa đêm. Bạn có chắc muốn thoát không?`
-                  : 'Thoát bây giờ thì hôm nay bạn chưa có chuỗi 🔥 và không nhận được XP. Bạn có chắc muốn thoát không?'}
+              {loseXp
+                ? mandatory
+                  ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
+                  : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`
+                : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.'}
             </Text>
+            {loseXp ? (
+              <View style={[styles.quitProgress, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                <Zap size={13} color="#EF4444" fill="#FCA5A5" />
+                <Text style={[styles.quitProgressText, { color: '#B91C1C' }]}>{`Mất tối đa −${lossOnQuit} XP nếu thoát`}</Text>
+              </View>
+            ) : null}
             {left > 0 ? (
               <View style={styles.quitProgress}>
                 <Zap size={13} color="#F59E0B" fill="#FCD34D" />
@@ -3172,7 +3815,7 @@ function QuitConfirm({ stats, answered, total, busy, play, onStay, onQuit }: {
               variant="secondary"
               size="md"
               fullWidth
-              text="Vẫn thoát"
+              text={loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát'}
               loading={busy}
               disabled={busy}
               onPress={onQuit}
@@ -3189,7 +3832,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   session: DpSession;
   stats: DpStats | null;
   play: (s: GameSound) => void;
-  onQuit: () => void;
+  onQuit: (info?: { abandoned?: boolean; profileXp?: number; stats?: DpStats } | null) => void;
   onFinished: (summary: DpSummary) => void;
   onDraggingChange: (dragging: boolean) => void;
 }) {
@@ -3212,9 +3855,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [combo, setCombo] = useState(0);
   const [comboCelebration, setComboCelebration] = useState<number | null>(null);
   const [wrongTryCount, setWrongTryCount] = useState(0);
+  const [retryCooldownSec, setRetryCooldownSec] = useState(0);
   const [answerResetKey, setAnswerResetKey] = useState(0);
   const [retryBaselineKey, setRetryBaselineKey] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
+  const [buyXpOpen, setBuyXpOpen] = useState(false);
   const { focusMode, toggle: toggleFocus, setFocusMode } = useMobileFocusMode();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const comboPop = useRef(new Animated.Value(1)).current;
@@ -3267,18 +3912,27 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     });
   }, [result, pending, question.type]);
 
-  const stakeXp = Number(session.stakeXp) || 0;
+  useEffect(() => {
+    if (!result || result.correct) {
+      setRetryCooldownSec(0);
+      return undefined;
+    }
+    setRetryCooldownSec(5);
+    const timer = setInterval(() => {
+      setRetryCooldownSec((sec) => (sec <= 1 ? 0 : sec - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [result, wrongTryCount]);
+
+  const isPathSession = session.mode === 'path' || Boolean(session.path);
+  const xpDisabled = Boolean(session.xpDisabled || (!isPathSession && session.mode === 'free') || session.review || session.path?.review);
+  const stakeXp = xpDisabled ? 0 : (Number(session.stakeXp) || 0);
   const isTestOutStake = Boolean(session.path?.testOut && stakeXp > 0);
-  const isPerQuestionStake = Boolean(
-    !session.xpDisabled
-    && !session.review
-    && !session.recovery
-    && session.path
-    && !session.path.testOut,
-  );
+  const isPerQuestionStake = Boolean(!xpDisabled && !session.recovery && !isTestOutStake && isPathSession);
   const walletXp = profileXp !== null ? inPlayWalletXp(profileXp, isTestOutStake ? stakeXp : 0) : null;
   const perQuestionStakeXp = session.perQuestionStakeXp || QUESTION_STAKE_XP;
-  const hintCostXp = session.xpDisabled
+  const mandatory = !xpDisabled && Boolean(session.mandatory ?? (stakeXp > 0 || isPerQuestionStake));
+  const hintCostXp = xpDisabled
     ? 0
     : (isPerQuestionStake
       ? Math.floor(perQuestionStakeXp / 2)
@@ -3301,13 +3955,6 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   useEffect(() => {
     Animated.timing(progress, { toValue: (index + (result ? 1 : 0)) / total, duration: 400, useNativeDriver: false }).start();
   }, [index, progress, result, total]);
-
-  const retryQuestion = useCallback(() => {
-    setResult(null);
-    setPending(null);
-    setChosen(null);
-    setAnswerResetKey((key) => key + 1);
-  }, []);
 
   const resetInteractiveAnswer = useCallback(() => {
     setPending(null);
@@ -3350,7 +3997,9 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       }
       play(isCorrect ? 'correct' : 'wrong');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không gửi được câu trả lời');
+      const status = (err as { status?: number })?.status;
+      if (status === 402) setBuyXpOpen(true);
+      else setError(err instanceof Error ? err.message : 'Không gửi được câu trả lời');
     } finally {
       setBusy(false);
     }
@@ -3358,6 +4007,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
 
   const askHint = async () => {
     if (reveal || result?.correct || busy) return;
+    if (!xpDisabled && hintCostXp > 0 && profileXp !== null && profileXp < hintCostXp) {
+      setBuyXpOpen(true);
+      return;
+    }
     setBusy(true);
     try {
       const data = await dailyPracticeApi.hint(session.id, question.id);
@@ -3368,7 +4021,9 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       if (charged > 0) setHintChargedXp(charged);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không lấy được gợi ý');
+      const status = (err as { status?: number })?.status;
+      if (status === 402) setBuyXpOpen(true);
+      else setError(err instanceof Error ? err.message : 'Không lấy được gợi ý');
     } finally {
       setBusy(false);
     }
@@ -3399,31 +4054,51 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     if (quitting) return;
     setQuitting(true);
     try {
-      await dailyPracticeApi.abandon(session.id);
+      const data = await dailyPracticeApi.abandon(session.id);
+      onQuit(data);
     } catch {
-      // vẫn cho thoát nếu phiên đã đóng
+      onQuit(null);
     } finally {
       setQuitting(false);
       setQuitOpen(false);
-      onQuit();
     }
   };
 
   const props = { question, reveal, result, play, onChange: setPending };
   const immediate = question.type === 'mcq' || question.type === 'truefalse';
   const mood: MascotMood = result ? (result.correct ? 'happy' : 'thinking') : reveal ? 'thinking' : 'idle';
-  const stepTitle = session.path
-    ? `Chặng ${session.path.unitIndex} · ${session.path.pathNodeLabel || session.path.unitTitle} · ${session.path.stepLabel}`
-    : `Luyện tự do · ${level.label}`;
+  const stepTitle = session.spacedReview
+    ? `Ôn tập ngắt quãng · ${session.topic?.name || 'Củng cố'}`
+    : session.path
+      ? `Chặng ${session.path.unitIndex} · ${session.path.pathNodeLabel || session.path.unitTitle} · ${session.path.stepLabel}`
+      : `Luyện tự do · ${level.label}`;
+  const answeredCount = index + (result?.correct ? 1 : 0);
+  const quitLossXp = xpDisabled ? 0 : (isPerQuestionStake ? Math.max(0, total - answeredCount) * perQuestionStakeXp : stakeXp);
   const confirmedQuestionXp = result?.correct
-    ? (typeof result.xp === 'number' && result.xp > 0
-      ? result.xp
-      : (isPerQuestionStake && !session.xpDisabled ? QUESTION_STAKE_XP : 0))
+    ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
+      ? result.xpDelta
+      : (typeof result.xp === 'number' && result.xp > 0
+        ? result.xp
+        : (isPerQuestionStake && !xpDisabled ? perQuestionStakeXp : 0)))
     : 0;
+  const canRetryWrong = Boolean(
+    result
+    && !result.correct
+    && !busy
+    && retryCooldownSec <= 0
+    && (immediate
+      ? Boolean(pending)
+      : canSubmitRetryAfterWrong({
+        pending,
+        retryBaselineKey,
+        questionType: question.type,
+      })),
+  );
   const canRetryInteractive = Boolean(
     result
     && !result.correct
     && !immediate
+    && retryCooldownSec <= 0
     && canSubmitRetryAfterWrong({
       pending,
       retryBaselineKey,
@@ -3438,8 +4113,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     busy,
     immediate,
     pending,
+    canRetryWrong,
     canRetryInteractive,
-    quitOpen,
+    retryCooldownSec,
+    blocked: quitOpen || buyXpOpen || Boolean(comboCelebration),
     submit,
     next,
     askHint,
@@ -3451,8 +4128,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     busy,
     immediate,
     pending,
+    canRetryWrong,
     canRetryInteractive,
-    quitOpen,
+    retryCooldownSec,
+    blocked: quitOpen || buyXpOpen || Boolean(comboCelebration),
     submit,
     next,
     askHint,
@@ -3462,54 +4141,62 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       const current = keyActionsRef.current;
-      if (current.quitOpen || current.busy) return;
+      if (current.blocked || current.busy) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toUpperCase();
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const key = event.key.toLowerCase();
-      if (!current.result?.correct) {
-        let optionIndex = -1;
-        if (key >= '1' && key <= '4') optionIndex = Number(key) - 1;
-        else if (key === 'a') optionIndex = 0;
-        else if (key === 'b') optionIndex = 1;
-        else if (key === 'c') optionIndex = 2;
-        else if (key === 'd') optionIndex = 3;
-
-        if (optionIndex >= 0) {
-          if (current.question.type === 'mcq' && optionIndex < (current.question.options?.length || 0)) {
-            if (current.reveal?.eliminate?.includes(optionIndex)) return;
-            event.preventDefault();
-            play('tap');
-            void current.submit({ index: optionIndex });
-            return;
-          }
-          if (current.question.type === 'truefalse' && optionIndex < 2) {
-            event.preventDefault();
-            play('tap');
-            void current.submit({ value: optionIndex === 0 });
-            return;
-          }
-        }
-        if (key === 'h') {
+      if (current.result?.correct) {
+        if (event.key === 'Enter' || event.key === 'ArrowRight') {
           event.preventDefault();
-          void current.askHint();
+          void current.next();
+        }
+        return;
+      }
+
+      if (current.result && !current.result.correct) {
+        if (current.retryCooldownSec > 0) return;
+        if (event.key === 'Enter' && current.canRetryWrong) {
+          event.preventDefault();
+          void current.submit(current.pending);
+        }
+        return;
+      }
+
+      if (key === 'h' && !current.reveal) {
+        event.preventDefault();
+        void current.askHint();
+        return;
+      }
+
+      let optionIndex = -1;
+      if (key >= '1' && key <= '4') optionIndex = Number(key) - 1;
+      else if (key === 'a') optionIndex = 0;
+      else if (key === 'b') optionIndex = 1;
+      else if (key === 'c') optionIndex = 2;
+      else if (key === 'd') optionIndex = 3;
+
+      if (optionIndex >= 0) {
+        if (current.question.type === 'mcq' && optionIndex < (current.question.options?.length || 0)) {
+          if (current.reveal?.eliminate?.includes(optionIndex)) return;
+          event.preventDefault();
+          play('tap');
+          void current.submit({ index: optionIndex });
+          return;
+        }
+        if (current.question.type === 'truefalse' && optionIndex < 2) {
+          event.preventDefault();
+          play('tap');
+          void current.submit({ value: optionIndex === 0 });
           return;
         }
       }
 
-      if (event.key === 'Enter' || event.key === 'ArrowRight') {
-        if (current.result?.correct) {
-          event.preventDefault();
-          void current.next();
-        } else if (current.result && !current.result.correct && current.canRetryInteractive) {
-          event.preventDefault();
-          void current.submit(current.pending);
-        } else if (!current.result && !current.immediate && current.pending) {
-          event.preventDefault();
-          void current.submit(current.pending);
-        }
+      if (!current.immediate && current.pending && event.key === 'Enter') {
+        event.preventDefault();
+        void current.submit(current.pending);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -3561,8 +4248,26 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             </Animated.View>
           ) : null}
           {session.xpDisabled ? (
-            <View style={[styles.xpPill, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-              <Text style={[styles.xpText, { color: '#64748B', fontSize: 12 }]}>{session.review ? 'Ôn tập · 0 XP' : '0 XP'}</Text>
+            <View
+              style={[
+                styles.xpPill,
+                session.spacedReview
+                  ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
+                  : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.xpText,
+                  { color: session.spacedReview ? '#047857' : '#64748B', fontSize: 12 },
+                ]}
+              >
+                {session.spacedReview
+                  ? `+${session.spacedRewardXp || 15} XP nếu ≥70%`
+                  : session.review || session.path?.review
+                    ? 'Ôn tập · 0 XP'
+                    : '0 XP'}
+              </Text>
             </View>
           ) : walletXp !== null ? (
             <View style={styles.xpPill}>
@@ -3594,7 +4299,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             >
                 <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
                 <Text style={styles.hintCornerBtnText}>
-                  {reveal ? 'Đã gợi ý' : session.xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp}`}
+                  {reveal ? 'Đã gợi ý' : xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp}`}
                 </Text>
             </Pressable>
           ) : null}
@@ -3613,7 +4318,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               </Text>
             </View>
           </View>
-          {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image} resizeMode="contain" /> : null}
+          {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image as ImageStyle} resizeMode="contain" /> : null}
           {hintText ? (
             <View style={styles.hintRevealWrap}>
               <View style={styles.hintBox}>
@@ -3626,8 +4331,30 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             </View>
           ) : null}
           <View key={`${question.id}-${answerResetKey}`} style={styles.answerArea}>
-            {question.type === 'mcq' ? <McqQuestion question={question} reveal={reveal} result={result} chosen={typeof chosen === 'number' ? chosen : null} onSubmit={submit} play={play} /> : null}
-            {question.type === 'truefalse' ? <TrueFalseQuestion result={result} chosen={typeof chosen === 'boolean' ? chosen : null} onSubmit={submit} play={play} /> : null}
+            {question.type === 'mcq' ? (
+              <McqQuestion
+                question={question}
+                reveal={reveal}
+                result={result}
+                chosen={typeof chosen === 'number' ? chosen : null}
+                pending={pending}
+                retryCooldownSec={retryCooldownSec}
+                onChange={setPending}
+                onSubmit={submit}
+                play={play}
+              />
+            ) : null}
+            {question.type === 'truefalse' ? (
+              <TrueFalseQuestion
+                result={result}
+                chosen={typeof chosen === 'boolean' ? chosen : null}
+                pending={pending}
+                retryCooldownSec={retryCooldownSec}
+                onChange={setPending}
+                onSubmit={submit}
+                play={play}
+              />
+            ) : null}
             {question.type === 'order' ? <OrderQuestion {...props} /> : null}
             {question.type === 'match' ? <MatchQuestion {...props} /> : null}
             {question.type === 'fill' ? <FillQuestion {...props} /> : null}
@@ -3646,25 +4373,12 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               play={play}
               onNext={() => { void next(); }}
               onRetry={() => {
-                if (immediate) {
-                  setResult(null);
-                  setChosen(null);
-                  setPending(null);
-                  return;
-                }
                 void submit(pending);
               }}
-              canRetry={Boolean(
-                result
-                && !result.correct
-                && !busy
-                && (immediate || canSubmitRetryAfterWrong({
-                  pending,
-                  retryBaselineKey,
-                  questionType: question.type,
-                })),
-              )}
+              canRetry={canRetryWrong}
               wrongTryCount={wrongTryCount}
+              retryCooldownSec={retryCooldownSec}
+              xpDisabled={xpDisabled}
               explainOpen={explainOpen}
               onExplainOpenChange={setExplainOpen}
             />
@@ -3719,12 +4433,25 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         {quitOpen ? (
           <QuitConfirm
             stats={stats}
-            answered={index + (result?.correct ? 1 : 0)}
+            answered={answeredCount}
             total={total}
+            stakeXp={stakeXp}
+            quitLossXp={quitLossXp}
+            mandatory={mandatory}
             busy={quitting}
             play={play}
             onStay={() => setQuitOpen(false)}
             onQuit={() => { void confirmQuit(); }}
+          />
+        ) : null}
+        {buyXpOpen ? (
+          <BuyXpModal
+            packs={stats?.xpPacks || session.xpPacks}
+            play={play}
+            onClose={() => setBuyXpOpen(false)}
+            onPurchased={(status) => {
+              if (typeof status?.profileXp === 'number') setProfileXp(status.profileXp);
+            }}
           />
         ) : null}
         {comboCelebration ? (
@@ -3880,13 +4607,21 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
 
           {showReview ? (
             <View style={styles.reviewListBody}>
-              {summary.review.map((item, idx) => (
-                <View key={item.id || idx} style={styles.reviewItem}>
-                  <Text style={styles.reviewPrompt}>{item.prompt}</Text>
-                  <Text style={styles.reviewAnswer}>{`✓ ${item.correctAnswer.text}`}</Text>
-                  {item.explanation ? <Text style={styles.reviewExplain}>{item.explanation}</Text> : null}
-                </View>
-              ))}
+              {summary.review.map((item, idx) => {
+                const answerText = String(item.correctAnswer?.text || '').trim();
+                const followUp = reviewItemFollowUpLine(item);
+                return (
+                  <View key={item.id || idx} style={styles.reviewItem}>
+                    <Text style={styles.reviewPrompt}>{item.prompt}</Text>
+                    {answerText ? (
+                      <Text style={styles.reviewAnswer}>{`✓ ${answerText}`}</Text>
+                    ) : followUp ? (
+                      <Text style={styles.reviewExplain}>{followUp}</Text>
+                    ) : null}
+                    {answerText && followUp ? <Text style={styles.reviewExplain}>{followUp}</Text> : null}
+                  </View>
+                );
+              })}
             </View>
           ) : null}
         </View>
@@ -3921,7 +4656,8 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
 
 type PracticePick =
   | { mode: 'free'; topicId: string; difficulty: DpDifficulty }
-  | { mode: 'path'; unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; review?: boolean };
+  | { mode: 'path'; unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; review?: boolean }
+  | { mode: 'spaced' };
 
 /** Luyện tập hằng ngày kiểu trò chơi - cùng API, luật chơi với web. */
 function shuffleList<T>(list: T[]): T[] {
@@ -3934,73 +4670,247 @@ function shuffleList<T>(list: T[]): T[] {
   return copy;
 }
 
+function isPathPickCompleted(pathTopics: DpTopicPath[], pick: PracticePick | null): boolean {
+  if (!pick || pick.mode !== 'path' || pick.testOut) return false;
+  for (const t of pathTopics || []) {
+    const unit = (t?.units || []).find((u) => String(u.id) === String(pick.unitId));
+    if (!unit) continue;
+    const node = pick.nodeKey
+      ? (unit.pathNodes || []).find((n) => String(n.key) === String(pick.nodeKey))
+      : null;
+    if (node) {
+      if (pick.step) {
+        const lvl = (node.levels || []).find((l) => String(l.key) === String(pick.step));
+        if (lvl) return lvl.state === 'completed';
+      }
+      if (node.state === 'completed') return true;
+    }
+    const step = pick.step
+      ? (unit.steps || []).find((s) => String(s.key) === String(pick.step))
+      : null;
+    if (step?.state === 'completed') return true;
+  }
+  return false;
+}
+
+function clientStakeMeta(pick: PracticePick | null) {
+  if (pick?.mode !== 'path') return null;
+  if (pick.review) return { stakeXp: 0, testOut: false, review: true };
+  if (pick.testOut) return { stakeXp: TEST_OUT_XP, testOut: true, review: false };
+  return { stakeXp: SESSION_STAKE_XP, testOut: false, review: false };
+}
+
 export function DailyPracticeScreen() {
+  const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, 'DailyPractice'>>();
   const linkedTopicId = route.params?.topicId || '';
   const play = useGameSounds();
   const [topics, setTopics] = useState<DpTopic[]>([]);
   const [stats, setStats] = useState<DpStats | null>(null);
+  const [spacedRepetition, setSpacedRepetition] = useState<DpSpacedRepetitionSummary | null>(null);
+  const [placementOpen, setPlacementOpen] = useState(false);
+  const [placementResult, setPlacementResult] = useState<PlacementResult | null>(null);
+  const [recommendedTopic, setRecommendedTopic] = useState<{ id: string; seq: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [session, setSession] = useState<DpSession | null>(null);
   const [summary, setSummary] = useState<DpSummary | null>(null);
   const [celebrating, setCelebrating] = useState(false);
+  const [finishRematchOpen, setFinishRematchOpen] = useState(false);
   const [lastPick, setLastPick] = useState<PracticePick | null>(null);
   const [starting, setStarting] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [mode, setMode] = useState<PracticeMode>('path');
   const [pathTopics, setPathTopics] = useState<DpTopicPath[]>([]);
   const [pathActiveTopicId, setPathActiveTopicId] = useState('');
+  const [pathCanTestOut, setPathCanTestOut] = useState(true);
   const [pathLoading, setPathLoading] = useState(true);
   const [pathError, setPathError] = useState('');
-  const [stakePrompt, setStakePrompt] = useState<{ unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; stakeXp: number } | null>(null);
+  const [stakePrompt, setStakePrompt] = useState<{
+    pick: Extract<PracticePick, { mode: 'path' }>;
+    stakeXp: number;
+    testOut: boolean;
+    review: boolean;
+  } | null>(null);
   const [buyXpOpen, setBuyXpOpen] = useState(false);
+  const [meetOfferOpen, setMeetOfferOpen] = useState(false);
+  const [welcomeTarget, setWelcomeTarget] = useState<{
+    topicId: string;
+    unit: DpPathUnit;
+    level: DpPathStep | null;
+    kind: string;
+    nodeKey: string;
+    step: DpStepKey;
+  } | null>(null);
+  const [requestedLesson, setRequestedLesson] = useState<{
+    unit: DpPathUnit;
+    level?: DpPathStep | null;
+    nodeKey: string;
+  } | null>(null);
+  const [pendingWatchStage, setPendingWatchStage] = useState(false);
+  const [pendingResume, setPendingResume] = useState<PendingPathResume | null>(null);
+  const handledResumeKeyRef = useRef(0);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const practiceLockRef = useRef(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    dailyPracticeApi.overview()
-      .then((data) => { setTopics(data.topics); setStats(data.stats); setError(''); })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Không tải được luyện tập hằng ngày'))
-      .finally(() => setLoading(false));
+  const applyStats = useCallback((statsPatch?: Partial<DpStats> | null) => {
+    if (!statsPatch) return;
+    setStats((prev) => {
+      const next = { ...(prev || ({} as DpStats)), ...statsPatch };
+      if (typeof next.xpTotal === 'number') {
+        next.xpEmpty = next.xpTotal < SESSION_STAKE_XP;
+      }
+      return next;
+    });
   }, []);
-  const loadPath = useCallback(() => {
-    setPathLoading(true);
+
+  useEffect(() => {
+    let alive = true;
+    void readPlacementResult(user?.id).then((loaded) => {
+      if (alive) setPlacementResult(loaded);
+    });
+    return () => { alive = false; };
+  }, [user?.id]);
+
+  // Chào mời nâng cấp Meet cho tài khoản miễn phí — đồng bộ Web DailyPracticePage
+  useEffect(() => {
+    if (!isFreePortalMenu(user) || session) return undefined;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const studentId = String(user?.id || user?._id || 'student').trim();
+    const today = (() => {
+      try {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      } catch {
+        return new Date().toISOString().slice(0, 10);
+      }
+    })();
+    subscriptionApi.overview()
+      .then((data) => {
+        if (cancelled) return;
+        const sub = data?.subscription;
+        if (sub?.meetLifetime || sub?.state === 'active') return;
+        let storageKey = `cms_meet_offer:${studentId}:${today}`;
+        if (sub?.state === 'expiring') {
+          const days = Math.max(1, Number(sub.daysLeft) || 1);
+          const milestone = days <= 1 ? 1 : 7;
+          storageKey = `cms_meet_remind:${studentId}:${sub.expiresAt}:${milestone}`;
+        }
+        AsyncStorage.getItem(storageKey)
+          .then((seen) => {
+            if (cancelled || seen === '1') return;
+            timer = setTimeout(() => {
+              if (cancelled) return;
+              void AsyncStorage.setItem(storageKey, '1').catch(() => { });
+              setMeetOfferOpen(true);
+            }, 5000);
+          })
+          .catch(() => { });
+      })
+      .catch(() => { });
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [user, session]);
+
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
+    dailyPracticeApi.overview()
+      .then((data) => {
+        setTopics(data.topics);
+        setStats(() => {
+          const s = { ...data.stats };
+          if (typeof s.xpTotal === 'number') s.xpEmpty = s.xpTotal < SESSION_STAKE_XP;
+          return s;
+        });
+        setSpacedRepetition(data.spacedRepetition || data.stats?.spacedRepetition || null);
+        setError('');
+      })
+      .catch((err: unknown) => {
+        if (!silent) setError(err instanceof Error ? err.message : 'Không tải được luyện tập hằng ngày');
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
+  }, []);
+  const loadPath = useCallback((silent = false) => {
+    if (!silent) setPathLoading(true);
     dailyPracticeApi.path()
       .then((data) => {
         setPathTopics(data.topics);
         setPathActiveTopicId(String(data.activeTopicId || '').trim());
+        setPathCanTestOut(data.canTestOut !== false);
       })
-      .catch((err: unknown) => setPathError(err instanceof Error ? err.message : 'Không tải được lộ trình luyện tập'))
-      .finally(() => setPathLoading(false));
+      .catch((err: unknown) => {
+        if (!silent) setPathError(err instanceof Error ? err.message : 'Không tải được lộ trình luyện tập');
+      })
+      .finally(() => {
+        if (!silent) setPathLoading(false);
+      });
   }, []);
-  useEffect(() => { load(); loadPath(); }, [load, loadPath]);
+  useEffect(() => { load(false); loadPath(false); }, [load, loadPath]);
+
+  const didFocusSyncRef = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!didFocusSyncRef.current) {
+      didFocusSyncRef.current = true;
+      return;
+    }
+    load(true);
+    loadPath(true);
+  }, [load, loadPath]));
+
+  useEffect(() => {
+    const appSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        load(true);
+        loadPath(true);
+      }
+    });
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const onForeground = () => {
+        if (document.visibilityState !== 'hidden') {
+          load(true);
+          loadPath(true);
+        }
+      };
+      window.addEventListener('focus', onForeground);
+      document.addEventListener('visibilitychange', onForeground);
+      return () => {
+        appSub.remove();
+        window.removeEventListener('focus', onForeground);
+        document.removeEventListener('visibilitychange', onForeground);
+      };
+    }
+    return () => {
+      appSub.remove();
+    };
+  }, [load, loadPath]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats>; xpTotal?: number | null }) => {
       if (!detail) return;
-      setStats((prev) => {
-        const nextPatch = detail.stats || detail;
-        if (!prev) return nextPatch as DpStats;
-        return {
-          ...prev,
-          ...nextPatch,
-          xpTotal: typeof detail.xpTotal === 'number' ? detail.xpTotal : (typeof nextPatch.xpTotal === 'number' ? nextPatch.xpTotal : prev.xpTotal),
-        };
+      const nextPatch = detail.stats || detail;
+      applyStats({
+        ...nextPatch,
+        ...(typeof detail.xpTotal === 'number' ? { xpTotal: detail.xpTotal } : {}),
       });
     });
     return () => sub.remove();
-  }, []);
+  }, [applyStats]);
 
-  const begin = async (pick: PracticePick) => {
+  const begin = useCallback(async (pick: PracticePick) => {
     setStarting(true);
     setError('');
     setPathError('');
     try {
-      const data = pick.mode === 'path'
-        ? await dailyPracticeApi.startPath(pick.unitId, pick.step, pick.testOut, pick.nodeKey || '', { review: pick.review })
-        : await dailyPracticeApi.start(pick.topicId, pick.difficulty);
+      const data = pick.mode === 'spaced'
+        ? await dailyPracticeApi.startSpacedReview()
+        : pick.mode === 'path'
+          ? await dailyPracticeApi.startPath(pick.unitId, pick.step, pick.testOut, pick.nodeKey || '', { review: pick.review })
+          : await dailyPracticeApi.start(pick.topicId, pick.difficulty);
       setStakePrompt(null);
       setLastPick(pick);
       setSummary(null);
@@ -4008,14 +4918,16 @@ export function DailyPracticeScreen() {
         ...data,
         questions: shuffleList(data.questions),
       });
+      if (typeof data.profileXp === 'number') applyStats({ xpTotal: data.profileXp });
+      load(true);
       scrollRef.current?.scrollTo({ y: 0, animated: false });
     } catch (err) {
       const status = (err as { status?: number })?.status;
       const message = err instanceof Error ? err.message : 'Không bắt đầu được lượt chơi';
-      if (status === 402) {
+      if (status === 402 || /hết xp|không đủ xp/i.test(message)) {
         setStakePrompt(null);
         setBuyXpOpen(true);
-        load();
+        load(true);
       } else if (pick.mode === 'path') {
         setStakePrompt(null);
         setPathError(message);
@@ -4027,15 +4939,35 @@ export function DailyPracticeScreen() {
     } finally {
       setStarting(false);
     }
-  };
-  const start = (topicId: string, difficulty: DpDifficulty) => begin({ mode: 'free', topicId, difficulty });
-  const startStep = (unitId: string, nodeKey: string, step: DpStepKey, testOut = false, opts: { review?: boolean } = {}) => {
-    if (opts.review) {
-      return begin({ mode: 'path', unitId, nodeKey, step, testOut: false, review: true });
+  }, [applyStats, load, loadPath]);
+
+  const queueBegin = useCallback((pick: PracticePick) => {
+    const resolvedPick: PracticePick = pick.mode === 'path' && !pick.testOut
+      ? { ...pick, review: Boolean(pick.review || isPathPickCompleted(pathTopics, pick)) }
+      : pick;
+    const meta = clientStakeMeta(resolvedPick);
+    if (!meta || resolvedPick.mode !== 'path') {
+      void begin(resolvedPick);
+      return;
     }
-    const stakeXp = testOut ? TEST_OUT_XP : SESSION_STAKE_XP;
-    setStakePrompt({ unitId, nodeKey: nodeKey || '', step, testOut, stakeXp });
-    return undefined;
+    const xpTotal = stats?.xpTotal;
+    const isBlockedFreeTestOut = meta.testOut && !pathCanTestOut;
+    if (!isBlockedFreeTestOut && typeof xpTotal === 'number' && xpTotal < meta.stakeXp) {
+      setBuyXpOpen(true);
+      return;
+    }
+    setStakePrompt({
+      pick: resolvedPick,
+      stakeXp: meta.stakeXp,
+      testOut: meta.testOut,
+      review: meta.review,
+    });
+  }, [begin, pathCanTestOut, pathTopics, stats?.xpTotal]);
+
+  const start = (topicId: string, difficulty: DpDifficulty) => void begin({ mode: 'free', topicId, difficulty });
+  const startSpacedReview = () => { void begin({ mode: 'spaced' }); };
+  const startStep = (unitId: string, nodeKey: string, step: DpStepKey, testOut = false, opts: { review?: boolean } = {}) => {
+    queueBegin({ mode: 'path', unitId, nodeKey: nodeKey || '', step, testOut, review: opts.review === true });
   };
   const quickStart = (preferredTopic?: DpTopicPath | null) => {
     const remembered = pickActivePathTopic(
@@ -4054,22 +4986,96 @@ export function DailyPracticeScreen() {
     }
     if (topics[0]) {
       setMode('free');
-      void start(topics[0].id, 'easy');
+      start(topics[0].id, 'easy');
     }
   };
   useEffect(() => {
+    const resumeKey = route.params?.resumeKey || 0;
+    if (resumeKey && handledResumeKeyRef.current !== resumeKey) {
+      handledResumeKeyRef.current = resumeKey;
+      setMode('path');
+      if (!session) {
+        setCelebrating(false);
+        setSummary(null);
+      }
+      setPendingResume({
+        key: resumeKey,
+        topicId: route.params?.topicId,
+        unitId: route.params?.resumeUnitId,
+        nodeKey: route.params?.resumeNodeKey,
+        sectionId: route.params?.resumeSectionId,
+        videoId: route.params?.resumeVideoId,
+        atSec: route.params?.resumeAtSec,
+        watchStage: route.params?.watch === 'stage',
+      });
+      navigation.setParams({
+        resumeKey: undefined,
+        resumeUnitId: undefined,
+        resumeNodeKey: undefined,
+        resumeSectionId: undefined,
+        resumeVideoId: undefined,
+        resumeAtSec: undefined,
+        watch: undefined,
+      } as never);
+      return;
+    }
     if (route.params?.watch === 'stage') {
       setMode('path');
+      setPendingWatchStage(true);
       navigation.setParams({ watch: undefined } as never);
     }
-  }, [route.params?.watch, navigation]);
+  }, [
+    route.params?.resumeKey,
+    route.params?.topicId,
+    route.params?.resumeUnitId,
+    route.params?.resumeNodeKey,
+    route.params?.resumeSectionId,
+    route.params?.resumeVideoId,
+    route.params?.resumeAtSec,
+    route.params?.watch,
+    navigation,
+    session,
+  ]);
 
   useEffect(() => {
-    if (route.params?.practice === 'stage') {
-      setMode('path');
-      navigation.setParams({ practice: undefined } as never);
+    if (route.params?.practice !== 'stage' || session || summary || pathLoading || !pathTopics.length) return;
+    if (practiceLockRef.current) return;
+    const topic = pathTopics.find((item) => continuePracticeTarget(item));
+    const target = topic ? continuePracticeTarget(topic) : null;
+    practiceLockRef.current = true;
+    navigation.setParams({ practice: undefined } as never);
+    setMode('path');
+    if (!target) {
+      practiceLockRef.current = false;
+      return;
     }
-  }, [route.params?.practice, navigation]);
+    void takeWelcomeBackTurn(String(user?.id || user?._id || '')).then((shouldWelcome) => {
+      if (shouldWelcome) {
+        setWelcomeTarget(target);
+        return;
+      }
+      if (target.kind === 'lesson' && target.level) {
+        setRequestedLesson(target);
+        practiceLockRef.current = false;
+        return;
+      }
+      queueBegin({ mode: 'path', unitId: target.unit.id, nodeKey: target.nodeKey, step: target.step, testOut: false });
+      practiceLockRef.current = false;
+    });
+  }, [route.params?.practice, navigation, session, summary, pathLoading, pathTopics, queueBegin, user?.id, user?._id]);
+
+  const enterWelcome = () => {
+    const target = welcomeTarget;
+    if (!target) return;
+    setWelcomeTarget(null);
+    if (target.kind === 'lesson' && target.level) {
+      setRequestedLesson(target);
+      practiceLockRef.current = false;
+      return;
+    }
+    queueBegin({ mode: 'path', unitId: target.unit.id, nodeKey: target.nodeKey, step: target.step, testOut: false });
+    practiceLockRef.current = false;
+  };
 
   const goHome = () => {
     setCelebrating(false);
@@ -4090,11 +5096,26 @@ export function DailyPracticeScreen() {
     goHome();
   };
 
+  const finishRematchStakeXp = summary?.xpDisabled ? 0 : (
+    summary?.path?.testOut ? TEST_OUT_XP
+      : (summary?.recovery ? 0 : ((summary?.total || 10) * QUESTION_STAKE_XP))
+  );
+
   const handleFinishReplay = () => {
+    const pathResult = summary?.path;
+    const currentXpTotal = stats?.xpTotal;
+    if (pathResult && !pathResult.passed) {
+      if (typeof currentXpTotal === 'number' && currentXpTotal < finishRematchStakeXp) {
+        setBuyXpOpen(true);
+        return;
+      }
+      setFinishRematchOpen(true);
+      return;
+    }
     if (lastPick) {
       setCelebrating(false);
       setSummary(null);
-      void begin(lastPick);
+      queueBegin(pathResult?.passed && lastPick.mode === 'path' ? { ...lastPick, review: true } : lastPick);
     }
   };
 
@@ -4123,7 +5144,7 @@ export function DailyPracticeScreen() {
         scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={mode !== 'path'}
         contentContainerStyle={styles.screen}
-        style={mode === 'path' ? { scrollbarWidth: 'none' } : undefined}
+        style={mode === 'path' ? ({ scrollbarWidth: 'none' } as never) : undefined}
         keyboardShouldPersistTaps="handled"
       >
         {session ? (
@@ -4131,26 +5152,36 @@ export function DailyPracticeScreen() {
             session={session}
             play={play}
             stats={stats}
-            onQuit={() => { setSession(null); load(); loadPath(); }}
+            onQuit={(info) => {
+              setSession(null);
+              if (info?.stats) applyStats(info.stats);
+              else if (typeof info?.profileXp === 'number') applyStats({ xpTotal: info.profileXp });
+              load(true);
+              loadPath(true);
+            }}
             onDraggingChange={(dragging) => setScrollEnabled(!dragging)}
             onFinished={(data) => {
               setSession(null);
               setSummary(data);
               setCelebrating(true);
-              setStats((prev) => (prev ? { ...prev, ...data.stats } : data.stats));
+              applyStats(data.stats);
+              load(true);
+              if (data.spacedRepetition) {
+                setSpacedRepetition(data.spacedRepetition);
+              }
               DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT, null);
               scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}
           />
         ) : (
           <HomeView
-            key={`${linkedTopicId}-${route.params?.watch || ''}`}
+            key={linkedTopicId || 'daily-practice'}
             topics={topics}
             stats={stats}
             loading={loading}
             error={error}
             starting={starting}
-            onStart={(t, d) => { void start(t, d); }}
+            onStart={(t, d) => { start(t, d); }}
             play={play}
             initialTopicId={linkedTopicId}
             mode={mode}
@@ -4158,12 +5189,26 @@ export function DailyPracticeScreen() {
             pathTopics={pathTopics}
             pathLoading={pathLoading}
             pathError={pathError}
+            pathCanTestOut={pathCanTestOut}
             onStartStep={(unitId, nodeKey, step, testOut, opts) => { startStep(unitId, nodeKey, step, testOut, opts); }}
             onQuickStart={quickStart}
             onPathChanged={() => { load(); loadPath(); }}
             onBuyXp={goToBuyXp}
-            initialWatchStage={route.params?.watch === 'stage'}
+            onOpenUpgrade={() => setMeetOfferOpen(true)}
+            onViewProgress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
+            onScrollToPath={() => scrollRef.current?.scrollTo({ y: 360, animated: true })}
+            initialWatchStage={pendingWatchStage}
+            onContinueVideoOpened={() => setPendingWatchStage(false)}
+            pendingResume={pendingResume}
+            onResumeConsumed={() => setPendingResume(null)}
             pathActiveTopicId={pathActiveTopicId}
+            requestedLesson={requestedLesson}
+            onRequestedLessonOpened={() => setRequestedLesson(null)}
+            spacedRepetition={spacedRepetition}
+            onStartSpacedReview={startSpacedReview}
+            placementResult={placementResult}
+            onOpenPlacement={() => setPlacementOpen(true)}
+            recommendedTopic={recommendedTopic}
           />
         )}
       </ChromeScrollView>
@@ -4174,30 +5219,58 @@ export function DailyPracticeScreen() {
           play={play}
           onDismiss={goHome}
           onContinue={handleFinishContinue}
-          onReplay={lastPick ? handleFinishReplay : undefined}
+          onReplay={lastPick || (summary.path && !summary.path.passed) ? handleFinishReplay : undefined}
           onRelatedVideo={handleFinishRelatedVideo}
         />
       ) : null}
-      {stakePrompt ? (
+      <WelcomeBackModal
+        visible={Boolean(welcomeTarget && !session)}
+        unitIndex={welcomeTarget?.unit?.index}
+        unitTitle={welcomeTarget?.unit?.title}
+        lessonLabel={welcomeTarget?.level?.title || welcomeTarget?.level?.label || ''}
+        play={play}
+        onEnter={enterWelcome}
+      />
+      {stakePrompt && !session ? (
         <StakeSessionConfirm
+          variant="start"
           stakeXp={stakePrompt.stakeXp}
-          xpTotal={stats?.xpTotal || 0}
+          xpTotal={stats?.xpTotal ?? 0}
           testOut={stakePrompt.testOut}
+          testOutLocked={stakePrompt.testOut && !pathCanTestOut}
+          review={stakePrompt.review}
           busy={starting}
           play={play}
           onCancel={() => { if (!starting) setStakePrompt(null); }}
           onConfirm={() => {
-            void begin({
-              mode: 'path',
-              unitId: stakePrompt.unitId,
-              nodeKey: stakePrompt.nodeKey,
-              step: stakePrompt.step,
-              testOut: stakePrompt.testOut,
-            });
+            const nextPick = stakePrompt.pick;
+            void begin(nextPick);
           }}
           onBuyXp={() => {
+            const lockedTestOut = stakePrompt.testOut && !pathCanTestOut;
             setStakePrompt(null);
+            if (lockedTestOut) setMeetOfferOpen(true);
+            else setBuyXpOpen(true);
+          }}
+        />
+      ) : null}
+      {finishRematchOpen && summary ? (
+        <StakeSessionConfirm
+          variant="rematch"
+          stakeXp={finishRematchStakeXp}
+          xpTotal={stats?.xpTotal ?? 0}
+          busy={starting}
+          play={play}
+          onCancel={() => { if (!starting) setFinishRematchOpen(false); }}
+          onBuyXp={() => {
+            setFinishRematchOpen(false);
             setBuyXpOpen(true);
+          }}
+          onConfirm={() => {
+            setFinishRematchOpen(false);
+            setCelebrating(false);
+            setSummary(null);
+            if (lastPick) void begin(lastPick);
           }}
         />
       ) : null}
@@ -4209,6 +5282,43 @@ export function DailyPracticeScreen() {
           onPurchased={() => { load(); loadPath(); }}
         />
       ) : null}
+      <FreeMeetPlanModal
+        visible={meetOfferOpen && !session}
+        onClose={() => setMeetOfferOpen(false)}
+        onUnlocked={() => { load(); loadPath(); }}
+      />
+      <PlacementTestModal
+        visible={placementOpen}
+        onClose={() => {
+          setPlacementOpen(false);
+          void readPlacementResult(user?.id).then(setPlacementResult);
+        }}
+        studentId={user?.id}
+        topics={pathTopics.length ? pathTopics : topics}
+        onApplied={(res) => {
+          setPlacementResult(res);
+          const allTopics = [
+            ...pathTopics.map((t) => ({ id: t.topic.id, name: t.topic.name, inPath: true })),
+            ...topics.map((t) => ({ id: t.id, name: t.name, inPath: false })),
+          ];
+          const matchedNameLower = (res.matchedTopicName || '').toLowerCase();
+          const chosen = allTopics.find((t) => t.id === res.matchedTopicId)
+            || allTopics.find((t) => matchedNameLower && t.name.toLowerCase().includes(matchedNameLower));
+          if (chosen) {
+            if (chosen.inPath) {
+              setMode('path');
+              setPathActiveTopicId(chosen.id);
+              void dailyPracticeApi.setActivePathTopic(chosen.id).catch(() => {});
+            } else {
+              setMode('free');
+            }
+            setRecommendedTopic((prev) => ({ id: chosen.id, seq: (prev?.seq || 0) + 1 }));
+          } else {
+            setMode('path');
+          }
+          scrollRef.current?.scrollTo({ y: 0, animated: false });
+        }}
+      />
     </AppScreen>
   );
 }
@@ -4328,7 +5438,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     flex: 1,
     color: PLAY_QUESTION_CHROME.hintRevealBox.color,
     fontSize: PLAY_QUESTION_CHROME.hintRevealBox.fontSize,
-    fontWeight: PLAY_QUESTION_CHROME.hintRevealBox.fontWeight,
+    fontWeight: PLAY_QUESTION_CHROME.hintRevealBox.fontWeight as TextStyle['fontWeight'],
     lineHeight: 20,
   },
   hintRevealWrap: { marginTop: 12, gap: 6 },
@@ -5437,7 +6547,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   hintCornerBtnText: {
     color: PLAY_QUESTION_CHROME.hintButton.color,
     fontSize: PLAY_QUESTION_CHROME.hintButton.fontSize,
-    fontWeight: PLAY_QUESTION_CHROME.hintButton.fontWeight,
+    fontWeight: PLAY_QUESTION_CHROME.hintButton.fontWeight as TextStyle['fontWeight'],
     maxWidth: 120,
   },
   playMetaChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -5464,7 +6574,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   playPrompt: {
     color: PLAY_QUESTION_CHROME.prompt.color,
     fontSize: PLAY_QUESTION_CHROME.prompt.fontSize,
-    fontWeight: PLAY_QUESTION_CHROME.prompt.fontWeight,
+    fontWeight: PLAY_QUESTION_CHROME.prompt.fontWeight as TextStyle['fontWeight'],
     lineHeight: PLAY_QUESTION_CHROME.prompt.lineHeight,
     flexShrink: 1,
     marginTop: 4,
@@ -5472,13 +6582,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   questionMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
   questionEyebrow: {
     fontSize: PLAY_QUESTION_CHROME.eyebrow.fontSize,
-    fontWeight: PLAY_QUESTION_CHROME.eyebrow.fontWeight,
+    fontWeight: PLAY_QUESTION_CHROME.eyebrow.fontWeight as TextStyle['fontWeight'],
     color: PLAY_QUESTION_CHROME.eyebrow.color,
   },
   questionMetaSep: { color: '#CBD5E1', fontSize: 12, fontWeight: '400' },
   playTypeChip: {
     fontSize: PLAY_QUESTION_CHROME.typeChip.fontSize,
-    fontWeight: PLAY_QUESTION_CHROME.typeChip.fontWeight,
+    fontWeight: PLAY_QUESTION_CHROME.typeChip.fontWeight as TextStyle['fontWeight'],
     color: PLAY_QUESTION_CHROME.typeChip.color,
     flexShrink: 1,
     maxWidth: '70%',
@@ -5501,7 +6611,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   explainFooterBtnText: {
     color: PLAY_QUESTION_CHROME.hintButton.color,
     fontSize: PLAY_QUESTION_CHROME.hintButton.fontSize,
-    fontWeight: PLAY_QUESTION_CHROME.hintButton.fontWeight,
+    fontWeight: PLAY_QUESTION_CHROME.hintButton.fontWeight as TextStyle['fontWeight'],
   },
   hintFooterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,

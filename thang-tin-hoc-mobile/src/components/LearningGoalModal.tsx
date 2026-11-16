@@ -86,8 +86,9 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
     if (!enabled) return undefined;
     load();
     const openSub = DeviceEventEmitter.addListener(OPEN_LEARNING_GOAL_EVENT, () => setOpen(true));
-    const changedSub = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next: LearningGoalData) => {
-      if (next) setData(next);
+    const changedSub = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next?: LearningGoalData | null) => {
+      if (next && typeof next === 'object' && 'progress' in next) setData(next);
+      else load();
     });
     return () => {
       openSub.remove();
@@ -486,7 +487,7 @@ function LearningGoalModal({
                   style={{ width: 105 }}
                 />
                 <DuoButton
-                  variant={isBrandStudent ? 'danger' : 'accent'}
+                  variant={isBrandStudent ? 'primary' : 'accent'}
                   size="md"
                   loading={saving}
                   icon={<Target size={16} color="#FFFFFF" />}
@@ -547,7 +548,7 @@ const styles = StyleSheet.create({
   badgeBrand: {
     backgroundColor: '#10B981',
     backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
-    boxShadow: '0px 10px 22px rgba(185, 28, 28, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(153, 27, 27, 0.5)',
+    boxShadow: '0px 10px 22px rgba(4, 120, 87, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(4, 120, 87, 0.5)',
   } as never,
   badgeSuccess: {
     backgroundColor: '#059669',

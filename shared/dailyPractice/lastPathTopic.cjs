@@ -36,10 +36,13 @@ function pathTopicHasLearningProgress(topicRow) {
   for (const unit of topicRow.units || []) {
     if (unit.state === 'completed') return true;
     if (unit.state === 'locked') continue;
+    if (Array.isArray(unit.completedSections) && unit.completedSections.length > 0) return true;
+    if (Array.isArray(unit.watchedVideoIds) && unit.watchedVideoIds.length > 0) return true;
     for (const step of unit.steps || []) {
       if (step.state === 'completed') return true;
     }
     for (const node of unit.pathNodes || []) {
+      if (node.state === 'completed') return true;
       for (const level of node.levels || []) {
         if (level.state === 'completed') return true;
       }

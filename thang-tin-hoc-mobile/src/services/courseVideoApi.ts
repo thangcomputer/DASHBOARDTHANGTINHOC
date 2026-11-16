@@ -1,4 +1,6 @@
+import { DeviceEventEmitter } from 'react-native';
 import { mobileApiRequest, resolveMobilePublicUrl } from './apiClient';
+import { LEARNING_GOAL_CHANGED_EVENT } from './learningGoalApi';
 
 export type LessonPracticeSubject = {
   id: string;
@@ -185,18 +187,28 @@ export async function saveStudyResumePoint(point: { unitId: string; sectionId: s
   });
 }
 
-export async function markCourseUnitSection(unitId: string, section: 'video' | 'note', itemId: string) {
+export async function markCourseUnitSection(unitId: string, section: 'video' | 'note', itemId: string, watchRatio?: number) {
   await mobileApiRequest(`/lesson-practice/my/units/${encodeURIComponent(unitId)}/sections/${section}`, {
     method: 'POST',
-    body: JSON.stringify({ itemId }),
+    body: JSON.stringify({
+      itemId,
+      ...(watchRatio !== undefined ? { watchRatio } : section === 'video' ? { watchRatio: 1 } : {}),
+    }),
   });
+  if (section === 'video') {
+    DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
+  }
 }
 
 export async function confirmCoursePracticeItem(itemId: string, answer: Record<string, unknown>) {
-  return mobileApiRequest<{ data?: { retry?: boolean; item?: LessonPracticeItem } }>(
+  const res = await mobileApiRequest<{ data?: { retry?: boolean; item?: LessonPracticeItem } }>(
     `/lesson-practice/my/items/${encodeURIComponent(itemId)}/confirm`,
     { method: 'POST', body: JSON.stringify(answer) },
   );
+  if (res?.data && !res.data.retry) {
+    DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
+  }
+  return res;
 }
 
 export async function resetCoursePractice(unitId: string, practiceGroupId: string) {

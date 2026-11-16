@@ -140,11 +140,6 @@ export function StageDropletBadge({ index, locked, accentTo }: { index: number; 
 
 export function PathITBackdrop({
   accentSoft = '#EFF6FF',
-  topicCompletedUnits = 0,
-  topicTotalUnits = 1,
-  unitIndex = 0,
-  unitTotal = 1,
-  unitState = 'locked',
   hideMap = false,
   fullBleed = false,
 }: {
@@ -168,17 +163,6 @@ export function PathITBackdrop({
             : { backgroundColor: accentSoft, opacity: 0.97 },
         ]}
       />
-      {hideMap ? null : (
-        <View style={styles.vnMapStage}>
-          <VietnamMapBackground
-            topicCompletedUnits={topicCompletedUnits}
-            topicTotalUnits={topicTotalUnits}
-            unitIndex={unitIndex}
-            unitTotal={unitTotal}
-            unitState={unitState}
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -237,6 +221,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   backdrop: { borderRadius: 22, overflow: 'hidden', opacity: 0.92 },
+  backdropFull: { borderRadius: 0, opacity: 1 },
   iconMonitor: { position: 'absolute', right: 4, top: '16%' as const },
   iconCpu: { position: 'absolute', left: 0, bottom: '14%' as const },
   mascotBuddy: { position: 'absolute', top: '25%' as const, zIndex: 2 },

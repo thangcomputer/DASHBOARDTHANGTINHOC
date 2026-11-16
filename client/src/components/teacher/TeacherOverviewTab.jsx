@@ -305,7 +305,7 @@ export default function TeacherOverviewTab({
           <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
             <TrendingUp size={16} className="text-sky-500 shrink-0" aria-hidden="true" /> Tháng này
           </h3>
-          <div className="grid flex-1 grid-cols-3 gap-2 sm:gap-3">
+          <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
             {[
               {
                 icon: WalletCards,
@@ -336,14 +336,14 @@ export default function TeacherOverviewTab({
                   type={onClick ? 'button' : undefined}
                   onClick={onClick}
                   title={title}
-                  className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:gap-3 sm:p-3 ${onClick ? 'cursor-pointer hover:border-emerald-200 hover:bg-emerald-50/40' : ''}`}
+                  className={`flex min-w-0 flex-row items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:flex-col sm:items-start sm:gap-2 sm:p-3 ${onClick ? 'cursor-pointer hover:border-emerald-200 hover:bg-emerald-50/40' : ''}`}
                 >
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tint}`}>
-                    <Icon size={24} strokeWidth={2.2} aria-hidden="true" />
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 ${tint}`}>
+                    <Icon size={20} strokeWidth={2.2} aria-hidden="true" />
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex min-w-0 w-full flex-1 flex-col">
                     <span className="truncate text-base font-black tabular-nums text-slate-900 sm:text-lg">{value}</span>
-                    <span className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</span>
+                    <span className="text-[11px] font-bold leading-tight text-slate-500 sm:text-xs">{label}</span>
                   </span>
                 </Tag>
               );

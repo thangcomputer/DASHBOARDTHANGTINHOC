@@ -1,20 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
   ChevronRight,
+  Download,
   ExternalLink,
   FileText,
   Gamepad2,
@@ -24,14 +29,18 @@ import {
   PlayCircle,
   X,
 } from 'lucide-react-native';
+import { saveLastStudySession } from '../../utils/resumeLearning';
 import {
   dailyPracticeApi,
   DpDifficulty,
+  DpLevelFile,
   DpLevelSectionConfig,
   DpPathNode,
+  DpPathStep,
   DpPathUnit,
   DpPathVideo,
   DpSectionKey,
+  DpSectionLockMode,
   DpStepKey,
 } from '../../services/dailyPracticeApi';
 import { resolveMobilePublicUrl } from '../../services/apiClient';
@@ -42,6 +51,36 @@ const DIFFICULTY_STEP_MAP: Record<DpDifficulty, DpStepKey> = {
   medium: 'practice',
   hard: 'challenge',
 };
+
+function buildMediaDownloadUrl(rawUrl: string, displayName?: string) {
+  const base = resolveMobilePublicUrl(rawUrl);
+  if (!base) return '';
+  const params: string[] = [];
+  if (base.includes('/uploads/')) params.push('download=1');
+  const cleanName = String(displayName || '').trim();
+  if (cleanName) params.push(`downloadAs=${encodeURIComponent(cleanName)}`);
+  if (!params.length) return base;
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}${params.join('&')}`;
+}
+
+function triggerFileDownload(file: DpLevelFile) {
+  const dlUrl = buildMediaDownloadUrl(file.url, file.name);
+  if (!dlUrl) return;
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const a = document.createElement('a');
+    a.href = dlUrl;
+    a.setAttribute('download', file.name || file.title || 'tai-lieu');
+    a.rel = 'noopener noreferrer';
+    a.target = '_blank';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+  void Linking.openURL(dlUrl);
+}
 
 function sectionActionLabel(
   secKey: DpSectionKey,
@@ -109,6 +148,16 @@ function renderSectionIcon(key: DpSectionKey, color: string) {
   return <Gamepad2 size={18} color={color} />;
 }
 
+function normalizeSectionLocks(raw?: Partial<Record<DpSectionKey, DpSectionLockMode>> | null): Record<DpSectionKey, DpSectionLockMode> {
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const out = {} as Record<DpSectionKey, DpSectionLockMode>;
+  for (const key of DEFAULT_SECTION_ORDER) {
+    const val = String(src[key] || '').trim();
+    out[key] = (val === 'auto' || val === 'unlocked' || val === 'locked') ? val : 'auto';
+  }
+  return out;
+}
+
 function normalizeConfig(node: DpPathNode, diff: DpDifficulty): DpLevelSectionConfig {
   const cfg = node.levelConfigs?.[diff];
   if (cfg) {
@@ -121,20 +170,26 @@ function normalizeConfig(node: DpPathNode, diff: DpDifficulty): DpLevelSectionCo
       sectionOrder: order,
       hiddenSections: Array.isArray(cfg.hiddenSections) ? cfg.hiddenSections : [],
       sequentialSections: cfg.sequentialSections !== false,
+      sectionLocks: normalizeSectionLocks(cfg.sectionLocks),
       content: cfg.content || { title: '', description: '', body: '' },
       files: Array.isArray(cfg.files) ? cfg.files : [],
       video: cfg.video || { title: '', url: '', antiSeek: true, checks: [] },
-      practice: cfg.practice || { title: '', description: '' },
+      practice: cfg.practice || { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [] } },
     };
   }
-  const legacy = diff === 'easy' ? node.levels?.[0] : null;
-  const legacyVid: DpPathVideo | null = legacy?.videos?.[0] ?? null;
+  const legacy = (diff === 'easy' ? node.levels?.[0] : null) as (DpPathStep & { fileUrl?: string; fileName?: string }) | null;
+  const legacyVid = (legacy?.videos?.[0] ?? null) as (DpPathVideo & { fileUrl?: string; fileName?: string }) | null;
+  const legacyFileUrl = legacy?.fileUrl || legacyVid?.fileUrl || '';
+  const legacyFileName = legacy?.fileName || legacyVid?.fileName || 'Tài liệu đính kèm';
   return {
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
     sequentialSections: true,
+    sectionLocks: normalizeSectionLocks(null),
     content: { title: legacy?.title || '', description: '', body: legacy?.content || legacyVid?.content || '' },
-    files: [],
+    files: legacyFileUrl
+      ? [{ id: 'legacy-file', title: legacyFileName, url: legacyFileUrl, name: legacyFileName }]
+      : [],
     video: {
       id: legacyVid?.id || '',
       title: legacyVid?.title || '',
@@ -147,6 +202,12 @@ function normalizeConfig(node: DpPathNode, diff: DpDifficulty): DpLevelSectionCo
 
 type Props = {
   visible: boolean;
+  suspended?: boolean;
+  userId?: string;
+  topicId?: string;
+  courseTitle?: string;
+  initialDifficulty?: DpDifficulty | null;
+  initialSection?: DpSectionKey | null;
   unit: DpPathUnit | null;
   node: DpPathNode | null;
   milestoneIndex: number;
@@ -158,6 +219,12 @@ type Props = {
 
 export default function MilestoneHubModal({
   visible,
+  suspended = false,
+  userId = '',
+  topicId = '',
+  courseTitle = '',
+  initialDifficulty = null,
+  initialSection = null,
   unit,
   node,
   milestoneIndex,
@@ -171,7 +238,21 @@ export default function MilestoneHubModal({
   const [selectedReviewSection, setSelectedReviewSection] = useState<DpSectionKey | null>(null);
   const [completedList, setCompletedList] = useState<string[]>([]);
   const [startedVideos, setStartedVideos] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState(false);
+  const [contentScrolledToEnd, setContentScrolledToEnd] = useState(false);
+  const autoCompletedRef = useRef<Set<string>>(new Set());
+  const scrollOffsetYRef = useRef(0);
+  const scrollViewportHeightRef = useRef(0);
+  const scrollContentHeightRef = useRef(0);
+
+  const checkScrollAtBottom = useCallback((offsetY?: number, viewportH?: number, contentH?: number) => {
+    const y = offsetY ?? scrollOffsetYRef.current;
+    const vh = viewportH ?? scrollViewportHeightRef.current;
+    const ch = contentH ?? scrollContentHeightRef.current;
+    if (vh > 0 && ch > 0 && y + vh >= ch - 24) {
+      setContentScrolledToEnd(true);
+    }
+  }, []);
 
   useEffect(() => {
     setCompletedList(unit?.completedSections || []);
@@ -185,6 +266,7 @@ export default function MilestoneHubModal({
     if (!visible) {
       setActiveSection(null);
       setSelectedReviewSection(null);
+      setContentScrolledToEnd(false);
       return;
     }
     if (!node) return;
@@ -192,18 +274,52 @@ export default function MilestoneHubModal({
     const isDone = (diff: DpDifficulty) => {
       const c = normalizeConfig(node, diff);
       const hidden = new Set(c.hiddenSections || []);
-      const secs = c.sectionOrder.filter((k) => !hidden.has(k));
+      const secs = c.sectionOrder.filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
       return !secs.length || secs.every((secKey) => doneSet.has(`${node.key}:${diff}:${secKey}`));
     };
     const nextDiff: DpDifficulty = !isDone('easy') ? 'easy' : !isDone('medium') ? 'medium' : !isDone('hard') ? 'hard' : 'easy';
-    setActiveDiff(nextDiff);
+    const isUnlockedForInit = (diff: DpDifficulty) => {
+      if (unit?.testedOut) return true;
+      if (diff === 'easy') return true;
+      if (diff === 'medium') return isDone('easy');
+      if (diff === 'hard') return isDone('easy') && isDone('medium');
+      return false;
+    };
+    const pickedDiff = initialDifficulty && isUnlockedForInit(initialDifficulty) ? initialDifficulty : nextDiff;
+    setActiveDiff(pickedDiff);
+    if (initialSection && (initialSection === 'content' || initialSection === 'file')) {
+      const c = normalizeConfig(node, pickedDiff);
+      const hidden = new Set(c.hiddenSections || []);
+      const secList = c.sectionOrder.filter((k) => !hidden.has(k));
+      const secIdx = secList.indexOf(initialSection);
+      if (secIdx >= 0 && c.sectionLocks?.[initialSection] !== 'locked') {
+        const prevRequired = secList.slice(0, secIdx).filter((k) => c.sectionLocks?.[k] !== 'locked');
+        const unlocked = unit?.testedOut
+          || c.sequentialSections === false
+          || c.sectionLocks?.[initialSection] === 'unlocked'
+          || !prevRequired.some((k) => !doneSet.has(`${node.key}:${pickedDiff}:${k}`));
+        setActiveSection(unlocked ? initialSection : null);
+        return;
+      }
+    }
     setActiveSection(null);
-  }, [visible, node?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, node?.key, initialDifficulty, initialSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cfg = useMemo(
     () => (node ? normalizeConfig(node, activeDiff) : null),
     [node, activeDiff],
   );
+
+  useEffect(() => {
+    if (activeSection !== 'content') {
+      setContentScrolledToEnd(false);
+      return;
+    }
+    setContentScrolledToEnd(false);
+    scrollOffsetYRef.current = 0;
+    scrollViewportHeightRef.current = 0;
+    scrollContentHeightRef.current = 0;
+  }, [activeSection, activeDiff, node?.key, cfg?.content?.body]);
 
   const visibleSections = useMemo(() => {
     if (!cfg) return [];
@@ -219,7 +335,7 @@ export default function MilestoneHubModal({
     if (!node) return [];
     const c = normalizeConfig(node, diff);
     const hidden = new Set(c.hiddenSections || []);
-    return c.sectionOrder.filter((k) => !hidden.has(k));
+    return c.sectionOrder.filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
   };
   const isDiffDone = (diff: DpDifficulty) => {
     const secs = getVisibleSectionsFor(diff);
@@ -247,41 +363,83 @@ export default function MilestoneHubModal({
   }, [activeDiffUnlocked]);
 
   const isSectionDone = (secKey: DpSectionKey) => isSectionDoneFor(activeDiff, secKey);
-  const isSectionUnlocked = (secIdx: number) => {
-    if (unit?.testedOut) return true;
-    if (cfg?.sequentialSections === false) return true;
-    if (secIdx <= 0) return true;
-    return isSectionDone(visibleSections[secIdx - 1]);
+  const getSectionLockState = (secKey: DpSectionKey, secIdx: number) => {
+    const lockMode = cfg?.sectionLocks?.[secKey] || 'auto';
+    if (lockMode === 'locked') return { unlocked: false, reason: 'Admin đang khóa phần này' };
+    if (lockMode === 'unlocked') return { unlocked: true, reason: '' };
+    if (unit?.testedOut || cfg?.sequentialSections === false) return { unlocked: true, reason: '' };
+    const prevRequired = visibleSections.slice(0, secIdx).filter((k) => cfg?.sectionLocks?.[k] !== 'locked');
+    if (prevRequired.some((k) => !isSectionDone(k))) {
+      return { unlocked: false, reason: 'Hoàn thành phần trước để mở khóa' };
+    }
+    return { unlocked: true, reason: '' };
   };
-  const doneCount = visibleSections.filter((secKey) => isSectionDone(secKey)).length;
-  const totalCount = visibleSections.length;
+  const isSectionUnlocked = (secIdx: number) => {
+    const secKey = visibleSections[secIdx];
+    return secKey ? getSectionLockState(secKey, secIdx).unlocked : false;
+  };
+  const requiredSections = visibleSections.filter((secKey) => cfg?.sectionLocks?.[secKey] !== 'locked');
+  const doneCount = requiredSections.filter((secKey) => isSectionDone(secKey)).length;
+  const totalCount = requiredSections.length;
   const progressPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
   const currentTab = DIFFICULTY_TABS.find((t) => t.key === activeDiff) || DIFFICULTY_TABS[0];
 
-  if (!unit || !node || !cfg) return null;
-
-  const toggleSectionDone = async (secKey: DpSectionKey, nextDone: boolean) => {
-    setSaving(true);
+  const markSectionDoneAuto = useCallback(async (secKey: DpSectionKey) => {
+    if (!unit?.id || !node?.key || !secKey) return;
+    const fullKey = `${node.key}:${activeDiff}:${secKey}`;
+    if (completedSet.has(fullKey) || autoCompletedRef.current.has(fullKey)) return;
+    autoCompletedRef.current.add(fullKey);
+    setCompletedList((prev) => (prev.includes(fullKey) ? prev : [...prev, fullKey]));
+    setSavingSection(true);
     try {
       const res = await dailyPracticeApi.completeSection(unit.id, {
         nodeKey: node.key,
         difficulty: activeDiff,
         sectionKey: secKey,
-        completed: nextDone,
+        completed: true,
       });
       if (Array.isArray(res?.completedSections)) {
         setCompletedList(res.completedSections);
-      } else {
-        const key = `${node.key}:${activeDiff}:${secKey}`;
-        setCompletedList((prev) => (nextDone ? Array.from(new Set([...prev, key])) : prev.filter((k) => k !== key)));
       }
       onProgressChanged?.();
     } catch {
-      // ignore
+      // keep optimistic completion in UI
     } finally {
-      setSaving(false);
+      setSavingSection(false);
     }
-  };
+  }, [unit?.id, node?.key, activeDiff, completedSet, onProgressChanged]);
+
+  useEffect(() => {
+    if (!visible || suspended || !unit?.id || !node?.key) return;
+    void saveLastStudySession({
+      kind: 'daily_practice',
+      studentId: userId,
+      topicId: topicId || '',
+      nodeKey: node.key,
+      courseTitle: courseTitle || '',
+      unitId: String(unit.id),
+      unitTitle: unit.title || '',
+      lessonId: String(node.key),
+      lessonTitle: node.label || unit.title || 'Bài học DewSkill',
+      sectionId: `${activeDiff}:${activeSection || 'hub'}`,
+      sectionLabel: `Chặng ${unit.index || 1} · ${currentTab.label}`,
+      progressPct,
+      href: '/student/daily-practice',
+    });
+  }, [visible, suspended, userId, topicId, courseTitle, unit?.id, unit?.index, unit?.title, node?.key, node?.label, activeDiff, activeSection, currentTab.label, progressPct]);
+
+  useEffect(() => {
+    if (!activeSection || !cfg) return;
+    if (activeSection === 'content' && contentScrolledToEnd) {
+      void markSectionDoneAuto('content');
+    } else if (activeSection === 'file') {
+      void markSectionDoneAuto('file');
+    } else if (activeSection === 'video' && !cfg.video?.url) {
+      void markSectionDoneAuto('video');
+    }
+  }, [activeSection, contentScrolledToEnd, cfg, markSectionDoneAuto]);
+
+  if (!unit || !node || !cfg) return null;
 
   const openSection = (secKey: DpSectionKey) => {
     if (secKey === 'video' && cfg.video?.url) {
@@ -290,7 +448,7 @@ export default function MilestoneHubModal({
       onOpenVideo(unit, vidId);
       return;
     }
-    if (secKey === 'practice') {
+    if (secKey === 'practice' && !cfg.practice?.video?.url) {
       onClose();
       onStartPractice(DIFFICULTY_STEP_MAP[activeDiff]);
       return;
@@ -298,10 +456,29 @@ export default function MilestoneHubModal({
     setActiveSection(secKey);
   };
 
+  const handleContinueNextSection = () => {
+    const curIdx = activeSection ? requiredSections.indexOf(activeSection) : -1;
+    const nextSec = curIdx >= 0 ? requiredSections[curIdx + 1] : null;
+    if (nextSec) {
+      if ((nextSec === 'video' && cfg.video?.url) || (nextSec === 'practice' && !cfg.practice?.video?.url)) {
+        setActiveSection(null);
+      }
+      openSection(nextSec);
+      return;
+    }
+    setActiveSection(null);
+  };
+
   const handleQuickStart = () => {
-    const firstPending = visibleSections.find((secKey, idx) => isSectionUnlocked(idx) && !isSectionDone(secKey))
-      || visibleSections.find((secKey, idx) => isSectionUnlocked(idx))
-      || visibleSections[0];
+    const firstPending = requiredSections.find((secKey) => {
+      const idx = visibleSections.indexOf(secKey);
+      return idx >= 0 && isSectionUnlocked(idx) && !isSectionDone(secKey);
+    })
+      || requiredSections.find((secKey) => {
+        const idx = visibleSections.indexOf(secKey);
+        return idx >= 0 && isSectionUnlocked(idx);
+      })
+      || requiredSections[0];
     if (firstPending) openSection(firstPending);
   };
 
@@ -318,7 +495,8 @@ export default function MilestoneHubModal({
       const c = cfg.video?.checks?.length || 0;
       return c ? `Xem video bài giảng (${c} câu hỏi)` : 'Xem video bài giảng';
     }
-    return SECTION_META.practice.defaultSub;
+    const qCount = unit?.counts?.[activeDiff] || 0;
+    return qCount ? `${qCount} câu hỏi mức ${currentTab.label}` : SECTION_META.practice.defaultSub;
   };
 
   const paragraphs = String(cfg.content?.body || '')
@@ -327,7 +505,7 @@ export default function MilestoneHubModal({
     .filter(Boolean);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => {
+    <Modal visible={visible && !suspended} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => {
       if (activeSection) setActiveSection(null);
       else onClose();
     }}>
@@ -406,9 +584,26 @@ export default function MilestoneHubModal({
               ) : visibleSections.map((secKey, secIdx) => {
                 const meta = SECTION_META[secKey];
                 const done = isSectionDone(secKey);
-                const unlocked = isSectionUnlocked(secIdx);
+                const lockState = getSectionLockState(secKey, secIdx);
+                const unlocked = lockState.unlocked;
                 const vidId = cfg.video?.id || `${node.key}:level:${activeDiff}`;
-                const videoInProgress = secKey === 'video' && !done && Boolean(startedVideos[vidId]);
+                const videoInProgress = secKey === 'video' && !done && (
+                  Boolean(startedVideos[vidId])
+                  || (Platform.OS === 'web' && typeof globalThis.sessionStorage !== 'undefined' && (() => {
+                    try {
+                      const keys = [
+                        `dp-${userId || 'anon'}-${unit.id}-${vidId}`,
+                        `dp-${unit.id}-${vidId}`,
+                      ];
+                      return keys.some((k) => (
+                        Number(globalThis.sessionStorage.getItem(`student_lms_watched_${k}`) || 0) > 0
+                        || Number(globalThis.sessionStorage.getItem(`student_lms_pos_${k}`) || 0) > 0
+                      ));
+                    } catch {
+                      return false;
+                    }
+                  })())
+                );
                 const isReviewMode = doneCount === totalCount && totalCount > 0;
                 const isSelectedReview = isReviewMode && selectedReviewSection === secKey;
                 const actionLabel = sectionActionLabel(secKey, { unlocked, done, videoInProgress });
@@ -440,7 +635,7 @@ export default function MilestoneHubModal({
                         {done && <CheckCircle2 size={15} color="#059669" />}
                       </View>
                       <Text numberOfLines={1} style={styles.sectionSub}>
-                        {!unlocked ? 'Hoàn thành phần trước để mở khóa' : sectionSubtitle(secKey)}
+                        {!unlocked ? lockState.reason : sectionSubtitle(secKey)}
                       </Text>
                     </View>
                     <View style={[styles.openPill, done && unlocked && styles.openPillDone, !unlocked && styles.openPillLocked]}>
@@ -455,7 +650,30 @@ export default function MilestoneHubModal({
             </View>
           </ScrollView>
         ) : (
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            key={`sub-${activeSection}-${activeDiff}`}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            scrollEventThrottle={16}
+            onLayout={(e: LayoutChangeEvent) => {
+              const h = e.nativeEvent.layout.height;
+              scrollViewportHeightRef.current = h;
+              if (activeSection === 'content') checkScrollAtBottom(undefined, h, undefined);
+            }}
+            onContentSizeChange={(_w: number, h: number) => {
+              scrollContentHeightRef.current = h;
+              if (activeSection === 'content') checkScrollAtBottom(undefined, undefined, h);
+            }}
+            onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              const y = e.nativeEvent.contentOffset.y;
+              const vh = e.nativeEvent.layoutMeasurement.height;
+              const ch = e.nativeEvent.contentSize.height;
+              scrollOffsetYRef.current = y;
+              if (vh > 0) scrollViewportHeightRef.current = vh;
+              if (ch > 0) scrollContentHeightRef.current = ch;
+              if (activeSection === 'content') checkScrollAtBottom(y, vh, ch);
+            }}
+          >
             {activeSection === 'content' && (
               <View style={styles.detailWrap}>
                 {cfg.content?.title ? <Text style={styles.detailTitle}>{cfg.content.title}</Text> : null}
@@ -482,23 +700,36 @@ export default function MilestoneHubModal({
               <View style={styles.detailWrap}>
                 {cfg.files?.length ? cfg.files.map((file, idx) => (
                   <View key={file.id || idx} style={styles.fileCard}>
-                    <View style={styles.fileIconWrap}>
-                      <FileText size={20} color="#FFFFFF" />
+                    <View style={styles.fileTopRow}>
+                      <View style={styles.fileIconWrap}>
+                        <FileText size={20} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.fileMeta}>
+                        <Text numberOfLines={1} style={styles.fileName}>{file.title || file.name}</Text>
+                        <Text style={styles.fileSub}>Tài liệu học tập</Text>
+                      </View>
                     </View>
-                    <View style={styles.fileMeta}>
-                      <Text numberOfLines={1} style={styles.fileName}>{file.title || file.name}</Text>
-                      <Text style={styles.fileSub}>Tài liệu học tập</Text>
+                    <View style={styles.fileActionsRow}>
+                      <Pressable
+                        onPress={() => {
+                          const url = resolveMobilePublicUrl(file.url);
+                          if (url) void Linking.openURL(url);
+                        }}
+                        style={styles.fileViewBtn}
+                        accessibilityRole="button"
+                      >
+                        <ExternalLink size={14} color="#78350F" />
+                        <Text style={styles.fileViewBtnText}>Xem file</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => triggerFileDownload(file)}
+                        style={styles.fileBtn}
+                        accessibilityRole="button"
+                      >
+                        <Download size={14} color="#FFFFFF" />
+                        <Text style={styles.fileBtnText}>Tải về</Text>
+                      </Pressable>
                     </View>
-                    <Pressable
-                      onPress={() => {
-                        const url = resolveMobilePublicUrl(file.url);
-                        if (url) Linking.openURL(url);
-                      }}
-                      style={styles.fileBtn}
-                    >
-                      <ExternalLink size={14} color="#FFFFFF" />
-                      <Text style={styles.fileBtnText}>Mở file</Text>
-                    </Pressable>
                   </View>
                 )) : (
                   <View style={styles.emptyBox}>
@@ -534,7 +765,37 @@ export default function MilestoneHubModal({
                   <Text style={styles.practiceDesc}>
                     {cfg.practice?.description || 'Hoàn thành tối thiểu 60% số câu hỏi để đạt phần luyện tập này.'}
                   </Text>
+                  <Text style={styles.practiceCountText}>
+                    {`Ngân hàng câu hỏi: ${unit?.counts?.[activeDiff] || 0} câu ${currentTab.label}`}
+                  </Text>
                 </View>
+                {cfg.practice?.video?.url ? (
+                  <View style={styles.practiceVideoCard}>
+                    <View style={styles.practiceVideoHead}>
+                      <View style={styles.practiceVideoMeta}>
+                        <Text style={styles.practiceVideoEyebrow}>VIDEO HƯỚNG DẪN LUYỆN TẬP</Text>
+                        <Text numberOfLines={1} style={styles.practiceVideoTitle}>
+                          {cfg.practice.video.title || `Video luyện tập (${currentTab.label})`}
+                        </Text>
+                      </View>
+                      {cfg.practice.video.checks?.length ? (
+                        <View style={styles.practiceVideoBadge}>
+                          <Text style={styles.practiceVideoBadgeText}>
+                            {`${cfg.practice.video.checks.length} mốc trắc nghiệm`}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      onPress={() => onOpenVideo(unit, cfg.practice.video?.id || `${node.key}:practice:${activeDiff}`)}
+                      style={styles.practiceVideoBtn}
+                      accessibilityRole="button"
+                    >
+                      <Play size={15} color="#FFFFFF" fill="#FFFFFF" />
+                      <Text style={styles.practiceVideoBtnText}>Mở video hướng dẫn</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
                 <Pressable
                   onPress={() => {
                     onClose();
@@ -594,25 +855,35 @@ export default function MilestoneHubModal({
           </View>
         ) : (
           <View style={styles.subFooter}>
-            <Pressable onPress={() => setActiveSection(null)} style={styles.subBackBtn}>
-              <ArrowLeft size={15} color="#334155" />
+            <Pressable onPress={() => setActiveSection(null)} style={styles.subBackBtn} accessibilityRole="button">
+              <ArrowLeft size={14} color="#334155" />
               <Text style={styles.subBackText}>Quay lại bài học</Text>
             </Pressable>
-            {(activeSection === 'content' || activeSection === 'file') && (
-              <Pressable
-                disabled={saving}
-                onPress={() => toggleSectionDone(activeSection, !isSectionDone(activeSection))}
-                style={[styles.doneBtn, isSectionDone(activeSection) && styles.doneBtnActive]}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={isSectionDone(activeSection) ? '#047857' : '#FFFFFF'} />
-                ) : (
-                  <CheckCircle2 size={15} color={isSectionDone(activeSection) ? '#047857' : '#FFFFFF'} />
-                )}
-                <Text style={[styles.doneBtnText, isSectionDone(activeSection) && styles.doneBtnTextActive]}>
-                  {isSectionDone(activeSection) ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
-                </Text>
-              </Pressable>
+            {(activeSection === 'content' || activeSection === 'file' || (activeSection === 'video' && !cfg.video?.url)) && (
+              activeSection === 'content' && !isSectionDone('content') && !contentScrolledToEnd ? (
+                <View style={styles.scrollHintPill}>
+                  <Text style={styles.scrollHintText}>Cuộn đọc hết nội dung để hoàn thành</Text>
+                </View>
+              ) : (
+                <View style={styles.subRightActions}>
+                  <View style={styles.doneBadgePill}>
+                    {savingSection ? (
+                      <ActivityIndicator size="small" color="#059669" />
+                    ) : (
+                      <CheckCircle2 size={14} color="#059669" />
+                    )}
+                    <Text style={styles.doneBadgeText}>Đã hoàn thành</Text>
+                  </View>
+                  <Pressable
+                    onPress={handleContinueNextSection}
+                    style={({ pressed }) => [styles.continueNextBtn, pressed && { opacity: 0.9 }]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.continueNextText}>Tiếp tục</Text>
+                    <ChevronRight size={15} color="#FFFFFF" />
+                  </Pressable>
+                </View>
+              )
             )}
           </View>
         )}
@@ -778,15 +1049,15 @@ const styles = StyleSheet.create({
   },
   paragraphText: { fontSize: 15, color: '#1E293B', lineHeight: 23 },
   fileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: 10,
     padding: 14,
     borderRadius: 18,
     backgroundColor: '#FFFBEB',
     borderWidth: 1,
     borderColor: '#FDE68A',
   },
+  fileTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  fileActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   fileIconWrap: {
     width: 40,
     height: 40,
@@ -798,13 +1069,29 @@ const styles = StyleSheet.create({
   fileMeta: { flex: 1, minWidth: 0 },
   fileName: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
   fileSub: { fontSize: 11, fontWeight: '600', color: '#B45309', marginTop: 2 },
-  fileBtn: {
+  fileViewBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  fileViewBtnText: { fontSize: 12, fontWeight: '800', color: '#78350F' },
+  fileBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
     backgroundColor: '#D97706',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 12,
   },
   fileBtnText: { fontSize: 12, fontWeight: '800', color: '#FFFFFF' },
@@ -829,6 +1116,36 @@ const styles = StyleSheet.create({
   practiceEyebrow: { fontSize: 11, fontWeight: '800', color: '#047857' },
   practiceTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
   practiceDesc: { fontSize: 13, color: '#475569', lineHeight: 19 },
+  practiceCountText: { fontSize: 12, fontWeight: '800', color: '#065F46', marginTop: 4 },
+  practiceVideoCard: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    gap: 10,
+  },
+  practiceVideoHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  practiceVideoMeta: { flex: 1, minWidth: 0, gap: 2 },
+  practiceVideoEyebrow: { fontSize: 10, fontWeight: '900', color: '#0369A1', letterSpacing: 0.4 },
+  practiceVideoTitle: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  practiceVideoBadge: {
+    borderRadius: 999,
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  practiceVideoBadgeText: { fontSize: 11, fontWeight: '800', color: '#075985' },
+  practiceVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#0284C7',
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  practiceVideoBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
   practiceStartBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -875,9 +1192,10 @@ const styles = StyleSheet.create({
   ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
   subFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
@@ -888,26 +1206,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
   },
-  subBackText: { fontSize: 13, fontWeight: '800', color: '#334155' },
-  doneBtn: {
+  subBackText: { fontSize: 12, fontWeight: '800', color: '#334155' },
+  scrollHintPill: {
+    flex: 1,
+    minWidth: 170,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  scrollHintText: { fontSize: 12, fontWeight: '700', color: '#64748B', textAlign: 'center' },
+  subRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    gap: 8,
+    flexShrink: 1,
+  },
+  doneBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  doneBadgeText: { fontSize: 12, fontWeight: '800', color: '#047857' },
+  continueNextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
     borderRadius: 12,
     backgroundColor: '#059669',
   },
-  doneBtnActive: {
-    backgroundColor: '#D1FAE5',
-  },
-  doneBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
-  doneBtnTextActive: { color: '#047857' },
+  continueNextText: { fontSize: 12, fontWeight: '800', color: '#FFFFFF' },
 });

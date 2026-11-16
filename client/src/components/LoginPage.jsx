@@ -267,7 +267,7 @@ const LoginPage = ({ onLogin }) => {
         <div className="w-full md:w-1/2 flex-1 flex flex-col px-4 py-5 sm:px-8 md:py-4 lg:px-12 xl:px-16 justify-center relative min-w-0">
           <div className="w-full max-w-md space-y-3 sm:space-y-3.5 z-10 my-auto mx-auto cms-login-autoscale-right">
             <div className="flex justify-center animate-in fade-in zoom-in duration-700">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-white/95 px-5 py-2 shadow-[0_10px_30px_rgba(16,185,129,0.22)] ring-1 ring-emerald-400/30 transition-transform duration-300 hover:-translate-y-0.5">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-white/95 px-2.5 py-1.5 shadow-[0_10px_30px_rgba(16,185,129,0.22)] ring-1 ring-emerald-400/30 transition-transform duration-300 hover:-translate-y-0.5">
                 <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-7 sm:h-8 max-w-[170px] object-contain" />
               </div>
             </div>
@@ -482,7 +482,7 @@ const LoginPage = ({ onLogin }) => {
 
                   <div className={`rounded-xl p-3 text-xs font-bold ${copied ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-sky-500/10 border border-sky-500/20 text-sky-300'}`}>
                     {copied
-                      ? '✓ Đã copy - mở Zalo Admin rồi dán (Ctrl+VN? / giữ để dán) và gửi.'
+                      ? '✓ Đã copy - mở Zalo Admin rồi dán (Ctrl+V / giữ để dán) và gửi.'
                       : '① Bấm Copy › ② Bấm Zalo Admin › dán tin nhắn và gửi.'}
                   </div>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { CalendarClock, CalendarX2, Check, ChevronDown, Crown, History, KeyRound, LogOut, Ticket } from 'lucide-react-native';
+import { CalendarClock, CalendarX2, Check, ChevronDown, Crown, History, KeyRound, LogOut, Ticket, Zap } from 'lucide-react-native';
 import { useAuth } from '../../app/AuthContext';
 import { CoursePaymentModal, type CoursePaymentCheckout } from '../CoursePaymentModal';
 import {
@@ -15,8 +15,8 @@ import { DuoButton } from '../duo/DuoButton';
 import { StandardBottomSheet } from '../StandardBottomSheet';
 import { isFreePortalMenu } from '../../utils/freePortalHelper';
 import { colors, radius, spacing, tabularNums } from '../../theme/tokens';
-import { DAILY_PRACTICE_STATS_EVENT, dailyPracticeApi, type DpStats } from '../../services/dailyPracticeApi';
-import { resolveTodayXpSidebar } from '../../../../shared/subscription/xpDailyLine.mjs';
+import { DAILY_PRACTICE_STATS_EVENT, dailyPracticeApi, type DpStats, type DpXpPack } from '../../services/dailyPracticeApi';
+import { isDailyXpExhausted, resolveTodayXpSidebar } from '../../../../shared/subscription/xpDailyLine.mjs';
 
 const PLAN_HINTS: Record<string, string> = {
   '1m': 'Làm quen',
@@ -258,7 +258,13 @@ export function SubscriptionExpiredScreen() {
   );
 }
 
-/** Thẻ hạn dùng cho Hồ sơ / drawer; bấm Gia hạn mở popup chọn gói + nhập mã. */
+const FALLBACK_XP_PACKS: DpXpPack[] = [
+  { id: 'xp_100', xp: 100, priceVnd: 10000, label: '100 XP · 10.000đ' },
+  { id: 'xp_300', xp: 300, priceVnd: 25000, label: '300 XP · 25.000đ' },
+  { id: 'xp_800', xp: 800, priceVnd: 59000, label: '800 XP · 59.000đ' },
+];
+
+/** Thẻ hạn dùng cho Hồ sơ / drawer; bấm Gia hạn mở popup chọn gói + nhập mã, hết XP hiện nút Mua XP. */
 export function SubscriptionStatusCard({
   compact = false,
   variant = 'default',
@@ -267,34 +273,46 @@ export function SubscriptionStatusCard({
   variant?: 'default' | 'drawer';
 }) {
   const { user, subscription, refreshSubscription } = useAuth();
-  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
   const [open, setOpen] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
-  if (!subscription) return null;
-  const sub = subscription.subscription;
-  const expiring = sub.state === 'expiring';
-  const isLifetime = sub.state === 'lifetime' && (!sub.freeTier || Boolean(sub.meetLifetime) || isBrandStudent);
-  const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || isLifetime || isBrandStudent;
-  const isFree = !isBrandStudent && (sub.freeTier === true || (!hasActivePaid && !isLifetime));
-  const isDrawer = variant === 'drawer';
   const [dpStats, setDpStats] = useState<DpStats | null>(null);
+  const [buyXpOpen, setBuyXpOpen] = useState(false);
+  const [selectedXpPackId, setSelectedXpPackId] = useState('');
+  const [xpCheckout, setXpCheckout] = useState<CoursePaymentCheckout | null>(null);
+  const [xpBusy, setXpBusy] = useState(false);
 
   useEffect(() => {
+    const subEv = DeviceEventEmitter.addListener(
+      DAILY_PRACTICE_STATS_EVENT,
+      (detail?: Partial<DpStats> & { stats?: Partial<DpStats> }) => {
+        const patch = detail?.stats ? { ...detail.stats } : detail;
+        if (patch) setDpStats((prev) => ({ ...prev, ...patch } as DpStats));
+      },
+    );
+    if (!user || user.role !== 'student' || user.previewMode) {
+      return () => subEv.remove();
+    }
     let alive = true;
     dailyPracticeApi.overview()
       .then((data) => {
         if (alive && data?.stats) setDpStats(data.stats);
       })
       .catch(() => {});
-    const subEv = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats> }) => {
-      const patch = detail?.stats ? { ...detail.stats } : detail;
-      if (patch) setDpStats((prev) => ({ ...prev, ...patch } as DpStats));
-    });
     return () => {
       alive = false;
       subEv.remove();
     };
-  }, []);
+  }, [user?.id, user?.role, user?.previewMode]);
+
+  if (!subscription) return null;
+
+  const isBrandStudent = Boolean(user && user.role === 'student' && !isFreePortalMenu(user));
+  const sub = subscription.subscription;
+  const expiring = sub.state === 'expiring';
+  const isLifetime = sub.state === 'lifetime' && (!sub.freeTier || Boolean(sub.meetLifetime) || isBrandStudent);
+  const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || isLifetime || isBrandStudent;
+  const isFree = !isBrandStudent && (sub.freeTier === true || (!hasActivePaid && !isLifetime));
+  const isDrawer = variant === 'drawer';
 
   const daysLeftNum = sub.daysLeft != null ? Number(sub.daysLeft) : null;
   const isNearExpiry = daysLeftNum != null ? daysLeftNum <= 7 : expiring;
@@ -309,13 +327,97 @@ export function SubscriptionStatusCard({
         : rawPlanLabel.toLowerCase().startsWith('gói')
           ? rawPlanLabel
           : `Gói ${rawPlanLabel}`;
-  const daysLine = isFree
-    ? resolveTodayXpSidebar(dpStats, sub).line
-    : isBrandStudent
-      ? 'Khóa chính thức'
-      : isLifetime
-        ? 'Không giới hạn'
-        : `Còn ${sub.daysLeft ?? 0} ngày`;
+  const sidebarXpLine = resolveTodayXpSidebar(dpStats, sub).line;
+  const daysLine = (isFree || isBrandStudent || isLifetime)
+    ? sidebarXpLine
+    : `Còn ${sub.daysLeft ?? 0} ngày`;
+  const isXpExhausted = isDailyXpExhausted(dpStats);
+  const showBuyXpAction = (isBrandStudent || isLifetime) && isXpExhausted;
+
+  const xpPacks = dpStats?.xpPacks?.length ? dpStats.xpPacks : FALLBACK_XP_PACKS;
+  const activeXpPack = xpPacks.find((p) => (p.id || `xp_${p.xp}`) === selectedXpPackId) || xpPacks[0];
+
+  const startXpCheckout = async () => {
+    if (!activeXpPack || xpBusy) return;
+    setXpBusy(true);
+    try {
+      const packId = activeXpPack.id || `xp_${activeXpPack.xp}`;
+      const order = await dailyPracticeApi.buyXp(packId);
+      setBuyXpOpen(false);
+      setXpCheckout({
+        sessionId: order.sessionId || '',
+        ref: order.ref || order.orderCode || '',
+        amount: order.amount || activeXpPack.priceVnd,
+        courseTitle: `Mua +${order.xp || activeXpPack.xp} XP luyện tập`,
+      });
+    } catch (error) {
+      Alert.alert('Không tạo được đơn mua XP', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setXpBusy(false);
+    }
+  };
+
+  const xpPurchaseUi = (
+    <>
+      <StandardBottomSheet
+        visible={buyXpOpen}
+        onClose={() => setBuyXpOpen(false)}
+        title="Mua thêm XP luyện tập"
+        subtitle="Nạp nhanh XP để tiếp tục làm bài trên lộ trình"
+        icon={<Zap size={18} color="#D97706" />}
+      >
+        <View style={styles.gapSm}>
+          {xpPacks.map((pack) => {
+            const pid = pack.id || `xp_${pack.xp}`;
+            const active = (activeXpPack?.id || `xp_${activeXpPack?.xp}`) === pid;
+            return (
+              <Pressable
+                key={pid}
+                onPress={() => setSelectedXpPackId(pid)}
+                style={[styles.buyXpPackRow, active && styles.buyXpPackActive]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+              >
+                <View style={[styles.planRadio, active && { borderColor: '#D97706', backgroundColor: '#F59E0B' }]}>
+                  {active ? <Check size={11} color="#FFFFFF" strokeWidth={3} /> : null}
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.buyXpPackTitle}>{`+${pack.xp} XP`}</Text>
+                  <Text style={styles.muted}>{`Đủ khoảng ${Math.max(1, Math.round(pack.xp / 20))} lượt luyện`}</Text>
+                </View>
+                <Text style={styles.buyXpPackPrice}>{formatVnd(pack.priceVnd)}</Text>
+              </Pressable>
+            );
+          })}
+          <DuoButton
+            variant="gold"
+            size="lg"
+            fullWidth
+            text={activeXpPack ? `Mua ${activeXpPack.xp} XP (${formatVnd(activeXpPack.priceVnd)})` : 'Mua XP'}
+            loading={xpBusy}
+            disabled={!activeXpPack || xpBusy}
+            onPress={() => { void startXpCheckout(); }}
+          />
+        </View>
+      </StandardBottomSheet>
+      <CoursePaymentModal
+        checkout={xpCheckout}
+        title="Mua XP luyện tập"
+        getSession={(sessionId) => dailyPracticeApi.xpPurchaseStatus(sessionId).then((res) => ({
+          paid: res.paid === true || res.status === 'paid',
+        }))}
+        simulate={(sessionId) => dailyPracticeApi.simulateXpPaid(sessionId)}
+        onClose={() => setXpCheckout(null)}
+        onPaid={() => {
+          setXpCheckout(null);
+          void dailyPracticeApi.overview()
+            .then((res) => { if (res?.stats) setDpStats(res.stats); })
+            .catch(() => {});
+          Alert.alert('Thanh toán thành công', 'Ví XP của bạn đã được cập nhật.');
+        }}
+      />
+    </>
+  );
 
   if (isDrawer) {
     return (
@@ -368,12 +470,29 @@ export function SubscriptionStatusCard({
                   style={[
                     styles.drawerSubDays,
                     styles.drawerSubDaysFlex,
-                    isBrandStudent && { color: '#34D399' },
+                    showBuyXpAction
+                      ? { color: '#FCD34D' }
+                      : isBrandStudent
+                        ? { color: '#34D399' }
+                        : null,
                   ]}
                 >
                   {daysLine}
                 </Text>
-                {isLifetime && !isBrandStudent ? (
+                {showBuyXpAction ? (
+                  <Pressable
+                    onPress={() => setBuyXpOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mua XP"
+                    style={({ pressed }) => [
+                      styles.drawerBuyXpCta,
+                      pressed && { transform: [{ translateY: 1 }], borderBottomWidth: 1 },
+                    ]}
+                  >
+                    <Zap size={10} color="#451A03" fill="#451A03" />
+                    <Text style={styles.drawerBuyXpCtaText}>Mua XP</Text>
+                  </Pressable>
+                ) : isLifetime && !isBrandStudent ? (
                   <View style={styles.drawerSubTag}>
                     <Text style={styles.drawerSubTagText}>VĨNH VIỄN</Text>
                   </View>
@@ -410,6 +529,7 @@ export function SubscriptionStatusCard({
             }}
           />
         </StandardBottomSheet>
+        {xpPurchaseUi}
       </>
     );
   }
@@ -425,9 +545,11 @@ export function SubscriptionStatusCard({
           </View>
           <View style={styles.flex}>
             <Text numberOfLines={1} style={styles.statusTitle}>{planTitle}</Text>
-            <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#059669' }]}>{daysLine}</Text>
+            <Text numberOfLines={1} style={[styles.statusDaysGreen, showBuyXpAction ? { color: '#D97706' } : isBrandStudent && { color: '#059669' }]}>{daysLine}</Text>
           </View>
-          {!isLifetime && !isBrandStudent ? (
+          {showBuyXpAction ? (
+            <DuoButton variant="gold" size="sm" text="Mua XP" icon={<Zap size={12} color="#FFFFFF" />} onPress={() => setBuyXpOpen(true)} accessibilityLabel="Mua XP" />
+          ) : !isLifetime && !isBrandStudent ? (
             <DuoButton variant="primary" size="sm" text={actionLabel} onPress={() => setOpen(true)} accessibilityLabel={actionLabel} />
           ) : null}
         </View>
@@ -446,9 +568,11 @@ export function SubscriptionStatusCard({
             </View>
             <View style={styles.flex}>
               <Text numberOfLines={1} style={styles.statusTitle}>{planTitle}</Text>
-              <Text numberOfLines={1} style={[styles.statusDaysGreen, isBrandStudent && { color: '#059669' }]}>{daysLine}</Text>
+              <Text numberOfLines={1} style={[styles.statusDaysGreen, showBuyXpAction ? { color: '#D97706' } : isBrandStudent && { color: '#059669' }]}>{daysLine}</Text>
             </View>
-            {(!isLifetime || isFree) && !isBrandStudent ? (
+            {showBuyXpAction ? (
+              <DuoButton variant="gold" size="sm" text="Mua XP" icon={<Zap size={12} color="#FFFFFF" />} onPress={() => setBuyXpOpen(true)} accessibilityLabel="Mua XP" />
+            ) : (!isLifetime || isFree) && !isBrandStudent ? (
               <DuoButton variant="primary" size="sm" text={actionLabel} onPress={() => setOpen(true)} accessibilityLabel={actionLabel} />
             ) : null}
           </View>
@@ -509,6 +633,7 @@ export function SubscriptionStatusCard({
           }}
         />
       </StandardBottomSheet>
+      {xpPurchaseUi}
     </>
   );
 }
@@ -916,5 +1041,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  drawerBuyXpCta: {
+    minHeight: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#FBBF24',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderBottomWidth: 2,
+    borderBottomColor: '#D97706',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  drawerBuyXpCtaText: {
+    color: '#451A03',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
+  buyXpPackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  buyXpPackActive: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFBEB',
+  },
+  buyXpPackTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  buyXpPackPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#B45309',
+    ...tabularNums,
   },
 });

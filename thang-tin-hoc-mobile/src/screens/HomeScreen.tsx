@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Animated, DeviceEventEmitter, Easing, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
   ArrowRight, Award, BookOpen, Bot, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardCheck, ClipboardList,
-  Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, Sparkles, Star, TrendingUp, Users,
+  Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, PlayCircle, Sparkles, Star, TrendingUp, Users,
   WalletCards, UserPlus, Trophy, Video, X, Zap, Flame, Gamepad2, type LucideIcon,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -29,6 +29,7 @@ import { hasMeetAccessClient } from '../services/subscriptionApi';
 import { CompactCoursePicker, type CoursePickerItem } from '../components/CompactCoursePicker';
 import { WelcomeHero, type WelcomeChip } from '../components/WelcomeHero';
 import { DAILY_PRACTICE_STATS_EVENT, dailyPracticeApi, type DpStats } from '../services/dailyPracticeApi';
+import { LEARNING_GOAL_CHANGED_EVENT } from '../services/learningGoalApi';
 import {
   assignmentService, evaluationService,
   quizService, scheduleService, studentProfileService, studentService,
@@ -43,7 +44,7 @@ import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { DuoButton } from '../components/duo/DuoButton';
 import { DuoHeroCard } from '../components/duo/DuoHeroCard';
 import { DuoDailyQuestsCard } from '../components/duo/DuoDailyQuestsCard';
-import { MobileHomeWidgetCard } from '../components/MobileHomeWidgetCard';
+import { ReferralRewardCard } from '../components/ReferralRewardCard';
 import { listOfflineVideos } from '../services/offlineVideos';
 import { saveHomeWidgetSnapshot } from '../services/widgetSync';
 import { DuoScheduleCard } from '../components/duo/DuoScheduleCard';
@@ -280,9 +281,14 @@ export function HomeScreen() {
       if (userKey && sessionData.studentId && sessionData.studentId !== userKey) return;
       setLastStudy(sessionData);
     });
+    const goalChangedSub = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, () => {
+      dailyPracticeApi.overview().then(setPractice).catch(() => { });
+      dailyPracticeApi.path().then(setPathData).catch(() => { });
+    });
     return () => {
       sub.remove();
       resumeSub.remove();
+      goalChangedSub.remove();
     };
   }, [isTeacher, user]);
   const schedulesLoader = useCallback(() => (
@@ -721,6 +727,43 @@ export function HomeScreen() {
   const heroProgress = activeUnitPct > 0
     ? activeUnitPct
     : (pathTopic?.totalUnits ? topicUnitPct : (practiceStats?.playedToday ? 100 : 0));
+  const effectiveLastStudy = useMemo<LastStudySession | null>(() => {
+    if (lastStudy) return lastStudy;
+    if (!practiceLocked && (pathTopic || activePathUnit)) {
+      const topicName = pathTopic?.topic?.name || 'Lộ trình DewSkill';
+      const lessonTitle = pathTopic?.next?.unitTitle || activePathUnit?.title || topicName;
+      const stepLabel = pathTopic?.next?.stepLabel
+        ? `${pathTopicNextLinePrefix(pathTopic)} · ${pathTopic.next.stepLabel}`
+        : `Chặng ${activePathUnit?.index || 1}`;
+      return {
+        kind: 'daily_practice',
+        studentId: String(user?.id || user?._id || ''),
+        topicId: String(pathTopic?.topic?.id || ''),
+        nodeKey: String(pathTopic?.next?.nodeKey || activePathUnit?.pathNodes?.[0]?.key || 'study'),
+        courseId: '',
+        courseTitle: topicName,
+        subjectId: '',
+        subjectName: '',
+        lessonId: '',
+        lessonTitle,
+        unitId: String(activePathUnit?.id || ''),
+        unitTitle: activePathUnit?.title || '',
+        sectionId: '',
+        sectionLabel: stepLabel,
+        atSec: 0,
+        durationSec: 0,
+        progressPct: heroProgress,
+        href: '/student/daily-practice',
+        updatedAt: 0,
+      };
+    }
+    return null;
+  }, [lastStudy, practiceLocked, pathTopic, activePathUnit, heroProgress, user?._id, user?.id]);
+  const resumeKindLabel = effectiveLastStudy?.kind === 'lesson_practice'
+    ? 'Bài giảng thực hành'
+    : effectiveLastStudy?.kind === 'daily_practice'
+      ? 'Lộ trình DewSkill'
+      : 'Video khóa học';
   const scheduleAccent = isBrandStudent ? '#059669' : '#059669';
   const portalSub = subscription?.subscription;
   const meetAccess = hasMeetAccessClient(portalSub);
@@ -916,60 +959,84 @@ export function HomeScreen() {
         </>
       ) : (
         <View style={styles.duoStudentContainer}>
-          <MobileHomeWidgetCard
-            streak={Number(practiceStats?.streak || 0)}
-            playedToday={Boolean(practiceStats?.playedToday)}
-            todayXp={Number(practiceStats?.todayXp || 0)}
-            todayClassesCount={todayMobileClasses.length}
-            nextClassLabel={widgetNextLabel}
-            nextClassTime={widgetNextTime}
-            nextClassLive={widgetNextLive}
-            offlineVideosCount={offlineVideosCount}
-            onPressPractice={() => tabNavigation.navigate('DailyPractice')}
-            onPressSchedule={() => {
-              if (!freeMenu) tabNavigation.navigate('Schedule');
-              else setMeetPlanOpen(true);
-            }}
-            onPressOffline={() => tabNavigation.navigate('CourseVideos')}
-          />
           <View style={isWide ? styles.duoGridWide : styles.studentGridStack}>
             <View style={isWide ? styles.duoColLeft : styles.studentColStack}>
-              {!isTeacher && lastStudy ? (
+              {!isTeacher && effectiveLastStudy ? (
                 <View style={styles.resumeCard}>
                   <View style={styles.resumeHeaderRow}>
-                    <View style={styles.resumeBadge}>
-                      <Text style={styles.resumeBadgeText}>HỌC TIẾP 1 CHẠM</Text>
+                    <View style={styles.resumeBadgeGroup}>
+                      <View style={styles.resumeBadge}>
+                        <Zap size={11} color="#FFFFFF" />
+                        <Text style={styles.resumeBadgeText}>HỌC TIẾP 1 CHẠM</Text>
+                      </View>
+                      <Text style={styles.resumeKindText}>{resumeKindLabel}</Text>
                     </View>
-                    <Text style={styles.resumeAgoText}>{formatResumeTimeAgo(lastStudy.updatedAt)}</Text>
+                    <Text style={styles.resumeAgoText}>
+                      {effectiveLastStudy.updatedAt > 0
+                        ? formatResumeTimeAgo(effectiveLastStudy.updatedAt)
+                        : 'Lộ trình hiện tại'}
+                    </Text>
                   </View>
                   <Text style={styles.resumeTitle} numberOfLines={2}>
-                    {lastStudy.unitTitle || lastStudy.courseTitle}
+                    {effectiveLastStudy.lessonTitle || effectiveLastStudy.unitTitle || effectiveLastStudy.courseTitle || 'Tiếp tục bài học'}
                   </Text>
                   <Text style={styles.resumeMeta} numberOfLines={1}>
-                    {[lastStudy.courseTitle, lastStudy.sectionLabel].filter(Boolean).join(' • ')}
+                    {[effectiveLastStudy.courseTitle || effectiveLastStudy.subjectName, effectiveLastStudy.sectionLabel]
+                      .filter(Boolean)
+                      .join(' · ') || 'Quay lại đúng vị trí bạn đang học dở'}
                   </Text>
-                  <View style={styles.resumeTimeRow}>
-                    <Text style={styles.resumeTimeText}>
-                      Mốc dừng: {formatLmsTimestamp(lastStudy.atSec)}
-                      {lastStudy.durationSec > 0 ? ` / ${formatLmsTimestamp(lastStudy.durationSec)}` : ''}
-                    </Text>
-                    <Text style={styles.resumePercentText}>
-                      {Math.min(100, Math.max(0, Math.round(lastStudy.progressPct || 0)))}%
-                    </Text>
-                  </View>
+                  {(effectiveLastStudy.atSec > 0 || effectiveLastStudy.progressPct != null) ? (
+                    <View style={styles.resumeTimeRow}>
+                      {effectiveLastStudy.atSec > 0 ? (
+                        <View style={styles.resumeTimePill}>
+                          <Clock size={11} color="#047857" />
+                          <Text style={styles.resumeTimeText}>
+                            {`Đang xem tại ${formatLmsTimestamp(effectiveLastStudy.atSec)}`}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {effectiveLastStudy.progressPct != null ? (
+                        <Text style={styles.resumePercentText}>
+                          {`${effectiveLastStudy.progressPct}% hoàn thành`}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
                   <DuoButton
                     variant="primary"
                     size="md"
-                    text="Tiếp tục bài học"
-                    onPress={() =>
+                    fullWidth
+                    icon={<PlayCircle size={15} color="#FFFFFF" />}
+                    rightIcon={<ChevronRight size={14} color="#FFFFFF" />}
+                    label="Học tiếp ngay"
+                    onPress={() => {
+                      if (effectiveLastStudy.kind === 'daily_practice') {
+                        const isVideoResume = Boolean(
+                          effectiveLastStudy.atSec > 0
+                          || effectiveLastStudy.sectionId === 'video'
+                          || effectiveLastStudy.href?.includes('watch=stage'),
+                        );
+                        tabNavigation.navigate('DailyPractice', {
+                          topicId: effectiveLastStudy.topicId || pathTopic?.topic?.id || undefined,
+                          resumeKey: Date.now(),
+                          resumeUnitId: effectiveLastStudy.unitId || pathTopic?.next?.unitId || activePathUnit?.id || undefined,
+                          resumeNodeKey: effectiveLastStudy.nodeKey || pathTopic?.next?.nodeKey || undefined,
+                          resumeSectionId: effectiveLastStudy.sectionId || undefined,
+                          resumeVideoId: isVideoResume ? (effectiveLastStudy.lessonId || undefined) : undefined,
+                          resumeAtSec: effectiveLastStudy.atSec || 0,
+                          watch: isVideoResume ? 'stage' : undefined,
+                        });
+                        return;
+                      }
                       tabNavigation.navigate('CourseVideos', {
                         resumeKey: Date.now(),
-                        resumeCourseId: lastStudy.courseId,
-                        resumeSubjectId: lastStudy.subjectId,
-                        resumeUnitId: lastStudy.unitId,
-                        resumeSectionId: lastStudy.sectionId,
-                      })
-                    }
+                        resumeCourseId: effectiveLastStudy.courseId,
+                        resumeSubjectId: effectiveLastStudy.subjectId,
+                        resumeUnitId: effectiveLastStudy.unitId,
+                        resumeSectionId: effectiveLastStudy.sectionId,
+                        resumeAtSec: effectiveLastStudy.atSec || 0,
+                      });
+                    }}
                   />
                 </View>
               ) : null}
@@ -1041,7 +1108,7 @@ export function HomeScreen() {
                     ) : (
                       <>
                         <DuoButton
-                          variant={isBrandStudent ? 'danger' : 'primary'}
+                          variant="primary"
                           size="md"
                           icon={<Video size={16} color="#FFFFFF" />}
                           label="Vào bài học"
@@ -1094,10 +1161,27 @@ export function HomeScreen() {
                       progressPercent={heroProgress}
                       playedToday={practiceStats?.playedToday ?? false}
                       streak={practiceStats?.streak ?? 0}
-                      onContinue={() => tabNavigation.navigate(
-                        'DailyPractice',
-                        pathTopic?.next ? { watch: 'stage' } : undefined,
-                      )}
+                      onContinue={() => {
+                        if (pathTopic?.next) {
+                          tabNavigation.navigate('DailyPractice', {
+                            topicId: pathTopic.topic.id,
+                            resumeKey: Date.now(),
+                            resumeUnitId: pathTopic.next.unitId,
+                            resumeNodeKey: pathTopic.next.nodeKey || undefined,
+                          });
+                          return;
+                        }
+                        if (activePathUnit) {
+                          tabNavigation.navigate('DailyPractice', {
+                            topicId: pathTopic?.topic?.id || undefined,
+                            resumeKey: Date.now(),
+                            resumeUnitId: activePathUnit.id,
+                            resumeNodeKey: activePathUnit.pathNodes?.[0]?.key || 'study',
+                          });
+                          return;
+                        }
+                        tabNavigation.navigate('DailyPractice');
+                      }}
                       continueLabel={
                         practiceStats?.playedToday
                           ? 'ÔN TẬP THÊM'
@@ -1117,6 +1201,14 @@ export function HomeScreen() {
                       isBrandStudent={isBrandStudent}
                     />
                   </>
+                ) : null}
+                {(practice?.referral || practiceStats?.referral) ? (
+                  <ReferralRewardCard
+                    referral={(practice?.referral || practiceStats?.referral)!}
+                    onRedeemed={() => {
+                      dailyPracticeApi.overview().then(setPractice).catch(() => { });
+                    }}
+                  />
                 ) : null}
               </View>
             ) : null}
@@ -1183,7 +1275,7 @@ function OverviewTaskRow({ icon: Icon, tone, title, sub, cta, onPress, freeMenu,
         </View>
       </Pressable>
       <DuoButton
-        variant={isBrandStudent ? 'danger' : 'primary'}
+        variant="primary"
         size="sm"
         label={cta}
         rightIcon={<ChevronRight size={14} color="#FFFFFF" />}
@@ -1197,8 +1289,10 @@ function OverviewDoneBox({ title, text }: { title: string; text: string }) {
   return (
     <View style={styles.ovDone}>
       <CheckCircle size={26} color="#10B981" />
-      <Text style={styles.ovDoneTitle}>{title}</Text>
-      <Text style={styles.ovDoneText}>{text}</Text>
+      <View style={styles.flex}>
+        <Text style={styles.ovDoneTitle}>{title}</Text>
+        <Text style={styles.ovDoneText}>{text}</Text>
+      </View>
     </View>
   );
 }
@@ -1275,9 +1369,9 @@ const styles = StyleSheet.create({
   ovTaskIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ovTaskCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   ovTaskCtaText: { color: colors.brand, fontSize: 12, fontWeight: '900' },
-  ovDone: { alignItems: 'center', gap: 4, paddingVertical: spacing.lg, borderRadius: 14, backgroundColor: '#ECFDF5' },
-  ovDoneTitle: { color: '#047857', fontSize: 14, fontWeight: '900', textAlign: 'center' },
-  ovDoneText: { color: '#059669', fontSize: 12, textAlign: 'center', paddingHorizontal: spacing.md },
+  ovDone: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, backgroundColor: '#ECFDF5' },
+  ovDoneTitle: { color: '#047857', fontSize: 14, fontWeight: '900' },
+  ovDoneText: { color: '#059669', fontSize: 12, lineHeight: 17, marginTop: 2 },
   ovSessionRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 10, borderRadius: 14,
     borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
@@ -1288,12 +1382,12 @@ const styles = StyleSheet.create({
   ovSessionBadge: { fontSize: 12, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
   ovStatRow: { flexDirection: 'row', gap: spacing.sm },
   ovStat: {
-    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, padding: spacing.sm,
+    flex: 1, minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 10,
     borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
   },
-  ovStatIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  ovStatValue: { color: colors.ink, fontSize: 15, fontWeight: '900' },
-  ovStatLabel: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  ovStatIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  ovStatValue: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  ovStatLabel: { color: colors.muted, fontSize: 11.5, lineHeight: 15, fontWeight: '700' },
   ovCourseName: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   ovCourseMeta: { color: colors.muted, fontSize: 12, fontWeight: '700', lineHeight: 18 },
   ovButtonRow: { flexDirection: 'row', gap: spacing.sm },
@@ -1310,7 +1404,7 @@ const styles = StyleSheet.create({
   screen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.lg, backgroundColor: '#F5F8FC' },
   studentScreen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md, backgroundColor: '#F5F8FC' },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: '#DFEAF2', backgroundColor: '#F0F6FA' },
-  greetingIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderWidth: 1, borderColor: '#FCA5A5', shadowColor: colors.brandDark, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  greetingIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderWidth: 1, borderColor: '#A7F3D0', shadowColor: colors.brandDark, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   greeting: { flex: 1, gap: 4 },
   greetingMeta: { color: colors.brand, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1.1 },
   greetingTitle: { color: '#17314C', fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
@@ -1383,13 +1477,13 @@ const styles = StyleSheet.create({
   todoCards: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
   todoSubtitle: { color: colors.muted, fontSize: typography.caption, fontWeight: '600', marginTop: 2 },
   todoCard: { width: '48%', height: 148, borderWidth: 1, borderRadius: 16, padding: spacing.sm, alignItems: 'flex-start', gap: spacing.xs, overflow: 'hidden' },
-  quizTodo: { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' },
+  quizTodo: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   homeworkTodo: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
   scheduleTodo: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   messagesTodo: { backgroundColor: '#FAF5FF', borderColor: '#E9D5FF' },
   todoCardIcon: { width: 36, height: 36, flexShrink: 0, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   todoBadge: { position: 'absolute', top: -7, right: -8, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, textAlign: 'center', overflow: 'hidden', backgroundColor: colors.brand, color: '#FFFFFF', fontSize: typography.micro, lineHeight: 20, fontWeight: '900', borderWidth: 2, borderColor: '#FFFFFF' },
-  quizTodoIcon: { backgroundColor: '#E11D48' },
+  quizTodoIcon: { backgroundColor: '#059669' },
   homeworkTodoIcon: { backgroundColor: '#F97316' },
   scheduleTodoIcon: { backgroundColor: '#3B82F6' },
   messagesTodoIcon: { backgroundColor: '#8B5CF6' },
@@ -1454,7 +1548,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.8 },
   duoStudentContainer: {
     gap: 16,
-    paddingBottom: 24,
+    paddingBottom: 96,
   },
   duoGridWide: {
     flexDirection: 'row',
@@ -1475,28 +1569,42 @@ const styles = StyleSheet.create({
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   sheetBody: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl },
   resumeCard: {
-    borderRadius: 20,
-    borderWidth: 1.5,
+    borderRadius: 18,
+    borderWidth: 2,
     borderColor: '#A7F3D0',
-    backgroundColor: '#FFFFFF',
-    padding: spacing.lg,
-    gap: 8,
-    marginBottom: spacing.md,
-  },
-  resumeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    backgroundColor: '#F2FDF7',
+    backgroundImage: 'linear-gradient(135deg, rgba(236,253,245,0.92) 0%, #FFFFFF 55%, rgba(240,253,250,0.75) 100%)',
+    padding: 16,
+    gap: 10,
+  } as never,
+  resumeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+  resumeBadgeGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resumeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#059669',
+  },
+  resumeBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
+  resumeKindText: { color: '#047857', fontSize: 11, fontWeight: '700' },
+  resumeAgoText: { color: '#64748B', fontSize: 11, fontWeight: '600' },
+  resumeTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900', lineHeight: 20 },
+  resumeMeta: { color: '#475569', fontSize: 12, fontWeight: '600' },
+  resumeTimeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 2, paddingBottom: 2 },
+  resumeTimePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#A7F3D0',
+    backgroundColor: '#FFFFFF',
   },
-  resumeBadgeText: { color: '#047857', fontSize: 11, fontWeight: '900' },
-  resumeAgoText: { color: '#64748B', fontSize: 12, fontWeight: '700' },
-  resumeTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900', lineHeight: 22 },
-  resumeMeta: { color: '#475569', fontSize: 13, fontWeight: '600' },
-  resumeTimeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 2, paddingBottom: 4 },
-  resumeTimeText: { color: '#047857', fontSize: 12, fontWeight: '800' },
-  resumePercentText: { color: '#059669', fontSize: 12, fontWeight: '900' },
+  resumeTimeText: { color: '#047857', fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  resumePercentText: { color: '#64748B', fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

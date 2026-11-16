@@ -4,6 +4,7 @@ import {
   DeviceEventEmitter,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,22 +12,33 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  ArrowLeft,
   ArrowRight,
   Award,
   Briefcase,
   Calendar,
   Check,
   Clock,
+  Compass,
   Crown,
   FolderOpen,
+  GraduationCap,
   Headphones,
   KeyRound,
+  Layers,
+  Lightbulb,
   Lock,
   MapPin,
   MessageCircle,
+  MessageCircleQuestion,
+  Rocket,
+  ShieldCheck,
   Sparkles,
+  Sprout,
   Unlock,
+  Users,
   Video,
   X,
   Zap,
@@ -38,7 +50,7 @@ import {
   type SubscriptionOverview,
   type SubscriptionPlanId,
 } from '../services/subscriptionApi';
-import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
+import { mobileApiRequest } from '../services/apiClient';
 import type { DemoEnrollment, DemoUser } from '../types';
 import { colors } from '../theme/tokens';
 import { DuoButton } from './duo/DuoButton';
@@ -433,7 +445,6 @@ export function FreeFeatureLockModal({
   onUnlocked?: () => void;
 }) {
   const [meetModalOpen, setMeetModalOpen] = useState(false);
-  const mascotUri = resolveMobilePublicUrl('/linh-vat-2.png');
 
   useEffect(() => {
     if (!visible) setMeetModalOpen(false);
@@ -463,11 +474,7 @@ export function FreeFeatureLockModal({
               <X size={18} color="rgba(255,255,255,0.8)" />
             </Pressable>
             <View style={styles.lockMascotWrap}>
-              {mascotUri ? (
-                <Image source={{ uri: mascotUri }} style={styles.lockMascot} resizeMode="contain" />
-              ) : (
-                <Lock size={34} color="#FBBF24" />
-              )}
+              <Image source={MASCOT_STUDY} style={styles.lockMascot} resizeMode="contain" />
               <View style={styles.lockCornerBadge}>
                 <Lock size={14} color="#0F172A" />
               </View>
@@ -499,14 +506,35 @@ export function FreeFeatureLockModal({
   );
 }
 
-const OCCUPATIONS = [
-  'Học sinh / Sinh viên',
-  'Nhân viên văn phòng',
-  'Giáo viên / Đào tạo',
-  'Kinh doanh tự do',
-  'Đang tìm việc',
-  'Khác',
+const SURVEY_SOURCES = [
+  { id: 'google', label: 'Tìm kiếm Google', hint: 'Qua tìm kiếm trên mạng' },
+  { id: 'tiktok', label: 'TikTok', hint: 'Qua video ngắn & chia sẻ mẹo hay' },
+  { id: 'facebook', label: 'Facebook', hint: 'Qua fanpage, bài viết hoặc nhóm' },
+  { id: 'referral', label: 'Bạn bè / Người thân', hint: 'Được người quen giới thiệu' },
+  { id: 'other', label: 'Nguồn khác', hint: 'YouTube, hội thảo, diễn đàn...' },
 ];
+
+const SURVEY_LEVELS = [
+  { id: 'beginner', label: 'Mới bắt đầu từ con số 0', hint: 'Chưa quen thao tác máy tính, muốn học từng bước.' },
+  { id: 'some', label: 'Đã biết cơ bản, muốn học cho vững', hint: 'Dùng được Word/Excel sơ sơ nhưng vẫn hay lúng túng.' },
+  { id: 'advanced', label: 'Đã có nền tảng, muốn luyện nâng cao', hint: 'Muốn tăng tốc và chuẩn hóa kỹ năng văn phòng.' },
+];
+
+const SURVEY_FEARS = [
+  { id: 'scam', label: 'Lo ngại về độ uy tín & chất lượng khóa học' },
+  { id: 'no_guidance', label: 'Ngại đăng ký xong lại phải tự học một mình' },
+  { id: 'not_understand', label: 'Sợ học online xem video xong không hiểu bài' },
+  { id: 'no_support', label: 'Sợ gặp chỗ khó không có người giải đáp ngay' },
+  { id: 'none', label: 'Mình rất hào hứng, chỉ muốn học thử ngay!' },
+];
+
+const FEAR_NOTES: Record<string, string> = {
+  scam: 'An tâm nhé: bạn đang trải nghiệm học thử miễn phí hoàn toàn, chưa cần đóng bất kỳ khoản phí nào.',
+  no_guidance: 'Phần luyện tập luôn mở sẵn. Khi đăng ký khóa chính thức, giảng viên sẽ đồng hành hướng dẫn sát sao.',
+  not_understand: 'Mỗi video đều có điểm dừng tương tác, bài tập thực hành và gợi ý từng bước khi bạn làm chưa đúng.',
+  no_support: 'Bạn luôn có Trợ lý AI hỗ trợ trong bài học, và có thể đăng ký lớp 1 kèm 1 bất cứ lúc nào cần.',
+  none: 'Tuyệt vời! Chúc bạn có những giờ học thật hứng khởi — khi nào cần người kèm riêng, tụi mình luôn sẵn sàng.',
+};
 
 export function FreeSurveyModal({
   visible,
@@ -516,44 +544,59 @@ export function FreeSurveyModal({
   onDone: () => void;
 }) {
   const [step, setStep] = useState<'survey' | 'guide'>('survey');
-  const [fromWhere, setFromWhere] = useState('');
-  const [birthYear, setBirthYear] = useState('');
-  const [occupation, setOccupation] = useState('');
-  const [customOccupation, setCustomOccupation] = useState('');
+  const [surveyStep, setSurveyStep] = useState(0);
+  const [source, setSource] = useState('');
+  const [sourceNote, setSourceNote] = useState('');
+  const [level, setLevel] = useState('');
+  const [fear, setFear] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const mascotUri = resolveMobilePublicUrl('/linh-vat-2.png');
 
-  const finalOccupation = occupation === 'Khác' ? customOccupation.trim() : occupation.trim();
+  const handleNext = () => {
+    if (surveyStep === 0) {
+      if (!source) {
+        setError('Vui lòng chọn một kênh bạn biết đến chúng tôi nhé.');
+        return;
+      }
+      if (source === 'other' && sourceNote.trim().length < 2) {
+        setError('Bạn ghi giúp tụi mình nguồn bạn biết đến nhé (ví dụ: YouTube...).');
+        return;
+      }
+    }
+    if (surveyStep === 1 && !level) {
+      setError('Hãy chọn mức độ hiện tại để hệ thống gợi ý bài học phù hợp.');
+      return;
+    }
+    setError('');
+    setSurveyStep((cur) => Math.min(2, cur + 1));
+  };
 
   const handleSubmit = async () => {
+    if (!source || !level || !fear) {
+      setError('Bạn chọn giúp mình đầy đủ cả 3 bước nhé.');
+      return;
+    }
+    if (source === 'other' && sourceNote.trim().length < 2) {
+      setError('Bạn ghi giúp tụi mình nguồn bạn biết đến nhé.');
+      return;
+    }
     setError('');
-    const place = fromWhere.trim();
-    const year = Number(birthYear);
-    const maxYear = new Date().getFullYear() - 4;
-    if (place.length < 2) {
-      setError('Vui lòng nhập tỉnh/thành phố bạn đang ở.');
-      return;
-    }
-    if (!Number.isInteger(year) || year < 1940 || year > maxYear) {
-      setError(`Vui lòng nhập năm sinh hợp lệ (1940 - ${maxYear}).`);
-      return;
-    }
-    if (finalOccupation.length < 2) {
-      setError('Vui lòng chọn hoặc nhập nghề nghiệp hiện tại.');
-      return;
-    }
     setSaving(true);
     try {
       await mobileApiRequest('/auth/free-survey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fromWhere: place,
-          birthYear: year,
-          occupation: finalOccupation,
+          source,
+          sourceNote: sourceNote.trim(),
+          level,
+          fear,
         }),
       });
+      await AsyncStorage.setItem('dewskill_survey_level', level).catch(() => {});
+      if (Platform.OS === 'web') {
+        try { globalThis.localStorage?.setItem('dewskill_survey_level', level); } catch { /* ignore */ }
+      }
       setStep('guide');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Không thể lưu thông tin. Vui lòng thử lại.');
@@ -571,11 +614,7 @@ export function FreeSurveyModal({
           <View style={styles.dialog}>
             <View style={styles.lockHeader}>
               <View style={styles.lockMascotWrap}>
-                {mascotUri ? (
-                  <Image source={{ uri: mascotUri }} style={styles.lockMascot} resizeMode="contain" />
-                ) : (
-                  <Sparkles size={34} color="#FBBF24" />
-                )}
+                <Image source={MASCOT_STUDY} style={styles.lockMascot} resizeMode="contain" />
               </View>
               <Text style={styles.lockTitle}>Cách mở các mục đang khóa</Text>
               <Text style={styles.lockSubtitle}>Tài khoản miễn phí có sẵn Luyện tập</Text>
@@ -608,95 +647,128 @@ export function FreeSurveyModal({
           <View style={[styles.dialog, styles.meetDialog]}>
             <View style={styles.surveyHeader}>
               <View style={styles.surveyMascotBox}>
-                {mascotUri ? (
-                  <Image source={{ uri: mascotUri }} style={styles.teacherAvatar} resizeMode="contain" />
-                ) : (
-                  <Sparkles size={24} color="#FBBF24" />
-                )}
+                <Image source={MASCOT_STUDY} style={styles.teacherAvatar} resizeMode="contain" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.meetTitle}>Chào mừng bạn!</Text>
-                <Text style={styles.meetSubtitle}>Trả lời 3 câu ngắn để mở bài học và luyện tập</Text>
+                <Text style={styles.meetTitle}>Cá nhân hóa lộ trình · Bước {surveyStep + 1}/3</Text>
+                <Text style={styles.meetSubtitle}>Cùng DewSkill thiết kế lộ trình dành riêng cho bạn</Text>
               </View>
             </View>
             <ScrollView style={styles.meetBody} contentContainerStyle={styles.meetBodyContent}>
               {error ? (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{error}</Text>
+                <View style={[styles.errorBox, { borderColor: '#FECDD3', backgroundColor: '#FFF1F2' }]}>
+                  <Text style={[styles.errorText, { color: '#BE123C' }]}>{error}</Text>
                 </View>
               ) : null}
 
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <MapPin size={14} color="#10B981" />
-                  <Text style={styles.fieldLabel}>Bạn đến từ đâu?</Text>
+              {surveyStep === 0 ? (
+                <View style={styles.fieldGroup}>
+                  <View style={styles.fieldLabelRow}>
+                    <Users size={14} color="#10B981" />
+                    <Text style={styles.fieldLabel}>Cơ duyên nào đưa bạn đến với Thắng Tin Học?</Text>
+                  </View>
+                  <View style={styles.occGrid}>
+                    {SURVEY_SOURCES.map((item) => {
+                      const active = source === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => { setSource(item.id); setError(''); }}
+                          style={[styles.occChip, active && styles.occChipActive, { width: '100%' }]}
+                        >
+                          <Text style={[styles.occChipText, active && styles.occChipTextActive]}>{item.label}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{item.hint}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {source === 'other' ? (
+                    <TextInput
+                      value={sourceNote}
+                      onChangeText={(t) => { setSourceNote(t); if (error) setError(''); }}
+                      placeholder="Ví dụ: YouTube, nhóm học tập, hội thảo..."
+                      placeholderTextColor="#94A3B8"
+                      style={[styles.input, { marginTop: 8 }]}
+                    />
+                  ) : null}
                 </View>
-                <TextInput
-                  value={fromWhere}
-                  onChangeText={setFromWhere}
-                  placeholder="Ví dụ: TP. Hồ Chí Minh, Hà Nội, Đà Nẵng..."
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                />
-              </View>
+              ) : surveyStep === 1 ? (
+                <View style={styles.fieldGroup}>
+                  <View style={styles.fieldLabelRow}>
+                    <Layers size={14} color="#10B981" />
+                    <Text style={styles.fieldLabel}>Hiện tại, kỹ năng Tin học của bạn đang ở mức nào?</Text>
+                  </View>
+                  <View style={styles.occGrid}>
+                    {SURVEY_LEVELS.map((item) => {
+                      const active = level === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => { setLevel(item.id); setError(''); }}
+                          style={[styles.occChip, active && styles.occChipActive, { width: '100%' }]}
+                        >
+                          <Text style={[styles.occChipText, active && styles.occChipTextActive]}>{item.label}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{item.hint}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.fieldGroup}>
+                  <View style={styles.fieldLabelRow}>
+                    <MessageCircleQuestion size={14} color="#10B981" />
+                    <Text style={styles.fieldLabel}>Điều gì khiến bạn còn băn khoăn nhất khi học online?</Text>
+                  </View>
+                  <View style={styles.occGrid}>
+                    {SURVEY_FEARS.map((item) => {
+                      const active = fear === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => { setFear(item.id); setError(''); }}
+                          style={[styles.occChip, active && styles.occChipActive, { width: '100%' }]}
+                        >
+                          <Text style={[styles.occChipText, active && styles.occChipTextActive]}>{item.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {fear && FEAR_NOTES[fear] ? (
+                    <View style={[styles.errorBox, { marginTop: 8 }]}>
+                      <Text style={styles.errorText}>{FEAR_NOTES[fear]}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
 
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Calendar size={14} color="#10B981" />
-                  <Text style={styles.fieldLabel}>Năm sinh</Text>
-                </View>
-                <TextInput
-                  value={birthYear}
-                  onChangeText={setBirthYear}
-                  placeholder="Ví dụ: 2002"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Briefcase size={14} color="#10B981" />
-                  <Text style={styles.fieldLabel}>Nghề nghiệp</Text>
-                </View>
-                <View style={styles.occGrid}>
-                  {OCCUPATIONS.map((item) => {
-                    const active = occupation === item;
-                    return (
-                      <Pressable
-                        key={item}
-                        onPress={() => setOccupation(item)}
-                        style={[styles.occChip, active && styles.occChipActive]}
-                      >
-                        <Text style={[styles.occChipText, active && styles.occChipTextActive]}>{item}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {occupation === 'Khác' ? (
-                  <TextInput
-                    value={customOccupation}
-                    onChangeText={setCustomOccupation}
-                    placeholder="Nhập nghề nghiệp của bạn..."
-                    placeholderTextColor="#94A3B8"
-                    style={[styles.input, { marginTop: 8 }]}
-                  />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                {surveyStep > 0 ? (
+                  <Pressable
+                    onPress={() => { setError(''); setSurveyStep((cur) => Math.max(0, cur - 1)); }}
+                    style={[styles.occChip, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12 }]}
+                  >
+                    <ArrowLeft size={15} color="#475569" />
+                    <Text style={styles.occChipText}>Quay lại</Text>
+                  </Pressable>
                 ) : null}
+                <Pressable
+                  onPress={() => { if (surveyStep < 2) handleNext(); else void handleSubmit(); }}
+                  disabled={saving}
+                  style={[styles.primaryCta, { flex: 1 }, saving && styles.disabledBtn]}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : surveyStep < 2 ? (
+                    <ArrowRight size={16} color="#FFFFFF" />
+                  ) : (
+                    <Rocket size={16} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.primaryCtaText}>
+                    {saving ? 'Đang thiết lập...' : surveyStep < 2 ? 'Tiếp tục' : 'Bắt đầu học ngay'}
+                  </Text>
+                </Pressable>
               </View>
-
-              <Pressable
-                onPress={() => void handleSubmit()}
-                disabled={saving}
-                style={[styles.primaryCta, saving && styles.disabledBtn]}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Sparkles size={16} color="#FFFFFF" />
-                )}
-                <Text style={styles.primaryCtaText}>{saving ? 'Đang lưu...' : 'Bắt đầu học miễn phí'}</Text>
-              </Pressable>
             </ScrollView>
           </View>
         )}

@@ -1,10 +1,12 @@
 import { DeviceEventEmitter } from 'react-native';
-import { mobileApiRequest } from './apiClient';
+import { MobileApiError, mobileApiRequest } from './apiClient';
+import { LEARNING_GOAL_CHANGED_EVENT } from './learningGoalApi';
 
 export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
 export const QUESTION_STAKE_XP = 5;
 export const SESSION_STAKE_XP = 50;
 export const TEST_OUT_XP = 50;
+export const UNIT_CHEST_REWARD_XP = 50;
 
 export function emitDailyPracticeStats(payload: unknown) {
   if (!payload || typeof payload !== 'object') return;
@@ -15,6 +17,24 @@ export function emitDailyPracticeStats(payload: unknown) {
   }
   if (typeof obj.currentXp === 'number' && typeof stats.xpTotal !== 'number') {
     stats.xpTotal = obj.currentXp;
+  }
+  if (typeof obj.xpTotal === 'number' && typeof stats.xpTotal !== 'number') {
+    stats.xpTotal = obj.xpTotal;
+  }
+  for (const key of [
+    'purchasedXp',
+    'dailyXp',
+    'dailyAllowanceXp',
+    'dailyRefillXp',
+    'xpEmpty',
+    'todayXp',
+    'todayXpCap',
+    'todayQuestions',
+    'todayVideos',
+  ] as const) {
+    if (obj[key] !== undefined && stats[key] === undefined) {
+      stats[key] = obj[key];
+    }
   }
   if (Object.keys(stats).length === 0) return;
   DeviceEventEmitter.emit(DAILY_PRACTICE_STATS_EVENT, stats);
@@ -39,11 +59,46 @@ export type DpTopic = {
   counts: { easy: number; medium: number; hard: number };
 };
 
+export type DpSpacedRepetitionSummary = {
+  totalQueued: number;
+  dueCount: number;
+  nextDueDay: string;
+  rewardXp: number;
+};
+
+export type DpPlacementSkillRow = {
+  skill: string;
+  keywords?: string[];
+  correct: number;
+  total: number;
+  percent: number;
+};
+
+export type DpPlacementAdvice = {
+  summary?: string;
+  recommendedTopic?: string;
+  levelLabel?: string;
+  strengths?: string[];
+  focus?: string[];
+  plan?: Array<{ title: string; detail?: string }>;
+};
+
+export type DpReferralInfo = {
+  code: string;
+  rewardXp: number;
+  referralCount: number;
+  referralXpEarned: number;
+  redeemed: boolean;
+  referredByCode?: string;
+};
+
 export type DpStats = {
   xpTotal: number;
   purchasedXp?: number;
+  dailyXp?: number;
   dailyAllowanceXp?: number;
   dailyRefillXp?: number;
+  sessionStakeXp?: number;
   xpEmpty?: boolean;
   xpPacks?: DpXpPack[];
   streak: number;
@@ -51,6 +106,9 @@ export type DpStats = {
   playedToday: boolean;
   sessionsCount: number;
   todaySessions?: number;
+  todayQuestions?: number;
+  todayVideos?: number;
+  todayMinutes?: number;
   todayXp?: number;
   todayPlayers?: number;
   streakState?: 'new' | 'active' | 'at_risk' | 'lost';
@@ -59,6 +117,8 @@ export type DpStats = {
   planType?: DpPlanType | string;
   todayXpCap?: number;
   xpCapReached?: boolean;
+  spacedRepetition?: DpSpacedRepetitionSummary | null;
+  referral?: DpReferralInfo | null;
 };
 
 export type DpQuestion = {
@@ -120,11 +180,19 @@ export type DpStepKey = 'learn' | 'practice' | 'challenge' | 'checkpoint' | stri
 export type DpNodeState = 'completed' | 'active' | 'locked';
 
 export type DpVideoCheck = {
+  id?: string;
+  _id?: string;
+  atSec?: number;
+  kind?: string;
   prompt: string;
+  choices?: string[];
   options: string[];
+  hintCostXp?: number;
   passed?: boolean;
   hintBought?: boolean;
   hint?: string;
+  reviewHint?: string;
+  reviewAnswer?: string;
 };
 
 export type DpPathStep = {
@@ -132,6 +200,8 @@ export type DpPathStep = {
   label: string;
   title?: string;
   content?: string;
+  fileUrl?: string;
+  fileName?: string;
   kind?: 'lesson' | 'quiz';
   difficulty: DpDifficulty | null;
   passPercent: number;
@@ -140,6 +210,7 @@ export type DpPathStep = {
 };
 
 export type DpSectionKey = 'content' | 'file' | 'video' | 'practice';
+export type DpSectionLockMode = 'auto' | 'unlocked' | 'locked';
 
 export type DpLevelFile = {
   id: string;
@@ -149,14 +220,57 @@ export type DpLevelFile = {
   size?: number;
 };
 
+export type DpVideoGuideFormula = {
+  id?: string;
+  title?: string;
+  name?: string;
+  formula?: string;
+  syntax?: string;
+  code?: string;
+  note?: string;
+  desc?: string;
+  description?: string;
+};
+
+export type DpVideoGuideShortcut = string | {
+  keys?: string;
+  key?: string;
+  shortcut?: string;
+  title?: string;
+  label?: string;
+  desc?: string;
+  description?: string;
+};
+
+export type DpVideoGuideChecklistItem = string | {
+  id?: string;
+  text?: string;
+  label?: string;
+  title?: string;
+  desc?: string;
+};
+
+export type DpVideoGuide = {
+  customized?: boolean;
+  focusSummary?: string;
+  formulas?: DpVideoGuideFormula[];
+  shortcuts?: DpVideoGuideShortcut[];
+  checklist?: DpVideoGuideChecklistItem[];
+};
+
 export type DpLevelSectionConfig = {
   sectionOrder: DpSectionKey[];
   hiddenSections?: DpSectionKey[];
   sequentialSections?: boolean;
+  sectionLocks?: Partial<Record<DpSectionKey, DpSectionLockMode>>;
   content: { title?: string; description?: string; body?: string };
   files: DpLevelFile[];
-  video: { id?: string; title?: string; url?: string; antiSeek?: boolean; checks?: DpVideoCheck[] };
-  practice: { title?: string; description?: string };
+  video: { id?: string; title?: string; url?: string; antiSeek?: boolean; checks?: DpVideoCheck[]; guide?: DpVideoGuide | null };
+  practice: {
+    title?: string;
+    description?: string;
+    video?: { id?: string; title?: string; url?: string; antiSeek?: boolean; checks?: DpVideoCheck[]; guide?: DpVideoGuide | null };
+  };
 };
 
 export type DpPathNode = {
@@ -179,7 +293,12 @@ export type DpPathUnit = {
   state: DpNodeState;
   testedOut: boolean;
   canTestOut: boolean;
+  requiresSubscription?: boolean;
+  chestClaimed?: boolean;
+  chestRewardXp?: number;
   completedSections?: string[];
+  watchedVideoIds?: string[];
+  counts?: { easy?: number; medium?: number; hard?: number; draft?: number; total?: number };
   pathNodes: DpPathNode[];
   steps: DpPathStep[];
   videos?: DpPathVideo[];
@@ -190,6 +309,8 @@ export type DpPathVideo = {
   id: string;
   title: string;
   url: string;
+  fileUrl?: string;
+  fileName?: string;
   antiSeek?: boolean;
   content?: string;
   state: DpNodeState;
@@ -199,6 +320,7 @@ export type DpPathVideo = {
   checks?: DpVideoCheck[];
   checksPassed?: boolean;
   hintCostXp?: number;
+  guide?: DpVideoGuide | null;
 };
 
 /** Danh sách phát của popup video: video riêng của chặng + video buổi bài giảng đã gắn (nếu HV được mở). */
@@ -208,6 +330,7 @@ export type DpUnitVideos = {
   unitIndex: number;
   state: DpNodeState;
   videos: DpPathVideo[];
+  passedCheckIds?: string[];
   lesson: {
     unitId: string;
     subjectId: string;
@@ -254,6 +377,7 @@ export type DpPathResult = {
 export type DpSession = {
   id: string;
   mode?: 'path' | 'free';
+  topic?: { id?: string; name?: string } | null;
   difficulty: DpDifficulty;
   total: number;
   questions: DpQuestion[];
@@ -263,6 +387,8 @@ export type DpSession = {
   sessionStakeXp?: number;
   recovery?: boolean;
   review?: boolean;
+  spacedReview?: boolean;
+  spacedRewardXp?: number;
   mandatory?: boolean;
   profileXp?: number;
   xpPacks?: DpXpPack[];
@@ -281,15 +407,23 @@ export type DpSession = {
 };
 
 export type DpSummary = {
+  id?: string;
+  sessionId?: string;
   total: number;
   correctCount: number;
+  scorePercent?: number;
+  passed?: boolean;
   stars: number;
   xp: number;
   bonusXp: number;
+  hintPenaltyXp?: number;
+  failPenaltyXp?: number;
   gainedXp: number;
   stakeXp?: number;
   recovery?: boolean;
   reviewMode?: boolean;
+  spacedReview?: boolean;
+  spacedRepetition?: DpSpacedRepetitionSummary | null;
   streakIncreased: boolean;
   stats: DpStats;
   review: Array<{ id: string; prompt: string; correct?: boolean; correctAnswer: DpCorrectAnswer; explanation: string }>;
@@ -319,7 +453,8 @@ export type DpRelatedLesson = {
 
 export type DpXpCheckout = {
   sessionId?: string;
-  orderCode: string;
+  ref?: string;
+  orderCode?: string;
   xp: number;
   amount: number;
   qrUrl?: string;
@@ -341,25 +476,46 @@ export type DpXpCheckout = {
 export type DpXpPurchaseStatus = {
   sessionId?: string;
   orderCode?: string;
+  ref?: string;
+  paid?: boolean;
   status: 'pending' | 'paid' | 'expired' | 'cancelled' | string;
   xp?: number;
   currentXp?: number;
   profileXp?: number;
   purchasedXp?: number;
+  dailyXp?: number;
 };
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
-  const payload = await mobileApiRequest<{ data?: T }>(
-    `/daily-practice/my${path}`,
-    body === undefined ? undefined : { method: 'POST', body: JSON.stringify(body) },
-  );
-  if (payload.data === undefined) throw new Error('Máy chủ không trả dữ liệu luyện tập');
-  return payload.data;
+async function call<T>(path: string, body?: unknown, method: 'POST' | 'PUT' | 'DELETE' = 'POST'): Promise<T> {
+  try {
+    const init = body === undefined && method === 'POST'
+      ? undefined
+      : {
+          method,
+          ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        };
+    const payload = await mobileApiRequest<{ data?: T }>(
+      `/daily-practice/my${path}`,
+      init,
+    );
+    if (payload.data === undefined) throw new Error('Máy chủ không trả dữ liệu luyện tập');
+    return payload.data;
+  } catch (err) {
+    if (err instanceof MobileApiError && typeof err.currentXp === 'number') {
+      emitDailyPracticeStats({ xpTotal: err.currentXp });
+    }
+    throw err;
+  }
 }
 
 /** Luyện tập hằng ngày - cùng API với web. */
 export const dailyPracticeApi = {
-  overview: () => call<{ topics: DpTopic[]; stats: DpStats }>('/overview').then((data) => {
+  overview: () => call<{
+    topics: DpTopic[];
+    stats: DpStats;
+    spacedRepetition?: DpSpacedRepetitionSummary | null;
+    referral?: DpReferralInfo | null;
+  }>('/overview').then((data) => {
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -367,7 +523,7 @@ export const dailyPracticeApi = {
     emitDailyPracticeStats(data);
     return data;
   }),
-  path: () => call<{ topics: DpTopicPath[] }>('/path') as Promise<{ topics: DpTopicPath[]; activeTopicId?: string }>,
+  path: () => call<{ topics: DpTopicPath[] }>('/path') as Promise<{ topics: DpTopicPath[]; activeTopicId?: string; canTestOut?: boolean }>,
   setActivePathTopic: (topicId: string) => call<{ topicId: string }>('/path/active-topic', { topicId }, 'PUT'),
   claimUnitChest: (unitId: string) => call<{ xp: number; chestClaimed: boolean; profileXp?: number; already?: boolean }>(
     `/path/units/${encodeURIComponent(unitId)}/chest/claim`,
@@ -377,14 +533,22 @@ export const dailyPracticeApi = {
     return data;
   }),
   unitVideos: (unitId: string) => call<DpUnitVideos>(`/path/units/${encodeURIComponent(unitId)}/videos`),
-  videoWatched: (unitId: string, videoId: string) => call<{ watched: boolean }>('/path/videos/watched', { unitId, videoId }),
+  videoWatched: (unitId: string, videoId: string) => call<{ watched: boolean }>('/path/videos/watched', { unitId, videoId }).then((data) => {
+    DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
+    return data;
+  }),
   completeSection: (
     unitId: string,
     payload: { nodeKey: string; difficulty: DpDifficulty; sectionKey: DpSectionKey; completed?: boolean },
   ) => call<{ unitId: string; completedSections: string[] }>(
     `/path/units/${encodeURIComponent(unitId)}/sections/complete`,
     payload,
-  ),
+  ).then((data) => {
+    if (payload?.sectionKey === 'video' && payload?.completed !== false) {
+      DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
+    }
+    return data;
+  }),
   answerVideoCheck: (
     unitId: string,
     videoId: string,
@@ -403,11 +567,14 @@ export const dailyPracticeApi = {
     emitDailyPracticeStats(data);
     return data;
   }),
-  buyVideoHint: (unitId: string, videoId: string, checkIndex: number) => call<{
+  buyVideoHint: (unitId: string, videoId: string, checkIndex: number, checkId?: string) => call<{
     hint: string;
-    costXp: number;
+    cost?: number;
+    costXp?: number;
     profileXp: number;
-  }>('/path/videos/hint', { unitId, videoId, checkIndex }).then((data) => {
+    purchasedXp?: number;
+    dailyXp?: number;
+  }>('/path/videos/hint', { unitId, videoId, checkIndex, ...(checkId ? { checkId } : {}) }).then((data) => {
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -428,6 +595,7 @@ export const dailyPracticeApi = {
   }),
   finish: (sessionId: string) => call<DpSummary>(`/sessions/${sessionId}/finish`, {}).then((data) => {
     emitDailyPracticeStats(data);
+    DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
     return data;
   }),
   abandon: (sessionId: string) => call<{ abandoned?: boolean; profileXp?: number; stats?: DpStats }>(`/sessions/${sessionId}/abandon`, {}).then((data) => {
@@ -437,6 +605,28 @@ export const dailyPracticeApi = {
   relatedTopics: (subjectId: string, unitId = '') => call<DpTopic[]>(
     `/related-topics?subjectId=${encodeURIComponent(subjectId)}${unitId ? `&unitId=${encodeURIComponent(unitId)}` : ''}`,
   ),
+  askLessonAssistant: (body: {
+    question: string;
+    lessonTitle?: string;
+    unitTitle?: string;
+    courseTitle?: string;
+    history?: Array<{ role: string; body?: string; content?: string; text?: string }>;
+  }) => call<{ answer: string; text?: string }>('/ai-assistant', body),
+  placementAdvice: (body: Record<string, unknown>) => call<DpPlacementAdvice>('/placement-advice', body),
+  startSpacedReview: () => call<DpSession>('/spaced-review/start', {}).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  redeemReferral: (code: string) => call<{
+    rewardXp: number;
+    referrerName: string;
+    code: string;
+    profileXp: number;
+    referral?: DpReferralInfo | null;
+  }>('/referral/redeem', { code }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
   buyXp: (packId: string) => call<DpXpCheckout>('/xp/purchase', { packId }),
   createXpCheckout: (packIdOrXp: string | number) => {
     const packId = typeof packIdOrXp === 'string' ? packIdOrXp : `xp_${packIdOrXp}`;
@@ -457,47 +647,57 @@ export function inPlayWalletXp(profileXp = 0, stakeXp = 0) {
 }
 
 export function practiceFinishXpDisplay(summary: Partial<DpSummary> = {}) {
-  if (summary.xpDisabled) {
+  if (!summary || summary.xpDisabled) {
     return {
       amount: 0,
       prefix: '',
       positive: true,
       caption: summary.reviewMode
         ? 'Ôn lại - không cộng và không trừ XP'
-        : 'Luyện tự do - không tính XP',
+        : 'Không tính XP',
     };
   }
-  const net = Number(summary.gainedXp) || 0;
-  const stake = Number(summary.stakeXp) || 0;
-  const passed = summary.path ? Boolean(summary.path.passed) : true;
-  if (net > 0) {
+  const gained = Number(summary.gainedXp) || 0;
+  const reward = Math.max(0, Number(summary.xp) || 0);
+  const stake = Math.max(0, Number(summary.stakeXp) || 0);
+  const hintNote = summary.hintPenaltyXp ? ` (−${summary.hintPenaltyXp} gợi ý)` : '';
+  const passed = summary.passed !== undefined
+    ? Boolean(summary.passed)
+    : (summary.path ? Boolean(summary.path.passed) : true);
+
+  if (!passed) {
     return {
-      amount: net,
+      amount: gained,
+      prefix: gained < 0 ? '' : '+',
+      positive: false,
+      caption: gained < 0
+        ? `Ròng ${gained} XP · không đạt nên không nhận XP câu đúng`
+        : (stake ? `Mất trắng −${stake} XP` : 'XP lượt này'),
+    };
+  }
+  if (gained > 0) {
+    return {
+      amount: gained,
       prefix: '+',
       positive: true,
       caption: summary.recovery
-        ? `Phục hồi · không cược · nhận +${net} XP`
-        : (stake > 0 ? `Hoàn ${stake} XP cược · nhận thêm +${net} XP` : `Hoàn thành nấc · cộng +${net} XP vào ví`),
+        ? `Phục hồi · không cược · nhận +${gained} XP`
+        : `Lời +${gained} XP${hintNote}`,
     };
   }
-  if (net < 0) {
-    const lost = Math.abs(net);
+  if (reward > 0) {
     return {
-      amount: lost,
-      prefix: '−',
-      positive: false,
-      caption: !passed
-        ? `Chưa đạt ${summary.path?.passPercent || 60}% · trừ ${lost} XP câu sai/gợi ý, không nhận XP câu đúng`
-        : `Đạt nấc · câu sai nhiều hơn câu đúng (−${lost} XP ròng)`,
+      amount: reward,
+      prefix: '+',
+      positive: true,
+      caption: `Hoàn ${reward} XP cược · ví giữ nguyên${hintNote}`,
     };
   }
   return {
     amount: 0,
     prefix: '',
-    positive: passed,
-    caption: summary.recovery
-      ? 'Chưa đạt điểm vượt - không mất thêm XP'
-      : 'Ví XP không đổi sau lượt này',
+    positive: true,
+    caption: `Hoàn cược · ví giữ nguyên${hintNote}`,
   };
 }
 

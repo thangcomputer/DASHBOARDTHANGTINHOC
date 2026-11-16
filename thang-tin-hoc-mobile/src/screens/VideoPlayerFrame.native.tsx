@@ -35,6 +35,7 @@ function createPlayerHtml({
   initialVolume,
   initialMuted,
   chromeBg,
+  initialAtSec = 0,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -47,6 +48,7 @@ function createPlayerHtml({
   initialVolume: number;
   initialMuted: boolean;
   chromeBg: string;
+  initialAtSec?: number;
 }) {
   const isDirectVideo = isDirectVideoUrl(videoUrl);
   const youtubeId = youtubeIdFromUrl(videoUrl);
@@ -74,6 +76,7 @@ function createPlayerHtml({
     ytBottomVeilW: JSON.stringify(YT_IFRAME_CROP.bottomVeilWidthPx),
     ytPlayerBg: escapedScriptValue(chromeBg),
     ytBrandedVars: JSON.stringify(YT_BRANDED_PLAYER_VARS),
+    initialResumeAt: JSON.stringify(Math.max(0, Math.floor(Number(initialAtSec) || 0))),
   };
   const topVeilBg = `linear-gradient(180deg,${chromeBg} 0%,${chromeBg} 80%,rgba(0,0,0,0) 100%)`;
   return `<!doctype html>
@@ -107,7 +110,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
     try{const value=Number(localStorage.getItem(key)||0);return Number.isFinite(value)&&value>0?value:0;}
     catch(error){console.error('Không thể đọc tiến độ video đã lưu.',error);return 0;}
   }
-  const initialMaxPosition=completed?0:readStoredNumber(watchKey);
+  const initialResumeAt=${encoded.initialResumeAt};
+  const initialMaxPosition=Math.max(completed?0:readStoredNumber(watchKey),initialResumeAt);
   const initialWatchedSeconds=completed?0:readStoredNumber(watchedKey);
   const guard=createVideoWatchGuard(youtubeId?1.25:2,initialWatchedSeconds,initialMaxPosition);
   let pending=false;
@@ -250,7 +254,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
   }
   if(isDirectVideo){
     video=document.createElement('video');video.src=videoUrl;video.controls=!brandedChrome;video.autoplay=true;video.playsInline=true;video.setAttribute('controlsList','nodownload noplaybackrate');video.setAttribute('aria-label',title);document.getElementById('player').appendChild(video);
-    video.addEventListener('loadedmetadata',function(){applyVolume(initialVolume,initialMuted);if(!completed&&initialMaxPosition>0)video.currentTime=Math.min(initialMaxPosition,Math.max(0,video.duration-1));});
+    video.addEventListener('loadedmetadata',function(){applyVolume(initialVolume,initialMuted);var target=(!completed||initialResumeAt>0)?initialMaxPosition:0;if(target>0)video.currentTime=Math.min(target,Math.max(0,video.duration-1));});
     video.addEventListener('play',function(){playing=true;});
     video.addEventListener('pause',function(){playing=false;});
     video.addEventListener('seeking',poll);
@@ -280,7 +284,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
             iframe.style.border='0';
           }
           applyVolume(initialVolume,initialMuted);
-          if(!completed&&initialMaxPosition>0)event.target.seekTo(initialMaxPosition,true);
+          if((!completed||initialResumeAt>0)&&initialMaxPosition>0)event.target.seekTo(initialMaxPosition,true);
           preferMaxQuality();
           disableCaptions();
           poll();
@@ -359,6 +363,24 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${chromeBg}
 </script></body></html>`;
 }
 
+type WebViewErrorEvent = {
+  nativeEvent?: {
+    description?: string;
+  };
+};
+
+type WebViewHandle = {
+  injectJavaScript: (script: string) => void;
+};
+
+const NativeWebView = WebView as unknown as React.ComponentType<
+  Record<string, unknown> & {
+    ref?: React.Ref<WebViewHandle | null>;
+    onError?: (event: WebViewErrorEvent) => void;
+    onMessage?: (event: WebViewMessageEvent) => void;
+  }
+>;
+
 export function VideoPlayerFrame({
   videoUrl,
   embeddedUrl,
@@ -373,6 +395,7 @@ export function VideoPlayerFrame({
   appearance = 'default',
   chromeBg,
   chromeRightSlot = null,
+  initialAtSec = 0,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -389,9 +412,10 @@ export function VideoPlayerFrame({
   /** Nền vùng video (popup #23262E) — veil khớp màu, không lộ viền YT. */
   chromeBg?: string;
   chromeRightSlot?: React.ReactNode;
+  initialAtSec?: number;
 }) {
   const surfaceBg = chromeBg || YT_IFRAME_CROP.playerBg;
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<WebViewHandle | null>(null);
   const [playerError, setPlayerError] = useState('');
   const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
   const [uiProgress, setUiProgress] = useState<VideoPlayerProgress>({
@@ -475,10 +499,11 @@ export function VideoPlayerFrame({
         initialVolume: volume,
         initialMuted: muted,
         chromeBg: surfaceBg,
+        initialAtSec,
       }),
       baseUrl: fileDir || apiOrigin,
     };
-  }, [videoUrl, embeddedUrl, title, lessonId, antiSeekEnabled, done, brandedChrome, prefsReady, surfaceBg]);
+  }, [videoUrl, embeddedUrl, title, lessonId, antiSeekEnabled, done, brandedChrome, prefsReady, surfaceBg, initialAtSec]);
   onProgressRef.current = onProgress;
   onWatchedRef.current = onWatched;
   doneRef.current = done;
@@ -628,7 +653,7 @@ export function VideoPlayerFrame({
   const playerBody = (
     <View style={{ flex: 1, position: 'relative', backgroundColor: playerSurfaceBg }}>
       {prefsReady ? (
-        <WebView
+        <NativeWebView
           ref={webViewRef}
           source={source}
           style={{ flex: 1, backgroundColor: playerSurfaceBg }}
@@ -637,8 +662,8 @@ export function VideoPlayerFrame({
           onLoadEnd={() => {
             injectPlayerCommand(`window.__mobileVideoCommands&&window.__mobileVideoCommands.setVolume(${volume},${muted ? 'true' : 'false'});`);
           }}
-          onError={(event) => {
-            const description = event.nativeEvent.description || 'Không thể tải trình phát video.';
+          onError={(event: { nativeEvent?: { description?: string } }) => {
+            const description = event.nativeEvent?.description || 'Không thể tải trình phát video.';
             setPlayerError(description);
           }}
           accessibilityLabel={title}

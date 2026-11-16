@@ -20,11 +20,21 @@ export function collectNodeVideos(unit, node) {
   const completedSet = new Set(unit.completedSections || []);
   const watchedSet = new Set(unit.watchedVideoIds || []);
   const nodeUnlocked = unit.state !== 'locked' && node.state !== 'locked';
+  const isSectionOpen = (cfg, diffKey, secKey, order) => {
+    const lock = cfg?.sectionLocks?.[secKey];
+    if (lock === 'locked') return false;
+    if (lock === 'unlocked') return true;
+    if (unit.testedOut || cfg?.sequentialSections === false) return true;
+    const idx = order.indexOf(secKey);
+    if (idx <= 0) return idx === 0;
+    return order.slice(0, idx).every((prev) => completedSet.has(`${node.key}:${diffKey}:${prev}`));
+  };
   const isLevelDone = (diff) => {
     const cfg = node.levelConfigs?.[diff];
     const hidden = new Set(cfg?.hiddenSections || []);
+    const locks = cfg?.sectionLocks || {};
     const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : DEFAULT_SEC_ORDER)
-      .filter((k) => !hidden.has(k));
+      .filter((k) => !hidden.has(k) && locks[k] !== 'locked');
     return !order.length || order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
   };
   const easyDone = isLevelDone('easy');
@@ -36,30 +46,43 @@ export function collectNodeVideos(unit, node) {
 
   for (const d of DIFF_META) {
     const cfg = node.levelConfigs?.[d.key];
-    const vid = cfg?.video;
-    if (!vid?.url) continue;
-    const hidden = new Set(cfg.hiddenSections || []);
-    if (hidden.has('video')) continue;
+    const hidden = new Set(cfg?.hiddenSections || []);
+    const locks = cfg?.sectionLocks || {};
     const diffUnlocked = unit.testedOut || d.key === 'easy'
       || (d.key === 'medium' && easyDone)
       || (d.key === 'hard' && easyDone && mediumDone);
-    const order = (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : DEFAULT_SEC_ORDER)
-      .filter((k) => !hidden.has(k));
-    const idx = order.indexOf('video');
-    const seqUnlocked = unit.testedOut || cfg.sequentialSections === false
-      || idx <= 0
-      || order.slice(0, idx).every((secKey) => completedSet.has(`${node.key}:${d.key}:${secKey}`));
-    const unlocked = nodeUnlocked && diffUnlocked && seqUnlocked;
-    const id = `${node.key}:level:${d.key}`;
-    const watched = completedSet.has(`${node.key}:${d.key}:video`) || watchedSet.has(id);
-    seenUrls.add(String(vid.url).trim());
-    items.push({
-      id,
-      title: vid.title || `${node.label} (${d.label})`,
-      url: unlocked ? vid.url : '',
-      stepLabel: d.label,
-      state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
-    });
+    const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder : DEFAULT_SEC_ORDER)
+      .filter((k) => !hidden.has(k) && locks[k] !== 'locked');
+
+    const vid = cfg?.video;
+    if (vid?.url && !hidden.has('video')) {
+      const unlocked = nodeUnlocked && diffUnlocked && isSectionOpen(cfg, d.key, 'video', order);
+      const id = `${node.key}:level:${d.key}`;
+      const watched = unlocked && (completedSet.has(`${node.key}:${d.key}:video`) || watchedSet.has(id) || unit.state === 'completed');
+      seenUrls.add(String(vid.url).trim());
+      items.push({
+        id,
+        title: vid.title || `${node.label} (${d.label})`,
+        url: unlocked ? vid.url : '',
+        stepLabel: d.label,
+        state: !unlocked ? 'locked' : watched ? 'completed' : 'active',
+      });
+    }
+
+    const pVid = cfg?.practice?.video;
+    if (pVid?.url && !hidden.has('practice')) {
+      const pUnlocked = nodeUnlocked && diffUnlocked && isSectionOpen(cfg, d.key, 'practice', order);
+      const pId = `${node.key}:practice:${d.key}`;
+      const pWatched = pUnlocked && (watchedSet.has(pId) || completedSet.has(`${node.key}:${d.key}:practice`) || unit.state === 'completed');
+      seenUrls.add(String(pVid.url).trim());
+      items.push({
+        id: pId,
+        title: pVid.title || `Video luyện tập · ${node.label} (${d.label})`,
+        url: pUnlocked ? pVid.url : '',
+        stepLabel: d.label,
+        state: !pUnlocked ? 'locked' : pWatched ? 'completed' : 'active',
+      });
+    }
   }
 
   for (const level of node.levels || []) {

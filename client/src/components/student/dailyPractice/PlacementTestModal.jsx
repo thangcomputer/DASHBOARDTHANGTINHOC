@@ -264,8 +264,13 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
   const ai = showResultScreen ? activeResult.ai : null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/65 p-3 sm:p-5 backdrop-blur-xs">
-      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/65 p-2 sm:p-5 backdrop-blur-xs">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Kiểm tra đầu vào"
+        className="relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+      >
         {aiLoading && (
           <div
             role="status"
@@ -281,16 +286,16 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
             </p>
           </div>
         )}
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-2.5 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
               <Compass size={19} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-black text-slate-900">
+              <h2 className="line-clamp-2 text-sm font-black leading-snug text-slate-900 sm:truncate sm:text-base">
                 Kiểm tra đầu vào · Gợi ý lộ trình cá nhân hóa
               </h2>
-              <p className="text-xs font-medium text-slate-500">
+              <p className="text-[11px] font-medium text-slate-500 sm:text-xs">
                 10 câu đánh giá nhanh Windows, Word, Excel, PowerPoint
               </p>
             </div>
@@ -306,27 +311,28 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
           {showIntro && !showResultScreen ? (
-            <div className="space-y-4 py-2 text-center">
-              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
-                <Compass size={28} />
+            <div className="space-y-3 py-1 text-center sm:space-y-4 sm:py-2">
+              <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md sm:h-14 sm:w-14">
+                <Compass size={24} className="sm:hidden" />
+                <Compass size={28} className="hidden sm:block" />
               </span>
               <div>
-                <h3 className="text-lg font-black text-slate-900">Cùng tìm điểm xuất phát phù hợp nhất cho bạn</h3>
-                <p className="mx-auto mt-1.5 max-w-md text-sm font-medium text-slate-500">
+                <h3 className="text-base font-black leading-snug text-slate-900 sm:text-lg">Cùng tìm điểm xuất phát phù hợp nhất cho bạn</h3>
+                <p className="mx-auto mt-1 max-w-md text-xs font-medium leading-relaxed text-slate-500 sm:mt-1.5 sm:text-sm">
                   10 câu trắc nghiệm nhanh (khoảng 3 phút) về Windows, Word, Excel và PowerPoint.
                   Hệ thống sẽ phân tích bài làm và gợi ý lộ trình học riêng cho bạn.
                 </p>
               </div>
-              <div className="mx-auto grid max-w-md grid-cols-3 gap-2 text-xs font-bold text-slate-700">
-                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-2 py-2.5 text-emerald-800">
+              <div className="mx-auto grid max-w-md grid-cols-3 gap-1.5 text-[11px] font-bold text-slate-700 sm:gap-2 sm:text-xs">
+                <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-emerald-50 px-1.5 py-2 text-emerald-800 sm:flex-row sm:gap-1.5 sm:px-2 sm:py-2.5">
                   <Clock size={14} className="shrink-0" aria-hidden="true" /> ~3 phút
                 </div>
-                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-sky-50 px-2 py-2.5 text-sky-800">
+                <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-sky-50 px-1.5 py-2 text-sky-800 sm:flex-row sm:gap-1.5 sm:px-2 sm:py-2.5">
                   <FileText size={14} className="shrink-0" aria-hidden="true" /> 10 câu
                 </div>
-                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-violet-50 px-2 py-2.5 text-violet-800">
+                <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-violet-50 px-1.5 py-2 text-violet-800 sm:flex-row sm:gap-1.5 sm:px-2 sm:py-2.5">
                   <Target size={14} className="shrink-0" aria-hidden="true" /> Gợi ý lộ trình
                 </div>
               </div>

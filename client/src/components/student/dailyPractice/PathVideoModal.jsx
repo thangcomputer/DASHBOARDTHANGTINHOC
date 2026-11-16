@@ -203,15 +203,31 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
 
   useEffect(() => {
     let alive = true;
-    dailyPracticeApi.student.unitVideos(unit.id)
-      .then((res) => {
-        if (!alive) return;
-        setData(res);
-        setWatchedIds(new Set((res.videos || []).filter((video) => video.state === 'completed').map((video) => video.id)));
-        setPassedKeys(new Set(res.passedCheckIds || []));
-      })
-      .catch((err) => { if (alive) setError(err.message || 'Không tải được video của chặng'); });
-    return () => { alive = false; };
+    const syncUnitVideos = () => {
+      dailyPracticeApi.student.unitVideos(unit.id)
+        .then((res) => {
+          if (!alive) return;
+          const nextWatched = new Set((res.videos || []).filter((video) => video.state === 'completed').map((video) => video.id));
+          const nextPassed = new Set(res.passedCheckIds || []);
+          passedRef.current = nextPassed;
+          setData(res);
+          setWatchedIds(nextWatched);
+          setPassedKeys(nextPassed);
+        })
+        .catch((err) => { if (alive) setError(err.message || 'Không tải được video của chặng'); });
+    };
+    syncUnitVideos();
+    const onFocus = () => syncUnitVideos();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') syncUnitVideos();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [unit.id]);
 
   useEffect(() => {

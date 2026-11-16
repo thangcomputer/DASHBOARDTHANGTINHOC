@@ -161,9 +161,9 @@ function HomeScreen({
   };
 
   const heroLabel = mode === 'path'
-    ? (pathContinue
-      ? pathTopicPrimaryCtaLabel(pathTopic)
-      : (topicPathDone ? 'Ôn lại lộ trình' : 'Xem chi tiết lộ trình'))
+    ? (topicPathDone
+      ? 'Ôn lại lộ trình'
+      : (pathTopic ? pathTopicPrimaryCtaLabel(pathTopic) : 'Xem chi tiết lộ trình'))
     : 'Bắt đầu luyện tập';
   const heroDisabled = mode === 'free' ? (!topicId || starting) : starting;
   const freePortal = isFreePortalAccount();
@@ -1522,12 +1522,20 @@ export default function DailyPracticePage() {
         try {
           if (localStorage.getItem(storageKey) === '1') return;
         } catch { /* vẫn cho hiện */ }
-        timer = window.setTimeout(() => {
-          if (cancelled) return;
-          try { localStorage.setItem(storageKey, '1'); } catch { /* ignore */ }
-          setMeetNotice(notice);
-          setMeetOfferOpen(true);
-        }, 5000);
+        const scheduleMeetOffer = (delayMs) => {
+          timer = window.setTimeout(() => {
+            if (cancelled) return;
+            // Avoid stacking the onboarding Meet modal over another active dialog (goal/placement/survey).
+            if (typeof document !== 'undefined' && document.querySelector('[role="dialog"], [aria-modal="true"]')) {
+              scheduleMeetOffer(2500);
+              return;
+            }
+            try { localStorage.setItem(storageKey, '1'); } catch { /* ignore */ }
+            setMeetNotice(notice);
+            setMeetOfferOpen(true);
+          }, delayMs);
+        };
+        scheduleMeetOffer(5000);
       })
       .catch(() => { });
     return () => {
@@ -1563,12 +1571,12 @@ export default function DailyPracticePage() {
     });
   }, []);
 
-  const loadPath = useCallback(() => {
-    setPathLoading(true);
+  const loadPath = useCallback((silent = false) => {
+    if (!silent) setPathLoading(true);
     dailyPracticeApi.student.path()
-      .then((data) => setPath(data))
-      .catch((err) => setPathError(err.message || 'Không tải được lộ trình luyện tập'))
-      .finally(() => setPathLoading(false));
+      .then((data) => { setPath(data); setPathError(''); })
+      .catch((err) => { if (!silent) setPathError(err.message || 'Không tải được lộ trình luyện tập'); })
+      .finally(() => { if (!silent) setPathLoading(false); });
   }, []);
 
   const refreshPathAndOverview = useCallback(() => {
@@ -1583,9 +1591,15 @@ export default function DailyPracticePage() {
       if (event?.detail) applyStats(event.detail);
     };
     const onVisible = () => {
-      if (document.visibilityState === 'visible') loadOverview(true);
+      if (document.visibilityState === 'visible') {
+        loadOverview(true);
+        loadPath(true);
+      }
     };
-    const onFocus = () => loadOverview(true);
+    const onFocus = () => {
+      loadOverview(true);
+      loadPath(true);
+    };
     window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
@@ -1594,7 +1608,7 @@ export default function DailyPracticePage() {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [applyStats, loadOverview]);
+  }, [applyStats, loadOverview, loadPath]);
 
   const changeMode = (next) => {
     setMode(next);
