@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, ExternalLink, Loader2, Lock, Play, StickyNote,
+  Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock, ExternalLink, Lightbulb, Loader2, Lock, Play, Send, StickyNote, X, Zap,
 } from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import { NotesPanel } from '../../lms/LmsPlayerTabs';
 import LessonAiAssistantPanel from '../../lms/LessonAiAssistantPanel';
 import { lmsStoreKey } from '../../../hooks/useLmsLocalStore';
 import { resolveCurrentStudentId, saveLastStudySession } from '../../../utils/resumeLearning';
-import dailyPracticeApi from '../../../services/dailyPracticeApi';
+import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { lessonResumeUrl } from '../../../utils/learningGoal';
@@ -17,7 +17,7 @@ import { gameSounds } from '../../../utils/sound';
 import { VIDEO_CHECK_ANSWER_XP } from '../../../utils/dailyPractice';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
 
-const WATCH_REQUIRED_RATIO = 2 / 3;
+const WATCH_REQUIRED_RATIO = 0.7;
 
 function vimeoId(url) {
   const match = String(url || '').match(/vimeo\.com\/(?:video\/)?(\d+)/i);
@@ -127,6 +127,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   const [paidHint, setPaidHint] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [xpPacks, setXpPacks] = useState([]);
+  const [walletXp, setWalletXp] = useState(null);
   const [checkBusy, setCheckBusy] = useState(false);
   const [checkError, setCheckError] = useState('');
   const [missed, setMissed] = useState(false);
@@ -135,7 +136,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   const [grading, setGrading] = useState(false);
   const [hintStep, setHintStep] = useState(false);
   const [markingWatched, setMarkingWatched] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const playerApiRef = useRef(null);
   const mediaElRef = useRef(null);
@@ -170,6 +171,33 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
 
   useEffect(() => {
     let alive = true;
+    dailyPracticeApi.student.overview()
+      .then((res) => {
+        if (alive && typeof res?.stats?.xpTotal === 'number') setWalletXp(res.stats.xpTotal);
+      })
+      .catch(() => {});
+    const onStats = (event) => {
+      if (typeof event?.detail?.xpTotal === 'number') setWalletXp(event.detail.xpTotal);
+    };
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+    return () => {
+      alive = false;
+      window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+    };
+  }, []);
+
+  const syncXpStats = (res) => {
+    if (typeof res?.profileXp !== 'number') return;
+    setWalletXp(res.profileXp);
+    emitDailyPracticeStats({
+      xpTotal: res.profileXp,
+      ...(typeof res.purchasedXp === 'number' ? { purchasedXp: res.purchasedXp } : {}),
+      ...(typeof res.dailyXp === 'number' ? { dailyXp: res.dailyXp } : {}),
+    });
+  };
+
+  useEffect(() => {
+    let alive = true;
     dailyPracticeApi.student.unitVideos(unit.id)
       .then((res) => {
         if (!alive) return;
@@ -192,7 +220,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     };
   }, [onClose]);
 
-  const isSingleMode = Boolean(singleVideoOnly || /:level:(easy|medium|hard)$/.test(String(initialVideoId || '')));
+  const isSingleMode = Boolean(singleVideoOnly || /:(level|practice):(easy|medium|hard)$/.test(String(initialVideoId || '')));
   const allPlaylist = useMemo(() => [
     ...(data?.videos || []).map((video) => ({ ...video, source: video.source || 'unit' })),
     ...(data?.lesson?.videos || []).map((video) => ({ ...video, source: 'lesson', state: 'active' })),
@@ -204,7 +232,11 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   }, [allPlaylist, isSingleMode, initialVideoId]);
   const playable = playlist.filter((video) => video.state !== 'locked');
   const current = playable.find((video) => video.id === currentId) || playable[0] || null;
-  const currentWatched = current ? ((current.source === 'unit' || current.source === 'step') ? watchedIds.has(current.id) : false) : false;
+  const currentWatched = current
+    ? ((current.source === 'unit' || current.source === 'step')
+      ? (watchedIds.has(current.id) || current.state === 'completed')
+      : false)
+    : false;
   const lesson = data?.lesson || null;
   currentRef.current = current;
 
@@ -367,6 +399,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
         text: answerText,
         imageDataUrl: imageDataUrl || '',
       });
+      syncXpStats(res);
       if (res.correct) {
         setMissed(false);
         gameSounds.win();
@@ -432,6 +465,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     } catch { /* server vẫn chặn nếu không đủ */ }
     try {
       const res = await dailyPracticeApi.student.buyVideoHint(unit.id, current.id, gate.id);
+      syncXpStats(res);
       setPaidHint(res.hint || '');
       setHintStep(true);
     } catch (err) {
@@ -448,24 +482,29 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   };
 
   const isCurrentYouTube = Boolean(current && extractYouTubeId(current.url));
+  const currentIdx = current ? playable.findIndex((v) => v.id === current.id) : -1;
+  const nextVideo = currentIdx >= 0 ? playable[currentIdx + 1] : null;
+  const handleContinueAfterVideo = () => {
+    if (nextVideo) {
+      setCurrentId(nextVideo.id);
+      return;
+    }
+    onClose();
+  };
   const watchStatusControl = (current?.source === 'unit' || current?.source === 'step') ? (
-    isSingleMode && currentWatched ? (
-      <span className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black text-emerald-300 border border-emerald-400/30 whitespace-nowrap">
-        <CheckCircle2 size={13} /> Đã xem
-      </span>
-    ) : !currentWatched && pendingOf(current).length === 0 ? (
+    currentWatched ? (
       <button
         type="button"
-        disabled={markingWatched}
-        onClick={(e) => {
-          e.stopPropagation();
-          void markWatched();
-        }}
-        className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black text-white hover:bg-emerald-500 disabled:opacity-60 !shadow-none whitespace-nowrap"
+        onClick={handleContinueAfterVideo}
+        className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-500 hover:bg-emerald-400 px-3 sm:px-3.5 text-[10px] sm:text-[11px] font-black text-white transition cursor-pointer whitespace-nowrap !shadow-none"
       >
-        <CheckCircle2 size={13} /> {markingWatched ? 'Đang lưu…' : 'Đánh dấu đã xem'}
+        <CheckCircle2 size={13} /> Tiếp tục bài kế tiếp <ChevronRight size={13} />
       </button>
-    ) : null
+    ) : (
+      <span className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-white/10 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-bold text-white/80 border border-white/15 whitespace-nowrap">
+        <Lock size={12} /> {markingWatched ? 'Đang lưu…' : 'Xem đủ 70% để mở khóa'}
+      </span>
+    )
   ) : null;
   const showFooterBar = Boolean(lesson || (!isCurrentYouTube && watchStatusControl));
 
@@ -527,70 +566,207 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
             ))}
             {cheer && gate && <AnswerCheer onDone={() => finishCheck(gate.id)} />}
             {gate && !cheer && (
-              <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 p-4">
-                <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
-                  <p className="text-[11px] font-black uppercase tracking-wide text-amber-700">Dừng ở giây {gate.atSec}</p>
-                  {missed && (
-                    <div className="flex items-center gap-3 rounded-xl bg-rose-50 px-3 py-2">
-                      <img src={CRY_MASCOT} alt="" className="h-16 w-16 object-contain" />
-                      <p className="text-sm font-black text-rose-700">
-                        {gate.kind === 'screen'
-                          ? `AI chưa chấp nhận. Mất ${VIDEO_CHECK_ANSWER_XP} XP. Hãy tải đáp án mới.`
-                          : gate.kind === 'text'
-                            ? `Chưa đúng ý. Mất ${VIDEO_CHECK_ANSWER_XP} XP. Hãy nhập lại.`
-                            : `Chưa đúng. Mất ${VIDEO_CHECK_ANSWER_XP} XP. Hãy chọn lại.`}
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-base font-black">{gate.prompt}</p>
-                  {hintStep && paidHint ? (
-                    <div className="space-y-3">
-                      <p className="rounded-xl bg-sky-50 px-3 py-3 text-sm font-semibold leading-relaxed text-sky-900">{paidHint}</p>
-                      <button type="button" onClick={() => finishCheck(gate.id)} className="w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-black text-white !shadow-none">Tiếp tục xem</button>
-                    </div>
-                  ) : (
-                    <>
-                      {gate.kind === 'choice' && (
-                        <div className="space-y-1.5">
-                          {(gate.choices || []).map((choice, index) => (
-                            <button key={index} type="button" onClick={() => setPicked(index)} className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-bold !shadow-none ${picked === index ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
-                              {choice}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {gate.kind === 'text' && (
-                        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" value={answerText} placeholder="Nhập đáp án" onChange={(e) => setAnswerText(e.target.value)} />
-                      )}
-                      {gate.kind === 'screen' && (uploadPct != null ? (
-                        <UploadProgress percent={uploadPct} grading={grading} />
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-4">
+                <div className="w-full max-w-md overflow-hidden rounded-[22px] border border-slate-200/80 bg-white text-slate-900 shadow-2xl">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100/90 px-2.5 py-0.5 text-[11px] font-black text-amber-800">
+                        <Clock size={11} aria-hidden="true" />
+                        Giây {gate.atSec}
+                      </span>
+                      {currentWatched ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-extrabold text-sky-700 ring-1 ring-sky-200/80">
+                          Ôn lại · Miễn phí XP
+                        </span>
                       ) : (
-                        <label className="block cursor-pointer rounded-xl bg-slate-100 px-3 py-3 text-center text-sm font-bold text-slate-700">
-                          {missed ? 'Tải đáp án mới' : 'Gửi ảnh'}
-                          <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { sendScreenshot(e.target.files?.[0]); e.target.value = ''; }} />
-                        </label>
-                      ))}
-                      {checkHint && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{checkHint}</p>}
-                      {paidHint && <p className="rounded-xl bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">{paidHint}</p>}
-                      {checkError && <p className="text-sm font-semibold text-red-600">{checkError}</p>}
-                      <div className="flex flex-wrap gap-2">
-                        {gate.kind !== 'screen' && (
-                          <button type="button" disabled={checkBusy || (gate.kind === 'choice' ? picked == null : !answerText.trim())} onClick={() => submitCheck('')} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-black text-white disabled:opacity-50 !shadow-none">
-                            {checkBusy ? 'Đang chấm…' : 'Trả lời'}
-                          </button>
-                        )}
-                        <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 !shadow-none">Thôi</button>
-                        {Number(gate.hintCostXp) > 0 && (
-                          <button type="button" disabled={checkBusy} onClick={buyHint} className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white !shadow-none">
-                            {checkBusy ? 'Đang lấy gợi ý…' : `Gợi ý thêm · ${gate.hintCostXp} XP`}
-                          </button>
-                        )}
+                        <>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-extrabold text-emerald-700 ring-1 ring-emerald-200/80">
+                            <Zap size={10} className="fill-emerald-500 text-emerald-600" aria-hidden="true" />
+                            +{VIDEO_CHECK_ANSWER_XP} XP
+                          </span>
+                          {typeof walletXp === 'number' && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold tabular-nums text-slate-700">
+                              Ví: {walletXp} XP
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      aria-label="Đóng video"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-700 !shadow-none"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3.5 p-4 sm:p-5">
+                    {!currentWatched && missed && (
+                      <div className="flex items-center gap-3 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2">
+                        <img src={CRY_MASCOT} alt="" className="h-12 w-12 shrink-0 object-contain" />
+                        <p className="text-xs font-bold leading-snug text-rose-700">
+                          {gate.kind === 'screen'
+                            ? `AI chưa chấp nhận (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy gửi ảnh mới.`
+                            : gate.kind === 'text'
+                              ? `Chưa đúng ý (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy nhập lại.`
+                              : `Chưa đúng (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy chọn lại.`}
+                        </p>
                       </div>
-                      <p className="text-[11px] font-semibold text-slate-500">
-                        Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP và xem tiếp. Sai mất {VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.
-                      </p>
-                    </>
-                  )}
+                    )}
+
+                    <p className="text-[15px] font-black leading-snug text-slate-900 sm:text-base">
+                      {gate.prompt}
+                    </p>
+
+                    {currentWatched ? (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5 rounded-xl border border-sky-200 bg-sky-50/80 px-3.5 py-3 text-sm leading-relaxed text-sky-950">
+                          <div className="flex items-start gap-2 font-semibold">
+                            <Lightbulb size={16} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+                            <span>
+                              {gate.reviewHint || gate.reviewAnswer || 'Video này bạn đã hoàn thành. Hãy xem lại đoạn hướng dẫn rồi tiếp tục nhé.'}
+                            </span>
+                          </div>
+                          {gate.reviewHint && gate.reviewAnswer && gate.reviewAnswer !== gate.reviewHint && (
+                            <p className="pl-6 text-xs font-bold text-emerald-700">
+                              Đáp án gợi ý: {gate.reviewAnswer}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => finishCheck(gate.id)}
+                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 !shadow-none"
+                        >
+                          <Play size={14} fill="white" aria-hidden="true" />
+                          <span>Tiếp tục xem video</span>
+                        </button>
+                      </div>
+                    ) : hintStep && paidHint ? (
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm font-semibold leading-relaxed text-sky-900">
+                          <Lightbulb size={16} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+                          <span>{paidHint}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => finishCheck(gate.id)}
+                          className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 !shadow-none"
+                        >
+                          Tiếp tục xem video
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {gate.kind === 'choice' && (
+                          <div className="space-y-2">
+                            {(gate.choices || []).map((choice, index) => {
+                              const active = picked === index;
+                              return (
+                                <button
+                                  key={index}
+                                  type="button"
+                                  onClick={() => setPicked(index)}
+                                  className={`flex w-full items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition !shadow-none ${
+                                    active
+                                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                                      : 'border-slate-200 bg-slate-50/60 text-slate-800 hover:border-slate-300 hover:bg-slate-100/70'
+                                  }`}
+                                >
+                                  <span
+                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
+                                      active ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                                    }`}
+                                  >
+                                    {String.fromCharCode(65 + index)}
+                                  </span>
+                                  <span className="min-w-0 flex-1">{choice}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {gate.kind === 'text' && (
+                          <input
+                            className="w-full rounded-xl border-2 border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                            value={answerText}
+                            placeholder="Nhập câu trả lời của bạn…"
+                            onChange={(e) => setAnswerText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !checkBusy && answerText.trim()) {
+                                e.preventDefault();
+                                submitCheck('');
+                              }
+                            }}
+                          />
+                        )}
+
+                        {gate.kind === 'screen' && (uploadPct != null ? (
+                          <UploadProgress percent={uploadPct} grading={grading} />
+                        ) : (
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                            <span>{missed ? 'Chọn ảnh bài làm mới' : 'Tải ảnh chụp bài làm'}</span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              className="sr-only"
+                              onChange={(e) => { sendScreenshot(e.target.files?.[0]); e.target.value = ''; }}
+                            />
+                          </label>
+                        ))}
+
+                        {checkHint && (
+                          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                            <Lightbulb size={14} className="mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
+                            <span>{checkHint}</span>
+                          </div>
+                        )}
+                        {paidHint && (
+                          <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
+                            <Lightbulb size={14} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+                            <span>{paidHint}</span>
+                          </div>
+                        )}
+                        {checkError && (
+                          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
+                            {checkError}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-0.5">
+                          {gate.kind !== 'screen' && (
+                            <button
+                              type="button"
+                              disabled={checkBusy || (gate.kind === 'choice' ? picked == null : !answerText.trim())}
+                              onClick={() => submitCheck('')}
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 !shadow-none"
+                            >
+                              {checkBusy ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} aria-hidden="true" />}
+                              <span>{checkBusy ? 'Đang chấm…' : 'Trả lời'}</span>
+                            </button>
+                          )}
+                          {Number(gate.hintCostXp) > 0 && (
+                            <button
+                              type="button"
+                              disabled={checkBusy}
+                              onClick={buyHint}
+                              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 !shadow-none"
+                            >
+                              <Lightbulb size={14} className="text-amber-600" aria-hidden="true" />
+                              <span>{checkBusy ? 'Đang lấy…' : `Gợi ý · ${gate.hintCostXp} XP`}</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <p className="text-center text-[11px] font-medium text-slate-400">
+                          Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP · Sai −{VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'gửi lại' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}
+                        </p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -631,7 +807,11 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
             <div className="mx-3 my-3 sm:mx-4 rounded-2xl border border-white/10 bg-[#16181E] overflow-hidden">
               <button
                 type="button"
-                onClick={() => setNotesOpen((open) => !open)}
+                onClick={() => setNotesOpen((open) => {
+                  const next = !open;
+                  if (next) setAiOpen(false);
+                  return next;
+                })}
                 className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none"
               >
                 <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-400">
@@ -661,7 +841,11 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
             <div className="mx-3 mb-3 sm:mx-4 rounded-2xl border border-emerald-400/20 bg-[#16181E] overflow-hidden">
               <button
                 type="button"
-                onClick={() => setAiOpen((open) => !open)}
+                onClick={() => setAiOpen((open) => {
+                  const next = !open;
+                  if (next) setNotesOpen(false);
+                  return next;
+                })}
                 className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none"
               >
                 <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-300">
@@ -675,9 +859,11 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
               {aiOpen && (
                 <div className="border-t border-white/10 p-3 sm:p-4">
                   <LessonAiAssistantPanel
+                    key={current.id}
                     lessonTitle={current.title}
                     unitTitle={unit.title}
                     courseTitle={lesson?.title || unit.title || 'Tin học Văn phòng'}
+                    guide={current.guide || null}
                   />
                 </div>
               )}

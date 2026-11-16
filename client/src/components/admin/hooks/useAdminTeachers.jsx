@@ -8,6 +8,7 @@ import {
   buildTeacherPayoutTransferNote,
   pickFifoPendingSessions,
 } from '../../../utils/teacherPayoutNote';
+import { matchesPersonSearch } from '../../../utils/personSearch';
 
 function monthLabelNow(d = new Date()) {
   return `tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
@@ -122,10 +123,13 @@ export function useAdminTeachers({
 
   const safeTeachersList = useMemo(() => (teachers || []).filter(Boolean), [teachers]);
   const safeTeachers = safeTeachersList;
-  const filteredTeachers = safeTeachers.filter((t) =>
-    (t.name || '').toLowerCase().includes((teacherSearch || '').toLowerCase())
-    || (t.phone || '').toLowerCase().includes((teacherSearch || '').toLowerCase()),
-  );
+  const filteredTeachers = safeTeachers.filter((t) => matchesPersonSearch(teacherSearch, {
+    name: t.name,
+    phone: t.phone,
+    zalo: t.zalo,
+    email: t.email,
+    extra: [t.specialty, t.teacherCode].filter(Boolean).join(' '),
+  }));
 
   const handlePayTeacher = async (teacher) => {
     const teacherId = String(teacher.id || teacher._id);

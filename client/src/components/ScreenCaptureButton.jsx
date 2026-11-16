@@ -33,14 +33,30 @@ export default function ScreenCaptureButton({
   buttonClassName = '',
   title = 'Chụp màn hình (chọn màn › chụp ngay)',
   size = 16,
+  label = '',
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [regionJob, setRegionJob] = useState(null);
   const [guideMode, setGuideMode] = useState(null);
   const [skipGuideNext, setSkipGuideNext] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
+  ));
   const rootRef = useRef(null);
-  const supported = isScreenCaptureSupported();
+  const supported = isScreenCaptureSupported() && isDesktop;
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e) => {
+      setIsDesktop(e.matches);
+      if (!e.matches) setGuideMode(null);
+    };
+    setIsDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -145,6 +161,40 @@ export default function ScreenCaptureButton({
   };
 
   if (!supported) return null;
+
+  if (label) {
+    return (
+      <>
+        <button
+          type="button"
+          disabled={disabled || busy}
+          onClick={() => { requestCapture('full'); }}
+          className={buttonClassName}
+          title={title}
+          aria-label={title}
+        >
+          {busy ? <Loader2 size={size} className="animate-spin shrink-0 text-amber-600" /> : <Camera size={size} className="shrink-0 text-amber-600" />}
+          <span>{label}</span>
+        </button>
+        <ScreenCaptureRegionOverlay
+          open={!!regionJob}
+          imageUrl={regionJob?.url}
+          naturalWidth={regionJob?.width}
+          naturalHeight={regionJob?.height}
+          onCancel={clearRegionJob}
+          onConfirm={onRegionConfirm}
+        />
+        <ScreenCaptureGuideModal
+          open={!!guideMode}
+          mode={guideMode || 'full'}
+          skipNext={skipGuideNext}
+          onSkipNextChange={setSkipGuideNext}
+          onCancel={() => setGuideMode(null)}
+          onContinue={confirmGuideAndCapture}
+        />
+      </>
+    );
+  }
 
   return (
     <div ref={rootRef} className={`relative inline-flex items-center ${className}`}>

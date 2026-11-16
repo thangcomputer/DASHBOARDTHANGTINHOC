@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { topicColor, topicIcon } from '../../../utils/dailyPractice';
 import { gameSounds } from '../../../utils/sound';
 
@@ -18,15 +18,20 @@ function normalizeTopics(topics, variant) {
       };
     });
   }
-  return (topics || []).map((item) => ({
-    id: item.topic?.id,
-    name: item.topic?.name,
-    icon: item.topic?.icon,
-    color: item.topic?.color,
-    metaPrimary: item.totalUnits > 0 ? 'Đã sẵn sàng' : 'Đang soạn',
-    metaPrimaryClass: 'text-emerald-600 font-bold',
-    metaSecondary: item.totalUnits > 0 ? `${item.completedUnits}/${item.totalUnits}` : null,
-  }));
+  return (topics || []).map((item) => {
+    const isLocked = Boolean(item.locked)
+      || (Array.isArray(item.units) && item.units.length > 0 && item.units.every((u) => u.state === 'locked'));
+    return {
+      id: item.topic?.id,
+      name: item.topic?.name,
+      icon: item.topic?.icon,
+      color: item.topic?.color,
+      locked: isLocked,
+      metaPrimary: isLocked ? 'Đã khóa' : (item.totalUnits > 0 ? 'Đã sẵn sàng' : 'Đang soạn'),
+      metaPrimaryClass: isLocked ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold',
+      metaSecondary: item.totalUnits > 0 ? `${item.completedUnits}/${item.totalUnits}` : null,
+    };
+  });
 }
 
 /** Hàng môn cố định trên cùng — lộ trình hoặc luyện tự do, vuốt ngang + mũi tên. */
@@ -118,19 +123,20 @@ export default function DailyPracticeSubjectBar({
                 gameSounds.tap();
                 onSelect?.(item.id);
               }}
-              className={`dp-dew-subject-chip flex items-center gap-2.5 px-3.5 py-3 text-left !shadow-none ${active ? 'dp-dew-subject-chip--active' : ''}`}
+              className={`dp-dew-subject-chip flex items-center gap-2 sm:gap-2.5 px-2.5 py-2 sm:px-3.5 sm:py-3 text-left !shadow-none ${active ? 'dp-dew-subject-chip--active' : ''}`}
               style={{ borderColor: active ? tone.to : '#E2E8F0', background: active ? tone.soft : '#FFFFFF' }}
               aria-pressed={active}
             >
               <span
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
                 style={{ background: `linear-gradient(180deg, ${tone.from}, ${tone.to})` }}
               >
-                <Icon size={17} aria-hidden="true" />
+                <Icon size={16} aria-hidden="true" />
               </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-black leading-tight text-slate-900">{item.name}</span>
-                <span className={`block text-[11px] ${item.metaPrimaryClass}`}>
+              <span className="min-w-0 flex-1 overflow-hidden">
+                <span title={item.name} className="block truncate text-[11.5px] sm:text-xs md:text-sm font-black leading-tight text-slate-900">{item.name}</span>
+                <span className={`block truncate text-[10px] sm:text-[11px] ${item.metaPrimaryClass}`}>
+                  {item.locked ? <Lock size={10} className="mr-1 -mt-0.5 inline shrink-0" aria-hidden="true" /> : null}
                   {item.metaPrimary}
                   {item.metaSecondary ? (
                     <span className="ml-1 font-semibold text-slate-400">· {item.metaSecondary}</span>

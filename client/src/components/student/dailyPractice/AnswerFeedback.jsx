@@ -86,20 +86,26 @@ export function QuizActionButtons({
   onRetry,
   canRetry = false,
   wrongTryCount = 0,
+  retryCooldownSec = 0,
 }) {
   if (!isCorrect && compactWrong) {
+    const waitingCooldown = retryCooldownSec > 0;
     return (
       <button
         type="button"
-        disabled={busy || !canRetry}
+        disabled={busy || !canRetry || waitingCooldown}
         onClick={() => {
           gameSounds.tap();
           onRetry?.();
         }}
-        className="cms-btn cms-btn-primary inline-flex min-h-[38px] shrink-0 items-center justify-center gap-1.5 px-4 py-2 text-xs !shadow-none disabled:opacity-50"
+        className="cms-btn cms-btn-primary inline-flex min-h-[38px] shrink-0 items-center justify-center gap-1.5 px-4 py-2 text-xs !shadow-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RotateCcw size={15} aria-hidden="true" />}
-        <span>{wrongTryCount > 0 ? 'Thử lại' : 'Kiểm tra'}</span>
+        <span>
+          {waitingCooldown
+            ? `Thử lại (${retryCooldownSec}s)`
+            : (wrongTryCount > 0 ? 'Thử lại' : 'Kiểm tra')}
+        </span>
       </button>
     );
   }
@@ -151,6 +157,8 @@ export function AnswerFeedback({
   onRetry,
   canRetry = false,
   wrongTryCount = 0,
+  retryCooldownSec = 0,
+  xpDisabled = false,
   explainOpen: explainOpenProp,
   onExplainOpenChange,
 }) {
@@ -228,7 +236,7 @@ export function AnswerFeedback({
               <h3 className={`font-extrabold tracking-tight ${isCorrect ? 'text-xl text-emerald-800 sm:text-[22px]' : 'text-sm text-red-700'}`}>
                 {bannerLabel}
               </h3>
-              {!isCorrect && result.wrongPenaltyXp > 0 ? (
+              {!isCorrect && !practiceOnly && !xpDisabled && result.wrongPenaltyXp > 0 ? (
                 <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-extrabold text-red-600">
                   <Zap size={11} className="fill-red-400 text-red-500" aria-hidden="true" />
                   -{result.wrongPenaltyXp} XP
@@ -271,6 +279,7 @@ export function AnswerFeedback({
           onRetry={onRetry}
           canRetry={canRetry}
           wrongTryCount={wrongTryCount}
+          retryCooldownSec={retryCooldownSec}
         />
       </div>
 

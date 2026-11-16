@@ -472,7 +472,9 @@ function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose
           ? (!canTestOut
             ? 'Đặc quyền chỉ dành cho học viên mua khóa / gói Google Meet (+300 XP/ngày). Học viên miễn phí không thể thi vượt chặng.'
             : `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`)
-          : `${QUESTION_STAKE_XP} XP/câu - sai trừ ngay; đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`}
+          : step.state === 'completed'
+            ? 'Ôn lại miễn phí: làm sai không trừ XP, thoát giữa chừng không mất XP.'
+            : `${QUESTION_STAKE_XP} XP/câu · Đạt % yêu cầu nhận +${QUESTION_STAKE_XP} XP/câu đúng (ôn lại không mất XP).`}
       </p>
       {testOut && !canTestOut ? (
         <button
@@ -491,7 +493,9 @@ function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose
           style={{ color: color.to }}
         >
           {starting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-          {step.state === 'completed' && !testOut ? 'Luyện lại' : 'Bắt đầu'} · {testOut ? TEST_OUT_XP : `${QUESTION_STAKE_XP}/câu`}
+          {step.state === 'completed' && !testOut
+            ? 'Ôn lại · Miễn phí XP'
+            : `${'Bắt đầu'} · ${testOut ? TEST_OUT_XP : `${QUESTION_STAKE_XP}/câu`}`}
         </button>
       )}
     </div>
@@ -1180,9 +1184,18 @@ export default function PathView({
                         onStartUnit={() => openUnitStageAction(unit, isNextUnit)}
                         onStageAction={() => openUnitStageAction(unit, isNextUnit)}
                         onTestOut={() => toggle(unit, 'challenge', true)}
+                        onUpgrade={() => {
+                          gameSounds.tap();
+                          setPopover(null);
+                          setUpgradeOpen(true);
+                        }}
                         onRoadmap={() => {
                           gameSounds.tap();
                           setPopover(null);
+                          if (unit.requiresSubscription) {
+                            setUpgradeOpen(true);
+                            return;
+                          }
                           setRoadmapOpen({ unit });
                         }}
                         testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
@@ -1297,8 +1310,10 @@ export default function PathView({
               onStartPractice={() => {
                 const targetNode = openHub.unit.pathNodes?.find((n) => n.kind !== 'study' && n.icon !== 'book');
                 const nodeKey = targetNode?.key || 'practice';
+                const firstLvl = targetNode?.levels?.[0];
+                const isDone = targetNode?.state === 'completed' || firstLvl?.state === 'completed';
                 setPopover(null);
-                onStartStep(openHub.unit.id, nodeKey, 'learn', false);
+                onStartStep(openHub.unit.id, nodeKey, 'learn', false, { review: isDone });
               }}
             />
           ) : (

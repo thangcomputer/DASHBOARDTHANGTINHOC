@@ -335,7 +335,11 @@ export default function LmsBrandedPlayerChrome({
 
       {!overlayVisible && (
         <div
-          className="absolute inset-x-0 bottom-0 z-[30] px-2.5 sm:px-4 pt-6 sm:pt-8 pb-2 sm:pb-3"
+          className={`absolute inset-x-0 bottom-0 z-[30] px-2.5 sm:px-4 pt-6 sm:pt-8 pb-2 sm:pb-3 transition-opacity duration-200 ${
+            dragging || showVol
+              ? 'opacity-100 pointer-events-auto'
+              : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+          }`}
           style={{ background: 'linear-gradient(to top, rgba(8,15,28,0.95) 0%, rgba(8,15,28,0.65) 60%, transparent 100%)' }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}

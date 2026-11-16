@@ -149,7 +149,7 @@ function computeNextSpacedQueue({ existingQueue = [], finished, day }) {
 
 function referralSummaryView(profile, student, settings) {
   const configured = Number(settings?.amounts?.referral);
-  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 100;
+  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 50;
   return {
     code: buildReferralCode(student),
     rewardXp,
@@ -206,6 +206,7 @@ function topicView(topic, counts = {}) {
     color: topic.color || 'red',
     sortOrder: topic.sortOrder || 0,
     active: topic.active !== false,
+    requireSubscription: Boolean(topic.requireSubscription),
     lessonSubjectId: topic.lessonSubjectId ? String(topic.lessonSubjectId) : '',
     lessonUnitIds: (topic.lessonUnitIds || []).map(String),
     counts: { easy: counts.easy || 0, medium: counts.medium || 0, hard: counts.hard || 0, draft: counts.draft || 0 },
@@ -272,6 +273,7 @@ function topicInput(body = {}) {
     color: rules.TOPIC_COLORS.includes(body.color) ? body.color : 'red',
     sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,
     active: body.active !== false,
+    requireSubscription: body.requireSubscription === true,
   };
 }
 
@@ -882,7 +884,34 @@ async function startSpacedReviewSession(studentId) {
   };
 }
 
-/** Nhập mã giới thiệu bạn bè: cộng thưởng XP đôi (Admin cấu hình tại Mức XP) cho cả người giới thiệu & người được giới thiệu. */
+const MAX_REFERRALS_PER_STUDENT = 10;
+const MAX_REFERRALS_PER_DAY = 2;
+
+function normalizePhoneTokens(student) {
+  const tokens = new Set();
+  for (const raw of [student?.phone, student?.zalo]) {
+    let digits = String(raw || '').replace(/\D/g, '');
+    if (!digits) continue;
+    if (digits.startsWith('84') && digits.length >= 10) digits = `0${digits.slice(2)}`;
+    if (digits.length >= 8) tokens.add(digits);
+  }
+  return tokens;
+}
+
+function collectDeviceFingerprints(student) {
+  const fps = new Set();
+  if (student?.deviceFingerprint) fps.add(String(student.deviceFingerprint).trim());
+  for (const d of student?.knownDevices || []) {
+    if (d?.fingerprint) fps.add(String(d.fingerprint).trim());
+    for (const sub of d?.fingerprints || []) {
+      if (sub) fps.add(String(sub).trim());
+    }
+  }
+  fps.delete('');
+  return fps;
+}
+
+/** Nhập mã giới thiệu bạn bè: cộng thưởng XP đôi (mặc định 50 XP) kèm chống tạo nhiều tài khoản ảo. */
 async function redeemReferralCode(studentId, rawCode) {
   const sid = requireId(studentId, 'Học viên');
   const code = String(rawCode || '').trim().toUpperCase();
@@ -894,7 +923,7 @@ async function redeemReferralCode(studentId, rawCode) {
   }
 
   const students = await Student.find({ status: { $nin: ['suspended', 'inactive'] } })
-    .select('_id name studentCode')
+    .select('_id name studentCode phone zalo freePortal +deviceFingerprint +knownDevices')
     .lean();
   const meDoc = students.find((s) => String(s._id) === String(sid)) || { _id: sid };
   const referrer = students.find((s) => {
@@ -907,10 +936,56 @@ async function redeemReferralCode(studentId, rawCode) {
     throw httpError(400, 'Bạn không thể tự nhập mã giới thiệu của chính mình.');
   }
 
+  // 1) Chống giới thiệu chéo (A ↔ B)
+  const referrerProfile = await getProfile(referrer._id);
+  if (String(referrerProfile?.referredByStudentId || '') === String(sid)) {
+    throw httpError(403, 'Hai tài khoản không thể nhập mã giới thiệu chéo cho nhau.');
+  }
+
+  // 2) Chống trùng số điện thoại / Zalo
+  const myPhones = normalizePhoneTokens(meDoc);
+  const refPhones = normalizePhoneTokens(referrer);
+  for (const p of myPhones) {
+    if (refPhones.has(p)) {
+      throw httpError(403, 'Không thể áp dụng mã giới thiệu giữa các tài khoản dùng chung số điện thoại / Zalo.');
+    }
+  }
+
+  // 3) Chống tạo nhiều tài khoản trên cùng thiết bị
+  const myDevices = collectDeviceFingerprints(meDoc);
+  const refDevices = collectDeviceFingerprints(referrer);
+  for (const fp of myDevices) {
+    if (refDevices.has(fp)) {
+      throw httpError(403, 'Không thể áp dụng mã giới thiệu giữa các tài khoản đăng nhập trên cùng thiết bị.');
+    }
+  }
+
+  // 4) Tài khoản miễn phí mới tạo phải hoàn thành ít nhất 1 bài luyện tập mới được nhận thưởng
+  if (meDoc.freePortal) {
+    const hasFinishedSession = (Number(myProfile?.sessionsCount) || 0) >= 1
+      || Boolean(await DailyPracticeSession.exists({ studentId: sid, status: 'finished' }));
+    if (!hasFinishedSession) {
+      throw httpError(403, 'Hãy hoàn thành ít nhất 1 bài luyện tập trước khi nhập mã giới thiệu.');
+    }
+  }
+
+  // 5) Giới hạn tổng số lượt (tối đa 10 bạn) & giới hạn theo ngày (tối đa 2 bạn/ngày) cho người giới thiệu
+  if ((Number(referrerProfile?.referralCount) || 0) >= MAX_REFERRALS_PER_STUDENT) {
+    throw httpError(409, `Người giới thiệu đã đạt giới hạn nhận thưởng tối đa (${MAX_REFERRALS_PER_STUDENT} bạn).`);
+  }
+  const todayStart = new Date(`${learningGoalService.vnDayKey()}T00:00:00.000+07:00`);
+  const todayCount = await DailyPracticeProfile.countDocuments({
+    referredByStudentId: referrer._id,
+    referredAt: { $gte: todayStart },
+  });
+  if (todayCount >= MAX_REFERRALS_PER_DAY) {
+    throw httpError(429, `Người giới thiệu đã đạt giới hạn tối đa ${MAX_REFERRALS_PER_DAY} lượt giới thiệu trong hôm nay.`);
+  }
+
   const lmsProgressService = require('./lmsProgressService');
   const lmsSettings = await lmsProgressService.loadSettings();
   const configured = Number(lmsSettings?.amounts?.referral);
-  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 100;
+  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 50;
   const referrerCode = buildReferralCode(referrer);
 
   const claimed = await DailyPracticeProfile.findOneAndUpdate(
@@ -918,12 +993,11 @@ async function redeemReferralCode(studentId, rawCode) {
       studentId: sid,
       $or: [{ referredByStudentId: null }, { referredByStudentId: { $exists: false } }],
     },
-    { $set: { referredByStudentId: referrer._id, referredByCode: referrerCode } },
+    { $set: { referredByStudentId: referrer._id, referredByCode: referrerCode, referredAt: new Date() } },
     { new: true },
   ).lean();
   if (!claimed) throw httpError(409, 'Tài khoản của bạn đã áp dụng mã giới thiệu trước đó.');
 
-  await getProfile(referrer._id);
   await DailyPracticeProfile.updateOne(
     { studentId: referrer._id },
     { $inc: { referralCount: 1, referralXpEarned: rewardXp } },

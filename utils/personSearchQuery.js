@@ -49,15 +49,22 @@ function tokenToRegexSource(token) {
   return out;
 }
 
-function phoneFlexibleRegexSource(token) {
+function phoneFlexibleRegexSources(token) {
   const digits = String(token || '').replace(/\D/g, '');
-  if (digits.length < 2 || digits.length > 15) return null;
-  return digits.split('').join('\\s*');
+  if (digits.length < 2 || digits.length > 15) return [];
+  const variants = [digits];
+  if (digits.startsWith('84') && digits.length >= 4) {
+    variants.push(`0${digits.slice(2)}`);
+  } else if (digits.startsWith('0') && digits.length >= 4) {
+    variants.push(`84${digits.slice(1)}`);
+  }
+  return variants.map((v) => v.split('').join('[\\s.-]*'));
 }
 
 function personFieldOr(sReg, extraRegs) {
   const or = [
     { name: sReg },
+    { email: sReg },
     { zalo: sReg },
     { phone: sReg },
     { course: sReg },
@@ -84,10 +91,9 @@ function buildStudentSearchAndConditions(search) {
     const src = tokenToRegexSource(token);
     if (!src) continue;
     const sReg = { $regex: src, $options: 'i' };
-    const phoneSrc = phoneFlexibleRegexSource(token);
-    const extra = phoneSrc && phoneSrc !== src
-      ? [{ $regex: phoneSrc, $options: 'i' }]
-      : [];
+    const extra = phoneFlexibleRegexSources(token)
+      .filter((phoneSrc) => phoneSrc && phoneSrc !== src)
+      .map((phoneSrc) => ({ $regex: phoneSrc, $options: 'i' }));
     conds.push(personFieldOr(sReg, extra));
   }
   return conds;

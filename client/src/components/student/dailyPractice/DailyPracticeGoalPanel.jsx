@@ -18,7 +18,7 @@ function pct(value, target) {
 }
 
 /** Cột phải: mục tiêu + nhiệm vụ + chuỗi (dữ liệu API thật). */
-export default function DailyPracticeGoalPanel({ practiceStats }) {
+export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = true }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
 
@@ -108,8 +108,14 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
         </div>
         {!goal ? (
           <div className="mt-3 space-y-2">
-            <p className="text-xs font-semibold text-slate-600">Chưa đặt mục tiêu giờ học. Vẫn theo dõi XP và chuỗi luyện tập bên dưới.</p>
-            <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-outline !py-2 text-xs">Đặt mục tiêu học</button>
+            <p className="text-xs font-semibold text-slate-600">
+              {canSetGoal
+                ? 'Chưa đặt mục tiêu giờ học. Vẫn theo dõi XP và chuỗi luyện tập bên dưới.'
+                : 'Hoàn thành bài học đầu tiên để mở khóa đặt mục tiêu học.'}
+            </p>
+            {canSetGoal && (
+              <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-outline !py-2 text-xs">Đặt mục tiêu học</button>
+            )}
           </div>
         ) : (
           <div className="mt-3 space-y-3">

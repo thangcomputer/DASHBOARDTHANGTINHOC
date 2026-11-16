@@ -10,15 +10,37 @@ import { comboArtGifSrc, comboArtWebpFallback } from '../../../../../shared/dail
 const TIMING_MS = { 3: 2200, 5: 2800, 10: 2800 };
 const FADE_MS = 320;
 
-const TIER_10 = {
-  glow: 'gold',
-  mascot: 'combo10',
-  ribbonClass: 'dp-combo-ribbon--x10',
-  ribbonLabel: 'COMBO ×10',
-  message: 'Mười câu đúng liên tiếp — huyền thoại DewSkill!',
-  stars: 5,
-  laurel: true,
-  confetti: true,
+const TIER_META = {
+  3: {
+    glow: 'mint',
+    mascot: 'happy',
+    ribbonClass: 'dp-combo-ribbon--x3',
+    ribbonLabel: 'COMBO ×3',
+    message: 'Ba câu đúng liên tiếp — tiếp tục giữ nhịp nhé!',
+    stars: 3,
+    laurel: false,
+    confetti: false,
+  },
+  5: {
+    glow: 'mint',
+    mascot: 'determined',
+    ribbonClass: 'dp-combo-ribbon--x5',
+    ribbonLabel: 'COMBO ×5',
+    message: 'Năm câu đúng liên tiếp — phong độ quá đỉnh!',
+    stars: 4,
+    laurel: true,
+    confetti: true,
+  },
+  10: {
+    glow: 'gold',
+    mascot: 'combo10',
+    ribbonClass: 'dp-combo-ribbon--x10',
+    ribbonLabel: 'COMBO ×10',
+    message: 'Mười câu đúng liên tiếp — huyền thoại DewSkill!',
+    stars: 5,
+    laurel: true,
+    confetti: true,
+  },
 };
 
 function LaurelSvg({ className = '' }) {
@@ -73,56 +95,28 @@ function DewComboStars({ count = 5 }) {
   );
 }
 
-function ComboArtOverlay({ tier, exiting }) {
-  const gifSrc = comboArtGifSrc(tier);
-  const webpSrc = comboArtWebpFallback(tier);
-  const [src, setSrc] = useState(gifSrc);
-  const label = tier === 3 ? 'Combo ba câu đúng liên tiếp' : 'Combo năm câu đúng liên tiếp';
-
-  useEffect(() => {
-    setSrc(gifSrc);
-  }, [gifSrc, tier]);
-
-  return (
-    <div className={`dp-combo-overlay${exiting ? ' dp-combo-overlay--exit' : ''}`} aria-live="polite" role="status">
-      <div className="dp-combo-dim dp-combo-dim--soft" aria-hidden="true" />
-      <div className="dp-combo-art-wrap">
-        <img
-          src={src}
-          alt={label}
-          className="dp-combo-art dp-combo-art--gif"
-          draggable={false}
-          onError={() => {
-            if (src !== webpSrc) setSrc(webpSrc);
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ComboTenOverlay({ exiting, bonusXp }) {
+function ComboStageContent({ tier, bonusXp = 0 }) {
+  const meta = TIER_META[tier] || TIER_META[3];
   const pillText = bonusXp > 0 ? `+${bonusXp} XP` : null;
   return (
-    <div className={`dp-combo-overlay${exiting ? ' dp-combo-overlay--exit' : ''}`} aria-live="polite" role="status">
-      <div className="dp-combo-dim dp-combo-dim--soft" aria-hidden="true" />
-      <ComboConfetti count={14} />
-      <div className="dp-combo-stage dp-combo-stage--tier5">
-        <ComboGlowEffect variant={TIER_10.glow} />
-        <DewComboStars count={TIER_10.stars} />
+    <>
+      {meta.confetti ? <ComboConfetti count={tier === 10 ? 14 : 10} /> : null}
+      <div className={`dp-combo-stage ${tier >= 5 ? 'dp-combo-stage--tier5' : ''}`}>
+        <ComboGlowEffect variant={meta.glow} />
+        <DewComboStars count={meta.stars} />
         <div className="dp-combo-mascot-wrap">
-          <Mascot emotion={TIER_10.mascot} size={108} />
+          <Mascot emotion={meta.mascot} size={108} />
         </div>
         <div className="dp-combo-hills" aria-hidden="true" />
         <div className="dp-combo-ribbon-wrap">
-          <LaurelSvg className="dp-combo-laurel" />
-          <div className={`dp-combo-ribbon ${TIER_10.ribbonClass}`}>
-            <span>{TIER_10.ribbonLabel}</span>
+          {meta.laurel ? <LaurelSvg className="dp-combo-laurel" /> : null}
+          <div className={`dp-combo-ribbon ${meta.ribbonClass}`}>
+            <span>{meta.ribbonLabel}</span>
           </div>
-          <LaurelSvg className="dp-combo-laurel dp-combo-laurel--right" />
+          {meta.laurel ? <LaurelSvg className="dp-combo-laurel dp-combo-laurel--right" /> : null}
         </div>
         <div className="dp-combo-message-card">
-          <p className="dp-combo-message-title">{TIER_10.message}</p>
+          <p className="dp-combo-message-title">{meta.message}</p>
           {pillText ? (
             <span className="dp-combo-pill">
               <Zap size={14} className="fill-amber-400 text-amber-500" aria-hidden="true" />
@@ -131,6 +125,50 @@ function ComboTenOverlay({ exiting, bonusXp }) {
           ) : null}
         </div>
       </div>
+    </>
+  );
+}
+
+function ComboArtOverlay({ tier, exiting, bonusXp = 0 }) {
+  const primarySrc = comboArtGifSrc(tier);
+  const fallbackSrc = comboArtWebpFallback(tier);
+  const [src, setSrc] = useState(primarySrc);
+  const [artFailed, setArtFailed] = useState(false);
+  const label = tier === 3 ? 'Combo ba câu đúng liên tiếp' : 'Combo năm câu đúng liên tiếp';
+
+  useEffect(() => {
+    setSrc(primarySrc);
+    setArtFailed(false);
+  }, [primarySrc, tier]);
+
+  return (
+    <div className={`dp-combo-overlay${exiting ? ' dp-combo-overlay--exit' : ''}`} aria-live="polite" role="status">
+      <div className="dp-combo-dim dp-combo-dim--soft" aria-hidden="true" />
+      {artFailed ? (
+        <ComboStageContent tier={tier} bonusXp={bonusXp} />
+      ) : (
+        <div className="dp-combo-art-wrap">
+          <img
+            src={src}
+            alt={label}
+            className="dp-combo-art dp-combo-art--gif"
+            draggable={false}
+            onError={() => {
+              if (src !== fallbackSrc) setSrc(fallbackSrc);
+              else setArtFailed(true);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ComboTenOverlay({ exiting, bonusXp }) {
+  return (
+    <div className={`dp-combo-overlay${exiting ? ' dp-combo-overlay--exit' : ''}`} aria-live="polite" role="status">
+      <div className="dp-combo-dim dp-combo-dim--soft" aria-hidden="true" />
+      <ComboStageContent tier={10} bonusXp={bonusXp} />
     </div>
   );
 }
@@ -165,7 +203,7 @@ export default function ComboCelebrationOverlay({ combo = 3, bonusXp = 0, onDone
 
   const body = tier === 10
     ? <ComboTenOverlay exiting={exiting} bonusXp={bonusXp} />
-  : <ComboArtOverlay tier={tier} exiting={exiting} />;
+    : <ComboArtOverlay tier={tier} exiting={exiting} bonusXp={bonusXp} />;
 
   return createPortal(body, document.body);
 }

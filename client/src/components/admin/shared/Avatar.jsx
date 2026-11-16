@@ -1,5 +1,5 @@
-import React from 'react';
-import { resolveAvatarUrl, DEFAULT_AVATARS } from '../../../utils/defaultAvatars';
+import React, { useEffect, useState } from 'react';
+import { getNameInitial, isRealAvatar, resolveAvatarUrl } from '../../../utils/defaultAvatars';
 
 const ROLE_BADGE = {
   teacher: { label: 'GV', className: 'bg-amber-500 text-white' },
@@ -39,13 +39,18 @@ export default function Avatar({
           : adminRole === 'STAFF' ? 'staff'
             : String(role || 'student').toLowerCase();
 
-  const url = resolveAvatarUrl({ avatar: src, role, adminRole, name, gender });
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => { setImgFailed(false); }, [src]);
+
+  const hasCustom = isRealAvatar(src) && !imgFailed;
+  const url = hasCustom ? resolveAvatarUrl({ avatar: src, role, adminRole, name, gender }) : '';
+  const initialText = getNameInitial(name, initials) || '?';
   const sizeClass =
-    size === 'sm' ? 'w-8 h-8'
-      : size === 'card' ? 'w-[52px] h-[52px]'
-        : size === 'lg' ? 'w-14 h-14'
-          : size === 'xl' ? 'w-20 h-20'
-            : 'w-10 h-10';
+    size === 'sm' ? 'w-8 h-8 text-xs'
+      : size === 'card' ? 'w-[52px] h-[52px] text-lg'
+        : size === 'lg' ? 'w-14 h-14 text-lg'
+          : size === 'xl' ? 'w-20 h-20 text-2xl'
+            : 'w-10 h-10 text-sm';
 
   const badge = ROLE_BADGE[normalized] || ROLE_BADGE.student;
   const ring = ROLE_RING[normalized] || ROLE_RING.student;
@@ -53,25 +58,22 @@ export default function Avatar({
 
   return (
     <div className={`relative flex-shrink-0 ${sizeClass}`}>
-      <img
-        src={url}
-        alt={name || initials || 'Avatar'}
-        title={name || initials || undefined}
-        className={`${sizeClass} rounded-2xl object-cover shadow-sm border-2 border-white bg-white ${ring} ${className}`}
-        onError={(e) => {
-          const el = e.currentTarget;
-          const step = Number(el.dataset.fallbackStep || '0');
-          if (step >= 2) return;
-          el.dataset.fallbackStep = String(step + 1);
-          if (step === 0) {
-            // Gender-aware / role default (ignore broken custom src)
-            el.src = resolveAvatarUrl({ role, adminRole, name, gender, avatar: '' });
-            return;
-          }
-          // Role-neutral last resort
-          el.src = DEFAULT_AVATARS[normalized] || DEFAULT_AVATARS.student;
-        }}
-      />
+      {hasCustom ? (
+        <img
+          src={url}
+          alt={name || initials || 'Avatar'}
+          title={name || initials || undefined}
+          className={`${sizeClass} rounded-2xl object-cover shadow-sm border-2 border-white bg-white ${ring} ${className}`}
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <div
+          title={name || initials || undefined}
+          className={`${sizeClass} flex items-center justify-center rounded-2xl font-black text-slate-700 bg-slate-100 shadow-sm border-2 border-white ${ring} ${className}`}
+        >
+          {initialText}
+        </div>
+      )}
       {showRoleBadge && (
         <span
           className={`absolute -bottom-0.5 -right-0.5 ${badgeSize} rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${badge.className}`}

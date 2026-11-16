@@ -496,6 +496,7 @@ export default function AdminStudentsTab() {
     return (filteredStudents || [])
       .filter((s) => matchesPersonSearch(q, {
         name: s.name,
+        email: s.email,
         phone: s.phone,
         zalo: s.zalo,
         studentCode: s.studentCode,
@@ -814,7 +815,7 @@ export default function AdminStudentsTab() {
                 window.setTimeout(() => setSearchFocused(false), 180);
               }}
               className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 outline-none w-full transition-all"
-              placeholder="Tìm họ, tên đệm, tên, SĐT..."
+              placeholder="Tìm tên, SĐT, Email, mã HV..."
               aria-label="Tìm học viên"
               autoComplete="off"
               aria-autocomplete="list"

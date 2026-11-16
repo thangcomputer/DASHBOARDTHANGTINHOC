@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { isUserOnline } from '../../utils/presence';
 import { ArrowLeft, Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
-import { resolveAvatarUrl } from '../../utils/defaultAvatars';
+import { getNameInitial, isRealAvatar, resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { matchesPersonSearch } from '../../utils/personSearch';
 import TeacherStudentCard from './TeacherStudentCard';
 import { getAttendanceAction } from '../../utils/attendanceAction';
@@ -87,8 +87,10 @@ export default function TeacherStudentsTab({
     .filter((student) => studentStatusFilter === 'all' || resolveStudentStatus(student) === studentStatusFilter)
     .filter((student) => matchesPersonSearch(studentSearch, {
       name: student.name,
+      email: student.email,
       phone: student.phone,
       zalo: student.zalo,
+      studentCode: student.studentCode,
       extra: student.course || '',
     }))
     .slice()
@@ -122,8 +124,8 @@ export default function TeacherStudentsTab({
             <input
               value={studentSearch}
               onChange={e => setStudentSearch(e.target.value)}
-              placeholder="Tìm tên, SĐT, Zalo, khóa học..."
-              aria-label="Tìm tên, số điện thoại, Zalo hoặc khóa học"
+              placeholder="Tìm tên, SĐT, Zalo, Email, khóa học..."
+              aria-label="Tìm tên, số điện thoại, Zalo, Email hoặc khóa học"
               className="w-full min-h-11 pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
             />
           </div>
@@ -185,8 +187,12 @@ export default function TeacherStudentsTab({
                 }}
               >
                 <div className="relative shrink-0">
-                  <div className="w-11 h-11 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">
-                    <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
+                  <div className="w-11 h-11 rounded-full overflow-hidden shadow-sm bg-slate-100 border border-slate-200 flex items-center justify-center">
+                    {isRealAvatar(s.avatar) ? (
+                      <img src={resolveAvatarUrl({ avatar: s.avatar, name: s.name })} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-black text-slate-700">{getNameInitial(s.name) || '?'}</span>
+                    )}
                   </div>
                   {isOnline && !isDropped && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" title="Đang hoạt động" />

@@ -72,11 +72,12 @@ export default function StudentDiaryLog({
   const weekEndKey = formatLocalDateKey(weekEnd);
   const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  const row1Filters = [
+  const filters = [
     { value: 'Ngày', label: 'Ngày' },
     { value: 'Tuần', label: 'Tuần' },
     { value: 'Tháng', label: 'Tháng' },
     { value: 'Hủy', label: 'Hủy' },
+    { value: 'Chưa điểm danh', label: 'Chưa điểm danh' },
   ];
 
   const filteredList = useMemo(() => {
@@ -131,40 +132,24 @@ export default function StudentDiaryLog({
           </h3>
         </div>
 
-        <div className="space-y-2 max-w-xl">
-          <div className="grid grid-cols-4 gap-2">
-            {row1Filters.map((tab) => {
-              const active = filter === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setFilter(tab.value)}
-                  className={`min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
-                    active
-                      ? 'bg-emerald-600 text-white border border-emerald-600'
-                      : 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-[48%] min-w-[140px] max-w-[220px]">
-            <button
-              type="button"
-              onClick={() => setFilter('Chưa điểm danh')}
-              className={`w-full min-h-[38px] rounded-[14px] text-xs font-black transition-all active:scale-95 ${
-                filter === 'Chưa điểm danh'
-                  ? 'bg-emerald-600 text-white border border-emerald-600'
-                  : 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60'
-              }`}
-            >
-              Chưa điểm danh
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {filters.map((tab) => {
+            const active = filter === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setFilter(tab.value)}
+                className={`min-h-[38px] whitespace-nowrap rounded-[14px] px-4 text-xs font-black transition-all active:scale-95 ${
+                  active
+                    ? 'bg-emerald-600 text-white border border-emerald-600'
+                    : 'bg-white text-emerald-600 border border-emerald-500 hover:bg-emerald-50/60'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

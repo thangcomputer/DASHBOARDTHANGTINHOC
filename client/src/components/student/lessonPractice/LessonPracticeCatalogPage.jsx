@@ -11,9 +11,9 @@ import VideoCoursePayModal from '../../VideoCoursePayModal';
 import CoursePurchaseConfirmModal from './CoursePurchaseConfirmModal';
 import { useToast } from '../../../utils/useToast';
 import {
+  expandEnrolledCoursesBySubject,
   getCourseProgressPercent,
   getDirectCourseSubject,
-  groupCoveredEnrolledCourses,
 } from '../../../utils/lessonPracticeCatalog';
 
 const COURSE_CONSULTATION_ZALO_PHONE = '0984623486';
@@ -120,6 +120,11 @@ function CourseCatalogCard({
           <span className="group/course-details relative flex min-h-0 flex-1 flex-col">
             <span className="flex min-h-0 min-w-0 flex-1 flex-col">
               <span className="line-clamp-2 min-h-8 text-[13px] font-black leading-4 text-slate-900 sm:text-sm sm:leading-[18px]">{course.name}</span>
+              {course.parentCourseName ? (
+                <span className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">
+                  Khóa: {course.parentCourseName}
+                </span>
+              ) : null}
               <span className="mt-1.5 flex min-h-[44px] flex-wrap content-start items-center gap-1 overflow-hidden sm:min-h-[50px]" aria-label="Các môn trong khóa học">
                 <span className="inline-flex items-center text-[10px] font-bold leading-none text-slate-500">Môn:</span>
                 {Array.isArray(course.subjects) && course.subjects.slice(0, course.subjects.length > 4 ? 3 : 4).map((subject, index) => (
@@ -599,7 +604,7 @@ function CourseCollection({
             onSelect={() => {
               const directSubject = getDirectCourseSubject(course);
               if (directSubject) {
-                onOpenSubject(directSubject.id, course.id);
+                onOpenSubject(directSubject.id, course.sourceCourseId || course.id);
                 return;
               }
               onSelectCourse((current) => current === course.id ? '' : course.id);
@@ -709,9 +714,8 @@ export default function LessonPracticeCatalogPage() {
     });
   };
 
-  const catalogCourses = groupCoveredEnrolledCourses(courses);
-  const enrolledCourses = catalogCourses.filter((course) => course.enrolled);
-  const availableCourses = catalogCourses.filter((course) => !course.enrolled);
+  const enrolledCourses = expandEnrolledCoursesBySubject(courses);
+  const availableCourses = courses.filter((course) => !course.enrolled && !course.hiddenByEnrollment);
   const visibleCourses = [...enrolledCourses, ...availableCourses];
   const matchesCourseFilter = (course) => {
     if (filter === 'registered') return course.enrolled;

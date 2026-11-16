@@ -917,6 +917,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setMessages([]);
   }, [activeConv, contactsLoaded, contacts, students, teachers, staffs]);
   const [pendingImage, setPendingImage] = useState(null);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const attachMenuRef = useRef(null);
+  useEffect(() => {
+    if (!attachMenuOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (!attachMenuRef.current?.contains(e.target)) setAttachMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [attachMenuOpen]);
   // Ghim chỉ lấy từ tin của hội thoại đang mở - tránh dính ghim sang người khác khi đổi chat.
   useEffect(() => {
     const convId = activeConv?.id ? String(activeConv.id) : '';
@@ -3896,32 +3906,70 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
                     <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
 
-                    <div className="cms-chat-attachment-tools flex items-center gap-1.5">
+                    <div ref={attachMenuRef} className="relative shrink-0">
                       <button
-                        onClick={() => imageInputRef.current?.click()}
+                        type="button"
+                        onClick={() => setAttachMenuOpen((v) => !v)}
                         disabled={isUploading}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Gửi ảnh (tối đa 10MB, lưu 10 ngày)"
+                        className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                          attachMenuOpen
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-600'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:text-emerald-600'
+                        }`}
+                        title="Đính kèm ảnh hoặc tệp"
+                        aria-label="Đính kèm ảnh hoặc tệp"
+                        aria-expanded={attachMenuOpen}
                       >
-                        {isUploading ? <span className="w-5 h-5 border-2 border-emerald-300 border-t-emerald-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
+                        {isUploading ? (
+                          <span className="w-5 h-5 border-2 border-emerald-300 border-t-emerald-600 rounded-full inline-block animate-spin" />
+                        ) : (
+                          <Plus size={19} className={`transition-transform duration-150 ${attachMenuOpen ? 'rotate-45' : ''}`} />
+                        )}
                       </button>
-                      <ScreenCaptureButton
-                        size={20}
-                        disabled={isUploading || !activeConv}
-                        buttonClassName="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        className="cms-chat-capture-control"
-                        title="Chụp màn hình"
-                        onCaptured={stageScreenshotForSend}
-                        onError={(msg) => toast.error(msg)}
-                      />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Đính kèm tài liệu Word, Excel, PowerPoint, PDF hoặc ZIP (tối đa 10MB, lưu 10 ngày)"
-                      >
-                        <Paperclip size={20} />
-                      </button>
+                      <div className={`absolute bottom-full left-0 z-30 mb-2 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl ${attachMenuOpen ? '' : 'hidden'}`}>
+                          <button
+                            type="button"
+                            disabled={isUploading}
+                            onClick={() => {
+                              setAttachMenuOpen(false);
+                              imageInputRef.current?.click();
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+                          >
+                            <Image size={16} className="shrink-0 text-emerald-600" />
+                            <span>Gửi hình ảnh</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isUploading}
+                            onClick={() => {
+                              setAttachMenuOpen(false);
+                              fileInputRef.current?.click();
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+                          >
+                            <Paperclip size={16} className="shrink-0 text-sky-600" />
+                            <span>Gửi file tài liệu</span>
+                          </button>
+                          <div className="mt-0.5 hidden border-t border-slate-100 pt-0.5 lg:block">
+                            <ScreenCaptureButton
+                              size={16}
+                              disabled={isUploading || !activeConv}
+                              buttonClassName="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+                              className="w-full"
+                              label="Chụp màn hình"
+                              title="Chụp màn hình"
+                              onCaptured={(file) => {
+                                setAttachMenuOpen(false);
+                                stageScreenshotForSend(file);
+                              }}
+                              onError={(msg) => {
+                                setAttachMenuOpen(false);
+                                toast.error(msg);
+                              }}
+                            />
+                          </div>
+                        </div>
                     </div>
 
                     <div className="flex-1 relative flex min-w-0 flex-col justify-end">
@@ -3948,7 +3996,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           </button>
                         </div>
                       )}
-                      <div className="relative flex w-full min-w-0 items-center gap-1">
+                      <div className="flex w-full min-w-0 items-center rounded-full border border-slate-200 bg-white pl-3.5 pr-1 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition">
                         <input
                           ref={inputRef}
                           value={newMsg}
@@ -3960,13 +4008,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           onBlur={stopInboxTyping}
                           onKeyDown={handleKeyPress}
                           onPaste={handlePaste}
-                          className="cms-input cms-chat-composer-input min-w-0 flex-1 pl-4 pr-4"
-                          placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
+                          className="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
+                          placeholder={pendingImage ? "Nhập thêm lời nhắn rồi nhấn Gửi..." : "Nhập tin nhắn..."}
                         />
                         <StickerPicker
                           key={activeConv?.id || 'no-conversation'}
                           inline
-                          buttonClassName="border border-slate-200 bg-white"
+                          buttonClassName="!h-8 !w-8 !border-0 !bg-transparent !shadow-none rounded-full text-slate-400 hover:text-emerald-600 shrink-0"
                           disabled={isUploading || Boolean(pendingImage) || !activeConv}
                           onPickEmoji={handleEmojiInsert}
                           onSendSticker={handleStickerSend}
@@ -3976,7 +4024,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <button
                       onClick={() => handleSend()}
                       disabled={!newMsg.trim() && !pendingImage}
-                      className="cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send"
+                      className="cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send shrink-0"
                       title="Gửi tin nhắn"
                     >
                       <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />

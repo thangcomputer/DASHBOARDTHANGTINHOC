@@ -20,6 +20,38 @@ export function getCourseProgressPercent(course, progressById) {
     : 0;
 }
 
+export function expandEnrolledCoursesBySubject(courses) {
+  const rows = Array.isArray(courses) ? courses : [];
+  const seen = new Set();
+  const expanded = [];
+
+  rows.forEach((course) => {
+    if (!course?.enrolled) return;
+    const subjects = Array.isArray(course.subjects) ? course.subjects : [];
+    if (subjects.length === 0) {
+      expanded.push(course);
+      return;
+    }
+    subjects.forEach((subject, idx) => {
+      const subjectKey = String(subject?.id || subject?.name || idx);
+      const dedupeKey = `${course.deliveryMode || 'default'}::${subjectKey}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      expanded.push({
+        ...course,
+        id: subjects.length > 1 ? `${course.id}::${subjectKey}` : course.id,
+        sourceCourseId: course.id,
+        name: subject?.name || course.name,
+        parentCourseName: subjects.length > 1 ? course.name : '',
+        subjects: [subject],
+        lessonCount: Number(subject?.totalUnitCount) || 0,
+      });
+    });
+  });
+
+  return expanded;
+}
+
 export function groupCoveredEnrolledCourses(courses) {
   const rows = Array.isArray(courses) ? courses : [];
   const groupedCourseIds = new Set();

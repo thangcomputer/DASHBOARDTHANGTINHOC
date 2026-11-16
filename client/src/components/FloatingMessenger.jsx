@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Headphones, Info, MessageCircle, MessageSquare, Minus, Search, Send, X, Circle,
-  ImagePlus, Paperclip, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
+  ImagePlus, Paperclip, Plus, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
   Copy, Scaling, Calendar,
   Smile, Users,
 } from 'lucide-react';
@@ -722,6 +722,17 @@ function ChatWindow({
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const attachMenuRef = useRef(null);
+  useEffect(() => {
+    if (!attachMenuOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (!attachMenuRef.current?.contains(e.target)) setAttachMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [attachMenuOpen]);
+
   const talkingToHuman = isAiPeer && (
     aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
     || aiStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
@@ -1412,9 +1423,9 @@ function ChatWindow({
             </button>
           </div>
         ) : null}
-        <div className="cms-fm-window__compose">
+        <div className="cms-fm-window__compose items-center gap-1.5">
           {(canAttachImage || imageBlocked || isAiPeer) ? (
-            <>
+            <div ref={attachMenuRef} className="relative shrink-0">
               <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
               <input
                 ref={attachmentRef}
@@ -1429,75 +1440,101 @@ function ChatWindow({
               />
               <button
                 type="button"
-                className="cms-fm-attach"
-                disabled={uploading || imageBlocked || questionBlocked}
-                onClick={() => {
-                  if (imageBlocked) return;
-                  imageRef.current?.click();
-                }}
-                title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay - ngày mai gửi tiếp` : 'Đính kèm ảnh'}
-                aria-label={imageBlocked ? 'Hết lượt gửi ảnh hôm nay' : 'Đính kèm ảnh'}
-              >
-                <ImagePlus size={16} />
-              </button>
-              <ScreenCaptureButton
-                size={16}
-                disabled={uploading || imageBlocked || questionBlocked}
-                buttonClassName="cms-fm-attach"
-                className="cms-fm-capture-control"
-                title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay - ngày mai gửi tiếp` : 'Chụp màn hình'}
-                onCaptured={(file) => stageImage(file)}
-                onError={(msg) => toast.error(msg)}
-              />
-              <button
-                type="button"
-                className="cms-fm-attach"
+                className={`cms-fm-attach ${attachMenuOpen ? '!bg-emerald-50 !text-emerald-600 !border-emerald-300' : ''}`}
                 disabled={uploading || sending || questionBlocked}
-                onClick={() => attachmentRef.current?.click()}
-                title="Đính kèm Word, Excel, PowerPoint, PDF hoặc ZIP (tối đa 10MB)"
-                aria-label="Đính kèm tệp"
+                onClick={() => setAttachMenuOpen((v) => !v)}
+                title="Gửi ảnh hoặc tệp"
+                aria-label="Đính kèm ảnh hoặc tệp"
+                aria-expanded={attachMenuOpen}
               >
-                <Paperclip size={16} />
+                <Plus size={18} className={`transition-transform duration-150 ${attachMenuOpen ? 'rotate-45' : ''}`} />
               </button>
-            </>
+              <div className={`absolute bottom-full left-0 z-30 mb-2 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl ${attachMenuOpen ? '' : 'hidden'}`}>
+                  <button
+                    type="button"
+                    disabled={uploading || imageBlocked || questionBlocked}
+                    onClick={() => {
+                      setAttachMenuOpen(false);
+                      if (!imageBlocked) imageRef.current?.click();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 !shadow-none"
+                  >
+                    <ImagePlus size={15} className="shrink-0 text-emerald-600" />
+                    <span>{imageBlocked ? `Hết ${imageLimit} ảnh hôm nay` : 'Gửi hình ảnh'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={uploading || sending || questionBlocked}
+                    onClick={() => {
+                      setAttachMenuOpen(false);
+                      attachmentRef.current?.click();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 !shadow-none"
+                  >
+                    <Paperclip size={15} className="shrink-0 text-sky-600" />
+                    <span>Gửi file tài liệu</span>
+                  </button>
+                  <div className="mt-0.5 hidden border-t border-slate-100 pt-0.5 lg:block">
+                    <ScreenCaptureButton
+                      size={15}
+                      disabled={uploading || imageBlocked || questionBlocked}
+                      buttonClassName="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 !shadow-none"
+                      className="w-full"
+                      label="Chụp màn hình"
+                      title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay - ngày mai gửi tiếp` : 'Chụp màn hình'}
+                      onCaptured={(file) => {
+                        setAttachMenuOpen(false);
+                        stageImage(file);
+                      }}
+                      onError={(msg) => {
+                        setAttachMenuOpen(false);
+                        toast.error(msg);
+                      }}
+                    />
+                  </div>
+                </div>
+            </div>
           ) : null}
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={handleInputChange}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submit(e);
+          <div className="flex min-w-0 flex-1 items-center rounded-full border border-slate-200 bg-slate-50/80 pl-3.5 pr-1 focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/20 transition">
+            <input
+              ref={inputRef}
+              value={text}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  submit(e);
+                }
+              }}
+              onPaste={canAttachImage ? handlePaste : undefined}
+              placeholder={
+                uploading
+                  ? 'Đang gửi ảnh…'
+                  : sending
+                    ? (isAiPeer ? 'Trợ lý AI đang trả lời…' : 'Đang gửi…')
+                    : questionBlocked
+                      ? `Hết ${questionLimit} lượt hỏi AI hôm nay`
+                      : pendingImage
+                        ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
+                        : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Nhập tin nhắn...')
               }
-            }}
-            onPaste={canAttachImage ? handlePaste : undefined}
-            placeholder={
-              uploading
-                ? 'Đang gửi ảnh…'
-                : sending
-                  ? (isAiPeer ? 'Trợ lý AI đang trả lời…' : 'Đang gửi…')
-                  : questionBlocked
-                    ? `Hết ${questionLimit} lượt hỏi AI hôm nay`
-                    : pendingImage
-                      ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
-                      : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Aa (Dán ảnh Ctrl+V)')
-            }
-            disabled={uploading || sending || questionBlocked}
-            className="cms-fm-input"
-          />
-          {!isAiPeer ? (
-            <StickerPicker
-              key={tab.id}
-              inline
-              disabled={uploading || sending || questionBlocked || Boolean(pendingImage)}
-              onPickEmoji={handleEmojiInsert}
-              onSendSticker={handleStickerSend}
+              disabled={uploading || sending || questionBlocked}
+              className="min-w-0 flex-1 border-0 bg-transparent py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
             />
-          ) : null}
-          <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading || sending || questionBlocked} className="cms-fm-send" aria-label={sending ? 'Đang xử lý' : 'Gửi'}>
+            {!isAiPeer ? (
+              <StickerPicker
+                key={tab.id}
+                inline
+                buttonClassName="!h-8 !w-8 !border-0 !bg-transparent !shadow-none rounded-full text-slate-400 hover:text-emerald-600 shrink-0"
+                disabled={uploading || sending || questionBlocked || Boolean(pendingImage)}
+                onPickEmoji={handleEmojiInsert}
+                onSendSticker={handleStickerSend}
+              />
+            ) : null}
+          </div>
+          <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading || sending || questionBlocked} className="cms-fm-send shrink-0" aria-label={sending ? 'Đang xử lý' : 'Gửi'}>
             {uploading || sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
         </div>

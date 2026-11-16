@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -14,7 +14,6 @@ import {
   Lock,
   Paperclip,
   Play,
-  X,
 } from 'lucide-react';
 import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -69,6 +68,16 @@ const SECTION_META = {
   },
 };
 
+function normalizeSectionLocks(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const key of DEFAULT_SECTION_ORDER) {
+    const val = String(src[key] || '').trim();
+    out[key] = ['auto', 'unlocked', 'locked'].includes(val) ? val : 'auto';
+  }
+  return out;
+}
+
 function normalizeConfig(node, diff) {
   const cfg = node?.levelConfigs?.[diff];
   if (cfg) {
@@ -81,10 +90,11 @@ function normalizeConfig(node, diff) {
       sectionOrder: order,
       hiddenSections: Array.isArray(cfg.hiddenSections) ? cfg.hiddenSections : [],
       sequentialSections: cfg.sequentialSections !== false,
+      sectionLocks: normalizeSectionLocks(cfg.sectionLocks),
       content: cfg.content || { title: '', description: '', body: '' },
       files: Array.isArray(cfg.files) ? cfg.files : [],
       video: cfg.video || { title: '', url: '', antiSeek: true, checks: [] },
-      practice: cfg.practice || { title: '', description: '' },
+      practice: cfg.practice || { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [] } },
     };
   }
   const legacy = diff === 'easy' ? node?.levels?.[0] : null;
@@ -93,6 +103,7 @@ function normalizeConfig(node, diff) {
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
     sequentialSections: true,
+    sectionLocks: normalizeSectionLocks(),
     content: { title: legacy?.title || '', description: '', body: legacy?.content || legacyVid?.content || '' },
     files: (legacy?.fileUrl || legacyVid?.fileUrl)
       ? [{
@@ -127,7 +138,7 @@ export default function MilestoneHubModal({
   const getVisibleSectionsFor = (diff) => {
     const c = normalizeConfig(node, diff);
     const hidden = new Set(c.hiddenSections || []);
-    return c.sectionOrder.filter((k) => !hidden.has(k));
+    return c.sectionOrder.filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
   };
   const isDiffDone = (diff) => {
     const secs = getVisibleSectionsFor(diff);
@@ -142,6 +153,33 @@ export default function MilestoneHubModal({
   const [activeSection, setActiveSection] = useState(null);
   const [selectedReviewSection, setSelectedReviewSection] = useState(null);
   const [savingSection, setSavingSection] = useState(false);
+  const cfg = useMemo(() => normalizeConfig(node, activeDiff), [node, activeDiff]);
+  const [contentScrolledToEnd, setContentScrolledToEnd] = useState(false);
+  const sectionScrollRef = useRef(null);
+
+  const checkScrollAtBottom = useCallback(() => {
+    const el = sectionScrollRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) {
+      setContentScrolledToEnd(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'content') {
+      setContentScrolledToEnd(false);
+      return undefined;
+    }
+    setContentScrolledToEnd(false);
+    const raf = window.requestAnimationFrame(() => {
+      checkScrollAtBottom();
+    });
+    window.addEventListener('resize', checkScrollAtBottom);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('resize', checkScrollAtBottom);
+    };
+  }, [activeSection, activeDiff, node?.key, cfg.content?.body, checkScrollAtBottom]);
 
   useEffect(() => {
     setCompletedList(unit?.completedSections || []);
@@ -173,7 +211,6 @@ export default function MilestoneHubModal({
     };
   }, [activeSection, onClose]);
 
-  const cfg = useMemo(() => normalizeConfig(node, activeDiff), [node, activeDiff]);
   const visibleSections = useMemo(
     () => cfg.sectionOrder.filter((key) => !cfg.hiddenSections.includes(key)),
     [cfg],
@@ -197,14 +234,21 @@ export default function MilestoneHubModal({
   }, [activeDiffUnlocked]);
 
   const isSectionDone = (secKey) => isSectionDoneFor(activeDiff, secKey);
-  const isSectionUnlocked = (secIdx) => {
-    if (unit?.testedOut) return true;
-    if (cfg.sequentialSections === false) return true;
-    if (secIdx <= 0) return true;
-    return isSectionDone(visibleSections[secIdx - 1]);
+  const getSectionLockState = (secKey, secIdx) => {
+    const lockMode = cfg.sectionLocks?.[secKey] || 'auto';
+    if (lockMode === 'locked') return { unlocked: false, reason: 'Admin đang khóa phần này' };
+    if (lockMode === 'unlocked') return { unlocked: true, reason: '' };
+    if (unit?.testedOut || cfg.sequentialSections === false) return { unlocked: true, reason: '' };
+    const prevRequired = visibleSections.slice(0, secIdx).filter((k) => cfg.sectionLocks?.[k] !== 'locked');
+    if (prevRequired.some((k) => !isSectionDone(k))) {
+      return { unlocked: false, reason: 'Hoàn thành phần trước để mở khóa' };
+    }
+    return { unlocked: true, reason: '' };
   };
-  const doneCount = visibleSections.filter((secKey) => isSectionDone(secKey)).length;
-  const totalCount = visibleSections.length;
+  const isSectionUnlocked = (secIdx) => getSectionLockState(visibleSections[secIdx], secIdx).unlocked;
+  const requiredSections = visibleSections.filter((secKey) => cfg.sectionLocks?.[secKey] !== 'locked');
+  const doneCount = requiredSections.filter((secKey) => isSectionDone(secKey)).length;
+  const totalCount = requiredSections.length;
   const progressPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
 
   const currentTabMeta = DIFFICULTY_TABS.find((t) => t.key === activeDiff) || DIFFICULTY_TABS[0];
@@ -224,28 +268,43 @@ export default function MilestoneHubModal({
     });
   }, [unit?.id, unit?.index, unit?.title, node?.key, node?.label, activeDiff, activeSection, currentTabMeta.label, progressPct]);
 
-  const toggleSectionDone = async (secKey, nextDone) => {
+  const autoCompletedRef = useRef(new Set());
+
+  const markSectionDoneAuto = useCallback(async (secKey) => {
+    if (!unit?.id || !node?.key || !secKey) return;
+    const fullKey = `${node.key}:${activeDiff}:${secKey}`;
+    if (completedSet.has(fullKey) || autoCompletedRef.current.has(fullKey)) return;
+    autoCompletedRef.current.add(fullKey);
+    setCompletedList((prev) => (prev.includes(fullKey) ? prev : [...prev, fullKey]));
     setSavingSection(true);
     try {
       const res = await dailyPracticeApi.student.completeSection(unit.id, {
         nodeKey: node.key,
         difficulty: activeDiff,
         sectionKey: secKey,
-        completed: nextDone,
+        completed: true,
       });
       if (Array.isArray(res?.completedSections)) {
         setCompletedList(res.completedSections);
-      } else {
-        const key = `${node.key}:${activeDiff}:${secKey}`;
-        setCompletedList((prev) => (nextDone ? Array.from(new Set([...prev, key])) : prev.filter((k) => k !== key)));
       }
       onProgressChanged?.();
     } catch {
-      // ignore
+      // keep optimistic completion in UI
     } finally {
       setSavingSection(false);
     }
-  };
+  }, [unit?.id, node?.key, activeDiff, completedSet, onProgressChanged]);
+
+  useEffect(() => {
+    if (!activeSection) return;
+    if (activeSection === 'content' && contentScrolledToEnd) {
+      markSectionDoneAuto('content');
+    } else if (activeSection === 'file') {
+      markSectionDoneAuto('file');
+    } else if (activeSection === 'video' && !cfg.video?.url) {
+      markSectionDoneAuto('video');
+    }
+  }, [activeSection, contentScrolledToEnd, cfg.video?.url, markSectionDoneAuto]);
 
   const openSection = (secKey) => {
     if (secKey === 'video' && cfg.video?.url) {
@@ -253,12 +312,22 @@ export default function MilestoneHubModal({
       onOpenVideo?.(unit, videoId);
       return;
     }
-    if (secKey === 'practice') {
+    if (secKey === 'practice' && !cfg.practice?.video?.url) {
       onClose();
       onStartPractice?.(DIFFICULTY_STEP_MAP[activeDiff]);
       return;
     }
     setActiveSection(secKey);
+  };
+
+  const handleContinueNextSection = () => {
+    const curIdx = requiredSections.indexOf(activeSection);
+    const nextSec = curIdx >= 0 ? requiredSections[curIdx + 1] : null;
+    if (nextSec) {
+      openSection(nextSec);
+      return;
+    }
+    setActiveSection(null);
   };
 
   const handleQuickStart = () => {
@@ -297,7 +366,9 @@ export default function MilestoneHubModal({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200"
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 transition-[max-width] duration-200 ${
+          activeSection === 'content' ? 'max-w-3xl lg:max-w-4xl' : 'max-w-lg'
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label={node.label}
@@ -333,9 +404,9 @@ export default function MilestoneHubModal({
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 !shadow-none"
+            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer !shadow-none"
           >
-            <X size={20} />
+            Đóng
           </button>
         </div>
 
@@ -381,7 +452,8 @@ export default function MilestoneHubModal({
                 const meta = SECTION_META[secKey];
                 const Icon = meta.icon;
                 const done = isSectionDone(secKey);
-                const unlocked = isSectionUnlocked(secIdx);
+                const lockState = getSectionLockState(secKey, secIdx);
+                const unlocked = lockState.unlocked;
                 const videoInProgress = secKey === 'video' && !done && (() => {
                   try {
                     const vidId = cfg.video?.id || `${node.key}:level:${activeDiff}`;
@@ -427,7 +499,7 @@ export default function MilestoneHubModal({
                         {done && <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />}
                       </div>
                       <p className="truncate text-xs font-medium text-slate-500">
-                        {!unlocked ? 'Hoàn thành phần trước để mở khóa' : sectionSubtitle(secKey)}
+                        {!unlocked ? lockState.reason : sectionSubtitle(secKey)}
                       </p>
                     </div>
                     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-black ${
@@ -447,19 +519,23 @@ export default function MilestoneHubModal({
           </div>
         ) : (
           /* Sub-view chi tiết của từng phần học */
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+          <div
+            ref={sectionScrollRef}
+            onScroll={activeSection === 'content' ? checkScrollAtBottom : undefined}
+            className={`min-h-0 flex-1 space-y-4 overflow-y-auto p-5 ${activeSection === 'content' ? 'sm:p-6 md:p-7' : ''}`}
+          >
             {activeSection === 'content' && (
               <div className="space-y-3">
                 {cfg.content?.title ? (
-                  <h4 className="text-base font-black text-slate-900">{cfg.content.title}</h4>
+                  <h4 className="text-base sm:text-lg font-black text-slate-900">{cfg.content.title}</h4>
                 ) : null}
                 {cfg.content?.description ? (
-                  <p className="rounded-xl bg-sky-50 px-3.5 py-2.5 text-xs font-semibold text-sky-900 ring-1 ring-sky-100">
+                  <p className="rounded-xl bg-sky-50 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-sky-900 ring-1 ring-sky-100">
                     {cfg.content.description}
                   </p>
                 ) : null}
                 {bodyParagraphs.length > 0 ? (
-                  <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 text-[15px] leading-relaxed text-slate-800">
+                  <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 sm:p-6 text-[15px] sm:text-base leading-relaxed text-slate-800">
                     {bodyParagraphs.map((p, idx) => (
                       <p key={idx}>{p}</p>
                     ))}
@@ -477,7 +553,7 @@ export default function MilestoneHubModal({
                 {cfg.files?.length ? (
                   <ul className="space-y-2.5">
                     {cfg.files.map((file, idx) => (
-                      <li key={file.id || idx} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+                      <li key={file.id || idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
                         <div className="flex min-w-0 flex-1 items-center gap-3">
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
                             <FileText size={20} />
@@ -487,19 +563,19 @@ export default function MilestoneHubModal({
                             <p className="text-[11px] font-semibold text-amber-800">Tài liệu học tập</p>
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex w-full sm:w-auto shrink-0 items-center gap-2">
                           <a
                             href={resolveMediaUrl(file.url)}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-100/60"
+                            className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-amber-300 bg-white px-3 py-2 sm:py-1.5 text-xs font-black text-amber-900 hover:bg-amber-100/60"
                           >
                             <ExternalLink size={13} /> Xem file
                           </a>
                           <a
                             href={buildMediaDownloadUrl(file.url, file.name)}
                             download={file.name}
-                            className="inline-flex items-center gap-1 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-black text-white hover:bg-amber-700"
+                            className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1 whitespace-nowrap rounded-xl bg-amber-600 px-3 py-2 sm:py-1.5 text-xs font-black text-white hover:bg-amber-700"
                           >
                             <Download size={13} /> Tải về
                           </a>
@@ -545,6 +621,30 @@ export default function MilestoneHubModal({
                     Ngân hàng câu hỏi: {unit?.counts?.[activeDiff] || 0} câu {currentTabMeta.label}
                   </p>
                 </div>
+                {cfg.practice?.video?.url ? (
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-sky-700">Video hướng dẫn luyện tập</p>
+                        <p className="truncate text-sm font-black text-slate-900">
+                          {cfg.practice.video.title || `Video luyện tập (${currentTabMeta.label})`}
+                        </p>
+                      </div>
+                      {cfg.practice.video.checks?.length ? (
+                        <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-black text-sky-800">
+                          {cfg.practice.video.checks.length} mốc trắc nghiệm
+                        </span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenVideo?.(unit, cfg.practice.video.id || `${node.key}:practice:${activeDiff}`)}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 py-2.5 text-xs font-black text-white hover:bg-sky-700 transition cursor-pointer !shadow-none"
+                    >
+                      <Play size={15} fill="currentColor" /> Mở video hướng dẫn
+                    </button>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
@@ -600,28 +700,34 @@ export default function MilestoneHubModal({
             )}
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 border-t border-slate-100 bg-slate-50/60 px-4 sm:px-5 py-3">
             <button
               type="button"
               onClick={() => setActiveSection(null)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 !shadow-none"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 sm:py-2 text-xs font-black text-slate-700 hover:bg-slate-50 !shadow-none"
             >
               <ArrowLeft size={14} /> Quay lại bài học
             </button>
             {(activeSection === 'content' || activeSection === 'file') && (
-              <button
-                type="button"
-                disabled={savingSection}
-                onClick={() => toggleSectionDone(activeSection, !isSectionDone(activeSection))}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black transition !shadow-none ${
-                  isSectionDone(activeSection)
-                    ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                }`}
-              >
-                {savingSection ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                {isSectionDone(activeSection) ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
-              </button>
+              activeSection === 'content' && !isSectionDone('content') && !contentScrolledToEnd ? (
+                <span className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-500">
+                  Cuộn đọc hết nội dung để hoàn thành
+                </span>
+              ) : (
+                <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2">
+                  <span className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                    {savingSection ? <Loader2 size={14} className="animate-spin text-emerald-600" /> : <CheckCircle2 size={14} className="text-emerald-600" />}
+                    Đã hoàn thành
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleContinueNextSection}
+                    className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1 whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700 transition cursor-pointer !shadow-none"
+                  >
+                    Tiếp tục <ChevronRight size={15} />
+                  </button>
+                </div>
+              )
             )}
           </div>
         )}

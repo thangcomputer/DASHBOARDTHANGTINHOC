@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { FileBox, Headphones, Lock, MessageSquare, Sparkles, Trophy, X } from 'lucide-react';
+import { FileBox, Headphones, Lock, MessageSquare, Newspaper, Sparkles, X } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { hasRealCourseEnrollment } from '../../../utils/enrollments';
 import FreeMeetPlanModal from './FreeMeetPlanModal';
@@ -10,11 +10,11 @@ const MASCOT = `/cam-xuc-animation/${encodeURI('vui tươi.webp')}`;
 const LOCKED_ITEMS = [
   { icon: Headphones, label: 'Hỗ trợ' },
   { icon: MessageSquare, label: 'Tin nhắn' },
-  { icon: Trophy, label: 'Phòng thi' },
   { icon: FileBox, label: 'Bài tập' },
+  { icon: Newspaper, label: 'Bảng tin' },
 ];
 
-export const FREE_HIDDEN_KEYS = new Set(['news', 'evaluation', 'center-info', 'schedule', 'lesson-practice']);
+export const FREE_HIDDEN_KEYS = new Set(['news', 'evaluation', 'center-info', 'schedule', 'lesson-practice', 'exam']);
 
 export function isFreePortalLocked(session) {
   return session?.role === 'student' && session?.freePortal === true && session?.freeUnlocked !== true;

@@ -1,4 +1,4 @@
-import { BookOpen, FastForward, Play } from 'lucide-react';
+import { BookOpen, Crown, FastForward, Play } from 'lucide-react';
 import { unitStageCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 
 function darken(hex, amount = 0.28) {
@@ -102,6 +102,7 @@ export function UnitStageHeader({
   unit,
   color,
   onTestOut,
+  onUpgrade,
   highlight: isNextUnit = false,
   hasVideo: _hasVideo,
   testOutButtonRef,
@@ -130,6 +131,7 @@ export function UnitStageHeader({
   let statusLabel = '';
   if (done) statusLabel = 'Đã vượt';
   else if (activeAndStarted) statusLabel = 'Đang học';
+  else if (locked && unit.requiresSubscription) statusLabel = 'Cần đăng ký gói';
   else if (locked) statusLabel = 'Chưa mở';
   else statusLabel = 'Chưa bắt đầu';
 
@@ -191,7 +193,18 @@ export function UnitStageHeader({
           ) : null}
         </div>
       </div>
-      {locked && unit.canTestOut ? (
+      {locked && unit.requiresSubscription && onUpgrade ? (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={onUpgrade}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 cursor-pointer"
+          >
+            <Crown size={13} aria-hidden="true" />
+            <span>Đăng ký gói để mở Chặng {unit.index}</span>
+          </button>
+        </div>
+      ) : locked && unit.canTestOut ? (
         <div className="mt-2 flex justify-center">
           <button
             ref={testOutButtonRef}

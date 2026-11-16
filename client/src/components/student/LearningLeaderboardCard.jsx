@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Crown, Trophy } from 'lucide-react';
+import { Award, CheckCircle2, ChevronRight, Crown, Gem, Medal, Shield, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { DAILY_PRACTICE_STATS_EVENT } from '../../services/dailyPracticeApi';
 import { resolveMediaUrl } from '../../services/api';
@@ -14,12 +14,17 @@ const MEDALS = {
 };
 
 const LEAGUE_TIERS = [
-  { key: 'bronze', name: 'Đồng', icon: '🥉', minMinutes: 0, frame: 'ring-2 ring-amber-700/60', badge: 'bg-amber-100 text-amber-800' },
-  { key: 'silver', name: 'Bạc', icon: '🥈', minMinutes: 60, frame: 'ring-2 ring-slate-400', badge: 'bg-slate-200 text-slate-700' },
-  { key: 'gold', name: 'Vàng', icon: '🥇', minMinutes: 120, frame: 'ring-2 ring-amber-400 shadow-xs', badge: 'bg-yellow-100 text-amber-800' },
-  { key: 'platinum', name: 'Bạch Kim', icon: '💠', minMinutes: 210, frame: 'ring-2 ring-cyan-400 shadow-sm', badge: 'bg-cyan-100 text-cyan-800' },
-  { key: 'diamond', name: 'Kim Cương', icon: '💎', minMinutes: 300, frame: 'ring-[3px] ring-fuchsia-400 shadow-md', badge: 'bg-fuchsia-100 text-fuchsia-800' },
+  { key: 'bronze', name: 'Đồng', Icon: Medal, iconClass: 'text-amber-700', minMinutes: 0, frame: 'ring-2 ring-amber-700/60', badge: 'bg-amber-100 text-amber-800' },
+  { key: 'silver', name: 'Bạc', Icon: Medal, iconClass: 'text-slate-500', minMinutes: 60, frame: 'ring-2 ring-slate-400', badge: 'bg-slate-200 text-slate-700' },
+  { key: 'gold', name: 'Vàng', Icon: Award, iconClass: 'text-amber-500', minMinutes: 120, frame: 'ring-2 ring-amber-400 shadow-xs', badge: 'bg-yellow-100 text-amber-800' },
+  { key: 'platinum', name: 'Bạch Kim', Icon: Shield, iconClass: 'text-cyan-600', minMinutes: 210, frame: 'ring-2 ring-cyan-400 shadow-sm', badge: 'bg-cyan-100 text-cyan-800' },
+  { key: 'diamond', name: 'Kim Cương', Icon: Gem, iconClass: 'text-fuchsia-600', minMinutes: 300, frame: 'ring-[3px] ring-fuchsia-400 shadow-md', badge: 'bg-fuchsia-100 text-fuchsia-800' },
 ];
+
+function TierIcon({ tier, size = 11 }) {
+  const Icon = tier?.Icon || Medal;
+  return <Icon size={size} className={`shrink-0 ${tier?.iconClass || ''}`} aria-hidden="true" />;
+}
 
 function leagueForRow(row) {
   const mins = Number(row?.minutes) || 0;
@@ -127,8 +132,9 @@ export default function LearningLeaderboardCard() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-black text-slate-900">Bảng xếp hạng tuần</h3>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${myLeague.badge}`}>
-              {myLeague.icon} {myLeague.name}
+            <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ${myLeague.badge}`}>
+              <TierIcon tier={myLeague} size={13} />
+              <span>{myLeague.name}</span>
             </span>
           </div>
           <p className="truncate text-[11px] text-slate-500">
@@ -140,8 +146,20 @@ export default function LearningLeaderboardCard() {
       </div>
 
       {me && myLeague.key !== 'diamond' && (
-        <div className="mt-2 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 flex items-center justify-between gap-2">
-          <span>League tuần: {LEAGUE_TIERS.map((t) => t.icon).join(' → ')}</span>
+        <div className="mt-2 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">Hạng tuần:</span>
+            <span className="flex items-center gap-1">
+              {LEAGUE_TIERS.map((t, idx) => (
+                <span key={t.key} className="inline-flex items-center gap-1" title={t.name}>
+                  <TierIcon tier={t} size={14} />
+                  {idx < LEAGUE_TIERS.length - 1 && (
+                    <ChevronRight size={12} className="text-slate-400" aria-hidden="true" />
+                  )}
+                </span>
+              ))}
+            </span>
+          </div>
           <span className="text-emerald-700 font-bold shrink-0">
             Lên {nextLeague.name}: {Math.max(0, nextLeague.minMinutes - (Number(me.minutes) || 0))}p
           </span>
@@ -182,9 +200,9 @@ export default function LearningLeaderboardCard() {
                   </span>
                 ) : null}
               </p>
-              <p className="truncate text-[10px] font-semibold text-slate-500">
-                <span>{tier.icon} Hạng {tier.name}</span>
-                {freePortal && row.hoursPerDay ? ` · Mục tiêu ${row.hoursPerDay}g/ngày` : ''}
+              <p className="flex items-center gap-1 truncate text-[10px] font-semibold text-slate-500">
+                <TierIcon tier={tier} size={13} />
+                <span>Hạng {tier.name}{freePortal && row.hoursPerDay ? ` · Mục tiêu ${row.hoursPerDay}g/ngày` : ''}</span>
               </p>
             </div>
             <div className="shrink-0 text-right leading-tight">

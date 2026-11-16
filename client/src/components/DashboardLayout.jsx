@@ -10,6 +10,7 @@ const MeetStartAlert = lazy(() => import('./student/MeetStartAlert'));
 const StudentAttendanceConfirmModal = lazy(() => import('./student/StudentAttendanceConfirmModal'));
 const WelcomeCelebrationOverlay = lazy(() => import('./WelcomeCelebrationOverlay'));
 const FreeSurveyModal = lazy(() => import('./student/FreeSurveyModal'));
+const PlacementTestModal = lazy(() => import('./student/dailyPractice/PlacementTestModal'));
 const LoginInboxAlertPopup = lazy(() => import('./LoginInboxAlertPopup'));
 const ClassRoomHost = lazy(() => import('./classRoom/ClassRoom'));
 const LearningGoalModal = lazy(() => import('./student/LearningGoalModal'));
@@ -577,12 +578,19 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   }, [session?.isFirstLogin, role, firstLoginPwDone]);
 
   const [showWelcomeCelebration, setShowWelcomeCelebration] = useState(false);
+  const [showPlacementPrompt, setShowPlacementPrompt] = useState(false);
   const [freeSurveyClosed, setFreeSurveyClosed] = useState(false);
   const [freeUnlockShow, setFreeUnlockShow] = useState(null);
   const finishFreeFireworks = useCallback(() => {
     setFreeUnlockShow((current) => (current === 'fireworks' ? 'guide' : current));
   }, []);
   const welcomeMarkedRef = React.useRef(false);
+
+  useEffect(() => {
+    const handleOpenPlacement = () => setShowPlacementPrompt(true);
+    window.addEventListener('open-placement-test', handleOpenPlacement);
+    return () => window.removeEventListener('open-placement-test', handleOpenPlacement);
+  }, []);
   const [courseCelebration, setCourseCelebration] = useState(null);
   const courseCelebrationTimerRef = React.useRef(null);
   const [starBonusCelebration, setStarBonusCelebration] = useState(null);
@@ -798,6 +806,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     (endsAt) => (myId ? `cms_goal_expired_dismissed:${myId}:${endsAt || ''}` : ''),
     [myId]
   );
+  const learningGoalRef = React.useRef(null);
+  learningGoalRef.current = learningGoalData?.goal || null;
   useEffect(() => {
     if (role !== 'student' || !myId) return undefined;
     let cancelled = false;
@@ -806,12 +816,23 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       .catch(() => { });
     const onOpen = () => setLearningGoalOpen(true);
     const onChanged = (event) => { if (event.detail) setLearningGoalData(event.detail); };
+    const onPartCompleted = () => {
+      if (learningGoalRef.current) return;
+      const key = `cms_goal_first_prompted:${myId}`;
+      try {
+        if (localStorage.getItem(key) === '1') return;
+        localStorage.setItem(key, '1');
+      } catch { /* ignore */ }
+      setLearningGoalOpen(true);
+    };
     window.addEventListener(OPEN_LEARNING_GOAL_EVENT, onOpen);
     window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, onChanged);
+    window.addEventListener('cms:part-completed', onPartCompleted);
     return () => {
       cancelled = true;
       window.removeEventListener(OPEN_LEARNING_GOAL_EVENT, onOpen);
       window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, onChanged);
+      window.removeEventListener('cms:part-completed', onPartCompleted);
     };
   }, [role, myId]);
 
@@ -1335,6 +1356,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   const dismissWelcomeCelebration = React.useCallback(async () => {
     setShowWelcomeCelebration(false);
+    if (role === 'student') {
+      try {
+        const studentId = session?.id || session?._id || myId;
+        const existing = localStorage.getItem(`dewskill_placement_v1:${studentId || 'guest'}`);
+        if (!existing) {
+          setShowPlacementPrompt(true);
+        }
+      } catch {
+        setShowPlacementPrompt(true);
+      }
+    }
     if (welcomeMarkedRef.current) return;
     welcomeMarkedRef.current = true;
     try {
@@ -1410,6 +1442,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   useEffect(() => {
     setLoginOverlay('welcome-celebration', Boolean(showWelcomeCelebration));
   }, [showWelcomeCelebration]);
+  useEffect(() => {
+    setLoginOverlay('placement-prompt', Boolean(showPlacementPrompt));
+  }, [showPlacementPrompt]);
   useEffect(() => {
     setLoginOverlay('course-celebration', Boolean(courseCelebration));
   }, [courseCelebration]);
@@ -1999,6 +2034,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             blocked={
               showFreeSurvey
               || showWelcomeCelebration
+              || showPlacementPrompt
               || !!courseCelebration
               || !!starBonusCelebration
               || (role === 'teacher' && !!teacherPaymentCelebration)
@@ -2017,6 +2053,15 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             onDone={() => {
               setFreeSurveyClosed(true);
               window.dispatchEvent(new Event('free-survey-done'));
+              if (!showWelcomeCelebration && role === 'student') {
+                try {
+                  const studentId = session?.id || session?._id || myId;
+                  const existing = localStorage.getItem(`dewskill_placement_v1:${studentId || 'guest'}`);
+                  if (!existing) setShowPlacementPrompt(true);
+                } catch {
+                  setShowPlacementPrompt(true);
+                }
+              }
             }}
           />
         </DeferredMount>
@@ -2035,6 +2080,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             name={displayName || session?.name || ''}
             variant="welcome"
             onClose={dismissWelcomeCelebration}
+          />
+        </DeferredMount>
+        <DeferredMount when={showPlacementPrompt && !showWelcomeCelebration && !showFreeSurvey}>
+          <PlacementTestModal
+            open={showPlacementPrompt && !showWelcomeCelebration && !showFreeSurvey}
+            intro={true}
+            onClose={() => setShowPlacementPrompt(false)}
+            studentId={session?.id || session?._id || myId}
+            onApplied={() => {
+              setShowPlacementPrompt(false);
+              navigate('/student/daily-practice');
+            }}
           />
         </DeferredMount>
         <DeferredMount when={!showWelcomeCelebration && !!courseCelebration}>

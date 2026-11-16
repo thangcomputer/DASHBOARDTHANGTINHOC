@@ -49,6 +49,7 @@ export default function StickerPicker({
   onSendSticker,
 }) {
   const [open, setOpen] = useState(false);
+  const [mobileBottom, setMobileBottom] = useState(84);
   const [tab, setTab] = useState('stickers');
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -85,6 +86,10 @@ export default function StickerPicker({
   ));
 
   useEffect(() => {
+    if (open && triggerRef.current && window.innerWidth < 640) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMobileBottom(Math.max(64, Math.round(window.innerHeight - rect.top + 10)));
+    }
     if (!open) return undefined;
 
     const handlePointerDown = (event) => {
@@ -140,9 +145,10 @@ export default function StickerPicker({
       {open ? (
         <section
           ref={pickerRef}
-          className={`cms-sticker-picker absolute bottom-full right-0 z-[60] mb-3 flex h-[min(480px,calc(100dvh-100px))] flex-col ${
-            inline ? 'w-[min(392px,calc(100vw-56px))]' : 'w-[min(392px,calc(100vw-24px))]'
-          } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.18)] animate-in fade-in slide-in-from-bottom-2 duration-150`}
+          style={typeof window !== 'undefined' && window.innerWidth < 640 ? { bottom: `${mobileBottom}px` } : undefined}
+          className={`cms-sticker-picker fixed left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:absolute sm:bottom-full sm:right-0 z-[60] sm:mb-2.5 flex h-[min(270px,42dvh)] sm:h-[min(380px,calc(100dvh-140px))] flex-col ${
+            inline ? 'w-[min(300px,calc(100vw-32px))] sm:w-[340px]' : 'w-[min(300px,calc(100vw-32px))] sm:w-[350px]'
+          } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_38px_rgba(15,23,42,0.18)] animate-in fade-in slide-in-from-bottom-2 duration-150`}
           role="dialog"
           aria-label="Bảng chọn emoji, sticker và GIF"
         >
@@ -158,7 +164,7 @@ export default function StickerPicker({
                 role="tab"
                 aria-selected={tab === item.id}
                 onClick={() => setTab(item.id)}
-                className={`h-11 border-b-2 text-xs font-bold tracking-wide transition-colors ${
+                className={`h-9 border-b-2 text-xs font-bold tracking-wide transition-colors ${
                   tab === item.id
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-slate-500 hover:bg-slate-50'
@@ -171,18 +177,18 @@ export default function StickerPicker({
 
           {tab === 'stickers' ? (
             <div key={tab} className="min-h-0 flex-1 overflow-y-auto p-2.5 animate-in fade-in duration-150">
-              <label className="relative mb-3 block">
-                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <label className="relative mb-2 block">
+                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Tìm sticker..."
                   aria-label="Tìm sticker"
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 text-xs sm:text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
                 />
               </label>
-              <div className="cms-sticker-categories mb-3 flex w-full min-w-0 flex-nowrap gap-1.5 overflow-x-auto whitespace-nowrap pb-1" aria-label="Danh mục sticker">
+              <div className="cms-sticker-categories mb-2 flex w-full min-w-0 flex-nowrap gap-1.5 overflow-x-auto whitespace-nowrap pb-1" aria-label="Danh mục sticker">
                 {STICKER_CATEGORIES.map((item) => (
                   <button
                     key={item.id}

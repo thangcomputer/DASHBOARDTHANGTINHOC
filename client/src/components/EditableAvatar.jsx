@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Loader2, Move, RotateCcw, UserRound, X } from 'lucide-react';
-import { resolveAvatarUrl } from '../utils/defaultAvatars';
+import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
 import { authAPI } from '../services/api';
 import { useToast } from '../utils/useToast';
 import { useData } from '../context/DataContext';
@@ -23,6 +23,7 @@ export default function EditableAvatar({
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [localAvatar, setLocalAvatar] = useState(avatar);
+  const [imgFailed, setImgFailed] = useState(false);
   const [cropSource, setCropSource] = useState(null);
   const [cropZoom, setCropZoom] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
@@ -41,6 +42,7 @@ export default function EditableAvatar({
 
   useEffect(() => {
     setLocalAvatar(avatar);
+    setImgFailed(false);
   }, [avatar]);
 
   const resolved = resolveAvatarUrl({
@@ -182,7 +184,8 @@ export default function EditableAvatar({
     dragRef.current = null;
   };
 
-  const hasCustomAvatar = Boolean(localAvatar || avatar);
+  const rawAvatar = localAvatar || avatar;
+  const hasCustomAvatar = isRealAvatar(rawAvatar) && !imgFailed;
 
   return (
     <div
@@ -277,6 +280,7 @@ export default function EditableAvatar({
                 key={displayAvatar}
                 src={displayAvatar}
                 alt={name || 'Avatar'}
+                onError={() => setImgFailed(true)}
                 className={`h-full w-full object-cover ${imgClassName}`}
               />
             ) : (
@@ -299,12 +303,17 @@ export default function EditableAvatar({
         </>
       ) : (
         <>
-          <img
-            key={displayAvatar}
-            src={displayAvatar}
-            alt={name || 'Avatar'}
-            className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
-          />
+          {hasCustomAvatar ? (
+            <img
+              key={displayAvatar}
+              src={displayAvatar}
+              alt={name || 'Avatar'}
+              onError={() => setImgFailed(true)}
+              className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
+            />
+          ) : (
+            <div className={`w-full h-full bg-slate-100/80 ${imgClassName}`} aria-hidden="true" />
+          )}
           {editable && (
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-center text-white z-10 p-0.5 pointer-events-none">
               {loading ? (

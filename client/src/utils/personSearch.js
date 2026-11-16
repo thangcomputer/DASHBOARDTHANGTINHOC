@@ -30,19 +30,28 @@ export function matchesPersonSearch(query, fields = {}) {
   if (!tokens.length) return true;
   const nameN = unaccent(fields.name);
   const extraN = unaccent(
-    [fields.extra, fields.studentCode, fields.course, fields.zalo]
+    [fields.extra, fields.email, fields.studentCode, fields.course, fields.zalo]
       .filter(Boolean)
       .join(' '),
   );
+  const haystack = [nameN, extraN, unaccent(fields.phone), unaccent(fields.zalo)]
+    .filter(Boolean)
+    .join(' ');
   const phoneDigits = normalizePhoneDigits(fields.phone);
   const zaloDigits = normalizePhoneDigits(fields.zalo);
-  const nameTokens = tokens.filter((token) => !/^\d+$/.test(token)).slice(0, MAX_TOKENS);
-  const queryDigits = normalizePhoneDigits(tokens.filter((token) => /^\d+$/.test(token)).join(''));
+  const textTokens = tokens.filter((token) => !/^\d+$/.test(token)).slice(0, MAX_TOKENS);
+  const digitTokens = tokens.filter((token) => /^\d+$/.test(token)).slice(0, MAX_TOKENS);
+  const queryDigits = normalizePhoneDigits(digitTokens.join(''));
 
-  const nameMatches = nameTokens.every((token) => nameN.includes(token) || extraN.includes(token));
-  const phoneMatches = !queryDigits || (queryDigits.length >= 2
-    && (phoneDigits.includes(queryDigits) || zaloDigits.includes(queryDigits)));
-  return nameMatches && phoneMatches;
+  const textMatches = textTokens.every((token) => haystack.includes(token));
+  if (!textMatches) return false;
+  if (!digitTokens.length) return true;
+
+  const digitsInText = digitTokens.every((token) => haystack.includes(token));
+  const digitsInPhone = Boolean(
+    queryDigits && (phoneDigits.includes(queryDigits) || zaloDigits.includes(queryDigits)),
+  );
+  return digitsInText || digitsInPhone;
 }
 
 function normalizePhoneDigits(value) {

@@ -38,6 +38,7 @@ const dailyPracticeProfileSchema = new mongoose.Schema({
   /** Thông tin mã giới thiệu bạn bè (B4 Referral thưởng XP đôi). */
   referredByStudentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
   referredByCode: { type: String, default: '' },
+  referredAt: { type: Date, default: null },
   referralCount: { type: Number, default: 0 },
   referralXpEarned: { type: Number, default: 0 },
 }, { timestamps: true });

@@ -121,8 +121,9 @@ function isLevelConfigComplete(node, diff, completedSections) {
   const cfg = levelConfigs?.[diff];
   if (!cfg) return false;
   const hidden = new Set(Array.isArray(cfg.hiddenSections) ? cfg.hiddenSections : []);
+  const locks = cfg.sectionLocks || {};
   const order = (Array.isArray(cfg.sectionOrder) ? cfg.sectionOrder : DEFAULT_SECTION_ORDER)
-    .filter((k) => DEFAULT_SECTION_ORDER.includes(k) && !hidden.has(k));
+    .filter((k) => DEFAULT_SECTION_ORDER.includes(k) && !hidden.has(k) && locks[k] !== 'locked');
   if (!order.length) return true;
   return order.every((secKey) => completedSections.has(`${node.key}:${diff}:${secKey}`));
 }
@@ -139,7 +140,8 @@ function hasConfiguredLevelContent(node) {
       || (Array.isArray(raw.files) && raw.files.length > 0)
       || String(raw.video?.url || '').trim()
       || String(raw.practice?.title || '').trim()
-      || String(raw.practice?.description || '').trim(),
+      || String(raw.practice?.description || '').trim()
+      || String(raw.practice?.video?.url || '').trim(),
     );
   });
 }
@@ -199,6 +201,31 @@ function normalizeHiddenSections(raw) {
   return list;
 }
 
+const SECTION_LOCK_MODES = ['auto', 'unlocked', 'locked'];
+
+function normalizeSectionLocks(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const key of DEFAULT_SECTION_ORDER) {
+    const val = String(src[key] || '').trim();
+    out[key] = SECTION_LOCK_MODES.includes(val) ? val : 'auto';
+  }
+  return out;
+}
+
+function isSectionUnlockedForStudent(cfg, secKey, completedSet, nodeKey, diff, testedOut = false) {
+  const locks = normalizeSectionLocks(cfg?.sectionLocks);
+  if (locks[secKey] === 'locked') return false;
+  if (locks[secKey] === 'unlocked') return true;
+  if (testedOut || !cfg || cfg.sequentialSections === false) return true;
+  const hidden = new Set(cfg.hiddenSections || []);
+  const order = (cfg.sectionOrder?.length ? cfg.sectionOrder : DEFAULT_SECTION_ORDER)
+    .filter((k) => !hidden.has(k) && locks[k] !== 'locked');
+  const idx = order.indexOf(secKey);
+  if (idx <= 0) return idx === 0;
+  return order.slice(0, idx).every((prevKey) => completedSet.has(`${nodeKey}:${diff}:${prevKey}`));
+}
+
 function mapLevelFiles(list) {
   return (Array.isArray(list) ? list : [])
     .filter((f) => f && String(f.url || '').trim())
@@ -211,15 +238,61 @@ function mapLevelFiles(list) {
     }));
 }
 
+function emptyVideoGuide() {
+  return {
+    customized: false,
+    formulas: [],
+    focusSummary: '',
+    shortcuts: [],
+    checklist: [],
+  };
+}
+
+function normalizeVideoGuide(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const formulas = (Array.isArray(src.formulas) ? src.formulas : [])
+    .map((item) => ({
+      name: String(item?.name || '').trim().slice(0, 160),
+      syntax: String(item?.syntax || '').trim().slice(0, 300),
+      note: String(item?.note || '').trim().slice(0, 400),
+    }))
+    .filter((item) => item.name || item.syntax || item.note)
+    .slice(0, 20);
+  const shortcuts = (Array.isArray(src.shortcuts) ? src.shortcuts : [])
+    .map((line) => String(line || '').trim().slice(0, 260))
+    .filter(Boolean)
+    .slice(0, 25);
+  const checklist = (Array.isArray(src.checklist) ? src.checklist : [])
+    .map((line) => String(line || '').trim().slice(0, 260))
+    .filter(Boolean)
+    .slice(0, 25);
+  const focusSummary = String(src.focusSummary || '').trim().slice(0, 1500);
+  const customized = Boolean(
+    src.customized === true
+    || formulas.length
+    || focusSummary
+    || shortcuts.length
+    || checklist.length,
+  );
+  return {
+    customized,
+    formulas,
+    focusSummary,
+    shortcuts,
+    checklist,
+  };
+}
+
 function emptyLevelConfig() {
   return {
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
     sequentialSections: true,
+    sectionLocks: normalizeSectionLocks(),
     content: { title: '', description: '', body: '' },
     files: [],
-    video: { title: '', url: '', antiSeek: true, checks: [] },
-    practice: { title: '', description: '' },
+    video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() },
+    practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
   };
 }
 
@@ -228,10 +301,14 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
     raw.content?.body || raw.content?.title || raw.content?.description
     || (Array.isArray(raw.files) && raw.files.length)
     || raw.video?.url || (Array.isArray(raw.video?.checks) && raw.video.checks.length)
+    || raw.video?.guide?.customized
     || raw.practice?.title || raw.practice?.description
+    || raw.practice?.video?.url || (Array.isArray(raw.practice?.video?.checks) && raw.practice.video.checks.length)
+    || raw.practice?.video?.guide?.customized
     || (Array.isArray(raw.sectionOrder) && raw.sectionOrder.length)
     || (Array.isArray(raw.hiddenSections) && raw.hiddenSections.length)
     || raw.sequentialSections === false
+    || Object.values(raw.sectionLocks || {}).some((v) => v && v !== 'auto')
     || raw.video?.antiSeek === false
   );
   if (hasRaw) {
@@ -239,6 +316,7 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
       sectionOrder: normalizeSectionOrder(raw.sectionOrder),
       hiddenSections: normalizeHiddenSections(raw.hiddenSections),
       sequentialSections: raw.sequentialSections !== false,
+      sectionLocks: normalizeSectionLocks(raw.sectionLocks),
       content: {
         title: String(raw.content?.title || '').trim(),
         description: String(raw.content?.description || '').trim(),
@@ -250,10 +328,18 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
         url: String(raw.video?.url || '').trim(),
         antiSeek: raw.video?.antiSeek !== false,
         checks: mapChecks(raw.video?.checks, { admin }),
+        guide: normalizeVideoGuide(raw.video?.guide),
       },
       practice: {
         title: String(raw.practice?.title || '').trim(),
         description: String(raw.practice?.description || '').trim(),
+        video: {
+          title: String(raw.practice?.video?.title || '').trim(),
+          url: String(raw.practice?.video?.url || '').trim(),
+          antiSeek: raw.practice?.video?.antiSeek !== false,
+          checks: mapChecks(raw.practice?.video?.checks, { admin }),
+          guide: normalizeVideoGuide(raw.practice?.video?.guide),
+        },
       },
     };
   }
@@ -262,6 +348,7 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
       sectionOrder: [...DEFAULT_SECTION_ORDER],
       hiddenSections: [],
       sequentialSections: true,
+      sectionLocks: normalizeSectionLocks(),
       content: {
         title: String(fallbackVideo.title || '').trim(),
         description: '',
@@ -281,8 +368,9 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
         url: String(fallbackVideo.url || '').trim(),
         antiSeek: fallbackVideo.antiSeek !== false,
         checks: mapChecks(fallbackVideo.checks, { admin }),
+        guide: emptyVideoGuide(),
       },
-      practice: { title: '', description: '' },
+      practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
     };
   }
   return emptyLevelConfig();
@@ -322,10 +410,15 @@ function levelConfigsInput(raw, nodeLabel = 'Bài') {
     if (videoUrl && !isValidMediaUrl(videoUrl)) {
       throw httpError(400, `${nodeLabel} (${diff}): link video không hợp lệ`);
     }
+    const practiceVideoUrl = String(cfg.practice?.video?.url || '').trim().slice(0, 500);
+    if (practiceVideoUrl && !isValidMediaUrl(practiceVideoUrl)) {
+      throw httpError(400, `${nodeLabel} (${diff}): link video luyện tập không hợp lệ`);
+    }
     out[diff] = {
       sectionOrder: normalizeSectionOrder(cfg.sectionOrder),
       hiddenSections: normalizeHiddenSections(cfg.hiddenSections),
       sequentialSections: cfg.sequentialSections !== false,
+      sectionLocks: normalizeSectionLocks(cfg.sectionLocks),
       content: {
         title: String(cfg.content?.title || '').trim().slice(0, 160),
         description: String(cfg.content?.description || '').trim().slice(0, 320),
@@ -337,10 +430,18 @@ function levelConfigsInput(raw, nodeLabel = 'Bài') {
         url: videoUrl,
         antiSeek: cfg.video?.antiSeek !== false,
         checks: checksInput(cfg.video?.checks, `${nodeLabel} (${diff})`),
+        guide: normalizeVideoGuide(cfg.video?.guide),
       },
       practice: {
         title: String(cfg.practice?.title || '').trim().slice(0, 160),
         description: String(cfg.practice?.description || '').trim().slice(0, 320),
+        video: {
+          title: String(cfg.practice?.video?.title || '').trim().slice(0, 160),
+          url: practiceVideoUrl,
+          antiSeek: cfg.practice?.video?.antiSeek !== false,
+          checks: checksInput(cfg.practice?.video?.checks, `${nodeLabel} (${diff}) · Luyện tập`),
+          guide: normalizeVideoGuide(cfg.practice?.video?.guide),
+        },
       },
     };
   }
@@ -759,6 +860,12 @@ function buildNodeLevelConfigsForStudent(node) {
       vid.nodeKey = node.key;
       vid.difficulty = diff;
     }
+    const pVid = mapped[diff].practice?.video;
+    if (pVid) {
+      pVid.id = `${node.key}:practice:${diff}`;
+      pVid.nodeKey = node.key;
+      pVid.difficulty = diff;
+    }
   }
   return mapped;
 }
@@ -867,14 +974,23 @@ function buildNodeLevels(node, nodeIndex, nodes, done, unitUnlocked, unitComplet
   };
 }
 
-/** Trạng thái các chặng (đã sắp xếp) theo tiến độ: chặng sau mở khi chặng trước xong. */
-function computeUnits(units, progressByUnit) {
+/** Trạng thái các chặng (đã sắp xếp) theo tiến độ: chặng sau mở khi chặng trước xong; tài khoản miễn phí/hết hạn chỉ mở Chặng 1 của môn đầu (trừ môn đã hoàn thành). */
+function computeUnits(units, progressByUnit, { hasFullPathAccess = true, requireSubscription = false } = {}) {
+  const allCompleted = units.length > 0 && units.every((unit) => {
+    const progress = progressByUnit.get(String(unit.id)) || null;
+    const done = new Set(progress?.completedSteps || []);
+    return unitIsCompleted(progress, done, unit);
+  });
   let previousCompleted = true;
   return units.map((unit, index) => {
     const progress = progressByUnit.get(String(unit.id)) || null;
     const done = new Set(progress?.completedSteps || []);
     const completed = unitIsCompleted(progress, done, unit);
-    const unlocked = completed || index === 0 || previousCompleted;
+    // Khi hết hạn gói Meet (!hasFullPathAccess) và môn học chưa hoàn thành toàn bộ (!allCompleted):
+    // - Nếu admin bật khóa cả môn (requireSubscription === true): khóa toàn bộ các chặng (kể cả Chặng 1).
+    // - Mặc định: giữ Chặng 1 (index === 0) làm học thử, khóa từ Chặng 2 trở đi (index > 0).
+    const unitRequiresSub = !hasFullPathAccess && !allCompleted && (requireSubscription || index > 0);
+    const unlocked = !unitRequiresSub && (completed || index === 0 || previousCompleted);
     const watched = new Set(progress?.watchedVideoIds || []);
     const completedSections = new Set(progress?.completedSections || []);
     const rawNodes = normalizePathNodes(unit);
@@ -894,12 +1010,14 @@ function computeUnits(units, progressByUnit) {
       nodeLabel: node.label,
     })));
     previousCompleted = completed;
+    const state = !unlocked ? 'locked' : (completed ? 'completed' : 'active');
     return {
       ...unit,
       index: index + 1,
-      state: completed ? 'completed' : unlocked ? 'active' : 'locked',
+      state,
+      requiresSubscription: unitRequiresSub,
       testedOut: Boolean(progress?.testedOut),
-      canTestOut: !completed,
+      canTestOut: !unitRequiresSub && !completed,
       chestClaimed: Boolean(progress?.chestClaimedAt),
       chestRewardXp: rules.UNIT_CHEST_REWARD_XP,
       completedSections: progress?.completedSections || [],
@@ -911,7 +1029,7 @@ function computeUnits(units, progressByUnit) {
         title: video.title,
         url: video.url,
         checks: mapChecks(video.checks),
-        state: watched.has(String(video.id || video._id)) ? 'completed' : unlocked ? 'active' : 'locked',
+        state: !unlocked ? 'locked' : (watched.has(String(video.id || video._id)) ? 'completed' : 'active'),
       })),
     };
   });
@@ -939,7 +1057,7 @@ function nextStepOf(units) {
   return null;
 }
 
-async function loadTopicsPath(studentId, topics) {
+async function loadTopicsPath(studentId, topics, { hasFullPathAccess = true, firstTopicId = null } = {}) {
   const topicIds = topics.map((topic) => topic._id);
   const units = await DailyPracticeUnit.find({ topicId: { $in: topicIds }, active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
   const counts = await unitCounts(units.map((unit) => unit._id));
@@ -950,6 +1068,12 @@ async function loadTopicsPath(studentId, topics) {
   ]);
   const progressByUnit = new Map(progressRows.map((row) => [String(row.unitId), row]));
   const lessonById = new Map(lessonUnits.map((unit) => [String(unit._id), unit]));
+  const resolvedFirstId = firstTopicId
+    ? String(firstTopicId)
+    : (() => {
+      const firstPlayableTopic = topics.find((t) => playable.some((u) => String(u.topicId) === String(t._id)));
+      return firstPlayableTopic ? String(firstPlayableTopic._id) : (topics[0] ? String(topics[0]._id) : '');
+    })();
   return topics.map((topic) => {
     const own = playable
       .filter((unit) => String(unit.topicId) === String(topic._id))
@@ -961,7 +1085,11 @@ async function loadTopicsPath(studentId, topics) {
           lesson: lesson ? { unitId: String(lesson._id), subjectId: String(lesson.subjectId), title: lesson.title || '' } : null,
         };
       });
-    const computed = computeUnits(own, progressByUnit);
+    const computed = computeUnits(own, progressByUnit, {
+      hasFullPathAccess,
+      requireSubscription: Boolean(topic.requireSubscription),
+    });
+    const locked = computed.length > 0 && computed.every((unit) => unit.state === 'locked');
     return {
       topic: {
         id: String(topic._id),
@@ -969,7 +1097,9 @@ async function loadTopicsPath(studentId, topics) {
         description: topic.description || '',
         icon: topic.icon || 'book',
         color: topic.color || 'red',
+        requireSubscription: Boolean(topic.requireSubscription),
       },
+      locked,
       units: computed,
       completedUnits: computed.filter((unit) => unit.state === 'completed').length,
       totalUnits: computed.length,
@@ -1009,13 +1139,14 @@ async function getPath(studentId) {
       logger.warn(`[DAILY_PRACTICE] ensure default unit failed: ${err.message}`);
     }
   }
-  const paths = await loadTopicsPath(sid, topics);
+  const hasFullPathAccess = hasTestOutAccess(student);
+  const paths = await loadTopicsPath(sid, topics, { hasFullPathAccess });
   const topicsOut = paths.filter((path) => path.units.length > 0);
   const allowed = new Set(topicsOut.map((path) => String(path.topic.id)));
   const saved = await readActivePathTopicId(sid);
   const activeTopicId = allowed.has(saved) ? saved : '';
   return {
-    canTestOut: hasTestOutAccess(student),
+    canTestOut: hasFullPathAccess,
     steps: PATH_STEPS.map((step) => ({ ...step, passPercent: passPercent(step.key) })),
     topics: topicsOut,
     activeTopicId,
@@ -1023,9 +1154,15 @@ async function getPath(studentId) {
 }
 
 async function topicPathForUnit(studentId, unit) {
-  const topic = await DailyPracticeTopic.findOne({ _id: unit.topicId, active: true }).lean();
+  const [topics, student] = await Promise.all([
+    DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    Student.findById(studentId).select('subscription freePortal enrollments').lean(),
+  ]);
+  const topic = topics.find((t) => String(t._id) === String(unit.topicId));
   if (!topic) throw httpError(404, 'Chủ đề không còn hoạt động');
-  const [path] = await loadTopicsPath(studentId, [topic]);
+  const hasFullPathAccess = hasTestOutAccess(student);
+  const firstTopicId = topics[0] ? String(topics[0]._id) : null;
+  const [path] = await loadTopicsPath(studentId, [topic], { hasFullPathAccess, firstTopicId });
   return { topic, path };
 }
 
@@ -1064,6 +1201,11 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
   const { topic, path } = await topicPathForUnit(sid, unit);
   const view = path.units.find((item) => item.id === String(unit._id));
   if (!view) throw httpError(404, 'Chặng này chưa đủ câu hỏi');
+  if (view.requiresSubscription) {
+    const err = httpError(403, 'Tài khoản miễn phí chỉ mở Chặng 1. Vui lòng đăng ký gói để mở khóa từ Chặng 2 trở đi.');
+    err.code = 'SUBSCRIPTION_REQUIRED';
+    throw err;
+  }
   let nk = String(nodeKey || '').trim();
   if (!nk && !testOut) {
     const activeQuiz = (view.pathNodes || []).find((node) => node.kind !== 'study' && node.state === 'active');
@@ -1102,14 +1244,11 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
       throw httpError(403, 'Hãy hoàn thành mức độ trước để mở khóa mức này');
     }
     const cfg = pathNode.levelConfigs?.[diff];
-    if (!view.testedOut && cfg && cfg.sequentialSections !== false) {
-      const hidden = new Set(cfg.hiddenSections || []);
-      const order = (cfg.sectionOrder?.length ? cfg.sectionOrder : DEFAULT_SECTION_ORDER)
-        .filter((k) => !hidden.has(k));
-      const idx = order.indexOf('practice');
-      if (idx > 0 && order.slice(0, idx).some((secKey) => !completedSet.has(`${nk}:${diff}:${secKey}`))) {
-        throw httpError(403, 'Hãy hoàn thành phần trước để mở khóa phần luyện tập');
-      }
+    if (cfg && !isSectionUnlockedForStudent(cfg, 'practice', completedSet, nk, diff, view.testedOut)) {
+      const msg = cfg.sectionLocks?.practice === 'locked'
+        ? 'Phần luyện tập đang được admin khóa'
+        : 'Hãy hoàn thành phần trước để mở khóa phần luyện tập';
+      throw httpError(403, msg);
     }
     studyStepCompleted = completedSet.has(`${nk}:${diff}:practice`);
     studyQuestionIds = Array.isArray(cfg?.practice?.questionIds) ? cfg.practice.questionIds.filter(Boolean) : [];
@@ -1168,6 +1307,29 @@ async function markSteps(studentId, topicId, unitId, steps, { complete = false, 
   }
 }
 
+function enrichCompletedVideoChecks(checks = [], rawChecks = []) {
+  return (checks || []).map((check, idx) => {
+    const raw = (rawChecks || []).find((r) => String(r?._id || r?.id || '') === String(check?.id || ''))
+      || (rawChecks || [])[idx]
+      || {};
+    const reviewHint = String(raw.paidHint || raw.shortHint || '').trim();
+    let reviewAnswer = '';
+    if (raw.kind === 'choice') {
+      const ansIdx = Number(raw.answer);
+      reviewAnswer = Number.isInteger(ansIdx) ? String(raw.choices?.[ansIdx] || '').trim() : '';
+    } else if (raw.kind === 'text') {
+      reviewAnswer = String(raw.answer || '').trim();
+    } else if (raw.kind === 'screen') {
+      reviewAnswer = String(raw.criteria || '').trim();
+    }
+    return {
+      ...check,
+      reviewHint,
+      reviewAnswer,
+    };
+  });
+}
+
 /**
  * Danh sách phát của chặng cho popup video: video riêng của chặng + video của buổi bài giảng đã gắn
  * (chỉ khi HV được mở buổi đó - cùng luật mua khóa / mở tuần tự như trang bài giảng).
@@ -1179,6 +1341,11 @@ async function unitVideos(studentId, unitId) {
   const { path } = await topicPathForUnit(sid, unit);
   const view = path.units.find((item) => item.id === String(unit._id));
   if (!view) throw httpError(404, 'Chặng này chưa đủ câu hỏi');
+  if (view.requiresSubscription) {
+    const err = httpError(403, 'Tài khoản miễn phí chỉ mở Chặng 1. Vui lòng đăng ký gói để mở khóa từ Chặng 2 trở đi.');
+    err.code = 'SUBSCRIPTION_REQUIRED';
+    throw err;
+  }
   let lesson = null;
   if (unit.lessonUnitId) {
     const base = await LessonUnit.findById(unit.lessonUnitId).select('title subjectId').lean();
@@ -1214,40 +1381,72 @@ async function unitVideos(studentId, unitId) {
     if (!cfg?.video?.url) return false;
     const hidden = new Set(cfg.hiddenSections || []);
     if (hidden.has('video')) return false;
-    if (view.testedOut || cfg.sequentialSections === false) return true;
-    const order = (cfg.sectionOrder?.length ? cfg.sectionOrder : DEFAULT_SECTION_ORDER)
-      .filter((k) => !hidden.has(k));
-    const idx = order.indexOf('video');
-    if (idx <= 0) return idx === 0;
-    return order.slice(0, idx).every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
+    return isSectionUnlockedForStudent(cfg, 'video', completedSet, node.key, diff, view.testedOut);
   };
+  const rawNodesByKey = new Map(normalizePathNodes(unit).map((n) => [String(n.key), n]));
   const stepLevelVideos = (view.pathNodes || []).flatMap((node) => {
+    const rawNode = rawNodesByKey.get(String(node.key));
     const nodeUnlocked = view.state !== 'locked' && node.state !== 'locked';
-    const rawLevelEntries = DIFFICULTY_KEYS.map((diff) => {
+    const rawLevelEntries = DIFFICULTY_KEYS.flatMap((diff) => {
       const cfg = node.levelConfigs?.[diff];
+      const rawCfg = rawNode?.levelConfigs?.[diff];
+      const hidden = new Set(cfg?.hiddenSections || []);
+      const entries = [];
       const vid = cfg?.video;
-      if (!vid || !vid.url) return null;
-      const hidden = new Set(cfg.hiddenSections || []);
-      if (hidden.has('video')) return null;
-      const vidId = `${node.key}:level:${diff}`;
-      const unlocked = nodeUnlocked && isDiffUnlockedInNode(node, diff) && isVideoSectionUnlockedInNode(node, diff);
-      return {
-        rawUrl: String(vid.url || '').trim(),
-        item: {
-          id: vidId,
-          title: vid.title || `${node.label} (${diffLabels[diff]})`,
-          url: unlocked ? vid.url : '',
-          antiSeek: vid.antiSeek !== false,
-          checks: unlocked ? (vid.checks || []) : [],
-          nodeKey: node.key,
-          nodeLabel: node.label,
-          step: DIFFICULTY_STEP_MAP[diff],
-          stepLabel: diffLabels[diff],
-          state: !unlocked ? 'locked' : watchedSet.has(vidId) ? 'completed' : 'active',
-          source: 'step',
-        },
-      };
-    }).filter(Boolean);
+      if (vid && vid.url && !hidden.has('video')) {
+        const vidId = `${node.key}:level:${diff}`;
+        const unlocked = nodeUnlocked && isDiffUnlockedInNode(node, diff) && isVideoSectionUnlockedInNode(node, diff);
+        const isCompleted = unlocked && (watchedSet.has(vidId) || completedSet.has(`${node.key}:${diff}:video`) || view.state === 'completed');
+        const checks = unlocked
+          ? (isCompleted ? enrichCompletedVideoChecks(vid.checks || [], rawCfg?.video?.checks || []) : (vid.checks || []))
+          : [];
+        entries.push({
+          rawUrl: String(vid.url || '').trim(),
+          item: {
+            id: vidId,
+            title: vid.title || `${node.label} (${diffLabels[diff]})`,
+            url: unlocked ? vid.url : '',
+            antiSeek: vid.antiSeek !== false,
+            checks,
+            guide: vid.guide || emptyVideoGuide(),
+            nodeKey: node.key,
+            nodeLabel: node.label,
+            step: DIFFICULTY_STEP_MAP[diff],
+            stepLabel: diffLabels[diff],
+            state: !unlocked ? 'locked' : isCompleted ? 'completed' : 'active',
+            source: 'step',
+          },
+        });
+      }
+      const pVid = cfg?.practice?.video;
+      if (pVid && pVid.url && !hidden.has('practice')) {
+        const pVidId = `${node.key}:practice:${diff}`;
+        const pUnlocked = nodeUnlocked && isDiffUnlockedInNode(node, diff)
+          && isSectionUnlockedForStudent(cfg, 'practice', completedSet, node.key, diff, view.testedOut);
+        const isCompleted = pUnlocked && (watchedSet.has(pVidId) || completedSet.has(`${node.key}:${diff}:practice`) || view.state === 'completed');
+        const checks = pUnlocked
+          ? (isCompleted ? enrichCompletedVideoChecks(pVid.checks || [], rawCfg?.practice?.video?.checks || []) : (pVid.checks || []))
+          : [];
+        entries.push({
+          rawUrl: String(pVid.url || '').trim(),
+          item: {
+            id: pVidId,
+            title: pVid.title || `Video luyện tập · ${node.label} (${diffLabels[diff]})`,
+            url: pUnlocked ? pVid.url : '',
+            antiSeek: pVid.antiSeek !== false,
+            checks,
+            guide: pVid.guide || emptyVideoGuide(),
+            nodeKey: node.key,
+            nodeLabel: node.label,
+            step: DIFFICULTY_STEP_MAP[diff],
+            stepLabel: diffLabels[diff],
+            state: !pUnlocked ? 'locked' : isCompleted ? 'completed' : 'active',
+            source: 'step',
+          },
+        });
+      }
+      return entries;
+    });
     const fromLevels = rawLevelEntries.map((e) => e.item);
     const hasLevelConfigVideo = DIFFICULTY_KEYS.some((d) => Boolean(node.levelConfigs?.[d]?.video?.url));
     const fromSteps = (node.levels || []).flatMap((level) => {
@@ -1257,17 +1456,24 @@ async function unitVideos(studentId, unitId) {
         return [];
       }
       const stepUnlocked = nodeUnlocked && level.state !== 'locked';
-      return (level.videos || []).map((video) => ({
-        ...video,
-        url: stepUnlocked ? video.url : '',
-        checks: stepUnlocked ? (video.checks || []) : [],
-        state: !stepUnlocked ? 'locked' : video.state,
-        step: level.key,
-        stepLabel: stepLabels[level.key],
-        nodeKey: node.key,
-        nodeLabel: node.label,
-        source: 'step',
-      }));
+      return (level.videos || []).map((video) => {
+        const isCompleted = stepUnlocked && (video.state === 'completed' || watchedSet.has(video.id) || view.state === 'completed');
+        const rawVid = (rawNode?.stepVideos?.[level.key] || []).find((rv) => stepVideoId(node.key, level.key, String(rv._id)) === String(video.id));
+        const checks = stepUnlocked
+          ? (isCompleted ? enrichCompletedVideoChecks(video.checks || [], rawVid?.checks || []) : (video.checks || []))
+          : [];
+        return {
+          ...video,
+          url: stepUnlocked ? video.url : '',
+          checks,
+          state: !stepUnlocked ? 'locked' : isCompleted ? 'completed' : video.state,
+          step: level.key,
+          stepLabel: stepLabels[level.key],
+          nodeKey: node.key,
+          nodeLabel: node.label,
+          source: 'step',
+        };
+      });
     });
     const seenUrls = new Set(rawLevelEntries.map((e) => e.rawUrl).filter(Boolean));
     return [...fromLevels, ...fromSteps.filter((v) => !seenUrls.has(String(v.url || '').trim()))];
@@ -1279,7 +1485,19 @@ async function unitVideos(studentId, unitId) {
     state: view.state,
     passedCheckIds: progress?.passedVideoChecks || [],
     videos: [
-      ...(view.videos || []).map((video) => ({ ...video, source: 'unit' })),
+      ...(view.videos || []).map((video) => {
+        const isCompleted = video.state === 'completed' || watchedSet.has(video.id) || view.state === 'completed';
+        const rawVid = (unit.videos || []).find((rv) => String(rv._id) === String(video.id));
+        const checks = isCompleted
+          ? enrichCompletedVideoChecks(video.checks || [], rawVid?.checks || [])
+          : (video.checks || []);
+        return {
+          ...video,
+          checks,
+          state: isCompleted ? 'completed' : video.state,
+          source: 'unit',
+        };
+      }),
       ...stepLevelVideos,
     ],
     lesson,
@@ -1287,8 +1505,8 @@ async function unitVideos(studentId, unitId) {
 }
 
 function parseLevelVideoId(videoId) {
-  const m = String(videoId || '').match(/^([^:]+):level:(easy|medium|hard)$/);
-  return m ? { nodeKey: m[1], difficulty: m[2] } : null;
+  const m = String(videoId || '').match(/^([^:]+):(level|practice):(easy|medium|hard)$/);
+  return m ? { nodeKey: m[1], kind: m[2], difficulty: m[3] } : null;
 }
 
 function locateVideo(unit, videoId) {
@@ -1297,11 +1515,11 @@ function locateVideo(unit, videoId) {
     const node = normalizePathNodes(unit).find((item) => item.key === levelParsed.nodeKey);
     if (!node) return null;
     const cfg = mapNodeLevelConfigs(node, { admin: true })[levelParsed.difficulty];
-    const video = cfg?.video;
+    const video = levelParsed.kind === 'practice' ? cfg?.practice?.video : cfg?.video;
     if (!video || !video.url) return null;
     return {
       video: { ...video, title: video.title || node.label },
-      storageId: `${levelParsed.nodeKey}:level:${levelParsed.difficulty}`,
+      storageId: `${levelParsed.nodeKey}:${levelParsed.kind}:${levelParsed.difficulty}`,
       levelRef: levelParsed,
     };
   }
@@ -1424,7 +1642,7 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
   const located = locateVideo(unit, videoId);
   if (!located) throw httpError(404, 'Không tìm thấy video');
   const check = (located.video.checks || []).find((item, idx) => (
-    checkId ? String(item._id) === String(checkId) : idx === Number(checkIndex)
+    checkId ? String(item._id || item.id) === String(checkId) : idx === Number(checkIndex)
   ));
   if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
   if (check.kind === 'text' && !normAnswer(text)) throw httpError(400, 'Hãy nhập đáp án');
@@ -1436,7 +1654,8 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
   if (check.kind === 'choice') status = Number(choiceIndex) === Number(check.answer) ? 'CORRECT' : 'INCORRECT';
   else if (check.kind === 'text') status = await gradeText(check, text);
   else status = (await gradeScreen(check, imageDataUrl)) ? 'CORRECT' : 'INCORRECT';
-  const key = `${located.storageId}:${check._id}`;
+  const resolvedCheckId = String(check._id || check.id || '');
+  const key = `${located.storageId}:${resolvedCheckId}`;
   if (status === 'CORRECT') {
     const firstPass = await rememberPassedCheck(sid, unit, key);
     // Đúng lần đầu ở mốc này: +XP (mốc đã qua thì không cộng lại).
@@ -1492,12 +1711,13 @@ async function buyVideoHint(studentId, { unitId, videoId, checkId, checkIndex } 
   if (!unit) throw httpError(404, 'Không tìm thấy chặng');
   const located = locateVideo(unit, videoId);
   const check = located && (located.video.checks || []).find((item, idx) => (
-    checkId ? String(item._id) === String(checkId) : idx === Number(checkIndex)
+    checkId ? String(item._id || item.id) === String(checkId) : idx === Number(checkIndex)
   ));
   if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
   if (!check.paidHint) throw httpError(400, 'Mốc này không có gợi ý thêm');
   const cost = Math.max(0, Number(check.hintCostXp) || 0);
   const { adjustProfileXp, getProfile } = require('./dailyPracticeService');
+  const resolvedCheckId = String(check._id || check.id || '');
   if (cost > 0) {
     const profile = await getProfile(sid);
     if ((profile?.xpTotal || 0) < cost) {
@@ -1507,7 +1727,7 @@ async function buyVideoHint(studentId, { unitId, videoId, checkId, checkIndex } 
       throw err;
     }
     const next = await adjustProfileXp(sid, -cost, { source: 'spend' });
-    await rememberPassedCheck(sid, unit, `${located.storageId}:${check._id}`);
+    await rememberPassedCheck(sid, unit, `${located.storageId}:${resolvedCheckId}`);
     return {
       hint: check.paidHint,
       cost,
@@ -1518,7 +1738,7 @@ async function buyVideoHint(studentId, { unitId, videoId, checkId, checkIndex } 
     };
   }
   const profile = await getProfile(sid);
-  await rememberPassedCheck(sid, unit, `${located.storageId}:${check._id}`);
+  await rememberPassedCheck(sid, unit, `${located.storageId}:${resolvedCheckId}`);
   return {
     hint: check.paidHint,
     cost: 0,
@@ -1552,6 +1772,11 @@ async function claimUnitChest(studentId, unitId) {
   const { path } = await topicPathForUnit(sid, unit);
   const view = path.units.find((item) => item.id === String(unit._id));
   if (!view) throw httpError(404, 'Chặng này chưa đủ câu hỏi');
+  if (view.requiresSubscription) {
+    const err = httpError(403, 'Tài khoản miễn phí chỉ mở Chặng 1. Vui lòng đăng ký gói để mở khóa từ Chặng 2 trở đi.');
+    err.code = 'SUBSCRIPTION_REQUIRED';
+    throw err;
+  }
   if (view.state !== 'completed') {
     throw httpError(403, 'Hoàn thành toàn bộ chặng trước khi mở rương phần thưởng');
   }
@@ -1650,12 +1875,14 @@ async function markVideoWatched(studentId, { unitId, videoId, watchRatio } = {})
     const locatedLevel = locateVideo(unit, rawId);
     if (!locatedLevel) throw httpError(404, 'Không tìm thấy video');
     storageId = locatedLevel.storageId;
-    extraSectionKeys.push(`${levelParsed.nodeKey}:${levelParsed.difficulty}:video`);
-    // Đồng bộ legacy watchedVideoIds nếu là mức easy của node học bài
-    if (levelParsed.difficulty === 'easy') {
-      const node = normalizePathNodes(unit).find((item) => item.key === levelParsed.nodeKey);
-      const legacyVid = node?.stepVideos?.learn?.[0];
-      if (legacyVid?._id) extraWatchedIds.push(stepVideoId(levelParsed.nodeKey, 'learn', String(legacyVid._id)));
+    if (levelParsed.kind !== 'practice') {
+      extraSectionKeys.push(`${levelParsed.nodeKey}:${levelParsed.difficulty}:video`);
+      // Đồng bộ legacy watchedVideoIds nếu là mức easy của node học bài
+      if (levelParsed.difficulty === 'easy') {
+        const node = normalizePathNodes(unit).find((item) => item.key === levelParsed.nodeKey);
+        const legacyVid = node?.stepVideos?.learn?.[0];
+        if (legacyVid?._id) extraWatchedIds.push(stepVideoId(levelParsed.nodeKey, 'learn', String(legacyVid._id)));
+      }
     }
   } else if (parsed) {
     const nodes = normalizePathNodes(unit);
@@ -1678,7 +1905,14 @@ async function markVideoWatched(studentId, { unitId, videoId, watchRatio } = {})
   }
   const { path } = await topicPathForUnit(sid, unit);
   const view = path.units.find((item) => item.id === String(unit._id));
-  if (!view || view.state === 'locked') throw httpError(403, 'Chặng này chưa mở');
+  if (!view || view.state === 'locked') {
+    throw httpError(
+      403,
+      view?.requiresSubscription
+        ? 'Tài khoản miễn phí chỉ mở Chặng 1. Vui lòng đăng ký gói để mở khóa từ Chặng 2 trở đi.'
+        : 'Chặng này chưa mở',
+    );
+  }
   if (levelParsed || parsed) {
     const targetKey = levelParsed ? levelParsed.nodeKey : parsed.nodeKey;
     const targetNode = (view.pathNodes || []).find((n) => n.key === targetKey);
@@ -1698,14 +1932,12 @@ async function markVideoWatched(studentId, { unitId, videoId, watchRatio } = {})
         || (diff === 'hard' && easyDone && mediumDone);
       if (!diffUnlocked) throw httpError(403, 'Hãy hoàn thành mức độ trước rồi mới mở video này');
       const cfg = targetNode.levelConfigs?.[diff];
-      if (!view.testedOut && cfg && cfg.sequentialSections !== false) {
-        const hidden = new Set(cfg.hiddenSections || []);
-        const order = (cfg.sectionOrder?.length ? cfg.sectionOrder : DEFAULT_SECTION_ORDER)
-          .filter((k) => !hidden.has(k));
-        const idx = order.indexOf('video');
-        if (idx > 0 && order.slice(0, idx).some((secKey) => !completedSet.has(`${targetNode.key}:${diff}:${secKey}`))) {
-          throw httpError(403, 'Hãy hoàn thành phần trước rồi mới mở video này');
-        }
+      const secName = levelParsed.kind === 'practice' ? 'practice' : 'video';
+      if (cfg && !isSectionUnlockedForStudent(cfg, secName, completedSet, targetNode.key, diff, view.testedOut)) {
+        const msg = cfg.sectionLocks?.[secName] === 'locked'
+          ? 'Phần này đang được admin khóa'
+          : 'Hãy hoàn thành phần trước rồi mới mở video này';
+        throw httpError(403, msg);
       }
     } else if (parsed) {
       const targetLevel = (targetNode.levels || []).find((l) => l.key === parsed.stepKey);
@@ -1749,7 +1981,20 @@ async function toggleSectionProgress(studentId, { unitId, nodeKey, difficulty, s
 
   const { path } = await topicPathForUnit(sid, unit);
   const view = path.units.find((item) => item.id === String(unit._id));
-  if (!view || view.state === 'locked') throw httpError(403, 'Chặng này chưa mở');
+  if (!view || view.state === 'locked') {
+    throw httpError(
+      403,
+      view?.requiresSubscription
+        ? 'Tài khoản miễn phí chỉ mở Chặng 1. Vui lòng đăng ký gói để mở khóa từ Chặng 2 trở đi.'
+        : 'Chặng này chưa mở',
+    );
+  }
+
+  const targetNode = (view.pathNodes || []).find((n) => n.key === cleanNodeKey);
+  const targetCfg = targetNode?.levelConfigs?.[cleanDiff];
+  if (completed !== false && targetCfg?.sectionLocks?.[cleanSection] === 'locked') {
+    throw httpError(403, 'Phần này đang được admin khóa');
+  }
 
   const key = `${cleanNodeKey}:${cleanDiff}:${cleanSection}`;
   const filter = { studentId: sid, unitId: unit._id };

@@ -146,15 +146,237 @@ export function VideoChecksEditor({ checks, onChange }) {
   );
 }
 
+const DEFAULT_VIDEO_GUIDE_TEMPLATE = {
+  customized: true,
+  formulas: [
+    {
+      name: 'VLOOKUP (Tra cứu theo cột)',
+      syntax: '=VLOOKUP(gia_tri_tim, bang_du_lieu, cot_lay, 0)',
+      note: 'Nhớ cố định bảng dữ liệu bằng F4 ($A$2:$D$20) và truyền số 0 để tìm chính xác.',
+    },
+    {
+      name: 'SUMIFS (Tính tổng nhiều điều kiện)',
+      syntax: '=SUMIFS(C2:C50, A2:A50, "Excel", B2:B50, ">=100000")',
+      note: 'Tham số đầu tiên là vùng cần cộng tổng; các cặp tiếp theo là (vùng ĐK, ĐK).',
+    },
+  ],
+  focusSummary: 'Hoàn thành video bài giảng (≥ 70% để mở bài tiếp), sau đó áp dụng đúng công thức/định dạng vào file thực hành.',
+  shortcuts: [
+    'Ctrl + S: Lưu bài liên tục để tránh mất dữ liệu.',
+    'F4 (Excel): Cố định địa chỉ tuyệt đối $A$1 · (Word/PPT): Lặp lại thao tác vừa làm.',
+    'Alt + = (Excel): Tính SUM tự động cực nhanh cho cột/hàng số.',
+  ],
+  checklist: [
+    'Không còn ô hiển thị lỗi #N/A, #VALUE!, #REF!, #NAME?',
+    'Đã dùng tham chiếu tuyệt đối $A$1 trước khi kéo công thức xuống.',
+    'Số tiền / ngày tháng đã định dạng chuẩn (không nhập chữ vào ô tính toán).',
+  ],
+};
+
+function emptyVideoGuide() {
+  return {
+    customized: false,
+    formulas: [],
+    focusSummary: '',
+    shortcuts: [],
+    checklist: [],
+  };
+}
+
+function normalizeVideoGuide(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const formulas = Array.isArray(src.formulas)
+    ? src.formulas.map((f) => ({
+      name: String(f?.name || ''),
+      syntax: String(f?.syntax || ''),
+      note: String(f?.note || ''),
+    }))
+    : [];
+  const shortcuts = Array.isArray(src.shortcuts) ? src.shortcuts.map((s) => String(s || '')) : [];
+  const checklist = Array.isArray(src.checklist) ? src.checklist.map((s) => String(s || '')) : [];
+  const focusSummary = String(src.focusSummary || '');
+  return {
+    customized: Boolean(src.customized || formulas.length || focusSummary.trim() || shortcuts.length || checklist.length),
+    formulas,
+    focusSummary,
+    shortcuts,
+    checklist,
+  };
+}
+
+function VideoGuideEditor({ guide, onChange }) {
+  const [open, setOpen] = useState(false);
+  const g = normalizeVideoGuide(guide);
+  const patchGuide = (patch) => onChange({ ...g, customized: true, ...patch });
+  const formulas = g.formulas || [];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-black text-slate-700 hover:bg-slate-100/70 !shadow-none"
+      >
+        <span>
+          Trợ lý dưới video: Công thức · Trọng tâm &amp; Phím tắt · Checklist tự chấm
+          {g.customized ? (
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
+              Đã tùy chỉnh riêng
+            </span>
+          ) : (
+            <span className="ml-2 rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+              Đang dùng mặc định
+            </span>
+          )}
+        </span>
+        {open ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+      </button>
+
+      {open && (
+        <div className="space-y-3 border-t border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-600"
+                checked={g.customized}
+                onChange={(e) => onChange({ ...g, customized: e.target.checked })}
+              />
+              Bật nội dung riêng cho bài video này (tắt = dùng mặc định)
+            </label>
+            <button
+              type="button"
+              onClick={() => onChange({ ...DEFAULT_VIDEO_GUIDE_TEMPLATE })}
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700 hover:bg-emerald-100 !shadow-none"
+            >
+              Nạp mẫu có sẵn để sửa
+            </button>
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wide text-slate-600">
+                Công thức / Hàm trọng tâm ({formulas.length})
+              </span>
+              {formulas.length < 20 && (
+                <button
+                  type="button"
+                  onClick={() => patchGuide({ formulas: [...formulas, { name: '', syntax: '', note: '' }] })}
+                  className="text-[11px] font-black text-emerald-700 hover:underline !shadow-none"
+                >
+                  + Thêm công thức
+                </button>
+              )}
+            </div>
+            {formulas.length === 0 ? (
+              <p className="text-[11px] text-slate-400">Chưa có công thức riêng (có thể để trống nếu là bài Word / Windows / PowerPoint).</p>
+            ) : (
+              formulas.map((item, idx) => (
+                <div key={idx} className="space-y-1.5 rounded-lg border border-slate-200 bg-white p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <input
+                      className={`${INPUT} !py-1 text-xs`}
+                      maxLength={160}
+                      value={item.name}
+                      placeholder="Tên hàm / mục (VD: SUMIFS - Tính tổng nhiều điều kiện)"
+                      onChange={(e) => {
+                        const next = formulas.map((f, i) => (i === idx ? { ...f, name: e.target.value } : f));
+                        patchGuide({ formulas: next });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => patchGuide({ formulas: formulas.filter((_, i) => i !== idx) })}
+                      className="shrink-0 text-[11px] font-bold text-rose-600 !shadow-none"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                  <input
+                    className={`${INPUT} !py-1 font-mono text-xs`}
+                    maxLength={300}
+                    value={item.syntax}
+                    placeholder="Cú pháp công thức (VD: =SUMIFS(...))"
+                    onChange={(e) => {
+                      const next = formulas.map((f, i) => (i === idx ? { ...f, syntax: e.target.value } : f));
+                      patchGuide({ formulas: next });
+                    }}
+                  />
+                  <input
+                    className={`${INPUT} !py-1 text-xs`}
+                    maxLength={400}
+                    value={item.note}
+                    placeholder="Ghi chú ngắn cách dùng"
+                    onChange={(e) => {
+                      const next = formulas.map((f, i) => (i === idx ? { ...f, note: e.target.value } : f));
+                      patchGuide({ formulas: next });
+                    }}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+
+          <label className="block">
+            <span className={LABEL}>Trọng tâm bài học</span>
+            <textarea
+              className={`${INPUT} !py-1.5 text-xs`}
+              rows={2}
+              maxLength={1500}
+              value={g.focusSummary}
+              placeholder="Tóm tắt kiến thức chính học viên cần nắm sau khi xem video..."
+              onChange={(e) => patchGuide({ focusSummary: e.target.value })}
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={LABEL}>Phím tắt nên nhớ (mỗi dòng 1 mục)</span>
+              <textarea
+                className={`${INPUT} !py-1.5 text-xs`}
+                rows={4}
+                value={(g.shortcuts || []).join('\n')}
+                placeholder={'Ctrl + S: Lưu bài liên tục\nF4: Cố định địa chỉ $A$1'}
+                onChange={(e) => patchGuide({ shortcuts: e.target.value.split('\n') })}
+              />
+            </label>
+            <label className="block">
+              <span className={LABEL}>Checklist rà lỗi / tự chấm (mỗi dòng 1 mục)</span>
+              <textarea
+                className={`${INPUT} !py-1.5 text-xs`}
+                rows={4}
+                value={(g.checklist || []).join('\n')}
+                placeholder={'Không còn ô lỗi #N/A, #VALUE!\nĐã cố định vùng tra cứu bằng F4'}
+                onChange={(e) => patchGuide({ checklist: e.target.value.split('\n') })}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeSectionLocks(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const key of DEFAULT_SECTION_ORDER) {
+    const val = String(src[key] || '').trim();
+    out[key] = ['auto', 'unlocked', 'locked'].includes(val) ? val : 'auto';
+  }
+  return out;
+}
+
 function emptyLevelConfig() {
   return {
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
     sequentialSections: true,
+    sectionLocks: normalizeSectionLocks(),
     content: { title: '', description: '', body: '' },
     files: [],
-    video: { title: '', url: '', antiSeek: true, checks: [] },
-    practice: { title: '', description: '' },
+    video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() },
+    practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
   };
 }
 
@@ -180,9 +402,13 @@ export function normalizeLevelConfigs(lesson) {
       cfg.content?.body || cfg.content?.title || cfg.content?.description
       || (Array.isArray(cfg.files) && cfg.files.length)
       || cfg.video?.url || (Array.isArray(cfg.video?.checks) && cfg.video.checks.length)
+      || cfg.video?.guide?.customized
       || cfg.practice?.title || cfg.practice?.description
+      || cfg.practice?.video?.url || (Array.isArray(cfg.practice?.video?.checks) && cfg.practice.video.checks.length)
+      || cfg.practice?.video?.guide?.customized
       || (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length)
       || cfg.sequentialSections === false
+      || Object.values(cfg.sectionLocks || {}).some((v) => v && v !== 'auto')
       || cfg.video?.antiSeek === false
     );
     if (hasData) {
@@ -190,6 +416,7 @@ export function normalizeLevelConfigs(lesson) {
         sectionOrder: normalizeSectionOrder(cfg.sectionOrder),
         hiddenSections: Array.isArray(cfg.hiddenSections) ? [...cfg.hiddenSections] : [],
         sequentialSections: cfg.sequentialSections !== false,
+        sectionLocks: normalizeSectionLocks(cfg.sectionLocks),
         content: {
           title: String(cfg.content?.title || ''),
           description: String(cfg.content?.description || ''),
@@ -207,10 +434,18 @@ export function normalizeLevelConfigs(lesson) {
           url: String(cfg.video?.url || ''),
           antiSeek: cfg.video?.antiSeek !== false,
           checks: Array.isArray(cfg.video?.checks) ? [...cfg.video.checks] : [],
+          guide: normalizeVideoGuide(cfg.video?.guide),
         },
         practice: {
           title: String(cfg.practice?.title || ''),
           description: String(cfg.practice?.description || ''),
+          video: {
+            title: String(cfg.practice?.video?.title || ''),
+            url: String(cfg.practice?.video?.url || ''),
+            antiSeek: cfg.practice?.video?.antiSeek !== false,
+            checks: Array.isArray(cfg.practice?.video?.checks) ? [...cfg.practice.video.checks] : [],
+            guide: normalizeVideoGuide(cfg.practice?.video?.guide),
+          },
         },
       };
     }
@@ -219,6 +454,7 @@ export function normalizeLevelConfigs(lesson) {
         sectionOrder: [...DEFAULT_SECTION_ORDER],
         hiddenSections: [],
         sequentialSections: true,
+        sectionLocks: normalizeSectionLocks(),
         content: {
           title: String(lesson.title || ''),
           description: '',
@@ -237,7 +473,7 @@ export function normalizeLevelConfigs(lesson) {
           antiSeek: true,
           checks: Array.isArray(lesson.checks) ? [...lesson.checks] : [],
         },
-        practice: { title: '', description: '' },
+        practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [] } },
       };
     }
     return emptyLevelConfig();
@@ -327,7 +563,13 @@ function StudentPreviewModal({ title, index, levelConfigs, questionCounts, onClo
                     <p className="text-sm font-black text-slate-900">{meta.title}</p>
                     <p className="truncate text-xs font-medium text-slate-500">{sub}</p>
                   </div>
-                  <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">Mở</span>
+                  <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${
+                    cfg.sectionLocks?.[secKey] === 'locked'
+                      ? 'border-rose-200 bg-rose-50 text-rose-600'
+                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                  }`}>
+                    {cfg.sectionLocks?.[secKey] === 'locked' ? 'Đang đóng' : 'Mở'}
+                  </span>
                 </div>
               );
             })}
@@ -485,6 +727,16 @@ export default function AdminMilestoneEditor({
       else hidden.add(sectionKey);
       return { ...cfg, hiddenSections: Array.from(hidden) };
     });
+  };
+
+  const setSectionLock = (sectionKey, mode) => {
+    patchCurrentLevel((cfg) => ({
+      ...cfg,
+      sectionLocks: {
+        ...normalizeSectionLocks(cfg.sectionLocks),
+        [sectionKey]: ['auto', 'unlocked', 'locked'].includes(mode) ? mode : 'auto',
+      },
+    }));
   };
 
   const handleUploadFile = async (e) => {
@@ -757,16 +1009,41 @@ export default function AdminMilestoneEditor({
                         onClick={() => setExpandedSection(isOpen ? null : secKey)}
                         className="min-w-0 flex-1 text-left !shadow-none"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="text-sm font-black text-slate-900">
                             {idx + 1}. {meta.title}
                           </p>
+                          {(currentCfg.sectionLocks?.[secKey] || 'auto') === 'unlocked' && (
+                            <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Mở sẵn</span>
+                          )}
+                          {(currentCfg.sectionLocks?.[secKey] || 'auto') === 'locked' && (
+                            <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">Đang đóng</span>
+                          )}
                           {isHidden && (
                             <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">Đang ẩn</span>
                           )}
                         </div>
                         <p className="truncate text-xs text-slate-500">{sectionSummary(secKey)}</p>
                       </button>
+
+                      {/* Trạng thái mở / đóng phần này */}
+                      <select
+                        value={currentCfg.sectionLocks?.[secKey] || 'auto'}
+                        onChange={(e) => setSectionLock(secKey, e.target.value)}
+                        aria-label={`Trạng thái mở khóa ${meta.title}`}
+                        title="Tùy chỉnh mở khóa hoặc đóng phần này"
+                        className={`rounded-lg border px-2 py-1 text-[11px] font-bold outline-none transition ${
+                          (currentCfg.sectionLocks?.[secKey] || 'auto') === 'locked'
+                            ? 'border-rose-200 bg-rose-50 text-rose-700'
+                            : (currentCfg.sectionLocks?.[secKey] || 'auto') === 'unlocked'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border-slate-200 bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        <option value="auto">🔒 Theo tuần tự</option>
+                        <option value="unlocked">🔓 Mở khóa</option>
+                        <option value="locked">⛔ Đang đóng</option>
+                      </select>
 
                       {/* Nút ẩn/hiện */}
                       <button
@@ -978,6 +1255,11 @@ export default function AdminMilestoneEditor({
                                   checks={currentCfg.video?.checks || []}
                                   onChange={(checks) => patchCurrentLevel((c) => ({ ...c, video: { ...c.video, checks } }))}
                                 />
+
+                                <VideoGuideEditor
+                                  guide={currentCfg.video?.guide}
+                                  onChange={(guide) => patchCurrentLevel((c) => ({ ...c, video: { ...c.video, guide } }))}
+                                />
                               </div>
                             ) : (
                               <p className="rounded-xl border border-dashed border-slate-200 p-3 text-xs font-semibold text-slate-500">
@@ -1010,6 +1292,104 @@ export default function AdminMilestoneEditor({
                                   placeholder="Làm tối thiểu 60% để vượt qua..."
                                 />
                               </label>
+                            </div>
+
+                            {/* Video hướng dẫn & mốc trắc nghiệm trong phần Luyện tập */}
+                            <div className="space-y-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/35 p-3.5">
+                              <p className="text-xs font-black uppercase tracking-wider text-emerald-800">
+                                Video hướng dẫn luyện tập &amp; mốc trắc nghiệm (tuỳ chọn)
+                              </p>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="block">
+                                  <span className={LABEL}>Tiêu đề video luyện tập</span>
+                                  <input
+                                    className={INPUT}
+                                    maxLength={160}
+                                    value={currentCfg.practice?.video?.title || ''}
+                                    onChange={(e) => patchCurrentLevel((c) => ({
+                                      ...c,
+                                      practice: {
+                                        ...c.practice,
+                                        video: { ...(c.practice?.video || {}), title: e.target.value },
+                                      },
+                                    }))}
+                                    placeholder={`Video hướng dẫn: ${title}`}
+                                  />
+                                </label>
+                                <label className="block">
+                                  <span className={LABEL}>Đường dẫn Video (YouTube, Vimeo hoặc .mp4)</span>
+                                  <input
+                                    className={INPUT}
+                                    maxLength={500}
+                                    value={currentCfg.practice?.video?.url || ''}
+                                    onChange={(e) => patchCurrentLevel((c) => ({
+                                      ...c,
+                                      practice: {
+                                        ...c.practice,
+                                        video: { ...(c.practice?.video || {}), url: e.target.value },
+                                      },
+                                    }))}
+                                    placeholder="https://www.youtube.com/watch?v=..."
+                                  />
+                                </label>
+                              </div>
+                              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-emerald-600"
+                                  checked={currentCfg.practice?.video?.antiSeek !== false}
+                                  onChange={(e) => patchCurrentLevel((c) => ({
+                                    ...c,
+                                    practice: {
+                                      ...c.practice,
+                                      video: { ...(c.practice?.video || {}), antiSeek: e.target.checked },
+                                    },
+                                  }))}
+                                />
+                                Chống tua video (không cho học viên tua nhanh khi chưa xem xong)
+                              </label>
+                              {String(currentCfg.practice?.video?.url || '').trim() ? (
+                                <div className="space-y-3">
+                                  {extractYouTubeId(currentCfg.practice.video.url) ? (
+                                    <div className="aspect-video w-full max-w-lg overflow-hidden rounded-xl bg-slate-900 ring-1 ring-slate-200">
+                                      <iframe
+                                        title="Xem trước video luyện tập"
+                                        src={`https://www.youtube.com/embed/${extractYouTubeId(currentCfg.practice.video.url)}`}
+                                        className="h-full w-full"
+                                        allowFullScreen
+                                      />
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs font-semibold text-slate-500">
+                                      Đã gắn URL video: <a href={resolveMediaUrl(currentCfg.practice.video.url)} target="_blank" rel="noreferrer" className="text-sky-700 underline">{currentCfg.practice.video.url}</a>
+                                    </p>
+                                  )}
+                                  <VideoChecksEditor
+                                    checks={currentCfg.practice?.video?.checks || []}
+                                    onChange={(checks) => patchCurrentLevel((c) => ({
+                                      ...c,
+                                      practice: {
+                                        ...c.practice,
+                                        video: { ...(c.practice?.video || {}), checks },
+                                      },
+                                    }))}
+                                  />
+                                  <VideoGuideEditor
+                                    guide={currentCfg.practice?.video?.guide}
+                                    onChange={(guide) => patchCurrentLevel((c) => ({
+                                      ...c,
+                                      practice: {
+                                        ...c.practice,
+                                        video: { ...(c.practice?.video || {}), guide },
+                                      },
+                                    }))}
+                                  />
+                                </div>
+                              ) : (
+                                <p className="rounded-xl border border-dashed border-emerald-200 bg-white/70 p-2.5 text-xs font-semibold text-slate-500">
+                                  Nhập đường dẫn video để xem trước và thêm mốc trắc nghiệm trong video luyện tập.
+                                </p>
+                              )}
                             </div>
 
                             {/* Thống kê 3 mức câu hỏi */}

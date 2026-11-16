@@ -704,14 +704,16 @@ export default function StudentOverviewTab({
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setCertOpen(true)}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-                    >
-                      <Award size={14} className="text-emerald-600" aria-hidden="true" />
-                      Chứng chỉ QR
-                    </button>
+                    {freePortalUi ? (
+                      <button
+                        type="button"
+                        onClick={() => setCertOpen(true)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+                      >
+                        <Award size={14} className="text-emerald-600" aria-hidden="true" />
+                        Chứng nhận QR
+                      </button>
+                    ) : null}
                     <DuoButton
                       variant="primary"
                       size="sm"

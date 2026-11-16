@@ -21,8 +21,17 @@ function hasRealCourseEnrollment(student) {
   });
 }
 
+function isSubscriptionExpired(student, now = new Date()) {
+  const sub = student?.subscription;
+  if (!sub || sub.plan === 'lifetime' || !sub.expiresAt) return false;
+  const exp = new Date(sub.expiresAt);
+  return !Number.isNaN(exp.getTime()) && exp.getTime() <= now.getTime();
+}
+
 function isFreePortalLocked(student) {
-  return student?.freePortal === true && student?.freeUnlocked !== true;
+  if (student?.freePortal !== true) return false;
+  if (isSubscriptionExpired(student) && !hasRealCourseEnrollment(student)) return true;
+  return student?.freeUnlocked !== true;
 }
 
 const SURVEY_SOURCES = new Set(['google', 'tiktok', 'facebook', 'referral', 'other']);
@@ -31,13 +40,24 @@ const SURVEY_FEARS = new Set(['scam', 'no_guidance', 'not_understand', 'no_suppo
 
 function freePortalFlags(student) {
   if (!student || student.freePortal !== true) {
-    return { freePortal: false, freeUnlocked: false, needsFreeSurvey: false };
+    return {
+      freePortal: false,
+      freeUnlocked: false,
+      needsFreeSurvey: false,
+      hasRealCourseEnrollment: true,
+      hideExamRoom: false,
+    };
   }
   const hasSurvey = Boolean(student.freeSurvey?.answeredAt || student.freeSurvey?.done);
+  const hasCourse = hasRealCourseEnrollment(student);
+  const unlocked = student.freeUnlocked === true
+    && (!isSubscriptionExpired(student) || hasCourse);
   return {
     freePortal: true,
-    freeUnlocked: student.freeUnlocked === true,
+    freeUnlocked: unlocked,
     needsFreeSurvey: !hasSurvey,
+    hasRealCourseEnrollment: hasCourse,
+    hideExamRoom: !hasCourse,
   };
 }
 

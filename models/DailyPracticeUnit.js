@@ -20,6 +20,20 @@ const lessonFileSchema = new mongoose.Schema({
   size: { type: Number, default: 0 },
 }, { _id: false });
 
+const videoGuideFormulaSchema = new mongoose.Schema({
+  name: { type: String, default: '', trim: true, maxlength: 160 },
+  syntax: { type: String, default: '', trim: true, maxlength: 300 },
+  note: { type: String, default: '', trim: true, maxlength: 400 },
+}, { _id: false });
+
+const videoGuideSchema = new mongoose.Schema({
+  customized: { type: Boolean, default: false },
+  formulas: { type: [videoGuideFormulaSchema], default: [] },
+  focusSummary: { type: String, default: '', trim: true, maxlength: 1500 },
+  shortcuts: { type: [String], default: [] },
+  checklist: { type: [String], default: [] },
+}, { _id: false });
+
 const levelSectionConfigSchema = new mongoose.Schema({
   sectionOrder: {
     type: [String],
@@ -27,6 +41,12 @@ const levelSectionConfigSchema = new mongoose.Schema({
   },
   hiddenSections: { type: [String], default: [] },
   sequentialSections: { type: Boolean, default: true },
+  sectionLocks: {
+    content: { type: String, enum: ['auto', 'unlocked', 'locked'], default: 'auto' },
+    file: { type: String, enum: ['auto', 'unlocked', 'locked'], default: 'auto' },
+    video: { type: String, enum: ['auto', 'unlocked', 'locked'], default: 'auto' },
+    practice: { type: String, enum: ['auto', 'unlocked', 'locked'], default: 'auto' },
+  },
   content: {
     title: { type: String, default: '', trim: true, maxlength: 160 },
     description: { type: String, default: '', trim: true, maxlength: 320 },
@@ -38,10 +58,18 @@ const levelSectionConfigSchema = new mongoose.Schema({
     url: { type: String, default: '', trim: true, maxlength: 500 },
     antiSeek: { type: Boolean, default: true },
     checks: { type: [videoCheckSchema], default: [] },
+    guide: { type: videoGuideSchema, default: () => ({}) },
   },
   practice: {
     title: { type: String, default: '', trim: true, maxlength: 160 },
     description: { type: String, default: '', trim: true, maxlength: 320 },
+    video: {
+      title: { type: String, default: '', trim: true, maxlength: 160 },
+      url: { type: String, default: '', trim: true, maxlength: 500 },
+      antiSeek: { type: Boolean, default: true },
+      checks: { type: [videoCheckSchema], default: [] },
+      guide: { type: videoGuideSchema, default: () => ({}) },
+    },
   },
 }, { _id: false });
 

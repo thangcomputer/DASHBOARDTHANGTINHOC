@@ -2548,7 +2548,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 title="Xem chứng nhận số có mã QR"
               >
                 <Award size={12} />
-                <span className="hidden sm:inline">Chứng chỉ số</span>
+                <span className="hidden sm:inline">Chứng nhận số</span>
               </button>
             )}
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 tabular-nums">
@@ -2764,7 +2764,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   onClick={() => setCertificateModalOpen(true)}
                   className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition-colors cursor-pointer"
                 >
-                  <Award size={14} /> Xem Chứng chỉ số
+                  <Award size={14} /> Xem Chứng nhận số
                 </button>
               </div>
             )}

@@ -149,6 +149,21 @@ router.get('/my/related-topics', ...requireStudent, handle((req) => service.rela
   subjectId: String(req.query?.subjectId || ''),
   unitId: String(req.query?.unitId || ''),
 })));
+router.post('/my/ai-assistant', ...requireStudent, handle((req) => aiService.askLessonAssistant({
+  question: req.body?.question,
+  lessonTitle: req.body?.lessonTitle,
+  unitTitle: req.body?.unitTitle,
+  courseTitle: req.body?.courseTitle,
+  history: req.body?.history,
+})));
+router.post('/my/placement-advice', ...requireStudent, handle((req) => aiService.placementAdvice({
+  score: req.body?.score,
+  total: req.body?.total,
+  bySkill: req.body?.bySkill,
+  wrongTopics: req.body?.wrongTopics,
+  surveyLevel: req.body?.surveyLevel,
+  topics: req.body?.topics,
+})));
 router.post(
   ['/my/xp/purchase', '/my/xp-purchases', '/my/xp-purchase', '/my-xp-purchases', '/my/xp/purchases'],
   ...requireStudent,

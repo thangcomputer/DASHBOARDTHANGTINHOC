@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, Compass, RotateCcw, Sparkles, Target, X } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Compass, FileText, Loader2, RotateCcw, Sparkles, Target } from 'lucide-react';
+import dailyPracticeApi from '../../../services/dailyPracticeApi';
 
 const STORAGE_PREFIX = 'dewskill_placement_v1';
 
@@ -165,11 +166,18 @@ export function computePlacementRecommendation(answers, topics = []) {
   };
 }
 
-export default function PlacementTestModal({ open, onClose, studentId, topics = [], onApplied }) {
+export default function PlacementTestModal({ open, onClose, studentId, topics = [], onApplied, surveyLevel = '', intro = false }) {
   const existing = useMemo(() => readPlacementResult(studentId), [studentId, open]);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [showIntro, setShowIntro] = useState(Boolean(intro));
+
+  const effectiveSurveyLevel = surveyLevel || (() => {
+    try { return localStorage.getItem('dewskill_survey_level') || ''; } catch { return ''; }
+  })();
 
   if (!open) return null;
 
@@ -185,23 +193,94 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
     }
   };
 
+  const requestAiAdvice = async (computed, answerMap) => {
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const answersToUse = (answerMap && Object.keys(answerMap).length > 0)
+        ? answerMap
+        : (computed?.savedAnswers || answers || {});
+      const wrongTopics = QUESTIONS
+        .filter((q) => answersToUse[q.id] !== undefined && answersToUse[q.id] !== q.answer)
+        .map((q) => `[${q.skill}] ${q.question}`);
+      const advice = await dailyPracticeApi.student.placementAdvice({
+        score: computed.score,
+        total: computed.total,
+        bySkill: computed.bySkill.map(({ skill, correct, total }) => ({ skill, correct, total })),
+        wrongTopics,
+        surveyLevel: effectiveSurveyLevel,
+        topics: (topics || []).map((t) => t?.name || t?.topic?.name || '').filter(Boolean),
+      });
+      if (!advice?.summary) throw new Error('empty');
+      let next = { ...computed, ai: advice };
+      const aiTopic = String(advice.recommendedTopic || '').toLowerCase();
+      if (aiTopic) {
+        const matched = (topics || []).find((t) => {
+          const name = String(t?.name || t?.topic?.name || '').toLowerCase();
+          return name && (name.includes(aiTopic) || aiTopic.includes(name));
+        });
+        if (matched) {
+          next = {
+            ...next,
+            matchedTopicId: String(matched.id || matched.topic?.id || ''),
+            matchedTopicName: matched.name || matched.topic?.name || next.matchedTopicName,
+          };
+        } else if (advice.recommendedTopic) {
+          next = {
+            ...next,
+            matchedTopicName: advice.recommendedTopic,
+          };
+        }
+      }
+      savePlacementResult(studentId, next);
+      setResult(next);
+    } catch (err) {
+      setAiError(err?.message && err.message !== 'empty'
+        ? err.message
+        : 'Chưa phân tích chi tiết được lúc này. Kết quả cơ bản vẫn được lưu.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const finish = () => {
-    const computed = computePlacementRecommendation(answers, topics);
+    const computed = {
+      ...computePlacementRecommendation(answers, topics),
+      savedAnswers: answers,
+    };
     savePlacementResult(studentId, computed);
     setResult(computed);
+    requestAiAdvice(computed, answers);
   };
 
   const resetTest = () => {
     setAnswers({});
     setStep(0);
+    setAiError('');
     setResult({ __retaking: true });
   };
 
   const showResultScreen = activeResult && !activeResult.__retaking;
+  const ai = showResultScreen ? activeResult.ai : null;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/65 p-3 sm:p-5 backdrop-blur-xs">
       <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        {aiLoading && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/85 p-6 text-center backdrop-blur-xs select-none"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200 shadow-sm">
+              <Loader2 size={28} className="animate-spin" />
+            </span>
+            <p className="mt-4 text-base font-black text-slate-900">Đang phân tích...</p>
+            <p className="mt-1 max-w-xs text-xs font-medium text-slate-500">
+              Đang tổng hợp bài làm và thiết kế lộ trình phù hợp nhất cho bạn.
+            </p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-5 py-4">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
@@ -218,21 +297,62 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
           </div>
           <button
             type="button"
+            disabled={aiLoading}
             onClick={onClose}
             aria-label="Đóng"
-            className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer !shadow-none"
           >
-            <X size={20} />
+            Đóng
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {showResultScreen ? (
+          {showIntro && !showResultScreen ? (
+            <div className="space-y-4 py-2 text-center">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
+                <Compass size={28} />
+              </span>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Cùng tìm điểm xuất phát phù hợp nhất cho bạn</h3>
+                <p className="mx-auto mt-1.5 max-w-md text-sm font-medium text-slate-500">
+                  10 câu trắc nghiệm nhanh (khoảng 3 phút) về Windows, Word, Excel và PowerPoint.
+                  Hệ thống sẽ phân tích bài làm và gợi ý lộ trình học riêng cho bạn.
+                </p>
+              </div>
+              <div className="mx-auto grid max-w-md grid-cols-3 gap-2 text-xs font-bold text-slate-700">
+                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-2 py-2.5 text-emerald-800">
+                  <Clock size={14} className="shrink-0" aria-hidden="true" /> ~3 phút
+                </div>
+                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-sky-50 px-2 py-2.5 text-sky-800">
+                  <FileText size={14} className="shrink-0" aria-hidden="true" /> 10 câu
+                </div>
+                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-violet-50 px-2 py-2.5 text-violet-800">
+                  <Target size={14} className="shrink-0" aria-hidden="true" /> Gợi ý lộ trình
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Để sau
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowIntro(false)}
+                  className="cms-btn cms-btn-primary inline-flex items-center gap-1.5 !py-2.5 text-xs"
+                >
+                  <Sparkles size={14} /> Bắt đầu kiểm tra
+                </button>
+              </div>
+            </div>
+          ) : showResultScreen ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Kết quả đánh giá AI</p>
+                    <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Kết quả đánh giá năng lực</p>
                     <p className="mt-1 text-2xl font-black text-slate-900">
                       {activeResult.score}/{activeResult.total} câu đúng
                     </p>
@@ -241,11 +361,85 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
                     {activeResult.recommendedLevel}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-slate-700">
-                  🤖 Đề xuất ưu tiên luyện ngay: <strong className="text-emerald-700">{activeResult.matchedTopicName}</strong>{' '}
-                  (Kỹ năng cần củng cố nhất: <strong>{activeResult.recommendedSkill}</strong>).
+                <p className="mt-2 flex flex-wrap items-center gap-1 text-sm text-slate-700">
+                  <Target size={15} className="shrink-0 text-emerald-600" aria-hidden="true" />
+                  <span>Đề xuất ưu tiên luyện ngay:</span>
+                  <strong className="text-emerald-700">{activeResult.matchedTopicName}</strong>
+                  <span>(Kỹ năng cần củng cố nhất: <strong>{activeResult.recommendedSkill}</strong>).</span>
                 </p>
               </div>
+
+              {aiLoading ? (
+                <div className="flex items-center gap-2.5 rounded-2xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-sm font-semibold text-violet-800">
+                  <Loader2 size={16} className="animate-spin shrink-0" />
+                  Đang phân tích bài làm và thiết kế lộ trình riêng cho bạn...
+                </div>
+              ) : ai ? (
+                <div className="space-y-3 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-violet-700">
+                      <Sparkles size={14} /> Nhận xét &amp; định hướng học tập
+                    </p>
+                    {ai.levelLabel ? (
+                      <span className="rounded-full bg-violet-600 px-2.5 py-0.5 text-[11px] font-black text-white">{ai.levelLabel}</span>
+                    ) : null}
+                  </div>
+                  <p className="text-sm font-medium leading-relaxed text-slate-700">{ai.summary}</p>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {ai.strengths?.length ? (
+                      <div className="rounded-xl border border-emerald-100 bg-white/80 p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-emerald-700">Điểm mạnh</p>
+                        <ul className="mt-1.5 space-y-1 text-xs font-medium text-slate-700">
+                          {ai.strengths.map((s) => (
+                            <li key={s} className="flex items-start gap-1.5">
+                              <Check size={13} className="mt-0.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {ai.focus?.length ? (
+                      <div className="rounded-xl border border-amber-100 bg-white/80 p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-amber-700">Cần tập trung</p>
+                        <ul className="mt-1.5 space-y-1 text-xs font-medium text-slate-700">
+                          {ai.focus.map((s) => (
+                            <li key={s} className="flex items-start gap-1.5">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                  {ai.plan?.length ? (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Lộ trình gợi ý</p>
+                      {ai.plan.map((p, i) => (
+                        <div key={`${p.title}-${i}`} className="flex gap-2.5 rounded-xl bg-white/80 px-3 py-2 ring-1 ring-slate-100">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-black text-white">{i + 1}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-800">{p.title}</p>
+                            {p.detail ? <p className="text-xs text-slate-600">{p.detail}</p> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+                  <span>{aiError || 'Nhận phân tích chi tiết & lộ trình học dành riêng cho bạn.'}</span>
+                  <button
+                    type="button"
+                    onClick={() => requestAiAdvice(activeResult, answers)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
+                  >
+                    <Sparkles size={13} /> {aiError ? 'Thử lại' : 'Phân tích lộ trình'}
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-2.5">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
@@ -269,23 +463,25 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-2">
                 <button
                   type="button"
+                  disabled={aiLoading}
                   onClick={resetTest}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCcw size={14} /> Làm lại bài 10 câu
                 </button>
                 <button
                   type="button"
+                  disabled={aiLoading}
                   onClick={() => {
                     onApplied?.(activeResult);
                     onClose();
                   }}
-                  className="cms-btn cms-btn-primary inline-flex items-center gap-1.5 !py-2.5 text-xs"
+                  className="cms-btn cms-btn-primary inline-flex w-full sm:w-auto items-center justify-center gap-1.5 whitespace-nowrap !py-2.5 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Target size={15} /> Áp dụng lộ trình gợi ý
+                  <Target size={15} /> {aiLoading ? 'Đang phân tích...' : 'Áp dụng lộ trình gợi ý'}
                 </button>
               </div>
             </div>
@@ -355,7 +551,7 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
                       onClick={finish}
                       className="cms-btn cms-btn-primary !py-2 text-xs disabled:opacity-50"
                     >
-                      Xem kết quả AI ({answeredCount}/{QUESTIONS.length})
+                      Xem kết quả đánh giá ({answeredCount}/{QUESTIONS.length})
                     </button>
                   )}
                 </div>

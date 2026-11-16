@@ -179,9 +179,11 @@ export function QuizAnswerOption({
 }
 
 // ── Trắc nghiệm ──────────────────────────────────────────────────────────────
-export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
+export function McqQuestion({ question, reveal, result, chosen, pending, retryCooldownSec = 0, onChange, onSubmit }) {
   const eliminated = new Set(reveal?.eliminate || []);
-  const locked = Boolean(result);
+  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
+  const retrying = Boolean(result && !result.correct);
+  const activeChoice = pending?.index ?? chosen;
   const allShort = useMemo(
     () => (question.options || []).every((opt) => String(opt || '').length <= 28),
     [question.options],
@@ -195,7 +197,7 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
           result.correctAnswer?.correctIndex === index
           || (result.correct && chosen === index)
         );
-        const isWrongPick = locked && chosen === index && !result?.correct;
+        const isWrongPick = Boolean(result && !result.correct) && chosen === index && pending == null;
         const out = eliminated.has(index);
         return (
           <QuizAnswerOption
@@ -205,11 +207,12 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
             locked={locked}
             isCorrect={isCorrect}
             isWrongPick={isWrongPick}
-            isChosen={chosen === index}
+            isChosen={activeChoice === index}
             eliminated={out}
             onSelect={() => {
               gameSounds.tap();
-              onSubmit({ index });
+              if (retrying) onChange?.({ index });
+              else onSubmit({ index });
             }}
           />
         );
@@ -219,8 +222,10 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
 }
 
 // ── Đúng / Sai ───────────────────────────────────────────────────────────────
-export function TrueFalseQuestion({ result, chosen, onSubmit }) {
-  const locked = Boolean(result);
+export function TrueFalseQuestion({ result, chosen, pending, retryCooldownSec = 0, onChange, onSubmit }) {
+  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
+  const retrying = Boolean(result && !result.correct);
+  const activeChoice = pending?.value ?? chosen;
   const options = [
     { value: true, label: 'Đúng', icon: Check, tone: 'emerald' },
     { value: false, label: 'Sai', icon: X, tone: 'red' },
@@ -230,15 +235,20 @@ export function TrueFalseQuestion({ result, chosen, onSubmit }) {
       {options.map(({ value, label, icon: Icon, tone }) => {
         const revealSolution = Boolean(result?.correct);
         const isCorrect = revealSolution && result.correctAnswer?.answerBool === value;
-        const isWrongPick = locked && chosen === value && !result?.correct;
+        const isWrongPick = Boolean(result && !result.correct) && chosen === value && pending == null;
+        const isPicked = activeChoice === value && !locked && retrying;
         return (
           <button
             key={label}
             type="button"
             disabled={locked}
-            onClick={() => { gameSounds.tap(); onSubmit({ value }); }}
+            onClick={() => {
+              gameSounds.tap();
+              if (retrying) onChange?.({ value });
+              else onSubmit({ value });
+            }}
             data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
-            className={`${CHIP} relative flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake' : `${CHIP_IDLE} hover:scale-[1.01] hover:border-emerald-400 active:translate-y-[2px]`
+            className={`${CHIP} relative flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake' : isPicked ? 'border-emerald-500 bg-emerald-50/70 text-emerald-900 !shadow-[0_3px_0_#34D399]' : `${CHIP_IDLE} hover:scale-[1.01] hover:border-emerald-400 active:translate-y-[2px]`
               }`}
           >
             {isCorrect && (

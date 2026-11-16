@@ -65,8 +65,8 @@ const MENU_CONFIG = {
     brand: { label: 'Học viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
       { key: 'dashboard', icon: Home, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
-      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', mobileLabel: 'Luyện tập', requiresLearningAccess: true },
       { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập', path: '/student/daily-practice', mobileLabel: 'Luyện tập', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageCircle, label: 'Hộp thư', path: '/student/inbox' },
       { key: 'schedule', icon: CalendarDays, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },

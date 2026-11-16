@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
   overflow: hidden;
   padding: 16px;

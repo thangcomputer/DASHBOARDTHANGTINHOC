@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDown, ArrowUp, BookOpen, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, X,
+  ArrowDown, ArrowUp, BookOpen, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Lock, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, Unlock, X,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -116,6 +116,7 @@ function TopicModal({ topic, onClose, onSaved }) {
     color: topic?.color || 'red',
     sortOrder: topic?.sortOrder || 0,
     active: topic?.active !== false,
+    requireSubscription: Boolean(topic?.requireSubscription),
     lessonSubjectId: topic?.lessonSubjectId || '',
     lessonUnitIds: topic?.lessonUnitIds || [],
   }));
@@ -225,6 +226,15 @@ function TopicModal({ topic, onClose, onSaved }) {
             Hiển thị cho học viên
           </label>
         </div>
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-xs font-bold text-amber-900">
+          <input
+            type="checkbox"
+            checked={form.requireSubscription}
+            onChange={(e) => set({ requireSubscription: e.target.checked })}
+            className="h-4 w-4 accent-amber-600"
+          />
+          <span>Khóa toàn bộ môn (bắt buộc mua gói mới được mở, kể cả Chặng 1)</span>
+        </label>
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
           <label className={`${LABEL} flex items-center gap-1.5`} htmlFor="dp-topic-lesson">
             <PlayCircle size={14} className="text-emerald-600" /> Video bài giảng liên quan
@@ -1753,7 +1763,11 @@ export default function AdminDailyPracticeTab() {
                     <Icon size={20} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-black text-slate-900">{t.name}{!t.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}</p>
+                    <p className="truncate text-sm font-black text-slate-900">
+                      {t.name}
+                      {t.requireSubscription && <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-800"><Lock size={10} /> Cần gói</span>}
+                      {!t.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
+                    </p>
                     <p className="text-[11px] text-slate-500">
                       {published} câu · Dễ {t.counts.easy} · Vừa {t.counts.medium} · Khó {t.counts.hard}
                       {t.counts.draft ? <span className="ml-1 font-bold text-amber-600">· {t.counts.draft} nháp</span> : null}
@@ -1775,6 +1789,36 @@ export default function AdminDailyPracticeTab() {
             <section className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="mr-auto text-base font-black text-slate-900">{topic.name}</h3>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const nextLock = !topic.requireSubscription;
+                      const saved = await dailyPracticeApi.admin.updateTopic(topic.id, {
+                        name: topic.name,
+                        description: topic.description || '',
+                        icon: topic.icon || 'book',
+                        color: topic.color || 'red',
+                        sortOrder: topic.sortOrder || 0,
+                        active: topic.active !== false,
+                        requireSubscription: nextLock,
+                      });
+                      setTopics((prev) => prev.map((item) => (item.id === topic.id ? saved : item)));
+                      toast.success(nextLock ? 'Đã khóa môn — bắt buộc mua gói mới mở' : 'Đã mở thử Chặng 1 cho môn này');
+                    } catch (err) {
+                      toast.error(err.message);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black transition cursor-pointer !shadow-none ${
+                    topic.requireSubscription
+                      ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                  }`}
+                  title="Bật để khóa toàn bộ môn đối với tài khoản miễn phí/hết hạn (bắt buộc mua gói)"
+                >
+                  {topic.requireSubscription ? <Lock size={13} /> : <Unlock size={13} />}
+                  {topic.requireSubscription ? 'Đang khóa · Bắt buộc mua gói' : 'Mở thử Chặng 1'}
+                </button>
                 {topic.counts.draft > 0 && (
                   <button type="button" onClick={publishDrafts} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Send size={14} /> Xuất bản {topic.counts.draft} nháp</button>
                 )}

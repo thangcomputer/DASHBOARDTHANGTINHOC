@@ -8,6 +8,8 @@ const dailyPracticeTopicSchema = new mongoose.Schema({
   color: { type: String, default: 'red' },
   sortOrder: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
+  /** true = khóa toàn bộ môn đối với tài khoản miễn phí/hết hạn (bắt buộc mua gói mới mở). */
+  requireSubscription: { type: Boolean, default: false },
   /** Môn video bài giảng khớp với chủ đề; lessonUnitIds rỗng = cả môn. */
   lessonSubjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonSubject', default: null },
   lessonUnitIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },

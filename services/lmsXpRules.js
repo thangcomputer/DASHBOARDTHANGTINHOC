@@ -15,7 +15,7 @@ const DEFAULT_AMOUNTS = {
   streak7: 50,
   streak14: 100,
   streak30: 300,
-  referral: 100,
+  referral: 50,
 };
 
 const DEFAULT_VIDEO_RATIO = 0.9;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, ShoppingBag, X, Zap } from 'lucide-react';
+import { Loader2, ShoppingBag, Zap } from 'lucide-react';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import api from '../../../services/api';
 import { generateVietQRUrl } from '../../bankSelectUtils';
@@ -125,8 +125,8 @@ export default function BuyXpModal({ packs = [], onClose, onPaid }) {
               <p className="text-[11px] font-semibold text-slate-500">Chuyển khoản là cộng XP, luyện tiếp được ngay</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none">
-            <X size={18} />
+          <button type="button" onClick={onClose} aria-label="Đóng" className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer !shadow-none">
+            Đóng
           </button>
         </div>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Award, Check, Copy, Printer, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Award, Check, Copy, Lock, Printer, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
 
 function hashString32(input, seed = 0x811c9dc5) {
   let h = seed >>> 0;
@@ -119,11 +119,19 @@ export default function DigitalCertificateModal({
   courseId = '',
   courseTitle = 'Khóa học Tin học ứng dụng',
   instructorName = 'Trung tâm Thắng Tin Học',
-  completionRate = 100,
+  completionRate = 0,
   avgGrade = null,
   issuedDate = '',
 }) {
   const [copied, setCopied] = useState(false);
+  const safeProgress = Math.min(
+    100,
+    Math.max(0, Number.isFinite(Number(completionRate)) ? Math.round(Number(completionRate)) : 0),
+  );
+  const isCompleted = safeProgress >= 100;
+  const displayCourseTitle = /^tài khoản miễn phí$/i.test(String(courseTitle || '').trim())
+    ? 'Xuất sắc'
+    : (String(courseTitle || '').trim() || 'Khóa học Tin học ứng dụng');
 
   useEffect(() => {
     if (!open) return undefined;
@@ -135,8 +143,8 @@ export default function DigitalCertificateModal({
   }, [open, onClose]);
 
   const certCode = useMemo(
-    () => buildCertificateCode({ studentId, studentCode, courseId, courseTitle }),
-    [studentId, studentCode, courseId, courseTitle],
+    () => buildCertificateCode({ studentId, studentCode, courseId, courseTitle: displayCourseTitle }),
+    [studentId, studentCode, courseId, displayCourseTitle],
   );
 
   const formattedDate = useMemo(() => {
@@ -165,7 +173,7 @@ export default function DigitalCertificateModal({
   }, [certCode]);
 
   const handleCopyVerify = async () => {
-    const text = `Chứng chỉ Thắng Tin Học · Học viên: ${studentName} · Khóa: ${courseTitle} · Mã xác thực: ${certCode} · Link: ${verifyUrl}`;
+    const text = `Chứng nhận Thắng Tin Học · Học viên: ${studentName} · Khóa: ${courseTitle} · Mã xác thực: ${certCode} · Link: ${verifyUrl}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -181,130 +189,195 @@ export default function DigitalCertificateModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Chứng chỉ số hoàn thành khóa học"
+      aria-label="Chứng nhận số hoàn thành khóa học"
       className="fixed inset-0 z-[260] flex items-center justify-center bg-slate-950/75 p-3 sm:p-6 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <style>{`
+        @page {
+          size: A5 portrait;
+          margin: 8mm;
+        }
         @media print {
-          body * { visibility: hidden !important; }
-          #th-digital-cert-sheet, #th-digital-cert-sheet * { visibility: visible !important; }
-          #th-digital-cert-sheet {
-            position: fixed !important;
-            inset: 0 !important;
-            margin: auto !important;
-            width: 100% !important;
-            max-width: 820px !important;
-            box-shadow: none !important;
+          html, body {
+            width: 148mm !important;
+            height: 210mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
           }
+          body * { visibility: hidden !important; }
+          ${isCompleted ? `
+            #th-digital-cert-sheet, #th-digital-cert-sheet * {
+              visibility: visible !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            #th-digital-cert-sheet {
+              position: fixed !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 132mm !important;
+              height: 194mm !important;
+              max-width: none !important;
+              margin: 0 !important;
+              box-shadow: none !important;
+              page-break-after: avoid !important;
+              break-inside: avoid !important;
+            }
+          ` : ''}
         }
       `}</style>
       <div
-        className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-auto"
+        className="relative w-full max-w-[500px] rounded-3xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div
           id="th-digital-cert-sheet"
-          className="relative bg-gradient-to-br from-[#ECFDF5] via-white to-[#FEFCE8] p-5 sm:p-8 border-[6px] border-emerald-700/90 m-3 sm:m-4 rounded-2xl"
+          className="relative flex flex-col justify-between aspect-[148/210] bg-gradient-to-br from-[#ECFDF5] via-white to-[#FEFCE8] p-4 sm:p-5 border-[5px] border-emerald-700/90 m-2.5 sm:m-3.5 rounded-2xl overflow-hidden"
         >
-          <div className="pointer-events-none absolute inset-2 rounded-xl border border-amber-500/40" />
-          <div className="relative z-10 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-600/25">
-                <Award size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] font-black tracking-[0.22em] text-emerald-700 uppercase">
-                  Thắng Tin Học Academy
+          <div className="pointer-events-none absolute inset-1.5 rounded-xl border border-amber-500/40" />
+          {!isCompleted && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center select-none px-4"
+            >
+              <div className="-rotate-12 rounded-xl border-2 border-rose-600/70 bg-white/70 px-3.5 py-1.5 text-center shadow-md backdrop-blur-[0.5px]">
+                <p className="whitespace-nowrap text-xs sm:text-sm font-black tracking-[0.14em] text-rose-600 uppercase">
+                  CHƯA HOÀN THÀNH
                 </p>
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Hệ thống Đào tạo &amp; Xác thực Kỹ năng số
+                <p className="mt-0.5 whitespace-nowrap text-[10px] font-black text-rose-700">
+                  TIẾN ĐỘ: {safeProgress}% / 100%
                 </p>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 px-2.5 py-1 text-[10px] font-black text-emerald-800">
-              <ShieldCheck size={13} /> Đã xác thực
-            </span>
+          )}
+          <div className="relative z-10 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-sm shadow-emerald-600/25">
+                <Award size={19} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[10.5px] font-black tracking-[0.14em] text-emerald-700 uppercase">
+                  DEWSKILL ACADEMY
+                </p>
+                <p className="truncate text-[10px] font-semibold text-slate-500">
+                  Đào tạo &amp; Xác thực Kỹ năng số
+                </p>
+              </div>
+            </div>
+            {isCompleted ? (
+              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 border border-emerald-200 px-2.5 py-1 text-[10px] font-black text-emerald-800">
+                <ShieldCheck size={12} className="shrink-0" /> Đã xác thực
+              </span>
+            ) : (
+              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-rose-100 border border-rose-200 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                <ShieldAlert size={12} className="shrink-0" /> Chưa xong ({safeProgress}%)
+              </span>
+            )}
           </div>
 
-          <div className="relative z-10 mt-6 text-center space-y-2">
-            <p className="inline-flex items-center gap-1.5 text-[11px] font-black tracking-[0.25em] text-amber-600 uppercase">
-              <Sparkles size={13} /> Certificate of Completion <Sparkles size={13} />
+          <div className="relative z-10 my-auto py-3 text-center space-y-1.5">
+            <p className="inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.2em] text-amber-600 uppercase">
+              <Sparkles size={12} /> Certificate of Completion <Sparkles size={12} />
             </p>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-              CHỨNG NHẬN HOÀN THÀNH KHÓA HỌC
+            <h2 className="text-lg sm:text-[20px] font-black leading-snug tracking-tight text-slate-900">
+              CHỨNG NHẬN HOÀN THÀNH
+              <br />
+              KHÓA HỌC
             </h2>
-            <p className="text-xs sm:text-sm font-medium text-slate-500">
+            <p className="text-[11px] font-medium text-slate-500">
               Trân trọng trao tặng học viên
             </p>
-            <p className="pt-1 text-2xl sm:text-3xl font-black tracking-tight text-emerald-700 uppercase break-words">
+            <p className="pt-0.5 text-xl sm:text-2xl font-black tracking-tight text-emerald-700 uppercase break-words">
               {studentName || 'HỌC VIÊN THẮNG TIN HỌC'}
             </p>
-            <p className="text-xs sm:text-sm font-medium text-slate-600">
-              Đã hoàn thành xuất sắc chương trình đào tạo &amp; thực hành
+            <p className="mx-auto max-w-[340px] text-[11px] font-medium leading-relaxed text-slate-600">
+              {isCompleted
+                ? 'Đã hoàn thành xuất sắc chương trình đào tạo & thực hành'
+                : 'Bản xem trước tiến độ — hoàn thành 100% để nhận chứng nhận'}
             </p>
-            <div className="mx-auto max-w-lg rounded-2xl border border-emerald-200 bg-white/90 px-4 py-2.5 shadow-xs">
-              <p className="text-base sm:text-lg font-black text-slate-900">{courseTitle}</p>
-              <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-bold text-slate-500">
-                <span className="text-emerald-700">Tiến độ: {Math.min(100, Math.max(0, Number(completionRate) || 100))}%</span>
+            <div className="mx-auto mt-1.5 max-w-sm rounded-2xl border border-emerald-200 bg-white/90 px-3.5 py-2 shadow-xs">
+              <p className="text-sm sm:text-base font-black text-slate-900">{displayCourseTitle}</p>
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] font-bold text-slate-500">
+                <span className={isCompleted ? 'text-emerald-700' : 'text-rose-600'}>
+                  Tiến độ: {safeProgress}%
+                </span>
                 {avgGrade != null && Number(avgGrade) > 0 ? (
                   <span className="text-amber-700">Điểm TB: {avgGrade}/10</span>
                 ) : null}
-                <span>Ngày cấp: {formattedDate}</span>
+                <span>{isCompleted ? `Ngày cấp: ${formattedDate}` : 'Chưa đủ 100%'}</span>
               </div>
             </div>
           </div>
 
-          <div className="relative z-10 mt-6 pt-5 border-t border-emerald-900/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Giảng viên / Đại diện đào tạo
+          <div className="relative z-10 pt-3 border-t border-emerald-900/10 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1 text-left space-y-0.5">
+              <p className="text-[8.5px] font-black uppercase tracking-wider text-slate-400">
+                Giảng viên / Đại diện
               </p>
-              <p className="text-sm font-black text-slate-800">{instructorName || 'Trung tâm Thắng Tin Học'}</p>
-              <p className="text-[11px] font-mono font-bold text-emerald-700">
-                Mã CC: {certCode}
+              <p className="truncate text-[11.5px] sm:text-xs font-black text-slate-800">
+                {instructorName || 'Trung tâm Thắng Tin Học'}
+              </p>
+              <p className="truncate text-[9.5px] font-mono font-bold text-emerald-700">
+                {isCompleted ? `Mã CN: ${certCode}` : 'Mã CN: Chưa kích hoạt'}
               </p>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm">
-              <QrSvg value={verifyUrl} size={86} />
-              <div className="text-left max-w-[155px]">
-                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+            <div className={`flex max-w-[54%] shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white p-1.5 sm:p-2 shadow-xs ${!isCompleted ? 'opacity-50 blur-[1px] select-none' : ''}`}>
+              <QrSvg value={verifyUrl} size={56} />
+              <div className="min-w-0 text-left">
+                <p className="text-[8.5px] font-black uppercase tracking-tight text-emerald-700 leading-tight">
                   Quét QR xác thực
                 </p>
-                <p className="text-[10px] text-slate-500 leading-snug mt-0.5">
-                  Kiểm tra tính hợp lệ trực tuyến theo mã định danh.
+                <p className="text-[8.5px] text-slate-500 leading-tight mt-0.5">
+                  Kiểm tra hợp lệ trực tuyến.
                 </p>
-                <p className="text-[9px] font-mono text-slate-400 truncate mt-1">{certCode}</p>
+                <p className="text-[8px] font-mono text-slate-400 truncate mt-0.5">
+                  {isCompleted ? certCode : 'CHƯA KÍCH HOẠT'}
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 pb-4 pt-1 flex flex-wrap items-center justify-between gap-2 bg-slate-50 border-t border-slate-100">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-extrabold transition cursor-pointer shadow-xs"
-            >
-              <Printer size={14} /> In / Lưu PDF
-            </button>
-            <button
-              type="button"
-              onClick={handleCopyVerify}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-slate-700 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
-            >
-              {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-              {copied ? 'Đã sao chép mã' : 'Sao chép mã xác thực'}
-            </button>
+        <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2 bg-slate-50 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            {isCompleted ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-extrabold transition cursor-pointer shadow-xs"
+                >
+                  <Printer size={14} /> In / Lưu PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyVerify}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-slate-700 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
+                >
+                  {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  {copied ? 'Đã sao chép mã' : 'Sao chép mã xác thực'}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title={`Hoàn thành 100% để tải về (${safeProgress}%)`}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-slate-200 text-slate-500 px-4 py-2 text-xs font-extrabold cursor-not-allowed"
+              >
+                <Lock size={14} /> Tải xuống
+              </button>
+            )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-1 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-500 hover:bg-slate-200/70 transition cursor-pointer"
+            className="shrink-0 inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
           >
-            <X size={14} /> Đóng
+            Đóng
           </button>
         </div>
       </div>

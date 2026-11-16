@@ -69,6 +69,8 @@ const dailyPracticeApi = {
       const query = new URLSearchParams({ subjectId, ...(unitId ? { unitId } : {}) }).toString();
       return parse(await apiFetch(`/daily-practice/my/related-topics?${query}`));
     },
+    askLessonAssistant: async (body) => parse(await apiFetch('/daily-practice/my/ai-assistant', json('POST', body))),
+    placementAdvice: async (body) => parse(await apiFetch('/daily-practice/my/placement-advice', json('POST', body))),
     buyXp: async (packId) => parse(await apiFetch('/daily-practice/my/xp/purchase', json('POST', { packId }))),
     startSpacedReview: async () => parse(await apiFetch('/daily-practice/my/spaced-review/start', json('POST'))),
     redeemReferral: async (code) => parse(await apiFetch('/daily-practice/my/referral/redeem', json('POST', { code }))),

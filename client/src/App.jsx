@@ -435,9 +435,11 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/exam" element={
           <ErrorBoundary inline>
-            <FreeFeatureLock session={session}>
-              <SelfStudyLock><StudentExamWrapper session={session} /></SelfStudyLock>
-            </FreeFeatureLock>
+            <FreeHiddenRoute session={session}>
+              <FreeFeatureLock session={session}>
+                <SelfStudyLock><StudentExamWrapper session={session} /></SelfStudyLock>
+              </FreeFeatureLock>
+            </FreeHiddenRoute>
           </ErrorBoundary>
         } />
         <Route path="/student/notifications" element={
@@ -527,11 +529,13 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
       <Route path="/student/exam/cert" element={<Navigate to="/student/exam" replace />} />
       <Route path="/student/exam/:subjectId" element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
-          <StudentLearningAccessGate session={session} allowHashes={[]}>
-            <FreeFeatureLock session={session}>
-              <SelfStudyLock><StudentTestWrapper session={session} /></SelfStudyLock>
-            </FreeFeatureLock>
-          </StudentLearningAccessGate>
+          <FreeHiddenRoute session={session}>
+            <StudentLearningAccessGate session={session} allowHashes={[]}>
+              <FreeFeatureLock session={session}>
+                <SelfStudyLock><StudentTestWrapper session={session} /></SelfStudyLock>
+              </FreeFeatureLock>
+            </StudentLearningAccessGate>
+          </FreeHiddenRoute>
         </Guard>
       } />
 

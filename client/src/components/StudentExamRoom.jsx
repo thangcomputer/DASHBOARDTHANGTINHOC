@@ -23,6 +23,7 @@ import {
 } from '../utils/examSubjects';
 import { useIsDesktopExamDevice } from '../utils/examDevice';
 import StudentQuizList from './student/StudentQuizList';
+import DigitalCertificateModal from './student/DigitalCertificateModal';
 import api from '../services/api';
 import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
 
@@ -82,7 +83,14 @@ function useCountdown(target) {
   return remaining;
 }
 
-const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, allowStartExam = true }) => {
+const SubjectCard = ({
+  subject,
+  onStart,
+  onOpenCertificate,
+  isGlobalApproved,
+  examSubjectsCatalog,
+  allowStartExam = true,
+}) => {
   const meta = getExamSubjectMeta(subject.id, examSubjectsCatalog);
   const initials = getExamSubjectInitials(meta);
   const countdown = useCountdown(subject.lockUntil);
@@ -147,7 +155,6 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
     return <span className="text-sm text-red-500">Chưa nộp bài</span>;
   };
 
-  const isFreeStudent = typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student');
   const failedLocked = isExamProgressLocked(subject);
   const awaitingGrade =
     subject.thucHanh === 'da_nop' &&
@@ -208,92 +215,116 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
         </div>
       </div>
 
-      {!isApproved && (
-        <div className="mx-5 mb-3 flex items-center justify-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5">
-          <Lock size={14} className="text-gray-500 flex-shrink-0" />
-          <span className="text-xs text-gray-600 font-bold">Mở khóa sau {subject.requiredSessions || 0} buổi học</span>
-        </div>
-      )}
-
       <div className="px-5 pb-5 pt-2">
-        {isLockedCountDown ? (
-          <button
-            type="button"
-            disabled
-            className="w-full py-2.5 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed  tracking-wide"
-          >
-            <Clock size={15} /> Mở khóa sau: {countdown}
-          </button>
-        ) : failedLocked ? (
-          <button
-            type="button"
-            disabled
-            className="w-full py-2.5 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed"
-          >
-            <Lock size={15} /> Đã rớt - chờ admin mở khóa
-          </button>
-        ) : isAwaitingGrade ? (
-          <button
-            type="button"
-            disabled
-            className="w-full py-2.5 bg-amber-50 border border-amber-200 text-amber-700 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed"
-          >
-            <Clock size={15} /> Đang chờ chấm
-          </button>
-        ) : !allowStartExam && wouldBeAbleToStart ? (
-          <div className="w-full py-2.5 px-3 bg-amber-50 border border-amber-200 text-amber-800 font-semibold rounded-xl text-xs flex items-start justify-center gap-2 text-center leading-snug">
+        {!allowStartExam && wouldBeAbleToStart ? (
+          <div className="mb-2.5 w-full py-2.5 px-3 bg-amber-50 border border-amber-200 text-amber-800 font-semibold rounded-xl text-xs flex items-start justify-center gap-2 text-center leading-snug">
             <Monitor size={15} className="shrink-0 mt-0.5" aria-hidden="true" />
             <span>Thi chỉ dành cho máy tính (laptop/desktop). Trên điện thoại/máy tính bảng bạn chỉ xem được điểm.</span>
           </div>
-        ) : (
-          <>
-            {canStart && (
-              <button
-                type="button"
-                onClick={() => onStart(subject.id)}
-                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
-              >
-                {(subject.attemptCount || 0) > 0 ? <><Play size={15} /> Thi lại</> : 'Vào thi ngay'}
-              </button>
-            )}
-            {canRetry && (
-              <button
-                type="button"
-                onClick={() => onStart(subject.id)}
-                className={`w-full py-2.5 ${isFreeStudent ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100'} text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md`}
-              >
-                <Play size={15} /> Thi lại
-              </button>
-            )}
-            {isOngoing && (
-              <button
-                type="button"
-                onClick={() => onStart(subject.id)}
-                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-orange-100"
-              >
-                <Play size={15} /> Tiếp tục thi
-              </button>
-            )}
-            {isPassed && (
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="min-w-0">
+            {!isApproved ? (
               <button
                 type="button"
                 disabled
-                className="w-full py-2.5 bg-gray-50 border border-gray-100 text-gray-400 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-70"
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-gray-100 border border-gray-200 text-gray-600 font-bold rounded-xl text-[11px] leading-tight flex items-center justify-center gap-1.5 text-center cursor-not-allowed"
               >
-                <CheckCircle size={15} /> Đã hoàn thành
+                <Lock size={13} className="shrink-0 text-gray-500" />
+                <span>Mở khóa sau {subject.requiredSessions || 0} buổi</span>
               </button>
-            )}
-            {!canStart && !canRetry && !isOngoing && !isPassed && subject.attemptStatus === 'active' && (
+            ) : isLockedCountDown ? (
               <button
                 type="button"
                 disabled
-                className="w-full py-2.5 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed"
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[11px] leading-tight flex items-center justify-center gap-1.5 text-center cursor-not-allowed"
               >
-                <Lock size={15} /> Lượt thi đã kết thúc - chờ admin mở khóa
+                <Clock size={13} className="shrink-0" />
+                <span>Mở sau: {countdown}</span>
+              </button>
+            ) : failedLocked ? (
+              <button
+                type="button"
+                disabled
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[11px] leading-tight flex items-center justify-center gap-1.5 text-center cursor-not-allowed"
+              >
+                <Lock size={13} className="shrink-0" />
+                <span>Đã rớt - chờ mở</span>
+              </button>
+            ) : isAwaitingGrade ? (
+              <button
+                type="button"
+                disabled
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-amber-50 border border-amber-200 text-amber-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-not-allowed"
+              >
+                <Clock size={14} className="shrink-0" />
+                <span>Chờ chấm</span>
+              </button>
+            ) : (canStart || canRetry) ? (
+              <button
+                type="button"
+                onClick={() => onStart(subject.id)}
+                className="w-full h-full min-h-[40px] px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-md shadow-emerald-100 cursor-pointer"
+              >
+                {(subject.attemptCount || 0) > 0 || canRetry ? <><Play size={14} className="shrink-0" /> Thi lại</> : 'Vào thi ngay'}
+              </button>
+            ) : isOngoing ? (
+              <button
+                type="button"
+                onClick={() => onStart(subject.id)}
+                className="w-full h-full min-h-[40px] px-2.5 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-md shadow-orange-100 cursor-pointer"
+              >
+                <Play size={14} className="shrink-0" />
+                <span>Tiếp tục thi</span>
+              </button>
+            ) : isPassed ? (
+              <button
+                type="button"
+                disabled
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-emerald-50/70 border border-emerald-200 text-emerald-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-default"
+              >
+                <CheckCircle size={14} className="shrink-0" />
+                <span>Đã hoàn thành</span>
+              </button>
+            ) : subject.attemptStatus === 'active' ? (
+              <button
+                type="button"
+                disabled
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[11px] leading-tight flex items-center justify-center gap-1.5 text-center cursor-not-allowed"
+              >
+                <Lock size={13} className="shrink-0" />
+                <span>Chờ admin mở</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="w-full h-full min-h-[40px] px-2 py-2 bg-gray-100 border border-gray-200 text-gray-500 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-not-allowed"
+              >
+                <Monitor size={13} className="shrink-0" />
+                <span>Thi trên máy tính</span>
               </button>
             )}
-          </>
-        )}
+          </div>
+
+          <button
+            type="button"
+            disabled={!isPassed}
+            onClick={() => {
+              if (isPassed) onOpenCertificate?.(subject, meta.label);
+            }}
+            title={isPassed ? 'Xem chứng nhận QR môn học' : 'Hoàn thành thi chứng nhận môn học để xem chứng nhận'}
+            className={`w-full h-full min-h-[40px] px-2 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-center transition-all ${
+              isPassed
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-100 active:scale-95 cursor-pointer'
+                : 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
+          >
+            <Award size={14} className="shrink-0" />
+            <span>Xem chứng nhận</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -557,6 +588,7 @@ const StudentExamRoom = ({
   );
 
   const [subjects, setSubjects] = useState(() => buildSubjects(student?.examProgress));
+  const [certSubject, setCertSubject] = useState(null);
 
   React.useEffect(() => {
     setSubjects(buildSubjects(student?.examProgress));
@@ -839,7 +871,15 @@ const StudentExamRoom = ({
             {filteredSubjects.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
                 {filteredSubjects.map(s => (
-                  <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={!!isSubjectCourseUnlocked[s.id]} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
+                  <SubjectCard
+                    key={s.id}
+                    subject={s}
+                    onStart={handleStart}
+                    onOpenCertificate={(subj, label) => setCertSubject({ subject: subj, label })}
+                    isGlobalApproved={!!isSubjectCourseUnlocked[s.id]}
+                    examSubjectsCatalog={examSubjectsCatalog}
+                    allowStartExam={allowStartExam}
+                  />
                 ))}
               </div>
             ) : (
@@ -872,6 +912,19 @@ const StudentExamRoom = ({
           </>
         )}
       </div>
+      {certSubject && (
+        <DigitalCertificateModal
+          open={Boolean(certSubject)}
+          onClose={() => setCertSubject(null)}
+          studentName={student?.name || 'Học viên Thắng Tin Học'}
+          studentCode={student?.studentCode || ''}
+          studentId={myStudentId || student?._id || student?.id || ''}
+          courseId={certSubject.subject?.id || 'cert'}
+          courseTitle={certSubject.label || certSubject.subject?.name || 'Chứng nhận môn học'}
+          instructorName="Trung tâm Thắng Tin Học"
+          completionRate={100}
+        />
+      )}
     </div>
   );
 };

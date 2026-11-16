@@ -1,12 +1,12 @@
-/** Combo ×3 / ×5 — ưu tiên GIF (động); fallback WebP nếu GIF chưa có (web). */
+/** Combo ×3 / ×5 — ảnh PNG tại client/public/daily-practice/. */
 export const COMBO_ART_GIF = {
-  3: '/daily-practice/combo-x3.gif',
-  5: '/daily-practice/combo-x5.gif',
+  3: '/daily-practice/combo-x3.png',
+  5: '/daily-practice/combo-x5.png',
 };
 
 export const COMBO_ART_WEBP_FALLBACK = {
-  3: '/daily-practice/combo-x3.webp',
-  5: '/daily-practice/combo-x5.webp',
+  3: '/daily-practice/combo-x3.png',
+  5: '/daily-practice/combo-x5.png',
 };
 
 export function comboArtGifSrc(tier) {

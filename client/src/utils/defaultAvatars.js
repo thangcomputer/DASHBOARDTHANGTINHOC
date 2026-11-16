@@ -91,21 +91,29 @@ export function looksLikeInitials(value) {
   return /^[\p{L}\p{N}]{1,4}$/u.test(s);
 }
 
-function pickRoleGenderAsset(roleKey, gender) {
-  const g = normalizeGender(gender);
-  const base = String(roleKey || 'student').toLowerCase();
-  if (g === 'female') return DEFAULT_AVATARS[`${base}_female`] || DEFAULT_AVATARS[base] || DEFAULT_AVATARS.student;
-  if (g === 'male') return DEFAULT_AVATARS[`${base}_male`] || DEFAULT_AVATARS[base] || DEFAULT_AVATARS.student;
-  return DEFAULT_AVATARS[`${base}_unknown`] || DEFAULT_AVATARS[base] || DEFAULT_AVATARS.student;
+export function getNameInitial(name = '', fallback = '') {
+  const raw = String(name || '').trim();
+  if (raw) {
+    return raw.charAt(0).toLocaleUpperCase('vi-VN');
+  }
+  const fb = String(fallback || '').trim();
+  return fb ? fb.charAt(0).toLocaleUpperCase('vi-VN') : '';
+}
+
+export function buildInitialAvatarDataUrl(name = '') {
+  const initial = getNameInitial(name).replace(/[<>&"']/g, '');
+  const svg = initial
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#E2E8F0"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#334155" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="700">${initial}</text></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#F1F5F9"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 /**
  * Resolve avatar hien thi.
- * Thu tu: upload that → default theo role + gender → role neutral.
- * Khong bien unknown thanh male.
+ * Chi dung anh upload that; neu chua co anh thi tra ve avatar chu cai dau hoac nen trong.
  */
 export function resolveAvatarUrl(userObj = {}) {
-  let avatar, role, adminRole, id, gender;
+  let avatar, name;
   if (typeof userObj === 'string') {
     avatar = userObj;
   } else if (userObj && typeof userObj === 'object') {
@@ -114,51 +122,15 @@ export function resolveAvatarUrl(userObj = {}) {
       ?? userObj.photo
       ?? userObj.photoUrl
       ?? userObj.src;
-    role = userObj.role;
-    adminRole = userObj.adminRole;
-    id = userObj.id || userObj._id;
-    gender = userObj.gender ?? userObj.genderCode;
+    name = userObj.name ?? userObj.fullName ?? userObj.username ?? '';
   }
 
   const raw = String(avatar || '').trim();
   if (isRealAvatar(raw)) return raw;
 
-  const r = String(role || '').toLowerCase();
-  const ar = String(adminRole || '').toUpperCase();
-  const uid = String(id || '').toLowerCase();
-  const g = normalizeGender(gender);
-
-  // Phase 8.21: STAFF/SUPPORT by adminRole BEFORE generic role==="admin"
-  // (JWT staff often has role=admin - must NOT resolve SUPER avatar).
-  if (ar === 'SUPPORT' || r === 'support') {
-    return pickRoleGenderAsset('support', g);
-  }
-
-  if (ar === 'STAFF' || r === 'staff') {
-    return pickRoleGenderAsset('staff', g);
-  }
-
-  // Legacy root id OR explicit SUPER/HIGH adminRole
-  if (uid === 'admin' || ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN') {
-    return pickRoleGenderAsset('admin', g);
-  }
-
-  // JWT admin without adminRole (true root-style session)
-  if (r === 'admin' || r === 'super_admin') {
-    return pickRoleGenderAsset('admin', g);
-  }
-
-  if (r === 'teacher') {
-    return pickRoleGenderAsset('teacher', g);
-  }
-
-  if (r === 'group') {
-    return DEFAULT_AVATARS.admin_unknown;
-  }
-
-  return pickRoleGenderAsset('student', g);
+  return buildInitialAvatarDataUrl(name);
 }
 
-export function getDefaultAvatar(role = 'student', adminRole = null, gender = '') {
-  return resolveAvatarUrl({ role, adminRole, gender });
+export function getDefaultAvatar(_role = 'student', _adminRole = null, _gender = '', name = '') {
+  return buildInitialAvatarDataUrl(name);
 }
