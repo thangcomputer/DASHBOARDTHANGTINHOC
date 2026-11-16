@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock, ExternalLink, Lightbulb, Loader2, Lock, Play, Send, StickyNote, X, Zap,
+  Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock, Lightbulb, Loader2, Lock, Play, Send, StickyNote, X, Zap,
 } from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import { NotesPanel } from '../../lms/LmsPlayerTabs';
@@ -12,7 +11,6 @@ import { resolveCurrentStudentId, saveLastStudySession } from '../../../utils/re
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
-import { lessonResumeUrl } from '../../../utils/learningGoal';
 import { gameSounds } from '../../../utils/sound';
 import { VIDEO_CHECK_ANSWER_XP } from '../../../utils/dailyPractice';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
@@ -111,10 +109,9 @@ function FallbackPlayer({ url, onWatched, onTick }) {
 /** Popup video của chặng lộ trình - giao diện trình phát Thắng Tin Học. */
 /**
  * Popup video của chặng - mở ngay trên trang lộ trình, đóng lại là về đúng chỗ đang xem.
- * Danh sách phát: video riêng của chặng + video buổi bài giảng đã gắn (vẫn có liên kết mở trang bài giảng).
+ * Danh sách phát: video riêng của chặng + video buổi bài giảng đã gắn.
  */
 export default function PathVideoModal({ unit, initialVideoId = '', singleVideoOnly = false, color, onClose, onWatched }) {
-  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [currentId, setCurrentId] = useState(initialVideoId);
@@ -476,11 +473,6 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     }
   };
 
-  const openLessonPage = () => {
-    onClose();
-    navigate(lessonResumeUrl({ subjectId: lesson.subjectId, unitId: lesson.unitId }));
-  };
-
   const isCurrentYouTube = Boolean(current && extractYouTubeId(current.url));
   const currentIdx = current ? playable.findIndex((v) => v.id === current.id) : -1;
   const nextVideo = currentIdx >= 0 ? playable[currentIdx + 1] : null;
@@ -506,7 +498,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       </span>
     )
   ) : null;
-  const showFooterBar = Boolean(lesson || (!isCurrentYouTube && watchStatusControl));
+  const showFooterBar = Boolean(!isCurrentYouTube && watchStatusControl);
 
   return createPortal(
     <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation" onClick={onClose}>
@@ -873,14 +865,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
 
         {showFooterBar && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
-            {!isCurrentYouTube ? (watchStatusControl || <span />) : <span />}
-            <div className={`flex flex-wrap gap-2 ${lesson ? 'ml-auto' : ''}`}>
-              {lesson && (
-                <button type="button" onClick={openLessonPage} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white transition hover:bg-white/20 !shadow-none">
-                  <ExternalLink size={14} /> Mở trang bài giảng
-                </button>
-              )}
-            </div>
+            {watchStatusControl}
           </div>
         )}
       </div>

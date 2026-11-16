@@ -307,10 +307,12 @@ test('giao diện lộ trình: web + mobile có màn lộ trình, luyện tự d
   assert.ok(admin.includes('Lưu danh sách video'));
   const pathView = read('client/src/components/student/dailyPractice/PathView.jsx');
   assert.ok(!pathView.includes('useNavigate'), 'nút Video trên chặng mở popup tại chỗ, không chuyển trang');
-  assert.ok(webVideo.includes('Mở trang bài giảng'), 'popup vẫn có liên kết sang trang bài giảng');
+  assert.ok(!webVideo.includes('Mở trang bài giảng'), 'popup video không còn nút Mở trang bài giảng');
   assert.ok(webVideo.includes('dailyPracticeApi.student.unitVideos'));
   assert.ok(mobile.includes('<PathVideoModal'), 'mobile: bấm nút video mở popup');
-  assert.ok(read('thang-tin-hoc-mobile/src/components/dailyPractice/PathVideoModal.tsx').includes('<VideoPlayerFrame'));
+  const mobileVideo = read('thang-tin-hoc-mobile/src/components/dailyPractice/PathVideoModal.tsx');
+  assert.ok(mobileVideo.includes('<VideoPlayerFrame'));
+  assert.ok(!mobileVideo.includes('Mở trang bài giảng'), 'mobile popup video không còn nút Mở trang bài giảng');
   const mobileApi = read('thang-tin-hoc-mobile/src/services/dailyPracticeApi.ts');
   assert.ok(mobileApi.includes("call<{ topics: DpTopicPath[] }>('/path')"));
   assert.ok(mobileApi.includes('nodeKey'));

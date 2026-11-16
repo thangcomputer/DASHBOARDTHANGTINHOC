@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
-import { CheckCircle2, Clapperboard, ExternalLink, Lock, Play } from 'lucide-react-native';
+import { CheckCircle2, Clapperboard, Lock, Play } from 'lucide-react-native';
 import { VideoPlayerFrame, type VideoPlayerApi } from '../../screens/VideoPlayerFrame';
 import { resolveMobilePublicUrl } from '../../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../../utils/videoSource';
@@ -52,7 +52,6 @@ export function PathVideoModal({
   play,
   onClose,
   onWatched,
-  onOpenLesson,
 }: {
   unit: DpPathUnit;
   initialVideoId?: string;
@@ -62,7 +61,6 @@ export function PathVideoModal({
   play: (s: GameSound) => void;
   onClose: () => void;
   onWatched: (videoId: string) => Promise<void>;
-  onOpenLesson: (lesson: { subjectId: string; unitId: string }) => void;
 }) {
   const [data, setData] = useState<DpUnitVideos | null>(null);
   const [error, setError] = useState('');
@@ -557,18 +555,9 @@ export function PathVideoModal({
             ) : null}
           </ScrollView>
 
-          {lesson || (!playable && watchStatusControl) ? (
+          {!playable && watchStatusControl ? (
             <View style={styles.footer}>
-              {!playable ? (watchStatusControl || <View style={styles.flex} />) : <View style={styles.flex} />}
-              {lesson ? (
-                <Pressable
-                  onPress={() => { onClose(); onOpenLesson({ subjectId: lesson.subjectId, unitId: lesson.unitId }); }}
-                  style={styles.lessonButton}
-                >
-                  <ExternalLink size={15} color="#FFFFFF" />
-                  <Text style={styles.lessonButtonText}>Mở trang bài giảng</Text>
-                </Pressable>
-              ) : null}
+              {watchStatusControl}
             </View>
           ) : null}
         </View>
@@ -757,15 +746,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16,185,129,0.15)',
   },
   watchedText: { color: '#6EE7B7', fontSize: 12, fontWeight: '900' },
-  lessonButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginLeft: 'auto',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  lessonButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
 });

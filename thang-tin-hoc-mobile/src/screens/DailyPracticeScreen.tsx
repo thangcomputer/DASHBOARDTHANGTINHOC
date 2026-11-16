@@ -2500,10 +2500,6 @@ function PathView({
     }
     setPopover({ unitId: unit.id, nodeKey, testOut: false });
   };
-  const watch = (lesson: { subjectId: string; unitId: string }) => navigation.navigate('MainTabs', {
-    screen: 'CourseVideos',
-    params: { resumeKey: Date.now(), resumeSubjectId: lesson.subjectId, resumeCourseId: '', resumeUnitId: lesson.unitId, resumeSectionId: '' },
-  });
 
   const activePopoverUnit = popover && !popover.testOut && current
     ? current.units.find((u) => u.id === popover.unitId) || null
@@ -2737,7 +2733,6 @@ function PathView({
               await dailyPracticeApi.videoWatched(videoOpen.unit.id, videoId);
               onPathChanged();
             }}
-            onOpenLesson={watch}
           />
         ) : null
       }
