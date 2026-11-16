@@ -720,15 +720,16 @@ function App() {
 
   const handleLogin = useCallback((account) => {
     // ⭐ Fix: Login mới thì dọn dẹp sạch sẽ session cũ của role khác để tránh xung đột
-    // (VD: Đã từng login Admin thì xóa admin_user khi login Teacher)
+    const keepKey = account.adminRole === 'STAFF' || account.role === 'staff' ? 'staff' : (account.role || 'admin');
     const roles = ['admin', 'staff', 'teacher', 'student'];
-    roles.forEach(r => {
-      if (r !== account.role) {
+    roles.forEach((r) => {
+      if (r !== keepKey) {
         localStorage.removeItem(`${r}_user`);
         localStorage.removeItem(`${r}_access_token`);
         localStorage.removeItem(`${r}_refresh_token`);
       }
     });
+    localStorage.removeItem('thvp_user');
 
     saveSession(account);
     setSession(account);

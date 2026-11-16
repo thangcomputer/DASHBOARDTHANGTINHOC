@@ -32,8 +32,16 @@ export function useDataSync({
 
   const triggerBackgroundSync = useCallback(async (opts = {}) => {
     if (!currentUser) return;
-    // HV/GV phải có token mới sync, Tránh gọi bị 401 khi chưa login xong
-    if (currentUser.role !== 'admin' && !localStorage.getItem(`${currentUser.role}_access_token`)) return;
+    const roleKey = currentUser.adminRole === 'STAFF' || currentUser.role === 'staff' ? 'staff' : currentUser.role;
+    const activeToken = localStorage.getItem(`${roleKey}_access_token`);
+    // HV/GV phải có token khớp đúng người dùng hiện tại mới sync, tránh 401/403 khi đổi phiên
+    if (currentUser.role !== 'admin' && !activeToken) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem(`${roleKey}_user`) || 'null');
+      const storedId = String(stored?.id || stored?._id || '');
+      const currentId = String(currentUser.id || currentUser._id || '');
+      if (storedId && currentId && storedId !== currentId) return;
+    } catch { /* ignore */ }
 
     const force = opts === true || opts?.force === true;
     const now = Date.now();

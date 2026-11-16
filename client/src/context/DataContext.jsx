@@ -39,14 +39,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
   }, [user]);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('thvp_user');
-    if (savedUser) {
-      try {
-        setCurrentUser(JSON.parse(savedUser));
-      } catch {
-        // Ignore invalid cached user data and keep the current session.
-      }
-    }
+    // Dọn key legacy thvp_user để tránh ghi đè nhầm phiên user cũ gây lỗi 403
+    try { localStorage.removeItem('thvp_user'); } catch { /* ignore */ }
   }, []);
 
   const updateUserAvatar = useCallback((newAvatarUrl) => {
@@ -54,7 +48,11 @@ export const DataProvider = ({ children, user, onLogout }) => {
       if (!prev) return prev;
       const updated = { ...prev, avatar: newAvatarUrl };
       try {
-        localStorage.setItem('thvp_user', JSON.stringify(updated));
+        const key = `${prev.adminRole === 'STAFF' || prev.role === 'staff' ? 'staff' : (prev.role || 'student')}_user`;
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          localStorage.setItem(key, JSON.stringify({ ...JSON.parse(raw), avatar: newAvatarUrl }));
+        }
       } catch {
         // Keep the in-memory avatar update when browser storage is unavailable.
       }
