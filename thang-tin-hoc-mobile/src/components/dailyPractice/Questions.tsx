@@ -436,7 +436,14 @@ export function SortQuestion({ question, reveal, result, play, onChange }: Quest
     if (lockedItem) setPlaced((prev) => ({ ...prev, [lockedItem.name]: lockedItem.group }));
   }, [lockedItem?.name, lockedItem?.group]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    onChange(items.every((item) => placed[item]) ? { placements: placed } : null);
+    onChange(
+      items.every((item) => placed[item])
+        ? {
+          placements: placed,
+          entries: Object.entries(placed).map(([item, group]) => ({ item, group })),
+        }
+        : null,
+    );
   }, [placed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const place = (item: string, group: string) => {

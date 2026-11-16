@@ -540,7 +540,14 @@ export function SortQuestion({ question, reveal, result, onChange }) {
 
   useEffect(() => {
     const complete = question.items.every((item) => placed[item]);
-    onChange(complete ? { placements: placed } : null);
+    onChange(
+      complete
+        ? {
+          placements: placed,
+          entries: Object.entries(placed).map(([item, group]) => ({ item, group })),
+        }
+        : null,
+    );
   }, [placed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const place = (item, group) => {

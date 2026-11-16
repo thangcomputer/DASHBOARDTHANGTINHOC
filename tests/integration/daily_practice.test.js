@@ -49,6 +49,65 @@ test('chấm đúng/sai cho cả 6 dạng câu hỏi', () => {
     assert.equal(rules.gradeAnswer(q, {}), false, `${type} bỏ trống`);
   }
   assert.equal(rules.gradeAnswer(rules.validateQuestion(SAMPLES.truefalse), { value: 'true' }), false, 'Đúng/Sai phải là boolean');
+
+  const mongoSanitize = require('../../middleware/mongoSanitize');
+  const excelSortQ = rules.validateQuestion({
+    type: 'sort',
+    difficulty: 'medium',
+    prompt: 'Phân loại các địa chỉ ô',
+    groups: [
+      { name: 'Tuyệt đối', items: ['$A$1', '$C$5'] },
+      { name: 'Tương đối', items: ['A1', 'C5'] },
+      { name: 'Hỗn hợp', items: ['$A1', 'C$5'] },
+    ],
+  });
+  const reqLegacy = {
+    body: {
+      placements: {
+        $A$1: 'Tuyệt đối',
+        $C$5: 'Tuyệt đối',
+        A1: 'Tương đối',
+        C5: 'Tương đối',
+        $A1: 'Hỗn hợp',
+        C$5: 'Hỗn hợp',
+      },
+    },
+  };
+  mongoSanitize({ replaceWith: '_' })(reqLegacy, {}, () => {});
+  assert.equal(rules.gradeAnswer(excelSortQ, reqLegacy.body), true, 'key bắt đầu bằng $ bị mongoSanitize đổi vẫn chấm đúng');
+
+  const reqEntries = {
+    body: {
+      placements: {
+        $A$1: 'Tuyệt đối',
+        $C$5: 'Tuyệt đối',
+        A1: 'Tương đối',
+        C5: 'Tương đối',
+        $A1: 'Hỗn hợp',
+        C$5: 'Hỗn hợp',
+      },
+      entries: [
+        { item: '$A$1', group: 'Tuyệt đối' },
+        { item: '$C$5', group: 'Tuyệt đối' },
+        { item: 'A1', group: 'Tương đối' },
+        { item: 'C5', group: 'Tương đối' },
+        { item: '$A1', group: 'Hỗn hợp' },
+        { item: 'C$5', group: 'Hỗn hợp' },
+      ],
+    },
+  };
+  mongoSanitize({ replaceWith: '_' })(reqEntries, {}, () => {});
+  assert.equal(rules.gradeAnswer(excelSortQ, reqEntries.body), true, 'payload có entries và placements qua mongoSanitize chấm đúng');
+  assert.equal(rules.gradeAnswer(excelSortQ, {
+    entries: [
+      { item: '$A$1', group: 'Tương đối' },
+      { item: '$C$5', group: 'Tuyệt đối' },
+      { item: 'A1', group: 'Tương đối' },
+      { item: 'C5', group: 'Tương đối' },
+      { item: '$A1', group: 'Hỗn hợp' },
+      { item: 'C$5', group: 'Hỗn hợp' },
+    ],
+  }), false, 'xếp sai nhóm vẫn chấm sai');
 });
 
 test('kiểm tra dữ liệu câu hỏi chặn câu sai cấu trúc', () => {

@@ -230,10 +230,37 @@ function gradeAnswer(q, answer = {}) {
     return blanks.length === answers.length && answers.every((word, index) => norm(blanks[index]) === norm(word));
   }
   if (q.type === 'sort') {
-    const placements = answer.placements && typeof answer.placements === 'object' ? answer.placements : {};
-    const given = new Map(Object.entries(placements).map(([item, group]) => [norm(item), norm(group)]));
-    const expected = q.groups.flatMap((group) => group.items.map((item) => [norm(item), norm(group.name)]));
-    return given.size === expected.length && expected.every(([item, group]) => given.get(item) === group);
+    const hasEntries = Array.isArray(answer.entries) && answer.entries.length > 0;
+    const given = new Map();
+    if (hasEntries) {
+      for (const entry of answer.entries) {
+        if (entry && typeof entry === 'object') {
+          given.set(norm(entry.item), norm(entry.group));
+        }
+      }
+    } else {
+      const placements = answer.placements && typeof answer.placements === 'object' && !Array.isArray(answer.placements)
+        ? answer.placements
+        : {};
+      for (const [item, group] of Object.entries(placements)) {
+        given.set(norm(item), norm(group));
+      }
+    }
+    const expected = q.groups.flatMap((group) => group.items.map((item) => {
+      const raw = String(item ?? '');
+      return {
+        raw,
+        item: norm(item),
+        sanitized: norm(raw.replace(/[$.]/g, '_')),
+        group: norm(group.name),
+      };
+    }));
+    if (given.size !== expected.length) return false;
+    return expected.every(({ raw, item, sanitized, group }) => {
+      const matched = given.get(item)
+        ?? ((raw.startsWith('$') || raw.includes('.')) ? given.get(sanitized) : undefined);
+      return matched === group;
+    });
   }
   return false;
 }

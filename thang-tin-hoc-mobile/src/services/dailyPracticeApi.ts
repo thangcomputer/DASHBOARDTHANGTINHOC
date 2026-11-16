@@ -82,7 +82,7 @@ export type DpAnswer =
   | { items: string[] }
   | { pairs: Array<{ left: string; right: string }> }
   | { blanks: string[] }
-  | { placements: Record<string, string> };
+  | { placements: Record<string, string>; entries?: Array<{ item: string; group: string }> };
 
 export type DpCorrectAnswer = {
   text: string;
