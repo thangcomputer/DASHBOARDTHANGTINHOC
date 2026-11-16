@@ -20,6 +20,7 @@ import {
   isExamProgressLocked,
   canEnterCertificationExam,
   canStartCertificationSubject,
+  computeSubjectExamScore10,
 } from '../utils/examSubjects';
 import { useIsDesktopExamDevice } from '../utils/examDevice';
 import StudentQuizList from './student/StudentQuizList';
@@ -924,6 +925,7 @@ const StudentExamRoom = ({
           instructorName="Trung tâm Thắng Tin Học"
           certificateScope="subject"
           completionRate={100}
+          avgGrade={computeSubjectExamScore10(certSubject.subject)}
         />
       )}
     </div>

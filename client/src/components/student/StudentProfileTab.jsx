@@ -624,7 +624,7 @@ export default function StudentProfileTab({
                               courseTitle: title,
                               instructorName: c.teacherName || (teacherValue && teacherValue !== 'Chưa phân công' ? teacherValue : '') || 'Trung tâm Thắng Tin Học',
                               completionRate: 100,
-                              avgGrade: c.avgGrade,
+                              avgGrade: examEval.averageExamScore ?? (Number(c.avgGrade) > 0 ? Number(c.avgGrade) : null),
                               examsPassed: true,
                               scope: 'course',
                             })}

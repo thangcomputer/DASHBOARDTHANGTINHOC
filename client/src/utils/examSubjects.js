@@ -363,6 +363,24 @@ export function resolveTeacherSubjectIds(teacher, catalog = BUILTIN_EXAM_SUBJECT
   return parseSpecialtyToSubjectIds(teacher?.specialty, catalog);
 }
 
+/** Quy đổi điểm trắc nghiệm và thực hành của một môn thi về thang điểm 10. */
+export function computeSubjectExamScore10(entry) {
+  if (!entry) return null;
+  const tnTotal = Number(entry?.tracNghiem?.total);
+  const tnScore = Number(entry?.tracNghiem?.score);
+  const hasTn = Number.isFinite(tnTotal) && tnTotal > 0 && Number.isFinite(tnScore);
+  const tn10 = hasTn ? Math.max(0, Math.min(10, (tnScore / tnTotal) * 10)) : null;
+
+  const rawEssay = entry?.essayScore;
+  const hasEssay = rawEssay !== null && rawEssay !== undefined && rawEssay !== '' && Number.isFinite(Number(rawEssay));
+  const essay10 = hasEssay ? Math.max(0, Math.min(10, Number(rawEssay))) : null;
+
+  if (tn10 != null && essay10 != null) return Math.round(((tn10 + essay10) / 2) * 10) / 10;
+  if (essay10 != null) return Math.round(essay10 * 10) / 10;
+  if (tn10 != null) return Math.round(tn10 * 10) / 10;
+  return null;
+}
+
 /**
  * Đánh giá điều kiện thi chứng nhận của một khóa học:
  * hoàn thành số buổi chưa đủ, phải thi đạt toàn bộ các môn thuộc khóa.
@@ -398,15 +416,35 @@ export function evaluateCourseCertificateStatus(
       label: meta?.label || id,
       status,
       passed: status === 'dat',
+      score10: computeSubjectExamScore10(entry),
     };
   });
   const totalExams = subjects.length;
   const passedExams = subjects.filter((item) => item.passed).length;
+  const scored = subjects.map((item) => item.score10).filter((val) => val != null);
+  const averageExamScore = scored.length
+    ? Math.round((scored.reduce((sum, val) => sum + val, 0) / scored.length) * 10) / 10
+    : null;
   return {
     subjectIds,
     subjects,
     totalExams,
     passedExams,
     allExamsPassed: totalExams > 0 ? passedExams === totalExams : true,
+    averageExamScore,
   };
+}
+
+/**
+ * Xếp loại chứng nhận theo thang điểm 10 đã chấm:
+ * >= 8.0: Giỏi | >= 6.5: Khá | >= 5.0 (hoặc đã đạt): Trung bình.
+ */
+export function classifyCertificateGrade(avgGrade) {
+  if (avgGrade === null || avgGrade === undefined || avgGrade === '') return null;
+  const n = Number(avgGrade);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const rounded = Math.round(n * 10) / 10;
+  if (rounded >= 8) return { score: rounded, label: 'Giỏi', toneClass: 'text-emerald-700' };
+  if (rounded >= 6.5) return { score: rounded, label: 'Khá', toneClass: 'text-blue-700' };
+  return { score: rounded, label: 'Trung bình', toneClass: 'text-amber-700' };
 }

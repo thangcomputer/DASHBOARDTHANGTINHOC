@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Award, Check, Copy, Lock, Printer, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
+import { classifyCertificateGrade } from '../../utils/examSubjects';
 
 function hashString32(input, seed = 0x811c9dc5) {
   let h = seed >>> 0;
@@ -142,6 +143,7 @@ export default function DigitalCertificateModal({
   const displayCourseTitle = /^tài khoản miễn phí$/i.test(String(courseTitle || '').trim())
     ? 'Xuất sắc'
     : (String(courseTitle || '').trim() || (isSubjectScope ? 'Môn học đã hoàn thành' : 'Khóa học đã đăng ký'));
+  const gradeInfo = classifyCertificateGrade(avgGrade);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -306,7 +308,7 @@ export default function DigitalCertificateModal({
             </p>
             <p className="mx-auto max-w-[340px] text-[11px] font-medium leading-relaxed text-slate-600">
               {isCompleted
-                ? 'Đã hoàn thành xuất sắc chương trình đào tạo & thực hành'
+                ? 'Đã hoàn thành chương trình đào tạo và thực hành'
                 : (progressDone && examsPassed === false
                   ? 'Cần thi đạt đầy đủ các môn bắt buộc để nhận chứng nhận'
                   : 'Bản xem trước tiến độ — hoàn thành 100% để nhận chứng nhận')}
@@ -314,17 +316,29 @@ export default function DigitalCertificateModal({
             <div className="mx-auto mt-1.5 max-w-sm rounded-2xl border border-emerald-200 bg-white/90 px-3.5 py-2 shadow-xs">
               <p className="text-sm sm:text-base font-black text-slate-900">{displayCourseTitle}</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] font-bold text-slate-500">
-                <span className={progressDone ? 'text-emerald-700' : 'text-rose-600'}>
-                  Tiến độ: {safeProgress}%
-                </span>
-                {avgGrade != null && Number(avgGrade) > 0 ? (
-                  <span className="text-amber-700">Điểm TB: {avgGrade}/10</span>
-                ) : null}
-                <span>
-                  {isCompleted
-                    ? `Ngày cấp: ${formattedDate}`
-                    : (progressDone && examsPassed === false ? 'Chưa đạt hết môn thi' : 'Chưa đủ 100%')}
-                </span>
+                {isCompleted ? (
+                  <>
+                    {gradeInfo ? (
+                      <>
+                        <span className={gradeInfo.toneClass}>Loại: {gradeInfo.label}</span>
+                        <span className="text-slate-600">Điểm: {gradeInfo.score}/10</span>
+                      </>
+                    ) : (
+                      <span className="text-emerald-700">Loại: Đạt</span>
+                    )}
+                    <span>Ngày cấp: {formattedDate}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className={progressDone ? 'text-emerald-700' : 'text-rose-600'}>
+                      Tiến độ: {safeProgress}%
+                    </span>
+                    {gradeInfo ? (
+                      <span className="text-amber-700">Điểm: {gradeInfo.score}/10</span>
+                    ) : null}
+                    <span>{progressDone && examsPassed === false ? 'Chưa đạt hết môn thi' : 'Chưa đủ 100%'}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
