@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle, User, Settings, BookOpen,
+  CheckCircle, CheckCircle2, Clock, User, Settings, BookOpen,
   Mail, Phone, MapPin, ChevronRight, ChevronDown,
   GraduationCap, KeyRound, Target, Camera, Bell, LogOut,
   CalendarClock, Crown, History, Zap, Wallet, Receipt, Shield,
-  Award, Laptop, QrCode, Smartphone, Users,
+  Award, Laptop, QrCode, Smartphone, Users, Lock,
 } from 'lucide-react';
 import DigitalCertificateModal from './DigitalCertificateModal';
 import EditableAvatar from '../EditableAvatar';
 import { openPinLockSettings } from '../../utils/pinLock';
 import { openLearningGoal } from '../../utils/learningGoal';
 import api from '../../services/api';
+import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../services/dailyPracticeApi';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { readOwnedVideoCourseCache } from '../../utils/lmsDeepLink';
 import { isFreePortalCourseName, isFreePortalSelfRegistrationStudent } from '../../utils/enrollments';
+import { evaluateCourseCertificateStatus } from '../../utils/examSubjects';
 import { useStudentSubscription } from './subscription/subscriptionContext';
 import { formatVnd } from '../../utils/subscription';
 import { useData } from '../../context/DataContext';
@@ -66,7 +68,7 @@ export default function StudentProfileTab({
 }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { onLogout } = useData();
+  const { onLogout, examSubjectsCatalog } = useData();
   const subCtx = useStudentSubscription();
   const subscription = subCtx?.subscription;
   const isFreePortal = isFreePortalSelfRegistrationStudent(studentData ? { ...studentData, role: 'student' } : null)
@@ -80,13 +82,24 @@ export default function StudentProfileTab({
 
   const [openSections, setOpenSections] = useState({
     courses: false,
+    freeSubjects: true,
     videoOrders: false,
     devices: false,
   });
   const [certificateCourse, setCertificateCourse] = useState(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [videoOrders, setVideoOrders] = useState([]);
-  const [lessonProgress, setLessonProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
+  const [lessonProgress, setLessonProgress] = useState({
+    loading: true,
+    error: '',
+    byId: new Map(),
+    byName: new Map(),
+    catalogById: new Map(),
+    catalogByName: new Map(),
+    openedSubjects: [],
+  });
+  const [freePathTopics, setFreePathTopics] = useState({ loading: false, items: [] });
+  const [freshExamProgress, setFreshExamProgress] = useState(null);
   const studentId = String(
     studentData?.id || studentData?._id || (() => {
       try { return JSON.parse(localStorage.getItem('student_user') || '{}').id; } catch { return ''; }
@@ -150,11 +163,18 @@ export default function StudentProfileTab({
       try {
         const res = await lessonPracticeApi.student.subjects();
         if (cancelled) return;
-        const enrolledVideoCourses = (res.data?.courses || []).filter(
+        const allCatalogCourses = res.data?.courses || [];
+        const enrolledVideoCourses = allCatalogCourses.filter(
           (course) => course.enrolled && course.deliveryMode === 'video',
         );
         const byId = new Map();
         const byName = new Map();
+        const catalogById = new Map();
+        const catalogByName = new Map();
+        allCatalogCourses.forEach((course) => {
+          catalogById.set(String(course.id), course);
+          catalogByName.set(normalizeCourseName(course.name), course);
+        });
         enrolledVideoCourses.forEach((course) => {
           const progress = {
             completed: Number(course.completedLessonCount) || 0,
@@ -163,10 +183,21 @@ export default function StudentProfileTab({
           byId.set(String(course.id), progress);
           byName.set(normalizeCourseName(course.name), progress);
         });
-        setLessonProgress({ loading: false, error: '', byId, byName });
+        const openedSubjects = (res.data?.subjects || []).filter(
+          (subj) => subj.opened && (Number(subj.totalUnitCount) || 0) > 0,
+        );
+        setLessonProgress({ loading: false, error: '', byId, byName, catalogById, catalogByName, openedSubjects });
       } catch (err) {
         if (!cancelled) {
-          setLessonProgress({ loading: false, error: err.message || 'Không tải được tiến độ bài học', byId: new Map(), byName: new Map() });
+          setLessonProgress({
+            loading: false,
+            error: err.message || 'Không tải được tiến độ bài học',
+            byId: new Map(),
+            byName: new Map(),
+            catalogById: new Map(),
+            catalogByName: new Map(),
+            openedSubjects: [],
+          });
         }
       }
     };
@@ -180,6 +211,49 @@ export default function StudentProfileTab({
       window.removeEventListener('lesson-practice-progress-updated', refresh);
     };
   }, [studentId]);
+
+  useEffect(() => {
+    if (!isFreePortal) return undefined;
+    let cancelled = false;
+    const loadFreeTopics = async () => {
+      setFreePathTopics((prev) => ({ ...prev, loading: prev.items.length === 0 }));
+      try {
+        const data = await dailyPracticeApi.student.path();
+        if (cancelled) return;
+        setFreePathTopics({ loading: false, items: Array.isArray(data?.topics) ? data.topics : [] });
+      } catch {
+        if (!cancelled) setFreePathTopics((prev) => ({ ...prev, loading: false }));
+      }
+    };
+    loadFreeTopics();
+    window.addEventListener('focus', loadFreeTopics);
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, loadFreeTopics);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', loadFreeTopics);
+      window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, loadFreeTopics);
+    };
+  }, [isFreePortal, studentId]);
+
+  useEffect(() => {
+    if (isFreePortal || !studentId) return undefined;
+    let cancelled = false;
+    const loadExamProgress = async () => {
+      try {
+        const res = await api.students.getById(studentId);
+        const data = res?.data || res;
+        if (!cancelled && Array.isArray(data?.examProgress)) {
+          setFreshExamProgress(data.examProgress);
+        }
+      } catch { /* ignore */ }
+    };
+    loadExamProgress();
+    window.addEventListener('focus', loadExamProgress);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', loadExamProgress);
+    };
+  }, [isFreePortal, studentId]);
 
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -202,12 +276,68 @@ export default function StudentProfileTab({
       : (studentData?.teacher || 'Chưa phân công'));
 
   const courses = Array.isArray(studentData?.courses) ? studentData.courses : [];
+  const effectiveExamProgress = freshExamProgress || studentData?.examProgress || [];
   const progressForCourse = (course) => {
     const courseId = String(course.courseId || '');
     return (courseId && lessonProgress.byId.get(courseId))
       || lessonProgress.byName.get(normalizeCourseName(course.courseName || course.name))
       || null;
   };
+  const catalogForCourse = (course) => {
+    const courseId = String(course.courseId || '');
+    return (courseId && lessonProgress.catalogById.get(courseId))
+      || lessonProgress.catalogByName.get(normalizeCourseName(course.courseName || course.name))
+      || null;
+  };
+
+  const freeSubjectItems = React.useMemo(() => {
+    if (!isFreePortal) return [];
+    const seenNames = new Set();
+    const rows = [];
+    (freePathTopics.items || []).forEach((item) => {
+      const id = String(item?.topic?.id || '');
+      const name = String(item?.topic?.name || '').trim();
+      if (!id || !name) return;
+      seenNames.add(normalizeCourseName(name));
+      const total = Number(item.totalUnits) || 0;
+      const done = Math.min(total, Number(item.completedUnits) || 0);
+      const completed = total > 0 && done >= total;
+      const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+      rows.push({
+        key: `path-${id}`,
+        id,
+        name,
+        done,
+        total,
+        unitLabel: 'chặng',
+        pct,
+        completed,
+        href: '/student/daily-practice',
+      });
+    });
+    (lessonProgress.openedSubjects || []).forEach((subj) => {
+      const id = String(subj?.id || '');
+      const name = String(subj?.name || '').trim();
+      if (!id || !name || seenNames.has(normalizeCourseName(name))) return;
+      const total = Number(subj.totalUnitCount) || 0;
+      const done = Math.min(total, Number(subj.completedUnitCount) || 0);
+      const completed = total > 0 && done >= total;
+      const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+      rows.push({
+        key: `lesson-${id}`,
+        id,
+        name,
+        done,
+        total,
+        unitLabel: 'bài',
+        pct,
+        completed,
+        href: `/student/lesson-practice/subjects/${encodeURIComponent(id)}`,
+      });
+    });
+    return rows.sort((a, b) => Number(b.completed) - Number(a.completed) || b.pct - a.pct);
+  }, [isFreePortal, freePathTopics.items, lessonProgress.openedSubjects]);
+  const completedFreeSubjectsCount = freeSubjectItems.filter((item) => item.completed).length;
 
   const handleEnableNotification = async () => {
     if (!('Notification' in window)) {
@@ -384,8 +514,8 @@ export default function StudentProfileTab({
         </div>
       </div>
 
-      {/* ── 4. Khóa học đã đăng ký (Chỉ dành cho đăng ký theo khóa, tài khoản tự đăng ký không hiển thị) ── */}
-      {!isFreePortal && (
+      {/* ── 4. Khóa học đã đăng ký (tài khoản theo khóa) / Môn học & Chứng nhận (tài khoản miễn phí) ── */}
+      {!isFreePortal ? (
         <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
           <button
             type="button"
@@ -415,19 +545,37 @@ export default function StudentProfileTab({
                   const title = c.courseName || c.name || 'Khóa học';
                   const freeCourse = isFreePortalCourseName(title);
                   const videoProgress = progressForCourse(c);
+                  const catalogCourse = catalogForCourse(c);
                   const isVideoCourse = Boolean(videoProgress);
                   const total = freeCourse ? 0 : (isVideoCourse ? videoProgress.total : (Number(c.totalSessions) || 12));
                   const done = freeCourse ? 0 : (isVideoCourse ? videoProgress.completed : (Number(c.completedSessions) || 0));
-                  const isCompleted = !freeCourse && (c.status === 'completed' || (isVideoCourse && total > 0 && done >= total));
+                  const sessionsDone = !freeCourse && (
+                    isVideoCourse
+                      ? (total > 0 && done >= total)
+                      : ((total > 0 && done >= total) || c.status === 'completed')
+                  );
+                  const examEval = evaluateCourseCertificateStatus(c, {
+                    examProgress: effectiveExamProgress,
+                    examSubjectsCatalog,
+                    fallbackExamSubjectIds: catalogCourse?.examSubjectIds || [],
+                  });
+                  const requiresExamPass = !freeCourse && !isVideoCourse && examEval.totalExams > 0;
+                  const isCompleted = !freeCourse && sessionsDone && (!requiresExamPass || examEval.allExamsPassed);
+                  const awaitingExams = !freeCourse && sessionsDone && requiresExamPass && !examEval.allExamsPassed;
                   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100) || 0) : 0;
 
                   return (
                     <div key={c.id || c.enrollmentId || title} className="px-4 py-3.5 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{title}</h4>
-                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${isCompleted ? 'bg-[#EFF6FF] text-[#2563EB]' : 'bg-[#ECFDF5] text-[#16A34A]'
-                          }`}>
-                          {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                          isCompleted
+                            ? 'bg-[#EFF6FF] text-[#2563EB]'
+                            : awaitingExams
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-[#ECFDF5] text-[#16A34A]'
+                        }`}>
+                          {isCompleted ? 'Hoàn thành' : (awaitingExams ? `Chờ thi (${examEval.passedExams}/${examEval.totalExams} môn)` : 'Đang học')}
                         </span>
                       </div>
                       <p className="text-[12px] text-[#64748B]">
@@ -437,9 +585,36 @@ export default function StudentProfileTab({
                         <div className="h-full rounded-full transition-all bg-[#10B981]" style={{ width: `${pct}%` }} />
                       </div>
                       <div className="flex items-center justify-between text-[12px]">
-                        <span className="text-[#64748B]">{done}/{total} buổi · Tiến độ {pct}%</span>
+                        <span className="text-[#64748B]">
+                          {done}/{total} {isVideoCourse ? 'bài' : 'buổi'} · Tiến độ {pct}%
+                        </span>
                         <span className="font-extrabold text-[#0F172A]">{c.avgGrade ?? 0} TB</span>
                       </div>
+                      {requiresExamPass ? (
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-600">
+                            <span>Thi chứng nhận môn học</span>
+                            <span className={examEval.allExamsPassed ? 'text-emerald-700' : 'text-amber-700'}>
+                              Đạt {examEval.passedExams}/{examEval.totalExams} môn
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {examEval.subjects.map((sub) => (
+                              <span
+                                key={sub.id}
+                                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10.5px] font-bold ${
+                                  sub.passed
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 bg-white text-slate-600'
+                                }`}
+                              >
+                                {sub.passed ? <CheckCircle2 size={11} /> : <Clock size={11} className="text-amber-500" />}
+                                {sub.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                       {isCompleted ? (
                         <div className="pt-1">
                           <button
@@ -447,19 +622,119 @@ export default function StudentProfileTab({
                             onClick={() => setCertificateCourse({
                               courseId: String(c.courseId || c.id || ''),
                               courseTitle: title,
-                              instructorName: c.teacherName || teacherValue || 'Trung tâm Thắng Tin Học',
-                              completionRate: pct || 100,
+                              instructorName: c.teacherName || (teacherValue && teacherValue !== 'Chưa phân công' ? teacherValue : '') || 'Trung tâm Thắng Tin Học',
+                              completionRate: 100,
                               avgGrade: c.avgGrade,
+                              examsPassed: true,
+                              scope: 'course',
                             })}
                             className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
                           >
                             <QrCode size={13} /> Xem chứng nhận QR
                           </button>
                         </div>
+                      ) : awaitingExams ? (
+                        <div className="pt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                          <span className="inline-flex items-center gap-1.5 min-w-0">
+                            <Lock size={12} className="shrink-0 text-amber-600" />
+                            <span>Hoàn thành số buổi chưa đủ — cần thi đạt tất cả {examEval.totalExams} môn để nhận chứng nhận.</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/student/exam')}
+                            className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 text-[10.5px] font-extrabold transition cursor-pointer"
+                          >
+                            Vào phòng thi
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('freeSubjects')}
+            aria-expanded={openSections.freeSubjects}
+            className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-slate-50/60 transition cursor-pointer !shadow-none ${openSections.freeSubjects ? 'border-b border-[#E9EEF2]' : ''}`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Award size={16} className="text-[#059669] shrink-0" />
+              <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Môn học &amp; Chứng nhận</h3>
+              <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] text-[11px] font-extrabold">
+                {completedFreeSubjectsCount}/{freeSubjectItems.length} xong
+              </span>
+            </div>
+            <ChevronDown size={17} className={`text-[#64748B] shrink-0 transition-transform duration-200 ${openSections.freeSubjects ? 'rotate-180' : ''}`} />
+          </button>
+
+          {openSections.freeSubjects && (
+            <div className="divide-y divide-[#E9EEF2]">
+              {freePathTopics.loading && freeSubjectItems.length === 0 ? (
+                <div className="py-6 px-4 text-center text-[13px] font-medium text-[#64748B]">
+                  Đang tải tiến độ môn học...
+                </div>
+              ) : freeSubjectItems.length === 0 ? (
+                <div className="py-8 px-4 text-center">
+                  <p className="text-[15px] font-bold text-[#0F172A]">Chưa có môn học</p>
+                  <p className="text-[13px] text-[#64748B] mt-1">Hoàn thành từng môn học để mở khóa tải chứng nhận.</p>
+                </div>
+              ) : (
+                freeSubjectItems.map((sub) => (
+                  <div key={sub.key} className="px-4 py-3.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{sub.name}</h4>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                        sub.completed
+                          ? 'bg-[#ECFDF5] text-[#059669]'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {sub.completed ? 'Đã học xong' : (sub.done > 0 ? 'Đang học' : 'Chưa học')}
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${sub.completed ? 'bg-[#059669]' : 'bg-[#10B981]'}`}
+                        style={{ width: `${sub.pct}%` }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
+                      <span className="text-[#64748B]">
+                        {sub.done}/{sub.total} {sub.unitLabel} · Tiến độ {sub.pct}%
+                      </span>
+                      {sub.completed ? (
+                        <button
+                          type="button"
+                          onClick={() => setCertificateCourse({
+                            courseId: sub.id,
+                            courseTitle: sub.name,
+                            instructorName: 'Trung tâm Thắng Tin Học',
+                            completionRate: 100,
+                            avgGrade: null,
+                            examsPassed: true,
+                            scope: 'subject',
+                          })}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                        >
+                          <QrCode size={13} /> Xem &amp; tải chứng nhận
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate(sub.href)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <Lock size={11} className="text-slate-400" /> Học xong để tải
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           )}
@@ -718,12 +993,15 @@ export default function StudentProfileTab({
         studentName={studentData?.name || 'Học viên'}
         studentCode={studentData?.studentCode || ''}
         studentId={studentId}
-        courseId={certificateCourse?._id || certificateCourse?.id || ''}
-        courseTitle={certificateCourse?.title || ''}
+        courseId={certificateCourse?.courseId || certificateCourse?._id || certificateCourse?.id || ''}
+        courseTitle={certificateCourse?.courseTitle || certificateCourse?.title || ''}
         instructorName={certificateCourse?.instructorName || 'Trung tâm Thắng Tin Học'}
         completionRate={
-          Number(certificateCourse?.completionRate ?? certificateCourse?.progress) || 100
+          Number(certificateCourse?.completionRate ?? certificateCourse?.progress) || 0
         }
+        avgGrade={certificateCourse?.avgGrade ?? null}
+        examsPassed={certificateCourse?.examsPassed !== false}
+        certificateScope={certificateCourse?.scope || 'course'}
       />
     </div>
   );

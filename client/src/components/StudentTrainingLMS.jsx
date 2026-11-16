@@ -2785,6 +2785,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         courseId={selectedCourseId}
         courseTitle={selectedCourse?.title || ''}
         instructorName={selectedCourse?.instructorName || 'Trung tâm Thắng Tin Học'}
+        certificateScope={isFreeStudent ? 'subject' : 'course'}
         completionRate={overallProgress}
       />
 

@@ -568,6 +568,12 @@ export default function StudentOverviewTab({
     return null;
   }, [lastStudy, practiceLocked, pathTopic, activePathUnit, heroProgress]);
 
+  const activeResumeCertReady = Boolean(
+    effectiveLastStudy
+    && (effectiveLastStudy.kind === 'daily_practice'
+      ? Boolean(pathTopic?.totalUnits && (pathTopic.completedUnits || 0) >= pathTopic.totalUnits)
+      : Number(effectiveLastStudy.progressPct) >= 100),
+  );
   const resumeKindLabel = effectiveLastStudy?.kind === 'lesson_practice'
     ? 'Bài giảng thực hành'
     : effectiveLastStudy?.kind === 'daily_practice'
@@ -704,7 +710,7 @@ export default function StudentOverviewTab({
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-                    {freePortalUi ? (
+                    {freePortalUi && activeResumeCertReady ? (
                       <button
                         type="button"
                         onClick={() => setCertOpen(true)}
@@ -1079,7 +1085,8 @@ export default function StudentOverviewTab({
           courseId={pathTopic?.topic?.id || currentCourseName || 'dewskill'}
           courseTitle={effectiveLastStudy?.courseTitle || currentCourseName || pathTopic?.topic?.name || 'Lộ trình Tin học DewSkill'}
           instructorName="Trung tâm Thắng Tin Học"
-          completionRate={effectiveLastStudy?.progressPct ?? (Number.isFinite(Number(progressPct)) ? Number(progressPct) : heroProgress)}
+          certificateScope={freePortalUi ? 'subject' : 'course'}
+          completionRate={activeResumeCertReady ? 100 : (effectiveLastStudy?.progressPct ?? (Number.isFinite(Number(progressPct)) ? Number(progressPct) : heroProgress))}
         />
       )}
     </div>

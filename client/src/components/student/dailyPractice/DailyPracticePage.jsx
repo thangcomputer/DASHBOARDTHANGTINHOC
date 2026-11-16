@@ -192,7 +192,7 @@ function HomeScreen({
         pathContinue={Boolean(pathContinue)}
         freeTopicName={selected?.name || topics[0]?.name || ''}
         onBuyXp={() => setBuyXpOpen(true)}
-        onOpenCertificate={() => setCertOpen(true)}
+        onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
       />
 
       {xpEmpty && (
@@ -443,6 +443,7 @@ function HomeScreen({
             ? (pathTopic?.topic?.name || selected?.name || topics[0]?.name || 'Lộ trình Tin học DewSkill')
             : (selected?.name || pathTopic?.topic?.name || 'Luyện tập Tin học DewSkill')}
           instructorName="Trung tâm Thắng Tin Học"
+          certificateScope="subject"
           completionRate={pathTopic?.totalUnits
             ? Math.min(100, Math.round(((pathTopic.completedUnits || 0) / pathTopic.totalUnits) * 100))
             : 0}

@@ -15,13 +15,13 @@ const authPath = path.join(__dirname, '../../routes/authRoutes.js');
 const editablePath = path.join(__dirname, '../../client/src/components/EditableAvatar.jsx');
 const sidebarPath = path.join(__dirname, '../../client/src/components/AppSidebar.jsx');
 const avatarCompPath = path.join(__dirname, '../../client/src/components/admin/shared/Avatar.jsx');
-const publicAvatarsDir = path.join(__dirname, '../../client/public/avatars');
 
 describe('avatar gender sync - normalizeGender + resolveAvatarUrl', async () => {
   const mod = await import(pathToFileURL(avatarsPath).href);
   const {
     normalizeGender,
     resolveAvatarUrl,
+    buildInitialAvatarDataUrl,
     isRealAvatar,
     isAvatarUrl,
     DEFAULT_AVATARS,
@@ -41,55 +41,25 @@ describe('avatar gender sync - normalizeGender + resolveAvatarUrl', async () => 
     assert.equal(normalizeGender('other'), 'unknown');
   });
 
-  it('unknown gender does NOT coerce to male', () => {
+  it('fallback without uploaded avatar renders blank SVG or name initial (no cartoon assets)', () => {
     const male = resolveAvatarUrl({ role: 'student', gender: 'male' });
     const female = resolveAvatarUrl({ role: 'student', gender: 'female' });
     const unknown = resolveAvatarUrl({ role: 'student', gender: '' });
-    assert.equal(male, DEFAULT_AVATARS.student_male);
-    assert.equal(female, DEFAULT_AVATARS.student_female);
+    assert.equal(male, DEFAULT_AVATARS.student_unknown);
+    assert.equal(female, DEFAULT_AVATARS.student_unknown);
     assert.equal(unknown, DEFAULT_AVATARS.student_unknown);
-    assert.notEqual(unknown, male);
-    assert.ok(unknown.endsWith('student.png'));
+    assert.ok(unknown.startsWith('data:image/svg+xml;utf8,'));
   });
 
-  it('A/B student male/female defaults', () => {
-    assert.equal(
-      resolveAvatarUrl({ role: 'student', gender: 'male' }),
-      DEFAULT_AVATARS.student_male,
-    );
-    assert.equal(
-      resolveAvatarUrl({ role: 'student', gender: 'female' }),
-      DEFAULT_AVATARS.student_female,
-    );
+  it('resolveAvatarUrl renders uppercase initial letter when name is present', () => {
+    const withName = resolveAvatarUrl({ role: 'student', name: 'Bùi Thị Ngân' });
+    const blank = buildInitialAvatarDataUrl('');
+    assert.ok(withName.startsWith('data:image/svg+xml;utf8,'));
+    assert.notEqual(withName, blank);
+    assert.ok(decodeURIComponent(withName).includes('>B<'));
   });
 
-  it('D/E teacher male/female', () => {
-    assert.equal(
-      resolveAvatarUrl({ role: 'teacher', gender: 'Nam' }),
-      DEFAULT_AVATARS.teacher_male,
-    );
-    assert.equal(
-      resolveAvatarUrl({ role: 'teacher', gender: 'Nữ' }),
-      DEFAULT_AVATARS.teacher_female,
-    );
-  });
-
-  it('F staff male is NOT staff_female / not female-biased', () => {
-    const url = resolveAvatarUrl({ role: 'staff', gender: 'male' });
-    assert.equal(url, DEFAULT_AVATARS.staff_male);
-    assert.ok(!String(DEFAULT_AVATARS.staff).includes('female'));
-    assert.notEqual(DEFAULT_AVATARS.staff, DEFAULT_AVATARS.staff_female);
-    assert.ok(!url.includes('staff_female'));
-  });
-
-  it('G staff female uses staff_female key path', () => {
-    assert.equal(
-      resolveAvatarUrl({ adminRole: 'STAFF', gender: 'female' }),
-      DEFAULT_AVATARS.staff_female,
-    );
-  });
-
-  it('H/I uploaded avatar wins over gender', () => {
+  it('H/I uploaded avatar wins over default fallback', () => {
     const up = '/uploads/avatars/x.jpg';
     assert.equal(
       resolveAvatarUrl({ avatar: up, role: 'student', gender: 'female' }),
@@ -106,50 +76,12 @@ describe('avatar gender sync - normalizeGender + resolveAvatarUrl', async () => 
     assert.equal(isAvatarUrl('TH'), false);
     assert.equal(isRealAvatar('/uploads/a.png'), true);
     const url = resolveAvatarUrl({ avatar: 'TH', role: 'student', gender: 'female' });
-    assert.equal(url, DEFAULT_AVATARS.student_female);
+    assert.ok(url.startsWith('data:image/svg+xml;utf8,'));
   });
 
-  it('SUPPORT/STAFF adminRole before role=admin', () => {
-    const staff = resolveAvatarUrl({
-      role: 'admin',
-      adminRole: 'STAFF',
-      gender: 'male',
-    });
-    const support = resolveAvatarUrl({
-      role: 'admin',
-      adminRole: 'SUPPORT',
-      gender: 'unknown',
-    });
-    const superA = resolveAvatarUrl({
-      role: 'admin',
-      adminRole: 'SUPER_ADMIN',
-      gender: '',
-    });
-    assert.equal(staff, DEFAULT_AVATARS.staff_male);
-    assert.equal(support, DEFAULT_AVATARS.support_unknown);
-    assert.equal(superA, DEFAULT_AVATARS.admin_unknown);
-  });
-
-  it('default asset files exist on disk', () => {
-    const needed = [
-      DEFAULT_AVATARS.student_male,
-      DEFAULT_AVATARS.student_female,
-      DEFAULT_AVATARS.student,
-      DEFAULT_AVATARS.teacher_male,
-      DEFAULT_AVATARS.staff_male,
-      DEFAULT_AVATARS.admin_male,
-    ];
-    for (const rel of needed) {
-      assert.ok(rel.startsWith('/avatars/'), rel);
-      const file = path.join(publicAvatarsDir, path.basename(rel));
-      assert.ok(fs.existsSync(file), `missing ${file}`);
-    }
-  });
-
-  it('male and female student paths differ (cartoon PNG)', () => {
-    assert.notEqual(DEFAULT_AVATARS.student_male, DEFAULT_AVATARS.student_female);
-    assert.ok(DEFAULT_AVATARS.student_male.endsWith('.png'));
-    assert.ok(DEFAULT_AVATARS.student_female.endsWith('.png'));
+  it('default entries use neutral SVG data URIs without gender bias', () => {
+    assert.equal(DEFAULT_AVATARS.staff_male, DEFAULT_AVATARS.staff_female);
+    assert.ok(DEFAULT_AVATARS.student.startsWith('data:image/svg+xml;utf8,'));
   });
 });
 
@@ -173,7 +105,6 @@ describe('avatar gender sync - static UI/API wiring', () => {
   it('EditableAvatar + AppSidebar pass gender', () => {
     assert.ok(editable.includes('gender'));
     assert.ok(editable.includes('gender,'));
-    // Sidebar bổ sung gender từ self profile khi session thiếu → effectiveGender
     assert.ok(sidebar.includes('gender={effectiveGender}') || sidebar.includes('gender={session?.gender}'));
     assert.ok(sidebar.includes('effectiveGender'));
   });
@@ -184,8 +115,8 @@ describe('avatar gender sync - static UI/API wiring', () => {
     assert.ok(editable.includes('document.body'));
   });
 
-  it('Avatar onError uses resolveAvatarUrl gender-aware fallback', () => {
-    assert.ok(avatarComp.includes('resolveAvatarUrl({ role, adminRole, name, gender, avatar: \'\''));
-    assert.ok(avatarComp.includes('fallbackStep'));
+  it('Avatar onError falls back to initial / blank background without cartoon image', () => {
+    assert.ok(avatarComp.includes('setImgFailed(true)'));
+    assert.ok(avatarComp.includes('getNameInitial'));
   });
 });

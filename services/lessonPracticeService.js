@@ -713,6 +713,7 @@ async function listSubjectsForStudent(studentId) {
       offerType: examSubjectIds.length === 1 ? 'single' : 'bundle',
       availableForEnrollment: course.status === 'published',
       subjectKeys: [...new Set(examSubjectIds.map(rules.normalizeSubjectKey).filter(Boolean))],
+      examSubjectIds,
       subjects: courseSubjects,
       lessonCount,
       completedLessonCount,

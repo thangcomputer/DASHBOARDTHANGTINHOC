@@ -362,3 +362,51 @@ export function resolveTeacherSubjectIds(teacher, catalog = BUILTIN_EXAM_SUBJECT
   if (fromIds.length) return fromIds;
   return parseSpecialtyToSubjectIds(teacher?.specialty, catalog);
 }
+
+/**
+ * Đánh giá điều kiện thi chứng nhận của một khóa học:
+ * hoàn thành số buổi chưa đủ, phải thi đạt toàn bộ các môn thuộc khóa.
+ */
+export function evaluateCourseCertificateStatus(
+  course,
+  { examProgress = [], examSubjectsCatalog = null, fallbackExamSubjectIds = [] } = {},
+) {
+  const cat = examSubjectsCatalog || BUILTIN_EXAM_SUBJECTS;
+  const fromEnrollment = Array.isArray(course?.examSubjects)
+    ? course.examSubjects.map((id) => String(id || '').trim()).filter(Boolean)
+    : [];
+  const fromFallback = Array.isArray(fallbackExamSubjectIds)
+    ? fallbackExamSubjectIds.map((id) => String(id || '').trim()).filter(Boolean)
+    : [];
+  const rawSubjectIds = fromEnrollment.length
+    ? fromEnrollment
+    : (fromFallback.length
+      ? fromFallback
+      : mapCourseToExamSubjectIdsStrict(course?.courseName || course?.name || '', cat));
+  const subjectIds = [...new Set(rawSubjectIds)];
+  const progressById = new Map(
+    (Array.isArray(examProgress) ? examProgress : [])
+      .filter((item) => item && item.id)
+      .map((item) => [String(item.id).trim(), item]),
+  );
+  const subjects = subjectIds.map((id) => {
+    const entry = progressById.get(id);
+    const meta = getExamSubjectMeta(id, cat);
+    const status = String(entry?.status || 'chua_thi');
+    return {
+      id,
+      label: meta?.label || id,
+      status,
+      passed: status === 'dat',
+    };
+  });
+  const totalExams = subjects.length;
+  const passedExams = subjects.filter((item) => item.passed).length;
+  return {
+    subjectIds,
+    subjects,
+    totalExams,
+    passedExams,
+    allExamsPassed: totalExams > 0 ? passedExams === totalExams : true,
+  };
+}

@@ -922,6 +922,7 @@ const StudentExamRoom = ({
           courseId={certSubject.subject?.id || 'cert'}
           courseTitle={certSubject.label || certSubject.subject?.name || 'Chứng nhận môn học'}
           instructorName="Trung tâm Thắng Tin Học"
+          certificateScope="subject"
           completionRate={100}
         />
       )}

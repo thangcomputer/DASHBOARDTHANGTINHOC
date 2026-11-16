@@ -117,21 +117,31 @@ export default function DigitalCertificateModal({
   studentCode = '',
   studentId = '',
   courseId = '',
-  courseTitle = 'Khóa học Tin học ứng dụng',
+  courseTitle = '',
   instructorName = 'Trung tâm Thắng Tin Học',
   completionRate = 0,
   avgGrade = null,
   issuedDate = '',
+  examsPassed = true,
+  certificateScope = 'course',
+  blockedReason = '',
 }) {
   const [copied, setCopied] = useState(false);
   const safeProgress = Math.min(
     100,
     Math.max(0, Number.isFinite(Number(completionRate)) ? Math.round(Number(completionRate)) : 0),
   );
-  const isCompleted = safeProgress >= 100;
+  const progressDone = safeProgress >= 100;
+  const isCompleted = progressDone && examsPassed !== false;
+  const isSubjectScope = certificateScope === 'subject';
+  const scopeNoun = isSubjectScope ? 'MÔN HỌC' : 'KHÓA HỌC';
+  const rawInstructor = String(instructorName || '').trim();
+  const displayInstructor = (!rawInstructor || /^chưa phân công$/i.test(rawInstructor))
+    ? 'Trung tâm Thắng Tin Học'
+    : rawInstructor;
   const displayCourseTitle = /^tài khoản miễn phí$/i.test(String(courseTitle || '').trim())
     ? 'Xuất sắc'
-    : (String(courseTitle || '').trim() || 'Khóa học Tin học ứng dụng');
+    : (String(courseTitle || '').trim() || (isSubjectScope ? 'Môn học đã hoàn thành' : 'Khóa học đã đăng ký'));
 
   useEffect(() => {
     if (!open) return undefined;
@@ -244,10 +254,12 @@ export default function DigitalCertificateModal({
             >
               <div className="-rotate-12 rounded-xl border-2 border-rose-600/70 bg-white/70 px-3.5 py-1.5 text-center shadow-md backdrop-blur-[0.5px]">
                 <p className="whitespace-nowrap text-xs sm:text-sm font-black tracking-[0.14em] text-rose-600 uppercase">
-                  CHƯA HOÀN THÀNH
+                  {progressDone && examsPassed === false ? (blockedReason || 'CHƯA THI ĐỦ MÔN') : 'CHƯA HOÀN THÀNH'}
                 </p>
                 <p className="mt-0.5 whitespace-nowrap text-[10px] font-black text-rose-700">
-                  TIẾN ĐỘ: {safeProgress}% / 100%
+                  {progressDone && examsPassed === false
+                    ? 'HOÀN THÀNH THI MÔN ĐỂ MỞ KHÓA'
+                    : `TIẾN ĐỘ: ${safeProgress}% / 100%`}
                 </p>
               </div>
             </div>
@@ -272,7 +284,7 @@ export default function DigitalCertificateModal({
               </span>
             ) : (
               <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-rose-100 border border-rose-200 px-2.5 py-1 text-[10px] font-black text-rose-700">
-                <ShieldAlert size={12} className="shrink-0" /> Chưa xong ({safeProgress}%)
+                <ShieldAlert size={12} className="shrink-0" /> {progressDone && examsPassed === false ? 'Chưa thi đủ môn' : `Chưa xong (${safeProgress}%)`}
               </span>
             )}
           </div>
@@ -284,7 +296,7 @@ export default function DigitalCertificateModal({
             <h2 className="text-lg sm:text-[20px] font-black leading-snug tracking-tight text-slate-900">
               CHỨNG NHẬN HOÀN THÀNH
               <br />
-              KHÓA HỌC
+              {scopeNoun}
             </h2>
             <p className="text-[11px] font-medium text-slate-500">
               Trân trọng trao tặng học viên
@@ -295,18 +307,24 @@ export default function DigitalCertificateModal({
             <p className="mx-auto max-w-[340px] text-[11px] font-medium leading-relaxed text-slate-600">
               {isCompleted
                 ? 'Đã hoàn thành xuất sắc chương trình đào tạo & thực hành'
-                : 'Bản xem trước tiến độ — hoàn thành 100% để nhận chứng nhận'}
+                : (progressDone && examsPassed === false
+                  ? 'Cần thi đạt đầy đủ các môn bắt buộc để nhận chứng nhận'
+                  : 'Bản xem trước tiến độ — hoàn thành 100% để nhận chứng nhận')}
             </p>
             <div className="mx-auto mt-1.5 max-w-sm rounded-2xl border border-emerald-200 bg-white/90 px-3.5 py-2 shadow-xs">
               <p className="text-sm sm:text-base font-black text-slate-900">{displayCourseTitle}</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] font-bold text-slate-500">
-                <span className={isCompleted ? 'text-emerald-700' : 'text-rose-600'}>
+                <span className={progressDone ? 'text-emerald-700' : 'text-rose-600'}>
                   Tiến độ: {safeProgress}%
                 </span>
                 {avgGrade != null && Number(avgGrade) > 0 ? (
                   <span className="text-amber-700">Điểm TB: {avgGrade}/10</span>
                 ) : null}
-                <span>{isCompleted ? `Ngày cấp: ${formattedDate}` : 'Chưa đủ 100%'}</span>
+                <span>
+                  {isCompleted
+                    ? `Ngày cấp: ${formattedDate}`
+                    : (progressDone && examsPassed === false ? 'Chưa đạt hết môn thi' : 'Chưa đủ 100%')}
+                </span>
               </div>
             </div>
           </div>
@@ -317,7 +335,7 @@ export default function DigitalCertificateModal({
                 Giảng viên / Đại diện
               </p>
               <p className="truncate text-[11.5px] sm:text-xs font-black text-slate-800">
-                {instructorName || 'Trung tâm Thắng Tin Học'}
+                {displayInstructor}
               </p>
               <p className="truncate text-[9.5px] font-mono font-bold text-emerald-700">
                 {isCompleted ? `Mã CN: ${certCode}` : 'Mã CN: Chưa kích hoạt'}
@@ -365,7 +383,7 @@ export default function DigitalCertificateModal({
               <button
                 type="button"
                 disabled
-                title={`Hoàn thành 100% để tải về (${safeProgress}%)`}
+                title={progressDone && examsPassed === false ? 'Thi đạt đầy đủ môn để tải về' : `Hoàn thành 100% để tải về (${safeProgress}%)`}
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-slate-200 text-slate-500 px-4 py-2 text-xs font-extrabold cursor-not-allowed"
               >
                 <Lock size={14} /> Tải xuống

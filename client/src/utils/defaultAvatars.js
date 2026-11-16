@@ -1,40 +1,36 @@
 /**
- * Avatar mac dinh phong cach cartoon chu de giao duc.
- * Chi dung khi user chua co anh tuy chinh (upload that).
- *
- * Assets trong client/public/avatars/ (PNG gender-specific + SVG trung tinh).
+ * Avatar mac dinh nen trong / chu cai dau khi user chua co anh upload that.
+ * Khong su dung anh cartoon mac dinh.
  */
 
-/**
- * Canonical map: role + gender → asset path.
- * unknown → role PNG trung tinh (student.png / teacher.png / ...) - KHONG doan male.
- * staff default KHONG dung staff_female.
- */
+export const BLANK_AVATAR_SVG =
+  'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2232%22%20fill%3D%22%23F1F5F9%22%2F%3E%3C%2Fsvg%3E';
+
 export const DEFAULT_AVATARS = {
-  admin: '/avatars/admin.png',
-  admin_male: '/avatars/admin_male.png',
-  admin_female: '/avatars/admin_female.png',
-  admin_unknown: '/avatars/admin.png',
+  admin: BLANK_AVATAR_SVG,
+  admin_male: BLANK_AVATAR_SVG,
+  admin_female: BLANK_AVATAR_SVG,
+  admin_unknown: BLANK_AVATAR_SVG,
 
-  staff: '/avatars/staff.png',
-  staff_male: '/avatars/staff_male.png',
-  staff_female: '/avatars/staff_female.png',
-  staff_unknown: '/avatars/staff.png',
+  staff: BLANK_AVATAR_SVG,
+  staff_male: BLANK_AVATAR_SVG,
+  staff_female: BLANK_AVATAR_SVG,
+  staff_unknown: BLANK_AVATAR_SVG,
 
-  support: '/avatars/support_male.png',
-  support_male: '/avatars/support_male.png',
-  support_female: '/avatars/support_female.png',
-  support_unknown: '/avatars/support_male.png',
+  support: BLANK_AVATAR_SVG,
+  support_male: BLANK_AVATAR_SVG,
+  support_female: BLANK_AVATAR_SVG,
+  support_unknown: BLANK_AVATAR_SVG,
 
-  teacher: '/avatars/teacher.png',
-  teacher_male: '/avatars/teacher_male.png',
-  teacher_female: '/avatars/teacher_female.png',
-  teacher_unknown: '/avatars/teacher.png',
+  teacher: BLANK_AVATAR_SVG,
+  teacher_male: BLANK_AVATAR_SVG,
+  teacher_female: BLANK_AVATAR_SVG,
+  teacher_unknown: BLANK_AVATAR_SVG,
 
-  student: '/avatars/student.png',
-  student_male: '/avatars/student_male.png',
-  student_female: '/avatars/student_female.png',
-  student_unknown: '/avatars/student.png',
+  student: BLANK_AVATAR_SVG,
+  student_male: BLANK_AVATAR_SVG,
+  student_female: BLANK_AVATAR_SVG,
+  student_unknown: BLANK_AVATAR_SVG,
 };
 
 /**
