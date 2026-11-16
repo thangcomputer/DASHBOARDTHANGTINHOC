@@ -119,11 +119,10 @@ describe('Phase 8.22 messaging identity lock', { concurrency: false }, () => {
     assert.equal(messaging.includes("otherUserId === 'admin' || otherRole === 'admin'"), false);
   });
 
-  it('8 defaultAvatars STAFF before role===admin (regression)', () => {
+  it('8 defaultAvatars STAFF uses the neutral blank avatar like admin (regression)', () => {
     const src = read('client/src/utils/defaultAvatars.js');
-    const staffIdx = src.indexOf("ar === 'STAFF'");
-    const adminIdx = src.indexOf("r === 'admin' || r === 'super_admin'");
-    assert.ok(staffIdx > 0 && adminIdx > staffIdx);
+    assert.ok(/staff:\s*BLANK_AVATAR_SVG/.test(src));
+    assert.ok(/admin:\s*BLANK_AVATAR_SVG/.test(src));
   });
 
   it('9 HTTP+Socket staff↔teacher same conversationId', () => {

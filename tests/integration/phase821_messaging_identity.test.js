@@ -102,14 +102,11 @@ describe('Phase 8.21 messaging identity', { concurrency: false }, () => {
     assert.equal(src.includes("if (msg.senderId === 'admin') {\n      const superDoc"), false);
   });
 
-  it('J defaultAvatars: STAFF/SUPPORT checked before role===admin', () => {
+  it('J defaultAvatars: STAFF/SUPPORT/admin all use the neutral blank avatar (no role-based cartoon)', () => {
     const src = read('client/src/utils/defaultAvatars.js');
-    const staffIdx = src.indexOf("ar === 'STAFF'");
-    const supportIdx = src.indexOf("ar === 'SUPPORT'");
-    const adminRoleIdx = src.indexOf("r === 'admin' || r === 'super_admin'");
-    assert.ok(staffIdx > 0 && supportIdx > 0 && adminRoleIdx > 0);
-    assert.ok(Math.min(staffIdx, supportIdx) < adminRoleIdx);
-    // Must not treat role===admin as SUPER before staff check
+    assert.ok(/staff:\s*BLANK_AVATAR_SVG/.test(src));
+    assert.ok(/support:\s*BLANK_AVATAR_SVG/.test(src));
+    assert.ok(/admin:\s*BLANK_AVATAR_SVG/.test(src));
     assert.equal(
       /uid === 'admin' \|\| ar === 'SUPER_ADMIN' \|\| ar === 'HIGH_ADMIN' \|\| r === 'admin'/.test(src),
       false,

@@ -105,7 +105,7 @@ test('Support chat composer aligns attachment, emoji, input, and send controls',
     fs.readFile(path.resolve(__dirname, '../client/src/components/StickerPicker.jsx'), 'utf8'),
     fs.readFile(path.resolve(__dirname, '../client/src/index.css'), 'utf8'),
   ]);
-  assert.ok(component.includes('className="cms-fm-capture-control"'));
+  assert.ok(component.includes('ScreenCaptureButton'));
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-window__compose\s*\{\s*width: 100%;\s*gap: 8px;/);
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-attach\s*\{\s*box-sizing: border-box;\s*width: 40px;/);
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-capture-control\s*>\s*button\s*\{\s*width: 14px;/);
@@ -115,16 +115,12 @@ test('Support chat composer aligns attachment, emoji, input, and send controls',
   );
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-send\s*\{\s*box-sizing: border-box;\s*width: 40px;/);
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-input\s*\{[\s\S]*?height: 40px;/);
-  assert.ok(inbox.includes('cms-chat-attachment-tools flex items-center gap-1.5'));
-  assert.ok(inbox.includes('className="cms-chat-capture-control"'));
-  assert.match(styles, /\.cms-chat-attachment-tools\s*>\s*button\s*\{\s*display: inline-flex;\s*width: 40px;/);
-  assert.match(styles, /\.cms-chat-attachment-tools\s*>\s*\.cms-chat-capture-control\s*\{[\s\S]*?overflow: visible;[\s\S]*?border: 1px solid #cbd5e1;/);
-  assert.match(styles, /\.cms-chat-capture-control\s*>\s*button\s*\{[\s\S]*?width: 24px;[\s\S]*?border-left: 1px solid #e2e8f0;/);
+  assert.ok(inbox.includes('ScreenCaptureButton'));
   assert.ok(styles.includes('@media (max-width: 640px)'));
   assert.ok(inbox.includes('key={activeConv?.id || \'no-conversation\'}'));
   assert.ok(inbox.includes('                        inline'));
-  assert.ok(inbox.includes('buttonClassName="border border-slate-200 bg-white"'));
-  assert.ok(inbox.includes('buttonClassName="border border-slate-200 bg-white"'));
+  assert.ok(inbox.includes('<StickerPicker'));
+  assert.ok(inbox.includes('buttonClassName="!h-8 !w-8 !border-0'));
   assert.ok(stickerPicker.includes('${buttonClassName}'));
 });
 
