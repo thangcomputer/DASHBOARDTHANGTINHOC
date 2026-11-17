@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, DeviceEventEmitter, Easing, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
-  ArrowRight, Award, BookOpen, Bot, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardCheck, ClipboardList,
-  Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, PlayCircle, Sparkles, Star, TrendingUp, Users,
-  WalletCards, UserPlus, Trophy, Video, X, Zap, Flame, Gamepad2, type LucideIcon,
+  ArrowRight, Award, BookOpen, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardList,
+  Clock, Flame, Gamepad2, GraduationCap, PlayCircle, Target, Trophy, Video, X, Zap, type LucideIcon,
 } from 'lucide-react-native';
+import { ClipboardCheck, FileText, WalletCards } from 'lucide-react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -22,32 +22,37 @@ import {
   type LastStudySession,
 } from '../utils/resumeLearning';
 import { isMeetEnded, isMeetLiveNow, meetLessonName, vnScheduleClock } from '../utils/meetJoin';
-import { DailyPracticeOverviewCard } from '../components/DailyPracticeOverviewCard';
 import { FreeMeetPlanModal, isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
 import { SubscriptionRenewPanel } from '../components/subscription/SubscriptionRenew';
 import { hasMeetAccessClient } from '../services/subscriptionApi';
 import { CompactCoursePicker, type CoursePickerItem } from '../components/CompactCoursePicker';
 import { WelcomeHero, type WelcomeChip } from '../components/WelcomeHero';
 import { DAILY_PRACTICE_STATS_EVENT, dailyPracticeApi, type DpStats } from '../services/dailyPracticeApi';
-import { LEARNING_GOAL_CHANGED_EVENT } from '../services/learningGoalApi';
+import {
+  LEARNING_GOAL_CHANGED_EVENT,
+  OPEN_LEARNING_GOAL_EVENT,
+  STUDY_MINUTE_EVENT,
+  formatStudyMinutes,
+  getLearningGoal,
+  periodLabel,
+  type LearningGoalData,
+} from '../services/learningGoalApi';
 import {
   assignmentService, evaluationService,
   quizService, scheduleService, studentProfileService, studentService,
 } from '../services/mockService';
 import { useMockResource } from '../hooks/useMockResource';
 import { SOCKET_EVENTS } from '../services/socketService';
-import { getMobileImageSource, mobileApiRequest } from '../services/apiClient';
+import { mobileApiRequest } from '../services/apiClient';
 import { getTeacherDashboardMetrics } from '../services/teacherApi';
 import { buildStudentDashboardActivity } from '../services/studentDashboardActivity';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { DuoButton } from '../components/duo/DuoButton';
-import { DuoHeroCard } from '../components/duo/DuoHeroCard';
 import { DuoDailyQuestsCard } from '../components/duo/DuoDailyQuestsCard';
 import { ReferralRewardCard } from '../components/ReferralRewardCard';
 import { listOfflineVideos } from '../services/offlineVideos';
 import { saveHomeWidgetSnapshot } from '../services/widgetSync';
-import { DuoScheduleCard } from '../components/duo/DuoScheduleCard';
 
 type RootNavigation = NativeStackNavigationProp<AppStackParamList>;
 type TabNavigation = BottomTabNavigationProp<MainTabsParamList>;
@@ -191,9 +196,10 @@ export function HomeScreen() {
   const [lmsSubjects, setLmsSubjects] = useState<LmsSubjectProgress[]>([]);
   const [savedPathTopicId, setSavedPathTopicId] = useState('');
   const [lastStudy, setLastStudy] = useState<LastStudySession | null>(null);
+  const [goalData, setGoalData] = useState<LearningGoalData | null>(null);
 
   useEffect(() => {
-    const t = setInterval(() => setNowTick(Date.now()), 30_000);
+    const t = setInterval(() => setNowTick(Date.now()), 15_000);
     return () => clearInterval(t);
   }, []);
 
@@ -201,6 +207,7 @@ export function HomeScreen() {
     if (isTeacher || !user || user.previewMode) return;
     const userKey = String(user.id || user._id || '').trim();
     void readLastStudySession(userKey).then(setLastStudy);
+    getLearningGoal().then(setGoalData).catch(() => { });
     dailyPracticeApi.overview().then(setPractice).catch(() => { });
     dailyPracticeApi.path()
       .then((data) => {
@@ -281,14 +288,29 @@ export function HomeScreen() {
       if (userKey && sessionData.studentId && sessionData.studentId !== userKey) return;
       setLastStudy(sessionData);
     });
-    const goalChangedSub = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, () => {
+    const goalChangedSub = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next?: LearningGoalData | null) => {
+      if (next && typeof next === 'object' && 'progress' in next) setGoalData(next);
+      else getLearningGoal().then(setGoalData).catch(() => { });
       dailyPracticeApi.overview().then(setPractice).catch(() => { });
       dailyPracticeApi.path().then(setPathData).catch(() => { });
+    });
+    const minuteSub = DeviceEventEmitter.addListener(STUDY_MINUTE_EVENT, (result: { todayMinutes?: number }) => {
+      const todayMinutes = Number(result?.todayMinutes);
+      if (!Number.isFinite(todayMinutes)) return;
+      setGoalData((prev) => {
+        if (!prev) return prev;
+        const delta = Math.max(0, todayMinutes - (prev.progress.todayMinutes || 0));
+        return {
+          ...prev,
+          progress: { ...prev.progress, todayMinutes, periodMinutes: (prev.progress.periodMinutes || 0) + delta },
+        };
+      });
     });
     return () => {
       sub.remove();
       resumeSub.remove();
       goalChangedSub.remove();
+      minuteSub.remove();
     };
   }, [isTeacher, user]);
   const schedulesLoader = useCallback(() => (
@@ -481,7 +503,13 @@ export function HomeScreen() {
     (studentSchedules || [])
       .filter((item) => item.date === todayKey && item.status !== 'cancelled')
       .forEach((item) => {
-        const live = scheduleIsLive(item);
+        const ended = isMeetEnded({
+          day: item.date,
+          endTime: item.endTime,
+          nowDay: todayKey,
+          nowMinutes,
+        });
+        const live = scheduleIsLive(item) && !ended;
         const enrollmentLinks = Array.isArray(profile.data?.enrollments)
           ? profile.data.enrollments
           : [];
@@ -497,7 +525,8 @@ export function HomeScreen() {
           || matchedEnrollment?.linkHoc
           || (typeof profile.data?.student?.linkHoc === 'string' ? profile.data.student.linkHoc : '')
           || (typeof profile.data?.student?.joinClassUrl === 'string' ? profile.data.student.joinClassUrl : '')
-          || (typeof profile.data?.student?.online_meeting_url === 'string' ? profile.data.student.online_meeting_url : '');
+          || (typeof profile.data?.student?.online_meeting_url === 'string' ? profile.data.student.online_meeting_url : '')
+          || (typeof (user as { linkHoc?: string } | null)?.linkHoc === 'string' ? (user as { linkHoc?: string }).linkHoc : '');
         const trimmedLink = String(rawMeetLink || '').trim();
         const normalizedLink = trimmedLink && !/^https?:\/\//i.test(trimmedLink)
           ? `https://${trimmedLink}`
@@ -510,12 +539,7 @@ export function HomeScreen() {
           meetLink: normalizedLink,
           live,
           joinable: live,
-          ended: isMeetEnded({
-            day: item.date,
-            endTime: item.endTime,
-            nowDay: todayKey,
-            nowMinutes,
-          }),
+          ended,
           waitLabel: item.startTime ? `Vào lúc ${item.startTime}` : 'Chưa đến giờ vào lớp',
           teacher: item.teacherName || item.person || '',
         });
@@ -524,35 +548,38 @@ export function HomeScreen() {
     (meetClasses || [])
       .filter((m) => m.status !== 'cancelled' && m.day === todayKey)
       .forEach((m) => {
+        const ended = isMeetEnded({
+          day: m.day,
+          endTime: m.endTime,
+          nowDay: todayKey,
+          nowMinutes,
+        });
         const live = isMeetLiveNow({
           day: m.day,
           startTime: m.startTime,
           endTime: m.endTime,
           nowDay: todayKey,
           nowMinutes,
-        });
+        }) && !ended;
         const joinable = live;
+        const rawLink = String(m.linkHoc || '').trim();
+        const normalizedMeetLink = rawLink && !/^https?:\/\//i.test(rawLink) ? `https://${rawLink}` : rawLink;
         list.push({
           id: String(m._id || m.id || `meet-${m.day}-${m.startTime}`),
           title: meetLessonName(m),
           time: m.startTime && m.endTime ? `${m.startTime} – ${m.endTime}` : (m.slotLabel || 'Trong ngày'),
           dateLabel: shortDayLabel(m.day),
-          meetLink: String(m.linkHoc || '').trim(),
+          meetLink: normalizedMeetLink,
           live,
           joinable,
-          ended: isMeetEnded({
-            day: m.day,
-            endTime: m.endTime,
-            nowDay: todayKey,
-            nowMinutes,
-          }),
+          ended,
           waitLabel: m.startTime ? `Vào lúc ${m.startTime}` : 'Chưa đến giờ vào lớp',
           teacher: '',
         });
       });
 
     return list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0));
-  }, [studentSchedules, meetClasses, currentCourse, profile.data, nowTick]);
+  }, [studentSchedules, meetClasses, currentCourse, profile.data, user, nowTick]);
   const nextLesson = useMemo(() => {
     const { day: todayKey } = vnScheduleClock();
     const rows: Array<{ sort: string; name: string; meta: string }> = [];
@@ -819,6 +846,18 @@ export function HomeScreen() {
     widgetNextTime,
   ]);
 
+  const goalObj = goalData?.goal || null;
+  const goalProgress = goalData?.progress;
+  const todayMinutes = goalProgress?.todayMinutes ?? practiceStats?.todayMinutes ?? 0;
+  const dailyTargetMinutes = goalProgress?.dailyTargetMinutes || (goalObj ? goalObj.hoursPerDay * 60 : 60);
+  const todayGoalPct = Math.min(100, Math.round((todayMinutes / Math.max(1, dailyTargetMinutes)) * 100));
+  const todayGoalDone = Boolean(goalObj) && todayGoalPct >= 100;
+  const vnHeroClock = getVnHeroClock();
+  const primaryTodayClass = todayMobileClasses[0] || null;
+  const primaryTask = studentTasks[0] || null;
+  const remainingTasks = studentTasks.slice(1);
+  const priorityCount = (primaryTodayClass ? 1 : 0) + studentTasks.length;
+
   return (
     <AppScreen
       contentStyle={isTeacher ? styles.screen : styles.studentScreen}
@@ -838,13 +877,73 @@ export function HomeScreen() {
           accent="emerald"
         />
       ) : (
-        <WelcomeHero
-          role="student"
-          name={user?.name || ''}
-          chips={studentHeroChips}
-          showJoin={false}
-          accent={isBrandStudent ? 'brand' : (freeMenu ? 'emerald' : 'brand')}
-        />
+        <View style={styles.bHeroCard}>
+          <View style={styles.bHeroTopRow}>
+            <View style={styles.bHeroIdentityCol}>
+              <Text style={styles.bHeroGreeting}>{`${vnHeroClock.greeting} · ${vnHeroClock.dateText}`}</Text>
+              <Text style={styles.bHeroName} numberOfLines={1}>{user?.name || 'Học viên'}</Text>
+            </View>
+            <View style={styles.bHeroChipsRow}>
+              <View style={styles.bStreakBadge}>
+                <Flame size={13} color="#D97706" fill="#F59E0B" />
+                <Text style={styles.bStreakBadgeText}>{`${practiceStats?.streak ?? 0} ngày`}</Text>
+              </View>
+              <View style={styles.bXpBadge}>
+                <Zap size={13} color="#FDE047" fill="#FDE047" />
+                <Text style={styles.bXpBadgeText}>{`${(practiceStats?.xpTotal ?? 0).toLocaleString('vi-VN')} XP`}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.bGoalPanel}>
+            <View style={styles.bGoalHeaderRow}>
+              <View style={styles.bGoalLabelGroup}>
+                <Target size={14} color="#FDE68A" />
+                <Text style={styles.bGoalLabelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                  {goalObj
+                    ? `Mục tiêu: ${formatStudyMinutes(todayMinutes)} / ${goalObj.hoursPerDay} giờ`
+                    : `Mục tiêu ngày · ${formatStudyMinutes(todayMinutes)}`}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)}
+                style={({ pressed }) => [styles.bGoalEditBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={goalObj && !goalObj.expired ? 'Đổi mục tiêu học' : 'Đặt mục tiêu học'}
+              >
+                <Text style={styles.bGoalEditText}>{goalObj && !goalObj.expired ? 'Đổi mục tiêu' : 'Đặt mục tiêu'}</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.bGoalTrack}>
+              <View
+                style={[
+                  styles.bGoalFill,
+                  {
+                    width: `${Math.max(todayGoalPct, todayMinutes > 0 ? 6 : 0)}%`,
+                    backgroundColor: todayGoalDone ? '#34D399' : '#FBBF24',
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.bGoalFootRow}>
+              <Text style={styles.bGoalFootText} numberOfLines={1}>
+                {goalObj
+                  ? (goalObj.expired
+                    ? `Đạt ${todayGoalPct}% · Chu kỳ đã kết thúc`
+                    : `${todayGoalPct}% · ${periodLabel(goalObj.period)} · Còn ${goalProgress?.daysLeft ?? 0} ngày`)
+                  : 'Đặt mục tiêu giờ học để duy trì tiến độ'}
+              </Text>
+              {studentHeroChips[0]?.label ? (
+                <View style={[styles.bNextSessionPill, studentHeroChips[0].live && styles.bNextSessionPillLive]}>
+                  {studentHeroChips[0].live ? <View style={styles.bLiveDot} /> : null}
+                  <Text style={styles.bNextSessionText} numberOfLines={1}>{studentHeroChips[0].label}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
       )}
 
       {schedules.loading || assignments.loading || students.loading || (isTeacher && teacherMetrics.loading) || (!isTeacher && (profile.loading || quizzes.loading || evaluationActivity.loading))
@@ -1040,30 +1139,213 @@ export function HomeScreen() {
                   />
                 </View>
               ) : null}
-              <DuoScheduleCard
-                todayClasses={todayMobileClasses}
-                firstSchedule={firstSchedule}
-                nextMeet={nextMeetForEmpty ? {
-                  slotLabel: nextMeetForEmpty.slotLabel,
-                  title: meetLessonName(nextMeetForEmpty),
-                  note: nextMeetForEmpty.note,
-                  startTime: nextMeetForEmpty.startTime,
-                  endTime: nextMeetForEmpty.endTime,
-                  dayLabel: formatMeetDayLabel(nextMeetForEmpty.day),
-                } : null}
-                accentColor={scheduleAccent}
-                nextLesson={nextLesson}
-                meetEmptyMode={meetEmptyMode}
-                onMeetPurchase={() => setMeetPlanOpen(true)}
-                onMeetRenew={() => setRenewSheetOpen(true)}
-                onOpenSchedule={freeMenu || meetEmptyMode !== 'default' ? undefined : () => tabNavigation.navigate('Schedule')}
-              />
+              <View style={styles.bSectionHeader}>
+                <Text style={styles.bSectionTitle}>Việc cần làm hôm nay</Text>
+                <View style={styles.bSectionPill}>
+                  <Text style={styles.bSectionPillText}>
+                    {priorityCount > 0 ? `${priorityCount} mục ưu tiên` : 'Đã sẵn sàng'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.bTwoColRow}>
+                {/* Thẻ trái: Lịch học / Google Meet hôm nay */}
+                <View style={[styles.bMiniCard, primaryTodayClass?.live && styles.bMiniCardLive]}>
+                  <View style={[styles.bMiniTag, primaryTodayClass?.live ? styles.bMiniTagLive : styles.bMiniTagAmber]}>
+                    <Clock size={11} color={primaryTodayClass?.live ? '#047857' : '#B45309'} />
+                    <Text style={[styles.bMiniTagText, primaryTodayClass?.live ? styles.bMiniTagLiveText : styles.bMiniTagAmberText]} numberOfLines={1}>
+                      {primaryTodayClass
+                        ? (primaryTodayClass.live ? 'Đang diễn ra' : `Hôm nay ${primaryTodayClass.time}`)
+                        : nextMeetForEmpty
+                          ? `Sắp tới ${formatMeetDayLabel(nextMeetForEmpty.day)}`
+                          : nextLesson[0]
+                            ? 'Lịch sắp tới'
+                            : 'Lịch học hôm nay'}
+                    </Text>
+                  </View>
+                  <Text style={styles.bMiniTitle} numberOfLines={2}>
+                    {primaryTodayClass?.title
+                      || (nextMeetForEmpty ? meetLessonName(nextMeetForEmpty) : null)
+                      || nextLesson[0]?.name
+                      || 'Hôm nay chưa có lịch Meet'}
+                  </Text>
+                  <Text style={styles.bMiniMeta} numberOfLines={2}>
+                    {primaryTodayClass
+                      ? (primaryTodayClass.teacher ? `GV: ${primaryTodayClass.teacher}` : primaryTodayClass.waitLabel)
+                      : nextMeetForEmpty
+                        ? `${nextMeetForEmpty.startTime || ''}–${nextMeetForEmpty.endTime || ''}`
+                        : nextLesson[0]
+                          ? nextLesson[0].meta
+                          : 'Tự học video & giữ chuỗi XP'}
+                  </Text>
+                  <View style={styles.bMiniActionWrap}>
+                    {primaryTodayClass ? (
+                      primaryTodayClass.ended ? (
+                        <DuoButton
+                          variant="secondary"
+                          size="sm"
+                          fullWidth
+                          disabled
+                          label="Đã kết thúc"
+                        />
+                      ) : primaryTodayClass.meetLink && primaryTodayClass.joinable ? (
+                        <DuoButton
+                          variant="danger"
+                          size="sm"
+                          fullWidth
+                          label="Vào học"
+                          onPress={() => { void openDashboardLink(primaryTodayClass.meetLink); }}
+                        />
+                      ) : (
+                        <DuoButton
+                          variant="secondary"
+                          size="sm"
+                          fullWidth
+                          disabled
+                          label="Vào học"
+                          accessibilityLabel={primaryTodayClass.waitLabel || 'Chưa đến giờ vào lớp'}
+                        />
+                      )
+                    ) : meetEmptyMode === 'purchase' ? (
+                      <DuoButton
+                        variant="primary"
+                        size="sm"
+                        fullWidth
+                        label="Mua gói Meet"
+                        onPress={() => setMeetPlanOpen(true)}
+                      />
+                    ) : meetEmptyMode === 'renew' ? (
+                      <DuoButton
+                        variant="primary"
+                        size="sm"
+                        fullWidth
+                        label="Gia hạn Meet"
+                        onPress={() => setRenewSheetOpen(true)}
+                      />
+                    ) : (nextMeetForEmpty || nextLesson.length > 0) ? (
+                      <DuoButton
+                        variant="secondary"
+                        size="sm"
+                        fullWidth
+                        disabled
+                        label="Vào học"
+                        accessibilityLabel="Chưa đến giờ vào lớp"
+                      />
+                    ) : (
+                      <DuoButton
+                        variant="secondary"
+                        size="sm"
+                        fullWidth
+                        label={freeMenu ? 'Mở khóa Meet' : 'Xem lịch học'}
+                        onPress={() => {
+                          if (freeMenu) setMeetPlanOpen(true);
+                          else tabNavigation.navigate('Schedule');
+                        }}
+                      />
+                    )}
+                  </View>
+                </View>
+
+                {/* Thẻ phải: Việc ưu tiên / Ôn tập nhanh */}
+                <View style={[styles.bMiniCard, styles.bMiniCardAccent]}>
+                  {primaryTask ? (
+                    <>
+                      <View style={[styles.bMiniTag, styles.bMiniTagBlue]}>
+                        <Zap size={11} color="#1D4ED8" />
+                        <Text style={[styles.bMiniTagText, styles.bMiniTagBlueText]} numberOfLines={1}>Ưu tiên hôm nay</Text>
+                      </View>
+                      <Text style={styles.bMiniTitle} numberOfLines={2}>{primaryTask.title}</Text>
+                      <Text style={styles.bMiniMeta} numberOfLines={2}>{primaryTask.sub || 'Hoàn thành để ghi nhận tiến độ'}</Text>
+                      <View style={styles.bMiniActionWrap}>
+                        <DuoButton
+                          variant="primary"
+                          size="sm"
+                          fullWidth
+                          label={primaryTask.cta}
+                          onPress={primaryTask.onPress}
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={[styles.bMiniTag, styles.bMiniTagGreen]}>
+                        <CheckCircle size={11} color="#047857" />
+                        <Text style={[styles.bMiniTagText, styles.bMiniTagGreenText]} numberOfLines={1}>
+                          {practiceStats?.playedToday ? 'Đã giữ chuỗi' : 'Ôn tập XP'}
+                        </Text>
+                      </View>
+                      <Text style={styles.bMiniTitle} numberOfLines={2}>
+                        {practiceLocked ? 'Mở khóa Luyện tập XP' : 'Luyện tập & Tích XP'}
+                      </Text>
+                      <Text style={styles.bMiniMeta} numberOfLines={2}>
+                        {practiceStats?.playedToday
+                          ? `Hôm nay đã đạt ${practiceStats.todayXp ?? 0} XP`
+                          : 'Hoàn thành 1 lượt để giữ chuỗi ngày'}
+                      </Text>
+                      <View style={styles.bMiniActionWrap}>
+                        <DuoButton
+                          variant="secondary"
+                          size="sm"
+                          fullWidth
+                          label={practiceStats?.playedToday ? 'Ôn thêm' : 'Luyện ngay'}
+                          onPress={() => tabNavigation.navigate('DailyPractice')}
+                        />
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+
+              {todayMobileClasses.length > 1 ? (
+                <View style={styles.bCardChunky}>
+                  <View style={styles.ovHeadRow}>
+                    <CalendarDays size={17} color="#059669" />
+                    <Text style={[styles.ovTitle, styles.flex]}>{`Thêm lịch hôm nay (${todayMobileClasses.length - 1})`}</Text>
+                  </View>
+                  {todayMobileClasses.slice(1).map((item) => (
+                    <View key={item.id} style={[styles.todayClassBox, item.live && styles.todayClassBoxLive]}>
+                      <View style={styles.flex}>
+                        <Text numberOfLines={1} style={styles.todayClassTitle}>{item.title}</Text>
+                        <Text numberOfLines={1} style={styles.todayClassMetaText}>{`${item.time}${item.teacher ? ` · ${item.teacher}` : ''}`}</Text>
+                      </View>
+                      {item.ended ? (
+                        <DuoButton variant="secondary" size="sm" disabled label="Đã kết thúc" />
+                      ) : item.meetLink && item.joinable ? (
+                        <DuoButton variant="danger" size="sm" label="Vào học" onPress={() => { void openDashboardLink(item.meetLink); }} />
+                      ) : (
+                        <DuoButton
+                          variant="secondary"
+                          size="sm"
+                          disabled
+                          label="Vào học"
+                          accessibilityLabel={item.waitLabel || 'Chưa đến giờ vào lớp'}
+                        />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {remainingTasks.length > 0 ? (
+                <View style={styles.bCardChunky}>
+                  <View style={styles.ovHeadRow}>
+                    <CheckCircle size={18} color="#059669" />
+                    <Text style={[styles.ovTitle, styles.flex]}>{`Việc khác cần làm (${remainingTasks.length})`}</Text>
+                  </View>
+                  {remainingTasks.map(({ key, ...task }) => (
+                    <OverviewTaskRow key={key} {...task} freeMenu={freeMenu} isBrandStudent={isBrandStudent} />
+                  ))}
+                </View>
+              ) : null}
 
               {!freePortalCourse && Boolean(currentCourse) ? (
-                <Card style={styles.ovCard}>
+                <View style={styles.bCardChunky}>
                   <View style={styles.ovHeadRow}>
-                    <BookOpen size={18} color={isBrandStudent ? '#059669' : colors.brand} />
+                    <BookOpen size={18} color="#059669" />
                     <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
+                    <Pressable onPress={() => tabNavigation.navigate('CourseVideos')} accessibilityRole="button">
+                      <Text style={styles.ovLink}>Xem tất cả ›</Text>
+                    </Pressable>
                   </View>
                   <CompactCoursePicker
                     items={coursePickerItems}
@@ -1126,82 +1408,25 @@ export function HomeScreen() {
                       </>
                     )}
                   </View>
-                </Card>
-              ) : null}
-
-              <Card style={styles.ovCard}>
-                <View style={styles.ovHeadRow}>
-                  <CheckCircle size={18} color={isBrandStudent ? '#059669' : scheduleAccent} />
-                  <Text style={[styles.ovTitle, styles.flex]}>Việc cần làm hôm nay</Text>
                 </View>
-                {studentTasks.length
-                  ? studentTasks.map(({ key, ...task }) => <OverviewTaskRow key={key} {...task} freeMenu={freeMenu} isBrandStudent={isBrandStudent} />)
-                  : (
-                    <OverviewDoneBox
-                      title="Hôm nay bạn đã hoàn thành hết việc!"
-                      text="Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ."
-                    />
-                  )}
-              </Card>
+              ) : null}
             </View>
 
             {!user?.previewMode ? (
               <View style={isWide ? styles.duoColRight : styles.studentColStack}>
-                <LearningLeaderboardCard isBrandStudent={isBrandStudent} />
                 {!practiceLocked ? (
-                  <>
-                    <DuoHeroCard
-                      stageTitle={activePathUnit?.title || pathTopic?.topic?.name || 'Windows cơ bản'}
-                      lessonSubtitle={
-                        pathTopic?.next?.unitTitle
-                          ? `${pathTopicNextLinePrefix(pathTopic)}: ${pathTopic.next.unitTitle}`
-                          : activePathUnit?.description
-                          || (practiceStats?.playedToday ? 'Hôm nay bạn đã hoàn thành bài tập xuất sắc!' : 'Bắt đầu hành trình chinh phục kiến thức')
-                      }
-                      progressPercent={heroProgress}
-                      playedToday={practiceStats?.playedToday ?? false}
-                      streak={practiceStats?.streak ?? 0}
-                      onContinue={() => {
-                        if (pathTopic?.next) {
-                          tabNavigation.navigate('DailyPractice', {
-                            topicId: pathTopic.topic.id,
-                            resumeKey: Date.now(),
-                            resumeUnitId: pathTopic.next.unitId,
-                            resumeNodeKey: pathTopic.next.nodeKey || undefined,
-                          });
-                          return;
-                        }
-                        if (activePathUnit) {
-                          tabNavigation.navigate('DailyPractice', {
-                            topicId: pathTopic?.topic?.id || undefined,
-                            resumeKey: Date.now(),
-                            resumeUnitId: activePathUnit.id,
-                            resumeNodeKey: activePathUnit.pathNodes?.[0]?.key || 'study',
-                          });
-                          return;
-                        }
-                        tabNavigation.navigate('DailyPractice');
-                      }}
-                      continueLabel={
-                        practiceStats?.playedToday
-                          ? 'ÔN TẬP THÊM'
-                          : (pathTopicHasLearningProgress(pathTopic) ? 'TIẾP TỤC HỌC' : 'BẮT ĐẦU')
-                      }
-                      mascotReaction={practiceStats?.playedToday ? 'happy' : 'studying'}
-                      isBrandStudent={isBrandStudent}
-                    />
-                    <DuoDailyQuestsCard
-                      todayAnswers={Math.max(
-                        Number((practiceStats as { todayQuestions?: number } | null)?.todayQuestions) || 0,
-                        practiceStats?.todaySessions ? practiceStats.todaySessions * 10 : (practiceStats?.playedToday ? 10 : 0),
-                      )}
-                      todayVideos={Number((practiceStats as { todayVideos?: number } | null)?.todayVideos) || 0}
-                      todayXp={practiceStats?.todayXp ?? (user as typeof user & { lms?: { dailyXpToday?: number } })?.lms?.dailyXpToday ?? 0}
-                      onOpenPractice={() => tabNavigation.navigate('DailyPractice')}
-                      isBrandStudent={isBrandStudent}
-                    />
-                  </>
+                  <DuoDailyQuestsCard
+                    todayAnswers={Math.max(
+                      Number((practiceStats as { todayQuestions?: number } | null)?.todayQuestions) || 0,
+                      practiceStats?.todaySessions ? practiceStats.todaySessions * 10 : (practiceStats?.playedToday ? 10 : 0),
+                    )}
+                    todayVideos={Number((practiceStats as { todayVideos?: number } | null)?.todayVideos) || 0}
+                    todayXp={practiceStats?.todayXp ?? (user as typeof user & { lms?: { dailyXpToday?: number } })?.lms?.dailyXpToday ?? 0}
+                    onOpenPractice={() => tabNavigation.navigate('DailyPractice')}
+                    isBrandStudent={isBrandStudent}
+                  />
                 ) : null}
+                <LearningLeaderboardCard isBrandStudent={isBrandStudent} />
                 {(practice?.referral || practiceStats?.referral) ? (
                   <ReferralRewardCard
                     referral={(practice?.referral || practiceStats?.referral)!}
@@ -1319,6 +1544,19 @@ function formatCurrency(value: number) {
   return `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 }
 
+const VN_HERO_WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+function getVnHeroClock() {
+  const vn = new Date(Date.now() + 7 * 3600e3);
+  const hour = vn.getUTCHours();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const greeting = hour < 11 ? 'Chào buổi sáng' : hour < 13 ? 'Chào buổi trưa' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+  return {
+    greeting,
+    dateText: `${VN_HERO_WEEKDAYS[vn.getUTCDay()]}, ${pad(vn.getUTCDate())}/${pad(vn.getUTCMonth() + 1)}`,
+  };
+}
+
 const styles = StyleSheet.create({
   todayLiveBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: '#A7F3D0' },
   todayLiveBadgeText: { color: '#047857', fontSize: 11, fontWeight: '800' },
@@ -1402,7 +1640,139 @@ const styles = StyleSheet.create({
   },
   ovSecondaryText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   screen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.lg, backgroundColor: '#F5F8FC' },
-  studentScreen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md, backgroundColor: '#F5F8FC' },
+  studentScreen: { paddingTop: spacing.sm, paddingBottom: spacing.xxxl, gap: 14, backgroundColor: '#FFFBF2' },
+  bHeroCard: {
+    backgroundColor: '#059669',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#047857',
+    borderBottomWidth: 5,
+    borderBottomColor: '#065F46',
+    padding: 15,
+    gap: 12,
+  },
+  bHeroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  bHeroIdentityCol: { flex: 1, minWidth: 150, gap: 2 },
+  bHeroGreeting: { color: '#D1FAE5', fontSize: 12, fontWeight: '700' },
+  bHeroName: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
+  bHeroChipsRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bStreakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  bStreakBadgeText: { color: '#92400E', fontSize: 11.5, fontWeight: '800' },
+  bXpBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  bXpBadgeText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
+  bGoalPanel: {
+    backgroundColor: 'rgba(4, 120, 87, 0.52)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  bGoalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  bGoalLabelGroup: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bGoalLabelText: { flex: 1, color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
+  bGoalEditBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 2,
+    borderBottomColor: '#D1FAE5',
+  },
+  bGoalEditText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  bGoalTrack: {
+    height: 11,
+    borderRadius: 999,
+    backgroundColor: 'rgba(6, 78, 59, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
+  },
+  bGoalFill: { height: '100%', borderRadius: 999 },
+  bGoalFootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 },
+  bGoalFootText: { color: '#D1FAE5', fontSize: 11.5, fontWeight: '600', flexShrink: 1 },
+  bNextSessionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  bNextSessionPillLive: { backgroundColor: '#DC2626' },
+  bLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FEF08A' },
+  bNextSessionText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700', flexShrink: 1 },
+  bSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
+  bSectionTitle: { color: '#1E293B', fontSize: 15, fontWeight: '900' },
+  bSectionPill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: '#D1FAE5', borderWidth: 1, borderColor: '#A7F3D0' },
+  bSectionPillText: { color: '#065F46', fontSize: 11, fontWeight: '800' },
+  bTwoColRow: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
+  bMiniCard: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 5,
+    borderBottomColor: '#CBD5E1',
+    padding: 12,
+    gap: 6,
+  },
+  bMiniCardLive: { borderColor: '#6EE7B7', borderBottomColor: '#34D399', backgroundColor: '#F0FDF4' },
+  bMiniCardAccent: { borderColor: '#FDE68A', borderBottomColor: '#FCD34D' },
+  bMiniTag: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  bMiniTagAmber: { backgroundColor: '#FEF3C7' },
+  bMiniTagAmberText: { color: '#B45309' },
+  bMiniTagBlue: { backgroundColor: '#E0F2FE' },
+  bMiniTagBlueText: { color: '#0369A1' },
+  bMiniTagGreen: { backgroundColor: '#D1FAE5' },
+  bMiniTagGreenText: { color: '#047857' },
+  bMiniTagLive: { backgroundColor: '#D1FAE5' },
+  bMiniTagLiveText: { color: '#047857' },
+  bMiniTagText: { fontSize: 11, fontWeight: '800' },
+  bMiniTitle: { color: '#1E293B', fontSize: 13.5, fontWeight: '800', lineHeight: 18, marginTop: 2 },
+  bMiniMeta: { color: '#64748B', fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
+  bMiniActionWrap: { marginTop: 'auto', paddingTop: 4 },
+  bCardChunky: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 5,
+    borderBottomColor: '#CBD5E1',
+    padding: 14,
+    gap: 10,
+  },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: '#DFEAF2', backgroundColor: '#F0F6FA' },
   greetingIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderWidth: 1, borderColor: '#A7F3D0', shadowColor: colors.brandDark, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   greeting: { flex: 1, gap: 4 },
@@ -1569,14 +1939,15 @@ const styles = StyleSheet.create({
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   sheetBody: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl },
   resumeCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#A7F3D0',
-    backgroundColor: '#F2FDF7',
-    backgroundImage: 'linear-gradient(135deg, rgba(236,253,245,0.92) 0%, #FFFFFF 55%, rgba(240,253,250,0.75) 100%)',
-    padding: 16,
-    gap: 10,
-  } as never,
+    borderColor: '#6EE7B7',
+    borderBottomWidth: 5,
+    borderBottomColor: '#34D399',
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    gap: 9,
+  },
   resumeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
   resumeBadgeGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resumeBadge: {

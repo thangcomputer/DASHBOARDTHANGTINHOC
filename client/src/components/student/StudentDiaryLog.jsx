@@ -170,7 +170,9 @@ export default function StudentDiaryLog({
                 || student?.online_meeting_url
                 || '',
               ).trim();
-              const canJoin = Boolean(meetingUrl && (diaryStatus.tone === 'ongoing' || diaryStatus.tone === 'upcoming'));
+              const isOngoing = diaryStatus.tone === 'ongoing';
+              const isUpcoming = diaryStatus.tone === 'upcoming';
+              const canJoin = Boolean(meetingUrl && isOngoing);
               const title = item.course || item.courseName || item.title || item.subject || 'Buổi học';
               const teacher = item.teacherName || item.teacher || 'Giảng viên';
               const dateText = formatScheduleDateVi(item.date);
@@ -213,10 +215,18 @@ export default function StudentDiaryLog({
                           href={meetingUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex min-h-[34px] items-center justify-center rounded-xl active:scale-95 px-4 py-1.5 text-xs font-black text-white transition bg-emerald-600 hover:bg-emerald-700"
+                          className="inline-flex min-h-[34px] items-center justify-center rounded-xl active:scale-95 px-4 py-1.5 text-xs font-black text-white transition bg-red-500 hover:bg-red-600"
                         >
-                          Vào lớp
+                          Vào học
                         </a>
+                      ) : isUpcoming ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="inline-flex min-h-[34px] items-center justify-center rounded-xl px-4 py-1.5 text-xs font-black bg-slate-200 text-slate-400 cursor-not-allowed"
+                        >
+                          Vào học
+                        </button>
                       ) : null}
 
                       {typeof onOpenSession === 'function' ? (

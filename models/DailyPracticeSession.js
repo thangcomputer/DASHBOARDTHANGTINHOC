@@ -11,6 +11,9 @@ const dailyPracticeSessionSchema = new mongoose.Schema({
   /** Nút lộ trình trong chặng (slug trong pathNodes). */
   pathNodeKey: { type: String, default: null, trim: true, maxlength: 40 },
   testOut: { type: Boolean, default: false },
+  /** Video tương tác nhúng trong lượt luyện tập và ngưỡng chỉ số câu hỏi đứng sau video. */
+  practiceVideoId: { type: String, default: '' },
+  practiceVideoRequiredAfterIndex: { type: Number, default: -1 },
   questionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeQuestion' }],
   hintsUsed: [{ type: mongoose.Schema.Types.ObjectId }],
   answers: [{

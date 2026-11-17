@@ -21,6 +21,8 @@ const meetClassSchema = new mongoose.Schema({
   }],
   status: { type: String, enum: ['scheduled', 'cancelled'], default: 'scheduled' },
   note: { type: String, default: '' },
+  reminderSent: { type: Boolean, default: false },
+  reminderSentAt: { type: Date, default: null },
   createdById: { type: String, default: '' },
   createdByName: { type: String, default: '' },
 }, { timestamps: true });

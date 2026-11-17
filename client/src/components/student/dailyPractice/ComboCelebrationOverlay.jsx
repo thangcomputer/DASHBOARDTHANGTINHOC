@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Star, Zap } from 'lucide-react';
 import Mascot from './Mascot';
@@ -182,22 +182,26 @@ export default function ComboCelebrationOverlay({ combo = 3, bonusXp = 0, onDone
   const displayMs = TIMING_MS[tier] || 2600;
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
+    setVisible(true);
+    setExiting(false);
     gameSounds.lightningCombo();
 
     const fadeAt = displayMs - FADE_MS;
     const fadeTimer = window.setTimeout(() => setExiting(true), fadeAt);
     const closeTimer = window.setTimeout(() => {
       setVisible(false);
-      onDone?.();
+      onDoneRef.current?.();
     }, displayMs);
 
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(closeTimer);
     };
-  }, [combo, displayMs, onDone]);
+  }, [combo, displayMs]);
 
   if (!visible) return null;
 

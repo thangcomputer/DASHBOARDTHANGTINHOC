@@ -917,14 +917,37 @@ export default function PathView({
   }, [error]);
 
   useEffect(() => {
-    if (!requestedLesson?.unit || !requestedLesson?.level) return;
+    if (!requestedLesson?.unit) return;
+    const desiredTopicId = requestedLesson.topicId
+      || topics.find((item) => item.units?.some((u) => u.id === requestedLesson.unit.id))?.topic?.id;
+    if (desiredTopicId && topicId !== desiredTopicId) {
+      setTopicId(desiredTopicId);
+      return;
+    }
+    const targetNodeKey = requestedLesson.nodeKey || '';
+    const targetUnit = (topics.find((item) => item.topic.id === (desiredTopicId || topicId))?.units || [])
+      .find((u) => u.id === requestedLesson.unit.id) || requestedLesson.unit;
+    const targetNode = targetNodeKey ? (targetUnit?.pathNodes || []).find((n) => n.key === targetNodeKey) : null;
+    if (requestedLesson.openMilestone || (targetNode && (targetNode.kind === 'study' || targetNode.icon === 'book'))) {
+      markUnitStarted(requestedLesson.unit.id);
+      setPopover(null);
+      setMilestoneOpen({
+        unitId: requestedLesson.unit.id,
+        nodeKey: targetNodeKey || 'study',
+        initialDifficulty: requestedLesson.initialDifficulty ?? null,
+        initialSection: requestedLesson.initialSection ?? null,
+      });
+      onRequestedLessonOpenedRef.current?.();
+      return;
+    }
+    if (!requestedLesson?.level) return;
     setLessonOpen({
       unit: requestedLesson.unit,
       lesson: requestedLesson.level,
       color: unitColor(requestedLesson.unit.index),
     });
     onRequestedLessonOpenedRef.current?.();
-  }, [requestedLesson]);
+  }, [requestedLesson, markUnitStarted, topics, topicId]);
 
   useEffect(() => {
     if (!continueVideo) {
@@ -1390,6 +1413,9 @@ export default function PathView({
             unit={mUnit}
             node={mNode}
             milestoneIndex={mIdx}
+            initialDifficulty={milestoneOpen.initialDifficulty ?? null}
+            initialSection={milestoneOpen.initialSection ?? null}
+            color={unitColor(mUnit.index)}
             onClose={() => setMilestoneOpen(null)}
             onProgressChanged={onPathChanged}
             onOpenVideo={(targetUnit, videoId) => setVideoOpen({ unit: targetUnit, videoId, singleVideoOnly: true })}

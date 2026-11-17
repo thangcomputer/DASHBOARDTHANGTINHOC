@@ -51,5 +51,14 @@ export function createVideoWatchGuard(
         eligible: total > 0 && watchedSeconds / total >= 0.7,
       };
     },
+    allowPosition(target: number) {
+      const safe = Math.max(0, Number(target) || 0);
+      maxPosition = Math.max(maxPosition, safe);
+      previousPosition = Math.max(previousPosition, safe);
+      return maxPosition;
+    },
+    getMaxPosition() {
+      return maxPosition;
+    },
   };
 }

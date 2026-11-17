@@ -122,16 +122,33 @@ export function DuoScheduleCard({
                 ) : null}
               </p>
             </div>
-            {item.meetLink ? (
+            {item.ended ? (
               <DuoButton
-                variant={item.live ? 'primary' : 'blue'}
+                variant="secondary"
                 size="sm"
-                className="shrink-0 self-start sm:self-center"
+                disabled
+                label="Đã kết thúc"
+              />
+            ) : item.meetLink && item.joinable ? (
+              <DuoButton
+                variant="danger"
+                className="duo-btn--meet-live shrink-0 self-start sm:self-center"
+                size="sm"
                 icon={<Video size={14} color="#FFFFFF" aria-hidden="true" />}
-                label="Vào Meet"
+                label="Vào học"
                 onClick={() => {
                   window.open(item.meetLink, '_blank', 'noopener,noreferrer');
                 }}
+              />
+            ) : !item.joinable ? (
+              <DuoButton
+                variant="secondary"
+                size="sm"
+                disabled
+                className="shrink-0 self-start sm:self-center"
+                icon={<Video size={14} color="#94A3B8" aria-hidden="true" />}
+                label="Vào học"
+                title={item.waitLabel || 'Chưa đến giờ vào lớp'}
               />
             ) : (
               <span className="shrink-0 rounded-[10px] bg-slate-100 px-2.5 py-1.5 text-[11px] font-bold text-slate-400">

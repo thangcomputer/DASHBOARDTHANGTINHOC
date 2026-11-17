@@ -14,7 +14,9 @@ export type LessonPracticeSubject = {
 
 export type LessonPracticeCourse = {
   id: string;
+  sourceCourseId?: string;
   name: string;
+  parentCourseName?: string;
   description?: string;
   thumbnail?: string;
   bannerColorStart?: string;
@@ -95,6 +97,10 @@ export type LessonPracticeItem = {
   feedback?: string;
   timeLimitSec?: number;
   answer?: Record<string, unknown> | null;
+  correctOptionId?: string;
+  correctOptionIds?: string[];
+  atSec?: number;
+  milestoneSec?: number;
 };
 
 export type LessonPracticeUnit = {

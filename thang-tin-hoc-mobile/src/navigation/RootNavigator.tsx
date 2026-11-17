@@ -4,7 +4,7 @@ import {
   useWindowDimensions, View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { PlatformPressable } from '@react-navigation/elements';
@@ -620,7 +620,7 @@ export function RootNavigator() {
         && stackRouteName !== 'Conversation'
         && stackRouteName !== 'Call'
         && activeTab !== 'Support'
-        && (user.role === 'student' || user.role === 'teacher') ? (
+        && user.role === 'teacher' ? (
         <FloatingSupportButton />
       ) : null}
       {!examRoomActive && !focusMode && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? (
@@ -972,6 +972,7 @@ function NavTabContent({
   badgeCount = 0,
   locked = false,
   isBrandStudent = false,
+  roomyLabel = false,
 }: {
   name: string;
   label: string;
@@ -981,6 +982,7 @@ function NavTabContent({
   badgeCount?: number;
   locked?: boolean;
   isBrandStudent?: boolean;
+  roomyLabel?: boolean;
 }) {
   const tone = TAB_ICON_TONES[name] || colors.muted;
   return (
@@ -1025,12 +1027,160 @@ function NavTabContent({
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.8}
-          style={[styles.navLabel, selected && (isBrandStudent ? styles.navLabelActiveBrand : styles.navLabelActive)]}
+          style={[
+            styles.navLabel,
+            roomyLabel && styles.navLabelRoomy,
+            selected && (isBrandStudent ? styles.navLabelActiveBrand : styles.navLabelActive),
+          ]}
         >
           {label}
         </Text>
       )}
     </View>
+  );
+}
+
+type StudentBarTabItem = {
+  name: keyof MainTabsParamList;
+  label: string;
+  shortLabel: string;
+  icon: LucideIcon;
+  matchTabs: string[];
+};
+
+function getStudentFiveTabItems(freeMenu: boolean): StudentBarTabItem[] {
+  return [
+    {
+      name: 'Schedule',
+      label: 'Lịch học',
+      shortLabel: 'Lịch học',
+      icon: CalendarDays,
+      matchTabs: ['Schedule'],
+    },
+    {
+      name: freeMenu ? 'DailyPractice' : 'CourseVideos',
+      label: 'Học tập',
+      shortLabel: 'Học tập',
+      icon: freeMenu ? Gamepad2 : BookOpen,
+      matchTabs: ['CourseVideos', 'DailyPractice', 'StudentLearning', 'CertPrepCatalog', 'CertPrepLevel'],
+    },
+    {
+      name: 'Home',
+      label: 'Trang chủ',
+      shortLabel: 'Trang chủ',
+      icon: House,
+      matchTabs: ['Home'],
+    },
+    {
+      name: 'Messages',
+      label: 'Trao đổi',
+      shortLabel: 'Trao đổi',
+      icon: MessageCircle,
+      matchTabs: ['Messages', 'Feed', 'Conversation'],
+    },
+    {
+      name: 'Profile',
+      label: 'Hồ sơ',
+      shortLabel: 'Hồ sơ',
+      icon: UserRound,
+      matchTabs: ['Profile', 'Tuition', 'Evaluations'],
+    },
+  ];
+}
+
+function StudentFiveTabBar({
+  activeTab,
+  unreadConversationCount,
+  todayScheduleCount,
+  freeMenu = false,
+  freeLocked = false,
+  isBrandStudent = false,
+  onSelect,
+}: {
+  activeTab: string;
+  unreadConversationCount: number;
+  todayScheduleCount: number;
+  freeMenu?: boolean;
+  freeLocked?: boolean;
+  isBrandStudent?: boolean;
+  onSelect: (screen: keyof MainTabsParamList) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const [visibility, setVisible] = useNavigationBarVisibility();
+  const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
+  const barWidth = 760;
+  const barSideInset = centeredWebBar ? (windowWidth - barWidth) / 2 : 0;
+  useEffect(() => {
+    const unsubscribe = navigationRef.addListener('state', () => setVisible(true));
+    return unsubscribe;
+  }, [setVisible]);
+
+  const items = getStudentFiveTabItems(freeMenu);
+  const barHeight = 96 + insets.bottom;
+
+  return (
+    <Animated.View
+      pointerEvents="box-none"
+      style={[
+        styles.persistentTabBar,
+        centeredWebBar && {
+          left: barSideInset,
+          right: barSideInset,
+          width: barWidth,
+        },
+        {
+          height: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, barHeight] }),
+          paddingTop: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.lg] }),
+          paddingBottom: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(insets.bottom, spacing.sm)] }),
+          opacity: visibility,
+          transform: [{ translateY: visibility.interpolate({ inputRange: [0, 1], outputRange: [barHeight, 0] }) }],
+        },
+      ]}
+    >
+      <BlurView
+        intensity={Platform.OS === 'android' ? 75 : 60}
+        tint="light"
+        style={styles.navigationGlassBackground}
+      >
+        <View style={styles.navigationGlassTint} />
+      </BlurView>
+      {items.map(({ name, label, shortLabel, icon: Icon, matchTabs }) => {
+        const selected = matchTabs.includes(activeTab);
+        const locked = freeLocked && FREE_LOCKED_DESTINATIONS.has(name);
+        const badgeCount = name === 'Messages'
+          ? unreadConversationCount
+          : name === 'Schedule' ? todayScheduleCount : 0;
+        return (
+          <Pressable
+            key={name}
+            onPress={() => {
+              if (locked) {
+                DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+                return;
+              }
+              onSelect(name);
+            }}
+            style={styles.persistentTabItem}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ selected }}
+          >
+            <NavTabContent
+              name={name}
+              label={shortLabel}
+              Icon={Icon}
+              selected={selected}
+              isHome={name === 'Home'}
+              badgeCount={badgeCount}
+              locked={locked}
+              isBrandStudent={isBrandStudent}
+              roomyLabel
+            />
+          </Pressable>
+        );
+      })}
+    </Animated.View>
   );
 }
 
@@ -1052,13 +1202,8 @@ function PersistentTabBar({
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isTeacher = role === 'teacher';
-  const { user, subscription } = useAuth();
+  const { user } = useAuth();
   const isBrandStudent = Boolean(user && user.role === 'student' && !freeMenu && !isFreePortalMenu(user));
-  const feedPostLocked = !isTeacher && !hasFeedPostAccess({
-    role,
-    user,
-    subscription: subscription?.subscription,
-  });
   const [visibility, setVisible] = useNavigationBarVisibility();
   const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
   const barWidth = 760;
@@ -1067,33 +1212,29 @@ function PersistentTabBar({
     const unsubscribe = navigationRef.addListener('state', () => setVisible(true));
     return unsubscribe;
   }, [setVisible]);
-  const items = isTeacher
-    ? [
-      { name: 'Schedule' as const, label: 'Lịch dạy', shortLabel: 'Lịch', icon: CalendarDays },
-      { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
-      { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
-      { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
-      { name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: DollarSign },
-      { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
-      { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
-    ]
-    : freeMenu
-      ? [
-        { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
-        { name: 'DailyPractice' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Gamepad2 },
-        { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
-        { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Radio },
-        { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
-      ]
-      : [
-        { name: 'Schedule' as const, label: 'Lịch học', shortLabel: 'Lịch học', icon: CalendarDays },
-        { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
-        { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Radio },
-        { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
-        { name: 'DailyPractice' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Gamepad2 },
-        { name: 'CourseVideos' as const, label: 'Bài giảng', shortLabel: 'Bài giảng', icon: BookOpen },
-        { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
-      ];
+
+  if (!isTeacher) {
+    return (
+      <StudentFiveTabBar
+        activeTab={activeTab}
+        unreadConversationCount={unreadConversationCount}
+        todayScheduleCount={todayScheduleCount}
+        freeMenu={freeMenu}
+        freeLocked={freeLocked}
+        isBrandStudent={isBrandStudent}
+        onSelect={(name) => navigationRef.navigate('MainTabs', { screen: name })}
+      />
+    );
+  }
+  const items = [
+    { name: 'Schedule' as const, label: 'Lịch dạy', shortLabel: 'Lịch', icon: CalendarDays },
+    { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
+    { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
+    { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
+    { name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: DollarSign },
+    { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
+    { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
+  ];
   const orderedItems = items;
   const barHeight = 96 + insets.bottom;
   return (
@@ -1679,9 +1820,25 @@ function MainTabs() {
     };
   }, [markFinanceTransactionsViewed, refreshTabBadges]);
 
+  const renderStudentTabBar = useCallback((tabProps: BottomTabBarProps) => {
+    const currentRoute = tabProps.state.routes[tabProps.state.index]?.name || 'Home';
+    return (
+      <StudentFiveTabBar
+        activeTab={currentRoute}
+        unreadConversationCount={unreadConversationCount}
+        todayScheduleCount={todayScheduleCount}
+        freeMenu={freeMenu}
+        freeLocked={freeLocked}
+        isBrandStudent={isBrandStudent}
+        onSelect={(screen) => tabProps.navigation.navigate(screen)}
+      />
+    );
+  }, [unreadConversationCount, todayScheduleCount, freeMenu, freeLocked, isBrandStudent]);
+
   return (
     <Tab.Navigator
       initialRouteName="Home"
+      tabBar={!isTeacher ? renderStudentTabBar : undefined}
       screenListeners={({ route }) => ({
         tabPress: (e) => {
           const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(route.name);
@@ -1818,53 +1975,15 @@ function MainTabs() {
             <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
             <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
           </>
-        ) : freeMenu ? (
-          <>
-            <Tab.Screen
-              name="Messages"
-              component={MessagesScreen}
-              options={{
-                title: 'Tin nhắn',
-              }}
-            />
-            <Tab.Screen
-              name="DailyPractice"
-              component={DailyPracticeScreen}
-              options={{ title: 'Luyện tập' }}
-            />
-            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-            <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
-            <Tab.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{ title: 'Hồ sơ' }}
-            />
-          </>
         ) : (
           <>
-            <Tab.Screen
-              name="Schedule"
-              component={ScheduleScreen}
-              options={{
-                title: 'Lịch học',
-              }}
-            />
-            <Tab.Screen
-              name="Messages"
-              component={MessagesScreen}
-              options={{
-                title: 'Tin nhắn',
-              }}
-            />
+            <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Lịch học' }} />
+            <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Trao đổi' }} />
             <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
             <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
             <Tab.Screen name="DailyPractice" component={DailyPracticeScreen} options={{ title: 'Luyện tập' }} />
-            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
-            <Tab.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{ title: 'Hồ sơ' }}
-            />
+            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Học tập' }} />
+            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
           </>
         )}
     </Tab.Navigator >
@@ -1944,6 +2063,7 @@ const styles = StyleSheet.create({
   navTileHome: { width: 56, height: 56, borderWidth: 3, borderBottomWidth: 5, borderColor: '#FFFFFF', borderBottomColor: '#047857', borderRadius: 28, backgroundColor: '#10B981', backgroundImage: 'linear-gradient(160deg, #34D399 0%, #059669 55%, #047857 100%)', boxShadow: droplet.navHome },
   navTileHomeBrand: { width: 56, height: 56, borderWidth: 3, borderBottomWidth: 5, borderColor: '#FFFFFF', borderBottomColor: '#065F46', borderRadius: 28, backgroundColor: '#10B981', backgroundImage: 'linear-gradient(160deg, #34D399 0%, #10B981 55%, #059669 100%)', boxShadow: droplet.navHomeBrand },
   navLabel: { maxWidth: '100%', color: colors.muted, fontSize: 8.5, lineHeight: 11.5, letterSpacing: -0.3, fontWeight: '700', textAlign: 'center' },
+  navLabelRoomy: { fontSize: 10.5, lineHeight: 13, letterSpacing: -0.1 },
   navLabelActive: { color: '#047857', fontWeight: '900' },
   navLabelActiveBrand: { color: '#059669', fontWeight: '900' },
   persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: colors.brand, color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },

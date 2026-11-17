@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DeviceEventEmitter, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, DeviceEventEmitter, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar, Clock, User, Video, X } from 'lucide-react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { mobileApiRequest } from '../services/apiClient';
-import { isMeetLiveNow, isMeetJoinWindow, meetLessonName, vnScheduleClock } from '../utils/meetJoin';
+import { isMeetEnded, isMeetLiveNow, isMeetJoinWindow, meetLessonName, vnScheduleClock } from '../utils/meetJoin';
 import { getMobileSoundEnabled } from '../services/soundPreferences';
 import { SOCKET_EVENTS } from '../services/socketService';
 import { DuoButton } from './duo/DuoButton';
@@ -66,18 +66,73 @@ function normalizeScheduleDay(raw?: unknown): string {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function extractRefId(value: unknown): string {
+  if (value && typeof value === 'object') {
+    const rec = value as Record<string, unknown>;
+    return String(rec._id || rec.id || '').trim();
+  }
+  return String(value || '').trim();
+}
+
+function resolveScheduleFallbackLink(
+  scheduleRow: any,
+  allRows: any[],
+  role: string,
+  currentUser: DemoUser | null | undefined,
+): string {
+  const targetStudentId = extractRefId(scheduleRow?.studentId);
+  const nonCancelled = (Array.isArray(allRows) ? allRows : []).filter(
+    (other) => String(other?.status || '').toLowerCase() !== 'cancelled',
+  );
+  const sameStudentWithLink = targetStudentId
+    ? nonCancelled.find((other) => (
+      extractRefId(other?.studentId) === targetStudentId
+      && resolveMeetJoinLink(other?.linkHoc, other?.meetingUrl, other?.joinClassUrl)
+    ))
+    : null;
+  const anyTeacherScheduleWithLink = role === 'teacher'
+    ? nonCancelled.find((other) => resolveMeetJoinLink(other?.linkHoc, other?.meetingUrl, other?.joinClassUrl))
+    : null;
+  const userRec = (currentUser || {}) as Record<string, unknown>;
+  return resolveMeetJoinLink(
+    scheduleRow?.linkHoc,
+    scheduleRow?.meetingUrl,
+    scheduleRow?.joinClassUrl,
+    scheduleRow?.studentId?.linkHoc,
+    scheduleRow?.studentId?.online_meeting_url,
+    sameStudentWithLink?.linkHoc,
+    sameStudentWithLink?.meetingUrl,
+    sameStudentWithLink?.joinClassUrl,
+    anyTeacherScheduleWithLink?.linkHoc,
+    anyTeacherScheduleWithLink?.meetingUrl,
+    anyTeacherScheduleWithLink?.joinClassUrl,
+    userRec.linkHoc,
+    userRec.online_meeting_url,
+  );
+}
+
+function ensureHttpUrl(rawLink: string): string {
+  const trimmed = String(rawLink || '').trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
   const auth = useAuth();
   const currentUser = user || auth?.user;
   const role = String(currentUser?.role || 'student').toLowerCase();
   const isTeacher = role === 'teacher';
+  const userIdKey = String(currentUser?.id || currentUser?._id || 'anon').trim() || 'anon';
+  const storageKey = `${STORAGE_KEY}:${userIdKey}`;
   const isFreePortal = role === 'student' && (
     (currentUser as any)?.freePortal === true || isFreePortalMenu(currentUser)
   );
 
   const [item, setItem] = useState<AlertClassItem | null>(null);
   const [ready, setReady] = useState(false);
+  const [clockTick, setClockTick] = useState(() => Date.now());
   const dismissedMapRef = useRef<Record<string, number>>({});
+  const tickRef = useRef<(() => Promise<void>) | null>(null);
   const player = useAudioPlayer(require('../assets/audio/notification.wav'));
 
   const isDismissed = (itemOrId: AlertClassItem | string) => {
@@ -88,19 +143,21 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
     });
   };
 
-  const rememberDismissed = (item: AlertClassItem, durationMs: number) => {
+  const rememberDismissed = (target: AlertClassItem, durationMs: number) => {
     const until = Date.now() + durationMs;
-    meetAlertIds(item).forEach((id) => {
+    meetAlertIds(target).forEach((id) => {
       dismissedMapRef.current[id] = until;
     });
-    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dismissedMapRef.current)).catch(() => {});
+    void AsyncStorage.setItem(storageKey, JSON.stringify(dismissedMapRef.current)).catch(() => {});
   };
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(STORAGE_KEY)
+    setReady(false);
+    dismissedMapRef.current = {};
+    AsyncStorage.getItem(storageKey)
       .then((raw) => {
-        if (!raw) return;
+        if (!raw || !active) return;
         const parsed: unknown = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           dismissedMapRef.current = parsed as Record<string, number>;
@@ -113,29 +170,37 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [storageKey]);
 
-  // Lắng nghe socket event 'class:reminder'
+  // Lắng nghe socket event 'class:reminder' và thay đổi lịch để cập nhật tức thì
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(SOCKET_EVENTS.CLASS_REMINDER, (data: any) => {
+    const userRec = (currentUser || {}) as Record<string, unknown>;
+    const subReminder = DeviceEventEmitter.addListener(SOCKET_EVENTS.CLASS_REMINDER, (data: any) => {
       if (!data) return;
+      const clock = vnScheduleClock();
+      const day = String(data.day || clock.day);
+      if (data.endTime && isMeetEnded({ day, endTime: data.endTime, nowDay: clock.day, nowMinutes: clock.minutes })) {
+        return;
+      }
       const incoming: AlertClassItem = {
         id: String(data.scheduleId || data.id || `socket-${data.startTime || Date.now()}`),
         scheduleId: data.scheduleId ? String(data.scheduleId) : '',
-        course: data.course || 'Khóa học',
-        title: data.course || 'Ca học theo lịch',
-        day: vnScheduleClock().day,
+        course: data.course || data.title || 'Buổi học trực tuyến',
+        title: data.title || data.course || 'Ca học theo lịch',
+        day,
         startTime: data.startTime || '',
         endTime: data.endTime || '',
         linkHoc: resolveMeetJoinLink(
           data.linkHoc,
           data.meetingUrl,
-          role === 'student' ? (currentUser as any)?.linkHoc : '',
+          data.joinClassUrl,
+          role === 'student' ? userRec.linkHoc : '',
+          role === 'student' ? userRec.online_meeting_url : '',
         ),
         personInfo: isTeacher
           ? (data.studentName ? `Học viên: ${data.studentName}` : '')
           : (data.teacherName ? `Giảng viên: ${data.teacherName}` : ''),
-        isLive: Boolean(data.isLive ?? true),
+        isLive: data.isLive !== false,
       };
       if (isDismissed(incoming)) return;
       setItem((current) => {
@@ -149,15 +214,41 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
         }
         return current || incoming;
       });
+      if (!incoming.linkHoc) {
+        void tickRef.current?.();
+      }
     });
-    return () => {
-      sub.remove();
+
+    const triggerTick = () => {
+      void tickRef.current?.();
     };
-  }, [isTeacher]);
+    const subNew = DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_NEW, triggerTick);
+    const subUpdated = DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_UPDATED, triggerTick);
+    const subRefresh = DeviceEventEmitter.addListener(SOCKET_EVENTS.DATA_REFRESH, (payload: any) => {
+      const type = String(payload?.type || '').toLowerCase();
+      if (!type || type === 'schedule' || type === 'schedules' || type === 'meet' || type === 'meet-class') {
+        triggerTick();
+      }
+    });
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') triggerTick();
+    });
+
+    return () => {
+      subReminder.remove();
+      subNew.remove();
+      subUpdated.remove();
+      subRefresh.remove();
+      appStateSub.remove();
+    };
+  }, [role, isTeacher, currentUser]);
 
   // Quét định kỳ lịch học mỗi 15 giây
   useEffect(() => {
-    if (!ready) return undefined;
+    if (!ready || !currentUser) {
+      tickRef.current = null;
+      return undefined;
+    }
     let active = true;
 
     const tick = async () => {
@@ -165,6 +256,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
         const clock = vnScheduleClock();
         const todayStr = clock.day;
         const candidates: AlertClassItem[] = [];
+        const userRec = (currentUser || {}) as Record<string, unknown>;
 
         // 1. Quét lịch học 1 kèm 1 / lịch theo khóa từ /schedules (chỉ dành cho GV hoặc học viên chính quy)
         if (!isFreePortal) {
@@ -201,11 +293,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
                   ? `Học viên: ${s.studentName || s.studentId?.name || 'Học viên'}`
                   : `Giảng viên: ${s.teacherName || s.teacherId?.name || 'Giảng viên'}`;
 
-                const link = resolveMeetJoinLink(
-                  s.linkHoc,
-                  s.meetingUrl,
-                  role === 'student' ? (currentUser as any)?.linkHoc : '',
-                );
+                const link = resolveScheduleFallbackLink(s, schList, role, currentUser);
 
                 const row: AlertClassItem = {
                   id,
@@ -228,7 +316,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
           }
         }
 
-        // 2. Quét thêm từ meet-classes (nếu có lớp meet nhóm)
+        // 2. Quét thêm từ meet-classes (lớp Meet nhóm)
         try {
           const meetRes = await mobileApiRequest<{ data?: any[] }>('/meet-classes/mine');
           const meetList = Array.isArray(meetRes?.data) ? meetRes.data : [];
@@ -259,7 +347,12 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
                 day: m.day,
                 startTime: m.startTime || '',
                 endTime: m.endTime || '',
-                linkHoc: resolveMeetJoinLink(m.linkHoc),
+                linkHoc: resolveMeetJoinLink(
+                  m.linkHoc,
+                  m.meetingUrl,
+                  role === 'student' ? userRec.linkHoc : '',
+                  role === 'student' ? userRec.online_meeting_url : '',
+                ),
                 personInfo: '',
                 isLive,
               };
@@ -271,7 +364,9 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
           /* Bỏ qua lỗi fetch meet-classes */
         }
 
-        if (candidates.length > 0 && active) {
+        if (!active) return;
+
+        if (candidates.length > 0) {
           candidates.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0));
           const target = candidates[0];
           setItem((current) => {
@@ -285,19 +380,41 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
             }
             return current || target;
           });
+        } else {
+          setItem((current) => {
+            if (!current) return null;
+            return isMeetEnded({
+              day: current.day,
+              endTime: current.endTime,
+              nowDay: clock.day,
+              nowMinutes: clock.minutes,
+            })
+              ? null
+              : current;
+          });
         }
       } catch {
         /* Bỏ qua lỗi */
       }
     };
 
-    tick();
-    const timer = setInterval(tick, 45000);
+    tickRef.current = tick;
+    void tick();
+    const timer = setInterval(() => {
+      void tick();
+    }, 15000);
     return () => {
       active = false;
+      tickRef.current = null;
       clearInterval(timer);
     };
-  }, [ready, role, isTeacher, isFreePortal]);
+  }, [ready, role, isTeacher, isFreePortal, userIdKey, currentUser]);
+
+  useEffect(() => {
+    if (!item) return undefined;
+    const timer = setInterval(() => setClockTick(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, [item?.id]);
 
   // Âm thanh chuông báo
   useEffect(() => {
@@ -331,18 +448,25 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
   };
 
   if (!item) return null;
-  const link = resolveMeetJoinLink(item.linkHoc, role === 'student' ? (currentUser as any)?.linkHoc : '');
-  const untilStart = minutesUntilMeetStart(item.startTime, vnScheduleClock().minutes);
+  void clockTick;
+  const clock = vnScheduleClock();
+  const link = ensureHttpUrl(resolveMeetJoinLink(
+    item.linkHoc,
+    role === 'student' ? (currentUser as any)?.linkHoc : '',
+    role === 'student' ? (currentUser as any)?.online_meeting_url : '',
+  ));
+  const untilStart = minutesUntilMeetStart(item.startTime, clock.minutes);
+  const effectiveLive = item.isLive || untilStart <= 0;
   const kickerText = meetAlertKicker({
-    isLive: item.isLive,
+    isLive: effectiveLive,
     isTeacher,
     minutesUntilStart: untilStart,
   });
-  const quietMs = meetAlertDismissMs(item, vnScheduleClock().minutes);
+  const quietMs = meetAlertDismissMs(item, clock.minutes);
 
-  const actionText = item.isLive
-    ? (isTeacher ? 'Vào lớp dạy ngay' : 'Vào lớp ngay')
-    : 'Vào lớp chuẩn bị';
+  const actionText = isTeacher
+    ? 'Vào lớp dạy ngay'
+    : (effectiveLive ? 'Vào học ngay' : 'Vào lớp ngay');
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => handleClose(quietMs)}>
@@ -443,6 +567,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+    textAlign: 'center',
+    paddingHorizontal: 28,
   },
   title: {
     marginTop: 6,

@@ -22,6 +22,11 @@ const COMBO_ART = {
   5: require('../../../assets/daily-practice/combo-x5.png'),
 } as const;
 
+const COMBO_ART_RATIO: Record<3 | 5, number> = {
+  3: 675 / 905,
+  5: 740 / 949,
+};
+
 function MobileComboArtOverlay({
   tier,
   displayMs,
@@ -34,15 +39,22 @@ function MobileComboArtOverlay({
   onDone: () => void;
 }) {
   const { width, height } = useWindowDimensions();
-  const artMaxWidth = Math.min(width - 28, 380);
-  const artMaxHeight = Math.min(height * 0.78, 560);
+  const artMaxWidth = Math.min(Math.max(width - 28, 200), 380);
+  const artMaxHeight = Math.min(Math.max(height * 0.78, 240), 560);
+  const ratio = COMBO_ART_RATIO[tier];
+  const artWidth = Math.round(Math.min(artMaxWidth, artMaxHeight * ratio));
+  const artHeight = Math.round(artWidth / ratio);
 
   const dim = useRef(new Animated.Value(0)).current;
   const art = useRef(new Animated.Value(0)).current;
   const rootOpacity = useRef(new Animated.Value(1)).current;
+  const playRef = useRef(play);
+  const onDoneRef = useRef(onDone);
+  playRef.current = play;
+  onDoneRef.current = onDone;
 
   useEffect(() => {
-    play('lightning');
+    playRef.current('lightning');
     dim.setValue(0);
     art.setValue(0);
     rootOpacity.setValue(1);
@@ -65,28 +77,28 @@ function MobileComboArtOverlay({
         useNativeDriver: USE_NATIVE_DRIVER,
       }).start();
     }, fadeAt);
-    const closeTimer = setTimeout(() => onDone(), displayMs);
+    const closeTimer = setTimeout(() => onDoneRef.current(), displayMs);
 
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(closeTimer);
     };
-  }, [art, dim, displayMs, onDone, play, tier]);
+  }, [art, dim, displayMs, rootOpacity, tier]);
 
   const dimOpacity = dim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.44] });
   const artScale = art.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
   const artY = art.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
 
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent pointerEvents="none">
-      <Animated.View style={[styles.root, { opacity: rootOpacity }]}>
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <Animated.View style={[styles.root, { opacity: rootOpacity }]} pointerEvents="none">
         <Animated.View style={[styles.dim, { opacity: dimOpacity }]} />
         <Animated.View
           style={[
             styles.artWrap,
             {
-              maxWidth: artMaxWidth,
-              maxHeight: artMaxHeight,
+              width: artWidth,
+              height: artHeight,
               transform: [{ scale: artScale }, { translateY: artY }],
               opacity: art,
             },
@@ -94,7 +106,7 @@ function MobileComboArtOverlay({
         >
           <Image
             source={COMBO_ART[tier]}
-            style={[styles.art, { maxWidth: artMaxWidth, maxHeight: artMaxHeight }]}
+            style={[styles.art, { width: artWidth, height: artHeight }]}
             resizeMode="contain"
             accessibilityLabel={tier === 3 ? 'Combo ba câu đúng liên tiếp' : 'Combo năm câu đúng liên tiếp'}
           />
@@ -118,9 +130,13 @@ function MobileComboTenOverlay({
   const dim = useRef(new Animated.Value(0)).current;
   const mascot = useRef(new Animated.Value(0)).current;
   const rootOpacity = useRef(new Animated.Value(1)).current;
+  const playRef = useRef(play);
+  const onDoneRef = useRef(onDone);
+  playRef.current = play;
+  onDoneRef.current = onDone;
 
   useEffect(() => {
-    play('lightning');
+    playRef.current('lightning');
     Animated.timing(dim, { toValue: 1, duration: 200, useNativeDriver: USE_NATIVE_DRIVER }).start();
     Animated.spring(mascot, {
       toValue: 1,
@@ -139,18 +155,18 @@ function MobileComboTenOverlay({
         useNativeDriver: USE_NATIVE_DRIVER,
       }).start();
     }, fadeAt);
-    const closeTimer = setTimeout(() => onDone(), displayMs);
+    const closeTimer = setTimeout(() => onDoneRef.current(), displayMs);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(closeTimer);
     };
-  }, [dim, displayMs, mascot, onDone, play]);
+  }, [dim, displayMs, mascot, rootOpacity]);
 
   const dimOpacity = dim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.44] });
 
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent pointerEvents="none">
-      <Animated.View style={[styles.root, { opacity: rootOpacity }]}>
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <Animated.View style={[styles.root, { opacity: rootOpacity }]} pointerEvents="none">
         <Animated.View style={[styles.dim, { opacity: dimOpacity }]} />
         <View style={[styles.stage, { width: stageWidth }]}>
           <ComboGlowEffect variant="gold" />

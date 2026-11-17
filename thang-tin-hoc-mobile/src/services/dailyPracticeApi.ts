@@ -41,7 +41,7 @@ export function emitDailyPracticeStats(payload: unknown) {
 }
 
 export type DpDifficulty = 'easy' | 'medium' | 'hard';
-export type DpType = 'mcq' | 'truefalse' | 'order' | 'match' | 'fill' | 'sort';
+export type DpType = 'mcq' | 'truefalse' | 'order' | 'match' | 'fill' | 'sort' | 'video';
 
 export type DpXpPack = {
   id?: string;
@@ -134,6 +134,15 @@ export type DpQuestion = {
   segments?: Array<{ text?: string; blank?: number }>;
   bank?: string[];
   groups?: string[];
+  watched?: boolean;
+  passedCheckIds?: string[];
+  video?: {
+    id?: string;
+    title?: string;
+    url?: string;
+    antiSeek?: boolean;
+    checks?: DpVideoCheck[];
+  };
 };
 
 export type DpAnswer =
@@ -269,6 +278,7 @@ export type DpLevelSectionConfig = {
   practice: {
     title?: string;
     description?: string;
+    itemOrder?: string[];
     video?: { id?: string; title?: string; url?: string; antiSeek?: boolean; checks?: DpVideoCheck[]; guide?: DpVideoGuide | null };
   };
 };
@@ -379,6 +389,7 @@ export type DpSession = {
   mode?: 'path' | 'free';
   topic?: { id?: string; name?: string } | null;
   difficulty: DpDifficulty;
+  preserveOrder?: boolean;
   total: number;
   questions: DpQuestion[];
   xpDisabled?: boolean;
@@ -578,6 +589,20 @@ export const dailyPracticeApi = {
     emitDailyPracticeStats(data);
     return data;
   }),
+  skipVideoCheck: (unitId: string, videoId: string, checkIndex: number, checkId?: string) => call<{
+    skipped: boolean;
+    passed: boolean;
+    review?: boolean;
+    cost?: number;
+    charged?: number;
+    xpDelta?: number;
+    profileXp?: number;
+    purchasedXp?: number;
+    dailyXp?: number;
+  }>('/path/videos/skip', { unitId, videoId, checkIndex, ...(checkId ? { checkId } : {}) }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
   startPath: (unitId: string, step: DpStepKey, testOut = false, nodeKey = '', opts: { review?: boolean } = {}) => call<DpSession>(
     '/sessions',
     { mode: 'path', unitId, step, testOut, nodeKey, review: Boolean(opts.review) },
@@ -758,6 +783,7 @@ export const DP_TYPES: Record<DpType, { label: string; instruction: string }> = 
   match: { label: 'Ghép cặp', instruction: 'Kéo mỗi thẻ vào đúng ô bên trái' },
   fill: { label: 'Điền vào chỗ trống', instruction: 'Kéo từ vào đúng chỗ trống' },
   sort: { label: 'Phân loại', instruction: 'Kéo từng mục vào đúng nhóm' },
+  video: { label: 'Video tương tác', instruction: 'Xem video và trả lời đúng hết câu hỏi trong video' },
 };
 
 const TYPE_CHIP = { soft: '#F1F5F9', color: '#475569' };

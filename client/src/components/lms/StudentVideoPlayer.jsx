@@ -97,6 +97,9 @@ export const StudentVideoPlayer = ({
   const pauseTimeoutRef = useRef(null);
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
+  const seekGuardTimerRef = useRef(null);
+  const pendingSeekRef = useRef(null);
+  const totalDurationRef = useRef(0);
   const eligibilitySentRef = useRef(false);
   const xpSentRef = useRef(false);
   const uiTickRef = useRef(null);
@@ -117,6 +120,7 @@ export const StudentVideoPlayer = ({
   lessonCompletedRef.current = lessonCompleted;
   antiSeekEnabledRef.current = antiSeekEnabled;
   bestInitialRef.current = bestInitial;
+  totalDurationRef.current = totalDuration;
 
   const effectiveDuration = resolveEffectiveDuration(adminDurationSeconds, totalDuration);
   // Server completed / đủ threshold → tua tự do (không phụ thuộc session watch thấp)
@@ -152,6 +156,8 @@ export const StudentVideoPlayer = ({
     }
     setMaxSeekableUi(maxPosRef.current);
     seekGuardRef.current = false;
+    pendingSeekRef.current = null;
+    clearTimeout(seekGuardTimerRef.current);
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
 
   // Khi vừa complete trên server hoặc duration YT load xong → mở seek full
@@ -346,12 +352,27 @@ export const StudentVideoPlayer = ({
       clearInterval(intervalRef.current);
       clearInterval(autoSaveTimerRef.current);
       clearInterval(uiTickRef.current);
+      clearTimeout(seekGuardTimerRef.current);
+      pendingSeekRef.current = null;
       try { playerRef.current?.destroy?.(); } catch { /* ignore */ }
       playerRef.current = null;
       isReadyRef.current = false;
     };
     // eslint-disable-line react-hooks/exhaustive-deps -- remount only on video/lesson change
   }, [videoId, lessonId]);
+
+  const settlePendingSeek = useCallback((rawTime) => {
+    const pending = pendingSeekRef.current;
+    if (!pending) return false;
+    if (Date.now() < pending.expiresAt && rawTime < pending.target - 0.35) {
+      setCurrentTime(pending.target);
+      uiTimeRef.current = pending.target;
+      return true;
+    }
+    pendingSeekRef.current = null;
+    seekGuardRef.current = false;
+    return false;
+  }, []);
 
   // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────
   const startCounting = useCallback(() => {
@@ -364,6 +385,7 @@ export const StudentVideoPlayer = ({
           Math.max(Number(adminDurationSeconds) || 0, totalDuration),
         );
         if (syncDur > 0) setTotalDuration((prev) => Math.max(prev, syncDur));
+        if (settlePendingSeek(t)) return;
         setCurrentTime(syncTime);
         uiTimeRef.current = Number(syncTime) || 0;
         const unlocked = seekUnlockedRef.current;
@@ -408,7 +430,7 @@ export const StudentVideoPlayer = ({
         }
       } catch { /* ignore */ }
     }, 1000);
-  }, [lessonId, antiSeekEnabled, onWatchProgress, totalDuration, adminDurationSeconds]);
+  }, [lessonId, antiSeekEnabled, onWatchProgress, totalDuration, adminDurationSeconds, settlePendingSeek]);
 
   const stopCounting = useCallback(() => {
     clearInterval(intervalRef.current);
@@ -432,40 +454,66 @@ export const StudentVideoPlayer = ({
       getCurrentTime: () => {
         try {
           const live = syncYouTubePlaybackState(playerRef.current, totalDuration).currentTime;
-          return Math.max(Number(live) || 0, Number(uiTimeRef.current) || 0);
+          const pending = pendingSeekRef.current;
+          if (pending && Date.now() < pending.expiresAt && live < pending.target - 0.35) {
+            return pending.target;
+          }
+          if (seekGuardRef.current) return Number(uiTimeRef.current) || Number(live) || 0;
+          return Number.isFinite(live) && (live > 0 || !uiTimeRef.current) ? live : (Number(uiTimeRef.current) || 0);
         } catch {
           return Number(uiTimeRef.current) || 0;
         }
       },
       getDuration: () => {
         try {
-          return syncYouTubePlaybackState(playerRef.current, totalDuration).duration;
+          return syncYouTubePlaybackState(
+            playerRef.current,
+            Math.max(Number(adminDurationSeconds) || 0, Number(totalDurationRef.current) || 0),
+          ).duration;
         } catch {
-          return Number(totalDuration) || 0;
+          return Number(totalDurationRef.current) || 0;
         }
       },
       pause: () => { try { playerRef.current?.pauseVideo?.(); } catch { /* bỏ qua */ } },
       play: () => { try { playerRef.current?.playVideo?.(); } catch { /* bỏ qua */ } },
-      seekTo: (sec) => {
+      seekTo: (sec, options = {}) => {
         try {
           const requested = Math.max(0, Number(sec) || 0);
-          const unlocked = seekUnlockedRef.current || !antiSeekEnabledRef.current;
+          const allowAdvance = Boolean(options?.allowAdvance);
+          const unlocked = allowAdvance || seekUnlockedRef.current || !antiSeekEnabledRef.current;
           const cap = unlocked
             ? Number.POSITIVE_INFINITY
             : Math.max(maxPosRef.current, uiTimeRef.current);
-          const targetSec = unlocked ? requested : Math.min(requested, cap);
+          let targetSec = unlocked ? requested : Math.min(requested, cap);
+          const knownDur = Number(
+            syncYouTubePlaybackState(playerRef.current, Math.max(Number(adminDurationSeconds) || 0, Number(totalDurationRef.current) || 0)).duration,
+          ) || 0;
+          if (knownDur > 0) targetSec = Math.min(targetSec, knownDur);
+          if (allowAdvance && targetSec > maxPosRef.current) {
+            maxPosRef.current = targetSec;
+            setMaxSeekableUi(targetSec);
+            if (antiSeekEnabledRef.current) {
+              sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(targetSec));
+            }
+          }
+          pendingSeekRef.current = allowAdvance
+            ? { target: targetSec, expiresAt: Date.now() + 2000 }
+            : null;
           seekGuardRef.current = true;
           playerRef.current?.seekTo?.(targetSec, true);
           uiTimeRef.current = targetSec;
           setCurrentTime(targetSec);
-          window.setTimeout(() => { seekGuardRef.current = false; }, 450);
+          clearTimeout(seekGuardTimerRef.current);
+          seekGuardTimerRef.current = window.setTimeout(() => {
+            seekGuardRef.current = false;
+          }, allowAdvance ? 1600 : 450);
         } catch { /* bỏ qua */ }
       },
     };
     return () => {
       playerApiRef.current = null;
     };
-  }, [playerApiRef, isReady, lessonId, totalDuration]);
+  }, [playerApiRef, isReady, lessonId, totalDuration, adminDurationSeconds]);
 
   const handleStateChange = useCallback((event) => {
     const state = event.data;
@@ -543,6 +591,7 @@ export const StudentVideoPlayer = ({
           Math.max(Number(adminDurationSeconds) || 0, totalDuration),
         );
         if (syncDur > 0) setTotalDuration((prev) => Math.max(prev, syncDur));
+        if (settlePendingSeek(t)) return;
         setCurrentTime(syncTime);
         uiTimeRef.current = Number(syncTime) || 0;
         const unlocked = seekUnlockedRef.current;
@@ -557,7 +606,7 @@ export const StudentVideoPlayer = ({
       } catch { /* ignore */ }
     }, 250);
     return () => clearInterval(uiTickRef.current);
-  }, [isPlaying, antiSeekEnabled, lessonId, adminDurationSeconds, totalDuration]);
+  }, [isPlaying, antiSeekEnabled, lessonId, adminDurationSeconds, totalDuration, settlePendingSeek]);
 
   useEffect(() => {
     const onFs = () => {
@@ -620,10 +669,13 @@ export const StudentVideoPlayer = ({
                 ? Math.max(maxPosRef.current, currentTime)
                 : Number.POSITIVE_INFINITY;
               const capped = (antiSeekEnabled && !unlocked) ? Math.min(t, cap) : t;
+              pendingSeekRef.current = null;
               seekGuardRef.current = true;
               playerRef.current?.seekTo?.(capped, true);
+              uiTimeRef.current = capped;
               setCurrentTime(capped);
-              setTimeout(() => { seekGuardRef.current = false; }, 500);
+              clearTimeout(seekGuardTimerRef.current);
+              seekGuardTimerRef.current = window.setTimeout(() => { seekGuardRef.current = false; }, 500);
             } catch { /* ignore */ }
           }}
           onVolumeChange={(v) => {

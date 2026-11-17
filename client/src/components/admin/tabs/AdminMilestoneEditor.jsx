@@ -30,6 +30,11 @@ import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/a
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { useToast } from '../../../utils/useToast';
 import { QUESTION_TYPES } from '../../../utils/dailyPractice';
+import {
+  PRACTICE_VIDEO_TOKEN,
+  buildPracticeSequence,
+  movePracticeOrderToken,
+} from '../../../../../shared/dailyPractice/practiceSequence.mjs';
 
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
@@ -376,7 +381,7 @@ function emptyLevelConfig() {
     content: { title: '', description: '', body: '' },
     files: [],
     video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() },
-    practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
+    practice: { title: '', description: '', itemOrder: [], video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
   };
 }
 
@@ -404,6 +409,7 @@ export function normalizeLevelConfigs(lesson) {
       || cfg.video?.url || (Array.isArray(cfg.video?.checks) && cfg.video.checks.length)
       || cfg.video?.guide?.customized
       || cfg.practice?.title || cfg.practice?.description
+      || (Array.isArray(cfg.practice?.itemOrder) && cfg.practice.itemOrder.length)
       || cfg.practice?.video?.url || (Array.isArray(cfg.practice?.video?.checks) && cfg.practice.video.checks.length)
       || cfg.practice?.video?.guide?.customized
       || (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length)
@@ -439,6 +445,7 @@ export function normalizeLevelConfigs(lesson) {
         practice: {
           title: String(cfg.practice?.title || ''),
           description: String(cfg.practice?.description || ''),
+          itemOrder: Array.isArray(cfg.practice?.itemOrder) ? [...cfg.practice.itemOrder] : [],
           video: {
             title: String(cfg.practice?.video?.title || ''),
             url: String(cfg.practice?.video?.url || ''),
@@ -473,7 +480,7 @@ export function normalizeLevelConfigs(lesson) {
           antiSeek: true,
           checks: Array.isArray(lesson.checks) ? [...lesson.checks] : [],
         },
-        practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [] } },
+        practice: { title: '', description: '', itemOrder: [], video: { title: '', url: '', antiSeek: true, checks: [] } },
       };
     }
     return emptyLevelConfig();
@@ -656,7 +663,7 @@ export default function AdminMilestoneEditor({
   useEffect(() => {
     let alive = true;
     setLoadingQ(true);
-    dailyPracticeApi.admin.questions({ topicId: unit.topicId, unitId: unit.id })
+    dailyPracticeApi.admin.questions({ topicId: unit.topicId, unitId: unit.id, forTestOut: 'false' })
       .then((rows) => {
         if (alive) setUnitQuestions(Array.isArray(rows) ? rows : []);
       })
@@ -681,6 +688,25 @@ export default function AdminMilestoneEditor({
   );
 
   const currentCfg = levelConfigs[activeDiff] || emptyLevelConfig();
+  const hasPracticeVideo = Boolean(String(currentCfg.practice?.video?.url || '').trim());
+  const orderedPracticeItems = useMemo(
+    () => buildPracticeSequence({
+      hasVideo: hasPracticeVideo,
+      itemOrder: currentCfg.practice?.itemOrder || [],
+      questions: diffQuestions,
+    }),
+    [hasPracticeVideo, currentCfg.practice?.itemOrder, diffQuestions],
+  );
+  const practiceVideoSeqIdx = orderedPracticeItems.findIndex((item) => item.key === PRACTICE_VIDEO_TOKEN);
+
+  const movePracticeItem = (fromIndex, toIndex) => {
+    const keys = orderedPracticeItems.map((item) => item.key);
+    const nextOrder = movePracticeOrderToken(keys, fromIndex, toIndex);
+    patchCurrentLevel((cfg) => ({
+      ...cfg,
+      practice: { ...cfg.practice, itemOrder: nextOrder },
+    }));
+  };
 
   const patchCurrentLevel = (updater) => {
     setLevelConfigs((prev) => {
@@ -825,7 +851,10 @@ export default function AdminMilestoneEditor({
       return c ? `Đã gắn video · ${c} câu hỏi trong video` : 'Đã gắn video bài giảng';
     }
     const qCount = questionCounts[activeDiff] || 0;
-    return qCount ? `${qCount} câu hỏi mức ${DIFFICULTY_TABS.find((t) => t.key === activeDiff)?.label}` : 'Chưa có câu hỏi ở mức này';
+    const label = DIFFICULTY_TABS.find((t) => t.key === activeDiff)?.label;
+    if (hasPracticeVideo && qCount) return `1 video + ${qCount} câu hỏi mức ${label}`;
+    if (hasPracticeVideo) return `1 video tương tác mức ${label}`;
+    return qCount ? `${qCount} câu hỏi mức ${label}` : 'Chưa có câu hỏi ở mức này';
   };
 
   const ytPreviewId = extractYouTubeId(currentCfg.video?.url);
@@ -1296,9 +1325,28 @@ export default function AdminMilestoneEditor({
 
                             {/* Video hướng dẫn & mốc trắc nghiệm trong phần Luyện tập */}
                             <div className="space-y-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/35 p-3.5">
-                              <p className="text-xs font-black uppercase tracking-wider text-emerald-800">
-                                Video hướng dẫn luyện tập &amp; mốc trắc nghiệm (tuỳ chọn)
-                              </p>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-black uppercase tracking-wider text-emerald-800">
+                                  Video tương tác luyện tập &amp; mốc trắc nghiệm (tuỳ chọn)
+                                </p>
+                                {hasPracticeVideo && practiceVideoSeqIdx >= 0 && (
+                                  <label className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+                                    <span>Vị trí trong bài:</span>
+                                    <select
+                                      aria-label="Vị trí câu video luyện tập"
+                                      value={practiceVideoSeqIdx}
+                                      onChange={(e) => movePracticeItem(practiceVideoSeqIdx, Number(e.target.value))}
+                                      className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-black text-emerald-900 outline-none"
+                                    >
+                                      {orderedPracticeItems.map((_, posIdx) => (
+                                        <option key={posIdx} value={posIdx}>
+                                          Câu {posIdx + 1} / {orderedPracticeItems.length}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                )}
+                              </div>
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <label className="block">
                                   <span className={LABEL}>Tiêu đề video luyện tập</span>
@@ -1426,31 +1474,98 @@ export default function AdminMilestoneEditor({
 
                             {loadingQ ? (
                               <p className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Loader2 size={14} className="animate-spin" /> Đang tải câu hỏi...</p>
-                            ) : diffQuestions.length === 0 ? (
+                            ) : orderedPracticeItems.length === 0 ? (
                               <p className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/40 p-4 text-center text-xs font-semibold text-emerald-800">
                                 Chưa có câu hỏi mức {DIFFICULTY_TABS.find((t) => t.key === activeDiff)?.label} trong chặng này.
                               </p>
                             ) : (
-                              <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-                                {diffQuestions.map((q, qIdx) => (
-                                  <li key={q.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs">
-                                    <span className="font-black text-slate-400">#{qIdx + 1}</span>
-                                    <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
-                                      {QUESTION_TYPES[q.type]?.label || q.type}
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-xs font-black text-slate-700">
+                                    Thứ tự câu trong lượt luyện tập ({orderedPracticeItems.length} mục)
+                                  </p>
+                                  {hasPracticeVideo && (
+                                    <span className="text-[11px] font-medium text-emerald-700">
+                                      Học viên phải trả lời đúng hết câu hỏi trong video rồi mới sang câu kế tiếp
                                     </span>
-                                    <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">{q.prompt}</span>
-                                    <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${q.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                      {q.status === 'published' ? 'Đã xuất bản' : 'Nháp'}
-                                    </span>
-                                    <button type="button" onClick={() => onEditQuestion?.(q)} className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800 !shadow-none" title="Sửa câu hỏi">
-                                      <Pencil size={13} />
-                                    </button>
-                                    <button type="button" onClick={() => removeQuestion(q)} className="rounded p-1 text-red-500 hover:bg-red-50 !shadow-none" title="Xóa câu hỏi">
-                                      <Trash2 size={13} />
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
+                                  )}
+                                </div>
+                                <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+                                  {orderedPracticeItems.map((item, seqIdx) => {
+                                    const canMoveUp = seqIdx > 0;
+                                    const canMoveDown = seqIdx < orderedPracticeItems.length - 1;
+                                    const orderControls = (
+                                      <div className="flex shrink-0 items-center gap-1">
+                                        <select
+                                          aria-label={`Chọn vị trí mục ${seqIdx + 1}`}
+                                          value={seqIdx}
+                                          onChange={(e) => movePracticeItem(seqIdx, Number(e.target.value))}
+                                          className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400"
+                                        >
+                                          {orderedPracticeItems.map((_, optIdx) => (
+                                            <option key={optIdx} value={optIdx}>Vị trí #{optIdx + 1}</option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          type="button"
+                                          disabled={!canMoveUp}
+                                          onClick={() => movePracticeItem(seqIdx, seqIdx - 1)}
+                                          className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800 disabled:opacity-30 !shadow-none"
+                                          title="Đưa lên trước"
+                                        >
+                                          <ArrowUp size={13} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={!canMoveDown}
+                                          onClick={() => movePracticeItem(seqIdx, seqIdx + 1)}
+                                          className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800 disabled:opacity-30 !shadow-none"
+                                          title="Đưa xuống sau"
+                                        >
+                                          <ArrowDown size={13} />
+                                        </button>
+                                      </div>
+                                    );
+                                    if (item.kind === 'video') {
+                                      const checksCount = currentCfg.practice?.video?.checks?.length || 0;
+                                      const vTitle = currentCfg.practice?.video?.title || `Video hướng dẫn: ${title}`;
+                                      return (
+                                        <li key={item.key} className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50/70 px-3 py-2 text-xs">
+                                          <span className="font-black text-emerald-700">#{seqIdx + 1}</span>
+                                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                                            <Clapperboard size={11} /> Video tương tác
+                                          </span>
+                                          <span className="min-w-0 flex-1 truncate font-bold text-slate-800">{vTitle}</span>
+                                          <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-200">
+                                            {checksCount} mốc câu hỏi
+                                          </span>
+                                          {orderControls}
+                                        </li>
+                                      );
+                                    }
+                                    const q = item.question;
+                                    return (
+                                      <li key={q.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs">
+                                        <span className="font-black text-slate-400">#{seqIdx + 1}</span>
+                                        <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
+                                          {QUESTION_TYPES[q.type]?.label || q.type}
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">{q.prompt}</span>
+                                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${q.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                          {q.status === 'published' ? 'Đã xuất bản' : 'Nháp'}
+                                        </span>
+                                        {orderControls}
+                                        <button type="button" onClick={() => onEditQuestion?.(q)} className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800 !shadow-none" title="Sửa câu hỏi">
+                                          <Pencil size={13} />
+                                        </button>
+                                        <button type="button" onClick={() => removeQuestion(q)} className="rounded p-1 text-red-500 hover:bg-red-50 !shadow-none" title="Xóa câu hỏi">
+                                          <Trash2 size={13} />
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
                             )}
                           </div>
                         )}

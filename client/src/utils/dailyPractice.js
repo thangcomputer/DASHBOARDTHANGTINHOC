@@ -62,6 +62,7 @@ export const DIFFICULTIES = [
 export const difficultyMeta = (id) => DIFFICULTIES.find((d) => d.id === id) || DIFFICULTIES[0];
 /** XP đặt cược mỗi lượt luyện (khớp backend). */
 export const VIDEO_CHECK_ANSWER_XP = 5;
+export const VIDEO_CHECK_SKIP_XP = 15;
 export const QUESTION_STAKE_XP = 5;
 /** 10 câu × 5 XP/câu */
 export const SESSION_STAKE_XP = 50;
@@ -77,6 +78,7 @@ export const QUESTION_TYPES = {
   match: { label: 'Ghép cặp', instruction: 'Kéo mỗi thẻ vào đúng ô bên trái' },
   fill: { label: 'Điền vào chỗ trống', instruction: 'Kéo từ vào đúng chỗ trống' },
   sort: { label: 'Phân loại', instruction: 'Kéo từng mục vào đúng nhóm' },
+  video: { label: 'Video tương tác', instruction: 'Xem video và trả lời đúng hết câu hỏi trong video' },
 };
 
 const TYPE_CHIP = { soft: '#F1F5F9', color: '#475569' };

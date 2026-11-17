@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, BookOpen, Brain, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Maximize2, Minimize2, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Target, Trophy, Zap,
+  ArrowLeft, BookOpen, Brain, CheckCircle2, ChevronDown, ChevronRight, Crown, Flame, Lightbulb, Loader2, Lock, LogOut, Maximize2, Minimize2, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Target, Trophy, Zap,
 } from 'lucide-react';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
@@ -20,16 +20,12 @@ import AnswerFeedback from './AnswerFeedback';
 import { SoundToggleButton } from './GameButton';
 import { AnimatedXpCounter } from './XPRewardAnimation';
 import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
-import {
-  RETRY_BASELINE_EMPTY,
-  canSubmitRetryAfterWrong,
-  serializePracticeAnswer,
-} from '../../../../../shared/dailyPractice/practiceAnswerCompare.mjs';
 import { reviewItemFollowUpLine } from '../../../../../shared/dailyPractice/reviewDisplay.mjs';
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
+import PathVideoModal from './PathVideoModal';
 import PracticeFinishOverlay from './PracticeFinishOverlay';
 import ComboCelebrationOverlay from './ComboCelebrationOverlay';
-import { shouldNudgeHintButton, shouldShowComboCelebration } from './quizFeedbackOrchestration';
+import { shouldShowComboCelebration } from './quizFeedbackOrchestration';
 import BuyXpModal from './BuyXpModal';
 import DigitalCertificateModal from '../DigitalCertificateModal';
 import PlacementTestModal, { readPlacementResult } from './PlacementTestModal';
@@ -240,8 +236,8 @@ function HomeScreen({
                     aria-selected={active}
                     onClick={() => { gameSounds.tap(); onModeChange(item.id); }}
                     className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-black transition !shadow-none ${active
-                        ? 'bg-white text-[#059669] shadow-sm ring-1 ring-emerald-200/60'
-                        : 'text-[#64748B] hover:text-slate-700'
+                      ? 'bg-white text-[#059669] shadow-sm ring-1 ring-emerald-200/60'
+                      : 'text-[#64748B] hover:text-slate-700'
                       }`}
                   >
                     <Icon size={15} aria-hidden="true" /> {displayLabel}
@@ -351,10 +347,10 @@ function HomeScreen({
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-black ${dueCount > 0
-                        ? 'bg-emerald-600 text-white'
-                        : totalQueued > 0
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-100 text-slate-500'
+                      ? 'bg-emerald-600 text-white'
+                      : totalQueued > 0
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-500'
                       }`}
                   >
                     {dueCount > 0
@@ -543,25 +539,30 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       if (typeof event?.detail?.xpTotal === 'number') {
         setProfileXp(event.detail.xpTotal);
       }
+      const spendXp = Number(event?.detail?.spendXp || 0);
+      if (spendXp > 0) {
+        setHintChargedXp(0);
+        window.requestAnimationFrame(() => setHintChargedXp(spendXp));
+      }
     };
     window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
     return () => window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
   }, []);
   const [combo, setCombo] = useState(0);
+  const comboRef = useRef(0);
   const [comboCelebration, setComboCelebration] = useState(null);
-  const [wrongTryCount, setWrongTryCount] = useState(0);
-  const [retryCooldownSec, setRetryCooldownSec] = useState(0);
-  const [answerResetKey, setAnswerResetKey] = useState(0);
-  const [retryBaselineKey, setRetryBaselineKey] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
   const [hintChargedXp, setHintChargedXp] = useState(0);
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
+  const [videoDoneIds, setVideoDoneIds] = useState({});
   const question = session.questions[index];
   const total = session.questions.length;
-  const meta = QUESTION_TYPES[question.type];
+  const meta = QUESTION_TYPES[question.type] || QUESTION_TYPES.mcq;
   const level = difficultyMeta(question.difficulty);
+  const isVideoQuestion = question.type === 'video';
+  const videoCompleted = isVideoQuestion && Boolean(videoDoneIds[question.id]);
   const isPathSession = session.mode === 'path' || Boolean(session.path);
   const xpDisabled = Boolean(session.xpDisabled || (!isPathSession && session.mode === 'free') || session.review || session.path?.review);
   const stakeXp = xpDisabled ? 0 : (session.stakeXp ?? 0);
@@ -582,32 +583,10 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   useEffect(() => {
     setExplainOpen(false);
     setHintChargedXp(0);
-  }, [question.id, answerResetKey]);
-
-  useEffect(() => {
-    setRetryBaselineKey('');
   }, [question.id]);
 
-  useEffect(() => {
-    if (!result || result.correct) {
-      setRetryBaselineKey('');
-      return;
-    }
-    if (pending == null || question.type !== 'order') return;
-    setRetryBaselineKey((prev) => {
-      if (prev === RETRY_BASELINE_EMPTY || prev === '') return serializePracticeAnswer(pending);
-      return prev;
-    });
-  }, [result, pending, question.type]);
-
-  const resetInteractiveAnswer = useCallback(() => {
-    setPending(null);
-    setChosen(null);
-    setAnswerResetKey((key) => key + 1);
-  }, []);
-
   const submit = useCallback(async (answer) => {
-    if (busy || result?.correct) return;
+    if (!answer || busy || result) return;
     setBusy(true);
     setError('');
     setChosen(answer.index ?? answer.value ?? null);
@@ -616,28 +595,19 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       setResult(data);
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       if (data.correct) {
-        setWrongTryCount(0);
-        setCombo((value) => {
-          const nextVal = value + 1;
-          if (shouldShowComboCelebration(nextVal)) {
-            setComboCelebration(nextVal);
-          }
-          return nextVal;
-        });
+        const nextVal = comboRef.current + 1;
+        comboRef.current = nextVal;
+        setCombo(nextVal);
+        if (shouldShowComboCelebration(nextVal)) {
+          setComboCelebration(nextVal);
+        }
         setFeedbackTitle(randomPraise());
         gameSounds.correct();
       } else {
-        setWrongTryCount(typeof data.wrongTryCount === 'number' ? data.wrongTryCount : (wrongTryCount + 1));
+        comboRef.current = 0;
         setCombo(0);
         setFeedbackTitle(randomComfort());
         gameSounds.wrong();
-        if (question.type === 'mcq' || question.type === 'truefalse') {
-          setChosen(null);
-          setPending(null);
-        } else {
-          setRetryBaselineKey(RETRY_BASELINE_EMPTY);
-          resetInteractiveAnswer();
-        }
       }
     } catch (err) {
       if (err.status === 402) setBuyXpOpen(true);
@@ -645,10 +615,10 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     } finally {
       setBusy(false);
     }
-  }, [busy, question.type, resetInteractiveAnswer, result, session.id, question.id, wrongTryCount]);
+  }, [busy, result, session.id, question.id]);
 
   const askHint = async () => {
-    if (reveal || result?.correct || busy) return;
+    if (reveal || result || busy) return;
     if (!xpDisabled && hintShareXp > 0 && profileXp < hintShareXp) {
       setBuyXpOpen(true);
       return;
@@ -685,8 +655,6 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       setResult(null);
       setReveal(null);
       setHintText('');
-      setWrongTryCount(0);
-      setAnswerResetKey((key) => key + 1);
       return;
     }
     setBusy(true);
@@ -713,10 +681,11 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   };
 
   const props = { question, reveal, result, onChange: setPending };
-  const progress = Math.round(((index + (result?.correct ? 1 : 0)) / total) * 100);
+  const stepDone = isVideoQuestion ? videoCompleted : Boolean(result);
+  const progress = Math.round(((index + (stepDone ? 1 : 0)) / total) * 100);
   const immediate = question.type === 'mcq' || question.type === 'truefalse';
   const contextLabel = headerChips[0]?.text || level.label;
-  const answeredCount = index + (result?.correct ? 1 : 0);
+  const answeredCount = index + (stepDone ? 1 : 0);
   const quitLossXp = isPerQuestion ? Math.max(0, total - answeredCount) * perQuestionStake : stakeXp;
   const confirmedQuestionXp = result?.correct
     ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
@@ -726,41 +695,23 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         : (isPerQuestion ? perQuestionStake : 0)))
     : 0;
 
-  const { focusMode, toggle: toggleFocus, setFocusMode } = useFocusMode();
+  const { setFocusMode } = useFocusMode();
   useEffect(() => () => setFocusMode(false), [setFocusMode]);
-
-  useEffect(() => {
-    if (!result || result.correct) {
-      setRetryCooldownSec(0);
-      return undefined;
-    }
-    setRetryCooldownSec(5);
-    const timer = window.setInterval(() => {
-      setRetryCooldownSec((sec) => (sec <= 1 ? 0 : sec - 1));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [result, wrongTryCount]);
 
   const keyActionsRef = useRef({});
   keyActionsRef.current = {
     blocked: quitOpen || buyXpOpen || Boolean(comboCelebration),
     busy,
     question,
+    isVideoQuestion,
+    videoCompleted,
     result,
     reveal,
     pending,
     immediate,
-    retryBaselineKey,
-    retryCooldownSec,
     submit,
     askHint,
     next,
-    clearImmediateResult: () => {
-      if (retryCooldownSec > 0) return;
-      setResult(null);
-      setChosen(null);
-      setPending(null);
-    },
   };
 
   useEffect(() => {
@@ -776,8 +727,8 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       const key = String(event.key || '');
       const lower = key.toLowerCase();
 
-      if (s.result?.correct) {
-        if (key === 'Enter' || key === 'ArrowRight') {
+      if (s.isVideoQuestion) {
+        if (s.videoCompleted && (key === 'Enter' || key === 'ArrowRight')) {
           event.preventDefault();
           gameSounds.tap();
           s.next();
@@ -785,13 +736,11 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         return;
       }
 
-      if (s.result && !s.result.correct) {
-        if (s.retryCooldownSec > 0) return;
-        if (key === 'Enter') {
-          if (s.immediate ? Boolean(s.pending) : canSubmitRetryAfterWrong({ pending: s.pending, retryBaselineKey: s.retryBaselineKey, questionType: s.question.type })) {
-            event.preventDefault();
-            s.submit(s.pending);
-          }
+      if (s.result) {
+        if (key === 'Enter' || key === 'ArrowRight') {
+          event.preventDefault();
+          gameSounds.tap();
+          s.next();
         }
         return;
       }
@@ -839,17 +788,19 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   }, []);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 pt-6 pb-12 sm:gap-6 sm:px-6 sm:pt-10">
-      {/* Thanh trên: thoát · tiến độ · XP · âm thanh */}
-      <header className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/80 sm:gap-4 sm:px-5 sm:py-3.5">
+    <div className={`mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 pb-10 sm:px-6 ${isVideoQuestion ? 'pt-4 sm:gap-4 sm:pt-5' : 'gap-5 pt-6 sm:gap-6 sm:pt-10 sm:pb-12'}`}>
+      <div className="flex items-center justify-start">
         <button
           type="button"
           onClick={() => setQuitOpen(true)}
           aria-label="Thoát"
-          className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
         >
           <LogOut size={16} aria-hidden="true" /> Thoát
         </button>
+      </div>
+      {/* Thanh trên: tiến độ · XP */}
+      <header className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/80 sm:gap-4 sm:px-5 sm:py-3.5">
         <AnimatedProgressBar
           progress={progress}
           currentStep={index + 1}
@@ -884,34 +835,20 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
               <span className="dp-xp-hint-spend" aria-live="polite">−{hintChargedXp} XP</span>
             ) : null}
           </span>
-          <button
-            type="button"
-            onClick={() => { gameSounds.tap(); toggleFocus(); }}
-            aria-pressed={focusMode}
-            title={focusMode ? 'Thoát Chế độ Tập trung' : 'Bật Chế độ Tập trung (ẩn sidebar)'}
-            aria-label={focusMode ? 'Thoát Chế độ Tập trung' : 'Bật Chế độ Tập trung'}
-            className={`hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition ${focusMode
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            {focusMode ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
-          </button>
-          <SoundToggleButton compact />
         </div>
       </header>
 
       {/* Thẻ câu */}
       <section className={`relative rounded-[28px] bg-white p-5 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 sm:p-8 ${result && !result.correct ? 'dp-shake' : ''}`}>
         {result?.correct && <Confetti />}
-        {!result?.correct ? (
+        {!result && !isVideoQuestion ? (
           <button
             type="button"
             onClick={askHint}
             disabled={Boolean(reveal) || busy}
             aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, trừ ngay ${hintShareXp} XP`)}
             title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, trừ ngay −${hintShareXp} XP`}
-            className={`absolute right-4 top-4 z-20 dp-play-hint-corner sm:right-6 sm:top-6 disabled:opacity-50 ${shouldNudgeHintButton(wrongTryCount, Boolean(reveal)) ? 'dp-hint-nudge' : ''}`}
+            className="absolute right-4 top-4 z-20 dp-play-hint-corner sm:right-6 sm:top-6 disabled:opacity-50"
           >
             <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className={reveal ? 'text-slate-400' : 'text-slate-500'} />
             <span>{reveal ? 'Đã gợi ý' : 'Gợi ý'}</span>
@@ -920,10 +857,10 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             ) : null}
           </button>
         ) : null}
-        <div className="flex items-start gap-3.5 border-b border-slate-100 pb-5 pr-20 sm:gap-5 sm:pb-6 sm:pr-24">
+        <div className={`flex items-start gap-3.5 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6 ${!result && !isVideoQuestion ? 'pr-20 sm:pr-24' : ''}`}>
           <div className="dp-play-mascot-wrap">
             <Mascot
-              mood={result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning'}
+              mood={isVideoQuestion ? (videoCompleted ? 'correct' : 'learning') : (result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning')}
               size={PLAY_QUESTION_CHROME.mascotSize.web}
               className="shrink-0"
             />
@@ -938,133 +875,159 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           </div>
         </div>
 
-        {question.imageUrl && (
-          <img src={question.imageUrl} alt="" className="mt-5 max-h-60 w-full rounded-2xl bg-slate-50 object-contain p-2 ring-1 ring-slate-200/70" />
-        )}
-
-        {hintText ? (
-          <div className="mt-5 space-y-1.5">
-            <p className="dp-play-hint-reveal !mt-0">
-              <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className="mt-0.5 shrink-0 text-slate-500" />
-              <span>{hintText}</span>
-            </p>
-            {hintChargedXp > 0 ? (
-              <p className="dp-play-hint-charge">Đã trừ <strong>−{hintChargedXp} XP</strong> từ ví của bạn.</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="mt-6" key={`${question.id}-${answerResetKey}`}>
-          {question.type === 'mcq' && (
-            <McqQuestion
-              {...props}
-              chosen={chosen}
-              pending={pending}
-              retryCooldownSec={retryCooldownSec}
-              onSubmit={submit}
-            />
-          )}
-          {question.type === 'truefalse' && (
-            <TrueFalseQuestion
-              {...props}
-              chosen={chosen}
-              pending={pending}
-              retryCooldownSec={retryCooldownSec}
-              onSubmit={submit}
-            />
-          )}
-          {question.type === 'order' && <OrderQuestion {...props} />}
-          {question.type === 'match' && <MatchQuestion {...props} />}
-          {question.type === 'fill' && <FillQuestion {...props} />}
-          {question.type === 'sort' && <SortQuestion {...props} />}
-        </div>
-        {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
-
-        {result && (
-          <AnswerFeedback
-            question={question}
-            result={result}
-            feedbackTitle={feedbackTitle}
-            confirmedXp={confirmedQuestionXp}
-            rewardKey={`${session.id}:${question.id}`}
-            isLastQuestion={index + 1 >= total}
-            busy={busy}
-            onNext={next}
-            onRetry={() => {
-              submit(pending);
-            }}
-            canRetry={Boolean(
-              result
-              && !result.correct
-              && !busy
-              && retryCooldownSec <= 0
-              && (immediate
-                ? Boolean(pending)
-                : canSubmitRetryAfterWrong({
-                  pending,
-                  retryBaselineKey,
-                  questionType: question.type,
-                })),
-            )}
-            wrongTryCount={wrongTryCount}
-            retryCooldownSec={retryCooldownSec}
-            xpDisabled={xpDisabled}
-            explainOpen={explainOpen}
-            onExplainOpenChange={setExplainOpen}
-          />
-        )}
-
-        {!result?.correct && (
-          <div className={`flex flex-wrap items-center gap-2.5 border-t border-slate-100 ${result ? 'mt-3 pt-3' : 'mt-6 pt-5'} ${result && !result.correct ? 'justify-start' : 'justify-end'}`}>
-            {result && !result.correct ? (
+        {isVideoQuestion ? (
+          <div className="mt-4 space-y-3.5">
+            <div className="w-full">
+              <PathVideoModal
+                key={`${session.id}:${question.id}`}
+                unit={{ id: session.path?.unitId || session.unitId, topicId: session.topic?.id }}
+                videos={question.video ? [{ ...question.video, source: 'step' }] : []}
+                initialVideoId={question.video?.id || ''}
+                singleVideoOnly
+                embedded
+                hideStudyTools
+                frameless
+                review={xpDisabled}
+                onWatched={async (videoId, metaInfo) => {
+                  const targetUnitId = session.path?.unitId || session.unitId;
+                  if (targetUnitId && videoId && !metaInfo?.initialSync) {
+                    await dailyPracticeApi.student.videoWatched(targetUnitId, videoId);
+                  }
+                  setVideoDoneIds((prev) => ({ ...prev, [question.id]: true }));
+                  if (metaInfo?.completedJustNow) {
+                    setHintChargedXp(0);
+                    gameSounds.correct();
+                    setError('');
+                  }
+                }}
+              />
+            </div>
+            {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
+            <div className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3.5 sm:px-4 ${videoCompleted
+              ? 'border-emerald-200 bg-emerald-50/75'
+              : 'border-slate-200 bg-slate-50/80'
+              }`}>
+              <div className="min-w-0 flex-1">
+                {videoCompleted ? (
+                  <p className="dp-play-video-status-text font-semibold text-emerald-800">
+                    Đã xem video và trả lời đúng hết câu hỏi tương tác — bạn có thể chuyển sang câu tiếp theo.
+                  </p>
+                ) : (
+                  <p className="dp-play-video-status-text font-medium text-slate-600">
+                    Xem video và trả lời đúng tất cả mốc trắc nghiệm trong video để mở khóa câu tiếp theo.
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
+                disabled={!videoCompleted || busy}
                 onClick={() => {
+                  if (!videoCompleted || busy) return;
                   gameSounds.tap();
-                  setExplainOpen((open) => !open);
+                  next();
                 }}
-                aria-expanded={explainOpen}
-                className="dp-play-footer-explain"
+                className={`dp-play-video-next-btn flex w-full sm:w-auto shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl px-4 py-2 font-black transition ${videoCompleted && !busy
+                  ? 'border-b-4 border-[#047857] bg-[#10B981] text-white shadow-[0_4px_14px_rgba(16,185,129,0.35)] hover:bg-[#059669] active:translate-y-[2px] active:border-b-2 cursor-pointer'
+                  : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed !shadow-none'
+                  }`}
               >
-                <BookOpen size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} aria-hidden="true" />
-                <span>{explainOpen ? 'Ẩn giải thích' : 'Giải thích'}</span>
+                {videoCompleted ? <ChevronRight size={17} /> : <Lock size={15} />}
+                {videoCompleted
+                  ? (index + 1 >= total ? 'Hoàn thành' : 'Tiếp tục')
+                  : 'Hoàn thành video để tiếp tục'}
               </button>
-            ) : null}
-            {!result && !immediate ? (
-              <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary min-w-[160px] !py-3">
-                {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
-                {' '}
-                Kiểm tra
-              </button>
-            ) : null}
-            {!result && immediate ? (
-              <p className="text-xs font-semibold text-slate-400">Chọn một đáp án phía trên để trả lời</p>
-            ) : null}
+            </div>
           </div>
-        )}
+        ) : (
+          <>
 
-        <p className="mt-4 hidden items-center justify-center gap-2 text-[11px] font-medium text-slate-400 sm:flex">
-          <span>Phím tắt:</span>
-          {result?.correct ? (
-            <span>
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Enter</kbd>
-              {' hoặc '}
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">→</kbd>
-              {' sang câu tiếp'}
-            </span>
-          ) : result ? (
-            <span>
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Enter</kbd>
-              {' thử lại'}
-            </span>
-          ) : (
-            <span>
-              {question.type === 'mcq' || question.type === 'truefalse' ? '1–4 / A–D chọn đáp án · ' : ''}
-              {!reveal ? 'H gợi ý · ' : ''}
-              {!immediate ? 'Enter kiểm tra' : 'Chọn đáp án ở trên'}
-            </span>
-          )}
-        </p>
+            {question.imageUrl && (
+              <img src={question.imageUrl} alt="" className="mt-5 max-h-60 w-full rounded-2xl bg-slate-50 object-contain p-2 ring-1 ring-slate-200/70" />
+            )}
+
+            {hintText ? (
+              <div className="mt-5 space-y-1.5">
+                <p className="dp-play-hint-reveal !mt-0">
+                  <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className="mt-0.5 shrink-0 text-slate-500" />
+                  <span>{hintText}</span>
+                </p>
+                {hintChargedXp > 0 ? (
+                  <p className="dp-play-hint-charge">Đã trừ <strong>−{hintChargedXp} XP</strong> từ ví của bạn.</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mt-6" key={question.id}>
+              {question.type === 'mcq' && (
+                <McqQuestion
+                  {...props}
+                  chosen={chosen}
+                  onSubmit={submit}
+                />
+              )}
+              {question.type === 'truefalse' && (
+                <TrueFalseQuestion
+                  {...props}
+                  chosen={chosen}
+                  onSubmit={submit}
+                />
+              )}
+              {question.type === 'order' && <OrderQuestion {...props} />}
+              {question.type === 'match' && <MatchQuestion {...props} />}
+              {question.type === 'fill' && <FillQuestion {...props} />}
+              {question.type === 'sort' && <SortQuestion {...props} />}
+            </div>
+            {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
+
+            {result && (
+              <AnswerFeedback
+                question={question}
+                result={result}
+                feedbackTitle={feedbackTitle}
+                confirmedXp={confirmedQuestionXp}
+                rewardKey={`${session.id}:${question.id}`}
+                isLastQuestion={index + 1 >= total}
+                busy={busy}
+                onNext={next}
+                xpDisabled={xpDisabled}
+                explainOpen={explainOpen}
+                onExplainOpenChange={setExplainOpen}
+              />
+            )}
+
+            {!result && (
+              <div className="mt-6 flex flex-wrap items-center justify-end gap-2.5 border-t border-slate-100 pt-5">
+                {!immediate ? (
+                  <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary min-w-[160px] !py-3">
+                    {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
+                    {' '}
+                    Kiểm tra
+                  </button>
+                ) : (
+                  <p className="text-xs font-semibold text-slate-400">Chọn một đáp án phía trên để trả lời</p>
+                )}
+              </div>
+            )}
+
+            <p className="mt-4 hidden items-center justify-center gap-2 text-[11px] font-medium text-slate-400 sm:flex">
+              <span>Phím tắt:</span>
+              {result ? (
+                <span>
+                  <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Enter</kbd>
+                  {' hoặc '}
+                  <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">→</kbd>
+                  {' sang câu tiếp'}
+                </span>
+              ) : (
+                <span>
+                  {question.type === 'mcq' || question.type === 'truefalse' ? '1–4 / A–D chọn đáp án · ' : ''}
+                  {!reveal ? 'H gợi ý · ' : ''}
+                  {!immediate ? 'Enter kiểm tra' : 'Chọn đáp án ở trên'}
+                </span>
+              )}
+            </p>
+          </>
+        )}
       </section>
 
       {quitOpen && (
@@ -1629,7 +1592,7 @@ export default function DailyPracticePage() {
       setSummary(null);
       setSession({
         ...data,
-        questions: shuffleList(data.questions),
+        questions: data.preserveOrder ? (data.questions || []) : shuffleList(data.questions),
       });
       if (typeof data.profileXp === 'number') applyStats({ xpTotal: data.profileXp });
       loadOverview(true);
@@ -1650,28 +1613,28 @@ export default function DailyPracticePage() {
       setStarting(false);
     }
   };
-function isPathPickCompleted(path, pick) {
-  if (!pick || pick.mode !== 'path' || pick.testOut) return false;
-  for (const t of path?.topics || []) {
-    const unit = (t?.units || []).find((u) => String(u.id) === String(pick.unitId));
-    if (!unit) continue;
-    const node = pick.nodeKey
-      ? (unit.pathNodes || []).find((n) => String(n.key) === String(pick.nodeKey))
-      : null;
-    if (node) {
-      if (pick.step) {
-        const lvl = (node.levels || []).find((l) => String(l.key) === String(pick.step));
-        if (lvl) return lvl.state === 'completed';
+  function isPathPickCompleted(path, pick) {
+    if (!pick || pick.mode !== 'path' || pick.testOut) return false;
+    for (const t of path?.topics || []) {
+      const unit = (t?.units || []).find((u) => String(u.id) === String(pick.unitId));
+      if (!unit) continue;
+      const node = pick.nodeKey
+        ? (unit.pathNodes || []).find((n) => String(n.key) === String(pick.nodeKey))
+        : null;
+      if (node) {
+        if (pick.step) {
+          const lvl = (node.levels || []).find((l) => String(l.key) === String(pick.step));
+          if (lvl) return lvl.state === 'completed';
+        }
+        if (node.state === 'completed') return true;
       }
-      if (node.state === 'completed') return true;
+      const step = pick.step
+        ? (unit.steps || []).find((s) => String(s.key) === String(pick.step))
+        : null;
+      if (step?.state === 'completed') return true;
     }
-    const step = pick.step
-      ? (unit.steps || []).find((s) => String(s.key) === String(pick.step))
-      : null;
-    if (step?.state === 'completed') return true;
+    return false;
   }
-  return false;
-}
 
   const queueBegin = (pick) => {
     const resolvedPick = pick?.mode === 'path' && !pick.testOut
@@ -1767,14 +1730,123 @@ function isPathPickCompleted(path, pick) {
     setCelebrating(true);
     applyStats(data.stats);
     loadOverview(true);
+    loadPath(true);
     window.dispatchEvent(new CustomEvent(LEARNING_GOAL_CHANGED_EVENT));
   };
 
   const navigate = useNavigate();
 
-  const closeFinishPopup = () => {
+  const resumeMilestoneAfterPractice = (preferNext, activeSession = null) => {
+    const pathPick = lastPick?.mode === 'path' ? lastPick : null;
+    const unitId = summary?.path?.unitId || activeSession?.path?.unitId || pathPick?.unitId || '';
+    const nodeKey = summary?.path?.pathNodeKey || activeSession?.path?.pathNodeKey || pathPick?.nodeKey || 'study';
+    const step = summary?.path?.step || activeSession?.path?.step || pathPick?.step || 'learn';
+    const isTestOut = Boolean(summary?.path?.testOut ?? activeSession?.path?.testOut ?? pathPick?.testOut);
+    const topicsList = path?.topics || [];
+
+    if (!isTestOut && unitId) {
+      const matchedTopic = topicsList.find((t) => (t.units || []).some((u) => u.id === unitId));
+      const matchedUnit = matchedTopic?.units?.find((u) => u.id === unitId);
+      const matchedNode = matchedUnit?.pathNodes?.find((n) => n.key === nodeKey);
+      const currDiff = step === 'challenge' ? 'hard' : step === 'practice' ? 'medium' : 'easy';
+      const resumeTopicId = matchedTopic?.topic?.id;
+
+      if (matchedNode && (matchedNode.kind === 'study' || matchedNode.icon === 'book')) {
+        setCelebrating(false);
+        setSummary(null);
+        setPathError('');
+        loadOverview(true);
+        loadPath(true);
+
+        if (preferNext && (summary?.path?.passed || summary?.xpDisabled)) {
+          const doneSet = new Set(matchedUnit?.completedSections || []);
+          doneSet.add(`${matchedNode.key}:${currDiff}:practice`);
+          const levelCfg = matchedNode.levelConfigs?.[currDiff];
+          const hiddenCurr = new Set(levelCfg?.hiddenSections || []);
+          const secOrder = (Array.isArray(levelCfg?.sectionOrder) && levelCfg.sectionOrder.length
+            ? levelCfg.sectionOrder
+            : ['content', 'file', 'video', 'practice'])
+            .filter((k) => !hiddenCurr.has(k) && levelCfg?.sectionLocks?.[k] !== 'locked');
+          const pIdx = secOrder.indexOf('practice');
+          const nextInCurrDiff = pIdx >= 0
+            ? secOrder.slice(pIdx + 1).find((k) => !doneSet.has(`${matchedNode.key}:${currDiff}:${k}`))
+            : null;
+
+          if (nextInCurrDiff) {
+            setRequestedLesson({
+              unit: matchedUnit,
+              nodeKey,
+              topicId: resumeTopicId,
+              openMilestone: true,
+              initialDifficulty: currDiff,
+              initialSection: nextInCurrDiff,
+            });
+            return;
+          }
+
+          const isNodeDiffDone = (diff) => {
+            const c = matchedNode.levelConfigs?.[diff];
+            if (!c) return diff !== 'easy';
+            const hidden = new Set(c.hiddenSections || []);
+            const secs = (Array.isArray(c.sectionOrder) && c.sectionOrder.length
+              ? c.sectionOrder
+              : ['content', 'file', 'video', 'practice'])
+              .filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
+            return !secs.length || secs.every((k) => doneSet.has(`${matchedNode.key}:${diff}:${k}`));
+          };
+
+          const allNodeDone = isNodeDiffDone('easy') && isNodeDiffDone('medium') && isNodeDiffDone('hard');
+          const nextStep = summary?.path?.next;
+          if (allNodeDone && nextStep && (nextStep.unitId !== unitId || nextStep.nodeKey !== nodeKey)) {
+            const nextTopic = topicsList.find((t) => (t.units || []).some((u) => u.id === nextStep.unitId));
+            const nextUnit = nextTopic?.units?.find((u) => u.id === nextStep.unitId);
+            const nextNode = nextUnit?.pathNodes?.find((n) => n.key === nextStep.nodeKey);
+            if (nextUnit && nextNode && (nextNode.kind === 'study' || nextNode.icon === 'book')) {
+              setRequestedLesson({
+                unit: nextUnit,
+                nodeKey: nextStep.nodeKey,
+                topicId: nextTopic?.topic?.id || resumeTopicId,
+                openMilestone: true,
+              });
+              return;
+            }
+            startStep(nextStep.unitId, nextStep.nodeKey || 'study', nextStep.step);
+            return;
+          }
+
+          setRequestedLesson({
+            unit: matchedUnit,
+            nodeKey,
+            topicId: resumeTopicId,
+            openMilestone: true,
+          });
+          return;
+        }
+
+        setRequestedLesson({
+          unit: matchedUnit,
+          nodeKey,
+          topicId: resumeTopicId,
+          openMilestone: true,
+          initialDifficulty: currDiff,
+        });
+        return;
+      }
+    }
+
+    if (preferNext && summary?.path?.passed && summary.path.next) {
+      setCelebrating(false);
+      setSummary(null);
+      startStep(summary.path.next.unitId, summary.path.next.nodeKey || 'study', summary.path.next.step);
+      return;
+    }
+
     setCelebrating(false);
     goHome();
+  };
+
+  const closeFinishPopup = () => {
+    resumeMilestoneAfterPractice(false);
   };
 
   useEffect(() => {
@@ -1796,14 +1868,7 @@ function isPathPickCompleted(path, pick) {
   );
 
   const handleFinishContinue = () => {
-    const pathResult = summary?.path;
-    if (pathResult?.passed && pathResult.next) {
-      setCelebrating(false);
-      setSummary(null);
-      startStep(pathResult.next.unitId, pathResult.next.nodeKey || 'study', pathResult.next.step);
-      return;
-    }
-    closeFinishPopup();
+    resumeMilestoneAfterPractice(true);
   };
 
   const handleFinishReplay = () => {
@@ -1837,10 +1902,11 @@ function isPathPickCompleted(path, pick) {
           session={session}
           stats={overview?.stats}
           onQuit={(info) => {
+            const prevSession = session;
             setSession(null);
             if (info?.stats) applyStats(info.stats);
             else if (typeof info?.profileXp === 'number') applyStats({ xpTotal: info.profileXp });
-            loadOverview(true);
+            resumeMilestoneAfterPractice(false, prevSession);
           }}
           onFinished={finished}
         />

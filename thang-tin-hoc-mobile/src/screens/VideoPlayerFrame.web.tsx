@@ -13,6 +13,7 @@ import {
   disableYouTubeCaptions,
   YT_IFRAME_CROP,
 } from '../../../shared/dailyPractice/lmsBrandedVideoPlayer.mjs';
+import { canMediaSeekTo } from '../../../shared/dailyPractice/videoCheckpointPlayback.mjs';
 
 type YouTubePlayer = {
   getCurrentTime: () => number;
@@ -100,6 +101,8 @@ export function VideoPlayerFrame({
   appearance = 'default',
   chromeBg = '#080D19',
   initialAtSec = 0,
+  pausedCheckpointSec = null,
+  onFullscreenChange,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -116,6 +119,8 @@ export function VideoPlayerFrame({
   appearance?: 'default' | 'window';
   chromeBg?: string;
   initialAtSec?: number;
+  pausedCheckpointSec?: number | null;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -133,6 +138,10 @@ export function VideoPlayerFrame({
   const watchedCallbackRef = useRef(onWatched);
   const doneRef = useRef(done);
   const antiSeekRef = useRef(antiSeekEnabled);
+  const guardRef = useRef<ReturnType<typeof createVideoWatchGuard> | null>(null);
+  const pendingSeekRef = useRef<{ target: number; expiresAt: number } | null>(null);
+  const watchStorageKeyRef = useRef(`student_lms_pos_${lessonId}`);
+  watchStorageKeyRef.current = `student_lms_pos_${lessonId}`;
   const [playerError, setPlayerError] = useState('');
   const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
   const [volume, setVolume] = useState(50);
@@ -203,19 +212,21 @@ export function VideoPlayerFrame({
 
   useEffect(() => {
     const onFsChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const next = Boolean(document.fullscreenElement);
+      setIsFullscreen(next);
+      onFullscreenChange?.(next);
     };
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
+  }, [onFullscreenChange]);
 
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
     if (document.fullscreenElement) {
-      void document.exitFullscreen?.().catch(() => {});
+      void document.exitFullscreen?.().catch(() => { });
     } else if (el.requestFullscreen) {
-      void el.requestFullscreen().catch(() => {});
+      void el.requestFullscreen().catch(() => { });
     }
   }, []);
 
@@ -247,9 +258,44 @@ export function VideoPlayerFrame({
         if (videoRef.current) void videoRef.current.play();
         else if (youtubePlayerRef.current) youtubePlayerRef.current.playVideo?.();
       },
-      seekTo: (position: number) => {
-        if (videoRef.current) videoRef.current.currentTime = position;
-        else if (youtubePlayerRef.current) youtubePlayerRef.current.seekTo(position, true);
+      seekTo: (position: number, options?: { allowAdvance?: boolean }) => {
+        const requested = Math.max(0, Number(position) || 0);
+        const allowAdvance = Boolean(options?.allowAdvance);
+        const guard = guardRef.current;
+        const duration = Number(progressRef.current.duration) || 0;
+        let target = requested;
+        if (duration > 0) target = Math.min(target, duration);
+        if (antiSeekRef.current && !doneRef.current && !allowAdvance && guard) {
+          const cap = Math.max(progressRef.current.currentTime, guard.getMaxPosition());
+          target = Math.min(target, cap);
+        }
+        if (allowAdvance && guard) {
+          const maxPos = guard.allowPosition(target);
+          try {
+            window.sessionStorage.setItem(watchStorageKeyRef.current, String(maxPos));
+          } catch { /* ignore */ }
+        }
+        pendingSeekRef.current = allowAdvance
+          ? { target, expiresAt: Date.now() + 2000 }
+          : null;
+        if (videoRef.current) {
+          const cur = Number(videoRef.current.currentTime) || 0;
+          const appliedTarget = (target <= cur || canMediaSeekTo(videoRef.current, target)) ? target : cur;
+          if (appliedTarget !== cur) {
+            videoRef.current.currentTime = appliedTarget;
+          } else {
+            pendingSeekRef.current = null;
+          }
+          progressRef.current = { ...progressRef.current, currentTime: appliedTarget };
+          setUiProgress((prev) => ({ ...prev, currentTime: appliedTarget }));
+          return;
+        }
+        if (youtubePlayerRef.current) youtubePlayerRef.current.seekTo(target, true);
+        else if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(JSON.stringify({ method: 'setCurrentTime', value: target }), 'https://player.vimeo.com');
+        }
+        progressRef.current = { ...progressRef.current, currentTime: target };
+        setUiProgress((prev) => ({ ...prev, currentTime: target }));
       },
     };
     if (playerApiRef) playerApiRef.current = currentPlayerApi;
@@ -277,6 +323,8 @@ export function VideoPlayerFrame({
     const initialMaxPosition = Math.max(doneRef.current ? 0 : readStoredNumber(watchStorageKey), initialResumeAt);
     const initialWatchedSeconds = doneRef.current ? 0 : readStoredNumber(watchedStorageKey);
     const guard = createVideoWatchGuard(youtubeId ? 1.25 : 2, initialWatchedSeconds, initialMaxPosition);
+    guardRef.current = guard;
+    pendingSeekRef.current = null;
     let youtubePlayer: YouTubePlayer | null = null;
     let pollTimer: number | null = null;
     let completionPending = false;
@@ -301,6 +349,13 @@ export function VideoPlayerFrame({
       playing: boolean,
       seekTo: (position: number) => void,
     ) => {
+      const pendingSeek = pendingSeekRef.current;
+      if (pendingSeek) {
+        if (Date.now() < pendingSeek.expiresAt && currentTime < pendingSeek.target - 0.35) {
+          return;
+        }
+        pendingSeekRef.current = null;
+      }
       const tick = guard.tick(currentTime, duration, playing, antiSeekRef.current, doneRef.current || thresholdReached);
       if (tick.seekTo !== null) {
         seekTo(tick.seekTo);
@@ -456,11 +511,9 @@ export function VideoPlayerFrame({
               const rawLevels = youtubePlayer.getAvailableQualityLevels?.() || [];
               const ordered = orderYouTubeQualities(rawLevels);
               setQualityOptions(ordered);
-              const best = ordered.find((q) => q !== 'default');
-              if (best) {
-                try { youtubePlayer.setPlaybackQualityRange?.(best, best); } catch { /* ignore */ }
-                try { youtubePlayer.setPlaybackQuality?.(best); } catch { /* ignore */ }
-              }
+              const best = ordered.find((q) => q !== 'default') || 'highres';
+              try { youtubePlayer.setPlaybackQualityRange?.(best, best); } catch { /* ignore */ }
+              try { youtubePlayer.setPlaybackQuality?.(best); } catch { /* ignore */ }
               const curQ = youtubePlayer.getPlaybackQuality?.();
               if (curQ && curQ !== 'unknown' && curQ !== 'default') setLiveQuality(curQ);
               const ytSeekTarget = initialResumeAt > 0 ? Math.max(initialResumeAt, doneRef.current ? 0 : initialMaxPosition) : (doneRef.current ? 0 : initialMaxPosition);
@@ -499,7 +552,11 @@ export function VideoPlayerFrame({
                 setAwaitingStart(false);
                 disableYouTubeCaptions(youtubePlayer);
                 const rawLevels = youtubePlayer.getAvailableQualityLevels?.() || [];
-                if (rawLevels.length) setQualityOptions(orderYouTubeQualities(rawLevels));
+                const ordered = orderYouTubeQualities(rawLevels);
+                if (rawLevels.length) setQualityOptions(ordered);
+                const best = ordered.find((q) => q !== 'default') || 'highres';
+                try { youtubePlayer.setPlaybackQualityRange?.(best, best); } catch { /* ignore */ }
+                try { youtubePlayer.setPlaybackQuality?.(best); } catch { /* ignore */ }
                 const curQ = youtubePlayer.getPlaybackQuality?.();
                 if (curQ && curQ !== 'unknown' && curQ !== 'default') setLiveQuality(curQ);
               }
@@ -657,6 +714,7 @@ export function VideoPlayerFrame({
         <MobileLmsPlayerChrome
           overlayVariant={appearance === 'window' ? 'window' : 'default'}
           startOverlayVisible={appearance === 'window' && awaitingStart && !uiProgress.playing}
+          pausedCheckpointSec={pausedCheckpointSec}
           isPlaying={uiProgress.playing}
           currentTime={uiProgress.currentTime}
           duration={uiProgress.duration}
@@ -674,7 +732,7 @@ export function VideoPlayerFrame({
           qualityOptions={qualityOptions}
           onSelectQuality={selectQuality}
           onOpenQualityMenu={refreshQualities}
-          showQuality={Boolean(youtubeId)}
+          showQuality={false}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
           rightSlot={chromeRightSlot}

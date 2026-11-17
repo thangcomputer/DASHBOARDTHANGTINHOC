@@ -26,15 +26,11 @@ import {
 } from '../../../shared/dailyPractice/pathHubProgressRing.mjs';
 import { PATH_HUB_DUO } from '../../../shared/dailyPractice/pathHubDuoVisual.mjs';
 import { pathNodeColor } from '../../../shared/dailyPractice/pathNodeColors.mjs';
-import {
-  RETRY_BASELINE_EMPTY,
-  canSubmitRetryAfterWrong,
-  serializePracticeAnswer,
-} from '../../../shared/dailyPractice/practiceAnswerCompare.mjs';
 import { DragProvider } from '../components/dailyPractice/DragKit';
 import { PracticeFinishOverlay } from '../components/dailyPractice/PracticeFinishOverlay';
 import { MobileComboCelebrationOverlay } from '../components/dailyPractice/MobileComboCelebrationOverlay';
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
+import { VideoCheckpointQuizCard } from '../components/dailyPractice/VideoCheckpointQuizCard';
 import { UnitStageChest } from '../components/dailyPractice/UnitStageChest';
 import { MobileAnswerFeedback } from '../components/dailyPractice/MobileAnswerFeedback';
 import * as VideoPlayerMod from './VideoPlayerFrame';
@@ -46,6 +42,10 @@ import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
 import { buildVietQrUrl, getCenterBankAccount, type CenterBankAccount } from '../services/courseVideoApi';
 import { subscriptionApi } from '../services/subscriptionApi';
 import { reviewItemFollowUpLine } from '../../../shared/dailyPractice/reviewDisplay.mjs';
+import {
+  findTriggeredVideoCheck,
+  resolveVideoCheckResumeTarget,
+} from '../../../shared/dailyPractice/videoCheckpointPlayback.mjs';
 import { resolveMobilePublicUrl, getMobileImageSource } from '../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/videoSource';
 import { useAuth } from '../app/AuthContext';
@@ -71,7 +71,6 @@ import {
   syncLastPathTopicFromServer,
 } from '../utils/lastPathTopic';
 import { pathTopicPrimaryCtaLabel, unitStageCtaLabel } from '../../../shared/dailyPractice/lastPathTopic.mjs';
-import { shouldNudgeHintButton } from '../../../shared/dailyPractice/quizWrongEncouragement.mjs';
 import { PLAY_QUESTION_CHROME } from '../../../shared/dailyPractice/playQuestionChrome.mjs';
 import { VietnamJourneyStage } from '../components/dailyPractice/VietnamJourneyStage';
 import { LevelUnlockBanner } from '../components/dailyPractice/LevelUnlockBanner';
@@ -323,8 +322,17 @@ function DailyPracticeGoalPanel({
                   {`${formatStudyMinutes(progress.todayMinutes)} / ${goal.hoursPerDay} giờ`}
                 </Text>
               </View>
-              <View style={[styles.pathTrack, { height: 8, backgroundColor: '#FFFFFF' }]}>
-                <View style={[styles.pathFill, { width: `${minutePct}%`, backgroundColor: minutePct >= 100 ? '#10B981' : '#FB923C' }]} />
+              <View style={styles.goalMinuteTrack}>
+                <View
+                  style={[
+                    styles.pathFill,
+                    {
+                      width: `${minutePct}%`,
+                      ...(minutePct > 0 || (progress.todayMinutes || 0) > 0 ? { minWidth: 6 } : {}),
+                      backgroundColor: minutePct >= 100 ? '#10B981' : '#FB923C',
+                    },
+                  ]}
+                />
               </View>
               <View style={[styles.goalHeaderRow, { marginTop: 4, gap: 8 }]}>
                 <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#64748B' }}>
@@ -431,11 +439,10 @@ function DailyPracticeGoalPanel({
   );
 }
 
-/** Hàng môn — đồng bộ Web DailyPracticeSubjectBar (Khóa / Sẵn sàng / Đang soạn + tỷ lệ chặng). */
+/** Lưới môn học 2 cột — bấm vào từng môn để mở danh sách chặng lộ trình. */
 function PracticeSubjectStrip({
   pathTopics,
   freeTopics,
-  variant = 'path',
   activeId,
   onSelect,
   play,
@@ -447,16 +454,11 @@ function PracticeSubjectStrip({
   onSelect: (id: string) => void;
   play: (s: GameSound) => void;
 }) {
-  const usePathList = variant === 'path' ? pathTopics.length > 0 : (pathTopics.length > 0 && freeTopics.length === 0);
+  const usePathList = pathTopics.length > 0;
   if (!usePathList && !freeTopics.length) return null;
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.chipScroller}
-      contentContainerStyle={styles.chipRow}
-    >
+    <View style={styles.subjectGrid2Col}>
       {usePathList
         ? pathTopics.map((item) => {
           const Icon = TOPIC_ICONS[item.topic.icon] || BookOpen;
@@ -470,16 +472,24 @@ function PracticeSubjectStrip({
             <Pressable
               key={item.topic.id}
               onPress={() => { play('tap'); onSelect(item.topic.id); }}
-              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+              style={[
+                styles.subjectGridCard,
+                {
+                  borderColor: active ? tone.to : '#E2E8F0',
+                  backgroundColor: active ? tone.soft : '#FFFFFF',
+                },
+              ]}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
             >
-              <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
-              <View style={{ minWidth: 0, flexShrink: 1 }}>
-                <Text numberOfLines={1} style={styles.chipName}>{item.topic.name}</Text>
+              <View style={[styles.subjectGridIcon, gradient(tone.from, tone.to)]}>
+                <Icon size={16} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text numberOfLines={2} style={styles.subjectGridName}>{item.topic.name}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                   {locked ? <Lock size={10} color="#D97706" /> : null}
-                  <Text numberOfLines={1} style={[styles.chipMeta, { color: metaColor, fontWeight: '700' }]}>
+                  <Text numberOfLines={1} style={[styles.subjectGridMeta, { color: metaColor, fontWeight: '700' }]}>
                     {metaPrimary}
                     {item.totalUnits > 0 ? (
                       <Text style={{ color: '#94A3B8', fontWeight: '600' }}>{` · ${item.completedUnits}/${item.totalUnits}`}</Text>
@@ -494,24 +504,31 @@ function PracticeSubjectStrip({
           const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
           const tone = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
           const active = topic.id === activeId;
-          const total = topic.counts.easy + topic.counts.medium + topic.counts.hard;
           return (
             <Pressable
               key={topic.id}
               onPress={() => { play('tap'); onSelect(topic.id); }}
-              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+              style={[
+                styles.subjectGridCard,
+                {
+                  borderColor: active ? tone.to : '#E2E8F0',
+                  backgroundColor: active ? tone.soft : '#FFFFFF',
+                },
+              ]}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
             >
-              <View style={[styles.chipIcon, gradient(tone.from, tone.to)]}><Icon size={15} color="#FFFFFF" /></View>
-              <View style={{ minWidth: 0, flexShrink: 1 }}>
-                <Text numberOfLines={1} style={styles.chipName}>{topic.name}</Text>
-                <Text numberOfLines={1} style={styles.chipMeta}>{total > 0 ? `${total} câu` : 'Chưa có câu'}</Text>
+              <View style={[styles.subjectGridIcon, gradient(tone.from, tone.to)]}>
+                <Icon size={16} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text numberOfLines={2} style={styles.subjectGridName}>{topic.name}</Text>
+                <Text numberOfLines={1} style={styles.subjectGridMeta}>Đã sẵn sàng</Text>
               </View>
             </Pressable>
           );
         })}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -527,11 +544,11 @@ type PendingPathResume = {
 };
 
 function HomeView({
-  topics, stats, loading, error, starting, onStart, play, initialTopicId = '',
-  mode, onModeChange, pathTopics, pathLoading, pathError, pathCanTestOut = true, onStartStep, onQuickStart, onPathChanged, onBuyXp, onOpenUpgrade, onViewProgress, onScrollToPath,
+  topics, stats, loading: _loading, error, starting, onStart: _onStart, play, initialTopicId = '',
+  mode, onModeChange, pathTopics, pathLoading, pathError, pathCanTestOut = true, onStartStep, onQuickStart: _onQuickStart, onPathChanged, onBuyXp, onOpenUpgrade, onViewProgress: _onViewProgress, onScrollToPath,
   initialWatchStage = false, onContinueVideoOpened, pendingResume = null, onResumeConsumed, pathActiveTopicId = '',
   requestedLesson = null, onRequestedLessonOpened,
-  spacedRepetition, onStartSpacedReview, placementResult, onOpenPlacement, recommendedTopic,
+  spacedRepetition: _spacedRepetition, onStartSpacedReview: _onStartSpacedReview, placementResult: _placementResult, onOpenPlacement: _onOpenPlacement, recommendedTopic,
 }: {
   topics: DpTopic[];
   stats: DpStats | null;
@@ -574,11 +591,24 @@ function HomeView({
   const freePortal = isFreePortalMenu(user);
   const [topicId, setTopicId] = useState('');
   const [selectedPathTopicId, setSelectedPathTopicId] = useState(initialTopicId);
-  const [difficulty, setDifficulty] = useState<DpDifficulty>('easy');
   const [continueVideo, setContinueVideo] = useState(Boolean(initialWatchStage));
   const [focusLessonSeq, setFocusLessonSeq] = useState(0);
   const [certOpen, setCertOpen] = useState(false);
+  const [subjectStageOpen, setSubjectStageOpen] = useState<boolean>(() => Boolean(
+    initialTopicId || initialWatchStage || pendingResume || requestedLesson,
+  ));
 
+  useEffect(() => {
+    if (mode !== 'path') onModeChange('path');
+  }, [mode, onModeChange]);
+  useEffect(() => {
+    if (initialTopicId || initialWatchStage || pendingResume || requestedLesson) {
+      setSubjectStageOpen(true);
+    }
+    if (pendingResume?.topicId) {
+      setSelectedPathTopicId(pendingResume.topicId);
+    }
+  }, [initialTopicId, initialWatchStage, pendingResume, requestedLesson]);
   useEffect(() => {
     if (initialWatchStage) {
       setContinueVideo(true);
@@ -612,13 +642,6 @@ function HomeView({
     );
   }, [pathTopics, initialTopicId, selectedPathTopicId, pathActiveTopicId]);
 
-  const hasCompletedFirstNode = useMemo(() => (pathTopics || []).some((t) => {
-    const firstUnit = t?.units?.[0];
-    const firstNode = firstUnit?.pathNodes?.[0];
-    if (firstNode) return firstNode.state === 'completed';
-    return firstUnit?.state === 'completed';
-  }), [pathTopics]);
-
   const pathContinue = activePathTopic?.next
     ? {
       unitId: activePathTopic.next.unitId,
@@ -629,18 +652,12 @@ function HomeView({
   const topicPathDone = Boolean(
     activePathTopic?.totalUnits && (activePathTopic.completedUnits || 0) >= activePathTopic.totalUnits,
   );
-  const heroLabel = mode === 'free'
-    ? 'Bắt đầu luyện tập'
-    : (topicPathDone
-      ? 'Ôn lại lộ trình'
-      : (activePathTopic ? pathTopicPrimaryCtaLabel(activePathTopic) : 'Xem chi tiết lộ trình'));
+  const heroLabel = topicPathDone
+    ? 'Ôn lại lộ trình'
+    : (activePathTopic ? pathTopicPrimaryCtaLabel(activePathTopic) : 'Tiếp tục học');
   const heroAction = () => {
     play('tap');
-    if (mode === 'free') {
-      if (topicId) onStart(topicId, difficulty);
-      return;
-    }
-    if (mode === 'goal') onModeChange('path');
+    setSubjectStageOpen(true);
     if (pathContinue) {
       setFocusLessonSeq((n) => n + 1);
     } else {
@@ -648,232 +665,138 @@ function HomeView({
     }
   };
 
-  const sideCards = (
-    <View style={{ gap: 12 }}>
-      <SpacedReviewCard
-        spaced={spacedRepetition}
-        starting={starting}
-        onStart={() => { play('tap'); onStartSpacedReview(); }}
-      />
-      <PlacementEntryCard
-        placementResult={placementResult}
-        onPress={() => { play('tap'); onOpenPlacement(); }}
-      />
-    </View>
-  );
-
   const rawUser = user as { id?: string; _id?: string; name?: string; fullName?: string; username?: string; studentCode?: string; code?: string } | null;
   const studentName = String(rawUser?.fullName || rawUser?.name || rawUser?.username || '').trim() || 'bạn';
   const studentCode = String(rawUser?.studentCode || rawUser?.code || '').trim();
   const studentId = String(rawUser?.id || rawUser?._id || '').trim();
-  const subjectBarActiveId = mode === 'path'
-    ? (activePathTopic?.topic.id || selectedPathTopicId || pathActiveTopicId || topicId)
-    : (topicId || selectedPathTopicId || activePathTopic?.topic.id || '');
+  const subjectBarActiveId = activePathTopic?.topic.id || selectedPathTopicId || pathActiveTopicId || topicId;
 
   return (
     <View style={styles.gapMd}>
-      <DailyPracticeHero
-        stats={stats}
-        displayName={studentName}
-        mode={mode}
-        onPrimaryAction={heroAction}
-        primaryDisabled={mode === 'free' ? (!topicId || starting) : starting}
-        primaryLabel={heroLabel}
-        starting={starting}
-        pathTopic={mode === 'path' ? activePathTopic : null}
-        pathContinue={Boolean(pathContinue)}
-        onBuyXp={onBuyXp}
-        onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
-        play={play}
-      />
+      {!subjectStageOpen ? (
+        <>
+          <DailyPracticeHero
+            stats={stats}
+            displayName={studentName}
+            mode="path"
+            onPrimaryAction={heroAction}
+            primaryDisabled={starting}
+            primaryLabel={heroLabel}
+            starting={starting}
+            pathTopic={activePathTopic}
+            pathContinue={Boolean(pathContinue)}
+            onBuyXp={onBuyXp}
+            onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
+            play={play}
+          />
 
-      {/* Banner hết XP để luyện - khớp Web */}
-      {stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
-        <View style={styles.xpEmptyBanner}>
-          <View style={[styles.inline, { flex: 1 }]}>
-            <View style={styles.xpEmptyIconWrap}>
-              <Zap size={18} color="#FFFFFF" />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.xpEmptyTitle}>Hết XP để luyện</Text>
-              <Text style={styles.xpEmptyDesc}>
-                {`Mua thêm để luyện tiếp trong hôm nay. Ngày mai bạn được lại ${stats.dailyAllowanceXp || stats.dailyRefillXp || 200} XP, XP đã mua vẫn được giữ.`}
-              </Text>
-            </View>
-          </View>
-          <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.xpEmptyBuyBtn} accessibilityRole="button">
-            <ShoppingBag size={14} color="#FFFFFF" />
-            <Text style={styles.xpEmptyBuyBtnText}>Mua XP</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <View style={styles.practicePanel}>
-      <PracticeSubjectStrip
-        pathTopics={pathTopics}
-        freeTopics={topics}
-        variant={pathTopics.length ? 'path' : 'free'}
-        activeId={subjectBarActiveId}
-        onSelect={(id) => {
-          setTopicId(id);
-          setSelectedPathTopicId(id);
-        }}
-        play={play}
-      />
-
-      {/* Segmented Mode Tabs: Theo lộ trình (hoặc Lộ trình khi freePortal) | Luyện tự do | Mục tiêu */}
-      <View style={styles.modeTabs} accessibilityRole="tablist">
-        {MODES.map(({ id, label, icon: Icon }) => {
-          const active = mode === id;
-          const displayLabel = freePortal && id === 'path' ? 'Lộ trình' : label;
-          return (
-            <Pressable
-              key={id}
-              onPress={() => { play('tap'); onModeChange(id); }}
-              style={[styles.modeTab, active && styles.modeTabActive]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-            >
-              <Icon size={15} color={active ? theme.brandDark : colors.muted} />
-              <Text style={[styles.modeTabText, active && styles.modeTabTextActive]}>{displayLabel}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      </View>
-
-      {/* Nội dung chính tương ứng từng Tab */}
-      <View style={isWide ? { flexDirection: 'row', alignItems: 'flex-start', gap: 20 } : undefined}>
-        <View style={[styles.gapMd, isWide && { flex: 8, minWidth: 0 }]}>
-          {mode === 'path' ? (
-            <PathView
-              topics={pathTopics}
-              activeTopicId={selectedPathTopicId || pathActiveTopicId}
-              loading={pathLoading}
-              error={pathError}
-              canTestOut={pathCanTestOut}
-              starting={starting}
-              play={play}
-              initialTopicId={initialTopicId}
-              onTopicChange={setSelectedPathTopicId}
-              onStartStep={onStartStep}
-              onPathChanged={onPathChanged}
-              onOpenUpgrade={onOpenUpgrade}
-              continueVideo={continueVideo}
-              onContinueVideoOpened={() => {
-                setContinueVideo(false);
-                onContinueVideoOpened?.();
-              }}
-              pendingResume={pendingResume}
-              onResumeConsumed={onResumeConsumed}
-              requestedLesson={requestedLesson}
-              onRequestedLessonOpened={onRequestedLessonOpened}
-              focusLessonSeq={focusLessonSeq}
-              xpTotal={stats?.xpTotal ?? null}
-              onBuyXp={onBuyXp}
-            />
-          ) : null}
-
-          {mode === 'free' && error ? <Text style={styles.error}>{error}</Text> : null}
-          {mode === 'free' && loading ? <ActivityIndicator color={theme.brand} /> : null}
-          {mode === 'free' && !loading && !topics.length && !error ? (
-            <View style={styles.empty}>
-              <Mascot mood="thinking" size={72} />
-              <Text style={styles.emptyTitle}>Chưa có câu Luyện tự do.</Text>
-              <Text style={[styles.muted, styles.center]}>Trung tâm cần soạn ngân hàng riêng (không dùng câu lộ trình). Quay lại sau nhé!</Text>
+          {/* Banner hết XP để luyện - khớp Web */}
+          {stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
+            <View style={styles.xpEmptyBanner}>
+              <View style={[styles.inline, { flex: 1 }]}>
+                <View style={styles.xpEmptyIconWrap}>
+                  <Zap size={18} color="#FFFFFF" />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.xpEmptyTitle}>Hết XP để luyện</Text>
+                  <Text style={styles.xpEmptyDesc}>
+                    {`Mua thêm để luyện tiếp trong hôm nay. Ngày mai bạn được lại ${stats.dailyAllowanceXp || stats.dailyRefillXp || 200} XP, XP đã mua vẫn được giữ.`}
+                  </Text>
+                </View>
+              </View>
+              <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.xpEmptyBuyBtn} accessibilityRole="button">
+                <ShoppingBag size={14} color="#FFFFFF" />
+                <Text style={styles.xpEmptyBuyBtnText}>Mua XP</Text>
+              </Pressable>
             </View>
           ) : null}
 
-          {mode === 'free' && topics.length ? (
-            <View style={[styles.card, { gap: 14 }]}>
-              <View style={styles.freeModeNotice}>
-                <Text style={styles.freeModeNoticeText}>
-                  {'Luyện tự do chỉ '}
-                  <Text style={styles.freeModeNoticeBold}>trắc nghiệm ôn</Text>
-                  {', không tính XP, không video, không dùng câu đã gắn chặng.'}
-                </Text>
-              </View>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {pathError ? <Text style={styles.error}>{pathError}</Text> : null}
 
-              <Text style={styles.sectionTitle}>Chọn độ khó</Text>
-              <View style={styles.row}>
-                {DP_DIFFICULTIES.map((level) => {
-                  const active = level.id === difficulty;
-                  return (
-                    <Pressable
-                      key={level.id}
-                      onPress={() => { play('tap'); setDifficulty(level.id); }}
-                      style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', backgroundColor: active ? level.soft : '#FFFFFF' }]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <View style={styles.starsRow}>
-                        {[1, 2, 3].map((n) => <Star key={n} size={14} color={n <= level.stars ? level.color : '#CBD5E1'} fill={n <= level.stars ? level.color : 'transparent'} />)}
-                      </View>
-                      <Text style={[styles.levelLabel, active && { color: level.color }]}>{level.label}</Text>
-                      <Text style={styles.levelMeta}>{`${selected?.counts[level.id] || 0} câu · không tính XP`}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <DuoButton
-                variant="primary"
-                size="lg"
-                fullWidth
-                disabled={!topicId || starting}
-                loading={starting}
-                icon={<Play size={18} color="#FFFFFF" />}
-                text="Bắt đầu luyện tập"
-                onPress={() => topicId && onStart(topicId, difficulty)}
-                style={{ marginTop: 8 }}
+          {pathLoading && !pathTopics.length && !topics.length ? (
+            <ActivityIndicator color={theme.brand} />
+          ) : (pathTopics.length || topics.length) ? (
+            <View style={styles.practicePanel}>
+              <PracticeSubjectStrip
+                pathTopics={pathTopics}
+                freeTopics={topics}
+                activeId={subjectBarActiveId}
+                onSelect={(id) => {
+                  setTopicId(id);
+                  setSelectedPathTopicId(id);
+                  setSubjectStageOpen(true);
+                }}
+                play={play}
               />
             </View>
-          ) : null}
-
-          {mode === 'goal' ? (
-            <DailyPracticeGoalPanel
-              stats={stats}
-              userId={user?.id}
-              canSetGoal={hasCompletedFirstNode}
-              onViewProgress={onViewProgress}
-              onWatchVideo={() => {
+          ) : (
+            <View style={styles.empty}>
+              <Mascot mood="thinking" size={72} />
+              <Text style={styles.emptyTitle}>Trung tâm đang soạn lộ trình luyện tập.</Text>
+              <Text style={[styles.muted, styles.center]}>Vui lòng quay lại sau nhé!</Text>
+            </View>
+          )}
+        </>
+      ) : (
+        <View style={styles.gapMd}>
+          <View style={styles.subjectStageHeaderBar}>
+            <Pressable
+              onPress={() => {
                 play('tap');
-                onModeChange('path');
-                setContinueVideo(true);
+                setSubjectStageOpen(false);
               }}
-              onGoPractice={() => {
-                play('tap');
-                onModeChange('path');
-                onQuickStart(activePathTopic);
-              }}
-            />
-          ) : null}
-
-          {mode !== 'free' && error ? <Text style={styles.error}>{error}</Text> : null}
-          {mode === 'goal' ? sideCards : null}
-        </View>
-
-        {isWide && mode !== 'goal' ? (
-          <View style={{ flex: 4, minWidth: 290, gap: 12 }}>
-            <DailyPracticeGoalPanel
-              stats={stats}
-              userId={user?.id}
-              canSetGoal={hasCompletedFirstNode}
-              onViewProgress={onViewProgress}
-              onWatchVideo={() => {
-                play('tap');
-                onModeChange('path');
-                setContinueVideo(true);
-              }}
-              onGoPractice={() => {
-                play('tap');
-                onModeChange('path');
-                onQuickStart(activePathTopic);
-              }}
-            />
+              style={styles.subjectStageBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Quay lại danh sách môn"
+            >
+              <ArrowLeft size={16} color="#047857" />
+              <Text style={styles.subjectStageBackText}>Chọn môn khác</Text>
+            </Pressable>
+            <View style={styles.subjectStageTitleWrap}>
+              <Text numberOfLines={1} style={styles.subjectStageTitle}>
+                {activePathTopic?.topic.name || selected?.name || 'Lộ trình chặng'}
+              </Text>
+              {activePathTopic?.totalUnits ? (
+                <Text numberOfLines={1} style={styles.subjectStageProgress}>
+                  {`${activePathTopic.completedUnits}/${activePathTopic.totalUnits} chặng`}
+                </Text>
+              ) : null}
+            </View>
           </View>
-        ) : null}
-      </View>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {pathError ? <Text style={styles.error}>{pathError}</Text> : null}
+
+          <PathView
+            topics={pathTopics}
+            activeTopicId={selectedPathTopicId || pathActiveTopicId}
+            loading={pathLoading}
+            error={pathError}
+            canTestOut={pathCanTestOut}
+            starting={starting}
+            play={play}
+            initialTopicId={selectedPathTopicId || initialTopicId}
+            onTopicChange={setSelectedPathTopicId}
+            onStartStep={onStartStep}
+            onPathChanged={onPathChanged}
+            onOpenUpgrade={onOpenUpgrade}
+            continueVideo={continueVideo}
+            onContinueVideoOpened={() => {
+              setContinueVideo(false);
+              onContinueVideoOpened?.();
+            }}
+            pendingResume={pendingResume}
+            onResumeConsumed={onResumeConsumed}
+            requestedLesson={requestedLesson}
+            onRequestedLessonOpened={onRequestedLessonOpened}
+            focusLessonSeq={focusLessonSeq}
+            xpTotal={stats?.xpTotal ?? null}
+            onBuyXp={onBuyXp}
+            bleedEdge={!isWide}
+          />
+        </View>
+      )}
 
       {certOpen ? (
         <DigitalCertificateModal
@@ -882,10 +805,8 @@ function HomeView({
           studentName={studentName === 'bạn' ? 'Học viên Thắng Tin Học' : studentName}
           studentCode={studentCode}
           studentId={studentId}
-          courseId={mode === 'path' ? (activePathTopic?.topic?.id || topicId || 'dewskill') : (topicId || activePathTopic?.topic?.id || 'dewskill')}
-          courseTitle={mode === 'path'
-            ? (activePathTopic?.topic?.name || selected?.name || topics[0]?.name || 'Lộ trình Tin học DewSkill')
-            : (selected?.name || activePathTopic?.topic?.name || 'Luyện tập Tin học DewSkill')}
+          courseId={activePathTopic?.topic?.id || topicId || 'dewskill'}
+          courseTitle={activePathTopic?.topic?.name || selected?.name || topics[0]?.name || 'Lộ trình Tin học DewSkill'}
           instructorName="Trung tâm Thắng Tin Học"
           completionRate={activePathTopic?.totalUnits
             ? Math.min(100, Math.round(((activePathTopic.completedUnits || 0) / activePathTopic.totalUnits) * 100))
@@ -1626,6 +1547,14 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   const [gate, setGate] = useState<any>(null);
   const gateRef = useRef<any>(null);
   const playerApiRef = useRef<VideoPlayerApi | null>(null);
+  const lastTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const cheerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const passedRef = useRef<Set<string>>(passedKeys);
+  useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
+  useEffect(() => () => {
+    if (cheerTimerRef.current) clearTimeout(cheerTimerRef.current);
+  }, []);
 
   const [picked, setPicked] = useState<number | null>(null);
   const [answerText, setAnswerText] = useState('');
@@ -1636,6 +1565,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   const [cheer, setCheer] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [grading, setGrading] = useState(false);
+  const [videoFullscreen, setVideoFullscreen] = useState(false);
 
   const initialWatched = Boolean(
     step.state === 'completed'
@@ -1652,7 +1582,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   const playable = Boolean(embedded || isDirectVideoUrl(rawUrl) || rawUrl.startsWith('/uploads/'));
 
   const syncStepVideoProgress = useCallback(() => {
-    if (!unit.id) return () => {};
+    if (!unit.id) return () => { };
     let alive = true;
     dailyPracticeApi.unitVideos(unit.id)
       .then((res: any) => {
@@ -1697,40 +1627,82 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
     };
   }, [syncStepVideoProgress]);
 
-  const onTick = (time: number) => {
+  const openGate = (next: any) => {
+    if (!next || gateRef.current) return;
+    playerApiRef.current?.pause?.();
+    const at = Number(next.atSec) || 0;
+    const now = Number(playerApiRef.current?.getCurrentTime?.() ?? lastTimeRef.current) || 0;
+    if (now > at + 1.2) playerApiRef.current?.seekTo?.(at);
+    gateRef.current = next;
+    setGate(next);
+    setPicked(null);
+    setAnswerText('');
+    setCheckHint('');
+    setCheckError('');
+    setMissed(false);
+    setCheer(false);
+    setUploadPct(null);
+    setGrading(false);
+  };
+
+  const onTick = (time: number, totalDuration?: number) => {
+    if (Number.isFinite(time) && time >= 0) lastTimeRef.current = time;
+    if (typeof totalDuration === 'number' && Number.isFinite(totalDuration) && totalDuration > 0) {
+      durationRef.current = totalDuration;
+    }
     if (!stepVideo || !checks.length) return;
     if (gateRef.current) {
       playerApiRef.current?.pause?.();
       return;
     }
-    const next = checks
-      .filter((check: any) => {
+    const next = findTriggeredVideoCheck(
+      checks.filter((check: any) => {
         const id = String(check._id || check.id || '');
-        return !passedKeys.has(`${stepVideo.id}:${id}`) && !passedKeys.has(id);
-      })
-      .sort((a: any, b: any) => (Number(a.atSec) || 0) - (Number(b.atSec) || 0))
-      .find((check: any) => time + 0.3 >= (Number(check.atSec) || 0));
-    if (next) {
-      playerApiRef.current?.pause?.();
-      gateRef.current = next;
-      setGate(next);
-      setPicked(null);
-      setAnswerText('');
-      setCheckHint('');
-      setCheckError('');
-      setMissed(false);
-      setCheer(false);
-      setUploadPct(null);
-      setGrading(false);
-    }
+        return !passedRef.current.has(`${stepVideo.id}:${id}`) && !passedRef.current.has(id);
+      }),
+      time,
+    );
+    if (next) openGate(next);
   };
 
   const closeGate = () => {
+    if (cheerTimerRef.current) {
+      clearTimeout(cheerTimerRef.current);
+      cheerTimerRef.current = null;
+    }
     gateRef.current = null;
     setGate(null);
     setCheer(false);
     setUploadPct(null);
     setGrading(false);
+    playerApiRef.current?.play?.();
+  };
+
+  const finishPassedGate = (completedCheck: any, updatedPassed: Set<string>) => {
+    const completedAtSec = Number(completedCheck?.atSec) || 0;
+    gateRef.current = null;
+    setGate(null);
+    setCheer(false);
+    setUploadPct(null);
+    setGrading(false);
+    const remaining = checks.filter((check: any) => {
+      const id = String(check._id || check.id || '');
+      return !updatedPassed.has(`${stepVideo?.id}:${id}`) && !updatedPassed.has(id);
+    });
+    const plan = resolveVideoCheckResumeTarget({
+      checkAtSec: completedAtSec,
+      currentTime: Number(playerApiRef.current?.getCurrentTime?.() ?? lastTimeRef.current) || 0,
+      duration: durationRef.current,
+      remainingPendingChecks: remaining,
+    });
+    if (plan.action === 'open_check' && plan.check) {
+      openGate(plan.check);
+      return;
+    }
+    if (typeof plan.seekToSec === 'number') {
+      lastTimeRef.current = plan.seekToSec;
+      playerApiRef.current?.seekTo?.(plan.seekToSec, { allowAdvance: true });
+    }
     playerApiRef.current?.play?.();
   };
 
@@ -1749,17 +1721,18 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
         { text: answerText, checkId, imageDataUrl: imageDataUrl || '' },
       );
       if (res.correct) {
-        setPassedKeys((prev) => {
-          const next = new Set(prev);
-          next.add(`${stepVideo.id}:${checkId}`);
-          next.add(checkId);
-          return next;
-        });
+        const nextPassed = new Set(passedRef.current);
+        nextPassed.add(`${stepVideo.id}:${checkId}`);
+        nextPassed.add(checkId);
+        passedRef.current = nextPassed;
+        setPassedKeys(nextPassed);
         setMissed(false);
         play('correct');
         setCheer(true);
-        setTimeout(() => {
-          closeGate();
+        const passedGate = gate;
+        if (cheerTimerRef.current) clearTimeout(cheerTimerRef.current);
+        cheerTimerRef.current = setTimeout(() => {
+          finishPassedGate(passedGate, nextPassed);
           onCompleted();
         }, 1200);
       } else if (res.needsReview) {
@@ -1839,6 +1812,30 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
     }
   };
 
+  const skipCheck = async () => {
+    if (!gate || !stepVideo || !unit.id || checkBusy) return;
+    setCheckBusy(true);
+    setCheckError('');
+    try {
+      const checkId = String(gate._id || gate.id || '');
+      const checkIndex = checks.findIndex((c: any) => String(c._id || c.id || '') === checkId);
+      await dailyPracticeApi.skipVideoCheck(unit.id, stepVideo.id, Math.max(0, checkIndex), checkId);
+      const nextPassed = new Set(passedRef.current);
+      nextPassed.add(`${stepVideo.id}:${checkId}`);
+      nextPassed.add(checkId);
+      passedRef.current = nextPassed;
+      setPassedKeys(nextPassed);
+      setMissed(false);
+      play('tap');
+      finishPassedGate(gate, nextPassed);
+      onCompleted();
+    } catch (err) {
+      setCheckError(err instanceof Error ? err.message : 'Chưa bỏ qua được câu hỏi');
+    } finally {
+      setCheckBusy(false);
+    }
+  };
+
   const pendingChecksCount = checks.filter((c: any) => {
     const id = String(c._id || c.id || '');
     return !passedKeys.has(`${stepVideo?.id}:${id}`) && !passedKeys.has(id);
@@ -1875,11 +1872,57 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
   const gateChoices: string[] = gate
     ? (Array.isArray(gate.choices) ? gate.choices : Array.isArray(gate.options) ? gate.options : [])
     : [];
+  const lessonGateMissedText = gate && missed ? (() => {
+    const penaltyNote = (done || watchedEnough) ? '' : ' (−5 XP)';
+    if (gate.kind === 'screen') return `AI chưa chấp nhận${penaltyNote}. Hãy tải đáp án mới.`;
+    return `Chưa đúng${penaltyNote}. Hãy ${gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'} nhé!`;
+  })() : '';
+  const lessonGateFootNote = gate
+    ? ((done || watchedEnough)
+      ? 'Đang ôn lại (không cộng/trừ XP). Trả lời đúng để xem tiếp.'
+      : `Đúng lần đầu +5 XP và xem tiếp. Sai mất 5 XP rồi ${gate.kind === 'screen' ? 'tải đáp án mới' : gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'}.`)
+    : '';
+  const lessonCheckpointNode = gate ? (
+    <VideoCheckpointQuizCard
+      atSec={gate.atSec || 0}
+      prompt={gate.prompt || ''}
+      kind={gate.kind}
+      choices={gateChoices}
+      picked={picked}
+      onSelectChoice={setPicked}
+      answerText={answerText}
+      onChangeText={setAnswerText}
+      onSubmitText={() => {
+        if (!checkBusy && answerText.trim()) void submitCheck();
+      }}
+      isReview={done || watchedEnough}
+      xpReward={5}
+      hintCostXp={Number(gate.hintCostXp || 0)}
+      missed={missed}
+      missedText={lessonGateMissedText}
+      checkHint={checkHint}
+      checkError={checkError}
+      checkBusy={checkBusy}
+      grading={grading}
+      uploadPct={uploadPct}
+      cheer={cheer}
+      cheerTitle={(done || watchedEnough) ? 'Chính xác! Tiếp tục nào' : 'Chính xác! +5 XP'}
+      cheerSubtitle="Đang tiếp tục video…"
+      onSubmit={() => { void submitCheck(); }}
+      onBuyHint={Number(gate.hintCostXp) > 0 ? () => { void buyHint(); } : undefined}
+      skipCostXp={(done || watchedEnough) ? 0 : 15}
+      onSkip={() => { void skipCheck(); }}
+      onPickScreenshot={gate.kind === 'screen' ? () => { void pickAndSendScreenshot(); } : undefined}
+      onDismiss={closeGate}
+      footNote={lessonGateFootNote}
+      compactOverlay={videoFullscreen}
+    />
+  ) : null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.quitBackdrop}>
-        <View style={[styles.quitCard, { maxWidth: 560, maxHeight: '92%' }]}>
+        <View style={[styles.quitCard, { maxWidth: 560, maxHeight: '92%', backgroundColor: '#FFFBF2', borderWidth: 2, borderColor: '#6EE7B7', borderBottomWidth: 5, borderBottomColor: '#34D399' }]}>
           <View style={[styles.lessonModalHead, gradient(color.from, color.to)]}>
             <BookOpen size={20} color="#FFFFFF" />
             <View style={[styles.flex, { marginLeft: 10 }]}>
@@ -1890,7 +1933,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
               <X size={18} color="#FFFFFF" />
             </Pressable>
           </View>
-          <ScrollView style={{ maxHeight: 500 }} contentContainerStyle={{ padding: spacing.lg, gap: 14 }}>
+          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ padding: spacing.md, gap: 12 }}>
             {lessonBodyContent ? (
               <View style={styles.lessonBodyBox}>
                 {lessonBodyContent.split(/\n+/).filter(Boolean).map((line: string, idx: number) => (
@@ -1942,8 +1985,10 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                   antiSeekEnabled={!done && !watchedEnough && (stepVideo as { antiSeek?: boolean })?.antiSeek !== false}
                   done={done || watchedEnough}
                   brandedChrome
+                  pausedCheckpointSec={gate && !cheer ? (gate.atSec || 0) : null}
+                  onFullscreenChange={setVideoFullscreen}
                   playerApiRef={playerApiRef}
-                  onProgress={(progress: VideoPlayerProgress) => onTick(progress.currentTime)}
+                  onProgress={(progress: VideoPlayerProgress) => onTick(progress.currentTime, progress.duration)}
                   onWatched={async () => {
                     setWatchedEnough(true);
                     if (stepVideo?.id) {
@@ -1960,165 +2005,25 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                   }}
                 />
 
-                {gate ? (
+                {lessonCheckpointNode && videoFullscreen ? (
                   <View style={styles.videoGateOverlay}>
-                    <View style={styles.videoGateCard}>
-                      {cheer ? (
-                        <View style={{ alignItems: 'center', padding: 14, gap: 6 }}>
-                          <Mascot mood="celebrate" size={60} />
-                          <Text style={{ fontSize: 15, fontWeight: '700', color: '#059669' }}>Chính xác! +5 XP</Text>
-                          <Text style={{ fontSize: 12, color: '#64748B' }}>Đang tiếp tục video…</Text>
-                        </View>
-                      ) : (
-                        <>
-                          <View style={styles.videoGateTopRow}>
-                            <Text style={styles.videoGateTime}>{`DỪNG Ở GIÂY ${gate.atSec || 0}`}</Text>
-                            <Pressable
-                              onPress={closeGate}
-                              style={styles.videoGateCloseBtn}
-                              accessibilityRole="button"
-                              accessibilityLabel="Đóng"
-                            >
-                              <X size={15} color="#64748B" />
-                            </Pressable>
-                          </View>
-
-                          {missed ? (
-                            <View style={[styles.videoGateMissedBox, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-                              <Mascot mood="sad" size={32} />
-                              <Text style={[styles.videoGateMissedText, { flex: 1 }]}>
-                                {gate.kind === 'screen'
-                                  ? 'AI chưa chấp nhận (−5 XP). Hãy tải đáp án mới.'
-                                  : `Chưa đúng (−5 XP). Hãy ${gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'} nhé!`}
-                              </Text>
-                            </View>
-                          ) : null}
-
-                          <Text style={styles.videoGatePrompt}>{gate.prompt}</Text>
-
-                          {gate.kind === 'screen' ? (
-                            uploadPct !== null ? (
-                              <View style={styles.videoGateUploadProgress}>
-                                <View style={styles.videoGateUploadTrack}>
-                                  <View
-                                    style={[
-                                      styles.videoGateUploadFill,
-                                      { width: `${grading ? 100 : uploadPct}%` },
-                                      grading && { backgroundColor: '#0284C7' },
-                                    ]}
-                                  />
-                                </View>
-                                <Text style={styles.videoGateUploadText}>
-                                  {grading ? 'AI đang chấm…' : `Đang tải ảnh lên ${uploadPct}%`}
-                                </Text>
-                              </View>
-                            ) : (
-                              <Pressable
-                                onPress={() => void pickAndSendScreenshot()}
-                                disabled={checkBusy}
-                                style={styles.videoGateScreenPickBtn}
-                                accessibilityRole="button"
-                              >
-                                <ImageIcon size={18} color="#1E293B" />
-                                <Text style={styles.videoGateScreenPickText}>
-                                  {missed ? 'Tải đáp án mới' : 'Gửi ảnh bài làm'}
-                                </Text>
-                              </Pressable>
-                            )
-                          ) : gateChoices.length > 0 ? (
-                            <View style={{ gap: 6, marginVertical: 4 }}>
-                              {gateChoices.map((choice: string, index: number) => {
-                                const isPicked = picked === index;
-                                return (
-                                  <Pressable
-                                    key={index}
-                                    onPress={() => setPicked(index)}
-                                    style={[
-                                      styles.videoGateChoiceBtn,
-                                      isPicked && styles.videoGateChoiceBtnActive,
-                                    ]}
-                                    accessibilityRole="button"
-                                  >
-                                    <Text style={[styles.videoGateChoiceText, isPicked && styles.videoGateChoiceTextActive]}>
-                                      {choice}
-                                    </Text>
-                                  </Pressable>
-                                );
-                              })}
-                            </View>
-                          ) : (
-                            <View style={{ marginVertical: 4 }}>
-                              <TextInput
-                                value={answerText}
-                                onChangeText={setAnswerText}
-                                placeholder="Nhập đáp án của bạn…"
-                                placeholderTextColor="#94A3B8"
-                                style={styles.videoGateTextInput}
-                              />
-                            </View>
-                          )}
-
-                          {checkHint ? (
-                            <View style={styles.videoGateHintBox}>
-                              <Lightbulb size={13} color="#D97706" />
-                              <Text style={styles.videoGateHintText}>{checkHint}</Text>
-                            </View>
-                          ) : null}
-
-                          {checkError ? <Text style={styles.videoGateErrorText}>{checkError}</Text> : null}
-
-                          <View style={styles.videoGateActionsRow}>
-                            {gate.kind !== 'screen' ? (
-                              <Pressable
-                                disabled={checkBusy || (gateChoices.length > 0 ? picked === null : !answerText.trim())}
-                                onPress={() => void submitCheck()}
-                                style={[
-                                  styles.videoGateSubmitBtn,
-                                  (checkBusy || (gateChoices.length > 0 ? picked === null : !answerText.trim())) && { opacity: 0.5 },
-                                ]}
-                                accessibilityRole="button"
-                              >
-                                {checkBusy ? (
-                                  <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                  <Text style={styles.videoGateSubmitBtnText}>Trả lời</Text>
-                                )}
-                              </Pressable>
-                            ) : null}
-                            <Pressable
-                              onPress={closeGate}
-                              style={styles.videoGateCancelBtn}
-                              accessibilityRole="button"
-                            >
-                              <Text style={styles.videoGateCancelBtnText}>Thôi</Text>
-                            </Pressable>
-                            {Number(gate.hintCostXp) > 0 ? (
-                              <Pressable
-                                disabled={checkBusy}
-                                onPress={() => void buyHint()}
-                                style={styles.videoGateHintBtn}
-                                accessibilityRole="button"
-                              >
-                                <Text style={styles.videoGateHintBtnText}>Gợi ý · {gate.hintCostXp} XP</Text>
-                              </Pressable>
-                            ) : null}
-                          </View>
-
-                          <Text style={styles.videoGateFootNote}>
-                            {`Đúng lần đầu +5 XP và xem tiếp. Sai mất 5 XP rồi ${gate.kind === 'screen' ? 'tải đáp án mới' : gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'}.`}
-                          </Text>
-                        </>
-                      )}
-                    </View>
+                    <ScrollView contentContainerStyle={styles.videoGateOverlayScroll} keyboardShouldPersistTaps="handled">
+                      {lessonCheckpointNode}
+                    </ScrollView>
                   </View>
                 ) : null}
               </View>
             ) : null}
 
-            {stepVideo?.url && pendingChecksCount > 0 ? (
-              <Text style={styles.lessonPendingNote}>
-                Video dừng ở từng mốc. Trả lời đúng mới xem tiếp. Chưa tua được quá phần đã xem.
-              </Text>
+            {lessonCheckpointNode && !videoFullscreen ? lessonCheckpointNode : null}
+
+            {stepVideo?.url && pendingChecksCount > 0 && !gate ? (
+              <View style={styles.lessonPendingBanner}>
+                <Lightbulb size={15} color="#B45309" />
+                <Text style={styles.lessonPendingNote}>
+                  {`Video có ${pendingChecksCount} mốc trắc nghiệm tương tác. Trả lời đúng từng mốc để tiếp tục!`}
+                </Text>
+              </View>
             ) : null}
 
             {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
@@ -2228,7 +2133,7 @@ function CourseFinaleCup({ courseDone, onPress }: {
       accessibilityRole="button"
       accessibilityLabel="Cúp Vàng Vinh Danh cuối khóa"
     >
-      <View style={styles.finaleCupStage}>
+      <View style={[styles.finaleCupStage, !courseDone && { height: 204 }]}>
         {courseDone ? <Confetti key={burst} count={26} spread={140} /> : null}
         <Animated.View style={{ opacity: courseDone ? 1 : 0.3, transform: [{ scale }] }}>
           <CupArtwork gold={courseDone} width={courseDone ? 214 : 168} height={courseDone ? 244 : 192} />
@@ -2706,6 +2611,7 @@ function PathView({
   focusLessonSeq = 0,
   xpTotal = null,
   onBuyXp,
+  bleedEdge = true,
 }: {
   topics: DpTopicPath[];
   activeTopicId?: string;
@@ -2728,6 +2634,7 @@ function PathView({
   focusLessonSeq?: number;
   xpTotal?: number | null;
   onBuyXp?: () => void;
+  bleedEdge?: boolean;
 }) {
   const { user } = useAuth();
   const [topicId, setTopicId] = useState('');
@@ -2791,8 +2698,8 @@ function PathView({
     const preferred = currentTarget
       ? currentTopic
       : (topics.find((item) => item.next && continueStageTarget(item))
-         || topics.find((item) => continueStageTarget(item))
-         || topics[0]);
+        || topics.find((item) => continueStageTarget(item))
+        || topics[0]);
     const target = currentTarget || (preferred ? continueStageTarget(preferred) : null);
     if (!preferred || !target) return;
     if (topicId !== preferred.topic.id) {
@@ -3042,7 +2949,7 @@ function PathView({
       {current ? (
         <>
           {newlyUnlockedUnit ? <LevelUnlockBanner unit={newlyUnlockedUnit} /> : null}
-          <View style={styles.pathTimelineWrap}>
+          <View style={[styles.pathTimelineWrap, !bleedEdge && styles.pathTimelineWrapBoxed]}>
             {current.units.map((unit, unitIdx) => {
               const locked = unit.state === 'locked';
               const doneSteps = unit.steps.filter((step) => step.state === 'completed').length;
@@ -3215,6 +3122,13 @@ function PathView({
               userId={String(user?.id || '')}
               topicId={current?.topic?.id || ''}
               courseTitle={current?.topic?.name || ''}
+              color={mUnit ? unitColor(mUnit.index) : undefined}
+              xpTotal={xpTotal}
+              play={play}
+              onBuyXp={onBuyXp ? () => {
+                setMilestoneOpen(null);
+                onBuyXp();
+              } : undefined}
               initialDifficulty={milestoneOpen.initialDifficulty ?? null}
               initialSection={milestoneOpen.initialSection ?? null}
               unit={mUnit}
@@ -3828,14 +3742,16 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
 }
 
 // ── Màn chơi ─────────────────────────────────────────────────────────────────
-function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }: {
+function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggingChange }: {
   session: DpSession;
   stats: DpStats | null;
+  pathUnit?: DpPathUnit | null;
   play: (s: GameSound) => void;
   onQuit: (info?: { abandoned?: boolean; profileXp?: number; stats?: DpStats } | null) => void;
   onFinished: (summary: DpSummary) => void;
   onDraggingChange: (dragging: boolean) => void;
 }) {
+  const { user } = useAuth();
   const [quitOpen, setQuitOpen] = useState(false);
   const [quitting, setQuitting] = useState(false);
   const [index, setIndex] = useState(0);
@@ -3853,20 +3769,20 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [combo, setCombo] = useState(0);
+  const comboRef = useRef(0);
   const [comboCelebration, setComboCelebration] = useState<number | null>(null);
-  const [wrongTryCount, setWrongTryCount] = useState(0);
-  const [retryCooldownSec, setRetryCooldownSec] = useState(0);
-  const [answerResetKey, setAnswerResetKey] = useState(0);
-  const [retryBaselineKey, setRetryBaselineKey] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
   const [buyXpOpen, setBuyXpOpen] = useState(false);
+  const [videoDoneIds, setVideoDoneIds] = useState<Record<string, boolean>>({});
   const { focusMode, toggle: toggleFocus, setFocusMode } = useMobileFocusMode();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
   const total = session.questions.length;
-  const meta = DP_TYPES[question.type];
+  const meta = DP_TYPES[question.type] || DP_TYPES.mcq;
   const level = DP_DIFFICULTIES.find((d) => d.id === question.difficulty) || DP_DIFFICULTIES[0];
+  const isVideoQuestion = question.type === 'video';
+  const videoCompleted = isVideoQuestion && Boolean(videoDoneIds[question.id]);
 
   useEffect(() => {
     let active = true;
@@ -3894,35 +3810,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   useEffect(() => {
     setExplainOpen(false);
     setHintChargedXp(0);
-  }, [question.id, answerResetKey]);
-
-  useEffect(() => {
-    setRetryBaselineKey('');
   }, [question.id]);
-
-  useEffect(() => {
-    if (!result || result.correct) {
-      setRetryBaselineKey('');
-      return;
-    }
-    if (pending == null || question.type !== 'order') return;
-    setRetryBaselineKey((prev) => {
-      if (prev === RETRY_BASELINE_EMPTY || prev === '') return serializePracticeAnswer(pending);
-      return prev;
-    });
-  }, [result, pending, question.type]);
-
-  useEffect(() => {
-    if (!result || result.correct) {
-      setRetryCooldownSec(0);
-      return undefined;
-    }
-    setRetryCooldownSec(5);
-    const timer = setInterval(() => {
-      setRetryCooldownSec((sec) => (sec <= 1 ? 0 : sec - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [result, wrongTryCount]);
 
   const isPathSession = session.mode === 'path' || Boolean(session.path);
   const xpDisabled = Boolean(session.xpDisabled || (!isPathSession && session.mode === 'free') || session.review || session.path?.review);
@@ -3945,25 +3833,22 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   }, [stats?.xpTotal]);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats>; xpTotal?: number | null }) => {
+    const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats>; xpTotal?: number | null; spendXp?: number }) => {
       if (typeof detail?.xpTotal === 'number') setProfileXp(detail.xpTotal);
       else if (typeof detail?.stats?.xpTotal === 'number') setProfileXp(detail.stats.xpTotal);
+      const spendXp = Number(detail?.spendXp || 0);
+      if (spendXp > 0) setHintChargedXp(spendXp);
     });
     return () => sub.remove();
   }, []);
 
   useEffect(() => {
-    Animated.timing(progress, { toValue: (index + (result ? 1 : 0)) / total, duration: 400, useNativeDriver: false }).start();
-  }, [index, progress, result, total]);
-
-  const resetInteractiveAnswer = useCallback(() => {
-    setPending(null);
-    setChosen(null);
-    setAnswerResetKey((key) => key + 1);
-  }, []);
+    const stepDone = isVideoQuestion ? videoCompleted : Boolean(result);
+    Animated.timing(progress, { toValue: (index + (stepDone ? 1 : 0)) / total, duration: 400, useNativeDriver: false }).start();
+  }, [index, isVideoQuestion, progress, result, total, videoCompleted]);
 
   const submit = useCallback(async (answer: DpAnswer | null) => {
-    if (!answer || busy || result?.correct) return;
+    if (!answer || busy || result) return;
     setBusy(true);
     setError('');
     setChosen('index' in answer ? answer.index : 'value' in answer ? answer.value : null);
@@ -3974,26 +3859,15 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       const isCorrect = data.correct;
       setTitle(isCorrect ? randomPraise() : randomComfort());
-      setCombo((value) => {
-        const nextCombo = isCorrect ? value + 1 : 0;
-        if ([3, 5, 10].includes(nextCombo)) {
-          setComboCelebration(nextCombo);
-        }
-        return nextCombo;
-      });
+      const nextCombo = isCorrect ? comboRef.current + 1 : 0;
+      comboRef.current = nextCombo;
+      setCombo(nextCombo);
+      if ([3, 5, 10].includes(nextCombo)) {
+        setComboCelebration(nextCombo);
+      }
       if (isCorrect) {
-        setWrongTryCount(0);
         comboPop.setValue(0.6);
         Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: USE_NATIVE_DRIVER }).start();
-      } else {
-        setWrongTryCount(typeof data.wrongTryCount === 'number' ? data.wrongTryCount : (wrongTryCount + 1));
-        if (question.type === 'mcq' || question.type === 'truefalse') {
-          setChosen(null);
-          setPending(null);
-        } else {
-          setRetryBaselineKey(RETRY_BASELINE_EMPTY);
-          resetInteractiveAnswer();
-        }
       }
       play(isCorrect ? 'correct' : 'wrong');
     } catch (err) {
@@ -4003,10 +3877,10 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     } finally {
       setBusy(false);
     }
-  }, [busy, comboPop, play, question.id, question.type, resetInteractiveAnswer, result, session.id, wrongTryCount]);
+  }, [busy, comboPop, play, question.id, result, session.id]);
 
   const askHint = async () => {
-    if (reveal || result?.correct || busy) return;
+    if (reveal || result || busy) return;
     if (!xpDisabled && hintCostXp > 0 && profileXp !== null && profileXp < hintCostXp) {
       setBuyXpOpen(true);
       return;
@@ -4037,8 +3911,6 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       setResult(null);
       setReveal(null);
       setHintText('');
-      setWrongTryCount(0);
-      setAnswerResetKey((key) => key + 1);
       return;
     }
     setBusy(true);
@@ -4072,7 +3944,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     : session.path
       ? `Chặng ${session.path.unitIndex} · ${session.path.pathNodeLabel || session.path.unitTitle} · ${session.path.stepLabel}`
       : `Luyện tự do · ${level.label}`;
-  const answeredCount = index + (result?.correct ? 1 : 0);
+  const answeredCount = index + ((isVideoQuestion ? videoCompleted : Boolean(result)) ? 1 : 0);
   const quitLossXp = xpDisabled ? 0 : (isPerQuestionStake ? Math.max(0, total - answeredCount) * perQuestionStakeXp : stakeXp);
   const confirmedQuestionXp = result?.correct
     ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
@@ -4081,41 +3953,16 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         ? result.xp
         : (isPerQuestionStake && !xpDisabled ? perQuestionStakeXp : 0)))
     : 0;
-  const canRetryWrong = Boolean(
-    result
-    && !result.correct
-    && !busy
-    && retryCooldownSec <= 0
-    && (immediate
-      ? Boolean(pending)
-      : canSubmitRetryAfterWrong({
-        pending,
-        retryBaselineKey,
-        questionType: question.type,
-      })),
-  );
-  const canRetryInteractive = Boolean(
-    result
-    && !result.correct
-    && !immediate
-    && retryCooldownSec <= 0
-    && canSubmitRetryAfterWrong({
-      pending,
-      retryBaselineKey,
-      questionType: question.type,
-    }),
-  );
 
   const keyActionsRef = useRef({
     question,
+    isVideoQuestion,
+    videoCompleted,
     reveal,
     result,
     busy,
     immediate,
     pending,
-    canRetryWrong,
-    canRetryInteractive,
-    retryCooldownSec,
     blocked: quitOpen || buyXpOpen || Boolean(comboCelebration),
     submit,
     next,
@@ -4123,14 +3970,13 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   });
   keyActionsRef.current = {
     question,
+    isVideoQuestion,
+    videoCompleted,
     reveal,
     result,
     busy,
     immediate,
     pending,
-    canRetryWrong,
-    canRetryInteractive,
-    retryCooldownSec,
     blocked: quitOpen || buyXpOpen || Boolean(comboCelebration),
     submit,
     next,
@@ -4148,19 +3994,17 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const key = event.key.toLowerCase();
-      if (current.result?.correct) {
-        if (event.key === 'Enter' || event.key === 'ArrowRight') {
+      if (current.isVideoQuestion) {
+        if (current.videoCompleted && (event.key === 'Enter' || event.key === 'ArrowRight')) {
           event.preventDefault();
           void current.next();
         }
         return;
       }
-
-      if (current.result && !current.result.correct) {
-        if (current.retryCooldownSec > 0) return;
-        if (event.key === 'Enter' && current.canRetryWrong) {
+      if (current.result) {
+        if (event.key === 'Enter' || event.key === 'ArrowRight') {
           event.preventDefault();
-          void current.submit(current.pending);
+          void current.next();
         }
         return;
       }
@@ -4206,11 +4050,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   return (
     <DragProvider onDraggingChange={onDraggingChange}>
       <View style={styles.playWrap}>
+        <Pressable onPress={() => setQuitOpen(true)} style={styles.quitBtn} accessibilityRole="button">
+          <LogOut size={15} color="#475569" />
+          <Text style={styles.quitBtnText}>Thoát</Text>
+        </Pressable>
         <View style={styles.topBarCard}>
-          <Pressable onPress={() => setQuitOpen(true)} style={styles.quitBtn} accessibilityRole="button">
-            <LogOut size={15} color="#475569" />
-            <Text style={styles.quitBtnText}>Thoát</Text>
-          </Pressable>
           <View style={styles.topBarProgressCol}>
             <View style={styles.topBarMetaRow}>
               <Text numberOfLines={1} style={styles.topBarStepTitle}>{stepTitle}</Text>
@@ -4220,34 +4064,13 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <Animated.View style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
             </View>
           </View>
-          <View style={styles.topBarUtilities}>
-            <Pressable
-              onPress={toggleSound}
-              style={styles.topBarUtilityBtn}
-              accessibilityRole="button"
-              accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-            >
-              {soundEnabled ? <Volume2 size={16} color="#475569" /> : <VolumeX size={16} color="#94A3B8" />}
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                play('tap');
-                toggleFocus();
-              }}
-              style={[styles.topBarUtilityBtn, focusMode && styles.topBarUtilityBtnActive]}
-              accessibilityRole="button"
-              accessibilityLabel={focusMode ? 'Thoát chế độ tập trung' : 'Bật chế độ tập trung'}
-            >
-              {focusMode ? <Minimize2 size={16} color="#047857" /> : <Maximize2 size={16} color="#475569" />}
-            </Pressable>
-          </View>
           {combo >= 2 ? (
             <Animated.View style={[styles.comboChip, { transform: [{ scale: comboPop }] }]} accessibilityLabel={`Combo ${combo} câu đúng liên tiếp`}>
               <Flame size={13} color="#FFFFFF" fill="#FCD34D" />
               <Text style={styles.comboText}>{`x${combo}`}</Text>
             </Animated.View>
           ) : null}
-          {session.xpDisabled ? (
+          {session.xpDisabled && !(isPathSession && walletXp !== null) ? (
             <View
               style={[
                 styles.xpPill,
@@ -4274,7 +4097,11 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <Zap size={14} color="#F59E0B" fill="#FBBF24" />
               <View style={{ alignItems: 'center' }}>
                 <Text style={styles.xpText}>{walletXp}</Text>
-                {isPerQuestionStake ? <Text style={styles.xpSubText}>{`${perQuestionStakeXp}/câu`}</Text> : null}
+                {isPerQuestionStake ? (
+                  <Text style={styles.xpSubText}>{`${perQuestionStakeXp}/câu`}</Text>
+                ) : (session.review || session.path?.review) ? (
+                  <Text style={styles.xpSubText}>Ôn lại</Text>
+                ) : null}
                 {hintChargedXp > 0 ? (
                   <Text style={styles.xpHintSpend} accessibilityLiveRegion="polite">{`−${hintChargedXp} XP`}</Text>
                 ) : null}
@@ -4286,26 +4113,25 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
         </View>
 
         <Animated.View style={[styles.playQuestionCard, { transform: [{ translateX: shakeX }] }]}>
-          {!result?.correct ? (
+          {!result && !isVideoQuestion ? (
             <Pressable
               onPress={() => { void askHint(); }}
               disabled={Boolean(reveal) || busy}
               style={[
                 styles.hintCornerBtn,
                 reveal ? styles.disabled : null,
-                shouldNudgeHintButton(wrongTryCount, Boolean(reveal)) ? styles.hintFooterBtnNudge : null,
               ]}
               accessibilityRole="button"
             >
-                <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
-                <Text style={styles.hintCornerBtnText}>
-                  {reveal ? 'Đã gợi ý' : xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp}`}
-                </Text>
+              <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
+              <Text style={styles.hintCornerBtnText}>
+                {reveal ? 'Đã gợi ý' : xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp}`}
+              </Text>
             </Pressable>
           ) : null}
-          <View style={[styles.promptRow, !result?.correct ? styles.promptRowHintPad : null]}>
+          <View style={[styles.promptRow, !result && !isVideoQuestion ? styles.promptRowHintPad : null]}>
             <View style={styles.promptMascotBox}>
-              <Mascot mood={mood} size={PLAY_QUESTION_CHROME.mascotSize.mobile} />
+              <Mascot mood={isVideoQuestion ? (videoCompleted ? 'happy' : 'idle') : mood} size={PLAY_QUESTION_CHROME.mascotSize.mobile} />
             </View>
             <View style={styles.flex}>
               <View style={styles.questionMetaRow}>
@@ -4318,115 +4144,160 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               </Text>
             </View>
           </View>
-          {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image as ImageStyle} resizeMode="contain" /> : null}
-          {hintText ? (
-            <View style={styles.hintRevealWrap}>
-              <View style={styles.hintBox}>
-                <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
-                <Text style={styles.hintText}>{hintText}</Text>
+          {isVideoQuestion ? (
+            <View style={styles.videoStepWrap}>
+              {(() => {
+                const videoUnit: DpPathUnit = pathUnit || {
+                  id: session.path?.unitId || '',
+                  title: session.path?.unitTitle || 'Luyện tập',
+                  description: '',
+                  index: session.path?.unitIndex || 1,
+                  state: 'active',
+                  testedOut: false,
+                  canTestOut: false,
+                  pathNodes: [],
+                  steps: [],
+                  lesson: null,
+                };
+                return (
+                  <PathVideoModal
+                    key={`${session.id}:${question.id}`}
+                    unit={videoUnit}
+                    initialVideoId={question.video?.id || ''}
+                    nodeKey={session.path?.pathNodeKey || ''}
+                    topicId={session.topic?.id || ''}
+                    userId={String(user?.id || '')}
+                    xpTotal={profileXp ?? stats?.xpTotal ?? 0}
+                    color={unitColor(videoUnit.index)}
+                    play={play}
+                    singleVideoOnly
+                    inline
+                    hideStudyTools
+                    frameless
+                    review={xpDisabled}
+                    onWatched={async (videoId, metaInfo) => {
+                      const targetUnitId = session.path?.unitId;
+                      if (targetUnitId && videoId && !metaInfo?.initialSync) {
+                        await dailyPracticeApi.videoWatched(targetUnitId, videoId);
+                      }
+                      setVideoDoneIds((prev) => ({ ...prev, [question.id]: true }));
+                      if (metaInfo?.completedJustNow) {
+                        setHintChargedXp(0);
+                        play('correct');
+                        setError('');
+                      }
+                    }}
+                    onBuyXp={() => setBuyXpOpen(true)}
+                  />
+                );
+              })()}
+              {error ? <Text style={styles.errorInline}>{error}</Text> : null}
+              <View style={[styles.videoGateNotice, videoCompleted && styles.videoGateNoticeDone]}>
+                <Text style={[styles.videoGateNoticeText, videoCompleted && styles.videoGateNoticeTextDone]}>
+                  {videoCompleted
+                    ? 'Đã xem video và trả lời đúng hết câu hỏi tương tác — bạn có thể chuyển sang câu tiếp theo.'
+                    : 'Xem video và trả lời đúng tất cả mốc trắc nghiệm trong video để mở khóa câu tiếp theo.'}
+                </Text>
               </View>
-              {hintChargedXp > 0 ? (
-                <Text style={styles.hintChargeLine}>{`Đã trừ −${hintChargedXp} XP từ ví của bạn.`}</Text>
-              ) : null}
+              <DuoButton
+                variant={videoCompleted ? 'primary' : 'secondary'}
+                size="md"
+                text={videoCompleted ? (index + 1 >= total ? 'Hoàn thành' : 'Tiếp tục') : 'Hoàn thành video để tiếp tục'}
+                icon={videoCompleted ? <ChevronRight size={17} color="#FFFFFF" /> : <Lock size={15} color="#94A3B8" />}
+                disabled={!videoCompleted || busy}
+                onPress={() => {
+                  if (!videoCompleted || busy) return;
+                  play('tap');
+                  void next();
+                }}
+              />
             </View>
-          ) : null}
-          <View key={`${question.id}-${answerResetKey}`} style={styles.answerArea}>
-            {question.type === 'mcq' ? (
-              <McqQuestion
-                question={question}
-                reveal={reveal}
-                result={result}
-                chosen={typeof chosen === 'number' ? chosen : null}
-                pending={pending}
-                retryCooldownSec={retryCooldownSec}
-                onChange={setPending}
-                onSubmit={submit}
-                play={play}
-              />
-            ) : null}
-            {question.type === 'truefalse' ? (
-              <TrueFalseQuestion
-                result={result}
-                chosen={typeof chosen === 'boolean' ? chosen : null}
-                pending={pending}
-                retryCooldownSec={retryCooldownSec}
-                onChange={setPending}
-                onSubmit={submit}
-                play={play}
-              />
-            ) : null}
-            {question.type === 'order' ? <OrderQuestion {...props} /> : null}
-            {question.type === 'match' ? <MatchQuestion {...props} /> : null}
-            {question.type === 'fill' ? <FillQuestion {...props} /> : null}
-            {question.type === 'sort' ? <SortQuestion {...props} /> : null}
-          </View>
-          {error ? <Text style={styles.errorInline}>{error}</Text> : null}
-
-          {result ? (
-            <MobileAnswerFeedback
-              question={question}
-              result={result}
-              confirmedXp={confirmedQuestionXp}
-              rewardKey={`${session.id}:${question.id}`}
-              feedbackTitle={title}
-              busy={busy}
-              play={play}
-              onNext={() => { void next(); }}
-              onRetry={() => {
-                void submit(pending);
-              }}
-              canRetry={canRetryWrong}
-              wrongTryCount={wrongTryCount}
-              retryCooldownSec={retryCooldownSec}
-              xpDisabled={xpDisabled}
-              explainOpen={explainOpen}
-              onExplainOpenChange={setExplainOpen}
-            />
-          ) : null}
-
-          {!result?.correct ? (
-            <View style={[styles.playCardFooter, result ? styles.playCardFooterTight : null, result && !result.correct ? styles.playCardFooterExplainOnly : null]}>
-              {result && !result.correct ? (
-                <Pressable
-                  onPress={() => {
-                    play('tap');
-                    setExplainOpen((open) => !open);
-                  }}
-                  style={({ pressed }) => [styles.hintFooterBtn, styles.explainFooterBtn, pressed && { opacity: 0.92 }]}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: explainOpen }}
-                >
-                  <BookOpen size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
-                  <Text style={styles.explainFooterBtnText}>
-                    {explainOpen ? 'Ẩn giải thích' : 'Giải thích'}
-                  </Text>
-                </Pressable>
+          ) : (
+            <>
+              {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image as ImageStyle} resizeMode="contain" /> : null}
+              {hintText ? (
+                <View style={styles.hintRevealWrap}>
+                  <View style={styles.hintBox}>
+                    <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} color="#64748B" strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} />
+                    <Text style={styles.hintText}>{hintText}</Text>
+                  </View>
+                  {hintChargedXp > 0 ? (
+                    <Text style={styles.hintChargeLine}>{`Đã trừ −${hintChargedXp} XP từ ví của bạn.`}</Text>
+                  ) : null}
+                </View>
               ) : null}
-              {!result && !immediate ? (
-                <DuoButton
-                  variant="primary"
-                  size="md"
-                  text="Kiểm tra"
-                  icon={busy ? undefined : <CheckCircle2 size={17} color="#FFFFFF" />}
-                  loading={busy}
-                  disabled={!pending || busy}
-                  onPress={() => { void submit(pending); }}
+              <View key={question.id} style={styles.answerArea}>
+                {question.type === 'mcq' ? (
+                  <McqQuestion
+                    question={question}
+                    reveal={reveal}
+                    result={result}
+                    chosen={typeof chosen === 'number' ? chosen : null}
+                    onSubmit={submit}
+                    play={play}
+                  />
+                ) : null}
+                {question.type === 'truefalse' ? (
+                  <TrueFalseQuestion
+                    result={result}
+                    chosen={typeof chosen === 'boolean' ? chosen : null}
+                    onSubmit={submit}
+                    play={play}
+                  />
+                ) : null}
+                {question.type === 'order' ? <OrderQuestion {...props} /> : null}
+                {question.type === 'match' ? <MatchQuestion {...props} /> : null}
+                {question.type === 'fill' ? <FillQuestion {...props} /> : null}
+                {question.type === 'sort' ? <SortQuestion {...props} /> : null}
+              </View>
+              {error ? <Text style={styles.errorInline}>{error}</Text> : null}
+
+              {result ? (
+                <MobileAnswerFeedback
+                  question={question}
+                  result={result}
+                  confirmedXp={confirmedQuestionXp}
+                  rewardKey={`${session.id}:${question.id}`}
+                  feedbackTitle={title}
+                  busy={busy}
+                  play={play}
+                  onNext={() => { void next(); }}
+                  xpDisabled={xpDisabled}
+                  explainOpen={explainOpen}
+                  onExplainOpenChange={setExplainOpen}
                 />
               ) : null}
-              {!result && immediate ? (
-                <Text style={styles.selectAnswerHint}>Chọn 1 đáp án bên trên</Text>
+
+              {!result ? (
+                <View style={styles.playCardFooter}>
+                  {!immediate ? (
+                    <DuoButton
+                      variant="primary"
+                      size="md"
+                      text="Kiểm tra"
+                      icon={busy ? undefined : <CheckCircle2 size={17} color="#FFFFFF" />}
+                      loading={busy}
+                      disabled={!pending || busy}
+                      onPress={() => { void submit(pending); }}
+                    />
+                  ) : (
+                    <Text style={styles.selectAnswerHint}>Chọn 1 đáp án bên trên</Text>
+                  )}
+                </View>
               ) : null}
-            </View>
-          ) : null}
+            </>
+          )}
         </Animated.View>
 
         {Platform.OS === 'web' ? (
           <Text style={styles.shortcutLegend}>
-            {question.type === 'mcq'
-              ? 'Phím tắt: 1–4 / A–D chọn đáp án · H gợi ý · Enter tiếp tục'
-              : question.type === 'truefalse'
-                ? 'Phím tắt: 1–2 / A–B chọn Đúng hoặc Sai · H gợi ý · Enter tiếp tục'
-                : 'Phím tắt: H gợi ý · Enter kiểm tra / tiếp tục'}
+            {isVideoQuestion
+              ? 'Phím tắt: Enter tiếp tục sau khi hoàn thành video'
+              : question.type === 'mcq'
+                ? 'Phím tắt: 1–4 / A–D chọn đáp án · H gợi ý · Enter tiếp tục'
+                : question.type === 'truefalse'
+                  ? 'Phím tắt: 1–2 / A–B chọn Đúng hoặc Sai · H gợi ý · Enter tiếp tục'
+                  : 'Phím tắt: H gợi ý · Enter kiểm tra / tiếp tục'}
           </Text>
         ) : null}
 
@@ -4916,7 +4787,7 @@ export function DailyPracticeScreen() {
       setSummary(null);
       setSession({
         ...data,
-        questions: shuffleList(data.questions),
+        questions: data.preserveOrder ? (data.questions || []) : shuffleList(data.questions),
       });
       if (typeof data.profileXp === 'number') applyStats({ xpTotal: data.profileXp });
       load(true);
@@ -5077,7 +4948,113 @@ export function DailyPracticeScreen() {
     practiceLockRef.current = false;
   };
 
-  const goHome = () => {
+  const resumeMilestoneAfterPractice = (preferNext: boolean, activeSession?: DpSession | null) => {
+    const pathPick = lastPick?.mode === 'path' ? lastPick : null;
+    const unitId = summary?.path?.unitId || activeSession?.path?.unitId || pathPick?.unitId || '';
+    const nodeKey = (summary?.path as { pathNodeKey?: string } | null | undefined)?.pathNodeKey
+      || activeSession?.path?.pathNodeKey
+      || pathPick?.nodeKey
+      || 'study';
+    const step = summary?.path?.step || activeSession?.path?.step || pathPick?.step || 'learn';
+    const isTestOut = Boolean(summary?.path?.testOut ?? activeSession?.path?.testOut ?? pathPick?.testOut);
+
+    if (!isTestOut && unitId) {
+      const matchedTopic = pathTopics.find((t) => t.units?.some((u) => u.id === unitId));
+      const matchedUnit = matchedTopic?.units?.find((u) => u.id === unitId);
+      const matchedNode = matchedUnit?.pathNodes?.find((n) => n.key === nodeKey);
+      const currDiff: DpDifficulty = step === 'challenge' ? 'hard' : step === 'practice' ? 'medium' : 'easy';
+      const resumeTopicId = matchedTopic?.topic?.id;
+
+      if (matchedNode && (matchedNode.kind === 'study' || matchedNode.icon === 'book')) {
+        setCelebrating(false);
+        setSummary(null);
+        setPathError('');
+        load(true);
+        loadPath(true);
+
+        if (preferNext && (summary?.path?.passed || summary?.xpDisabled)) {
+          const doneSet = new Set(matchedUnit?.completedSections || []);
+          doneSet.add(`${matchedNode.key}:${currDiff}:practice`);
+
+          const levelCfg = matchedNode.levelConfigs?.[currDiff];
+          const hiddenCurr = new Set(levelCfg?.hiddenSections || []);
+          const secOrder = ((levelCfg?.sectionOrder?.length
+            ? levelCfg.sectionOrder
+            : ['content', 'file', 'video', 'practice']) as DpSectionKey[])
+            .filter((k) => !hiddenCurr.has(k) && levelCfg?.sectionLocks?.[k] !== 'locked');
+          const pIdx = secOrder.indexOf('practice');
+          const nextInCurrDiff = pIdx >= 0
+            ? secOrder.slice(pIdx + 1).find((k) => !doneSet.has(`${matchedNode.key}:${currDiff}:${k}`))
+            : undefined;
+
+          if (nextInCurrDiff) {
+            setPendingResume({
+              key: Date.now(),
+              topicId: resumeTopicId,
+              unitId,
+              nodeKey,
+              sectionId: `${currDiff}:${nextInCurrDiff}`,
+            });
+            return;
+          }
+
+          const isNodeDiffDone = (diff: DpDifficulty) => {
+            const c = matchedNode.levelConfigs?.[diff];
+            if (!c) return diff !== 'easy';
+            const hidden = new Set(c.hiddenSections || []);
+            const secs = (c.sectionOrder?.length
+              ? c.sectionOrder
+              : (['content', 'file', 'video', 'practice'] as DpSectionKey[]))
+              .filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
+            return !secs.length || secs.every((k) => doneSet.has(`${matchedNode.key}:${diff}:${k}`));
+          };
+
+          const allNodeDone = isNodeDiffDone('easy') && isNodeDiffDone('medium') && isNodeDiffDone('hard');
+          const nextStep = summary?.path?.next;
+          if (allNodeDone && nextStep && (nextStep.unitId !== unitId || nextStep.nodeKey !== nodeKey)) {
+            const nextTopic = pathTopics.find((t) => t.units?.some((u) => u.id === nextStep.unitId));
+            const nextUnit = nextTopic?.units?.find((u) => u.id === nextStep.unitId);
+            const nextNode = nextUnit?.pathNodes?.find((n) => n.key === nextStep.nodeKey);
+            if (nextNode && (nextNode.kind === 'study' || nextNode.icon === 'book')) {
+              setPendingResume({
+                key: Date.now(),
+                topicId: nextTopic?.topic?.id || resumeTopicId,
+                unitId: nextStep.unitId,
+                nodeKey: nextStep.nodeKey,
+              });
+              return;
+            }
+            startStep(nextStep.unitId, nextStep.nodeKey || 'study', nextStep.step);
+            return;
+          }
+
+          setPendingResume({
+            key: Date.now(),
+            topicId: resumeTopicId,
+            unitId,
+            nodeKey,
+          });
+          return;
+        }
+
+        setPendingResume({
+          key: Date.now(),
+          topicId: resumeTopicId,
+          unitId,
+          nodeKey,
+          sectionId: currDiff,
+        });
+        return;
+      }
+    }
+
+    if (preferNext && summary?.path?.passed && summary.path.next) {
+      setCelebrating(false);
+      setSummary(null);
+      startStep(summary.path.next.unitId, summary.path.next.nodeKey || 'study', summary.path.next.step);
+      return;
+    }
+
     setCelebrating(false);
     setSummary(null);
     setPathError('');
@@ -5085,15 +5062,12 @@ export function DailyPracticeScreen() {
     loadPath();
   };
 
+  const goHome = () => {
+    resumeMilestoneAfterPractice(false);
+  };
+
   const handleFinishContinue = () => {
-    const pathResult = summary?.path;
-    if (pathResult?.passed && pathResult.next) {
-      setCelebrating(false);
-      setSummary(null);
-      startStep(pathResult.next.unitId, pathResult.next.nodeKey || 'study', pathResult.next.step);
-      return;
-    }
-    goHome();
+    resumeMilestoneAfterPractice(true);
   };
 
   const finishRematchStakeXp = summary?.xpDisabled ? 0 : (
@@ -5138,26 +5112,27 @@ export function DailyPracticeScreen() {
   };
 
   return (
-    <AppScreen scroll={false} hideBrandingTopBar={Boolean(session)}>
+    <AppScreen scroll={false} hideBrandingTopBar={Boolean(session)} contentStyle={styles.appScreenZeroPad}>
       <ChromeScrollView
         ref={scrollRef}
         scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={mode !== 'path'}
-        contentContainerStyle={styles.screen}
+        contentContainerStyle={[styles.screen, !session && mode === 'path' && styles.screenPathMode]}
         style={mode === 'path' ? ({ scrollbarWidth: 'none' } as never) : undefined}
         keyboardShouldPersistTaps="handled"
       >
         {session ? (
           <PlayView
             session={session}
+            pathUnit={pathTopics.flatMap((t) => t.units || []).find((u) => u.id === session.path?.unitId) || null}
             play={play}
             stats={stats}
             onQuit={(info) => {
+              const prevSession = session;
               setSession(null);
               if (info?.stats) applyStats(info.stats);
               else if (typeof info?.profileXp === 'number') applyStats({ xpTotal: info.profileXp });
-              load(true);
-              loadPath(true);
+              resumeMilestoneAfterPractice(false, prevSession);
             }}
             onDraggingChange={(dragging) => setScrollEnabled(!dragging)}
             onFinished={(data) => {
@@ -5166,6 +5141,7 @@ export function DailyPracticeScreen() {
               setCelebrating(true);
               applyStats(data.stats);
               load(true);
+              loadPath(true);
               if (data.spacedRepetition) {
                 setSpacedRepetition(data.spacedRepetition);
               }
@@ -5308,7 +5284,7 @@ export function DailyPracticeScreen() {
             if (chosen.inPath) {
               setMode('path');
               setPathActiveTopicId(chosen.id);
-              void dailyPracticeApi.setActivePathTopic(chosen.id).catch(() => {});
+              void dailyPracticeApi.setActivePathTopic(chosen.id).catch(() => { });
             } else {
               setMode('free');
             }
@@ -5324,7 +5300,9 @@ export function DailyPracticeScreen() {
 }
 
 const styles = createThemedStyles((colors) => StyleSheet.create({
+  appScreenZeroPad: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 },
   screen: { padding: spacing.lg, paddingBottom: 120 },
+  screenPathMode: { paddingBottom: spacing.lg },
   relatedCard: { gap: spacing.md, padding: spacing.md, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.brandSoft },
   relatedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   relatedIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand },
@@ -5380,7 +5358,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   disabled: { opacity: 0.55 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   quitBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7,
+    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
   },
   quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '800' },
@@ -5596,6 +5574,87 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginBottom: 4,
   },
+  subjectGrid2Col: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    columnGap: 8,
+  },
+  subjectGridCard: {
+    width: '48.2%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  subjectGridIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  subjectGridName: {
+    color: '#0F172A',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  subjectGridMeta: {
+    color: colors.muted,
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  subjectStageHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#CBECE0',
+    backgroundColor: '#FFFFFF',
+  },
+  subjectStageBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  subjectStageBackText: {
+    color: '#047857',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  subjectStageTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  subjectStageTitle: {
+    color: '#0F172A',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  subjectStageProgress: {
+    color: '#059669',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
   chipScroller: { flexGrow: 0, minHeight: 58, marginHorizontal: -2 },
   chipRow: { gap: 8, paddingRight: spacing.sm, alignItems: 'center' },
   chip: {
@@ -5625,14 +5684,21 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   },
   pathTimelineWrap: {
     position: 'relative',
-    backgroundColor: '#ECFDF5',
-    borderRadius: 0,
-    borderWidth: 0,
-    overflow: 'visible',
-    marginBottom: spacing.sm,
-    marginHorizontal: -spacing.md,
+    backgroundColor: '#F0F7FF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#DCE8F5',
+    overflow: 'hidden',
+    marginBottom: 0,
+    paddingBottom: spacing.lg,
+    marginHorizontal: 0,
     width: undefined,
     alignSelf: 'stretch',
+  },
+  pathTimelineWrapBoxed: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    paddingBottom: spacing.lg + 4,
   },
   pathSummaryCard: { position: 'relative', overflow: 'hidden', paddingRight: 56 },
   pathSummaryMascot: { position: 'absolute', right: 4, top: 8 },
@@ -6121,7 +6187,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  lessonBodyBox: { gap: 8, padding: 14, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  lessonBodyBox: { gap: 8, padding: 14, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1' },
   lessonBodyText: { color: '#334155', fontSize: 14, lineHeight: 21 },
   lessonCheckCard: { padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
   lessonCheckPrompt: { color: colors.ink, fontSize: 14, fontWeight: '600' },
@@ -6137,9 +6203,11 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   lessonVideoFrameWrap: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
+    borderWidth: 2,
+    borderColor: '#1E293B',
     position: 'relative',
   },
   videoGateOverlay: {
@@ -6148,195 +6216,31 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
     zIndex: 40,
-    alignItems: 'center',
+  },
+  videoGateOverlayScroll: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 10,
   },
-  videoGateCard: {
-    width: '100%',
-    maxWidth: 420,
-    maxHeight: '94%',
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    padding: 12,
+  lessonPendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  videoGateTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  videoGateTime: {
-    color: '#B45309',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  videoGateCloseBtn: {
-    padding: 4,
-  },
-  videoGateMissedBox: {
-    backgroundColor: '#ECFDF5',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  videoGateMissedText: {
-    color: '#047857',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  videoGatePrompt: {
-    color: '#0F172A',
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  videoGateChoiceBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-  },
-  videoGateChoiceBtnActive: {
-    backgroundColor: '#0284C7',
-  },
-  videoGateChoiceText: {
-    color: '#1E293B',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  videoGateChoiceTextActive: {
-    color: '#FFFFFF',
-  },
-  videoGateTextInput: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    fontSize: 13,
-    color: '#0F172A',
-  },
-  videoGateHintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
   },
-  videoGateHintText: {
+  lessonPendingNote: {
     flex: 1,
     color: '#92400E',
     fontSize: 12,
-    fontWeight: '400',
-  },
-  videoGateErrorText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  videoGateActionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 2,
-  },
-  videoGateSubmitBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#059669',
-  },
-  videoGateSubmitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  videoGateCancelBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-  },
-  videoGateCancelBtnText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  videoGateHintBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#0F172A',
-  },
-  videoGateHintBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  videoGateScreenPickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginVertical: 4,
-  },
-  videoGateScreenPickText: {
-    color: '#1E293B',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  videoGateUploadProgress: {
-    gap: 6,
-    marginVertical: 6,
-  },
-  videoGateUploadTrack: {
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-  videoGateUploadFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#0284C7',
-  },
-  videoGateUploadText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  videoGateFootNote: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '400',
-  },
-  lessonPendingNote: {
-    color: '#64748B',
-    fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '700',
     lineHeight: 18,
-    marginTop: -2,
   },
   lessonModalFoot: {
     flexDirection: 'row',
@@ -6392,8 +6296,8 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   finaleGhost: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -4,
-    marginBottom: 10,
+    marginTop: 0,
+    marginBottom: 4,
     paddingVertical: 2,
   },
   finaleCupStage: {
@@ -6781,6 +6685,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
+  goalMinuteTrack: {
+    width: '100%',
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
   goalInfoTitle: { fontSize: 13, fontWeight: '700' },
   goalInfoSub: { fontSize: 12, marginTop: 1, lineHeight: 18 },
   goalLabelSmall: { color: '#64748B', fontSize: 13, fontWeight: '600' },
@@ -7009,4 +6920,19 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
     textAlign: 'center',
   },
   pathSummaryTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  videoStepWrap: { marginTop: 12, gap: 12 },
+  videoGateNotice: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  videoGateNoticeDone: {
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  videoGateNoticeText: { fontSize: 11.5, fontWeight: '600', color: '#475569', lineHeight: 16 },
+  videoGateNoticeTextDone: { color: '#047857', fontWeight: '700' },
 }));

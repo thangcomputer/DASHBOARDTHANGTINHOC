@@ -25,11 +25,11 @@ import {
   Gamepad2,
   Lock,
   Paperclip,
-  Play,
   PlayCircle,
-  X,
 } from 'lucide-react-native';
 import { saveLastStudySession } from '../../utils/resumeLearning';
+import { PathVideoModal } from './PathVideoModal';
+import type { GameSound } from './useGameSounds';
 import {
   dailyPracticeApi,
   DpDifficulty,
@@ -206,6 +206,10 @@ type Props = {
   userId?: string;
   topicId?: string;
   courseTitle?: string;
+  color?: { from: string; to: string };
+  xpTotal?: number | null;
+  play?: (s: GameSound) => void;
+  onBuyXp?: () => void;
   initialDifficulty?: DpDifficulty | null;
   initialSection?: DpSectionKey | null;
   unit: DpPathUnit | null;
@@ -223,6 +227,10 @@ export default function MilestoneHubModal({
   userId = '',
   topicId = '',
   courseTitle = '',
+  color,
+  xpTotal = null,
+  play,
+  onBuyXp,
   initialDifficulty = null,
   initialSection = null,
   unit,
@@ -241,6 +249,7 @@ export default function MilestoneHubModal({
   const [savingSection, setSavingSection] = useState(false);
   const [contentScrolledToEnd, setContentScrolledToEnd] = useState(false);
   const autoCompletedRef = useRef<Set<string>>(new Set());
+  const prevCompletedKeyRef = useRef('');
   const scrollOffsetYRef = useRef(0);
   const scrollViewportHeightRef = useRef(0);
   const scrollContentHeightRef = useRef(0);
@@ -257,6 +266,33 @@ export default function MilestoneHubModal({
   useEffect(() => {
     setCompletedList(unit?.completedSections || []);
   }, [unit?.completedSections, visible]);
+
+  useEffect(() => {
+    if (!visible || activeSection || initialDifficulty || !node) {
+      prevCompletedKeyRef.current = (unit?.completedSections || []).join('|');
+      return;
+    }
+    const nextKey = (unit?.completedSections || []).join('|');
+    if (prevCompletedKeyRef.current === nextKey) return;
+    prevCompletedKeyRef.current = nextKey;
+    const doneSet = new Set(unit?.completedSections || []);
+    const isDiffCompleted = (diff: DpDifficulty) => {
+      const c = normalizeConfig(node, diff);
+      const hidden = new Set(c.hiddenSections || []);
+      const secs = c.sectionOrder.filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
+      return !secs.length || secs.every((secKey) => doneSet.has(`${node.key}:${diff}:${secKey}`));
+    };
+    const nextDiff: DpDifficulty = !isDiffCompleted('easy')
+      ? 'easy'
+      : !isDiffCompleted('medium')
+        ? 'medium'
+        : !isDiffCompleted('hard')
+          ? 'hard'
+          : activeDiff;
+    if (isDiffCompleted(activeDiff) && nextDiff !== activeDiff) {
+      setActiveDiff(nextDiff);
+    }
+  }, [visible, activeSection, initialDifficulty, unit?.completedSections, node, activeDiff]);
 
   useEffect(() => {
     setSelectedReviewSection(null);
@@ -439,6 +475,12 @@ export default function MilestoneHubModal({
     }
   }, [activeSection, contentScrolledToEnd, cfg, markSectionDoneAuto]);
 
+  const handleEmbeddedVideoWatched = useCallback(async (videoId: string) => {
+    if (!unit?.id || !videoId) return;
+    await dailyPracticeApi.videoWatched(unit.id, videoId);
+    onProgressChanged?.();
+  }, [unit?.id, onProgressChanged]);
+
   if (!unit || !node || !cfg) return null;
 
   const openSection = (secKey: DpSectionKey) => {
@@ -448,7 +490,7 @@ export default function MilestoneHubModal({
       onOpenVideo(unit, vidId);
       return;
     }
-    if (secKey === 'practice' && !cfg.practice?.video?.url) {
+    if (secKey === 'practice') {
       onClose();
       onStartPractice(DIFFICULTY_STEP_MAP[activeDiff]);
       return;
@@ -460,7 +502,7 @@ export default function MilestoneHubModal({
     const curIdx = activeSection ? requiredSections.indexOf(activeSection) : -1;
     const nextSec = curIdx >= 0 ? requiredSections[curIdx + 1] : null;
     if (nextSec) {
-      if ((nextSec === 'video' && cfg.video?.url) || (nextSec === 'practice' && !cfg.practice?.video?.url)) {
+      if ((nextSec === 'video' && cfg.video?.url) || nextSec === 'practice') {
         setActiveSection(null);
       }
       openSection(nextSec);
@@ -503,6 +545,15 @@ export default function MilestoneHubModal({
     .split(/\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
+  const activeSectionCompleted = Boolean(
+    activeSection && (
+      isSectionDone(activeSection)
+      || savingSection
+      || activeSection === 'file'
+      || (activeSection === 'content' && contentScrolledToEnd)
+      || (activeSection === 'video' && !cfg.video?.url)
+    ),
+  );
 
   return (
     <Modal visible={visible && !suspended} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => {
@@ -512,9 +563,17 @@ export default function MilestoneHubModal({
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerIconBox}>
-            <BookOpen size={20} color="#0F172A" />
-          </View>
+          <Pressable
+            onPress={() => {
+              if (activeSection) setActiveSection(null);
+              else onClose();
+            }}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+            accessibilityLabel={activeSection ? 'Quay lại bài học' : 'Trở về'}
+          >
+            <ArrowLeft size={19} color="#0F172A" />
+          </Pressable>
           <View style={styles.headerTextWrap}>
             <Text style={styles.eyebrow}>
               {activeSection
@@ -540,9 +599,15 @@ export default function MilestoneHubModal({
               </View>
             )}
           </View>
-          <Pressable onPress={onClose} style={styles.closeBtn} accessibilityLabel="Đóng">
-            <X size={20} color="#64748B" />
-          </Pressable>
+          {activeSection && activeSectionCompleted ? (
+            <View style={styles.headerDoneIconBadge} accessibilityLabel="Đã hoàn thành">
+              {savingSection ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <CheckCircle2 size={18} color="#059669" />
+              )}
+            </View>
+          ) : null}
         </View>
 
         {/* Body */}
@@ -740,73 +805,32 @@ export default function MilestoneHubModal({
             )}
 
             {activeSection === 'video' && (
-              <View style={styles.emptyBox}>
-                {cfg.video?.url ? (
-                  <Pressable
-                    onPress={() => onOpenVideo(unit, cfg.video.id || `${node.key}:level:${activeDiff}`)}
-                    style={styles.videoLaunchBtn}
-                  >
-                    <Play size={16} color="#FFFFFF" />
-                    <Text style={styles.videoLaunchText}>Mở trình phát video</Text>
-                  </Pressable>
-                ) : (
-                  <Text style={styles.emptyText}>Mức độ {currentTab.label} chưa có video bài giảng.</Text>
-                )}
-              </View>
-            )}
-
-            {activeSection === 'practice' && (
-              <View style={styles.detailWrap}>
-                <View style={styles.practiceCard}>
-                  <Text style={styles.practiceEyebrow}>LUYỆN TẬP · MỨC {currentTab.label.toUpperCase()}</Text>
-                  <Text style={styles.practiceTitle}>
-                    {cfg.practice?.title || `Bài tập trắc nghiệm (${currentTab.label})`}
-                  </Text>
-                  <Text style={styles.practiceDesc}>
-                    {cfg.practice?.description || 'Hoàn thành tối thiểu 60% số câu hỏi để đạt phần luyện tập này.'}
-                  </Text>
-                  <Text style={styles.practiceCountText}>
-                    {`Ngân hàng câu hỏi: ${unit?.counts?.[activeDiff] || 0} câu ${currentTab.label}`}
-                  </Text>
-                </View>
-                {cfg.practice?.video?.url ? (
-                  <View style={styles.practiceVideoCard}>
-                    <View style={styles.practiceVideoHead}>
-                      <View style={styles.practiceVideoMeta}>
-                        <Text style={styles.practiceVideoEyebrow}>VIDEO HƯỚNG DẪN LUYỆN TẬP</Text>
-                        <Text numberOfLines={1} style={styles.practiceVideoTitle}>
-                          {cfg.practice.video.title || `Video luyện tập (${currentTab.label})`}
-                        </Text>
-                      </View>
-                      {cfg.practice.video.checks?.length ? (
-                        <View style={styles.practiceVideoBadge}>
-                          <Text style={styles.practiceVideoBadgeText}>
-                            {`${cfg.practice.video.checks.length} mốc trắc nghiệm`}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Pressable
-                      onPress={() => onOpenVideo(unit, cfg.practice.video?.id || `${node.key}:practice:${activeDiff}`)}
-                      style={styles.practiceVideoBtn}
-                      accessibilityRole="button"
-                    >
-                      <Play size={15} color="#FFFFFF" fill="#FFFFFF" />
-                      <Text style={styles.practiceVideoBtnText}>Mở video hướng dẫn</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-                <Pressable
-                  onPress={() => {
+              cfg.video?.url ? (
+                <PathVideoModal
+                  key={`${unit.id}:${cfg.video.id || `${node.key}:level:${activeDiff}`}`}
+                  unit={unit}
+                  initialVideoId={cfg.video.id || `${node.key}:level:${activeDiff}`}
+                  nodeKey={node.key}
+                  topicId={topicId}
+                  courseTitle={courseTitle}
+                  userId={userId}
+                  xpTotal={xpTotal}
+                  color={color}
+                  play={play}
+                  singleVideoOnly
+                  inline
+                  onWatched={handleEmbeddedVideoWatched}
+                  onChecksChanged={onProgressChanged}
+                  onBuyXp={onBuyXp ? () => {
                     onClose();
-                    onStartPractice(DIFFICULTY_STEP_MAP[activeDiff]);
-                  }}
-                  style={styles.practiceStartBtn}
-                >
-                  <Gamepad2 size={18} color="#FFFFFF" />
-                  <Text style={styles.practiceStartText}>Bắt đầu làm bài luyện tập</Text>
-                </Pressable>
-              </View>
+                    onBuyXp();
+                  } : undefined}
+                />
+              ) : (
+                <View style={styles.emptyBox}>
+                  <Text style={styles.emptyText}>Mức độ {currentTab.label} chưa có video bài giảng.</Text>
+                </View>
+              )
             )}
           </ScrollView>
         )}
@@ -865,24 +889,14 @@ export default function MilestoneHubModal({
                   <Text style={styles.scrollHintText}>Cuộn đọc hết nội dung để hoàn thành</Text>
                 </View>
               ) : (
-                <View style={styles.subRightActions}>
-                  <View style={styles.doneBadgePill}>
-                    {savingSection ? (
-                      <ActivityIndicator size="small" color="#059669" />
-                    ) : (
-                      <CheckCircle2 size={14} color="#059669" />
-                    )}
-                    <Text style={styles.doneBadgeText}>Đã hoàn thành</Text>
-                  </View>
-                  <Pressable
-                    onPress={handleContinueNextSection}
-                    style={({ pressed }) => [styles.continueNextBtn, pressed && { opacity: 0.9 }]}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.continueNextText}>Tiếp tục</Text>
-                    <ChevronRight size={15} color="#FFFFFF" />
-                  </Pressable>
-                </View>
+                <Pressable
+                  onPress={handleContinueNextSection}
+                  style={({ pressed }) => [styles.continueNextBtn, pressed && { opacity: 0.9 }]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.continueNextText}>Tiếp tục</Text>
+                  <ChevronRight size={15} color="#FFFFFF" />
+                </Pressable>
               )
             )}
           </View>
@@ -903,20 +917,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  headerIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   backBtn: {
     width: 38,
     height: 38,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -935,13 +942,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   lessonDoneBadgeText: { fontSize: 11, fontWeight: '800', color: '#065F46' },
-  closeBtn: {
+  headerDoneIconBadge: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   scroll: { flex: 1 },
   scrollContent: { padding: 18, gap: 16 },
@@ -1156,6 +1165,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   practiceStartText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  practiceFooterBtn: {
+    flex: 1,
+    minWidth: 190,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: '#10B981',
+    borderBottomWidth: 3,
+    borderBottomColor: '#047857',
+  },
+  practiceFooterBtnText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
+  practiceFooterBtnLocked: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  practiceFooterBtnTextLocked: { color: '#94A3B8' },
   footer: {
     padding: 18,
     borderTopWidth: 1,
@@ -1192,7 +1224,7 @@ const styles = StyleSheet.create({
   ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
   subFooter: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,

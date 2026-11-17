@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDown, ArrowUp, BookOpen, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Lock, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, Unlock, X,
+  ArrowDown, ArrowUp, Award, BookOpen, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Lock, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, Unlock, X,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -296,6 +296,7 @@ function blankQuestion(type, difficulty) {
     imageUrl: '',
     hint: '',
     explanation: '',
+    forTestOut: false,
     status: 'published',
     options: ['', '', '', ''],
     correctIndex: 0,
@@ -353,11 +354,11 @@ function ListEditor({ values, onChange, min = 2, max = 8, placeholder, ordered =
 
 const splitList = (text) => String(text || '').split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
 
-function QuestionModal({ topicId, question, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, onClose, onSaved }) {
+function QuestionModal({ topicId, question, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, defaultForTestOut = false, lockTestOut = false, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState(() => (question
     ? fromQuestion(question)
-    : { ...blankQuestion('mcq', defaultDifficulty || 'easy'), unitId: defaultUnitId }));
+    : { ...blankQuestion('mcq', defaultDifficulty || 'easy'), unitId: defaultUnitId, forTestOut: Boolean(defaultForTestOut) }));
   const [saving, setSaving] = useState(false);
   const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
   const blanks = useMemo(() => [...String(form.text || '').matchAll(/\{\{([^{}]+)\}\}/g)].map((m) => m[1]), [form.text]);
@@ -370,6 +371,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
     const body = {
       topicId, type: form.type, difficulty: form.difficulty, prompt: form.prompt, imageUrl: form.imageUrl,
       hint: form.hint, explanation: form.explanation, status: form.status, unitId: form.unitId || '',
+      forTestOut: Boolean(form.unitId && form.forTestOut),
     };
     if (form.type === 'mcq') Object.assign(body, { options: form.options.filter((o) => o.trim()), correctIndex: form.correctIndex });
     if (form.type === 'truefalse') body.answerBool = form.answerBool;
@@ -437,12 +439,41 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
               <span className="mt-0.5 block text-[11px] font-semibold text-sky-700">Chỉ dùng ở Luyện tự do. Không vào lộ trình, không gắn video.</span>
             </p>
           ) : lockUnit && lockedUnit ? (
-            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900">
+            <div className={`rounded-xl border px-3 py-2 text-sm font-bold ${
+              lockTestOut && form.forTestOut
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            }`}>
               Chặng {lockedUnitIndex + 1}: {lockedUnit.title}
-              <span className="mt-0.5 block text-[11px] font-semibold text-emerald-700">Gắn theo nút trắc nghiệm bạn vừa bấm. Không đổi chặng tại đây.</span>
-            </p>
+              {lockTestOut && form.forTestOut ? ' · Kiểm tra vượt chặng' : ''}
+              <span className={`mt-0.5 block text-[11px] font-semibold ${
+                lockTestOut && form.forTestOut ? 'text-amber-700' : 'text-emerald-700'
+              }`}>
+                {lockTestOut && form.forTestOut
+                  ? 'Câu hỏi dành riêng cho bài Kiểm tra vượt chặng (không trộn vào bài học thường).'
+                  : 'Gắn theo nút trắc nghiệm bạn vừa bấm. Không đổi chặng tại đây.'}
+              </span>
+            </div>
           ) : (
-            <UnitSelect id="dp-q-unit" units={units} value={form.unitId || ''} onChange={(unitId) => set({ unitId })} />
+            <div className="space-y-2">
+              <UnitSelect
+                id="dp-q-unit"
+                units={units}
+                value={form.unitId || ''}
+                onChange={(unitId) => set({ unitId, forTestOut: unitId ? Boolean(form.forTestOut) : false })}
+              />
+              {form.unitId ? (
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs font-bold text-amber-900">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-amber-600"
+                    checked={Boolean(form.forTestOut)}
+                    onChange={(e) => set({ forTestOut: e.target.checked })}
+                  />
+                  <span>Dùng riêng cho Kiểm tra vượt chặng (không trộn vào bài học thường)</span>
+                </label>
+              ) : null}
+            </div>
           )}
         </div>
         <div>
@@ -607,10 +638,11 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
   );
 }
 
-function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, onClose, onDone }) {
+function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, defaultForTestOut = false, lockTestOut = false, onClose, onDone }) {
   const toast = useToast();
   const [difficulty, setDifficulty] = useState(defaultDifficulty || 'easy');
   const [unitId, setUnitId] = useState(defaultUnitId);
+  const [forTestOut, setForTestOut] = useState(Boolean(defaultForTestOut));
   const [count, setCount] = useState(6);
   const [types, setTypes] = useState(TYPE_IDS);
   const [busy, setBusy] = useState(false);
@@ -621,7 +653,14 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
   const run = async () => {
     setBusy(true);
     try {
-      const result = await dailyPracticeApi.admin.aiGenerate({ topicId: topic.id, difficulty, count, types, unitId });
+      const result = await dailyPracticeApi.admin.aiGenerate({
+        topicId: topic.id,
+        difficulty,
+        count,
+        types,
+        unitId,
+        forTestOut: Boolean(unitId && forTestOut),
+      });
       toast.success(`AI đã tạo ${result.created} câu nháp${result.skipped ? ` (bỏ ${result.skipped} câu lỗi)` : ''}. Hãy duyệt rồi xuất bản.`);
       onDone();
     } catch (err) {
@@ -656,12 +695,44 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
               <span className="mt-0.5 block text-[11px] font-semibold text-sky-700">Chỉ dùng ở Luyện tự do. Không vào lộ trình.</span>
             </p>
           ) : lockUnit && lockedUnit ? (
-            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900">
+            <div className={`rounded-xl border px-3 py-2 text-sm font-bold ${
+              lockTestOut && forTestOut
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            }`}>
               Chặng {lockedUnitIndex + 1}: {lockedUnit.title}
-              <span className="mt-0.5 block text-[11px] font-semibold text-emerald-700">Gắn theo nút trắc nghiệm bạn vừa bấm.</span>
-            </p>
+              {lockTestOut && forTestOut ? ' · Kiểm tra vượt chặng' : ''}
+              <span className={`mt-0.5 block text-[11px] font-semibold ${
+                lockTestOut && forTestOut ? 'text-amber-700' : 'text-emerald-700'
+              }`}>
+                {lockTestOut && forTestOut
+                  ? 'Câu hỏi dành riêng cho Kiểm tra vượt chặng.'
+                  : 'Gắn theo nút trắc nghiệm bạn vừa bấm.'}
+              </span>
+            </div>
           ) : (
-            <UnitSelect id="dp-ai-unit" units={units} value={unitId} onChange={setUnitId} />
+            <div className="space-y-2">
+              <UnitSelect
+                id="dp-ai-unit"
+                units={units}
+                value={unitId}
+                onChange={(nextUnitId) => {
+                  setUnitId(nextUnitId);
+                  if (!nextUnitId) setForTestOut(false);
+                }}
+              />
+              {unitId ? (
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs font-bold text-amber-900">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-amber-600"
+                    checked={forTestOut}
+                    onChange={(e) => setForTestOut(e.target.checked)}
+                  />
+                  <span>Tạo câu hỏi riêng cho Kiểm tra vượt chặng</span>
+                </label>
+              ) : null}
+            </div>
           )}
         </div>
         <div>
@@ -1129,6 +1200,113 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEdi
   );
 }
 
+/** Quản lý bộ câu hỏi riêng cho Kiểm tra vượt chặng của một chặng. */
+function UnitTestOutPanel({
+  unit,
+  questionsVersion = 0,
+  onComposeTestOut,
+  onAiTestOut,
+  onEditQuestion,
+  onToggleStatus,
+  onDeleteQuestion,
+}) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    dailyPracticeApi.admin.questions({ topicId: unit.topicId, unitId: unit.id, forTestOut: 'true' })
+      .then((rows) => { if (alive) setItems(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (alive) setItems([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [unit.topicId, unit.id, questionsVersion]);
+
+  const publishedCount = items.filter((q) => q.status === 'published').length;
+  const draftCount = items.length - publishedCount;
+
+  return (
+    <div className="space-y-2.5 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="mr-auto flex items-center gap-1.5 text-xs font-black text-amber-950">
+          <Award size={15} className="text-amber-600" />
+          Câu hỏi Kiểm tra vượt chặng
+          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-amber-800 ring-1 ring-amber-200">
+            {publishedCount} đã xuất bản
+          </span>
+          {draftCount > 0 ? (
+            <span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-black text-amber-900">
+              {draftCount} nháp
+            </span>
+          ) : null}
+        </p>
+        <button
+          type="button"
+          onClick={() => onAiTestOut?.(unit.id)}
+          className="cms-btn cms-btn-outline !py-1 text-xs"
+        >
+          <Bot size={13} /> AI tạo vượt chặng
+        </button>
+        <button
+          type="button"
+          onClick={() => onComposeTestOut?.(unit.id)}
+          className="cms-btn cms-btn-primary !py-1 text-xs"
+        >
+          <Plus size={13} /> Thêm câu hỏi vượt chặng
+        </button>
+      </div>
+      <p className="text-[11px] font-medium text-amber-900/80">
+        Dành riêng cho nút <b>Kiểm tra vượt chặng</b> (thi nhảy cóc toàn chặng, cần ≥ 80%). Nếu chưa tạo câu riêng, hệ thống lấy ngẫu nhiên tối đa 10 câu đã xuất bản trong chặng.
+      </p>
+      {loading ? (
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+          <Loader2 size={13} className="animate-spin" /> Đang tải câu hỏi vượt chặng…
+        </p>
+      ) : !items.length ? (
+        <p className="rounded-xl border border-dashed border-amber-300/80 bg-white/80 px-3 py-3 text-center text-xs font-semibold text-amber-800">
+          Chưa có câu hỏi vượt chặng riêng. Bấm <b>Thêm câu hỏi vượt chặng</b> hoặc <b>AI tạo vượt chặng</b> để soạn bộ đề riêng.
+        </p>
+      ) : (
+        <ul className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
+          {items.map((q, idx) => {
+            const level = difficultyMeta(q.difficulty);
+            return (
+              <li key={q.id} className={`flex flex-wrap items-center gap-2 rounded-xl border bg-white px-2.5 py-2 text-xs ${q.status === 'draft' ? 'border-amber-300 bg-amber-50/40' : 'border-amber-200/80'}`}>
+                <span className="font-black text-amber-700">#{idx + 1}</span>
+                <span className="rounded-md bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {QUESTION_TYPES[q.type]?.label || q.type}
+                </span>
+                <span className="rounded-md px-1.5 py-0.5 text-[10px] font-black" style={{ background: level.soft, color: level.color }}>
+                  {level.label}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-semibold text-slate-800" title={q.prompt}>{q.prompt}</span>
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${q.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                  {q.status === 'published' ? 'Đã xuất bản' : 'Nháp'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onToggleStatus?.(q)}
+                  title={q.status === 'published' ? 'Chuyển về nháp' : 'Xuất bản'}
+                  className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 !shadow-none"
+                >
+                  {q.status === 'published' ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+                <button type="button" onClick={() => onEditQuestion?.(q)} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 !shadow-none" title="Sửa câu hỏi">
+                  <Pencil size={13} />
+                </button>
+                <button type="button" onClick={() => onDeleteQuestion?.(q)} className="rounded p-1 text-red-500 hover:bg-red-50 !shadow-none" title="Xóa câu hỏi">
+                  <Trash2 size={13} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 
 /** Ảnh minh họa chặng - sửa ngay trong khung Lộ trình (desktop), không cần mở modal. */
 function UnitImagePanel({ unit, onSaved }) {
@@ -1420,7 +1598,22 @@ function UnitStepVideosPanel({
 }
 
 /** Danh sách chặng của chủ đề: thứ tự mở khóa, số câu theo độ khó, gắn video. */
-function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, onChanged, onComposeQuestion, onAiDraft, onEditQuestion, questionsVersion = 0 }) {
+function UnitsManager({
+  topic,
+  units,
+  unassigned,
+  filterUnitId,
+  onFilterUnit,
+  onChanged,
+  onComposeQuestion,
+  onAiDraft,
+  onComposeTestOut,
+  onAiTestOut,
+  onEditQuestion,
+  onToggleStatus,
+  onDeleteQuestion,
+  questionsVersion = 0,
+}) {
   const toast = useToast();
   const [modal, setModal] = useState(null);
   const [targetUnitId, setTargetUnitId] = useState('');
@@ -1493,6 +1686,7 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                     <p className="text-[11px] text-slate-500">
                       {stageItemSummary(unit)}
                       {unit.counts.total ? ` · ${unit.counts.total} câu` : ''}
+                      {unit.counts.testOut ? ` · ${unit.counts.testOut} vượt chặng` : ''}
                       {unit.counts.draft ? <span className="font-bold text-amber-600"> · {unit.counts.draft} nháp</span> : null}
                     </p>
                     {short && <p className="text-[11px] font-bold text-amber-600">Chưa hiện trên lộ trình: cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản</p>}
@@ -1523,6 +1717,15 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
                       onComposeQuestion={onComposeQuestion}
                       onAiDraft={onAiDraft}
                       onEditQuestion={onEditQuestion}
+                    />
+                    <UnitTestOutPanel
+                      unit={unit}
+                      questionsVersion={questionsVersion}
+                      onComposeTestOut={onComposeTestOut}
+                      onAiTestOut={onAiTestOut}
+                      onEditQuestion={onEditQuestion}
+                      onToggleStatus={onToggleStatus}
+                      onDeleteQuestion={onDeleteQuestion}
                     />
                     <details className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs">
                       <summary className="cursor-pointer font-bold text-slate-600">Ảnh chặng và video danh sách (tuỳ chọn)</summary>
@@ -1589,7 +1792,8 @@ export default function AdminDailyPracticeTab() {
   const [topics, setTopics] = useState([]);
   const [topicId, setTopicId] = useState('');
   const [questions, setQuestions] = useState([]);
-  const [filters, setFilters] = useState({ difficulty: '', type: '', status: '', unitId: '' });
+  const [questionsVersion, setQuestionsVersion] = useState(0);
+  const [filters, setFilters] = useState({ difficulty: '', type: '', status: '', unitId: '', forTestOut: '' });
   const [unitData, setUnitData] = useState({ topicId: '', units: [], unassigned: 0 });
   const [loading, setLoading] = useState(true);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -1642,7 +1846,12 @@ export default function AdminDailyPracticeTab() {
   const units = useMemo(() => (unitData.topicId === topicId ? unitData.units : []), [unitData, topicId]);
   const unitTitle = useMemo(() => new Map(units.map((unit, index) => [unit.id, `Chặng ${index + 1}: ${unit.title}`])), [units]);
   const defaultUnitId = filters.unitId && filters.unitId !== 'none' ? filters.unitId : '';
-  const refreshAll = () => { loadTopics(); loadQuestions(); loadUnits(); };
+  const refreshAll = () => {
+    loadTopics();
+    loadQuestions();
+    loadUnits();
+    setQuestionsVersion((v) => v + 1);
+  };
 
   const installStarter = async () => {
     setBusy(true);
@@ -1828,7 +2037,7 @@ export default function AdminDailyPracticeTab() {
                 units={units}
                 unassigned={unitData.topicId === topicId ? unitData.unassigned : 0}
                 filterUnitId={filters.unitId}
-                questionsVersion={questions.length}
+                questionsVersion={questionsVersion}
                 onFilterUnit={(unitId) => setFilters((f) => ({ ...f, unitId }))}
                 onChanged={refreshAll}
                 onComposeQuestion={(unitId, difficulty) => {
@@ -1839,7 +2048,17 @@ export default function AdminDailyPracticeTab() {
                   setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
                   setAiOpen({ defaultUnitId: unitId || '', defaultDifficulty: difficulty || '', lockUnit: Boolean(unitId) });
                 }}
+                onComposeTestOut={(unitId) => {
+                  setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
+                  setQuestionModal({ defaultUnitId: unitId || '', defaultDifficulty: 'hard', lockUnit: Boolean(unitId), defaultForTestOut: true, lockTestOut: true });
+                }}
+                onAiTestOut={(unitId) => {
+                  setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
+                  setAiOpen({ defaultUnitId: unitId || '', defaultDifficulty: 'hard', lockUnit: Boolean(unitId), defaultForTestOut: true, lockTestOut: true });
+                }}
                 onEditQuestion={(q) => setQuestionModal(q)}
+                onToggleStatus={toggleStatus}
+                onDeleteQuestion={removeQuestion}
               />
               <div className="space-y-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1892,6 +2111,11 @@ export default function AdminDailyPracticeTab() {
                   <option value="published">Đã xuất bản</option>
                   <option value="draft">Nháp</option>
                 </select>
+                <select className={`${INPUT} !w-auto`} value={filters.forTestOut} onChange={(e) => setFilters((f) => ({ ...f, forTestOut: e.target.value }))} aria-label="Lọc mục đích">
+                  <option value="">Mọi mục đích</option>
+                  <option value="false">Luyện bài học</option>
+                  <option value="true">Kiểm tra vượt chặng</option>
+                </select>
               </div>
 
               {loadingQuestions ? (
@@ -1912,6 +2136,9 @@ export default function AdminDailyPracticeTab() {
                               {q.unitId
                                 ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">{unitTitle.get(q.unitId) || 'Chặng'}</span>
                                 : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Chưa xếp chặng</span>}
+                              {q.forTestOut ? (
+                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Vượt chặng</span>
+                              ) : null}
                               {q.status === 'draft'
                                 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Nháp{q.source === 'ai' ? ' · AI' : ''}</span>
                                 : <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700"><CheckCircle2 size={10} /> Đã xuất bản</span>}
@@ -1955,6 +2182,8 @@ export default function AdminDailyPracticeTab() {
           units={units}
           defaultUnitId={questionModal.defaultUnitId ?? defaultUnitId}
           lockUnit={Boolean(questionModal.lockUnit)}
+          defaultForTestOut={Boolean(questionModal.defaultForTestOut ?? filters.forTestOut === 'true')}
+          lockTestOut={Boolean(questionModal.lockTestOut)}
           onClose={() => setQuestionModal(null)}
           onSaved={() => { setQuestionModal(null); refreshAll(); }}
         />
@@ -1966,6 +2195,8 @@ export default function AdminDailyPracticeTab() {
           units={units}
           defaultUnitId={aiOpen.defaultUnitId ?? defaultUnitId}
           lockUnit={Boolean(aiOpen.lockUnit)}
+          defaultForTestOut={Boolean(aiOpen.defaultForTestOut ?? filters.forTestOut === 'true')}
+          lockTestOut={Boolean(aiOpen.lockTestOut)}
           onClose={() => setAiOpen(null)}
           onDone={() => { setAiOpen(null); setFilters((f) => ({ ...f, status: 'draft' })); refreshAll(); }}
         />

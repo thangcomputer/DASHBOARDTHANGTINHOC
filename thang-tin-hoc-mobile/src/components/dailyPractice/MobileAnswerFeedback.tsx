@@ -9,12 +9,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import { BookOpen, Check, ChevronRight, RotateCcw, X, Zap } from 'lucide-react-native';
+import { BookOpen, Check, ChevronRight, X, Zap } from 'lucide-react-native';
 import type { DpAnswerResult, DpQuestion } from '../../services/dailyPracticeApi';
 import { Mascot } from './Mascot';
 import { XPRewardBurst } from './XPRewardBurst';
 import type { GameSound } from './useGameSounds';
-import { resolveWrongEncouragement } from '../../../../shared/dailyPractice/quizWrongEncouragement.mjs';
 import { PLAY_QUESTION_CHROME } from '../../../../shared/dailyPractice/playQuestionChrome.mjs';
 
 const FEEDBACK_STATUS = PLAY_QUESTION_CHROME.feedbackStatus;
@@ -82,10 +81,6 @@ export function MobileAnswerFeedback({
   busy = false,
   play,
   onNext,
-  onRetry,
-  canRetry = false,
-  wrongTryCount = 0,
-  retryCooldownSec = 0,
   xpDisabled = false,
   rewardKey = '',
   explainOpen: explainOpenProp,
@@ -98,10 +93,6 @@ export function MobileAnswerFeedback({
   busy?: boolean;
   play: (sound: GameSound) => void;
   onNext: () => void;
-  onRetry?: () => void;
-  canRetry?: boolean;
-  wrongTryCount?: number;
-  retryCooldownSec?: number;
   xpDisabled?: boolean;
   rewardKey?: string;
   explainOpen?: boolean;
@@ -150,26 +141,18 @@ export function MobileAnswerFeedback({
   }, [result, slideAnim, checkPop, xpPop]);
 
   const practiceOnly = Boolean((result as { practiceOnly?: boolean }).practiceOnly);
-  const waitingCooldown = retryCooldownSec > 0;
   const bannerLabel = isCorrect ? 'Chính xác!' : 'Chưa chính xác';
-  const conciseLine = isCorrect
-    ? buildMobileConciseSummary(question, result)
-    : resolveWrongEncouragement(wrongTryCount);
+  const conciseLine = buildMobileConciseSummary(question, result);
   const answerText = String(result.correctAnswer?.text || '').trim();
   const detailExplanation = normalizeExplanationBody(result.explanation, answerText);
   const explainTitle = String(question?.prompt || '').replace(/\?+$/, '').trim();
-  const mascotMood = isCorrect
-    ? 'happy'
-    : wrongTryCount >= 3
-      ? 'studying'
-      : 'thinking';
+  const mascotMood = isCorrect ? 'happy' : 'thinking';
 
   return (
     <Animated.View
       style={[
         styles.card,
         isCorrect ? styles.cardOk : styles.cardBad,
-        !isCorrect ? styles.cardBadCompact : null,
         {
           opacity: slideAnim,
           transform: [
@@ -183,106 +166,53 @@ export function MobileAnswerFeedback({
         },
       ]}
     >
-      {!isCorrect ? (
-        <View style={styles.wrongBannerRow}>
-          <View style={styles.mascotColCompact}>
-            <Mascot mood={mascotMood} size={40} />
-          </View>
-          <View style={styles.wrongBodyCol}>
-            <View style={styles.titleRowCompact}>
-              <Animated.View
-                style={[
-                  styles.statusCircleSmall,
-                  {
-                    backgroundColor: FEEDBACK_STATUS.wrong.backgroundColor,
-                    borderColor: FEEDBACK_STATUS.wrong.borderColor,
-                    transform: [{ scale: checkPop }],
-                  },
-                ]}
-              >
-                <X
-                  size={FEEDBACK_STATUS.wrong.size}
-                  color={FEEDBACK_STATUS.wrong.color}
-                  strokeWidth={FEEDBACK_STATUS.strokeWidth}
-                />
-              </Animated.View>
-              <Text
-                style={[styles.titleTextCompact, { color: '#B91C1C' }]}
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-              >
-                {bannerLabel}
-              </Text>
-              {!practiceOnly && !xpDisabled && result.wrongPenaltyXp && result.wrongPenaltyXp > 0 ? (
-                <View style={styles.xpPillMutedInline}>
-                  <Zap size={11} color="#EF4444" fill="#FCA5A5" />
-                  <Text style={styles.xpPillMutedText} maxFontSizeMultiplier={1.25}>{`-${result.wrongPenaltyXp} XP`}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.conciseTextCompact} maxFontSizeMultiplier={1.35}>
-              {conciseLine}
-            </Text>
-          </View>
-          <Pressable
-            disabled={busy || !canRetry || waitingCooldown}
-            onPress={() => {
-              play('tap');
-              onRetry?.();
-            }}
-            style={({ pressed }) => [
-              styles.retryBannerBtn,
-              pressed && canRetry && !waitingCooldown && styles.btnPressed,
-              (!canRetry || waitingCooldown) && !busy && { opacity: 0.45 },
-              busy && { opacity: 0.5 },
-            ]}
-            accessibilityRole="button"
-          >
-            <RotateCcw size={15} color="#FFFFFF" />
-            <Text style={styles.retryBannerBtnText} maxFontSizeMultiplier={1.2}>
-              {waitingCooldown ? `Thử lại (${retryCooldownSec}s)` : wrongTryCount > 0 ? 'Thử lại' : 'Kiểm tra'}
-            </Text>
-          </Pressable>
+      <View style={styles.bannerRow}>
+        <View style={styles.mascotCol}>
+          <Mascot mood={mascotMood} size={64} />
         </View>
-      ) : (
-        <View style={styles.bannerRow}>
-          <View style={styles.mascotCol}>
-            <Mascot mood="happy" size={64} />
-          </View>
-          <View style={styles.bodyCol}>
-            <View style={styles.titleRow}>
-              <Animated.View
-                style={[
-                  styles.statusCircle,
-                  {
-                    backgroundColor: FEEDBACK_STATUS.correct.backgroundColor,
-                    borderColor: FEEDBACK_STATUS.correct.borderColor,
-                    transform: [{ scale: checkPop }],
-                  },
-                ]}
-              >
+        <View style={styles.bodyCol}>
+          <View style={styles.titleRow}>
+            <Animated.View
+              style={[
+                styles.statusCircle,
+                {
+                  backgroundColor: isCorrect ? FEEDBACK_STATUS.correct.backgroundColor : FEEDBACK_STATUS.wrong.backgroundColor,
+                  borderColor: isCorrect ? FEEDBACK_STATUS.correct.borderColor : FEEDBACK_STATUS.wrong.borderColor,
+                  transform: [{ scale: checkPop }],
+                },
+              ]}
+            >
+              {isCorrect ? (
                 <Check
                   size={FEEDBACK_STATUS.correct.size}
                   color={FEEDBACK_STATUS.correct.color}
                   strokeWidth={FEEDBACK_STATUS.strokeWidth}
                 />
-              </Animated.View>
-              <Text
-                style={[styles.titleText, { color: DEW_GREEN_DARK }]}
-                maxFontSizeMultiplier={1.3}
-              >
-                {bannerLabel}
-              </Text>
-            </View>
-            <Text style={styles.conciseText} maxFontSizeMultiplier={1.35}>
-              {conciseLine}
+              ) : (
+                <X
+                  size={FEEDBACK_STATUS.wrong.size}
+                  color={FEEDBACK_STATUS.wrong.color}
+                  strokeWidth={FEEDBACK_STATUS.strokeWidth}
+                />
+              )}
+            </Animated.View>
+            <Text
+              style={[styles.titleText, { color: isCorrect ? DEW_GREEN_DARK : '#B91C1C' }]}
+              maxFontSizeMultiplier={1.3}
+            >
+              {bannerLabel}
             </Text>
-            <Animated.View style={[styles.xpRow, { transform: [{ scale: xpPop }] }]}>
-              {practiceOnly ? (
-                <View style={{ backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
-                  <Text style={{ color: '#075985', fontSize: 12, fontWeight: '800' }}>Ôn lại · không đổi XP</Text>
-                </View>
-              ) : confirmedXp > 0 ? (
+          </View>
+          <Text style={styles.conciseText} maxFontSizeMultiplier={1.35}>
+            {conciseLine}
+          </Text>
+          <Animated.View style={[styles.xpRow, { transform: [{ scale: xpPop }] }]}>
+            {practiceOnly ? (
+              <View style={{ backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+                <Text style={{ color: '#075985', fontSize: 12, fontWeight: '800' }}>Ôn lại · không đổi XP</Text>
+              </View>
+            ) : isCorrect ? (
+              confirmedXp > 0 ? (
                 <XPRewardBurst xpAmount={confirmedXp} burstKey={rewardKey} />
               ) : (
                 <View style={styles.xpPillGold}>
@@ -291,47 +221,50 @@ export function MobileAnswerFeedback({
                     {feedbackTitle || 'Ôn tập · 0 XP'}
                   </Text>
                 </View>
-              )}
-            </Animated.View>
-          </View>
+              )
+            ) : !xpDisabled && result.wrongPenaltyXp && result.wrongPenaltyXp > 0 ? (
+              <View style={styles.xpPillMuted}>
+                <Zap size={12} color="#EF4444" fill="#FCA5A5" />
+                <Text style={styles.xpPillMutedText} maxFontSizeMultiplier={1.25}>{`-${result.wrongPenaltyXp} XP`}</Text>
+              </View>
+            ) : null}
+          </Animated.View>
         </View>
-      )}
+      </View>
 
-      {isCorrect ? (
-        <View style={styles.actionsRow}>
-          <Pressable
-            onPress={() => {
-              play('tap');
-              setExplainOpen((prev) => !prev);
-            }}
-            style={({ pressed }) => [styles.explainBtn, pressed && styles.btnPressed]}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: explainOpen }}
-          >
-            <BookOpen size={15} color={DEW_GREEN_DARK} />
-            <Text style={styles.explainBtnText} maxFontSizeMultiplier={1.25}>
-              {explainOpen ? 'Ẩn giải thích' : 'Giải thích'}
-            </Text>
-          </Pressable>
-          <Pressable
-            disabled={busy}
-            onPress={() => {
-              play('tap');
-              onNext();
-            }}
-            style={({ pressed }) => [
-              styles.continueBtn,
-              pressed && styles.btnPressed,
-              busy && { opacity: 0.65 },
-            ]}
-            accessibilityRole="button"
-          >
-            {busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
-            <Text style={styles.continueBtnText} maxFontSizeMultiplier={1.25}>Tiếp tục</Text>
-            <ChevronRight size={17} color="#FFFFFF" strokeWidth={3} />
-          </Pressable>
-        </View>
-      ) : null}
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={() => {
+            play('tap');
+            setExplainOpen((prev) => !prev);
+          }}
+          style={({ pressed }) => [styles.explainBtn, !isCorrect && styles.explainBtnBad, pressed && styles.btnPressed]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: explainOpen }}
+        >
+          <BookOpen size={15} color={isCorrect ? DEW_GREEN_DARK : '#B91C1C'} />
+          <Text style={[styles.explainBtnText, !isCorrect && styles.explainBtnTextBad]} maxFontSizeMultiplier={1.25}>
+            {explainOpen ? 'Ẩn giải thích' : 'Giải thích'}
+          </Text>
+        </Pressable>
+        <Pressable
+          disabled={busy}
+          onPress={() => {
+            play('tap');
+            onNext();
+          }}
+          style={({ pressed }) => [
+            styles.continueBtn,
+            pressed && styles.btnPressed,
+            busy && { opacity: 0.65 },
+          ]}
+          accessibilityRole="button"
+        >
+          {busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+          <Text style={styles.continueBtnText} maxFontSizeMultiplier={1.25}>Tiếp tục</Text>
+          <ChevronRight size={17} color="#FFFFFF" strokeWidth={3} />
+        </Pressable>
+      </View>
 
       {explainOpen ? (
         <View style={[styles.explainPanel, isCorrect ? styles.explainPanelOk : styles.explainPanelBad]}>
@@ -494,6 +427,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   xpPillMuted: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -550,6 +484,13 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontSize: 13.5,
     fontWeight: '800',
+  },
+  explainBtnBad: {
+    borderColor: '#FECACA',
+    borderBottomColor: '#FDA4AF',
+  },
+  explainBtnTextBad: {
+    color: '#B91C1C',
   },
   explainBtnCompact: {
     flexShrink: 0,

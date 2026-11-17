@@ -1492,6 +1492,7 @@ if (!isTest) {
 // CRON JOB: Nhắc lịch học tự động
 // ==========================================
 const Schedule = require('./models/Schedule');
+const MeetClass = require('./models/MeetClass');
 
 // Chạy mỗi 1 phút - kiểm tra lịch học sắp tới và đang diễn ra để gửi nhắc nhở
 if (!isTest) cron.schedule('* * * * *', async () => {
@@ -1576,6 +1577,46 @@ if (!isTest) cron.schedule('* * * * *', async () => {
         }
         await Schedule.updateOne({ _id: sched._id }, { $set: reminderUpdate });
         logger.info(`[CRON] Đã gửi nhắc lịch học ca ${sched.startTime} môn ${sched.course} cho HV: ${sched.studentName} & GV: ${sched.teacherName}`);
+      }
+    }
+
+    const todayMeetClasses = await MeetClass.find({
+      day: todayStr,
+      status: 'scheduled',
+      reminderSent: { $ne: true },
+    }).lean();
+
+    for (const mc of todayMeetClasses) {
+      const [sh, sm] = String(mc.startTime || '').split(':').map(Number);
+      if (!Number.isFinite(sh)) continue;
+      const startMinutes = sh * 60 + (Number.isFinite(sm) ? sm : 0);
+      const [eh, em] = String(mc.endTime || '').split(':').map(Number);
+      const endMinutes = Number.isFinite(eh) ? eh * 60 + (Number.isFinite(em) ? em : 0) : startMinutes + 60;
+
+      if (nowMinutes >= startMinutes - 1 && nowMinutes < endMinutes) {
+        const isLive = nowMinutes >= startMinutes;
+        const classTitle = String(mc.title || 'Học Meet').trim() || 'Học Meet';
+        const studentMsg = isLive
+          ? `🔴 Đã đến giờ vào học! Lớp: ${classTitle} (${mc.startTime} - ${mc.endTime})`
+          : `⏰ Sắp đến giờ vào học (còn 1 phút)! Lớp: ${classTitle} lúc ${mc.startTime}`;
+        const recipientIds = [...new Set((Array.isArray(mc.studentIds) ? mc.studentIds : []).map((id) => String(id || '')).filter(Boolean))];
+        const payload = {
+          scheduleId: mc._id,
+          id: String(mc._id),
+          course: classTitle,
+          title: classTitle,
+          day: mc.day,
+          startTime: mc.startTime,
+          endTime: mc.endTime,
+          linkHoc: String(mc.linkHoc || '').trim(),
+          isLive,
+          message: studentMsg,
+        };
+        for (const studentId of recipientIds) {
+          app.notifyUser('student', studentId, 'class:reminder', payload);
+        }
+        await MeetClass.updateOne({ _id: mc._id }, { $set: { reminderSent: true, reminderSentAt: new Date() } });
+        logger.info(`[CRON] Đã gửi nhắc lớp Meet ${classTitle} (${mc.startTime}) cho ${recipientIds.length} HV`);
       }
     }
   } catch (err) {

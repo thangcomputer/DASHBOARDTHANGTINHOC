@@ -389,20 +389,28 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   assert.ok(soundUtil.includes('if (saved === null) return false;'), 'mặc định bật âm thanh khi chưa cấu hình');
 
   // Kiểm tra giao diện trả lời trắc nghiệm DewSkill (Web + Mobile) theo hình tham chiếu
+  const web = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
   const webQuestions = read('client/src/components/student/dailyPractice/Questions.jsx');
   assert.ok(webQuestions.includes('export function QuizAnswerOption'), 'Web có component QuizAnswerOption');
   assert.ok(answerFeedback.includes('export function QuizActionButtons'), 'Web có component QuizActionButtons');
-  assert.ok(answerFeedback.includes("'Chưa chính xác, thử lại nhé!'"), 'Web hiển thị Chưa chính xác, thử lại nhé! khi sai');
+  assert.ok(answerFeedback.includes("'Chưa chính xác'"), 'Web hiển thị Chưa chính xác khi sai');
   assert.ok(answerFeedback.includes("'Giải thích'"), 'Web có nút Giải thích');
   assert.ok(answerFeedback.includes("'Tiếp tục'"), 'Web có nút Tiếp tục');
+  assert.ok(!answerFeedback.includes('retryCooldownSec'), 'Web không khóa đếm ngược Thử lại khi sai câu thường');
+  assert.ok(!web.includes('retryCooldownSec'), 'Web cho phép qua câu tiếp ngay khi sai câu thường');
+  assert.ok(web.includes('disabled={!videoCompleted || busy}'), 'Web chỉ khóa Tiếp tục với câu video chưa hoàn thành');
   assert.ok(progressBar.includes('export function QuizProgressBar'), 'Web có component QuizProgressBar');
   assert.ok(progressBar.includes('data-progress-xp-pill'), 'Web hiện +XP trên thanh tiến độ khi xác nhận');
 
+  const mobile = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
   const mobileAnswerFeedback = read('thang-tin-hoc-mobile/src/components/dailyPractice/MobileAnswerFeedback.tsx');
   assert.ok(mobileAnswerFeedback.includes("'Chính xác!'"), 'Mobile hiển thị Chính xác! khi đúng');
   assert.ok(mobileAnswerFeedback.includes('Chưa chính xác'), 'Mobile hiển thị Chưa chính xác khi sai');
   assert.ok(mobileAnswerFeedback.includes('Giải thích'), 'Mobile có nút Giải thích');
   assert.ok(mobileAnswerFeedback.includes('Tiếp tục'), 'Mobile có nút Tiếp tục');
+  assert.ok(!mobileAnswerFeedback.includes('retryCooldownSec'), 'Mobile không khóa đếm ngược Thử lại khi sai câu thường');
+  assert.ok(!mobile.includes('retryCooldownSec'), 'Mobile cho phép qua câu tiếp ngay khi sai câu thường');
+  assert.ok(mobile.includes('disabled={!videoCompleted || busy}'), 'Mobile chỉ khóa Tiếp tục với câu video chưa hoàn thành');
 });
 
 test('luyện tập tới đâu xem video tới đó: web + mobile đồng bộ định tuyến video theo chặng đang học', () => {

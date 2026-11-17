@@ -1885,7 +1885,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             <div className="cms-topbar__row">
               <button
                 type="button"
-                className="cms-topbar__menu"
+                className="cms-topbar__menu shrink-0"
                 onClick={() => setMobileNavOpen(true)}
                 aria-label="Mở menu điều hướng"
                 aria-expanded={mobileNavOpen}
@@ -1913,7 +1913,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 />
               </button>
 
-              <div className="flex items-center flex-nowrap justify-end gap-1 sm:gap-2 shrink-0 relative z-10">
+              <div className="cms-topbar__actions flex items-center flex-nowrap justify-end gap-1 sm:gap-2 shrink-0 relative z-10">
                 {showAdminBranch && (
                   <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
                     <BranchFilterDropdown />

@@ -40,6 +40,7 @@ module.exports = [
       'tests/**',
       'scripts/**',
       'deploy_scripts/**',
+      'docs/mobile-ux-redesign/prototype/**',
       '*.log',
     ],
   },

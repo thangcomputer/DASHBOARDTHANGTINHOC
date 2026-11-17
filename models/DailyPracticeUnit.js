@@ -63,6 +63,7 @@ const levelSectionConfigSchema = new mongoose.Schema({
   practice: {
     title: { type: String, default: '', trim: true, maxlength: 160 },
     description: { type: String, default: '', trim: true, maxlength: 320 },
+    itemOrder: { type: [String], default: [] },
     video: {
       title: { type: String, default: '', trim: true, maxlength: 160 },
       url: { type: String, default: '', trim: true, maxlength: 500 },

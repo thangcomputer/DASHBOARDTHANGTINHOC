@@ -234,6 +234,7 @@ function questionAdminView(q) {
     distractors: q.distractors,
     groups: q.groups,
     unitId: q.unitId ? String(q.unitId) : '',
+    forTestOut: Boolean(q.forTestOut),
     updatedAt: q.updatedAt,
   };
 }
@@ -318,13 +319,15 @@ async function deleteTopic(id) {
 }
 
 // ── Admin: câu hỏi ──────────────────────────────────────────────────────────
-async function listQuestions({ topicId, difficulty, type, status, unitId } = {}) {
+async function listQuestions({ topicId, difficulty, type, status, unitId, forTestOut } = {}) {
   const filter = { topicId: requireId(topicId, 'Chủ đề') };
   if (rules.DIFFICULTIES.includes(difficulty)) filter.difficulty = difficulty;
   if (rules.TYPES.includes(type)) filter.type = type;
   if (status === 'draft' || status === 'published') filter.status = status;
   if (unitId === 'none') filter.unitId = null;
   else if (mongoose.Types.ObjectId.isValid(String(unitId || ''))) filter.unitId = new mongoose.Types.ObjectId(String(unitId));
+  if (forTestOut === 'true' || forTestOut === true) filter.forTestOut = true;
+  else if (forTestOut === 'false' || forTestOut === false) filter.forTestOut = { $ne: true };
   const questions = await DailyPracticeQuestion.find(filter).sort({ status: 1, updatedAt: -1 }).limit(500).lean();
   return questions.map(questionAdminView);
 }
@@ -335,10 +338,12 @@ async function createQuestion(body, userId) {
   const doc = rules.validateQuestion(body);
   const status = body?.status === 'draft' ? 'draft' : 'published';
   rules.assertExplanationForPublish(doc, status);
+  const unitId = await pathService.resolveQuestionUnit(topicId, body?.unitId);
   const question = await DailyPracticeQuestion.create({
     ...doc,
     topicId,
-    unitId: await pathService.resolveQuestionUnit(topicId, body?.unitId),
+    unitId,
+    forTestOut: Boolean(unitId && body?.forTestOut === true),
     status,
     source: 'manual',
     createdBy: mongoose.Types.ObjectId.isValid(String(userId || '')) ? userId : null,
@@ -367,6 +372,12 @@ async function updateQuestion(id, body) {
       set.unitId = await pathService.resolveQuestionUnit(targetTopic, body.unitId);
     } else if (set.topicId && String(set.topicId) !== String(existing.topicId)) {
       set.unitId = null;
+    }
+    const nextUnitId = Object.prototype.hasOwnProperty.call(set, 'unitId') ? set.unitId : existing.unitId;
+    if (body && Object.prototype.hasOwnProperty.call(body, 'forTestOut')) {
+      set.forTestOut = Boolean(nextUnitId && body.forTestOut === true);
+    } else if (!nextUnitId) {
+      set.forTestOut = false;
     }
   }
   const unset = {};
@@ -804,6 +815,7 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     await assertCanSpendXp(sid, { recovery: false, stake: stakeNeed });
   }
   const sessionQuestions = prepared.questions;
+  const pv = prepared.practiceVideo || null;
   const { session, profileXp } = await createStakedSession({
     studentId: sid,
     topicId: prepared.topic._id,
@@ -813,10 +825,26 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     step,
     pathNodeKey: prepared.pathInfo.pathNodeKey,
     testOut: Boolean(testOut),
+    practiceVideoId: pv?.id || '',
+    practiceVideoRequiredAfterIndex: pv ? pv.insertIndex : -1,
     questionIds: sessionQuestions.map((q) => q._id),
     recovery: false,
     review,
   }, { stakeXp: stakeDeductAtStart });
+  const questionsPayload = sessionQuestions.map((q) => rules.publicQuestion(q));
+  if (pv) {
+    const insertAt = Math.max(0, Math.min(pv.insertIndex, questionsPayload.length));
+    questionsPayload.splice(insertAt, 0, {
+      id: `video:${pv.id}`,
+      type: 'video',
+      difficulty: prepared.difficulty,
+      prompt: pv.video.title,
+      imageUrl: '',
+      watched: pv.watched,
+      passedCheckIds: pv.passedCheckIds || [],
+      video: pv.video,
+    });
+  }
   const xpOff = review;
   return {
     id: String(session._id),
@@ -824,8 +852,9 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     recovery: false,
     topic: topicView(prepared.topic),
     difficulty: prepared.difficulty,
-    total: sessionQuestions.length,
-    questions: sessionQuestions.map((q) => rules.publicQuestion(q)),
+    preserveOrder: Boolean(prepared.preserveOrder || pv),
+    total: questionsPayload.length,
+    questions: questionsPayload,
     path: { ...prepared.pathInfo, recovery, review },
     profileXp,
     review,
@@ -1117,10 +1146,33 @@ async function loadSessionQuestion(session, questionId) {
   return question;
 }
 
+async function assertPracticeVideoCompletedIfRequired(session, questionIndex = null) {
+  if (!session?.practiceVideoId || session.review === true || session.testOut === true) return;
+  const threshold = Number(session.practiceVideoRequiredAfterIndex);
+  if (questionIndex !== null && (!Number.isInteger(threshold) || threshold < 0 || questionIndex < threshold)) {
+    return;
+  }
+  const watched = await DailyPracticePathProgress.exists({
+    studentId: session.studentId,
+    unitId: session.unitId,
+    watchedVideoIds: session.practiceVideoId,
+  });
+  if (!watched) {
+    throw httpError(
+      403,
+      questionIndex === null
+        ? 'Hãy xem video và trả lời đúng hết câu hỏi trong video trước khi hoàn thành lượt luyện tập'
+        : 'Hãy xem video và trả lời đúng hết câu hỏi trong video trước khi sang câu trắc nghiệm tiếp theo',
+    );
+  }
+}
+
 async function answerQuestion(studentId, sessionId, { questionId, answer } = {}) {
   const session = await loadOwnSession(studentId, sessionId);
   if (session.status !== 'in_progress') throw httpError(409, 'Lượt chơi đã kết thúc');
   const question = await loadSessionQuestion(session, questionId);
+  const qIdx = (session.questionIds || []).findIndex((id) => String(id) === String(question._id));
+  await assertPracticeVideoCompletedIfRequired(session, qIdx);
   const existing = (session.answers || []).find((row) => String(row.questionId) === String(question._id));
   if (existing?.correct) throw httpError(409, 'Câu này đã được trả lời đúng');
   const correct = rules.gradeAnswer(question, answer || {});
@@ -1131,14 +1183,16 @@ async function answerQuestion(studentId, sessionId, { questionId, answer } = {})
   if (perQuestion && !correct) {
     const before = await getProfile(session.studentId);
     const cost = rules.QUESTION_STAKE_XP;
-    if (rules.clampXp(before?.xpTotal) < cost) {
+    const available = rules.clampXp(before?.xpTotal);
+    if (existing && available < cost) {
       const err = httpError(402, `Cần ${cost} XP để tiếp tục sau câu sai. Bạn chưa đủ XP.`);
-      err.currentXp = rules.clampXp(before?.xpTotal);
+      err.currentXp = available;
       err.needXp = cost;
       throw err;
     }
-    xpDelta = -cost;
-    await adjustProfileXp(session.studentId, xpDelta, { source: 'spend' });
+    const deduct = Math.min(cost, available);
+    xpDelta = deduct > 0 ? -deduct : 0;
+    if (xpDelta < 0) await adjustProfileXp(session.studentId, xpDelta, { source: 'spend' });
   }
   const hintPaid = perQuestion && hintUsed && !existing ? rules.hintCostXp() : 0;
   let updated;
@@ -1295,6 +1349,7 @@ function maxComboOf(answers = []) {
 async function finishSession(studentId, sessionId) {
   const session = await loadOwnSession(studentId, sessionId);
   if (session.status !== 'in_progress') throw httpError(409, 'Lượt chơi đã kết thúc');
+  await assertPracticeVideoCompletedIfRequired(session, null);
   const total = session.questionIds.length;
   const correct = session.correctCount || 0;
   const stars = rules.starsFor(correct, total);

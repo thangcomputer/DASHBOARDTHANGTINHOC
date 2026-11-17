@@ -29,8 +29,11 @@ function parseJsonLoose(text) {
   try { return JSON.parse(match[0]); } catch { return null; }
 }
 
-function buildMessages(topic, difficulty, types, count) {
+function buildMessages(topic, difficulty, types, count, forTestOut = false) {
   const schemas = types.map((type) => TYPE_SCHEMA[type]).join('\n');
+  const testOutNote = forTestOut
+    ? '\nMục tiêu: Bộ câu hỏi tổng hợp cho bài Kiểm tra vượt chặng (đánh giá tổng quát kiến thức trọng tâm của chặng).'
+    : '';
   return [
     {
       role: 'system',
@@ -48,13 +51,13 @@ function buildMessages(topic, difficulty, types, count) {
     },
     {
       role: 'user',
-      content: `Chủ đề: ${topic.name}${topic.description ? ` - ${topic.description}` : ''}\nĐộ khó: ${DIFFICULTY_LABEL[difficulty]}\nSố câu: ${count}\nDạng câu được dùng: ${types.join(', ')} (trộn đều các dạng).`,
+      content: `Chủ đề: ${topic.name}${topic.description ? ` - ${topic.description}` : ''}${testOutNote}\nĐộ khó: ${DIFFICULTY_LABEL[difficulty]}\nSố câu: ${count}\nDạng câu được dùng: ${types.join(', ')} (trộn đều các dạng).`,
     },
   ];
 }
 
 /** AI soạn nháp câu hỏi (status draft) - admin duyệt rồi mới xuất bản cho học viên. */
-async function generateDrafts({ topicId, difficulty, types, count, unitId } = {}, userId = null) {
+async function generateDrafts({ topicId, difficulty, types, count, unitId, forTestOut = false } = {}, userId = null) {
   if (!mongoose.Types.ObjectId.isValid(String(topicId || ''))) throw httpError(400, 'Chủ đề không hợp lệ');
   if (!rules.DIFFICULTIES.includes(difficulty)) throw httpError(400, 'Độ khó không hợp lệ');
   const wanted = (Array.isArray(types) ? types : []).filter((type) => rules.TYPES.includes(type));
@@ -63,6 +66,7 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId } = {}
   const topic = await DailyPracticeTopic.findById(topicId).lean();
   if (!topic) throw httpError(404, 'Không tìm thấy chủ đề');
   const targetUnitId = await resolveQuestionUnit(topic._id, unitId);
+  const testOutFlag = Boolean(targetUnitId && forTestOut === true);
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình');
 
   const { getSupportModelFallbacks } = require('./aiSupportService');
@@ -70,7 +74,7 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId } = {}
   for (const model of getSupportModelFallbacks()) {
     try {
       const result = await chatCompletion({
-        messages: buildMessages(topic, difficulty, useTypes, total),
+        messages: buildMessages(topic, difficulty, useTypes, total, testOutFlag),
         model,
         temperature: 0.7,
         maxTokens: 4000,
@@ -92,6 +96,7 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId } = {}
             ...doc,
             topicId: topic._id,
             unitId: targetUnitId,
+            forTestOut: testOutFlag,
             status: 'draft',
             source: 'ai',
             createdBy: mongoose.Types.ObjectId.isValid(String(userId || '')) ? userId : null,

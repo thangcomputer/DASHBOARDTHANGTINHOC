@@ -79,14 +79,11 @@ function Chip({ label, selected, locked, state }: { label: string; selected?: bo
 }
 
 // ── Trắc nghiệm ──────────────────────────────────────────────────────────────
-export function McqQuestion({ question, reveal, result, chosen, pending = null, retryCooldownSec = 0, onChange, onSubmit, play }: {
+export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }: {
   question: DpQuestion;
   reveal: DpReveal | null;
   result: DpAnswerResult | null;
   chosen: number | null;
-  pending?: DpAnswer | null;
-  retryCooldownSec?: number;
-  onChange?: (answer: DpAnswer | null) => void;
   onSubmit: (answer: DpAnswer) => void;
   play: (sound: GameSound) => void;
 }) {
@@ -103,21 +100,17 @@ export function McqQuestion({ question, reveal, result, chosen, pending = null, 
     return options.length > 0 && options.every((opt) => String(opt || '').length <= 24);
   }, [width, question.options]);
   const eliminated = new Set(reveal?.eliminate || []);
-  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
-  const retrying = Boolean(result && !result.correct);
-  const pendingIdx = pending && 'index' in pending ? pending.index : null;
-  const activeChoice = pendingIdx ?? chosen;
+  const locked = Boolean(result);
 
   return (
     <View style={[styles.mcqList, twoColumns && styles.mcqGrid]}>
       {(question.options || []).map((option, index) => {
-        const revealSolution = Boolean(result?.correct);
-        const isCorrect = revealSolution && (
+        const isCorrect = locked && (
           result?.correctAnswer?.correctIndex === index
           || (result?.correct && chosen === index)
         );
-        const isWrong = Boolean(result && !result.correct) && chosen === index && pendingIdx == null;
-        const isChosen = activeChoice === index && !isCorrect && !isWrong;
+        const isWrong = locked && chosen === index && !isCorrect;
+        const isChosen = chosen === index && !isCorrect && !isWrong;
         const out = eliminated.has(index);
         return (
           <View
@@ -128,8 +121,7 @@ export function McqQuestion({ question, reveal, result, chosen, pending = null, 
               disabled={locked || out}
               onPress={() => {
                 play('tap');
-                if (retrying && onChange) onChange({ index });
-                else onSubmit({ index });
+                onSubmit({ index });
               }}
               style={({ pressed }) => [
                 styles.option,
@@ -182,38 +174,28 @@ export function McqQuestion({ question, reveal, result, chosen, pending = null, 
 }
 
 // ── Đúng / Sai ───────────────────────────────────────────────────────────────
-export function TrueFalseQuestion({ result, chosen, pending = null, retryCooldownSec = 0, onChange, onSubmit, play }: {
+export function TrueFalseQuestion({ result, chosen, onSubmit, play }: {
   result: DpAnswerResult | null;
   chosen: boolean | null;
-  pending?: DpAnswer | null;
-  retryCooldownSec?: number;
-  onChange?: (answer: DpAnswer | null) => void;
   onSubmit: (answer: DpAnswer) => void;
   play: (sound: GameSound) => void;
 }) {
-  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
-  const retrying = Boolean(result && !result.correct);
-  const pendingBool = pending && 'value' in pending ? pending.value : null;
-  const activeChoice = pendingBool ?? chosen;
+  const locked = Boolean(result);
   return (
     <View style={styles.row}>
       {[true, false].map((value) => {
-        const revealSolution = Boolean(result?.correct);
-        const isCorrect = revealSolution && result?.correctAnswer.answerBool === value;
-        const isWrong = Boolean(result && !result.correct) && chosen === value && pendingBool == null;
-        const isPicked = activeChoice === value && !locked && retrying;
+        const isCorrect = locked && result?.correctAnswer.answerBool === value;
+        const isWrong = locked && chosen === value && !isCorrect;
         return (
           <Pressable
             key={String(value)}
             disabled={locked}
             onPress={() => {
               play('tap');
-              if (retrying && onChange) onChange({ value });
-              else onSubmit({ value });
+              onSubmit({ value });
             }}
             style={({ pressed }) => [
               styles.tf,
-              isPicked && styles.optionSelected,
               isCorrect && styles.chipOk,
               isWrong && styles.chipBad,
               pressed && !locked && styles.optionPressed,
@@ -233,7 +215,7 @@ export function TrueFalseQuestion({ result, chosen, pending = null, retryCooldow
 
 // ── Sắp xếp ──────────────────────────────────────────────────────────────────
 export function OrderQuestion({ question, reveal, result, play, onChange }: QuestionProps) {
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const [list, setList] = useState<string[]>(() => question.items || []);
   const [selected, setSelected] = useState<string | null>(null);
   const lockedItem = reveal?.first || null;
@@ -257,7 +239,7 @@ export function OrderQuestion({ question, reveal, result, play, onChange }: Ques
     <View style={styles.gap}>
       {list.map((item, index) => {
         const isLocked = item === lockedItem;
-        const ok = Boolean(result?.correct) && result?.correctAnswer.items?.[index] === item;
+        const ok = locked && result?.correctAnswer.items?.[index] === item;
         return (
           <DropZone
             key={item}
@@ -280,7 +262,7 @@ export function OrderQuestion({ question, reveal, result, play, onChange }: Ques
               }}
               style={styles.flex}
             >
-              <View style={[styles.chip, styles.orderChip, selected === item && styles.chipSelected, isLocked && styles.chipLocked, Boolean(result?.correct) && (ok ? styles.chipOk : styles.chipBad)]}>
+              <View style={[styles.chip, styles.orderChip, selected === item && styles.chipSelected, isLocked && styles.chipLocked, locked && (ok ? styles.chipOk : styles.chipBad)]}>
                 {isLocked ? <Lock size={14} color="#F59E0B" /> : <GripVertical size={16} color="#CBD5E1" />}
                 <Text style={[styles.chipText, styles.flex]}>{item}</Text>
                 {locked ? <Mark ok={ok} /> : null}
@@ -298,7 +280,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
   const lefts = question.lefts || [];
   const [assign, setAssign] = useState<Array<string | null>>(() => lefts.map(() => null));
   const [selected, setSelected] = useState<string | null>(null);
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const lockedIndex = reveal?.pair ? lefts.indexOf(reveal.pair.left) : -1;
 
   useEffect(() => {
@@ -322,7 +304,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
       <View style={styles.gap}>
         {lefts.map((left, index) => {
           const value = assign[index];
-          const ok = Boolean(result?.correct) && correct.get(left) === value;
+          const ok = locked && correct.get(left) === value;
           return (
             <View key={left} style={styles.matchRow}>
               <View style={styles.matchLeft}><Text style={styles.matchLeftText}>{left}</Text></View>
@@ -336,7 +318,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
                       setAssign((prev) => prev.map((v, i) => (i === index ? null : v)));
                     }
                   }}
-                  style={[styles.slot, value ? styles.slotFilled : null, index === lockedIndex && styles.chipLocked, Boolean(result?.correct) && (ok ? styles.chipOk : styles.chipBad)]}
+                  style={[styles.slot, value ? styles.slotFilled : null, index === lockedIndex && styles.chipLocked, locked && (ok ? styles.chipOk : styles.chipBad)]}
                 >
                   {index === lockedIndex ? <Lock size={13} color="#F59E0B" /> : null}
                   <Text style={[styles.slotText, value ? styles.slotTextFilled : null]}>{value || 'Thả thẻ vào đây'}</Text>
@@ -368,7 +350,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
 
 // ── Điền vào chỗ trống ───────────────────────────────────────────────────────
 export function FillQuestion({ question, reveal, result, play, onChange }: QuestionProps) {
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const segments = question.segments || [];
   const bankWords = question.bank || [];
   const blankCount = segments.filter((s) => s.blank !== undefined).length;
@@ -405,7 +387,7 @@ export function FillQuestion({ question, reveal, result, play, onChange }: Quest
           const chip = blanks[slot];
           const word = chip === null ? '' : bankWords[chip];
           const isLocked = lockedBlank?.index === slot;
-          const ok = Boolean(result?.correct) && norm(answers[slot] || '') === norm(word);
+          const ok = locked && norm(answers[slot] || '') === norm(word);
           return (
             <DropZone
               key={index}
@@ -417,10 +399,10 @@ export function FillQuestion({ question, reveal, result, play, onChange }: Quest
                   setBlanks((prev) => prev.map((v, i) => (i === slot ? null : v)));
                 }
               }}
-              style={[styles.blank, chip !== null && styles.slotFilled, isLocked && styles.chipLocked, Boolean(result?.correct) && (ok ? styles.chipOk : styles.chipBad)]}
+              style={[styles.blank, chip !== null && styles.slotFilled, isLocked && styles.chipLocked, locked && (ok ? styles.chipOk : styles.chipBad)]}
             >
               <Text style={styles.blankText}>{word || ' '}</Text>
-              {Boolean(result?.correct) && !ok ? <Text style={styles.blankFix}>{`(${answers[slot]})`}</Text> : null}
+              {locked && !ok ? <Text style={styles.blankFix}>{`(${answers[slot]})`}</Text> : null}
             </DropZone>
           );
         })}
@@ -452,7 +434,7 @@ export function SortQuestion({ question, reveal, result, play, onChange }: Quest
   const items = question.items || [];
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const lockedItem = reveal?.item || null;
 
   useEffect(() => {

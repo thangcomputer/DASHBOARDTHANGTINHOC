@@ -76,6 +76,10 @@ const dailyPracticeApi = {
       `/daily-practice/my/path/units/${unitId}/videos/${encodeURIComponent(videoId)}/checks/${checkId}/hint`,
       json('POST', {}),
     ), true),
+    skipVideoCheck: async (unitId, videoId, checkId) => parse(await apiFetch(
+      `/daily-practice/my/path/units/${unitId}/videos/${encodeURIComponent(videoId)}/checks/${checkId}/skip`,
+      json('POST', {}),
+    ), true),
     startPath: async (unitId, step, testOut = false, nodeKey = '') => parse(await apiFetch('/daily-practice/my/sessions', json('POST', {
       mode: 'path', unitId, step, testOut, nodeKey,
     })), true),

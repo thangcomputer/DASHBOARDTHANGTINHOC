@@ -63,10 +63,10 @@ export function preferMaxYouTubeQuality(player) {
   try {
     const levels = listYouTubeQualityOptions(player);
     const best = highestYouTubeQuality(levels);
-    if (!best) return false;
-    try { player.setPlaybackQualityRange?.(best, best); } catch { /* ignore */ }
-    try { player.setPlaybackQuality?.(best); } catch { /* ignore */ }
-    return true;
+    const target = best || 'highres';
+    try { player.setPlaybackQualityRange?.(target, target); } catch { /* ignore */ }
+    try { player.setPlaybackQuality?.(target); } catch { /* ignore */ }
+    return Boolean(best);
   } catch {
     return false;
   }
@@ -122,7 +122,7 @@ export default function LmsBrandedPlayerChrome({
   /** () => YT.Player | null - để chọn độ phân giải */
   getPlayer = null,
   /** Chất lượng thực tế từ onPlaybackQualityChange */
-  actualPlaybackQuality = null,
+  actualPlaybackQuality: _actualPlaybackQuality = null,
   /** 'window': màn chờ nền xám đậm + nút phát đỏ lớn, không nhãn thương hiệu (popup video lộ trình). */
   overlayVariant = 'default',
   /** Slot hiển thị ngang hàng trên thanh điều khiển (vd: Đánh dấu đã xem). */
@@ -132,7 +132,6 @@ export default function LmsBrandedPlayerChrome({
   const [dragging, setDragging] = useState(false);
   const [dragRatio, setDragRatio] = useState(0);
   const [showVol, setShowVol] = useState(false);
-  const [liveQuality, setLiveQuality] = useState(null);
   const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
   const barRef = useRef(null);
   const preferredMaxOnceRef = useRef(false);
@@ -167,13 +166,10 @@ export default function LmsBrandedPlayerChrome({
 
   const refreshQualityLevels = useCallback(() => {
     const player = typeof getPlayer === 'function' ? getPlayer() : null;
-    const levels = listYouTubeQualityOptions(player);
-    const best = highestYouTubeQuality(levels);
-    const cur = readCurrentYouTubeQuality(player);
-    if (cur && cur !== 'default' && cur !== 'unknown') setLiveQuality(cur);
-    if (best && player && !preferredMaxOnceRef.current) {
-      preferredMaxOnceRef.current = true;
-      preferMaxYouTubeQuality(player);
+    if (player && !preferredMaxOnceRef.current) {
+      if (preferMaxYouTubeQuality(player)) {
+        preferredMaxOnceRef.current = true;
+      }
     }
   }, [getPlayer]);
 
@@ -185,12 +181,6 @@ export default function LmsBrandedPlayerChrome({
     refreshQualityLevels();
     return undefined;
   }, [isPlaying, refreshQualityLevels]);
-
-  useEffect(() => {
-    if (!actualPlaybackQuality) return;
-    const q = String(actualPlaybackQuality);
-    if (q && q !== 'default' && q !== 'unknown') setLiveQuality(q);
-  }, [actualPlaybackQuality]);
 
   const ratioFromEvent = useCallback((clientX) => {
     const el = barRef.current;
@@ -241,9 +231,6 @@ export default function LmsBrandedPlayerChrome({
   if (!visible) return null;
 
   const VolIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
-  // Option 3: Auto + mức thực tế đang phát (không khóa badge theo max 4K)
-  const liveLabel = liveQuality ? youtubeQualityLabel(liveQuality) : null;
-  const qualityBtnLabel = liveLabel && liveLabel !== 'Auto' ? `Auto · ${liveLabel}` : 'Auto';
 
   return (
     <>
@@ -430,14 +417,6 @@ export default function LmsBrandedPlayerChrome({
             <div className="flex-1" />
 
             {rightSlot}
-
-            <span
-              className="h-8 sm:h-9 min-w-[2.5rem] px-2 rounded-full inline-flex items-center justify-center bg-white/10 text-white border border-white/20 text-[10px] sm:text-[11px] font-bold tabular-nums shrink-0"
-              title={liveLabel ? `Auto · đang phát ${liveLabel}` : 'Auto (YouTube chọn mức)'}
-              aria-label={`Độ phân giải ${qualityBtnLabel}`}
-            >
-              {qualityBtnLabel}
-            </span>
 
             {typeof onToggleFullscreen === 'function' ? (
               <button

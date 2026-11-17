@@ -48,7 +48,7 @@ test('mobile tab bars share one droplet nav item with a round home button', () =
   const navigator = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');
   const ui = read('thang-tin-hoc-mobile/src/components/ui.tsx');
 
-  assert.equal((navigator.match(/<NavTabContent/g) || []).length, 2);
+  assert.equal((navigator.match(/<NavTabContent/g) || []).length, 3);
   assert.ok(navigator.includes("isHome={name === 'Home'}"));
   assert.ok(navigator.includes("isHome={route.name === 'Home'}"));
   assert.ok(navigator.includes('navTileHome: { width: 56, height: 56, borderWidth: 3'));

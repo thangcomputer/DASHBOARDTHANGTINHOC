@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { BookOpen, Check, ChevronRight, Loader2, RotateCcw, Sparkles, Star, X, Zap } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, Loader2, Sparkles, Star, X, Zap } from 'lucide-react';
 import MascotEmotion from './MascotEmotion';
 import XPRewardAnimation from './XPRewardAnimation';
 import { gameSounds } from '../../../utils/sound';
-import {
-  resolveFeedbackMascotEmotion,
-  resolveWrongEncouragement,
-  shouldSuppressWrongShake,
-} from './quizFeedbackOrchestration';
+import { resolveFeedbackMascotEmotion } from './quizFeedbackOrchestration';
 import { useQuizFeedbackBannerFade } from './useQuizFeedbackBannerFade';
 import { PLAY_QUESTION_CHROME } from '../../../../../shared/dailyPractice/playQuestionChrome.mjs';
 import './quizFeedbackDew.css';
@@ -82,36 +78,9 @@ export function QuizActionButtons({
   busy = false,
   isLastQuestion = false,
   highlightExplain = false,
-  compactWrong = false,
-  onRetry,
-  canRetry = false,
-  wrongTryCount = 0,
-  retryCooldownSec = 0,
 }) {
-  if (!isCorrect && compactWrong) {
-    const waitingCooldown = retryCooldownSec > 0;
-    return (
-      <button
-        type="button"
-        disabled={busy || !canRetry || waitingCooldown}
-        onClick={() => {
-          gameSounds.tap();
-          onRetry?.();
-        }}
-        className="cms-btn cms-btn-primary inline-flex min-h-[38px] shrink-0 items-center justify-center gap-1.5 px-4 py-2 text-xs !shadow-none disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RotateCcw size={15} aria-hidden="true" />}
-        <span>
-          {waitingCooldown
-            ? `Thử lại (${retryCooldownSec}s)`
-            : (wrongTryCount > 0 ? 'Thử lại' : 'Kiểm tra')}
-        </span>
-      </button>
-    );
-  }
-
   return (
-    <div className={`grid w-full shrink-0 gap-2 ${isCorrect ? 'grid-cols-2 sm:w-[172px] sm:grid-cols-1' : 'grid-cols-2 sm:grid-cols-1 sm:w-[178px]'}`}>
+    <div className={`grid w-full shrink-0 gap-2 ${isCorrect ? 'grid-cols-2 sm:w-[172px] sm:grid-cols-1' : 'grid-cols-2 sm:w-[178px] sm:grid-cols-1'}`}>
       <button
         type="button"
         onClick={() => {
@@ -126,21 +95,19 @@ export function QuizActionButtons({
         <span>{explainOpen ? 'Ẩn giải thích' : 'Giải thích'}</span>
       </button>
 
-      {isCorrect ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            gameSounds.tap();
-            onNext?.();
-          }}
-          className="dp-quiz-btn-continue inline-flex min-h-[46px] items-center justify-center gap-1.5 px-4 py-2.5 text-sm transition disabled:opacity-60"
-        >
-          {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-          <span>{isLastQuestion ? 'Tiếp tục' : 'Tiếp tục'}</span>
-          <ChevronRight size={18} strokeWidth={3} aria-hidden="true" />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          gameSounds.tap();
+          onNext?.();
+        }}
+        className="dp-quiz-btn-continue inline-flex min-h-[46px] items-center justify-center gap-1.5 px-4 py-2.5 text-sm transition disabled:opacity-60"
+      >
+        {busy ? <Loader2 size={16} className="animate-spin" /> : null}
+        <span>{isLastQuestion ? 'Tiếp tục' : 'Tiếp tục'}</span>
+        <ChevronRight size={18} strokeWidth={3} aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -154,10 +121,6 @@ export function AnswerFeedback({
   isLastQuestion = false,
   busy = false,
   onNext,
-  onRetry,
-  canRetry = false,
-  wrongTryCount = 0,
-  retryCooldownSec = 0,
   xpDisabled = false,
   explainOpen: explainOpenProp,
   onExplainOpenChange,
@@ -176,12 +139,9 @@ export function AnswerFeedback({
 
   const isCorrect = Boolean(result.correct);
   const practiceOnly = Boolean(result.practiceOnly);
-  const bannerLabel = isCorrect ? 'Chính xác!' : 'Chưa chính xác, thử lại nhé!';
-  const conciseLine = isCorrect
-    ? buildConciseAnswerSummary(question, result)
-    : resolveWrongEncouragement(wrongTryCount);
-  const mascotEmotion = resolveFeedbackMascotEmotion({ isCorrect, wrongTryCount });
-  const suppressShake = !isCorrect && shouldSuppressWrongShake(wrongTryCount);
+  const bannerLabel = isCorrect ? 'Chính xác!' : 'Chưa chính xác';
+  const conciseLine = buildConciseAnswerSummary(question, result);
+  const mascotEmotion = resolveFeedbackMascotEmotion({ isCorrect, wrongTryCount: isCorrect ? 0 : 1 });
   const answerText = String(result.correctAnswer?.text || '').trim();
   const detailExplanation = normalizeExplanationBody(result.explanation, answerText);
   const explainTitle = String(question?.prompt || '').replace(/\?+$/, '').trim();
@@ -189,14 +149,14 @@ export function AnswerFeedback({
   return (
     <div
       data-answer-feedback={isCorrect ? 'correct' : 'incorrect'}
-      className={`dp-quiz-feedback dp-quiz-feedback--panel-in mt-5 ${isCorrect && bannerFaded ? 'dp-quiz-feedback--compact' : ''
-        } ${isCorrect ? 'dp-quiz-feedback--correct' : `dp-quiz-feedback--wrong dp-quiz-feedback--wrong-inline${suppressShake ? '' : ' dp-shake'}`
+      className={`dp-quiz-feedback dp-quiz-feedback--panel-in mt-5 ${bannerFaded ? 'dp-quiz-feedback--compact' : ''
+        } ${isCorrect ? 'dp-quiz-feedback--correct' : 'dp-quiz-feedback--wrong dp-shake'
         }`}
     >
-      <div className={`relative z-[1] flex text-left ${isCorrect ? 'flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-left' : 'flex-row items-start gap-2.5 sm:gap-3'}`}>
-        <div className={`dp-quiz-feedback__banner flex w-full min-w-0 flex-1 ${isCorrect ? 'flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-left' : 'flex-row items-start gap-2.5 sm:gap-3'}`}>
-          <div className={`relative shrink-0 ${isCorrect ? 'flex flex-col items-center gap-1.5 sm:items-start' : 'flex items-center justify-center'}`}>
-            <div className={`relative flex shrink-0 items-center justify-center ${isCorrect ? 'h-24 w-28 sm:h-[104px] sm:w-[120px]' : 'h-12 w-12'}`}>
+      <div className="relative z-[1] flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-left">
+        <div className="dp-quiz-feedback__banner flex w-full min-w-0 flex-1 flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-left">
+          <div className="relative flex shrink-0 flex-col items-center gap-1.5 sm:items-start">
+            <div className="relative flex h-24 w-28 shrink-0 items-center justify-center sm:h-[104px] sm:w-[120px]">
               {isCorrect && (
                 <>
                   <Star size={14} className="dp-star-burst pointer-events-none absolute left-0 top-0 fill-amber-400 text-amber-400" aria-hidden="true" />
@@ -206,7 +166,7 @@ export function AnswerFeedback({
               )}
               <MascotEmotion
                 emotion={mascotEmotion}
-                size={isCorrect ? 92 : 48}
+                size={92}
                 className={`relative z-[1] ${isCorrect ? 'dp-mascot-correct-pop' : ''}`}
               />
             </div>
@@ -215,7 +175,7 @@ export function AnswerFeedback({
           <div className="flex min-w-0 flex-1 flex-col items-start">
             <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
               <span
-                className={`dp-check-pop flex shrink-0 items-center justify-center rounded-full border ${isCorrect ? 'h-7 w-7 border-emerald-200 bg-white' : 'h-6 w-6 border-red-200 bg-white'
+                className={`dp-check-pop flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${isCorrect ? 'border-emerald-200 bg-white' : 'border-red-200 bg-white'
                   }`}
                 aria-hidden="true"
               >
@@ -233,22 +193,22 @@ export function AnswerFeedback({
                   />
                 )}
               </span>
-              <h3 className={`font-extrabold tracking-tight ${isCorrect ? 'text-xl text-emerald-800 sm:text-[22px]' : 'text-sm text-red-700'}`}>
+              <h3 className={`font-extrabold tracking-tight text-xl sm:text-[22px] ${isCorrect ? 'text-emerald-800' : 'text-red-700'}`}>
                 {bannerLabel}
               </h3>
               {!isCorrect && !practiceOnly && !xpDisabled && result.wrongPenaltyXp > 0 ? (
-                <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-extrabold text-red-600">
-                  <Zap size={11} className="fill-red-400 text-red-500" aria-hidden="true" />
+                <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200/90 bg-white/90 px-2.5 py-0.5 text-xs font-extrabold text-red-600">
+                  <Zap size={12} className="fill-red-400 text-red-500" aria-hidden="true" />
                   -{result.wrongPenaltyXp} XP
                 </span>
               ) : null}
             </div>
 
-            <p className={`leading-snug text-slate-800 ${isCorrect ? 'mt-1.5 text-sm font-bold sm:text-[15px]' : 'mt-1 text-[13px] font-semibold'}`}>
+            <p className="mt-1.5 text-sm font-bold leading-snug text-slate-800 sm:text-[15px]">
               {conciseLine}
             </p>
 
-            <div className={`flex flex-wrap items-center gap-2 ${isCorrect ? 'mt-3 justify-center sm:justify-start' : 'hidden'}`}>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               {practiceOnly ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-extrabold text-sky-800">
                   Ôn lại · không đổi XP
@@ -274,17 +234,12 @@ export function AnswerFeedback({
           onNext={onNext}
           busy={busy}
           isLastQuestion={isLastQuestion}
-          highlightExplain={false}
-          compactWrong={!isCorrect}
-          onRetry={onRetry}
-          canRetry={canRetry}
-          wrongTryCount={wrongTryCount}
-          retryCooldownSec={retryCooldownSec}
+          highlightExplain={!isCorrect && !explainOpen}
         />
       </div>
 
       {explainOpen && (
-        <div className={`dp-quiz-explain-panel dp-slide-up relative z-[1] text-left ${isCorrect ? 'mt-4' : 'mt-2.5'}`}>
+        <div className="dp-quiz-explain-panel dp-slide-up relative z-[1] mt-4 text-left">
           <span className="dp-quiz-explain-tag">
             <BookOpen size={13} aria-hidden="true" />
             Giải thích chi tiết

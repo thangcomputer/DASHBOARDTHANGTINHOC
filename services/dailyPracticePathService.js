@@ -14,6 +14,11 @@ const lmsProgressService = require('./lmsProgressService');
 const learningGoalService = require('./learningGoalService');
 const subscriptionService = require('./subscriptionService');
 const logger = require('../config/logger');
+const {
+  PRACTICE_VIDEO_TOKEN,
+  buildPracticeSequence,
+  splitPracticeSequence,
+} = require('../shared/dailyPractice/practiceSequence.cjs');
 
 const { httpError } = rules;
 
@@ -284,6 +289,20 @@ function normalizeVideoGuide(raw) {
   };
 }
 
+function normalizePracticeItemOrder(raw) {
+  const seen = new Set();
+  const out = [];
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    const token = String(entry || '').trim();
+    if (!token || seen.has(token)) continue;
+    if (token === PRACTICE_VIDEO_TOKEN || mongoose.Types.ObjectId.isValid(token)) {
+      seen.add(token);
+      out.push(token);
+    }
+  }
+  return out.slice(0, 60);
+}
+
 function emptyLevelConfig() {
   return {
     sectionOrder: [...DEFAULT_SECTION_ORDER],
@@ -293,7 +312,7 @@ function emptyLevelConfig() {
     content: { title: '', description: '', body: '' },
     files: [],
     video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() },
-    practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
+    practice: { title: '', description: '', itemOrder: [], video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
   };
 }
 
@@ -304,6 +323,7 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
     || raw.video?.url || (Array.isArray(raw.video?.checks) && raw.video.checks.length)
     || raw.video?.guide?.customized
     || raw.practice?.title || raw.practice?.description
+    || (Array.isArray(raw.practice?.itemOrder) && raw.practice.itemOrder.length)
     || raw.practice?.video?.url || (Array.isArray(raw.practice?.video?.checks) && raw.practice.video.checks.length)
     || raw.practice?.video?.guide?.customized
     || (Array.isArray(raw.sectionOrder) && raw.sectionOrder.length)
@@ -334,6 +354,7 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
       practice: {
         title: String(raw.practice?.title || '').trim(),
         description: String(raw.practice?.description || '').trim(),
+        itemOrder: normalizePracticeItemOrder(raw.practice?.itemOrder),
         video: {
           title: String(raw.practice?.video?.title || '').trim(),
           url: String(raw.practice?.video?.url || '').trim(),
@@ -371,7 +392,7 @@ function mapSingleLevelConfig(raw, fallbackVideo = null, { admin = false } = {})
         checks: mapChecks(fallbackVideo.checks, { admin }),
         guide: emptyVideoGuide(),
       },
-      practice: { title: '', description: '', video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
+      practice: { title: '', description: '', itemOrder: [], video: { title: '', url: '', antiSeek: true, checks: [], guide: emptyVideoGuide() } },
     };
   }
   return emptyLevelConfig();
@@ -436,6 +457,7 @@ function levelConfigsInput(raw, nodeLabel = 'Bài') {
       practice: {
         title: String(cfg.practice?.title || '').trim().slice(0, 160),
         description: String(cfg.practice?.description || '').trim().slice(0, 320),
+        itemOrder: normalizePracticeItemOrder(cfg.practice?.itemOrder),
         video: {
           title: String(cfg.practice?.video?.title || '').trim().slice(0, 160),
           url: practiceVideoUrl,
@@ -536,14 +558,15 @@ async function unitCounts(unitIds) {
   if (!unitIds.length) return new Map();
   const rows = await DailyPracticeQuestion.aggregate([
     { $match: { unitId: { $in: unitIds } } },
-    { $group: { _id: { unitId: '$unitId', difficulty: '$difficulty', status: '$status' }, n: { $sum: 1 } } },
+    { $group: { _id: { unitId: '$unitId', difficulty: '$difficulty', status: '$status', forTestOut: { $ifNull: ['$forTestOut', false] } }, n: { $sum: 1 } } },
   ]);
   const byUnit = new Map();
   for (const row of rows) {
     const key = String(row._id.unitId);
-    const counts = byUnit.get(key) || { easy: 0, medium: 0, hard: 0, draft: 0, total: 0 };
+    const counts = byUnit.get(key) || { easy: 0, medium: 0, hard: 0, testOut: 0, draft: 0, total: 0 };
     if (row._id.status === 'published') {
-      counts[row._id.difficulty] += row.n;
+      if (row._id.forTestOut) counts.testOut += row.n;
+      else counts[row._id.difficulty] += row.n;
       counts.total += row.n;
     } else {
       counts.draft += row.n;
@@ -576,7 +599,7 @@ function unitView(unit, counts) {
     stepVideos: mapStepVideos(unit, { admin: true }),
     pathNodes: mapPathNodesRaw(unit, { admin: true }),
     auto: Boolean(unit.autoKey),
-    counts: counts || { easy: 0, medium: 0, hard: 0, draft: 0, total: 0 },
+    counts: counts || { easy: 0, medium: 0, hard: 0, testOut: 0, draft: 0, total: 0 },
   };
 }
 
@@ -1172,24 +1195,34 @@ async function pickUnitQuestions(unitId, step, { testOut = false } = {}) {
   const base = { unitId, status: 'published' };
   let picked = [];
   if (testOut || step === LEGACY_CHECKPOINT) {
+    const dedicated = await DailyPracticeQuestion.aggregate([
+      { $match: { ...base, forTestOut: true } },
+      { $sample: { size: rules.SESSION_SIZE } },
+    ]);
+    if (dedicated.length) return rules.shuffle(dedicated);
     picked = await DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
     return rules.shuffle(picked);
   }
+  const regularBase = { ...base, forTestOut: { $ne: true } };
   const meta = stepMeta(step);
   if (!meta?.difficulty) {
-    picked = await DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
+    picked = await DailyPracticeQuestion.aggregate([{ $match: regularBase }, { $sample: { size: rules.SESSION_SIZE } }]);
+    if (!picked.length) picked = await DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
     return rules.shuffle(picked);
   }
   picked = await DailyPracticeQuestion.aggregate([
-    { $match: { ...base, difficulty: meta.difficulty } },
+    { $match: { ...regularBase, difficulty: meta.difficulty } },
     { $sample: { size: rules.SESSION_SIZE } },
   ]);
   if (picked.length < rules.SESSION_SIZE) {
     const more = await DailyPracticeQuestion.aggregate([
-      { $match: { ...base, difficulty: { $ne: meta.difficulty } } },
+      { $match: { ...regularBase, difficulty: { $ne: meta.difficulty } } },
       { $sample: { size: rules.SESSION_SIZE - picked.length } },
     ]);
     picked.push(...more);
+  }
+  if (!picked.length) {
+    picked = await DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
   }
   return picked;
 }
@@ -1219,6 +1252,9 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
   const levelState = pathNode?.levels?.find((item) => item.key === step)?.state || '';
   let studyStepCompleted = false;
   let studyQuestionIds = [];
+  let studyPracticeCfg = null;
+  let studyDiff = '';
+  let studyProg = null;
   if (testOut) {
     // Kiểm tra vượt chặng là đặc quyền chỉ dành cho học viên mua khóa / gói Meet
     const student = await Student.findById(sid).select('subscription freePortal enrollments').lean();
@@ -1234,7 +1270,7 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
     const diff = STEP_DIFFICULTY_MAP[step];
     if (!diff) throw httpError(400, 'Mức độ luyện tập không hợp lệ');
     const prog = await DailyPracticePathProgress.findOne({ studentId: sid, unitId: unit._id })
-      .select('completedSections')
+      .select('completedSections watchedVideoIds passedVideoChecks')
       .lean();
     const completedSet = new Set(prog?.completedSections || []);
     const easyDone = isLevelConfigComplete(pathNode, 'easy', completedSet);
@@ -1254,20 +1290,73 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
     }
     studyStepCompleted = completedSet.has(`${nk}:${diff}:practice`);
     studyQuestionIds = Array.isArray(cfg?.practice?.questionIds) ? cfg.practice.questionIds.filter(Boolean) : [];
+    studyPracticeCfg = cfg?.practice || null;
+    studyDiff = diff;
+    studyProg = prog;
   } else if (levelState === 'locked') {
     throw httpError(403, 'Hoàn thành bước trước để mở khóa bước này');
   }
   let questions = [];
-  if (studyQuestionIds.length) {
-    const validIds = studyQuestionIds
-      .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
-      .map((id) => new mongoose.Types.ObjectId(String(id)));
-    if (validIds.length) {
-      const picked = await DailyPracticeQuestion.find({ _id: { $in: validIds }, status: 'published' }).lean();
-      questions = rules.shuffle(picked);
+  let preserveOrder = false;
+  let practiceVideo = null;
+  if (pathNode?.kind === 'study' && !testOut) {
+    let pool = [];
+    if (studyQuestionIds.length) {
+      const validIds = studyQuestionIds
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+      if (validIds.length) {
+        pool = await DailyPracticeQuestion.find({ _id: { $in: validIds }, status: 'published' }).lean();
+      }
     }
-  }
-  if (!questions.length) {
+    if (!pool.length && studyDiff) {
+      pool = await DailyPracticeQuestion.find({
+        unitId: unit._id,
+        difficulty: studyDiff,
+        status: 'published',
+        forTestOut: { $ne: true },
+      })
+        .sort({ createdAt: 1, _id: 1 })
+        .lean();
+    }
+    if (!pool.length) {
+      pool = await pickUnitQuestions(unit._id, step, { testOut });
+    }
+    const practiceVideoUrl = String(studyPracticeCfg?.video?.url || '').trim();
+    const seq = buildPracticeSequence({
+      hasVideo: Boolean(practiceVideoUrl),
+      itemOrder: studyPracticeCfg?.itemOrder || [],
+      questions: pool,
+    });
+    const { orderedQuestions, videoInsertIndex } = splitPracticeSequence(seq);
+    questions = orderedQuestions.slice(0, rules.SESSION_SIZE);
+    preserveOrder = true;
+    if (practiceVideoUrl) {
+      const practiceVideoId = `${nk}:practice:${studyDiff}`;
+      const watchedSet = new Set(studyProg?.watchedVideoIds || []);
+      const practiceVideoWatched = Boolean(view.testedOut || studyStepCompleted || watchedSet.has(practiceVideoId));
+      const prefix = `${practiceVideoId}:`;
+      const passedCheckIds = (studyProg?.passedVideoChecks || []).filter((id) => String(id).startsWith(prefix));
+      const rawNode = normalizePathNodes(unit).find((n) => String(n.key) === String(nk));
+      const rawVideoCfg = rawNode?.levelConfigs?.[studyDiff]?.practice?.video || {};
+      const checks = practiceVideoWatched
+        ? enrichCompletedVideoChecks(studyPracticeCfg?.video?.checks || [], rawVideoCfg?.checks || [])
+        : (studyPracticeCfg?.video?.checks || []);
+      practiceVideo = {
+        id: practiceVideoId,
+        insertIndex: Math.max(0, Math.min(videoInsertIndex >= 0 ? videoInsertIndex : 0, questions.length)),
+        watched: practiceVideoWatched,
+        passedCheckIds,
+        video: {
+          id: practiceVideoId,
+          title: studyPracticeCfg?.video?.title || `${pathNode?.label || nk} · Video tương tác`,
+          url: practiceVideoUrl,
+          antiSeek: studyPracticeCfg?.video?.antiSeek !== false,
+          checks,
+        },
+      };
+    }
+  } else {
     questions = await pickUnitQuestions(unit._id, step, { testOut });
   }
   if (!questions.length) throw httpError(404, 'Chặng này chưa có câu hỏi');
@@ -1275,6 +1364,8 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
     topic,
     unit,
     questions,
+    preserveOrder,
+    practiceVideo,
     difficulty: stepMeta(step).difficulty || 'medium',
     pathInfo: {
       unitId: String(unit._id),
@@ -1637,6 +1728,49 @@ async function gradeScreen(check, imageDataUrl) {
   return correct;
 }
 
+/** Xác định video đang được học viên ôn lại (video/phần/chặng đã hoàn thành) để không cộng/trừ XP. */
+async function isVideoReviewCompleted(studentId, unit, located) {
+  const [prog, { path }] = await Promise.all([
+    DailyPracticePathProgress.findOne({ studentId, unitId: unit._id })
+      .select('watchedVideoIds completedSections testedOut')
+      .lean(),
+    topicPathForUnit(studentId, unit),
+  ]);
+  const view = path.units.find((item) => item.id === String(unit._id));
+  if (view?.state === 'completed' || prog?.testedOut) return true;
+  const watchedSet = new Set(prog?.watchedVideoIds || []);
+  if (watchedSet.has(located.storageId)) return true;
+  const completedSet = new Set(prog?.completedSections || []);
+
+  if (located.levelRef) {
+    const { nodeKey, kind, difficulty } = located.levelRef;
+    const secKey = `${nodeKey}:${difficulty}:${kind === 'practice' ? 'practice' : 'video'}`;
+    if (completedSet.has(secKey)) return true;
+    const nodeView = (view?.pathNodes || []).find((n) => n.key === nodeKey);
+    if (nodeView?.state === 'completed') return true;
+    const stepKey = DIFFICULTY_STEP_MAP[difficulty];
+    const levelView = stepKey ? (nodeView?.levels || []).find((l) => l.key === stepKey) : null;
+    return Boolean(levelView?.state === 'completed');
+  }
+
+  const stepParsed = parseStepVideoId(located.storageId);
+  if (stepParsed) {
+    const nodeView = (view?.pathNodes || []).find((n) => n.key === stepParsed.nodeKey);
+    const levelView = (nodeView?.levels || []).find((l) => l.key === stepParsed.stepKey);
+    const vidView = (levelView?.videos || []).find((v) => v.id === located.storageId);
+    const mappedDiff = STEP_DIFFICULTY_MAP[stepParsed.stepKey];
+    return Boolean(
+      nodeView?.state === 'completed'
+      || levelView?.state === 'completed'
+      || vidView?.state === 'completed'
+      || (mappedDiff && completedSet.has(`${stepParsed.nodeKey}:${mappedDiff}:video`)),
+    );
+  }
+
+  const unitVidView = (view?.videos || []).find((v) => v.id === located.storageId);
+  return Boolean(unitVidView?.state === 'completed');
+}
+
 async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkIndex, choiceIndex, text, imageDataUrl } = {}) {
   const sid = requireId(studentId, 'Học viên');
   const unit = await DailyPracticeUnit.findOne({ _id: requireId(unitId, 'Chặng'), active: true }).lean();
@@ -1650,7 +1784,7 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
   if (check.kind === 'text' && !normAnswer(text)) throw httpError(400, 'Hãy nhập đáp án');
   if (check.kind === 'choice' && !Number.isInteger(Number(choiceIndex))) throw httpError(400, 'Hãy chọn đáp án');
   if (check.kind === 'screen' && !imageDataUrl) throw httpError(400, 'Hãy gửi ảnh bài làm');
-  const cost = rules.VIDEO_CHECK_ANSWER_XP;
+  const reviewMode = await isVideoReviewCompleted(sid, unit, located);
   const { adjustProfileXp, getProfile } = require('./dailyPracticeService');
   let status = 'INCORRECT';
   if (check.kind === 'choice') status = Number(choiceIndex) === Number(check.answer) ? 'CORRECT' : 'INCORRECT';
@@ -1660,16 +1794,18 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
   const key = `${located.storageId}:${resolvedCheckId}`;
   if (status === 'CORRECT') {
     const firstPass = await rememberPassedCheck(sid, unit, key);
-    // Đúng lần đầu ở mốc này: +XP (mốc đã qua thì không cộng lại).
-    const reward = firstPass ? cost : 0;
+    // Đúng lần đầu khi chưa hoàn thành video/bài: +XP; đang ôn lại hoặc mốc đã qua thì không cộng lại.
+    const { reward } = rules.videoCheckXpConfig({ isReview: reviewMode, firstPass });
     const profile = reward > 0
       ? await adjustProfileXp(sid, reward, { source: 'reward' })
       : await getProfile(sid);
     return {
       correct: true,
       needsReview: false,
+      review: reviewMode,
       hint: '',
       cost: 0,
+      xpDelta: reward,
       gainedXp: reward,
       profileXp: rules.clampXp(profile?.xpTotal),
       purchasedXp: rules.clampXp(profile?.purchasedXp),
@@ -1681,13 +1817,16 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
     return {
       correct: false,
       needsReview: true,
+      review: reviewMode,
       cost: 0,
+      xpDelta: 0,
       profileXp: rules.clampXp(profile?.xpTotal),
       purchasedXp: rules.clampXp(profile?.purchasedXp),
       dailyXp: rules.clampXp(profile?.dailyXp),
       hint: 'Chưa đủ ý để kết luận. Hãy viết rõ hơn, lần này không mất XP.',
     };
   }
+  const { wrongCost: cost } = rules.videoCheckXpConfig({ isReview: reviewMode });
   const profile = await getProfile(sid);
   if (cost > 0 && (profile?.xpTotal || 0) < cost) {
     const err = httpError(402, `Sai mất ${cost} XP. Bạn chưa đủ XP.`);
@@ -1699,7 +1838,9 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
   return {
     correct: false,
     needsReview: false,
+    review: reviewMode,
     cost,
+    xpDelta: cost > 0 ? -cost : 0,
     profileXp: rules.clampXp(next?.xpTotal),
     purchasedXp: rules.clampXp(next?.purchasedXp),
     dailyXp: rules.clampXp(next?.dailyXp),
@@ -1716,10 +1857,13 @@ async function buyVideoHint(studentId, { unitId, videoId, checkId, checkIndex } 
     checkId ? String(item._id || item.id) === String(checkId) : idx === Number(checkIndex)
   ));
   if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
-  if (!check.paidHint) throw httpError(400, 'Mốc này không có gợi ý thêm');
-  const cost = Math.max(0, Number(check.hintCostXp) || 0);
+  const hintText = String(check.paidHint || check.shortHint || rules.DEFAULT_HINT).trim();
+  const reviewMode = await isVideoReviewCompleted(sid, unit, located);
+  const { hintCost: cost } = rules.videoCheckXpConfig({
+    isReview: reviewMode,
+    hintCostXp: check.hintCostXp,
+  });
   const { adjustProfileXp, getProfile } = require('./dailyPracticeService');
-  const resolvedCheckId = String(check._id || check.id || '');
   if (cost > 0) {
     const profile = await getProfile(sid);
     if ((profile?.xpTotal || 0) < cost) {
@@ -1729,25 +1873,74 @@ async function buyVideoHint(studentId, { unitId, videoId, checkId, checkIndex } 
       throw err;
     }
     const next = await adjustProfileXp(sid, -cost, { source: 'spend' });
-    await rememberPassedCheck(sid, unit, `${located.storageId}:${resolvedCheckId}`);
     return {
-      hint: check.paidHint,
+      hint: hintText,
+      review: reviewMode,
       cost,
+      charged: cost,
+      xpDelta: -cost,
       profileXp: rules.clampXp(next?.xpTotal),
       purchasedXp: rules.clampXp(next?.purchasedXp),
       dailyXp: rules.clampXp(next?.dailyXp),
-      passed: true,
+      passed: false,
     };
   }
   const profile = await getProfile(sid);
-  await rememberPassedCheck(sid, unit, `${located.storageId}:${resolvedCheckId}`);
   return {
-    hint: check.paidHint,
+    hint: hintText,
+    review: reviewMode,
     cost: 0,
+    charged: 0,
+    xpDelta: 0,
     profileXp: rules.clampXp(profile?.xpTotal),
     purchasedXp: rules.clampXp(profile?.purchasedXp),
     dailyXp: rules.clampXp(profile?.dailyXp),
+    passed: false,
+  };
+}
+
+/** Bỏ qua câu hỏi mốc video: trừ VIDEO_CHECK_SKIP_XP (trừ chế độ ôn lại) và mở khóa xem tiếp. */
+async function skipVideoCheck(studentId, { unitId, videoId, checkId, checkIndex } = {}) {
+  const sid = requireId(studentId, 'Học viên');
+  const unit = await DailyPracticeUnit.findOne({ _id: requireId(unitId, 'Chặng'), active: true }).lean();
+  if (!unit) throw httpError(404, 'Không tìm thấy chặng');
+  const located = locateVideo(unit, videoId);
+  const check = located && (located.video.checks || []).find((item, idx) => (
+    checkId ? String(item._id || item.id) === String(checkId) : idx === Number(checkIndex)
+  ));
+  if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
+
+  const reviewMode = await isVideoReviewCompleted(sid, unit, located);
+  const cost = rules.videoCheckSkipCost(reviewMode);
+  const { adjustProfileXp, getProfile } = require('./dailyPracticeService');
+  let nextProfile = null;
+  if (cost > 0) {
+    const profile = await getProfile(sid);
+    if ((profile?.xpTotal || 0) < cost) {
+      const err = httpError(402, `Cần ${cost} XP để bỏ qua câu hỏi này. Bạn hiện có ${rules.clampXp(profile?.xpTotal)} XP.`);
+      err.currentXp = rules.clampXp(profile?.xpTotal);
+      err.needXp = cost;
+      throw err;
+    }
+    nextProfile = await adjustProfileXp(sid, -cost, { source: 'spend' });
+  } else {
+    nextProfile = await getProfile(sid);
+  }
+
+  const resolvedCheckId = String(check._id || check.id || '');
+  const key = `${located.storageId}:${resolvedCheckId}`;
+  await rememberPassedCheck(sid, unit, key);
+
+  return {
+    skipped: true,
     passed: true,
+    review: reviewMode,
+    cost,
+    charged: cost,
+    xpDelta: cost > 0 ? -cost : 0,
+    profileXp: rules.clampXp(nextProfile?.xpTotal),
+    purchasedXp: rules.clampXp(nextProfile?.purchasedXp),
+    dailyXp: rules.clampXp(nextProfile?.dailyXp),
   };
 }
 
@@ -2177,6 +2370,7 @@ module.exports = {
   toggleSectionProgress,
   answerVideoCheck,
   buyVideoHint,
+  skipVideoCheck,
   unitVideos,
   claimUnitChest,
 };

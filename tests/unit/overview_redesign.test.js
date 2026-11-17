@@ -42,7 +42,7 @@ test('Trang chủ mobile: cùng bố cục, bỏ khối trùng (thẻ lớp, KPI
   for (const removed of ['styles.studentCourseCard}', 'styles.studentKpiGrid}', 'Truy cập nhanh', 'styles.helpCard}', 'styles.liveClassCard}', 'Lịch dạy trong tháng', 'Bài tập cần chấm" action', 'styles.materialPanel}']) {
     assert.ok(!home.includes(removed), `bỏ khối trùng: ${removed}`);
   }
-  assert.ok(home.includes('DuoHeroCard') && home.includes('Khóa học của tôi') && home.includes('DuoDailyQuestsCard'));
+  assert.ok(home.includes('duoStudentContainer') && home.includes('Khóa học của tôi') && home.includes('DuoDailyQuestsCard'));
   assert.ok(home.includes('Cần xử lý') && home.includes('Lịch dạy hôm nay') && home.includes('title="Tháng này"'));
   assert.ok(home.includes("navigation?.navigate('Assignments', { assignmentId: nextHomework.id })"));
   assert.ok(home.includes("navigation?.navigate('Attendance', { scheduleId: first.id })"));

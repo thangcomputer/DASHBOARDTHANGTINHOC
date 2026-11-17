@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thắng Tin Học Mobile · Phác thảo UX/UI (Phương án A / B / C)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="showcase-header">
+    <div class="brand-cluster">
+      <div class="brand-badge">UX</div>
+      <div>
+        <h1 class="brand-title">Phác thảo Thiết kế Lại Mobile App · Thắng Tin Học</h1>
+        <p class="brand-sub">Prototype độc lập (390×844) · Chưa chỉnh sửa mã nguồn chính · Chờ phê duyệt</p>
+      </div>
+    </div>
+    <div class="toolbar-controls">
+      <div class="seg-group" id="variant-switcher">
+        <button class="seg-btn" data-var="A">Phương án A · Tối giản</button>
+        <button class="seg-btn" data-var="B">Phương án B · Game hóa</button>
+        <button class="seg-btn active" data-var="C">Phương án C · Cân bằng (Khuyên dùng)</button>
+      </div>
+      <div class="seg-group">
+        <button class="seg-btn" id="btn-compare-all">So sánh 3 PA cùng lúc</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="showcase-layout" id="layout-root">
+    <aside class="showcase-sidebar" id="sidebar"></aside>
+    <section class="showcase-stage" id="stage"></section>
+    <aside class="showcase-notes" id="notes"></aside>
+  </main>
+
+  <script src="./screens.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const captureMode = params.get('capture') === '1';
+
+    let currentVariant = ['A', 'B', 'C'].includes(params.get('variant')) ? params.get('variant') : 'C';
+    let currentScreen = window.SCREEN_CATALOG.some((s) => s.id === params.get('screen'))
+      ? params.get('screen')
+      : 'student-home';
+    let compareMode = false;
+
+    const uiState = {
+      drawerOpen: false,
+      loginRole: 'student',
+      quizChoice: 1,
+      selectedPlan: '3m',
+      inboxTab: 'chat',
+      teacherSubTab: 'grade',
+    };
+
+    if (captureMode) {
+      document.body.classList.add('capture-mode');
+    }
+
+    function renderSidebar() {
+      const sb = document.getElementById('sidebar');
+      const common = window.SCREEN_CATALOG.filter((s) => s.role === 'chung');
+      const student = window.SCREEN_CATALOG.filter((s) => s.role === 'student');
+      const teacher = window.SCREEN_CATALOG.filter((s) => s.role === 'teacher');
+      const groupHtml = (label, items, isTeacher) => `
+        <div class="sidebar-section-label">${label}</div>
+        ${items.map((s) => `
+          <button class="screen-nav-btn ${s.id === currentScreen ? 'active' : ''}" data-screen="${s.id}">
+            <span>${s.title}</span>
+            <span class="role-pill ${isTeacher ? 'teacher' : ''}">${isTeacher ? 'GV' : s.role === 'chung' ? 'Chung' : 'HV'}</span>
+          </button>
+        `).join('')}
+      `;
+      sb.innerHTML =
+        groupHtml('Khởi động', common, false) +
+        groupHtml('Luồng Học viên (7 màn)', student, false) +
+        groupHtml('Luồng Giảng viên (2 màn)', teacher, true);
+    }
+
+    function renderNotes() {
+      const notes = document.getElementById('notes');
+      const vMeta = window.VARIANT_META[currentVariant];
+      const rMeta = window.SCREEN_RATIONALE[currentScreen];
+      notes.innerHTML = `
+        <span class="notes-badge" style="background:${vMeta.tagBg};color:#fff;">${vMeta.tag}</span>
+        <h3 class="notes-title">${vMeta.name}</h3>
+        <p style="font-size:12.5px;line-height:1.5;color:#cbd5e1;margin:0 0 14px;">${vMeta.summary}</p>
+        <div class="notes-block">
+          <h4>Giữ nguyên từ bản cũ</h4>
+          <ul>${rMeta.keep.map((x) => `<li>${x}</li>`).join('')}</ul>
+        </div>
+        <div class="notes-block">
+          <h4>Điểm thiết kế lại & Bổ sung</h4>
+          <ul>${rMeta.redesign.map((x) => `<li>${x}</li>`).join('')}</ul>
+        </div>
+        <div class="notes-block">
+          <h4>Lợi ích cho người dùng</h4>
+          <p style="font-size:12.5px;line-height:1.5;color:#cbd5e1;margin:0;">${rMeta.benefit}</p>
+        </div>
+      `;
+    }
+
+    function renderStage() {
+      const stage = document.getElementById('stage');
+      if (captureMode) {
+        stage.innerHTML = `<div class="phone-bezel">${window.renderPhone({ variant: currentVariant, screenId: currentScreen, state: uiState })}</div>`;
+        return;
+      }
+
+      if (compareMode) {
+        stage.style.width = '100%';
+        stage.innerHTML = `
+          <div style="display:flex;flex-wrap:wrap;gap:18px;justify-content:center;">
+            ${['A', 'B', 'C'].map((v) => `
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <span class="pill" style="background:${window.VARIANT_META[v].tagBg};color:#fff;font-size:12px;padding:5px 12px;">
+                  ${window.VARIANT_META[v].name}
+                </span>
+                <div class="phone-bezel" style="transform:scale(0.84);transform-origin:top center;margin:-60px -28px;">
+                  ${window.renderPhone({ variant: v, screenId: currentScreen, state: uiState })}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else {
+        stage.innerHTML = `
+          <div class="phone-bezel">
+            ${window.renderPhone({ variant: currentVariant, screenId: currentScreen, state: uiState })}
+          </div>
+          <div style="font-size:12px;color:#94a3b8;">
+            Mẹo: Nhấn nút <b>Menu (☰)</b>, tab dưới, hoặc nút chọn bên trong màn hình để thử tương tác trực tiếp.
+          </div>
+        `;
+      }
+    }
+
+    function updateAll() {
+      document.querySelectorAll('#variant-switcher .seg-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.var === currentVariant && !compareMode);
+      });
+      document.getElementById('btn-compare-all')?.classList.toggle('active', compareMode);
+      if (!captureMode) {
+        renderSidebar();
+        renderNotes();
+      }
+      renderStage();
+    }
+
+    document.addEventListener('click', (e) => {
+      const varBtn = e.target.closest('[data-var]');
+      if (varBtn) {
+        currentVariant = varBtn.dataset.var;
+        compareMode = false;
+        updateAll();
+        return;
+      }
+      if (e.target.closest('#btn-compare-all')) {
+        compareMode = !compareMode;
+        const root = document.getElementById('layout-root');
+        root.style.gridTemplateColumns = compareMode ? '240px 1fr' : '';
+        document.getElementById('notes').style.display = compareMode ? 'none' : '';
+        updateAll();
+        return;
+      }
+      const scrBtn = e.target.closest('[data-screen]');
+      if (scrBtn) {
+        currentScreen = scrBtn.dataset.screen;
+        uiState.drawerOpen = false;
+        updateAll();
+        return;
+      }
+      if (e.target.closest('#btn-drawer')) {
+        uiState.drawerOpen = !uiState.drawerOpen;
+        renderStage();
+        return;
+      }
+      if (e.target.id === 'drawer-backdrop') {
+        uiState.drawerOpen = false;
+        renderStage();
+        return;
+      }
+      if (e.target.closest('#btn-ai')) {
+        currentScreen = 'student-inbox';
+        uiState.inboxTab = 'chat';
+        updateAll();
+        return;
+      }
+      const actBtn = e.target.closest('[data-action]');
+      if (actBtn) {
+        const { action, val } = actBtn.dataset;
+        uiState[action] = action === 'quizChoice' ? Number(val) : val;
+        renderStage();
+        return;
+      }
+      const navBtn = e.target.closest('[data-nav]');
+      if (navBtn) {
+        const nav = navBtn.dataset.nav;
+        const role = window.SCREEN_CATALOG.find((s) => s.id === currentScreen)?.role;
+        const mapStudent = { home: 'student-home', learn: 'student-video', schedule: 'student-practice', chat: 'student-inbox', profile: 'student-profile' };
+        const mapTeacher = { home: 'teacher-home', schedule: 'teacher-home', grade: 'teacher-grading', chat: 'student-inbox', profile: 'teacher-grading' };
+        currentScreen = (role === 'teacher' ? mapTeacher[nav] : mapStudent[nav]) || 'student-home';
+        uiState.drawerOpen = false;
+        updateAll();
+      }
+    });
+
+    updateAll();
+  </script>
+</body>
+</html>

@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, type LucideIcon } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, Sparkles, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
@@ -31,7 +31,7 @@ import { getWebLogoUrl } from '../services/webSettingsApi';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import type { AppStackParamList } from '../navigation/types';
 import { useAuth } from '../app/AuthContext';
-import { hasRealCourseEnrollment, isFreePortalMenu } from '../utils/freePortalHelper';
+import { hasRealCourseEnrollment, isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
 import { KineticDotsLoader } from './KineticDotsLoader';
 
 export { KineticDotsLoader };
@@ -142,12 +142,14 @@ export function AppScreen({
   children,
   scroll = true,
   contentStyle,
+  safeAreaStyle,
   refreshControl,
   scrollViewRef,
   hideBrandingTopBar = false,
 }: React.PropsWithChildren<{
   scroll?: boolean;
   contentStyle?: ViewStyle;
+  safeAreaStyle?: ViewStyle;
   refreshControl?: React.ReactElement;
   scrollViewRef?: React.Ref<React.ComponentRef<typeof ScrollView>>;
   hideBrandingTopBar?: boolean;
@@ -160,7 +162,7 @@ export function AppScreen({
   }, []));
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <SafeAreaView edges={['top']} style={[styles.safeArea, safeAreaStyle]}>
       {!hideBrandingTopBar ? <BrandingTopBar /> : null}
       {scroll ? (
         <ScrollView
@@ -191,6 +193,10 @@ function BrandingTopBar() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const auth = useAuth();
+  const isStudent = auth?.user?.role === 'student';
+  const studentAiLocked = isStudent && isFreePortalLocked(auth?.user);
+  const compactLogoWithAi = isStudent && windowWidth < 430;
+  const hideMenuLabel = compactTopBar || compactLogoWithAi;
   const isFreeStudent =
     auth?.user?.role === 'student'
     && (auth?.user?.freePortal === true || String(auth?.user?.course || '').toLowerCase().includes('miễn phí'))
@@ -259,65 +265,97 @@ function BrandingTopBar() {
       <BlurView
         intensity={Platform.OS === 'android' ? 65 : 48}
         tint="light"
-        style={[styles.brandingTopBar, compactTopBar && styles.brandingTopBarCompact]}
+        style={[
+          styles.brandingTopBar,
+          compactTopBar && styles.brandingTopBarCompact,
+          isStudent && styles.brandingTopBarStudent,
+        ]}
       >
-        <View style={styles.topBarSideLeft}>
+        <View style={[styles.topBarSideLeft, compactTopBar && styles.topBarSideLeftCompact]}>
           <Pressable
             onPress={() => DeviceEventEmitter.emit(MOBILE_OPEN_MENU_EVENT)}
             style={({ pressed }) => [
               styles.topBarMenu,
-              compactTopBar && styles.topBarMenuCompact,
+              hideMenuLabel && styles.topBarMenuCompact,
               pressed && styles.topBarNeoPressed,
             ]}
             accessibilityRole="button"
             accessibilityLabel="Mở danh mục"
           >
             <Menu size={20} color="#475569" />
-            {!compactTopBar ? <Text style={styles.topBarMenuLabel}>Menu</Text> : null}
+            {!hideMenuLabel ? <Text style={styles.topBarMenuLabel}>Menu</Text> : null}
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
+            style={[
+              styles.brandingHomeCentered,
+              (compactTopBar || compactLogoWithAi) && styles.brandingHomeCompact,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Về trang tổng quan"
+          >
+            {isFreeStudent ? (
+              <Image
+                source={require('../../assets/logo.webp')}
+                style={styles.brandingLogo}
+                resizeMode="contain"
+                accessibilityLabel="Logo DewSkill"
+              />
+            ) : (logoUrl && !logoLoadFailed ? (
+              <Image
+                source={{ uri: logoUrl }}
+                style={styles.brandingLogo}
+                resizeMode="contain"
+                accessibilityLabel="Logo Thắng Tin Học LMS"
+                onError={() => setLogoLoadFailed(true)}
+              />
+            ) : (
+              <Image
+                source={require('../../assets/logo-lms.png')}
+                style={styles.brandingLogo}
+                resizeMode="contain"
+                accessibilityLabel="Logo Thắng Tin Học LMS"
+              />
+            ))}
           </Pressable>
         </View>
-        <Pressable
-          onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
-          style={[styles.brandingHomeCentered, compactTopBar && styles.brandingHomeCompact]}
-          accessibilityRole="button"
-          accessibilityLabel="Về trang tổng quan"
-        >
-          {isFreeStudent ? (
-            <Image
-              source={require('../../assets/logo.webp')}
-              style={styles.brandingLogo}
-              resizeMode="contain"
-              accessibilityLabel="Logo DewSkill"
-            />
-          ) : (logoUrl && !logoLoadFailed ? (
-            <Image
-              source={{ uri: logoUrl }}
-              style={styles.brandingLogo}
-              resizeMode="contain"
-              accessibilityLabel="Logo Thắng Tin Học LMS"
-              onError={() => setLogoLoadFailed(true)}
-            />
-          ) : (
-            <Image
-              source={require('../../assets/logo-lms.png')}
-              style={styles.brandingLogo}
-              resizeMode="contain"
-              accessibilityLabel="Logo Thắng Tin Học LMS"
-            />
-          ))}
-        </Pressable>
-        <View style={styles.topBarActionsRow}>
+        <View style={[styles.topBarActionsRow, isStudent && styles.topBarActionsRowStudent]}>
+          {isStudent ? (
+            <Pressable
+              onPress={() => {
+                if (studentAiLocked) {
+                  DeviceEventEmitter.emit('mobile:open-free-lock-modal');
+                  return;
+                }
+                navigation.navigate('Support');
+              }}
+              style={({ pressed }) => [styles.topBarAiChip, pressed && styles.topBarAiChipPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Mở Trợ lý AI và Hỗ trợ"
+            >
+              <Sparkles size={14} color="#059669" />
+              <Text style={styles.topBarAiText}>AI</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
-            style={({ pressed }) => [styles.topBarAction, pressed && styles.topBarNeoPressed]}
+            style={({ pressed }) => [
+              styles.topBarAction,
+              compactLogoWithAi && styles.topBarActionCompact,
+              pressed && styles.topBarNeoPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Tìm kiếm và tác vụ nhanh"
           >
-            <Search size={19} color={colors.muted} />
+            <Search size={18} color={colors.muted} />
           </Pressable>
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
-            style={({ pressed }) => [styles.topBarAction, pressed && styles.topBarNeoPressed]}
+            style={({ pressed }) => [
+              styles.topBarAction,
+              compactLogoWithAi && styles.topBarActionCompact,
+              pressed && styles.topBarNeoPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel={unreadCount > 0 ? `Mở thông báo, ${unreadCount} chưa đọc` : 'Mở thông báo'}
           >
@@ -708,16 +746,23 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   brandingTopBarContainer: { overflow: 'hidden' },
   brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
   brandingTopBarCompact: { paddingHorizontal: spacing.md, gap: 4 },
-  topBarSideLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
-  brandingHomeCentered: { width: 112, height: 38, flexShrink: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 14, backgroundColor: '#FFFFFF', ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)' } : {}), boxShadow: droplet.logo },
-  brandingHomeCompact: { width: 96, height: 34 },
-  brandingLogo: { width: '96%', height: 34, transform: [{ scale: 1.04 }] },
+  brandingTopBarStudent: { paddingHorizontal: 12, gap: 8 },
+  topBarSideLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 },
+  topBarSideLeftCompact: { gap: 6 },
+  brandingHomeCentered: { width: 122, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 5, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 14, backgroundColor: '#FFFFFF', ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)' } : {}), boxShadow: droplet.logo },
+  brandingHomeCompact: { width: 92, height: 36, paddingHorizontal: 6, paddingVertical: 4 },
+  brandingLogo: { width: '100%', height: '100%' },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
-  topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
-  topBarMenuCompact: { width: 42, height: 42, minWidth: 42, paddingHorizontal: 0 },
+  topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
+  topBarMenuCompact: { width: 40, height: 40, minWidth: 40, paddingHorizontal: 0 },
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  topBarActionsRow: { zIndex: 1, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  topBarActionsRow: { zIndex: 1, flexShrink: 0, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  topBarActionsRowStudent: { gap: 5 },
+  topBarAiChip: { zIndex: 1, height: 38, paddingHorizontal: 9, borderRadius: 12, borderWidth: 1.5, borderColor: '#6EE7B7', borderBottomWidth: 3, borderBottomColor: '#10B981', backgroundColor: '#ECFDF5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  topBarAiChipPressed: { transform: [{ translateY: 1 }], borderBottomWidth: 1.5 },
+  topBarAiText: { color: '#047857', fontSize: 12, fontWeight: '900' },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
+  topBarActionCompact: { width: 38, height: 38 },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },
   notificationBell: { position: 'relative' },
   notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },

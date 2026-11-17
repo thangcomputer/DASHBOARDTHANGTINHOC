@@ -806,21 +806,21 @@ export default function StudentOverviewTab({
                           />
                         ) : item.meetLink && item.joinable ? (
                           <DuoButton
-                            variant="primary"
+                            variant="danger"
                             className="duo-btn--meet-live"
                             size="sm"
                             icon={<Video size={14} color="#FFFFFF" aria-hidden="true" />}
                             rightIcon={<ExternalLink size={12} color="#FFFFFF" aria-hidden="true" />}
-                            label="Vào Meet"
+                            label="Vào học"
                             onClick={() => window.open(item.meetLink, '_blank', 'noopener,noreferrer')}
                           />
-                        ) : item.meetLink ? (
+                        ) : !item.joinable ? (
                           <DuoButton
                             variant="secondary"
                             size="sm"
                             disabled
                             icon={<Video size={14} color="#94A3B8" aria-hidden="true" />}
-                            label="Vào Meet"
+                            label="Vào học"
                             title={item.waitLabel || 'Chưa đến giờ vào lớp'}
                           />
                         ) : (

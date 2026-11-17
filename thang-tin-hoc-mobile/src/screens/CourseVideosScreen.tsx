@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, AppState, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ArrowLeft, Award, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Download, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, ShieldCheck, Sparkles, Star, StickyNote, Trash2, Trophy, Volume2, VolumeX, WifiOff, X } from 'lucide-react-native';
 import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
 import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
@@ -155,10 +155,10 @@ function getPracticePraise(previousText: string) {
 
 const filterOptions: { id: CourseFilter; label: string; displayLabel: string; icon: typeof Layers3 }[] = [
   { id: 'all', label: 'Tất cả', displayLabel: 'Tất cả', icon: Layers3 },
-  { id: 'registered', label: 'Khóa đã đăng ký', displayLabel: 'Khóa đã\nđăng ký', icon: CheckCircle2 },
-  { id: 'video', label: 'Tự học qua video', displayLabel: 'Tự học\nqua video', icon: Clapperboard },
-  { id: 'instructor', label: 'Học cùng giảng viên', displayLabel: 'Học cùng\ngiảng viên', icon: GraduationCap },
-  { id: 'guide', label: 'Hướng dẫn học', displayLabel: 'Hướng dẫn\nhọc', icon: CircleHelp },
+  { id: 'registered', label: 'Khóa đã đăng ký', displayLabel: 'Đã đăng ký', icon: CheckCircle2 },
+  { id: 'video', label: 'Tự học qua video', displayLabel: 'Video', icon: Clapperboard },
+  { id: 'instructor', label: 'Học cùng giảng viên', displayLabel: 'Cùng GV', icon: GraduationCap },
+  { id: 'guide', label: 'Hướng dẫn học', displayLabel: 'Hướng dẫn', icon: CircleHelp },
 ];
 
 function previewCatalog(): Promise<{ subjects: LessonPracticeSubject[]; courses: LessonPracticeCourse[] }> {
@@ -210,10 +210,41 @@ function courseProgress(course: LessonPracticeCourse) {
   return total ? Math.min(100, Math.round((completed / total) * 100)) : 0;
 }
 
+function expandEnrolledCoursesBySubject(courses: LessonPracticeCourse[]): LessonPracticeCourse[] {
+  const rows = Array.isArray(courses) ? courses : [];
+  const seen = new Set<string>();
+  const expanded: LessonPracticeCourse[] = [];
+
+  rows.forEach((course) => {
+    if (!course?.enrolled) return;
+    const subjects = Array.isArray(course.subjects) ? course.subjects : [];
+    if (subjects.length === 0) {
+      expanded.push(course);
+      return;
+    }
+    subjects.forEach((subject, idx) => {
+      const subjectKey = String(subject?.id || subject?.name || idx);
+      const dedupeKey = `${course.deliveryMode || 'default'}::${subjectKey}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      expanded.push({
+        ...course,
+        id: subjects.length > 1 ? `${course.id}::${subjectKey}` : course.id,
+        sourceCourseId: course.id,
+        name: subject?.name || course.name,
+        parentCourseName: subjects.length > 1 ? course.name : '',
+        subjects: [subject],
+        lessonCount: Number(subject?.totalUnitCount) || 0,
+      });
+    });
+  });
+
+  return expanded;
+}
+
 function buildSections(courses: LessonPracticeCourse[], filter: CourseFilter): CourseSection[] {
-  const visible = courses.filter((course) => course.enrolled || !course.hiddenByEnrollment);
-  const enrolled = visible.filter((course) => course.enrolled);
-  const available = visible.filter((course) => !course.enrolled);
+  const enrolled = expandEnrolledCoursesBySubject(courses);
+  const available = courses.filter((course) => !course.enrolled && !course.hiddenByEnrollment);
   const matching = (items: LessonPracticeCourse[], mode: 'video' | 'instructor') =>
     items.filter((course) => course.deliveryMode === mode);
   if (filter === 'registered') return [{ id: 'registered', title: 'Khóa đã đăng ký', courses: enrolled }];
@@ -225,24 +256,8 @@ function buildSections(courses: LessonPracticeCourse[], filter: CourseFilter): C
     { id: 'instructor-registered', title: 'Khóa học cùng giảng viên · Đã đăng ký', courses: matching(enrolled, 'instructor') },
     { id: 'instructor-available', title: 'Khóa học cùng giảng viên · Chưa đăng ký', courses: matching(available, 'instructor') },
   ];
-  const groupedCourseIds = new Set<string>();
-  const groupedBundles: LessonPracticeCourse[] = [];
-  courses.filter((course) => !course.enrolled && course.offerType === 'bundle' && course.hiddenByEnrollment).forEach((bundle) => {
-    const subjectIds = new Set(bundle.subjects.map((subject) => subject.id).filter(Boolean));
-    if (!subjectIds.size || subjectIds.size !== bundle.subjects.length) return;
-    const covered = enrolled.filter((course) =>
-      course.offerType === 'single'
-      && course.deliveryMode === bundle.deliveryMode
-      && course.subjects.length === 1
-      && subjectIds.has(course.subjects[0].id)
-      && !groupedCourseIds.has(course.id));
-    if (covered.length !== subjectIds.size || new Set(covered.map((course) => course.subjects[0].id)).size !== subjectIds.size) return;
-    covered.forEach((course) => groupedCourseIds.add(course.id));
-    groupedBundles.push({ ...bundle, enrolled: true, hiddenByEnrollment: false });
-  });
-  const visibleEnrolled = [...groupedBundles, ...enrolled.filter((course) => !groupedCourseIds.has(course.id))];
   return [
-    { id: 'registered', title: 'Khóa đã đăng ký', courses: visibleEnrolled },
+    { id: 'registered', title: 'Khóa đã đăng ký', courses: enrolled },
     { id: 'video', title: 'Khóa tự học qua video', courses: matching(available, 'video') },
     { id: 'instructor', title: 'Khóa học cùng với giảng viên', courses: matching(available, 'instructor') },
   ];
@@ -295,6 +310,16 @@ function isUnitSectionDone(unit: LessonPracticeUnit, section: UnitLearningSectio
   if (section.kind === 'note') return unit.noteDoneIds?.includes(section.itemId) || (unit.noteDone && section.itemId === 'legacy-note');
   if (section.kind === 'video') return unit.videoDoneIds?.includes(section.itemId) || (unit.videoDone && section.itemId === 'legacy-video');
   return unit.practiceDoneGroupIds?.includes(section.itemId) || (unit.practiceDone && section.itemId === unit.id);
+}
+
+function pickDefaultLearningSectionIndex(unit: LessonPracticeUnit, sections: UnitLearningSection[]): number {
+  const incompleteVideo = sections.findIndex((item) => item.kind === 'video' && !isUnitSectionDone(unit, item));
+  if (incompleteVideo >= 0) return incompleteVideo;
+  const anyVideo = sections.findIndex((item) => item.kind === 'video');
+  if (anyVideo >= 0) return anyVideo;
+  const incompleteAny = sections.findIndex((item) => !isUnitSectionDone(unit, item));
+  if (incompleteAny >= 0) return incompleteAny;
+  return sections.length - 1;
 }
 
 type PracticeAttemptStats = {
@@ -416,10 +441,12 @@ export function CourseVideosScreen() {
   const courses = resource.data?.courses || [];
   const sections = useMemo(() => filter === 'guide' ? [] : buildSections(courses, filter), [courses, filter]);
   const counts = useMemo(() => {
-    const visible = courses.filter((course) => course.enrolled || !course.hiddenByEnrollment);
+    const enrolled = expandEnrolledCoursesBySubject(courses);
+    const available = courses.filter((course) => !course.enrolled && !course.hiddenByEnrollment);
+    const visible = [...enrolled, ...available];
     return {
       all: visible.length,
-      registered: visible.filter((course) => course.enrolled).length,
+      registered: enrolled.length,
       video: visible.filter((course) => course.deliveryMode === 'video').length,
       instructor: visible.filter((course) => course.deliveryMode === 'instructor').length,
     };
@@ -483,7 +510,8 @@ export function CourseVideosScreen() {
       void openSubject(course, subject);
       return;
     }
-    setSelectedCourse(course);
+    const realCourseId = course.sourceCourseId || course.id;
+    setSelectedCourse(course.sourceCourseId ? { ...course, id: realCourseId } : course);
     setSelectedSubject(null);
     setSelectedUnit(null);
     setActiveUnitDetails([]);
@@ -498,7 +526,8 @@ export function CourseVideosScreen() {
     subject: LessonPracticeSubject,
     resume?: { unitId: string; sectionId: string; atSec?: number },
   ) => {
-    setSelectedCourse(course);
+    const realCourseId = course.sourceCourseId || course.id;
+    setSelectedCourse(course.sourceCourseId ? { ...course, id: realCourseId } : course);
     setSelectedSubject(subject);
     setSelectedUnit(null);
     setActiveUnitDetails([]);
@@ -510,7 +539,7 @@ export function CourseVideosScreen() {
     if (isPreview) return;
     setUnitsLoading(true);
     try {
-      const subjectUnits = await getCourseSubjectUnits(subject.id, course.id);
+      const subjectUnits = await getCourseSubjectUnits(subject.id, realCourseId);
       setUnits(subjectUnits);
       const availableUnits = subjectUnits.filter((unit) => !unit.locked && unit.status !== 'locked');
       const resumeUnit = resume ? availableUnits.find((unit) => unit.id === resume.unitId) : undefined;
@@ -666,11 +695,16 @@ export function CourseVideosScreen() {
     };
   }, [syncForegroundProgress]);
 
-  const completeUnitSection = async (unitId: string, section: 'video' | 'note', itemId: string): Promise<boolean> => {
+  const completeUnitSection = async (
+    unitId: string,
+    section: 'video' | 'note',
+    itemId: string,
+    keepSection = false,
+  ): Promise<boolean> => {
     try {
       await markCourseUnitSection(unitId, section, itemId);
       await refreshUnitDetail(unitId);
-      setSelectedLearningSectionId(`${section}:${itemId}`);
+      if (!keepSection) setSelectedLearningSectionId(`${section}:${itemId}`);
       return true;
     } catch (error) {
       Alert.alert('Không lưu được tiến độ', error instanceof Error ? error.message : 'Vui lòng thử lại.');
@@ -683,13 +717,16 @@ export function CourseVideosScreen() {
     itemId: string,
     practiceGroupId: string | undefined,
     answer: Record<string, unknown>,
+    keepSection = false,
   ): Promise<LessonPracticeItem | null> => {
     try {
       const result = await confirmCoursePracticeItem(itemId, answer);
       const confirmedItem = result.data?.item;
-      setSelectedLearningSectionId(`practice:${practiceGroupId || confirmedItem?.practiceGroupId || unitId}`);
+      if (!keepSection) {
+        setSelectedLearningSectionId(`practice:${practiceGroupId || confirmedItem?.practiceGroupId || unitId}`);
+      }
       if (result.data?.retry) return confirmedItem || null;
-      if (!(confirmedItem?.correct === true && confirmedItem.confirmed === true)) {
+      if (!keepSection && !(confirmedItem?.correct === true && confirmedItem.confirmed === true)) {
         await refreshUnitDetail(unitId);
       }
       return confirmedItem || null;
@@ -725,15 +762,13 @@ export function CourseVideosScreen() {
     && displayedUnitSections.length
     && displayedUnitSections.every((section) => isUnitSectionDone(displayedUnit, section)));
   const selectedSectionIndex = displayedUnitSections.findIndex((section) => section.id === selectedLearningSectionId);
-  const firstIncompleteSectionIndex = displayedUnit
-    ? displayedUnitSections.findIndex((section) => !isUnitSectionDone(displayedUnit, section))
-    : -1;
   const displayedSectionIndex = selectedSectionIndex >= 0
     ? selectedSectionIndex
-    : firstIncompleteSectionIndex >= 0
-      ? firstIncompleteSectionIndex
-      : displayedUnitSections.length - 1;
+    : displayedUnit
+      ? pickDefaultLearningSectionIndex(displayedUnit, displayedUnitSections)
+      : -1;
   const displayedUnitIndex = displayedUnit ? units.findIndex((unit) => unit.id === displayedUnit.id) : -1;
+  const completedUnitsCount = units.filter((unit) => unit.status === 'completed').length;
 
   const route = useRoute<RouteProp<MainTabsParamList, 'CourseVideos'>>();
   const tabNavigation = useNavigation();
@@ -828,7 +863,7 @@ export function CourseVideosScreen() {
     user?._id,
     user?.id,
   ]);
-  const lessonNavigation = displayedUnit && (allDisplayedSectionsDone || !displayedUnitSections.length)
+  const lessonNavigation = displayedUnit
     ? (
       <UnitNavigationBar
         previousUnit={displayedUnitIndex > 0 ? units[displayedUnitIndex - 1] : null}
@@ -836,49 +871,44 @@ export function CourseVideosScreen() {
         onNavigateUnit={(target) => void startUnit(target)}
       />
     )
-    : displayedUnit
-      ? (
-        <SectionNavigationBar
-          sections={displayedUnitSections}
-          currentIndex={displayedSectionIndex}
-          currentDone={Boolean(displayedSectionIndex >= 0 && isUnitSectionDone(displayedUnit, displayedUnitSections[displayedSectionIndex]))}
-          onNavigateSection={setSelectedLearningSectionId}
-        />
-      )
-      : null;
+    : null;
 
   return (
-    <AppScreen contentStyle={styles.screenContent}>
+    <AppScreen safeAreaStyle={{ backgroundColor: '#FFFBF2' }} contentStyle={styles.screenContent}>
       <View style={styles.headerBand}>
         <View style={styles.headerGroup}>
           <AppHeader title="Bài giảng" icon={Clapperboard} />
         </View>
       </View>
-      <View style={styles.filters}>
-        {filterOptions.map((option) => {
-          const Icon = option.icon;
-          const count = option.id === 'all' ? counts.all
-            : option.id === 'registered' ? counts.registered
-              : option.id === 'video' ? counts.video
-                : option.id === 'instructor' ? counts.instructor : undefined;
-          const active = filter === option.id;
-          return (
-            <Pressable
-              key={option.id}
-              onPress={() => setFilter(option.id)}
-              style={[styles.filterChip, active && styles.filterChipActive]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={option.label}
-            >
-              <View style={styles.filterIconWrap}>
-                <Icon size={17} color={active ? theme.brandDark : colors.muted} />
-                {count !== undefined ? <Text style={[styles.filterCount, active && styles.filterCountActive]}>{count}</Text> : null}
-              </View>
-              <Text numberOfLines={2} style={[styles.filterText, active && styles.filterTextActive]}>{option.displayLabel}</Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.filtersOuter}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">
+          {filterOptions.map((option) => {
+            const Icon = option.icon;
+            const count = option.id === 'all' ? counts.all
+              : option.id === 'registered' ? counts.registered
+                : option.id === 'video' ? counts.video
+                  : option.id === 'instructor' ? counts.instructor : undefined;
+            const active = filter === option.id;
+            return (
+              <Pressable
+                key={option.id}
+                onPress={() => setFilter(option.id)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={option.label}
+              >
+                <Icon size={15} color={active ? '#FFFFFF' : '#92400E'} />
+                <Text numberOfLines={1} style={[styles.filterText, active && styles.filterTextActive]}>
+                  {option.displayLabel}
+                </Text>
+                {count !== undefined ? (
+                  <Text style={[styles.filterCount, active && styles.filterCountActive]}>{count}</Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
       {!resource.loading && Platform.OS !== 'web' && offlineVideos.length > 0 ? (
         <Card style={styles.offlineCatalogCard}>
@@ -1014,7 +1044,7 @@ export function CourseVideosScreen() {
         studentName={user?.name || 'Học viên'}
         studentCode={user?.code || ''}
         studentId={String(user?.id || user?._id || '')}
-        courseId={certificateCourse?.id || ''}
+        courseId={certificateCourse?.sourceCourseId || certificateCourse?.id || ''}
         courseTitle={certificateCourse?.name || ''}
         completionRate={certificateCourse ? courseProgress(certificateCourse) : 100}
       />
@@ -1025,25 +1055,31 @@ export function CourseVideosScreen() {
             <View style={styles.modalHeader}>
               <Pressable
                 onPress={() => {
-                  if (selectedSubject) {
-                    setSelectedSubject(null);
-                    setSelectedUnit(null);
-                    setUnits([]);
-                    setActiveUnitDetails([]);
-                    setUnitNavOpen(false);
-                  } else {
+                  const closeDirectly = !selectedSubject || Boolean(selectedCourse?.enrolled) || (selectedCourse?.subjects.length || 0) <= 1;
+                  if (closeDirectly) {
                     setSelectedCourse(null);
                   }
+                  setSelectedSubject(null);
+                  setSelectedUnit(null);
+                  setUnits([]);
+                  setActiveUnitDetails([]);
+                  setUnitNavOpen(false);
                 }}
                 style={styles.modalBack}
                 accessibilityRole="button"
-                accessibilityLabel={selectedSubject ? 'Quay lại danh sách môn học' : 'Quay lại danh sách khóa học'}
+                accessibilityLabel={(!selectedSubject || Boolean(selectedCourse?.enrolled) || (selectedCourse?.subjects.length || 0) <= 1) ? 'Quay lại danh sách khóa học' : 'Quay lại danh sách môn học'}
               >
                 <ArrowLeft size={19} color={theme.brand} />
               </Pressable>
               <View style={styles.flex}>
-                <Text style={styles.modalTitle}>{selectedSubject?.name || selectedCourse?.name}</Text>
-                {!selectedSubject ? <Text style={styles.muted}>{`${selectedCourse?.subjects.length || 0} môn học`}</Text> : null}
+                <Text numberOfLines={1} style={styles.modalTitle}>{selectedSubject?.name || selectedCourse?.name}</Text>
+                <Text numberOfLines={1} style={styles.muted}>
+                  {selectedSubject
+                    ? (selectedCourse?.parentCourseName
+                      || (selectedCourse?.name && selectedCourse.name !== selectedSubject.name ? selectedCourse.name : '')
+                      || `${units.length} buổi học`)
+                    : `${selectedCourse?.subjects.length || 0} môn học`}
+                </Text>
               </View>
               {selectedCourse?.enrolled && courseProgress(selectedCourse) >= 100 ? (
                 <Pressable
@@ -1057,17 +1093,10 @@ export function CourseVideosScreen() {
                 </Pressable>
               ) : null}
               {selectedSubject && units.length > 0 ? (
-                <Pressable
-                  onPress={() => setUnitNavOpen((open) => !open)}
-                  style={[styles.headerLessonNav, unitNavOpen && styles.headerLessonNavOpen]}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: unitNavOpen }}
-                  accessibilityLabel={unitNavOpen ? 'Thu gọn danh sách bài học' : 'Mở danh sách bài học'}
-                >
-                  <Menu size={17} color={theme.brand} />
-                  <Text style={styles.headerLessonNavText}>Danh sách bài học</Text>
-                  {unitNavOpen ? <ChevronUp size={16} color={theme.brand} /> : <ChevronDown size={16} color={theme.brand} />}
-                </Pressable>
+                <View style={styles.headerProgressPill}>
+                  <CheckCircle2 size={14} color="#047857" />
+                  <Text style={styles.headerProgressPillText}>{`${completedUnitsCount}/${units.length} buổi`}</Text>
+                </View>
               ) : null}
             </View>
             <View style={styles.modalContent}>
@@ -1076,7 +1105,7 @@ export function CourseVideosScreen() {
                   {(unitsLoading || openingUnit) && !selectedUnit && !activeUnitDetails.length ? <LoadingSkeleton rows={3} /> : null}
                   {unitsError ? <Text style={styles.errorText}>{unitsError}</Text> : null}
                   {!unitsLoading && !unitsError && !selectedUnit && !activeUnitDetails.length ? (
-                    <EmptyState title="Chưa có bài học đang mở" message="Mở menu bài học để chọn bài có thể học." />
+                    <EmptyState title="Chưa có bài học đang mở" message="Chọn bài học trong Mục lục để bắt đầu." />
                   ) : null}
                   <ScrollView
                     style={styles.lessonMainColumn}
@@ -1095,6 +1124,8 @@ export function CourseVideosScreen() {
                         <UnitDetails
                           key={unit.id}
                           unit={unit}
+                          units={units}
+                          unitIndex={Math.max(0, units.findIndex((entry) => entry.id === unit.id))}
                           subjectId={selectedSubject?.id || ''}
                           subjectName={selectedSubject?.name || ''}
                           courseId={selectedCourse?.id || ''}
@@ -1112,6 +1143,7 @@ export function CourseVideosScreen() {
                           selectedSectionId={selectedLearningSectionId}
                           resumeVideoAt={resumeVideoAt?.unitId === unit.id ? resumeVideoAt : null}
                           contentWidth={lessonContentWidth}
+                          onSelectUnit={(targetUnit) => { void startUnit(targetUnit); }}
                           onOpenVideo={(url) => void openVideo(url)}
                           onCompleteSection={completeUnitSection}
                           onSubmitPractice={submitPracticeAnswer}
@@ -1305,8 +1337,8 @@ export function CourseVideosScreen() {
                     paddingRight: spacing.sm,
                     paddingBottom: Math.max(insets.bottom, spacing.sm),
                     paddingLeft: spacing.sm,
-                    borderTop: '1px solid #E2E8F0',
-                    backgroundColor: '#FFFFFF',
+                    borderTop: '2px solid #E2E8F0',
+                    backgroundColor: '#FFFBF2',
                   }}
                 >
                   {relatedStrip}
@@ -1381,7 +1413,7 @@ function CourseCard({
       onHoverIn={() => setIsHovered(true)}
       onHoverOut={() => setIsHovered(false)}
     >
-      <Card style={{ ...styles.courseCard, ...(isHovered ? styles.courseCardHovered : {}) }}>
+      <Card style={{ ...styles.courseCard, ...(course.enrolled ? styles.courseCardEnrolled : {}), ...(isHovered ? styles.courseCardHovered : {}) }}>
         <Pressable
           style={styles.courseCardContent}
           onPress={blockUnregisteredInstructorPreview ? () => setInfoOpen((current) => !current) : onOpen}
@@ -1417,6 +1449,11 @@ function CourseCard({
           </View>
           <View style={styles.courseInfo}>
             <Text numberOfLines={2} style={styles.courseTitle}>{course.name}</Text>
+            {course.parentCourseName ? (
+              <Text numberOfLines={1} style={styles.parentCourseName}>
+                {`Khóa: ${course.parentCourseName}`}
+              </Text>
+            ) : null}
             {course.subjects.length ? (
               <View style={styles.subjectChips}>
                 <Text style={styles.subjectLabel}>Môn:</Text>
@@ -1485,7 +1522,7 @@ function CourseCard({
           {!blockUnregisteredInstructorPreview ? (
             <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
               <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
-              <ChevronRight size={16} color="#047857" />
+              <ChevronRight size={16} color="#FFFFFF" />
             </Pressable>
           ) : null}
         </View>
@@ -1553,8 +1590,15 @@ function CourseTooltip({ isVideo }: { isVideo: boolean }) {
   );
 }
 
+function formatMinuteSecond(seconds: number) {
+  const safe = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
+}
+
 function UnitDetails({
   unit,
+  units = [],
+  unitIndex = 0,
   subjectId = '',
   subjectName,
   courseId,
@@ -1566,6 +1610,7 @@ function UnitDetails({
   selectedSectionId,
   resumeVideoAt = null,
   contentWidth,
+  onSelectUnit,
   onOpenVideo,
   onCompleteSection,
   onSubmitPractice,
@@ -1574,6 +1619,8 @@ function UnitDetails({
   onContinuePractice,
 }: {
   unit: LessonPracticeUnit;
+  units?: LessonPracticeUnit[];
+  unitIndex?: number;
   subjectId?: string;
   subjectName: string;
   courseId: string;
@@ -1585,13 +1632,15 @@ function UnitDetails({
   selectedSectionId: string | null;
   resumeVideoAt?: { unitId: string; sectionId: string; atSec: number } | null;
   contentWidth: number;
+  onSelectUnit?: (unit: LessonPracticeUnit) => void;
   onOpenVideo: (url: string) => void;
-  onCompleteSection: (unitId: string, section: 'video' | 'note', itemId: string) => Promise<boolean>;
+  onCompleteSection: (unitId: string, section: 'video' | 'note', itemId: string, keepSection?: boolean) => Promise<boolean>;
   onSubmitPractice: (
     unitId: string,
     itemId: string,
     practiceGroupId: string | undefined,
     answer: Record<string, unknown>,
+    keepSection?: boolean,
   ) => Promise<LessonPracticeItem | null>;
   onAdvancePractice: (unitId: string) => Promise<void>;
   onResetPractice: (unitId: string, practiceGroupId: string) => Promise<boolean>;
@@ -1763,11 +1812,15 @@ function UnitDetails({
   const contents = unit.contents || [];
   const sections = getUnitLearningSections(unit);
   const section = sections.find((item) => item.id === selectedSectionId)
-    || sections.find((item) => !isUnitSectionDone(unit, item))
-    || sections[sections.length - 1];
-  const sectionDone = section ? isUnitSectionDone(unit, section) : false;
-  const sectionContent = section?.kind === 'note' ? contents.find((item) => item.id === section.itemId) : undefined;
-  const sectionVideo = section?.kind === 'video' ? [...videos, ...legacyVideo].find((item) => item.id === section.itemId) : undefined;
+    || sections[pickDefaultLearningSectionIndex(unit, sections)];
+  const activeVideo = (section?.kind === 'video'
+    ? [...videos, ...legacyVideo].find((item) => item.id === section.itemId)
+    : undefined) || videos[0] || legacyVideo[0];
+  const videoSectionId = activeVideo ? `video:${activeVideo.id}` : section?.id || '';
+  const videoSectionLabel = activeVideo?.title || section?.title || unit.title;
+  const activeVideoDone = activeVideo
+    ? Boolean(unit.videoDoneIds?.includes(activeVideo.id) || (unit.videoDone && activeVideo.id === 'legacy-video'))
+    : Boolean(unit.status === 'completed');
   const practiceItems = section?.kind === 'practice'
     ? unit.items?.filter((item) => ['hotspot', 'mcq', 'multi', 'match', 'drag', 'written'].includes(item.type)
       && (item.practiceGroupId ? item.practiceGroupId === section.itemId : section.itemId === unit.id)) || []
@@ -1890,321 +1943,45 @@ function UnitDetails({
           />
         ))}
       </View>
-      <Text style={styles.unitTitle}>{unit.title}</Text>
-      {section?.kind === 'note' ? (
-        <View style={styles.contentCard}>
-          <Text style={styles.contentTitle}>{sectionContent?.title || section.title}</Text>
-          {sectionContent?.content ? (
-            <RenderHtml
-              contentWidth={Math.max(1, contentWidth)}
-              source={{ html: sectionContent.content, baseUrl: getMobileApiBaseUrl() }}
-              baseStyle={lessonHtmlBaseStyle}
-              tagsStyles={lessonHtmlTags}
-            />
-          ) : <Text style={styles.muted}>Nội dung này hiện không có văn bản.</Text>}
-          {sectionDone ? (
-            <Text style={styles.practiceSuccess}>Đã hoàn thành · Có thể xem lại từ danh sách bài học.</Text>
-          ) : (
-            <Pressable
-              onPress={() => {
-                void onCompleteSection(unit.id, 'note', section.itemId).then((saved) => {
-                  if (saved) celebrateSectionCompletion();
-                });
-              }}
-              style={styles.completeSectionButton}
-              accessibilityRole="button"
-            >
-              <CheckCircle2 size={17} color="#FFFFFF" />
-              <Text style={styles.completeSectionButtonText}>Đã đọc xong · Tiếp tục</Text>
-            </Pressable>
-          )}
-        </View>
-      ) : null}
-      {section?.kind === 'video' ? (
-        <VideoLessonPane
-          key={`${unit.id}-${section.itemId}`}
-          unit={unit}
-          subjectId={subjectId}
-          subjectName={subjectName}
-          sectionId={section.id}
-          sectionLabel={section.title}
-          video={sectionVideo}
-          initialAtSec={resumeVideoAt && (!resumeVideoAt.sectionId || resumeVideoAt.sectionId === section.id) ? resumeVideoAt.atSec : 0}
-          done={Boolean(sectionDone)}
-          antiSeekEnabled={sectionVideo?.antiSeek ?? unit.antiSeek !== false}
-          courseId={courseId}
-          courseTitle={courseTitle}
-          progressPct={progressPct}
-          userId={userId}
-          enabled={enabled}
-          resources={resources}
-          onOpenVideo={onOpenVideo}
-          onComplete={() => {
-            return onCompleteSection(unit.id, 'video', section.itemId).then((saved) => {
-              if (saved) celebrateSectionCompletion();
-              return saved;
-            });
-          }}
-        />
-      ) : null}
-      {section?.kind === 'practice' ? (
-        <View style={[styles.practiceCard, styles.practiceCardInteractive]}>
-          <View style={styles.practiceHeader}>
-            <View style={styles.flex}>
-              <Text style={styles.contentTitle}>{section.title}</Text>
-              <Text style={styles.practiceProgressText}>Tiến độ {completedPracticeCount}/{practiceItems.length} câu</Text>
-            </View>
-            <View style={styles.practiceHeaderActions}>
-              <View style={styles.practiceStreak}>
-                <Sparkles size={13} color="#D97706" />
-                <Text style={styles.practiceStreakText}>Chuỗi đúng: {currentPracticeStats.streak}</Text>
-              </View>
-              <Pressable
-                onPress={() => {
-                  void setMobileSoundEnabled(!practiceSoundEnabled)
-                    .then(() => setPracticeSoundEnabled(!practiceSoundEnabled))
-                    .catch((error: unknown) => Alert.alert('Không thể đổi âm thanh', error instanceof Error ? error.message : 'Vui lòng thử lại.'));
-                }}
-                style={styles.practiceSoundButton}
-                accessibilityRole="button"
-                accessibilityLabel={practiceSoundEnabled ? 'Tắt âm thanh luyện tập' : 'Bật âm thanh luyện tập'}
-                accessibilityState={{ checked: practiceSoundEnabled }}
-              >
-                {practiceSoundEnabled ? <Volume2 size={16} color={theme.brand} /> : <VolumeX size={16} color={colors.muted} />}
-              </Pressable>
-              {practiceTimeLimit > 0 ? (
-                <View style={[styles.practiceClock, practiceRemaining > 0 && practiceRemaining <= 10 && styles.practiceClockWarning]}>
-                  <Clock3 size={15} color={practiceRemaining > 0 && practiceRemaining <= 10 ? '#059669' : '#334155'} />
-                  <Text style={styles.practiceClockText}>
-                    {Math.floor((practiceStarted ? practiceRemaining : practiceTimeLimit) / 60)}:{String((practiceStarted ? practiceRemaining : practiceTimeLimit) % 60).padStart(2, '0')}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-          {practiceItems.length ? (
-            <View style={styles.practiceContent}>
-              <View style={styles.practiceProgressArea}>
-                <View style={styles.practiceProgressTrack}>
-                  <View style={[styles.practiceProgressFill, { width: `${(completedPracticeCount / practiceItems.length) * 100}%` }]} />
-                </View>
-                <View
-                  onLayout={(event) => setPracticeProgressWidth(event.nativeEvent.layout.width)}
-                  style={styles.practiceSteps}
-                  accessibilityLabel={`Tiến độ câu hỏi: ${completedPracticeCount} trên ${practiceItems.length} câu đúng`}
-                >
-                  {practiceItems.map((item, index) => {
-                    const done = item.confirmed === true && item.correct === true;
-                    const active = index === currentPracticeIndex;
-                    return (
-                      <View key={item.id} style={[styles.practiceStep, done && styles.practiceStepDone, currentPracticeStats.wrongIds.includes(item.id) && !done && styles.practiceStepRetry, active && styles.practiceStepActive]}>
-                        <Text style={[styles.practiceStepText, done && styles.practiceStepTextDone, active && styles.practiceStepTextActive]}>{done ? '✓' : index + 1}</Text>
-                      </View>
-                    );
-                  })}
-                  {currentPracticeItem && !practiceComplete ? (
-                    <View pointerEvents="none" style={styles.practiceProgressFireworkOverlay}>
-                      {[0, 1].map((ringIndex) => {
-                        const progress = practiceProgressCelebration.interpolate({
-                          inputRange: [0, 0.12 + ringIndex * 0.08, 0.84, 1],
-                          outputRange: [0, 0, 0.9, 0],
-                        });
-                        return (
-                          <Animated.View
-                            key={`ring-${ringIndex}`}
-                            style={[
-                              styles.practiceFireworkRing,
-                              {
-                                left: progressMarkerOffset,
-                                borderColor: ringIndex === 0 ? '#0F766E' : '#C4A35A',
-                                opacity: progress,
-                                transform: [{ scale: progress.interpolate({ inputRange: [0, 0.9], outputRange: [0.2, 1.8 + ringIndex * 0.6] }) }],
-                              },
-                            ]}
-                          />
-                        );
-                      })}
-                      {practiceFireworkRays.map(([angle, color, size], particleIndex) => (
-                        <Animated.View
-                          key={particleIndex}
-                          style={[
-                            styles.practiceFireworkRay,
-                            {
-                              backgroundColor: color,
-                              left: progressMarkerOffset,
-                              top: '50%',
-                              opacity: practiceProgressCelebration.interpolate({ inputRange: [0, 0.12, 0.84, 1], outputRange: [0, 1, 0.85, 0] }),
-                            },
-                            {
-                              transform: [
-                                { rotate: `${angle}deg` },
-                                { translateY: practiceProgressCelebration.interpolate({ inputRange: [0, 1], outputRange: [0, -size] }) },
-                                { scaleY: practiceProgressCelebration.interpolate({ inputRange: [0, 0.85], outputRange: [0.2, 1] }) },
-                              ]
-                            },
-                          ]}
-                        />
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-              {currentPracticeItem && !practiceComplete ? (
-                <PracticeQuestion
-                  key={currentPracticeItem.id}
-                  item={currentPracticeItem}
-                  index={currentPracticeIndex}
-                  soundEnabled={practiceSoundEnabled}
-                  onChoosePraise={choosePracticePraise}
-                  onChooseEncouragement={choosePracticeEncouragement}
-                  onPlayPraise={playPracticePraise}
-                  onCelebrateCorrect={() => celebratePracticeProgress(currentPracticeIndex)}
-                  onAdvancePractice={() => onAdvancePractice(unit.id)}
-                  onSubmit={(answer) => submitPracticeQuestion(currentPracticeItem.id, currentPracticeItem.practiceGroupId, answer)}
-                />
-              ) : (
-                <View style={styles.practiceResultCard}>
-                  <View style={styles.practiceResultIcon}><Trophy size={30} color="#059669" /></View>
-                  <Text style={styles.practiceResultEyebrow}>Đã hoàn thành bài luyện tập</Text>
-                  <Text style={styles.practiceResultTitle}>Bạn đã hoàn thành rất tốt!</Text>
-                  <Text style={styles.practiceResultSummary}>
-                    Đúng {completedPracticeCount}/{practiceItems.length} câu{currentPracticeStats.wrongAttempts ? ` với ${currentPracticeStats.wrongAttempts} lượt trả lời sai.` : '.'}
-                  </Text>
-                  <View style={styles.practiceResultStats}>
-                    <View style={styles.practiceResultStat}><Text style={styles.practiceResultValue}>{completedPracticeCount}/{practiceItems.length}</Text><Text style={styles.practiceResultLabel}>Câu đúng</Text></View>
-                    <View style={styles.practiceResultStat}><Text style={styles.practiceResultValue}>{currentPracticeStats.wrongIds.length}</Text><Text style={styles.practiceResultLabel}>Câu từng trả lời sai</Text></View>
-                    <View style={styles.practiceResultStat}><Text style={styles.practiceResultValue}>{Math.round((completedPracticeCount / practiceItems.length) * 100)}%</Text><Text style={styles.practiceResultLabel}>Độ chính xác</Text></View>
-                    <View style={styles.practiceResultStat}><Text style={styles.practiceResultValue}>{currentPracticeStats.bestStreak}</Text><Text style={styles.practiceResultLabel}>Chuỗi đúng dài nhất</Text></View>
-                  </View>
-                  <View style={styles.practiceResultActions}>
-                    {currentPracticeStats.wrongIds.length ? (
-                      <Pressable onPress={() => setShowWrongQuestions((visible) => !visible)} style={styles.practiceSecondaryAction} accessibilityRole="button">
-                        <Eye size={14} color="#334155" />
-                        <Text style={styles.practiceSecondaryActionText}>{showWrongQuestions ? 'Ẩn câu đã sai' : `Xem lại câu sai (${currentPracticeStats.wrongIds.length})`}</Text>
-                      </Pressable>
-                    ) : null}
-                    <Pressable onPress={() => void restartPractice(true)} disabled={resettingPractice} style={styles.practiceSecondaryAction} accessibilityRole="button">
-                      <RotateCcw size={14} color="#334155" />
-                      <Text style={styles.practiceSecondaryActionText}>{resettingPractice ? 'Đang làm lại...' : 'Làm lại bài'}</Text>
-                    </Pressable>
-                    <Pressable onPress={onContinuePractice} style={styles.practiceContinueAction} accessibilityRole="button">
-                      <Text style={styles.practiceContinueText}>Học tiếp</Text>
-                      <ChevronRight size={16} color="#FFFFFF" />
-                    </Pressable>
-                  </View>
-                  {showWrongQuestions ? (
-                    <View style={styles.practiceWrongList}>
-                      {practiceItems.filter((item) => currentPracticeStats.wrongIds.includes(item.id)).map((item) => (
-                        <View key={item.id} style={styles.practiceWrongItem}>
-                          <Text style={styles.practiceWrongTitle}>{item.prompt || 'Câu hỏi luyện tập'}</Text>
-                          {practiceAnswerSummary(item) ? <Text style={styles.practiceWrongAnswer}>Đáp án đúng: {practiceAnswerSummary(item)}</Text> : null}
-                          <Text style={styles.practiceWrongCopy}>{item.explanation || 'Bạn đã trả lời sai câu này trước khi tìm được đáp án đúng.'}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              )}
-            </View>
-          ) : (
-            <Text style={styles.muted}>Phần luyện tập này chưa có câu hỏi.</Text>
-          )}
-          {practiceItems.length && currentPracticeItem && !practiceStarted ? (
-            <View style={styles.practiceModalOverlay}>
-              <View style={styles.practiceStartModal}>
-                <View style={styles.practiceStartIcon}><Play size={24} color="#FFFFFF" fill="#FFFFFF" /></View>
-                <Text style={styles.practiceStartTitle}>Sẵn sàng luyện tập?</Text>
-                <Text style={styles.practiceStartCopy}>
-                  Có {practiceItems.length} câu hỏi. Câu hỏi sẽ hiện và đồng hồ bắt đầu tính sau khi bạn bấm nút bên dưới.
-                </Text>
-                {practiceTimeLimit > 0 ? (
-                  <View style={styles.practiceStartTime}><Clock3 size={14} color="#059669" /><Text style={styles.practiceStartTimeText}>Thời gian: {Math.floor(practiceTimeLimit / 60)}:{String(practiceTimeLimit % 60).padStart(2, '0')}</Text></View>
-                ) : null}
-                <Pressable
-                  onPress={() => {
-                    setPracticeExpired(false);
-                    setStartedPracticeKey(practiceStatsKey);
-                  }}
-                  style={styles.practiceStartButton}
-                  accessibilityRole="button"
-                >
-                  <Play size={15} color="#FFFFFF" fill="#FFFFFF" />
-                  <Text style={styles.practiceStartButtonText}>Bắt đầu luyện tập</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-          {practiceExpired ? (
-            <View style={styles.practiceModalOverlay}>
-              <View style={styles.practiceStartModal}>
-                <View style={[styles.practiceStartIcon, styles.practiceTimeoutIcon]}><Clock3 size={24} color="#FFFFFF" /></View>
-                <Text style={styles.practiceStartTitle}>Bạn đã hết thời gian</Text>
-                <Pressable
-                  onPress={() => void restartPractice(true)}
-                  disabled={resettingPractice}
-                  style={styles.practiceStartButton}
-                  accessibilityRole="button"
-                >
-                  <RotateCcw size={15} color="#FFFFFF" />
-                  <Text style={styles.practiceStartButtonText}>{resettingPractice ? 'Đang làm lại...' : 'Làm lại'}</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-          {practiceComplete ? (
-            <View pointerEvents="none" style={styles.practiceCompletionFireworkOverlay}>
-              {practiceCompletionRings.map((ring, index) => (
-                <Animated.View
-                  key={`completion-ring-${index}`}
-                  style={[
-                    styles.practiceFireworkRing,
-                    styles.practiceCompletionFireworkRing,
-                    {
-                      left: '50%',
-                      top: '50%',
-                      borderColor: index === 0 ? '#0F766E' : '#C4A35A',
-                      opacity: ring.interpolate({ inputRange: [0, 0.1, 0.82, 1], outputRange: [0, 0.9, 0.7, 0] }),
-                      transform: [{ scale: ring.interpolate({ inputRange: [0, 0.9], outputRange: [0.2, 5 + index * 2] }) }],
-                    },
-                  ]}
-                />
-              ))}
-              {practiceFireworkRays.map(([angle, color, size], index) => {
-                const progress = practiceCompletionRays[index];
-                return (
-                  <Animated.View
-                    key={`completion-ray-${index}`}
-                    style={[
-                      styles.practiceFireworkRay,
-                      styles.practiceCompletionFireworkRay,
-                      {
-                        backgroundColor: color,
-                        left: '50%',
-                        top: '50%',
-                        opacity: progress.interpolate({ inputRange: [0, 0.1, 0.84, 1], outputRange: [0, 1, 0.8, 0] }),
-                      },
-                      {
-                        transform: [
-                          { rotate: `${angle}deg` },
-                          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 1.8] }) },
-                          { scaleY: progress.interpolate({ inputRange: [0, 0.85], outputRange: [0.25, 1] }) },
-                        ]
-                      },
-                    ]}
-                  />
-                );
-              })}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-      {!sections.length || !section ? (
-        <View style={styles.contentCard}>
-          <CheckCircle2 size={23} color="#059669" />
-          <Text style={styles.contentTitle}>{sections.length ? 'Đã hoàn thành nội dung bài học' : 'Bài học chưa có nội dung'}</Text>
-          <Text style={styles.muted}>{sections.length ? 'Bạn đã hoàn thành tất cả phần học có trong bài này.' : 'Bài học này chưa có nội dung hoặc luyện tập.'}</Text>
-        </View>
-      ) : null}
+      <VideoLessonPane
+        key={`${unit.id}-${activeVideo?.id || 'lesson'}`}
+        unit={unit}
+        units={units}
+        unitIndex={unitIndex}
+        subjectId={subjectId}
+        subjectName={subjectName}
+        sectionId={videoSectionId}
+        sectionLabel={videoSectionLabel}
+        video={activeVideo}
+        initialAtSec={resumeVideoAt && (!resumeVideoAt.sectionId || resumeVideoAt.sectionId === videoSectionId) ? resumeVideoAt.atSec : 0}
+        done={Boolean(activeVideoDone)}
+        antiSeekEnabled={activeVideo?.antiSeek ?? unit.antiSeek !== false}
+        courseId={courseId}
+        courseTitle={courseTitle}
+        progressPct={progressPct}
+        userId={userId}
+        enabled={enabled}
+        resources={resources}
+        contentWidth={contentWidth}
+        soundEnabled={practiceSoundEnabled}
+        onSelectUnit={onSelectUnit}
+        onOpenVideo={onOpenVideo}
+        onCompleteSection={(secKind, itemId) => onCompleteSection(unit.id, secKind, itemId, true).then((saved) => {
+          if (saved) celebrateSectionCompletion();
+          return saved;
+        })}
+        onSubmitQuizItem={(itemId, grpId, answer) => onSubmitPractice(unit.id, itemId, grpId, answer, true)}
+        onAdvancePractice={() => onAdvancePractice(unit.id)}
+        onChoosePraise={choosePracticePraise}
+        onPlayPraise={playPracticePraise}
+        onComplete={() => {
+          if (!activeVideo) return Promise.resolve(true);
+          return onCompleteSection(unit.id, 'video', activeVideo.id, true).then((saved) => {
+            if (saved) celebrateSectionCompletion();
+            return saved;
+          });
+        }}
+      />
     </View>
   );
 }
@@ -2273,7 +2050,7 @@ function SectionNavigationBar({
         accessibilityLabel={previousSection ? `Mục trước: ${previousSection.title}` : 'Không có mục trước'}
       >
         <ArrowLeft size={15} color={previousSection ? theme.brand : colors.muted} />
-        <Text numberOfLines={1} style={styles.sectionNavigationLabel}>{previousSection?.title || 'Mục trước'}</Text>
+        <Text numberOfLines={1} style={[styles.sectionNavigationLabel, !previousSection && styles.sectionNavigationLabelDisabled]}>{previousSection?.title || 'Mục trước'}</Text>
       </Pressable>
       <Pressable
         onPress={() => nextSection && onNavigateSection(nextSection.id)}
@@ -2286,26 +2063,23 @@ function SectionNavigationBar({
         accessibilityRole="button"
         accessibilityLabel={nextSection ? `Mục tiếp theo: ${nextSection.title}${!currentDone ? ', hoàn thành mục hiện tại trước' : ''}` : 'Đã đến mục cuối cùng'}
       >
-        <Text numberOfLines={1} style={styles.sectionNavigationLabel}>{nextSection?.title || 'Mục tiếp theo'}</Text>
+        <Text numberOfLines={1} style={[styles.sectionNavigationLabel, (!nextSection || !currentDone) && styles.sectionNavigationLabelDisabled]}>{nextSection?.title || 'Mục tiếp theo'}</Text>
         <ChevronRight size={15} color={nextSection && currentDone ? theme.brand : colors.muted} />
       </Pressable>
     </View>
   );
 }
 
-type VideoLessonTab = 'overview' | 'qa' | 'notes' | 'reviews' | 'resources';
-const videoLessonTabs: Array<{ id: VideoLessonTab; label: string; icon: typeof Layers3 }> = [
-  { id: 'overview', label: 'Tổng quan', icon: Layers3 },
-  { id: 'qa', label: 'Hỏi đáp', icon: MessageSquare },
-  { id: 'notes', label: 'Ghi chú', icon: StickyNote },
-  { id: 'reviews', label: 'Đánh giá', icon: Star },
-  { id: 'resources', label: 'Tài liệu', icon: FileText },
-];
+type VideoMainTab = 'lesson' | 'curriculum' | 'resources';
+type VideoResourceSubTab = 'resources' | 'notes' | 'qa' | 'reviews';
+const QUIZ_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 const getEmbeddedVideoUrl = embeddedVideoUrl;
 
 function VideoLessonPane({
   unit,
+  units = [],
+  unitIndex = 0,
   subjectId = '',
   subjectName,
   sectionId = '',
@@ -2320,10 +2094,20 @@ function VideoLessonPane({
   userId,
   enabled,
   resources,
+  contentWidth = 340,
+  soundEnabled = true,
+  onSelectUnit,
   onOpenVideo,
+  onCompleteSection,
+  onSubmitQuizItem,
+  onAdvancePractice,
+  onChoosePraise,
+  onPlayPraise,
   onComplete,
 }: {
   unit: LessonPracticeUnit;
+  units?: LessonPracticeUnit[];
+  unitIndex?: number;
   subjectId?: string;
   subjectName: string;
   sectionId?: string;
@@ -2338,10 +2122,23 @@ function VideoLessonPane({
   userId: string;
   enabled: boolean;
   resources: NonNullable<LessonPracticeCourse['files']>;
+  contentWidth?: number;
+  soundEnabled?: boolean;
+  onSelectUnit?: (unit: LessonPracticeUnit) => void;
   onOpenVideo: (url: string) => void;
+  onCompleteSection?: (section: 'video' | 'note', itemId: string) => Promise<boolean>;
+  onSubmitQuizItem?: (
+    itemId: string,
+    practiceGroupId: string | undefined,
+    answer: Record<string, unknown>,
+  ) => Promise<LessonPracticeItem | null>;
+  onAdvancePractice?: () => Promise<void>;
+  onChoosePraise?: () => PracticePraise;
+  onPlayPraise?: (audio: number) => void;
   onComplete: () => Promise<boolean>;
 }) {
-  const [activeTab, setActiveTab] = useState<VideoLessonTab>('overview');
+  const [activeTab, setActiveTab] = useState<VideoMainTab>('lesson');
+  const [resourceSubTab, setResourceSubTab] = useState<VideoResourceSubTab>('resources');
   const [started, setStarted] = useState(() => Boolean(initialAtSec > 0 && playableVideoUrl(video?.url || '')));
   useEffect(() => {
     if (initialAtSec > 0 && playableVideoUrl(video?.url || '')) {
@@ -2367,6 +2164,194 @@ function VideoLessonPane({
   const [offlineDownloadPct, setOfflineDownloadPct] = useState<number | null>(null);
   const [offlineUri, setOfflineUri] = useState<string>('');
   const [usingOfflineUri, setUsingOfflineUri] = useState(false);
+
+  const wrongSoundPlayer = useAudioPlayer(require('../assets/audio/practice-wrong.wav'));
+  const unitQuizItems = useMemo(
+    () => (unit.items || []).filter((item) => item.type === 'mcq' || item.type === 'multi'),
+    [unit.items],
+  );
+  const isLocalFallbackQuiz = unitQuizItems.length === 0;
+  const quizItems = useMemo<LessonPracticeItem[]>(() => {
+    if (unitQuizItems.length) return unitQuizItems;
+    return [{
+      id: `quick-check-${unit.id}`,
+      type: 'mcq',
+      prompt: `Nội dung trọng tâm của "${video?.title || unit.title}" là gì?`,
+      options: [
+        { id: 'a', text: 'Nắm vững thao tác và quy tắc thực hành chuẩn trong video bài giảng' },
+        { id: 'b', text: 'Bỏ qua bước thực hành và không cần kiểm tra lại kết quả' },
+        { id: 'c', text: 'Chỉ xem lướt tiêu đề mà không theo dõi hướng dẫn' },
+      ],
+      hint: `Hãy xem lại phần hướng dẫn chính trong "${video?.title || unit.title}" để chọn đáp án đúng nhất.`,
+      explanation: 'Chính xác! Kết hợp xem video và thực hành giúp bạn làm chủ bài học nhanh chóng.',
+      answer: { choiceId: 'a' },
+    }];
+  }, [unit.id, unit.title, unitQuizItems, video?.title]);
+
+  const getQuizMilestoneSecFor = (qIdx: number, durSec: number): number => {
+    if (qIdx <= 0) return 0;
+    const explicit = Number(quizItems[qIdx]?.milestoneSec ?? quizItems[qIdx]?.atSec ?? 0);
+    if (Number.isFinite(explicit) && explicit > 0) return Math.floor(explicit);
+    if (durSec > 0) {
+      return Math.max(qIdx * 5, Math.min(Math.max(1, durSec - 2), Math.floor((durSec * qIdx) / quizItems.length)));
+    }
+    return qIdx * 30;
+  };
+
+  const resolveInitialQuizIdx = () => {
+    const startSec = done ? 999999 : Math.max(0, Math.floor(initialAtSec || 0));
+    const idx = quizItems.findIndex((item) => !(item.confirmed === true && item.correct === true));
+    if (idx < 0) return 0;
+    if (idx === 0 || !url || done || startSec >= getQuizMilestoneSecFor(idx, 0)) return idx;
+    return idx - 1;
+  };
+
+  const [activeQuizIdx, setActiveQuizIdx] = useState(resolveInitialQuizIdx);
+  const [selectedChoiceIds, setSelectedChoiceIds] = useState<string[]>([]);
+  const [showQuizHint, setShowQuizHint] = useState(false);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [quizStatus, setQuizStatus] = useState<'idle' | 'correct' | 'wrong'>('idle');
+  const [quizFeedback, setQuizFeedback] = useState('');
+  const [localDoneQuizIds, setLocalDoneQuizIds] = useState<Record<string, boolean>>({});
+  const [localAnsweredChoices, setLocalAnsweredChoices] = useState<Record<string, string[]>>({});
+  const [maxReachedSec, setMaxReachedSec] = useState<number>(() => (done ? 999999 : Math.max(0, Math.floor(initialAtSec || 0))));
+  const maxReachedSecRef = useRef(maxReachedSec);
+  maxReachedSecRef.current = maxReachedSec;
+  const videoDurationRef = useRef(0);
+  videoDurationRef.current = Math.floor(videoProgress.duration || 0);
+  const pausedMilestoneQuizIdRef = useRef('');
+  const gateHoldPlaybackRef = useRef(false);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isQuizItemDone = (item: LessonPracticeItem | undefined) =>
+    Boolean(item && ((item.confirmed === true && item.correct === true) || localDoneQuizIds[item.id]));
+
+  const getSavedQuizChoices = (item: LessonPracticeItem | undefined): string[] => {
+    if (!item) return [];
+    const local = localAnsweredChoices[item.id];
+    if (local && local.length) return local;
+    if (item.type === 'multi') {
+      if (Array.isArray(item.answer?.choiceIds) && item.answer.choiceIds.length) {
+        return (item.answer.choiceIds as unknown[]).map(String);
+      }
+      if (Array.isArray(item.correctOptionIds) && item.correctOptionIds.length) {
+        return item.correctOptionIds.map(String);
+      }
+    } else {
+      if (typeof item.answer?.choiceId === 'string' && item.answer.choiceId) {
+        return [item.answer.choiceId];
+      }
+      if (typeof item.correctOptionId === 'string' && item.correctOptionId) {
+        return [item.correctOptionId];
+      }
+    }
+    if (item.confirmed === true && item.correct === true && item.options?.length) {
+      return [item.options[0].id];
+    }
+    return [];
+  };
+
+  const getQuizMilestoneSec = (qIdx: number): number =>
+    getQuizMilestoneSecFor(qIdx, Math.floor(videoProgress.duration || 0));
+
+  const isQuizUnlocked = (qIdx: number): boolean => {
+    if (qIdx <= 0) return true;
+    if (isQuizItemDone(quizItems[qIdx])) return true;
+    for (let i = 0; i < qIdx; i += 1) {
+      if (!isQuizItemDone(quizItems[i])) return false;
+    }
+    if (!url || done) return true;
+    return maxReachedSec >= getQuizMilestoneSec(qIdx);
+  };
+
+  const hydratedUnitIdRef = useRef('');
+
+  useEffect(() => {
+    setActiveTab('lesson');
+    hydratedUnitIdRef.current = unitQuizItems.length ? unit.id : '';
+    setLocalDoneQuizIds({});
+    setLocalAnsweredChoices({});
+    pausedMilestoneQuizIdRef.current = '';
+    gateHoldPlaybackRef.current = false;
+    setMaxReachedSec(done ? 999999 : Math.max(0, Math.floor(initialAtSec || 0)));
+    const initIdx = resolveInitialQuizIdx();
+    setActiveQuizIdx(initIdx);
+    const initItem = quizItems[initIdx];
+    setSelectedChoiceIds(isQuizItemDone(initItem) ? getSavedQuizChoices(initItem) : []);
+    setShowQuizHint(false);
+    setQuizStatus('idle');
+    setQuizFeedback('');
+  }, [unit.id]); // eslint-disable-line react-hooks/exhaustive-deps -- reset state only when changing unit
+
+  useEffect(() => {
+    if (!unitQuizItems.length || hydratedUnitIdRef.current === unit.id) return;
+    hydratedUnitIdRef.current = unit.id;
+    const initIdx = resolveInitialQuizIdx();
+    setActiveQuizIdx(initIdx);
+    const initItem = quizItems[initIdx];
+    if (isQuizItemDone(initItem)) {
+      setSelectedChoiceIds(getSavedQuizChoices(initItem));
+    }
+  }, [unit.id, unitQuizItems]); // eslint-disable-line react-hooks/exhaustive-deps -- jump to first unlocked pending question when async unit items load
+
+  useEffect(() => {
+    const minSec = done ? 999999 : Math.max(0, Math.floor(initialAtSec || 0));
+    if (minSec > maxReachedSec) setMaxReachedSec(minSec);
+  }, [done, initialAtSec, maxReachedSec]);
+
+  useEffect(() => () => {
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+  }, []);
+
+  const safeQuizIdx = Math.min(Math.max(0, activeQuizIdx), Math.max(0, quizItems.length - 1));
+  const activeQuizItem = quizItems[safeQuizIdx];
+  const activeQuizDone = isQuizItemDone(activeQuizItem);
+
+  useEffect(() => {
+    if (isQuizItemDone(activeQuizItem)) {
+      setSelectedChoiceIds(getSavedQuizChoices(activeQuizItem));
+    } else {
+      setSelectedChoiceIds([]);
+    }
+    setShowQuizHint(false);
+    setQuizStatus('idle');
+    setQuizFeedback('');
+  }, [activeQuizItem?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- sync choices when switching active question
+
+  useEffect(() => {
+    if (!url || done) {
+      gateHoldPlaybackRef.current = false;
+      return;
+    }
+    const firstUnansweredIdx = quizItems.findIndex((item) => !isQuizItemDone(item));
+    if (firstUnansweredIdx < 0) {
+      gateHoldPlaybackRef.current = false;
+      return;
+    }
+    const reachedCurrentMilestone = firstUnansweredIdx > 0 && maxReachedSec >= getQuizMilestoneSec(firstUnansweredIdx);
+    const blockedAtNextMilestone =
+      firstUnansweredIdx + 1 < quizItems.length && maxReachedSec >= getQuizMilestoneSec(firstUnansweredIdx + 1);
+
+    if (reachedCurrentMilestone) {
+      const targetItem = quizItems[firstUnansweredIdx];
+      if (pausedMilestoneQuizIdRef.current !== targetItem.id) {
+        pausedMilestoneQuizIdRef.current = targetItem.id;
+        setActiveQuizIdx(firstUnansweredIdx);
+        playerApiRef.current?.pause?.();
+      }
+      gateHoldPlaybackRef.current = true;
+      return;
+    }
+
+    if (blockedAtNextMilestone) {
+      setActiveQuizIdx(firstUnansweredIdx);
+      playerApiRef.current?.pause?.();
+      gateHoldPlaybackRef.current = true;
+      return;
+    }
+
+    gateHoldPlaybackRef.current = false;
+  }, [maxReachedSec, localDoneQuizIds, unit.items, url, done, videoProgress.duration]); // eslint-disable-line react-hooks/exhaustive-deps -- evaluate milestone unlock & hold state cleanly
 
   useEffect(() => {
     let alive = true;
@@ -2457,6 +2442,13 @@ function VideoLessonPane({
   const handleVideoProgress = (p: VideoPlayerProgress) => {
     setVideoProgress(p);
     const currentSec = Math.floor(p.currentTime || 0);
+    const reachedSec = Math.max(currentSec, Math.floor(p.watchedSeconds || 0));
+    if (reachedSec > 0) {
+      setMaxReachedSec((prev) => (reachedSec > prev ? reachedSec : prev));
+    }
+    if (p.playing && gateHoldPlaybackRef.current) {
+      playerApiRef.current?.pause?.();
+    }
     if (
       p.playing &&
       userId &&
@@ -2493,53 +2485,195 @@ function VideoLessonPane({
     }
   };
 
+  const toggleQuizOption = (optionId: string) => {
+    if (quizSubmitting || quizStatus === 'correct' || isQuizItemDone(activeQuizItem)) return;
+    setQuizStatus('idle');
+    setQuizFeedback('');
+    if (activeQuizItem?.type === 'multi') {
+      setSelectedChoiceIds((cur) => (cur.includes(optionId) ? cur.filter((id) => id !== optionId) : [...cur, optionId]));
+    } else {
+      setSelectedChoiceIds([optionId]);
+    }
+  };
+
+  const playInteractiveSound = (isCorrect: boolean) => {
+    if (!soundEnabled) return;
+    if (isCorrect) {
+      const praise = onChoosePraise?.();
+      if (praise && onPlayPraise) {
+        onPlayPraise(praise.audio);
+      } else if (Platform.OS === 'web') {
+        playWebPracticeFeedbackSound(true);
+      }
+      return;
+    }
+    if (Platform.OS === 'web') {
+      playWebPracticeFeedbackSound(false);
+    } else {
+      void wrongSoundPlayer.seekTo(0)
+        .then(() => wrongSoundPlayer.play())
+        .catch(() => undefined);
+    }
+  };
+
+  const submitInteractiveQuiz = async () => {
+    if (!activeQuizItem || !selectedChoiceIds.length || quizSubmitting || quizStatus === 'correct' || isQuizItemDone(activeQuizItem)) return;
+    if (soundEnabled) unlockPracticeFeedbackAudio();
+    setQuizSubmitting(true);
+    setQuizStatus('idle');
+    setQuizFeedback('');
+    try {
+      let isCorrect = false;
+      let feedbackMsg = '';
+      if (isLocalFallbackQuiz) {
+        isCorrect = selectedChoiceIds[0] === 'a';
+        feedbackMsg = isCorrect
+          ? (activeQuizItem.explanation || 'Chính xác!')
+          : 'Chưa đúng. Bạn thử chọn đáp án khác nhé!';
+      } else if (activeQuizItem.confirmed === true && activeQuizItem.correct === true) {
+        if (activeQuizItem.type === 'multi') {
+          const expected = Array.isArray(activeQuizItem.answer?.choiceIds)
+            ? (activeQuizItem.answer.choiceIds as unknown[]).map(String).sort()
+            : [];
+          const pickedSorted = [...selectedChoiceIds].map(String).sort();
+          isCorrect = expected.length ? (pickedSorted.length === expected.length && pickedSorted.every((v, i) => v === expected[i])) : true;
+        } else {
+          const expectedId = typeof activeQuizItem.answer?.choiceId === 'string' ? activeQuizItem.answer.choiceId : '';
+          isCorrect = expectedId ? selectedChoiceIds[0] === expectedId : true;
+        }
+        feedbackMsg = isCorrect ? 'Chính xác!' : 'Chưa đúng. Bạn thử chọn lại nhé!';
+      } else if (onSubmitQuizItem) {
+        const answerPayload: Record<string, unknown> = activeQuizItem.type === 'multi'
+          ? { choiceIds: selectedChoiceIds }
+          : { choiceId: selectedChoiceIds[0] || '' };
+        const result = await onSubmitQuizItem(activeQuizItem.id, activeQuizItem.practiceGroupId, answerPayload);
+        if (!result) return;
+        isCorrect = result.confirmed === true && result.correct === true;
+        const rawFeedback = String(result.feedback || result.explanation || '').trim();
+        feedbackMsg = !isCorrect && rawFeedback === 'Bạn sai rồi, vui lòng chọn lại đáp án'
+          ? 'Chưa đúng. Hãy chọn lại đáp án!'
+          : rawFeedback;
+      }
+
+      playInteractiveSound(isCorrect);
+      if (isCorrect) {
+        gateHoldPlaybackRef.current = false;
+        setLocalDoneQuizIds((prev) => ({ ...prev, [activeQuizItem.id]: true }));
+        setLocalAnsweredChoices((prev) => ({ ...prev, [activeQuizItem.id]: [...selectedChoiceIds] }));
+        setQuizStatus('correct');
+        setQuizFeedback(feedbackMsg || 'Chính xác! Đang tiếp tục video...');
+        if (url) {
+          if (!started) setStarted(true);
+          playerApiRef.current?.play?.();
+        }
+        if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = setTimeout(() => {
+          if (!isLocalFallbackQuiz && !(activeQuizItem.confirmed === true && activeQuizItem.correct === true)) {
+            void onAdvancePractice?.();
+          }
+          const nextIdx = safeQuizIdx + 1;
+          if (nextIdx < quizItems.length) {
+            const nextMilestone = getQuizMilestoneSecFor(nextIdx, videoDurationRef.current);
+            if (!url || done || maxReachedSecRef.current >= nextMilestone || isQuizItemDone(quizItems[nextIdx])) {
+              setActiveQuizIdx(nextIdx);
+            } else {
+              setQuizFeedback(
+                `Chính xác! Tiếp tục xem video đến mốc ${formatMinuteSecond(nextMilestone)} để mở Câu ${nextIdx + 1}.`,
+              );
+            }
+          } else {
+            setQuizFeedback('Chính xác! Bạn đã hoàn thành tất cả câu hỏi tương tác.');
+          }
+        }, 700);
+      } else {
+        setQuizStatus('wrong');
+        setQuizFeedback(feedbackMsg || 'Chưa đúng. Hãy thử chọn đáp án khác nhé!');
+      }
+    } finally {
+      setQuizSubmitting(false);
+    }
+  };
+
+  const watchedPct = done
+    ? 100
+    : videoProgress.duration > 0
+      ? Math.min(100, Math.round((videoProgress.watchedSeconds / videoProgress.duration) * 100))
+      : 0;
+  const unitContents = unit.contents || [];
+  const mainTabs: Array<{ id: VideoMainTab; label: string }> = [
+    { id: 'lesson', label: 'Bài học hiện tại' },
+    { id: 'curriculum', label: `Mục lục (${units.length || 1} buổi)` },
+    { id: 'resources', label: 'Tài liệu (.xlsx)' },
+  ];
+
   return (
-    <View style={styles.videoLessonCard}>
-      <View style={styles.videoLessonHeading}>
-        <View style={styles.videoLessonTitleRow}>
-          <Clapperboard size={17} color={theme.brand} />
-          <Text style={styles.videoLessonTitle}>{video?.title || 'Video bài giảng'}</Text>
-        </View>
-        {done ? (
-          <View style={styles.videoDoneBadge}>
-            <CheckCircle2 size={13} color="#059669" />
-            <Text style={styles.videoDoneBadgeText}>Đã xong</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.videoFrame}>
-        {started && (usingOfflineUri ? Boolean(offlineUri) : (embeddedUrl || directVideo)) ? (
-          <VideoPlayerFrame
-            videoUrl={usingOfflineUri && offlineUri ? offlineUri : resolveMobilePublicUrl(url)}
-            embeddedUrl={usingOfflineUri ? '' : embeddedUrl}
-            title={video?.title || unit.title}
-            lessonId={`${userId || 'anon'}-${unit.id}-${video?.id || 'video'}`}
-            antiSeekEnabled={antiSeekEnabled}
-            done={done}
-            initialAtSec={initialAtSec}
-            playerApiRef={playerApiRef}
-            onProgress={handleVideoProgress}
-            onWatched={onComplete}
-          />
-        ) : (
-          <View style={styles.videoStartOverlay}>
-            <Pressable
-              onPress={startVideo}
-              disabled={!url}
-              style={[styles.videoStartButton, !url && styles.actionDisabled]}
-              accessibilityRole="button"
-              accessibilityLabel="Bắt đầu phát video"
-            >
-              <Play size={25} color="#FFFFFF" fill="#FFFFFF" />
-            </Pressable>
-            <Text style={styles.videoStartLabel}>
-              {url ? 'Nhấn để bắt đầu học' : invalidLink ? 'Liên kết video chưa đúng - trung tâm sẽ cập nhật sớm' : 'Video chưa có liên kết'}
+    <View style={styles.videoPaneWrap}>
+      <View style={styles.videoStageBox}>
+        <View style={styles.videoStageHeader}>
+          <View style={styles.videoStageUnitPill}>
+            <Text numberOfLines={1} style={styles.videoStageUnitPillText}>
+              {`Buổi ${Math.max(1, unitIndex + 1)} · ${done ? 'Đã hoàn thành ✓' : `Đã xem ${watchedPct}%`}`}
             </Text>
           </View>
-        )}
+          <View style={styles.videoStageCheckPill}>
+            <Text numberOfLines={1} style={styles.videoStageCheckPillText}>
+              {`${Math.min(safeQuizIdx + 1, quizItems.length)}/${quizItems.length} mốc câu hỏi`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[styles.videoFrame, styles.videoStageFrame]}>
+          {started && (usingOfflineUri ? Boolean(offlineUri) : (embeddedUrl || directVideo)) ? (
+            <VideoPlayerFrame
+              videoUrl={usingOfflineUri && offlineUri ? offlineUri : resolveMobilePublicUrl(url)}
+              embeddedUrl={usingOfflineUri ? '' : embeddedUrl}
+              title={video?.title || unit.title}
+              lessonId={`${userId || 'anon'}-${unit.id}-${video?.id || 'video'}`}
+              antiSeekEnabled={antiSeekEnabled}
+              done={done}
+              initialAtSec={initialAtSec}
+              playerApiRef={playerApiRef}
+              onProgress={handleVideoProgress}
+              onWatched={onComplete}
+            />
+          ) : (
+            <View style={styles.videoStartOverlay}>
+              <Pressable
+                onPress={startVideo}
+                disabled={!url}
+                style={[styles.videoStartButton, !url && styles.actionDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel="Bắt đầu phát video"
+              >
+                <Play size={22} color="#FFFFFF" fill="#FFFFFF" />
+              </Pressable>
+              <Text numberOfLines={2} style={styles.videoStageTitle}>{video?.title || unit.title}</Text>
+              <Text numberOfLines={2} style={styles.videoStartLabel}>
+                {url
+                  ? (done ? 'Đã hoàn thành video · Nhấn để xem lại' : 'Nhấn để phát video · Trả lời mốc câu hỏi bên dưới')
+                  : invalidLink
+                    ? 'Liên kết video chưa đúng - trung tâm sẽ cập nhật sớm'
+                    : 'Video chưa có liên kết · Đọc lý thuyết ở tab Tài liệu'}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
+
+      {!url && unitContents.length ? (
+        <View style={styles.contentCard}>
+          <Text style={styles.contentTitle}>{unitContents[0].title || unit.title}</Text>
+          <RenderHtml
+            contentWidth={Math.max(1, contentWidth)}
+            source={{ html: unitContents[0].content, baseUrl: getMobileApiBaseUrl() }}
+            baseStyle={lessonHtmlBaseStyle}
+            tagsStyles={lessonHtmlTags}
+          />
+        </View>
+      ) : null}
+
       {Platform.OS !== 'web' && url ? (
-        <View style={styles.offlineLessonBar}>
+        <View style={styles.offlineLessonCard}>
           <View style={styles.offlineLessonLeft}>
             <ShieldCheck size={14} color={offlineRecord ? '#059669' : '#64748B'} />
             <Text style={styles.offlineLessonText} numberOfLines={1}>
@@ -2549,7 +2683,7 @@ function VideoLessonPane({
                   ? `Đã tải offline (Mã hóa • ${formatOfflineBytes(offlineRecord.sizeBytes)})`
                   : directVideo
                     ? 'Hỗ trợ tải offline (Mã hóa nội bộ)'
-                    : 'Link nhúng YouTube (chỉ tải offline file MP4/WebM nội bộ)'}
+                    : 'Link nhúng YouTube (chỉ tải offline MP4/WebM nội bộ)'}
             </Text>
           </View>
           {directVideo ? (
@@ -2586,66 +2720,341 @@ function VideoLessonPane({
           ) : null}
         </View>
       ) : null}
-      <View style={styles.videoTabBar} accessibilityRole="tablist">
-        {videoLessonTabs.map((tab) => {
+
+      <View style={styles.videoTopTabBar} accessibilityRole="tablist">
+        {mainTabs.map((tab) => {
           const active = activeTab === tab.id;
-          const Icon = tab.icon;
           return (
             <Pressable
               key={tab.id}
               onPress={() => setActiveTab(tab.id)}
-              style={[styles.videoTab, active && styles.videoTabActive]}
+              style={[styles.videoTopTabBtn, active && styles.videoTopTabBtnActive]}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
-              <Icon size={15} color={active ? theme.brand : '#64748B'} />
-              <Text style={[styles.videoTabText, active && styles.videoTabTextActive]}>{tab.label}</Text>
+              <Text numberOfLines={1} style={[styles.videoTopTabText, active && styles.videoTopTabTextActive]}>
+                {tab.label}
+              </Text>
             </Pressable>
           );
         })}
       </View>
-      <View style={styles.videoOverview}>
-        {activeTab === 'overview' ? (
-          <>
-            <View style={styles.videoOverviewHeading}>
-              <View style={styles.flex}>
-                <Text style={styles.videoSubjectEyebrow}>{subjectName || unit.title}</Text>
-                <Text style={styles.videoOverviewTitle}>{video?.title || unit.title}</Text>
-              </View>
-              {done ? (
-                <View style={styles.videoDoneBadge}>
-                  <CheckCircle2 size={13} color="#059669" />
-                  <Text style={styles.videoDoneBadgeText}>Đã xong</Text>
+
+      {activeTab === 'lesson' ? (
+        <View style={styles.videoLessonBody}>
+          {activeQuizItem ? (() => {
+            const effectiveChoiceIds = activeQuizDone
+              ? (selectedChoiceIds.length ? selectedChoiceIds : getSavedQuizChoices(activeQuizItem))
+              : selectedChoiceIds;
+            const nextIdx = safeQuizIdx + 1;
+            const nextLocked = nextIdx < quizItems.length && !isQuizUnlocked(nextIdx);
+            const submitDisabled = !effectiveChoiceIds.length || quizSubmitting || quizStatus === 'correct' || quizStatus === 'wrong' || activeQuizDone;
+            return (
+              <View style={styles.videoQuizSheet}>
+                {quizItems.length > 1 ? (
+                  <View style={styles.videoQuizSwitcherRow}>
+                    {quizItems.map((qItem, qIdx) => {
+                      const qActive = qIdx === safeQuizIdx;
+                      const qDone = isQuizItemDone(qItem);
+                      const qUnlocked = isQuizUnlocked(qIdx);
+                      const qMilestoneSec = getQuizMilestoneSec(qIdx);
+                      return (
+                        <Pressable
+                          key={qItem.id}
+                          onPress={() => { if (qUnlocked) setActiveQuizIdx(qIdx); }}
+                          disabled={!qUnlocked}
+                          style={[
+                            styles.videoQuizSwitchPill,
+                            qDone && styles.videoQuizSwitchPillDone,
+                            !qUnlocked && styles.videoQuizSwitchPillLocked,
+                            qActive && styles.videoQuizSwitchPillActive,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: qActive, disabled: !qUnlocked }}
+                        >
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.videoQuizSwitchText,
+                              qDone && styles.videoQuizSwitchTextDone,
+                              !qUnlocked && styles.videoQuizSwitchTextLocked,
+                              qActive && styles.videoQuizSwitchTextActive,
+                            ]}
+                          >
+                            {qDone
+                              ? `Câu ${qIdx + 1} ✓`
+                              : qUnlocked
+                                ? `Câu ${qIdx + 1}`
+                                : `🔒 Câu ${qIdx + 1} · ${formatMinuteSecond(qMilestoneSec)}`}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                <Text style={styles.videoQuizPrompt}>{activeQuizItem.prompt || 'Chọn đáp án đúng nhất:'}</Text>
+
+                {activeQuizItem.imageUrl ? (
+                  <Image
+                    source={{ uri: resolveMobilePublicUrl(activeQuizItem.imageUrl) }}
+                    style={styles.videoQuizImage}
+                    resizeMode="contain"
+                  />
+                ) : null}
+
+                <View style={styles.videoQuizOptions}>
+                  {(activeQuizItem.options || []).map((option, optIdx) => {
+                    const chosen = effectiveChoiceIds.includes(option.id);
+                    const letter = QUIZ_LETTERS[optIdx] || String(optIdx + 1);
+                    const isWrongChoice = chosen && quizStatus === 'wrong';
+                    return (
+                      <Pressable
+                        key={option.id}
+                        onPress={() => toggleQuizOption(option.id)}
+                        disabled={quizSubmitting || quizStatus === 'correct' || activeQuizDone}
+                        style={[
+                          styles.videoQuizOption,
+                          chosen && styles.videoQuizOptionSelected,
+                          isWrongChoice && styles.videoQuizOptionWrong,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: chosen, disabled: activeQuizDone }}
+                      >
+                        <Text
+                          style={[
+                            styles.videoQuizOptionText,
+                            chosen && styles.videoQuizOptionTextSelected,
+                            isWrongChoice && styles.videoQuizOptionTextWrong,
+                          ]}
+                        >
+                          {`${letter}. ${option.text}`}
+                        </Text>
+                        {chosen ? (
+                          activeQuizDone
+                            ? <CheckCircle2 size={16} color="#059669" />
+                            : <View style={[styles.videoQuizDot, isWrongChoice && styles.videoQuizDotWrong]} />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
                 </View>
-              ) : null}
+
+                {showQuizHint ? (
+                  <View style={styles.videoQuizHintBox}>
+                    <Lightbulb size={15} color="#B45309" />
+                    <Text style={styles.videoQuizHintText}>
+                      {activeQuizItem.hint || 'Hãy xem kỹ thao tác hướng dẫn trong video bài giảng để chọn đáp án chính xác.'}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {quizFeedback ? (
+                  <View style={[styles.videoQuizFeedbackBox, quizStatus === 'wrong' ? styles.videoQuizFeedbackBad : styles.videoQuizFeedbackGood]}>
+                    <Text style={[styles.videoQuizFeedbackText, quizStatus === 'wrong' ? styles.videoQuizFeedbackTextBad : styles.videoQuizFeedbackTextGood]}>
+                      {quizFeedback}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.videoQuizActions}>
+                  <Pressable
+                    onPress={() => setShowQuizHint((prev) => !prev)}
+                    style={styles.videoQuizHintBtn}
+                    accessibilityRole="button"
+                  >
+                    <Lightbulb size={15} color="#B45309" />
+                    <Text style={styles.videoQuizHintBtnText}>Gợi ý</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { void submitInteractiveQuiz(); }}
+                    disabled={submitDisabled}
+                    style={[
+                      styles.videoQuizSubmitBtn,
+                      submitDisabled && styles.videoQuizSubmitBtnDisabled,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: submitDisabled }}
+                  >
+                    {quizSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : activeQuizDone ? (
+                      <Text numberOfLines={2} style={[styles.videoQuizSubmitText, { textAlign: 'center' }]}>
+                        {nextLocked
+                          ? `Xem đến mốc ${formatMinuteSecond(getQuizMilestoneSec(nextIdx))} để mở Câu ${nextIdx + 1}`
+                          : 'Đã trả lời đúng ✓'}
+                      </Text>
+                    ) : (
+                      <>
+                        <Text numberOfLines={1} style={styles.videoQuizSubmitText}>Xác nhận & Xem tiếp</Text>
+                        <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })() : null}
+        </View>
+      ) : activeTab === 'curriculum' ? (
+        <View style={styles.curriculumTabWrap}>
+          {(units.length ? units : [unit]).map((item, idx) => {
+              const active = item.id === unit.id;
+              const locked = Boolean(item.locked);
+              const completed = item.status === 'completed';
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => {
+                    if (locked) {
+                      Alert.alert('Bài học đang khóa', 'Hoàn thành buổi học trước để mở nội dung này.');
+                      return;
+                    }
+                    if (item.id !== unit.id && onSelectUnit) {
+                      onSelectUnit(item);
+                    }
+                    setActiveTab('lesson');
+                  }}
+                  style={[
+                    styles.curriculumItemCard,
+                    active && styles.curriculumItemCardActive,
+                    completed && !active && styles.curriculumItemCardDone,
+                    locked && styles.curriculumItemCardLocked,
+                  ]}
+                  accessibilityRole="button"
+                >
+                  <View style={[
+                    styles.curriculumIdxBox,
+                    completed && styles.curriculumIdxBoxDone,
+                    active && styles.curriculumIdxBoxActive,
+                    locked && styles.curriculumIdxBoxLocked,
+                  ]}>
+                    {completed && !active
+                      ? <CheckCircle2 size={16} color="#059669" />
+                      : locked
+                        ? <Lock size={14} color="#94A3B8" />
+                        : (
+                          <Text style={[styles.curriculumIdxText, active && styles.curriculumIdxTextActive]}>
+                            {String(idx + 1).padStart(2, '0')}
+                          </Text>
+                        )}
+                  </View>
+                  <View style={styles.flex}>
+                    <Text numberOfLines={2} style={[styles.unitTitle, locked && styles.unitTitleLocked]}>
+                      {item.title}
+                    </Text>
+                    <View style={styles.curriculumChipRow}>
+                      <View style={[styles.curriculumCompChip, item.videoDone && styles.curriculumCompChipDone]}>
+                        <Text style={[styles.curriculumCompText, item.videoDone && styles.curriculumCompTextDone]}>
+                          {`🎬 Video`}
+                        </Text>
+                      </View>
+                      <View style={[styles.curriculumCompChip, item.noteDone && styles.curriculumCompChipDone]}>
+                        <Text style={[styles.curriculumCompText, item.noteDone && styles.curriculumCompTextDone]}>
+                          {`📝 Lý thuyết`}
+                        </Text>
+                      </View>
+                      {item.hasPractice !== false ? (
+                        <View style={[styles.curriculumCompChip, item.practiceDone && styles.curriculumCompChipDone]}>
+                          <Text style={[styles.curriculumCompText, item.practiceDone && styles.curriculumCompTextDone]}>
+                            {`🎯 Bài tập`}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <View style={[
+                    styles.unitAction,
+                    locked && styles.unitActionLocked,
+                    completed && !active && styles.unitActionCompleted,
+                  ]}>
+                    <Text style={[
+                      styles.unitActionText,
+                      locked && styles.unitActionTextLocked,
+                      completed && !active && styles.unitActionTextCompleted,
+                    ]}>
+                      {locked ? 'Khóa' : active ? 'Đang học' : completed ? 'Xem lại' : 'Học ngay'}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+        </View>
+      ) : (
+        <View style={styles.resourcesTabWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.resourcesSubTabBar} accessibilityRole="tablist">
+            {([
+              { id: 'resources', label: 'Tài liệu', icon: FileText },
+              { id: 'notes', label: 'Ghi chú', icon: StickyNote },
+              { id: 'qa', label: 'Hỏi đáp', icon: MessageSquare },
+              { id: 'reviews', label: 'Đánh giá', icon: Star },
+            ] as const).map((sub) => {
+              const SubIcon = sub.icon;
+              const isSubActive = resourceSubTab === sub.id;
+              return (
+                <Pressable
+                  key={sub.id}
+                  onPress={() => setResourceSubTab(sub.id)}
+                  style={[styles.videoTab, styles.resourcesSubTab, isSubActive && styles.videoTabActive]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isSubActive }}
+                >
+                  <SubIcon size={12} color={isSubActive ? '#FFFFFF' : '#92400E'} />
+                  <Text numberOfLines={1} style={[styles.videoTabText, styles.resourcesSubTabText, isSubActive && styles.videoTabTextActive]}>{sub.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {resourceSubTab === 'resources' && unitContents.length ? (
+            <View style={styles.contentCard}>
+              {unitContents.map((entry) => {
+                const noteDone = Boolean(unit.noteDoneIds?.includes(entry.id) || (unit.noteDone && entry.id === 'legacy-note'));
+                return (
+                  <View key={entry.id} style={styles.resourceNoteBlock}>
+                    <Text style={styles.contentTitle}>{entry.title || 'Nội dung trọng tâm'}</Text>
+                    <RenderHtml
+                      contentWidth={Math.max(1, contentWidth)}
+                      source={{ html: entry.content, baseUrl: getMobileApiBaseUrl() }}
+                      baseStyle={lessonHtmlBaseStyle}
+                      tagsStyles={lessonHtmlTags}
+                    />
+                    {noteDone ? (
+                      <Text style={styles.practiceSuccess}>Đã đọc xong lý thuyết bài học.</Text>
+                    ) : onCompleteSection ? (
+                      <Pressable
+                        onPress={() => { void onCompleteSection('note', entry.id); }}
+                        style={styles.completeSectionButton}
+                        accessibilityRole="button"
+                      >
+                        <CheckCircle2 size={16} color="#FFFFFF" />
+                        <Text style={styles.completeSectionButtonText}>Đã đọc xong · Tiếp tục</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
-            <Text style={styles.videoDescriptionLabel}>Mô tả bài giảng</Text>
-            <Text style={styles.videoDescription}>
-              Theo dõi video để nắm kiến thức. Hệ thống ghi nhận tiến độ khi bạn xem đủ thời lượng yêu cầu.
-            </Text>
-            <Text style={styles.videoDescription}>
-              {done
-                ? 'Đã xem đủ thời lượng yêu cầu. Bạn có thể xem lại video.'
-                : `Đã xem ${Math.floor(videoProgress.watchedSeconds)} giây${videoProgress.duration ? ` · ${Math.round((videoProgress.watchedSeconds / videoProgress.duration) * 100)}%` : ''}. Xem tối thiểu 70% video để hoàn thành mục này${antiSeekEnabled ? ' (không thể tua vượt phần đã xem)' : ''}.`}
-            </Text>
-          </>
-        ) : (
-          <VideoLessonTabs
-            activeTab={activeTab}
-            courseId={courseId}
-            courseTitle={subjectName || courseTitle}
-            lessonId={`${unit.id}-${video?.id || 'video'}`}
-            lessonTitle={video?.title || unit.title}
-            userId={userId}
-            enabled={enabled}
-            videoUrl={url}
-            resources={resources}
-            currentTime={videoProgress.currentTime || playerApiRef.current?.getCurrentTime() || 0}
-            videoDuration={videoProgress.duration || playerApiRef.current?.getDuration() || 0}
-            onSeekTo={handleSeekTo}
-          />
-        )}
-      </View>
+          ) : null}
+
+          <View style={styles.resourcesTabsCard}>
+            <VideoLessonTabs
+              activeTab={resourceSubTab}
+              courseId={courseId}
+              courseTitle={subjectName || courseTitle}
+              lessonId={`${unit.id}-${video?.id || 'video'}`}
+              lessonTitle={video?.title || unit.title}
+              userId={userId}
+              enabled={enabled}
+              videoUrl={url}
+              resources={resources}
+              currentTime={videoProgress.currentTime || playerApiRef.current?.getCurrentTime() || 0}
+              videoDuration={videoProgress.duration || playerApiRef.current?.getDuration() || 0}
+              onSeekTo={handleSeekTo}
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -2961,45 +3370,86 @@ function PracticeQuestion({
 
 const styles = createThemedStyles((colors) => StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  screenContent: { gap: spacing.md },
+  screenContent: { gap: spacing.md, backgroundColor: '#FFFBF2', paddingBottom: spacing.xl },
   relatedTopics: {
     height: RELATED_STRIP_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs,
-    paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
+    paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1.5, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
   },
   relatedTopicsTitle: { color: '#92400E', fontSize: 12, fontWeight: '900' },
   relatedTopicsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   relatedTopicChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%', paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 999, borderWidth: 1, borderColor: '#FCD34D', backgroundColor: colors.surface,
+    borderRadius: 999, borderWidth: 1.5, borderColor: '#FCD34D', backgroundColor: '#FFFFFF',
   },
   relatedTopicText: { color: colors.ink, fontSize: 12, fontWeight: '800', flexShrink: 1 },
-  headerBand: { marginHorizontal: -spacing.xl, marginTop: -spacing.md, marginBottom: -spacing.sm, paddingHorizontal: spacing.xl, paddingTop: spacing.md, backgroundColor: '#F1F5F9' },
-  headerGroup: { marginBottom: spacing.sm },
+  headerBand: { marginHorizontal: -spacing.xl, marginTop: -spacing.md, marginBottom: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, backgroundColor: '#FFFBF2' },
+  headerGroup: { marginBottom: spacing.xs },
   courseCardWrap: { width: '100%', position: 'relative' },
   courseCardWrapActive: { zIndex: 20 },
-  filters: { alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'nowrap', gap: 0, marginHorizontal: -spacing.xl, paddingHorizontal: spacing.lg, marginBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#E8EDF3', backgroundColor: colors.surface },
-  filterChip: { minWidth: 0, minHeight: 68, flex: 1, flexBasis: 0, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2, paddingVertical: 4, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  filterChipActive: { borderBottomColor: colors.brand },
-  filterIconWrap: { position: 'relative', width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  filterText: { minHeight: 24, color: '#64748B', fontSize: typography.micro, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
-  filterTextActive: { color: colors.brandDark, fontWeight: '900' },
-  filterCount: { position: 'absolute', top: -5, right: -7, minWidth: 15, paddingHorizontal: 4, paddingVertical: 1, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.surface, borderRadius: radius.pill, backgroundColor: '#E2E8F0', color: '#475569', textAlign: 'center', fontSize: typography.micro, fontWeight: '900' },
-  filterCountActive: { backgroundColor: colors.brand, color: colors.surface },
+  filtersOuter: {
+    alignSelf: 'stretch',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FEF3C7',
+    padding: 4,
+    marginBottom: spacing.xs,
+  },
+  filters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  filterChip: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  filterChipActive: {
+    borderColor: '#10B981',
+    borderBottomWidth: 3,
+    borderBottomColor: '#047857',
+    backgroundColor: '#10B981',
+  },
+  filterText: { color: '#92400E', fontSize: 12, fontWeight: '800' },
+  filterTextActive: { color: '#FFFFFF', fontWeight: '900' },
+  filterCount: {
+    minWidth: 19,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    overflow: 'hidden',
+    borderRadius: radius.pill,
+    backgroundColor: '#FDE68A',
+    color: '#92400E',
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  filterCountActive: { backgroundColor: '#047857', color: '#FFFFFF' },
   courseSection: { width: '100%', alignSelf: 'stretch', marginTop: spacing.xs, gap: spacing.md },
   courseList: { width: '100%', gap: spacing.md },
   registeredCourseCard: { width: '100%', alignSelf: 'stretch' },
   sectionHeaderWrap: { gap: 8 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  sectionDivider: { height: 1, marginLeft: 54 },
+  sectionDivider: { height: 2, marginLeft: 54, borderRadius: 2 },
   registeredDivider: { backgroundColor: '#A7F3D0' },
   videoDivider: { backgroundColor: '#FDE68A' },
   instructorDivider: { backgroundColor: '#BAE6FD' },
-  sectionIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
-  registeredIcon: { backgroundColor: '#D1FAE5' },
-  videoIcon: { backgroundColor: '#FEF3C7' },
-  instructorIcon: { backgroundColor: '#E0F2FE' },
+  sectionIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.08)' },
+  registeredIcon: { backgroundColor: '#D1FAE5', borderColor: '#A7F3D0' },
+  videoIcon: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
+  instructorIcon: { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' },
   sectionCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { color: '#94A3B8', fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  eyebrow: { color: '#94A3B8', fontSize: 10, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
   sectionTitle: { flexShrink: 1, color: '#0F172A', fontSize: 16, fontWeight: '900' },
   sectionCount: { minWidth: 22, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, textAlign: 'center', fontSize: 11, fontWeight: '900' },
@@ -3007,9 +3457,24 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   videoCount: { backgroundColor: '#FEF3C7', color: '#92400E' },
   instructorCount: { backgroundColor: '#E0F2FE', color: '#075985' },
   sectionDescription: { marginTop: 3, color: colors.muted, fontSize: typography.micro, lineHeight: 15 },
-  courseCard: { flex: 1, gap: 0, overflow: 'hidden', padding: 0 },
+  courseCard: {
+    flex: 1,
+    gap: 0,
+    overflow: 'hidden',
+    padding: 0,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 5,
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  courseCardEnrolled: {
+    borderColor: '#6EE7B7',
+    borderBottomColor: '#10B981',
+  },
   courseCardContent: { flex: 1 },
-  courseCardHovered: { borderColor: '#CBD5E1', shadowColor: '#0F172A', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  courseCardHovered: { borderColor: '#10B981', shadowColor: '#0F172A', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   courseBanner: { height: 98, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   bannerRing: { position: 'absolute', width: 142, height: 142, right: -38, top: -49, borderWidth: 18, borderRadius: 80 },
   lockBadge: { position: 'absolute', left: 12, top: 12, width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FEF3C7' },
@@ -3020,8 +3485,9 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   courseModeText: { color: '#1E293B', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
   offerBadge: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.95)' },
   offerText: { color: '#334155', fontSize: 10, fontWeight: '800' },
-  courseInfo: { minHeight: 168, padding: spacing.md, paddingBottom: spacing.sm },
+  courseInfo: { minHeight: 118, padding: spacing.md, paddingBottom: spacing.sm },
   courseTitle: { minHeight: 34, color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '900' },
+  parentCourseName: { marginTop: 2, color: '#64748B', fontSize: 11, fontWeight: '700' },
   subjectChips: { minHeight: 35, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 4, marginTop: 6 },
   subjectLabel: { paddingTop: 4, color: colors.muted, fontSize: typography.micro },
   subjectChip: { maxWidth: 140, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', borderRadius: 5, backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: typography.micro },
@@ -3040,64 +3506,79 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   discountPctText: { fontSize: 8, fontWeight: '900', color: '#BE123C', backgroundColor: '#FFE4E6', borderRadius: 999, paddingHorizontal: 4, paddingVertical: 1 },
   priceText: { color: '#1E293B', fontSize: 14, fontWeight: '900' },
   priceTextSale: { color: '#BE123C' },
-  courseActions: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: 8, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  courseActions: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', backgroundColor: '#FFFDF5' },
   courseActionsCentered: { justifyContent: 'center' },
-  zaloButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#D6ECFF' },
+  zaloButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#BAE6FD', borderBottomWidth: 3, borderBottomColor: '#38BDF8', backgroundColor: '#E0F2FE' },
   zaloButtonText: { color: '#075985', fontSize: 12, fontWeight: '900' },
-  courseTooltip: { position: 'absolute', top: 76, left: 10, right: 10, zIndex: 30, gap: 7, padding: spacing.md, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
+  courseTooltip: { position: 'absolute', top: 76, left: 10, right: 10, zIndex: 30, gap: 7, padding: spacing.md, borderWidth: 2, borderColor: '#FDE68A', borderRadius: 18, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
   tooltipTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   tooltipHeading: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   tooltipLine: { color: '#475569', fontSize: typography.caption, lineHeight: 16 },
   tooltipWarning: { marginTop: 2, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#D1FAE5', color: colors.ink, fontSize: typography.micro, lineHeight: 15, fontWeight: '700' },
-  registerButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#ECFDF5' },
-  registerText: { color: '#047857', fontSize: 12, fontWeight: '900' },
-  openButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#ECFDF5' },
-  openButtonActive: { backgroundColor: '#ECFDF5' },
-  openButtonText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
-  openButtonTextActive: { color: '#047857' },
+  registerButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#FDE68A', borderBottomWidth: 3, borderBottomColor: '#F59E0B', backgroundColor: '#FEF3C7' },
+  registerText: { color: '#92400E', fontSize: 12, fontWeight: '900' },
+  openButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 15, borderRadius: 14, borderBottomWidth: 3, borderBottomColor: '#047857', backgroundColor: '#10B981' },
+  openButtonActive: { backgroundColor: '#10B981' },
+  openButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  openButtonTextActive: { color: '#FFFFFF' },
   modalBackdrop: { flex: 1, justifyContent: 'flex-start', backgroundColor: 'rgba(15,23,42,0.55)' },
-  modalCard: { width: '100%', height: '100%', maxHeight: '100%', paddingTop: spacing.md, borderRadius: 0, backgroundColor: colors.surface },
-  modalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  modalBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.md, backgroundColor: '#ECFDF5' },
-  headerLessonNav: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  headerLessonNavOpen: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  modalCard: { width: '100%', height: '100%', maxHeight: '100%', paddingTop: spacing.md, borderRadius: 0, backgroundColor: '#FFFBF2' },
+  modalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 2, borderBottomColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  modalBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#A7F3D0', borderBottomWidth: 3, borderBottomColor: '#34D399', borderRadius: 13, backgroundColor: '#ECFDF5' },
+  headerLessonNav: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 3, borderBottomColor: '#CBD5E1', borderRadius: 13, backgroundColor: '#FFFFFF' },
+  headerLessonNavOpen: { borderColor: '#10B981', borderBottomColor: '#047857', backgroundColor: '#ECFDF5' },
   headerLessonNavText: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '900' },
+  headerProgressPill: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: '#A7F3D0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#34D399',
+    backgroundColor: '#ECFDF5',
+  },
+  headerProgressPillText: { color: '#047857', fontSize: 11.5, fontWeight: '900' },
   modalTitle: { marginTop: 3, color: colors.ink, fontSize: typography.heading, fontWeight: '900' },
   muted: { color: colors.muted, fontSize: typography.micro },
   backText: { paddingTop: spacing.md, color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
   modalClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 1, borderColor: colors.line },
   closeText: { color: colors.muted, fontSize: typography.title, lineHeight: 25 },
-  modalContent: { flex: 1, minHeight: 0 },
+  modalContent: { flex: 1, minHeight: 0, backgroundColor: '#FFFBF2' },
   modalContentScroll: { flex: 1 },
   modalContentInner: { gap: spacing.sm, padding: spacing.lg },
-  subjectCard: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
-  unitNumber: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.canvas },
-  unitNumberDone: { backgroundColor: '#D1FAE5' },
-  unitNumberText: { color: colors.muted, fontSize: typography.caption, fontWeight: '900' },
+  subjectCard: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 5, borderBottomColor: '#CBD5E1', borderRadius: 18, backgroundColor: '#FFFFFF' },
+  unitNumber: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#FEF3C7', borderWidth: 1.5, borderColor: '#FDE68A' },
+  unitNumberDone: { backgroundColor: '#D1FAE5', borderColor: '#6EE7B7' },
+  unitNumberText: { color: '#92400E', fontSize: typography.caption, fontWeight: '900' },
   unitTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
-  progressTrack: { height: 5, marginTop: 7, overflow: 'hidden', borderRadius: 3, backgroundColor: colors.line },
-  progressFill: { height: '100%', borderRadius: 3, backgroundColor: '#10B981' },
-  unitsIntro: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.md, backgroundColor: '#F8FAFC' },
-  unitsIntroIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#ECFDF5' },
+  progressTrack: { height: 7, marginTop: 7, overflow: 'hidden', borderRadius: 999, backgroundColor: '#E2E8F0' },
+  progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#10B981' },
+  unitsIntro: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: 16, borderWidth: 1.5, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  unitsIntroIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#D1FAE5' },
   unitsIntroTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
-  unitRow: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: colors.surface },
-  unitRowLocked: { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-  unitRowCompleted: { borderColor: '#A7F3D0', backgroundColor: '#F0FDF4' },
+  unitRow: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 5, borderBottomColor: '#CBD5E1', borderRadius: 18, backgroundColor: '#FFFFFF' },
+  unitRowLocked: { borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+  unitRowCompleted: { borderColor: '#6EE7B7', borderBottomColor: '#34D399', backgroundColor: '#ECFDF5' },
   unitRowBusy: { opacity: 0.65 },
-  unitNumberLocked: { backgroundColor: '#E2E8F0' },
+  unitNumberLocked: { backgroundColor: '#E2E8F0', borderColor: '#CBD5E1' },
   unitTitleLocked: { color: '#64748B' },
   unitStatus: { marginTop: 4, color: colors.muted, fontSize: typography.micro, lineHeight: 16 },
   unitStatusLocked: { color: '#94A3B8' },
-  unitAction: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderRadius: radius.sm, backgroundColor: colors.brand },
-  unitActionLocked: { backgroundColor: '#E2E8F0' },
-  unitActionCompleted: { backgroundColor: '#D1FAE5' },
-  unitActionText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900' },
+  unitAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, borderRadius: 12, borderBottomWidth: 3, borderBottomColor: '#047857', backgroundColor: '#10B981' },
+  unitActionLocked: { backgroundColor: '#E2E8F0', borderBottomWidth: 0 },
+  unitActionCompleted: { backgroundColor: '#D1FAE5', borderWidth: 1.5, borderColor: '#6EE7B7', borderBottomWidth: 3, borderBottomColor: '#34D399' },
+  unitActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900' },
   unitActionTextLocked: { color: '#64748B' },
   unitActionTextCompleted: { color: '#047857' },
-  lessonPage: { position: 'relative', flex: 1, minHeight: 0, gap: spacing.sm, padding: spacing.sm },
+  lessonPage: { position: 'relative', flex: 1, minHeight: 0, gap: spacing.sm, padding: spacing.sm, backgroundColor: '#FFFBF2' },
   lessonMainColumn: { zIndex: 0, flex: 1, minWidth: 0 },
   lessonMainContent: { gap: spacing.md, padding: spacing.sm, paddingBottom: spacing.xl },
-  lessonNavigationFooter: { flexShrink: 0, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  lessonNavigationFooter: { flexShrink: 0, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: 2, borderTopColor: '#E2E8F0', backgroundColor: '#FFFBF2' },
   lessonDrawerOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
   lessonDrawerBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(15,23,42,0.35)' },
   lessonDrawer: { height: '100%', marginLeft: 'auto', padding: spacing.md, borderLeftWidth: 1, borderLeftColor: '#E2E8F0', backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: -6, height: 0 }, elevation: 12 },
@@ -3132,53 +3613,408 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   sectionCelebration: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 5, overflow: 'visible' },
   sectionFireworkParticle: { position: 'absolute', width: 6, height: 9, borderRadius: 2 },
   videoPlay: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.blueSoft },
-  videoLessonCard: { overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, backgroundColor: '#FFFFFF' },
-  videoLessonHeading: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
-  videoLessonTitleRow: { minWidth: 0, flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  videoLessonTitle: { flexShrink: 1, color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
-  videoDoneBadge: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.pill, backgroundColor: '#ECFDF5' },
-  videoDoneBadgeText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
+  videoPaneWrap: { gap: spacing.sm },
+  videoTopTabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 4,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FEF3C7',
+  },
+  videoTopTabBtn: {
+    flex: 1,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  videoTopTabBtnActive: {
+    backgroundColor: '#10B981',
+    borderBottomWidth: 3,
+    borderBottomColor: '#047857',
+  },
+  videoTopTabText: { color: '#92400E', fontSize: 11.5, fontWeight: '800', textAlign: 'center' },
+  videoTopTabTextActive: { color: '#FFFFFF', fontWeight: '900' },
+  videoLessonBody: { gap: spacing.sm },
+  videoStageBox: {
+    overflow: 'hidden',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderBottomWidth: 5,
+    borderBottomColor: '#0F172A',
+    backgroundColor: '#0B1623',
+  },
+  videoStageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#0F1F2E',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  videoStageUnitPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  videoStageUnitPillText: { color: '#F8FAFC', fontSize: 10.5, fontWeight: '800' },
+  videoStageCheckPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  videoStageCheckPillText: { color: '#92400E', fontSize: 10.5, fontWeight: '900' },
+  videoStageFrame: { marginTop: 0, borderRadius: 0 },
+  videoStageTitle: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  offlineLessonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+    flexWrap: 'wrap',
+  },
+  videoQuizSheet: {
+    gap: 10,
+    padding: spacing.md,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#6EE7B7',
+    borderBottomWidth: 5,
+    borderBottomColor: '#34D399',
+    backgroundColor: '#FFFFFF',
+  },
+  videoQuizMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  videoQuizCheckPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: '#D1FAE5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  videoQuizCheckPillText: { color: '#047857', fontSize: 10.5, fontWeight: '900' },
+  videoQuizXpPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  videoQuizXpPillText: { color: '#92400E', fontSize: 10.5, fontWeight: '900' },
+  videoQuizDoneStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  videoQuizDoneText: { color: '#047857', fontSize: 11.5, fontWeight: '800' },
+  videoQuizSwitcherRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingVertical: 2 },
+  videoQuizSwitchPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  videoQuizSwitchPillDone: {
+    borderColor: '#10B981',
+    backgroundColor: '#D1FAE5',
+  },
+  videoQuizSwitchPillLocked: {
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
+    opacity: 0.65,
+  },
+  videoQuizSwitchPillActive: {
+    borderColor: '#047857',
+    backgroundColor: '#10B981',
+  },
+  videoQuizSwitchText: { color: '#92400E', fontSize: 11, fontWeight: '800' },
+  videoQuizSwitchTextDone: { color: '#047857', fontWeight: '900' },
+  videoQuizSwitchTextLocked: { color: '#94A3B8', fontWeight: '700' },
+  videoQuizSwitchTextActive: { color: '#FFFFFF', fontWeight: '900' },
+  videoQuizPrompt: { color: '#0F172A', fontSize: 14, lineHeight: 20, fontWeight: '900' },
+  videoQuizImage: { width: '100%', height: 150, borderRadius: 12, backgroundColor: '#F8FAFC' },
+  videoQuizOptions: { gap: 8 },
+  videoQuizOption: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: '#FDE68A',
+    borderBottomWidth: 3,
+    borderBottomColor: '#FCD34D',
+    backgroundColor: '#FFFDF5',
+  },
+  videoQuizOptionSelected: {
+    borderColor: '#10B981',
+    borderBottomColor: '#059669',
+    backgroundColor: '#D1FAE5',
+  },
+  videoQuizOptionWrong: {
+    borderColor: '#EF4444',
+    borderBottomColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
+  },
+  videoQuizOptionText: { flex: 1, color: '#1E293B', fontSize: 12.5, lineHeight: 18, fontWeight: '700' },
+  videoQuizOptionTextSelected: { color: '#065F46', fontWeight: '900' },
+  videoQuizOptionTextWrong: { color: '#B91C1C', fontWeight: '800' },
+  videoQuizDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#059669' },
+  videoQuizDotWrong: { backgroundColor: '#DC2626' },
+  videoQuizHintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  videoQuizHintText: { flex: 1, color: '#92400E', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  videoQuizFeedbackBox: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  videoQuizFeedbackGood: { borderColor: '#6EE7B7', backgroundColor: '#ECFDF5' },
+  videoQuizFeedbackBad: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  videoQuizFeedbackText: { fontSize: 12, fontWeight: '800', lineHeight: 17 },
+  videoQuizFeedbackTextGood: { color: '#047857' },
+  videoQuizFeedbackTextBad: { color: '#B91C1C' },
+  videoQuizActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  videoQuizHintBtn: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#FDE68A',
+    borderBottomWidth: 4,
+    borderBottomColor: '#F59E0B',
+    backgroundColor: '#FFFDF5',
+  },
+  videoQuizHintBtnText: { color: '#92400E', fontSize: 12.5, fontWeight: '900' },
+  videoQuizSubmitBtn: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    borderBottomWidth: 4,
+    borderBottomColor: '#047857',
+    backgroundColor: '#10B981',
+  },
+  videoQuizSubmitBtnDisabled: { opacity: 0.5 },
+  videoQuizSubmitText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '900' },
+  curriculumTabWrap: { gap: spacing.sm },
+  curriculumSummaryCard: {
+    gap: 8,
+    padding: spacing.md,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#A7F3D0',
+    borderBottomWidth: 4,
+    borderBottomColor: '#34D399',
+    backgroundColor: '#FFFFFF',
+  },
+  curriculumSummaryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  curriculumEyebrow: { color: '#059669', fontSize: 10.5, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.6 },
+  curriculumHeading: { marginTop: 2, color: '#0F172A', fontSize: 14.5, fontWeight: '900' },
+  curriculumCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  curriculumCountBadgeText: { color: '#92400E', fontSize: 11, fontWeight: '900' },
+  curriculumSubNote: { color: '#64748B', fontSize: 11.5, fontWeight: '700' },
+  curriculumItemCard: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 4,
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  curriculumItemCardActive: { borderColor: '#10B981', borderBottomColor: '#059669', backgroundColor: '#ECFDF5' },
+  curriculumItemCardDone: { borderColor: '#A7F3D0', borderBottomColor: '#34D399', backgroundColor: '#FFFFFF' },
+  curriculumItemCardLocked: { borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#F8FAFC', opacity: 0.78 },
+  curriculumIdxBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FEF3C7',
+  },
+  curriculumIdxBoxDone: { borderColor: '#6EE7B7', backgroundColor: '#D1FAE5' },
+  curriculumIdxBoxActive: { borderColor: '#047857', backgroundColor: '#10B981' },
+  curriculumIdxBoxLocked: { borderColor: '#CBD5E1', backgroundColor: '#E2E8F0' },
+  curriculumIdxText: { color: '#92400E', fontSize: 12, fontWeight: '900' },
+  curriculumIdxTextActive: { color: '#FFFFFF' },
+  curriculumChipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, marginTop: 6 },
+  curriculumCompChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  curriculumCompChipDone: {
+    borderColor: '#A7F3D0',
+    backgroundColor: '#D1FAE5',
+  },
+  curriculumCompText: { color: '#64748B', fontSize: 10, fontWeight: '800' },
+  curriculumCompTextDone: { color: '#047857', fontWeight: '900' },
+  resourcesTabWrap: { gap: spacing.sm },
+  resourcesSubTabBar: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 2 },
+  resourcesSubTab: { minHeight: 34, gap: 4, paddingHorizontal: 9, paddingVertical: 5 },
+  resourcesSubTabText: { fontSize: 11.5 },
+  resourceNoteBlock: { gap: spacing.xs, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  resourcesTabsCard: {
+    padding: spacing.md,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 5,
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
   videoFrame: { position: 'relative', width: '100%', aspectRatio: 16 / 9, overflow: 'hidden', marginTop: spacing.sm, borderRadius: 16, backgroundColor: '#080D19' },
-  videoStartOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#080D19' },
+  videoStartOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, backgroundColor: '#0B1623' },
   videoBrandBadge: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.brand },
   videoBrandText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.6 },
-  videoStartButton: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
-  videoStartLabel: { marginTop: spacing.sm, color: '#E2E8F0', fontSize: typography.caption, fontWeight: '800' },
-  videoTabBar: { flexDirection: 'row', flexWrap: 'nowrap', marginTop: spacing.xs, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
-  videoTab: { flex: 1, minWidth: 0, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 1, paddingVertical: 5, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  videoTabActive: { borderBottomColor: colors.brand, backgroundColor: '#ECFDF5' },
-  videoTabText: { color: '#64748B', fontSize: typography.micro, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
-  videoTabTextActive: { color: colors.brandDark, fontWeight: '900' },
-  videoOverview: { minHeight: 155, gap: spacing.sm, padding: spacing.md },
-  videoOverviewHeading: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  videoSubjectEyebrow: { color: '#047857', fontSize: typography.micro, fontWeight: '900', letterSpacing: 1.1 },
-  videoOverviewTitle: { marginTop: 5, color: colors.ink, fontSize: typography.body, fontWeight: '900' },
-  videoDescriptionLabel: { marginTop: spacing.xs, color: '#64748B', fontSize: typography.micro, fontWeight: '900', letterSpacing: 1.1 },
-  videoDescription: { color: '#475569', fontSize: typography.caption, lineHeight: 21 },
-  videoCompleteButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brand },
+  videoStartButton: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 2, borderColor: '#6EE7B7', borderBottomWidth: 4, borderBottomColor: '#047857', backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
+  videoStartLabel: { marginTop: 4, color: 'rgba(226,232,240,0.82)', fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
+  videoTab: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  videoTabActive: {
+    borderColor: '#10B981',
+    borderBottomWidth: 3,
+    borderBottomColor: '#047857',
+    backgroundColor: '#10B981',
+  },
+  videoTabText: { color: '#92400E', fontSize: 12, fontWeight: '800' },
+  videoTabTextActive: { color: '#FFFFFF', fontWeight: '900' },
+  videoWatchProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  videoWatchProgressLabel: { color: '#065F46', fontSize: 12, fontWeight: '800' },
+  videoWatchProgressValue: { color: '#059669', fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  videoWatchProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#D1FAE5',
+    overflow: 'hidden',
+  },
+  videoWatchProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#10B981',
+  },
   videoTabContent: { gap: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.canvas },
   videoTabEmpty: { minHeight: 60, justifyContent: 'center', paddingVertical: spacing.xs },
-  contentCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.canvas },
+  contentCard: { gap: spacing.xs, padding: spacing.md, borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 5, borderBottomColor: '#CBD5E1', borderRadius: 20, backgroundColor: '#FFFFFF' },
   contentTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
   unitNavigation: { flexDirection: 'row', gap: spacing.sm },
   sectionNavigation: { flexDirection: 'row', gap: spacing.sm },
-  sectionNavigationButton: { minHeight: 38, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  sectionNavigationButton: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.sm, borderWidth: 2, borderColor: '#CBD5E1', borderBottomWidth: 4, borderBottomColor: '#94A3B8', borderRadius: 14, backgroundColor: '#FFFFFF' },
   previousSectionButton: { justifyContent: 'flex-start' },
-  nextSectionButton: { justifyContent: 'flex-end' },
-  sectionNavigationLabel: { flexShrink: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
-  unitNavigationButton: { minHeight: 58, flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  nextSectionButton: { justifyContent: 'flex-end', borderColor: '#6EE7B7', borderBottomColor: '#10B981', backgroundColor: '#ECFDF5' },
+  sectionNavigationLabel: { flexShrink: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '900' },
+  sectionNavigationLabelDisabled: { color: '#94A3B8' },
+  unitNavigationButton: { minHeight: 58, flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 2, borderColor: '#CBD5E1', borderBottomWidth: 4, borderBottomColor: '#94A3B8', borderRadius: 16, backgroundColor: '#FFFFFF' },
   previousUnitButton: { justifyContent: 'flex-start' },
-  nextUnitButton: { justifyContent: 'flex-end', borderColor: colors.brand, backgroundColor: colors.brand },
-  unitNavigationButtonDisabled: { borderColor: '#E2E8F0', backgroundColor: '#F1F5F9' },
+  nextUnitButton: { justifyContent: 'flex-end', borderColor: '#10B981', borderBottomColor: '#047857', backgroundColor: '#10B981' },
+  unitNavigationButtonDisabled: { borderColor: '#E2E8F0', borderBottomWidth: 2, borderBottomColor: '#E2E8F0', backgroundColor: '#F1F5F9' },
   unitNavigationCopy: { flex: 1, minWidth: 0 },
   unitNavigationLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   unitNavigationTitle: { marginTop: 2, color: colors.ink, fontSize: typography.micro, fontWeight: '900' },
   nextUnitNavigationLabel: { color: '#D1FAE5' },
   nextUnitNavigationTitle: { color: '#FFFFFF' },
-  completeSectionButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brand },
+  completeSectionButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderRadius: 15, borderBottomWidth: 4, borderBottomColor: '#047857', backgroundColor: '#10B981' },
   completeSectionButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900' },
   actionDisabled: { opacity: 0.55 },
-  practiceCard: { position: 'relative', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: '#DBEAFE', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
+  practiceCard: { position: 'relative', gap: spacing.sm, padding: spacing.md, borderWidth: 2, borderColor: '#FDE68A', borderBottomWidth: 5, borderBottomColor: '#F59E0B', borderRadius: 20, backgroundColor: '#FFFFFF' },
   practiceContent: { gap: spacing.sm },
   practiceProgressArea: { position: 'relative', gap: spacing.xs },
   practiceProgressFireworkOverlay: { ...StyleSheet.absoluteFill, zIndex: 4, overflow: 'visible' },

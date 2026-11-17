@@ -73,6 +73,7 @@ router.get('/questions', ...requireAdmin, handle((req) => service.listQuestions(
   type: req.query.type,
   status: req.query.status,
   unitId: req.query.unitId,
+  forTestOut: req.query.forTestOut,
 })));
 router.post('/questions', ...requireAdmin, handle((req) => service.createQuestion(req.body || {}, userId(req))));
 router.post('/questions/ai-generate', ...requireAdmin, handle((req) => aiService.generateDrafts(req.body || {}, userId(req))));
@@ -107,6 +108,17 @@ router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/hint', ...re
   checkId: req.params.checkId,
 })));
 router.post(['/my/path/videos/hint', '/path/videos/hint'], ...requireStudent, handle((req) => pathService.buyVideoHint(userId(req), {
+  unitId: req.body?.unitId,
+  videoId: decodeURIComponent(req.body?.videoId || ''),
+  checkId: req.body?.checkId,
+  checkIndex: req.body?.checkIndex,
+})));
+router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/skip', ...requireStudent, handle((req) => pathService.skipVideoCheck(userId(req), {
+  unitId: req.params.unitId,
+  videoId: decodeURIComponent(req.params.videoId),
+  checkId: req.params.checkId,
+})));
+router.post(['/my/path/videos/skip', '/path/videos/skip'], ...requireStudent, handle((req) => pathService.skipVideoCheck(userId(req), {
   unitId: req.body?.unitId,
   videoId: decodeURIComponent(req.body?.videoId || ''),
   checkId: req.body?.checkId,

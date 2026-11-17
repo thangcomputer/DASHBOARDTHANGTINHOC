@@ -1466,13 +1466,24 @@ export function ScheduleScreen() {
                     </View>
                     {item.status === 'upcoming' ? (
                       <View style={styles.studentDiaryActions}>
-                        {item.meetingUrl ? (
+                        {(diaryStatus.tone === 'ongoing' && item.meetingUrl) ? (
                           <Pressable
                             onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }}
-                            style={[styles.studentDiaryJoinButton, isBrandStudent && { backgroundColor: '#059669' }]}
+                            style={[styles.studentDiaryJoinButton, { backgroundColor: '#EF4444' }]}
                             accessibilityRole="button"
+                            accessibilityLabel={`Vào học ${item.courseName || item.title}`}
                           >
-                            <Text style={styles.studentDiaryJoinButtonText}>Vào lớp</Text>
+                            <Text style={styles.studentDiaryJoinButtonText}>Vào học</Text>
+                          </Pressable>
+                        ) : (diaryStatus.tone === 'upcoming') ? (
+                          <Pressable
+                            disabled
+                            style={[styles.studentDiaryJoinButton, { backgroundColor: '#E2E8F0', opacity: 0.75 }]}
+                            accessibilityRole="button"
+                            accessibilityState={{ disabled: true }}
+                            accessibilityLabel="Chưa đến giờ vào lớp"
+                          >
+                            <Text style={[styles.studentDiaryJoinButtonText, { color: '#94A3B8' }]}>Vào học</Text>
                           </Pressable>
                         ) : null}
                         <Pressable

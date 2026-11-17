@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock, Lightbulb, Loader2, Lock, Play, Send, StickyNote, X, Zap,
+  AlertTriangle, Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock, FastForward, Lightbulb, Loader2, Lock, Play, Send, StickyNote, X, Zap,
 } from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import { NotesPanel } from '../../lms/LmsPlayerTabs';
@@ -13,8 +13,14 @@ import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { setStudyMediaPlaying } from '../../../utils/learningGoal';
 import { gameSounds } from '../../../utils/sound';
-import { VIDEO_CHECK_ANSWER_XP } from '../../../utils/dailyPractice';
+import { VIDEO_CHECK_ANSWER_XP, VIDEO_CHECK_SKIP_XP } from '../../../utils/dailyPractice';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
+import {
+  canMediaSeekTo,
+  findTriggeredVideoCheck,
+  resolveVideoCheckResumeTarget,
+  sortVideoChecksAsc,
+} from '../../../../../shared/dailyPractice/videoCheckpointPlayback.mjs';
 
 const WATCH_REQUIRED_RATIO = 0.7;
 
@@ -45,7 +51,7 @@ function BigPlayOverlay({ onPlay }) {
   );
 }
 
-function FallbackPlayer({ url, onWatched, onTick }) {
+function FallbackPlayer({ url, onWatched, onTick, mediaRef = null }) {
   const [started, setStarted] = useState(false);
   const [ended, setEnded] = useState(false);
   const doneRef = useRef(false);
@@ -59,10 +65,10 @@ function FallbackPlayer({ url, onWatched, onTick }) {
     setStudyMediaPlaying(key, Boolean(started && !ended && (vimeo || isDirectVideo(url))));
     return () => setStudyMediaPlaying(key, false);
   }, [started, ended, url, vimeo]);
-  const markOnce = () => {
-    if (doneRef.current) return;
+  const markOnce = (meta) => {
+    if (doneRef.current && !meta?.fromEnded) return;
     doneRef.current = true;
-    onWatchedRef.current();
+    onWatchedRef.current(meta);
   };
   useEffect(() => {
     if (!vimeo || !started) return undefined;
@@ -90,6 +96,7 @@ function FallbackPlayer({ url, onWatched, onTick }) {
   if (isDirectVideo(url)) {
     return (
       <video
+        ref={mediaRef}
         src={url}
         className="h-full w-full bg-black object-contain accent-emerald-500"
         controls
@@ -97,13 +104,16 @@ function FallbackPlayer({ url, onWatched, onTick }) {
         playsInline
         controlsList="nodownload"
         onContextMenu={(e) => e.preventDefault()}
-        onPlay={() => setEnded(false)}
+        onPlay={(e) => {
+          setEnded(false);
+          if (mediaRef) mediaRef.current = e.currentTarget;
+        }}
         onTimeUpdate={(e) => {
           const { currentTime, duration } = e.currentTarget;
           onTickRef.current?.(currentTime, e.currentTarget);
           if (duration > 0 && currentTime / duration >= WATCH_REQUIRED_RATIO) markOnce();
         }}
-        onEnded={() => { setEnded(true); markOnce(); }}
+        onEnded={() => { setEnded(true); markOnce({ fromEnded: true }); }}
       />
     );
   }
@@ -119,7 +129,17 @@ function FallbackPlayer({ url, onWatched, onTick }) {
  * Popup video của chặng - mở ngay trên trang lộ trình, đóng lại là về đúng chỗ đang xem.
  * Danh sách phát: video riêng của chặng + video buổi bài giảng đã gắn.
  */
-export default function PathVideoModal({ unit, initialVideoId = '', singleVideoOnly = false, color, onClose, onWatched }) {
+export default function PathVideoModal({
+  unit,
+  initialVideoId = '',
+  singleVideoOnly = false,
+  embedded = false,
+  hideStudyTools = false,
+  frameless = false,
+  review = false,
+  onClose = () => { },
+  onWatched,
+}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [currentId, setCurrentId] = useState(initialVideoId);
@@ -135,20 +155,24 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   const [walletXp, setWalletXp] = useState(null);
   const [checkBusy, setCheckBusy] = useState(false);
   const [checkError, setCheckError] = useState('');
+  const [confirmingSkip, setConfirmingSkip] = useState(false);
   const [missed, setMissed] = useState(false);
   const [cheer, setCheer] = useState(false);
   const [uploadPct, setUploadPct] = useState(null);
   const [grading, setGrading] = useState(false);
-  const [hintStep, setHintStep] = useState(false);
   const [markingWatched, setMarkingWatched] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const playerApiRef = useRef(null);
   const mediaElRef = useRef(null);
   const passedRef = useRef(passedKeys);
+  const initializedVideoIdsRef = useRef(new Set());
+  const replayRequiredIdsRef = useRef(new Set());
+  const localPassedInRunRef = useRef(new Set());
   const gateRef = useRef(null);
   const currentRef = useRef(null);
   const eligibleRef = useRef(false);
+  const endedRef = useRef(false);
   const syncedSectionRef = useRef(new Set());
   useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
 
@@ -162,15 +186,41 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     return 0;
   };
 
-  const seekVideoTo = (sec) => {
-    const targetSec = Math.max(0, Math.floor(Number(sec) || 0));
+  const getVideoDuration = () => {
+    try {
+      if (playerApiRef.current?.getDuration) return Number(playerApiRef.current.getDuration()) || 0;
+      if (mediaElRef.current) return Number(mediaElRef.current.duration) || 0;
+    } catch {
+      /* ignore player duration error */
+    }
+    return 0;
+  };
+
+  const seekVideoTo = (sec, options = {}) => {
+    const targetSec = Math.max(0, Number(sec) || 0);
     if (playerApiRef.current?.seekTo) {
-      playerApiRef.current.seekTo(targetSec);
+      playerApiRef.current.seekTo(targetSec, options);
       return;
     }
     if (mediaElRef.current) {
       mediaElRef.current.currentTime = targetSec;
-      mediaElRef.current.play?.().catch?.(() => {});
+      mediaElRef.current.play?.()?.catch?.(() => { });
+    }
+  };
+
+  const resumeMediaAt = (sec) => {
+    const targetSec = Math.max(0, Number(sec) || 0);
+    if (playerApiRef.current) {
+      playerApiRef.current.seekTo?.(targetSec, { allowAdvance: true });
+      playerApiRef.current.play?.();
+      return;
+    }
+    if (mediaElRef.current) {
+      const cur = Number(mediaElRef.current.currentTime) || 0;
+      if (targetSec <= cur || canMediaSeekTo(mediaElRef.current, targetSec)) {
+        mediaElRef.current.currentTime = targetSec;
+      }
+      mediaElRef.current.play?.()?.catch?.(() => { });
     }
   };
 
@@ -180,7 +230,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       .then((res) => {
         if (alive && typeof res?.stats?.xpTotal === 'number') setWalletXp(res.stats.xpTotal);
       })
-      .catch(() => {});
+      .catch(() => { });
     const onStats = (event) => {
       if (typeof event?.detail?.xpTotal === 'number') setWalletXp(event.detail.xpTotal);
     };
@@ -191,14 +241,15 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     };
   }, []);
 
-  const syncXpStats = (res) => {
-    if (typeof res?.profileXp !== 'number') return;
-    setWalletXp(res.profileXp);
-    emitDailyPracticeStats({
-      xpTotal: res.profileXp,
-      ...(typeof res.purchasedXp === 'number' ? { purchasedXp: res.purchasedXp } : {}),
-      ...(typeof res.dailyXp === 'number' ? { dailyXp: res.dailyXp } : {}),
-    });
+  const syncXpStats = (res, spendXp = 0) => {
+    const patch = {
+      ...(typeof res?.profileXp === 'number' ? { xpTotal: res.profileXp } : {}),
+      ...(typeof res?.purchasedXp === 'number' ? { purchasedXp: res.purchasedXp } : {}),
+      ...(typeof res?.dailyXp === 'number' ? { dailyXp: res.dailyXp } : {}),
+      ...(spendXp > 0 ? { spendXp } : {}),
+    };
+    if (typeof patch.xpTotal === 'number') setWalletXp(patch.xpTotal);
+    if (Object.keys(patch).length > 0) emitDailyPracticeStats(patch);
   };
 
   useEffect(() => {
@@ -207,8 +258,26 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       dailyPracticeApi.student.unitVideos(unit.id)
         .then((res) => {
           if (!alive) return;
-          const nextWatched = new Set((res.videos || []).filter((video) => video.state === 'completed').map((video) => video.id));
-          const nextPassed = new Set(res.passedCheckIds || []);
+          const videos = res.videos || [];
+          const nextWatched = new Set(videos.filter((video) => video.state === 'completed').map((video) => video.id));
+          videos.forEach((video) => {
+            if (!initializedVideoIdsRef.current.has(video.id)) {
+              initializedVideoIdsRef.current.add(video.id);
+              if (frameless || video.state === 'completed') {
+                replayRequiredIdsRef.current.add(video.id);
+              }
+            }
+          });
+          const nextPassed = new Set(
+            (res.passedCheckIds || []).filter((id) => {
+              const sId = String(id);
+              for (const reqVidId of replayRequiredIdsRef.current) {
+                if (sId.startsWith(`${reqVidId}:`)) return false;
+              }
+              return true;
+            }),
+          );
+          localPassedInRunRef.current.forEach((key) => nextPassed.add(key));
           passedRef.current = nextPassed;
           setData(res);
           setWatchedIds(nextWatched);
@@ -228,9 +297,10 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [unit.id]);
+  }, [unit.id, frameless]);
 
   useEffect(() => {
+    if (embedded) return undefined;
     const onKey = (event) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
@@ -239,7 +309,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
     };
-  }, [onClose]);
+  }, [embedded, onClose]);
 
   const isSingleMode = Boolean(singleVideoOnly || /:(level|practice):(easy|medium|hard)$/.test(String(initialVideoId || '')));
   const allPlaylist = useMemo(() => [
@@ -258,6 +328,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       ? (watchedIds.has(current.id) || current.state === 'completed')
       : false)
     : false;
+  const effectiveReview = Boolean(review || currentWatched);
   const lesson = data?.lesson || null;
   currentRef.current = current;
 
@@ -280,9 +351,9 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     setCheckHint('');
     setPaidHint('');
     setCheckError('');
+    setConfirmingSkip(false);
     setUploadPct(null);
     setGrading(false);
-    setHintStep(false);
   };
 
   const onMediaTick = (time, media) => {
@@ -300,12 +371,13 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       }
       return;
     }
-    const check = pendingOf(video).sort((a, b) => a.atSec - b.atSec).find((item) => time + 0.3 >= Number(item.atSec));
+    const check = findTriggeredVideoCheck(pendingOf(video), time);
     if (check) openGate(check, media);
   };
 
   useEffect(() => {
     eligibleRef.current = false;
+    endedRef.current = false;
     gateRef.current = null;
     mediaElRef.current = null;
     setGate(null);
@@ -333,15 +405,16 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     };
   }, [unit?.id, unit?.index, unit?.title, current?.id, current?.title]);
 
-  // Nếu video đã được đánh dấu watched từ trước, vẫn đồng bộ tiến độ mục tiêu học hôm nay khi mở lại
+  // Nếu video đã được đánh dấu watched từ trước, chỉ mở khóa tiếp sau khi hoàn thành lại hết mốc câu hỏi của lượt này
   useEffect(() => {
     if (!current || !watchedIds.has(current.id)) return;
     if (current.source !== 'unit' && current.source !== 'step') return;
     if (syncedSectionRef.current.has(current.id)) return;
     if (pendingOf(current).length > 0) return;
     syncedSectionRef.current.add(current.id);
-    Promise.resolve(onWatched(current.id)).catch(() => {});
-  }, [current, watchedIds, onWatched]);
+    const hadChecks = Boolean(current.checks?.length);
+    Promise.resolve(onWatched(current.id, { initialSync: !hadChecks, completedJustNow: frameless && hadChecks })).catch(() => { });
+  }, [current, watchedIds, passedKeys, frameless, onWatched]);
 
   useEffect(() => {
     if (!current || !extractYouTubeId(current.url) || current.source === 'lesson') return undefined;
@@ -352,13 +425,16 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     return () => window.clearInterval(timer);
   }, [current?.id, current?.url]);
 
-  const markWatched = async () => {
+  const markWatched = async (meta) => {
+    const endedNow = Boolean(meta?.fromEnded);
+    if (endedNow) endedRef.current = true;
     eligibleRef.current = true;
     const target = currentRef.current || current;
     if (!target || (target.source !== 'unit' && target.source !== 'step')) return true;
-    if (pendingOf(target).length) {
-      if (!extractYouTubeId(target.url) && !isDirectVideo(target.url)) {
-        openGate(pendingOf(target).slice().sort((a, b) => a.atSec - b.atSec)[0], null);
+    const pendingList = sortVideoChecksAsc(pendingOf(target));
+    if (pendingList.length) {
+      if (endedNow || (!extractYouTubeId(target.url) && !isDirectVideo(target.url))) {
+        openGate(pendingList[0], mediaElRef.current);
       }
       return false;
     }
@@ -376,7 +452,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     syncedSectionRef.current.add(videoId);
     setMarkingWatched(true);
     try {
-      await onWatched(videoId);
+      await onWatched(videoId, { completedJustNow: true });
       setWatchedIds((prev) => new Set(prev).add(videoId));
       gameSounds.correct();
     } catch (err) {
@@ -397,7 +473,11 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   };
 
   const finishCheck = (checkId) => {
-    const key = `${current.id}:${checkId}`;
+    const cur = currentRef.current || current;
+    if (!cur) return;
+    const completedAtSec = Number(gateRef.current?.atSec) || 0;
+    const key = `${cur.id}:${checkId}`;
+    localPassedInRunRef.current.add(key);
     const next = new Set(passedRef.current);
     next.add(key);
     passedRef.current = next;
@@ -406,8 +486,23 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
     setGate(null);
     setCheer(false);
     setMissed(false);
-    playerApiRef.current?.play?.();
-    if (eligibleRef.current) markWatched();
+    const plan = resolveVideoCheckResumeTarget({
+      checkAtSec: completedAtSec,
+      currentTime: getVideoCurrentTime(),
+      duration: getVideoDuration(),
+      remainingPendingChecks: pendingOf(cur),
+    });
+    if (plan.action === 'open_check' && plan.check) {
+      openGate(plan.check, mediaElRef.current);
+      return;
+    }
+    if (typeof plan.seekToSec === 'number') {
+      resumeMediaAt(plan.seekToSec);
+    } else {
+      playerApiRef.current?.play?.();
+      mediaElRef.current?.play?.()?.catch?.(() => { });
+    }
+    if (eligibleRef.current || endedRef.current) markWatched({ fromEnded: endedRef.current });
   };
 
   const submitCheck = async (imageDataUrl) => {
@@ -420,8 +515,10 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
         text: answerText,
         imageDataUrl: imageDataUrl || '',
       });
-      syncXpStats(res);
+      const fallbackPenalty = effectiveReview ? 0 : VIDEO_CHECK_ANSWER_XP;
+      syncXpStats(res, !res.correct && !res.needsReview ? Number(res.cost ?? fallbackPenalty) : 0);
       if (res.correct) {
+        localPassedInRunRef.current.add(`${current.id}:${gate.id}`);
         setMissed(false);
         gameSounds.win();
         setCheer(true);
@@ -470,28 +567,47 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
   };
 
   const buyHint = async () => {
-    if (!gate || !current || checkBusy) return;
+    if (!gate || !current || checkBusy || paidHint) return;
     setCheckBusy(true);
     setCheckError('');
-    try {
-      const data = await dailyPracticeApi.student.overview();
-      const cost = Number(gate.hintCostXp) || 0;
-      const xp = Number(data?.stats?.xpTotal) || 0;
-      if (cost > 0 && xp < cost) {
-        setXpPacks(data?.stats?.xpPacks || []);
-        setBuyXpOpen(true);
-        setCheckBusy(false);
-        return;
-      }
-    } catch { /* server vẫn chặn nếu không đủ */ }
+    const cost = effectiveReview ? 0 : (Number(gate.hintCostXp) || 0);
+    if (cost > 0) {
+      try {
+        const data = await dailyPracticeApi.student.overview();
+        const xp = Number(data?.stats?.xpTotal) || 0;
+        if (xp < cost) {
+          setXpPacks(data?.stats?.xpPacks || []);
+          setBuyXpOpen(true);
+          setCheckBusy(false);
+          return;
+        }
+      } catch { /* server vẫn chặn nếu không đủ */ }
+    }
     try {
       const res = await dailyPracticeApi.student.buyVideoHint(unit.id, current.id, gate.id);
-      syncXpStats(res);
+      syncXpStats(res, Number(res?.charged ?? res?.cost ?? 0));
       setPaidHint(res.hint || '');
-      setHintStep(true);
     } catch (err) {
       if (err.status === 402) openBuyXp();
       else setCheckError(err.message || 'Chưa đổi được gợi ý');
+    } finally {
+      setCheckBusy(false);
+    }
+  };
+
+  const skipCheck = async () => {
+    if (!gate || !current || checkBusy || cheer) return;
+    setCheckBusy(true);
+    setCheckError('');
+    try {
+      const res = await dailyPracticeApi.student.skipVideoCheck(unit.id, current.id, gate.id);
+      syncXpStats(res, Number(res?.charged ?? res?.cost ?? 0));
+      gameSounds.tap();
+      setConfirmingSkip(false);
+      finishCheck(gate.id);
+    } catch (err) {
+      if (err.status === 402) openBuyXp();
+      else setCheckError(err.message || 'Chưa bỏ qua được câu hỏi');
     } finally {
       setCheckBusy(false);
     }
@@ -505,24 +621,465 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
       setCurrentId(nextVideo.id);
       return;
     }
-    onClose();
+    if (!embedded) onClose();
   };
   const watchStatusControl = (current?.source === 'unit' || current?.source === 'step') ? (
     currentWatched ? (
-      <button
-        type="button"
-        onClick={handleContinueAfterVideo}
-        className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-500 hover:bg-emerald-400 px-3 sm:px-3.5 text-[10px] sm:text-[11px] font-black text-white transition cursor-pointer whitespace-nowrap !shadow-none"
-      >
-        <CheckCircle2 size={13} /> Tiếp tục bài kế tiếp <ChevronRight size={13} />
-      </button>
+      embedded ? (
+        <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 text-[11px] font-black text-emerald-300 ring-1 ring-emerald-400/30 whitespace-nowrap">
+          <CheckCircle2 size={13} /> Đã xem xong
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={handleContinueAfterVideo}
+          className="ml-auto inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-emerald-500 hover:bg-emerald-400 px-3 sm:px-3.5 text-[10px] sm:text-[11px] font-black text-white transition cursor-pointer whitespace-nowrap !shadow-none"
+        >
+          <CheckCircle2 size={13} /> Tiếp tục bài kế tiếp <ChevronRight size={13} />
+        </button>
+      )
     ) : (
       <span className="inline-flex h-8 sm:h-9 shrink-0 items-center gap-1 rounded-full bg-white/10 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-bold text-white/80 border border-white/15 whitespace-nowrap">
         <Lock size={12} /> {markingWatched ? 'Đang lưu…' : 'Xem đủ 70% để mở khóa'}
       </span>
     )
   ) : null;
-  const showFooterBar = Boolean(!isCurrentYouTube && watchStatusControl);
+  const showFooterBar = Boolean(!embedded && !isCurrentYouTube && watchStatusControl);
+
+  const playerBody = (
+    <div className={embedded ? 'w-full' : 'min-h-0 flex-1 overflow-y-auto'}>
+      <div
+        className={`relative w-full overflow-hidden bg-[#23262E] ${gate && !cheer
+          ? 'min-h-[460px] sm:min-h-[490px]'
+          : `aspect-video ${embedded ? '' : 'max-h-[58dvh] sm:max-h-[68dvh]'}`
+          }`}
+      >
+        {!data && !error && (
+          <p className="flex h-full items-center justify-center gap-2 text-sm font-semibold text-white/70"><Loader2 size={18} className="animate-spin" /> Đang tải video…</p>
+        )}
+        {error && <p className="flex h-full items-center justify-center p-6 text-center text-sm font-semibold text-amber-300">{error}</p>}
+        {data && !current && (
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm font-semibold text-white/75">
+            <Lock size={22} />
+            {lesson?.locked ? lesson.message : 'Chặng này chưa có video.'}
+          </div>
+        )}
+        {current && (isCurrentYouTube ? (
+          <StudentVideoPlayer
+            key={`${unit.id}-${current.id}`}
+            videoId={current.url}
+            lessonId={`dp-${unit.id}-${current.id}`}
+            courseId="daily-practice"
+            antiSeekEnabled={!currentWatched && current.antiSeek !== false}
+            lessonCompleted={currentWatched}
+            requiredRatio={WATCH_REQUIRED_RATIO}
+            onEligibilityReached={markWatched}
+            onVideoEnded={() => markWatched({ fromEnded: true })}
+            playerApiRef={playerApiRef}
+            appearance="window"
+            chromeRightSlot={frameless ? null : watchStatusControl}
+          />
+        ) : (
+          <FallbackPlayer key={`${unit.id}-${current.id}`} url={current.url} onWatched={markWatched} onTick={onMediaTick} mediaRef={mediaElRef} />
+        ))}
+        {cheer && gate && <AnswerCheer onDone={() => finishCheck(gate.id)} />}
+        {gate && !cheer && (
+          <div className="absolute inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-slate-950/65 p-2.5 backdrop-blur-[2px] sm:p-4">
+            <div className="my-auto w-full max-w-md overflow-hidden rounded-[22px] border border-slate-200/80 bg-white text-slate-900 shadow-2xl">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100/90 px-2.5 py-0.5 text-[11px] font-black text-amber-800">
+                    <Clock size={11} aria-hidden="true" />
+                    Giây {gate.atSec}
+                  </span>
+                  {!frameless && (
+                    <>
+                      {effectiveReview ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-extrabold text-sky-700 ring-1 ring-sky-200/80">
+                          Ôn lại · Miễn phí XP
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-extrabold text-emerald-700 ring-1 ring-emerald-200/80">
+                          <Zap size={10} className="fill-emerald-500 text-emerald-600" aria-hidden="true" />
+                          +{VIDEO_CHECK_ANSWER_XP} XP
+                        </span>
+                      )}
+                      {typeof walletXp === 'number' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold tabular-nums text-slate-700">
+                          Ví: {walletXp} XP
+                        </span>
+                      )}
+                    </>
+                  )}
+                  {frameless && effectiveReview && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-extrabold text-sky-700 ring-1 ring-sky-200/80">
+                      Ôn lại
+                    </span>
+                  )}
+                </div>
+                {!embedded && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Đóng video"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-700 !shadow-none"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3.5 p-4 sm:p-5">
+                {missed && (
+                  <div className="flex items-center gap-3 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2">
+                    <img src={CRY_MASCOT} alt="" className="h-12 w-12 shrink-0 object-contain" />
+                    <p className="text-xs font-bold leading-snug text-rose-700">
+                      {(() => {
+                        const penaltyNote = (!frameless && !effectiveReview) ? ` (−${VIDEO_CHECK_ANSWER_XP} XP)` : '';
+                        if (gate.kind === 'screen') return `AI chưa chấp nhận${penaltyNote}. Hãy gửi ảnh mới.`;
+                        if (gate.kind === 'text') return `Chưa đúng ý${penaltyNote}. Hãy nhập lại.`;
+                        return `Chưa đúng${penaltyNote}. Hãy chọn lại.`;
+                      })()}
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[15px] font-black leading-snug text-slate-900 sm:text-base">
+                  {gate.prompt}
+                </p>
+
+                {gate.kind === 'choice' && (
+                  <div className="space-y-2">
+                    {(gate.choices || []).map((choice, index) => {
+                      const active = picked === index;
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => setPicked(index)}
+                          className={`flex w-full items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition !shadow-none ${
+                            active
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                              : 'border-slate-200 bg-slate-50/60 text-slate-800 hover:border-slate-300 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
+                              active ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + index)}
+                          </span>
+                          <span className="min-w-0 flex-1">{choice}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {gate.kind === 'text' && (
+                  <input
+                    className="w-full rounded-xl border-2 border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                    value={answerText}
+                    placeholder="Nhập câu trả lời của bạn…"
+                    onChange={(e) => setAnswerText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !checkBusy && answerText.trim()) {
+                        e.preventDefault();
+                        submitCheck('');
+                      }
+                    }}
+                  />
+                )}
+
+                {gate.kind === 'screen' && (uploadPct != null ? (
+                  <UploadProgress percent={uploadPct} grading={grading} />
+                ) : (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                    <span>{missed ? 'Chọn ảnh bài làm mới' : 'Tải ảnh chụp bài làm'}</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      onChange={(e) => { sendScreenshot(e.target.files?.[0]); e.target.value = ''; }}
+                    />
+                  </label>
+                ))}
+
+                {checkHint && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                    <Lightbulb size={14} className="mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
+                    <span>{checkHint}</span>
+                  </div>
+                )}
+                {paidHint && (
+                  <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
+                    <Lightbulb size={14} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+                    <span>{paidHint}</span>
+                  </div>
+                )}
+                {checkError && (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
+                    {checkError}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  {gate.kind !== 'screen' && (
+                    <button
+                      type="button"
+                      disabled={checkBusy || (gate.kind === 'choice' ? picked == null : !answerText.trim())}
+                      onClick={() => submitCheck('')}
+                      className="inline-flex flex-1 min-w-[140px] items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 !shadow-none"
+                    >
+                      {checkBusy ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} aria-hidden="true" />}
+                      <span>{checkBusy ? 'Đang chấm…' : 'Trả lời'}</span>
+                    </button>
+                  )}
+                  {Number(gate.hintCostXp) > 0 && (
+                    <button
+                      type="button"
+                      disabled={checkBusy || Boolean(paidHint)}
+                      onClick={buyHint}
+                      className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 !shadow-none"
+                    >
+                      <Lightbulb size={14} className="text-amber-600" aria-hidden="true" />
+                      <span>
+                        {paidHint
+                          ? 'Đã gợi ý'
+                          : checkBusy
+                            ? 'Đang lấy…'
+                            : frameless
+                              ? 'Gợi ý'
+                              : effectiveReview
+                                ? 'Gợi ý · Miễn phí'
+                                : `Gợi ý · ${gate.hintCostXp} XP`}
+                      </span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={checkBusy || uploadPct != null || confirmingSkip}
+                    onClick={() => setConfirmingSkip(true)}
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-black text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 !shadow-none"
+                  >
+                    <FastForward size={14} className="text-rose-600" aria-hidden="true" />
+                    <span>Khó quá bỏ qua</span>
+                  </button>
+                </div>
+
+                {confirmingSkip && (
+                  <div role="alert" className="space-y-2.5 rounded-2xl border-2 border-rose-200 bg-rose-50 p-3.5">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-rose-800">
+                      <AlertTriangle size={15} className="shrink-0 text-rose-600" aria-hidden="true" />
+                      <span>{effectiveReview ? 'Xác nhận bỏ qua' : `Cảnh báo mất ${VIDEO_CHECK_SKIP_XP} XP`}</span>
+                    </div>
+                    <p className="text-xs font-semibold leading-relaxed text-rose-700">
+                      {effectiveReview
+                        ? 'Đang ở chế độ ôn lại (không mất XP). Bạn muốn bỏ qua câu hỏi này để xem tiếp video?'
+                        : `Bỏ qua câu hỏi mốc video này sẽ bị trừ ${VIDEO_CHECK_SKIP_XP} XP để tiếp tục xem. Bạn có chắc muốn bỏ qua?`}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={checkBusy}
+                        onClick={() => setConfirmingSkip(false)}
+                        className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 !shadow-none"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={checkBusy}
+                        onClick={skipCheck}
+                        className="flex-1 rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white hover:bg-red-600 disabled:opacity-60 !shadow-none"
+                      >
+                        {effectiveReview ? 'Đồng ý bỏ qua' : `Bỏ qua (−${VIDEO_CHECK_SKIP_XP} XP)`}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!frameless && (
+                  <p className="text-center text-[11px] font-medium text-slate-400">
+                    {effectiveReview
+                      ? 'Đang ôn lại (không cộng/trừ XP) · Trả lời đúng để xem tiếp'
+                      : `Đúng lần đầu +${VIDEO_CHECK_ANSWER_XP} XP · Sai −${VIDEO_CHECK_ANSWER_XP} XP rồi ${gate.kind === 'screen' ? 'gửi lại' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}`}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!isSingleMode && playlist.length > 0 && (
+        <div className="space-y-1.5 px-4 pt-3">
+          <p className="text-[11px] font-black uppercase tracking-wider text-white/50">Danh sách video ({playlist.length})</p>
+          {playlist.map((video, index) => {
+            const active = current?.id === video.id;
+            const locked = video.state === 'locked';
+            const done = video.source === 'unit' && watchedIds.has(video.id);
+            return (
+              <button
+                key={video.id}
+                type="button"
+                disabled={locked}
+                onClick={() => {
+                  gameSounds.tap();
+                  if (replayRequiredIdsRef.current.has(video.id)) {
+                    for (const k of [...localPassedInRunRef.current]) {
+                      if (k.startsWith(`${video.id}:`)) localPassedInRunRef.current.delete(k);
+                    }
+                    const next = new Set([...passedRef.current].filter((k) => !k.startsWith(`${video.id}:`)));
+                    passedRef.current = next;
+                    setPassedKeys(next);
+                    syncedSectionRef.current.delete(video.id);
+                  }
+                  setCurrentId(video.id);
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition !shadow-none ${active ? 'bg-white/15 ring-1 ring-white/25' : 'hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white" style={{ background: active ? '#EF3B36' : 'rgba(255,255,255,0.12)' }}>
+                  {locked ? <Lock size={12} /> : active ? <Play size={12} fill="white" className="text-white" /> : index + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-white">{video.title}</span>
+                  <span className="block text-[11px] font-semibold text-white/50">
+                    {video.source === 'lesson' ? `Bài giảng · ${lesson?.title || ''}` : video.stepLabel ? `${video.stepLabel} · Video cấp` : 'Video chặng'}
+                  </span>
+                </span>
+                {done && <CheckCircle2 size={16} className="shrink-0 text-emerald-400" aria-label="Đã xem" />}
+              </button>
+            );
+          })}
+        </div>
+      )
+      }
+
+      {
+        !hideStudyTools && current && (
+          <div className="mx-3 my-3 sm:mx-4 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                {
+                  key: 'notes',
+                  label: 'Ghi chú',
+                  open: notesOpen,
+                  Icon: StickyNote,
+                  toneClass: 'text-emerald-400',
+                  borderClass: notesOpen ? 'border-emerald-400/60' : 'border-white/10',
+                  onClick: () => {
+                    setNotesOpen((open) => !open);
+                    setAiOpen(false);
+                  },
+                },
+                {
+                  key: 'ai',
+                  label: 'Nội dung & AI',
+                  open: aiOpen,
+                  Icon: Bot,
+                  toneClass: 'text-emerald-300',
+                  borderClass: aiOpen ? 'border-emerald-400/60' : 'border-emerald-400/20',
+                  onClick: () => {
+                    setAiOpen((open) => !open);
+                    setNotesOpen(false);
+                  },
+                },
+              ].map(({ key, label, open, Icon, toneClass, borderClass, onClick }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={onClick}
+                  aria-expanded={open}
+                  className={`flex w-full items-center justify-between gap-2 rounded-2xl border ${borderClass} bg-[#16181E] px-3 sm:px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none`}
+                >
+                  <span className={`inline-flex min-w-0 items-center gap-1.5 text-xs font-black truncate ${toneClass}`}>
+                    <Icon size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="truncate">{label}</span>
+                  </span>
+                  {open
+                    ? <ChevronUp size={15} className="shrink-0 text-white/50" />
+                    : <ChevronDown size={15} className="shrink-0 text-white/50" />}
+                </button>
+              ))}
+            </div>
+
+            {notesOpen && (
+              <div className="rounded-2xl border border-white/10 bg-[#16181E] overflow-hidden p-3 sm:p-4">
+                <NotesPanel
+                  storageKey={lmsStoreKey('notes', resolveCurrentStudentId(), `dp_${unit.id}`)}
+                  lessonId={current.id}
+                  lessonTitle={current.title || unit.title}
+                  courseTitle={unit.title || 'Luyện tập DewSkill'}
+                  getCurrentTime={getVideoCurrentTime}
+                  onSeekTo={seekVideoTo}
+                />
+              </div>
+            )}
+
+            {aiOpen && (
+              <div className="rounded-2xl border border-emerald-400/20 bg-[#16181E] overflow-hidden p-3 sm:p-4">
+                <LessonAiAssistantPanel
+                  key={current.id}
+                  lessonTitle={current.title}
+                  unitTitle={unit.title}
+                  courseTitle={lesson?.title || unit.title || 'Tin học Văn phòng'}
+                  guide={current.guide || null}
+                />
+              </div>
+            )}
+          </div>
+        )
+      }
+    </div >
+  );
+
+  if (embedded) {
+    if (frameless) {
+      return (
+        <>
+          <div className="w-full overflow-hidden rounded-2xl bg-[#23262E]">
+            {playerBody}
+          </div>
+          {buyXpOpen && (
+            <BuyXpModal packs={xpPacks} onClose={() => setBuyXpOpen(false)} onPaid={() => setBuyXpOpen(false)} />
+          )}
+        </>
+      );
+    }
+    return (
+      <>
+        <div className="flex w-full flex-col overflow-hidden rounded-2xl bg-[#1C1F26] shadow-md ring-1 ring-slate-900/15">
+          <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-[#16181E] px-3.5 py-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <Clapperboard size={15} className="shrink-0 text-emerald-400" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                  Video hướng dẫn tương tác
+                </p>
+                <p className="truncate text-xs sm:text-sm font-black text-white" title={current?.title || ''}>
+                  {current?.title || 'Video hướng dẫn'}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {!isCurrentYouTube && watchStatusControl}
+              {current?.checks?.length ? (
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-amber-300 ring-1 ring-white/15 whitespace-nowrap">
+                  {current.checks.length} mốc trắc nghiệm
+                </span>
+              ) : null}
+            </div>
+          </div>
+          {playerBody}
+        </div>
+        {buyXpOpen && (
+          <BuyXpModal packs={xpPacks} onClose={() => setBuyXpOpen(false)} onPaid={() => setBuyXpOpen(false)} />
+        )}
+      </>
+    );
+  }
 
   return createPortal(
     <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation" onClick={onClose}>
@@ -534,13 +1091,6 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 sm:gap-3 border-b border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
-          <span
-            className="max-w-[44%] sm:max-w-[38%] shrink-0 truncate rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white"
-            style={{ background: `linear-gradient(135deg, ${color.from}, ${color.to})` }}
-            title={`Chặng ${unit.index} · ${unit.title}`}
-          >
-            Chặng {unit.index} · {unit.title}
-          </span>
           <h2 className="flex min-w-0 flex-1 items-center justify-start gap-1.5 text-left text-xs sm:text-base font-black text-white" title={current?.title || ''}>
             <Clapperboard size={15} className="shrink-0 text-emerald-400" aria-hidden="true" />
             <span className="line-clamp-1 sm:line-clamp-2 break-words">{current?.title || 'Video của chặng'}</span>
@@ -550,345 +1100,10 @@ export default function PathVideoModal({ unit, initialVideoId = '', singleVideoO
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="relative aspect-video max-h-[58dvh] sm:max-h-[68dvh] w-full overflow-hidden bg-[#23262E]">
-            {!data && !error && (
-              <p className="flex h-full items-center justify-center gap-2 text-sm font-semibold text-white/70"><Loader2 size={18} className="animate-spin" /> Đang tải video…</p>
-            )}
-            {error && <p className="flex h-full items-center justify-center p-6 text-center text-sm font-semibold text-amber-300">{error}</p>}
-            {data && !current && (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm font-semibold text-white/75">
-                <Lock size={22} />
-                {lesson?.locked ? lesson.message : 'Chặng này chưa có video.'}
-              </div>
-            )}
-            {current && (isCurrentYouTube ? (
-              <StudentVideoPlayer
-                key={`${unit.id}-${current.id}`}
-                videoId={current.url}
-                lessonId={`dp-${unit.id}-${current.id}`}
-                courseId="daily-practice"
-                antiSeekEnabled={!currentWatched && current.antiSeek !== false}
-                lessonCompleted={currentWatched}
-                requiredRatio={WATCH_REQUIRED_RATIO}
-                onEligibilityReached={markWatched}
-                onVideoEnded={markWatched}
-                playerApiRef={playerApiRef}
-                appearance="window"
-                chromeRightSlot={watchStatusControl}
-              />
-            ) : (
-              <FallbackPlayer key={`${unit.id}-${current.id}`} url={current.url} onWatched={markWatched} onTick={onMediaTick} />
-            ))}
-            {cheer && gate && <AnswerCheer onDone={() => finishCheck(gate.id)} />}
-            {gate && !cheer && (
-              <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-4">
-                <div className="w-full max-w-md overflow-hidden rounded-[22px] border border-slate-200/80 bg-white text-slate-900 shadow-2xl">
-                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100/90 px-2.5 py-0.5 text-[11px] font-black text-amber-800">
-                        <Clock size={11} aria-hidden="true" />
-                        Giây {gate.atSec}
-                      </span>
-                      {currentWatched ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-extrabold text-sky-700 ring-1 ring-sky-200/80">
-                          Ôn lại · Miễn phí XP
-                        </span>
-                      ) : (
-                        <>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-extrabold text-emerald-700 ring-1 ring-emerald-200/80">
-                            <Zap size={10} className="fill-emerald-500 text-emerald-600" aria-hidden="true" />
-                            +{VIDEO_CHECK_ANSWER_XP} XP
-                          </span>
-                          {typeof walletXp === 'number' && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold tabular-nums text-slate-700">
-                              Ví: {walletXp} XP
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      aria-label="Đóng video"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-700 !shadow-none"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3.5 p-4 sm:p-5">
-                    {!currentWatched && missed && (
-                      <div className="flex items-center gap-3 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2">
-                        <img src={CRY_MASCOT} alt="" className="h-12 w-12 shrink-0 object-contain" />
-                        <p className="text-xs font-bold leading-snug text-rose-700">
-                          {gate.kind === 'screen'
-                            ? `AI chưa chấp nhận (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy gửi ảnh mới.`
-                            : gate.kind === 'text'
-                              ? `Chưa đúng ý (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy nhập lại.`
-                              : `Chưa đúng (−${VIDEO_CHECK_ANSWER_XP} XP). Hãy chọn lại.`}
-                        </p>
-                      </div>
-                    )}
-
-                    <p className="text-[15px] font-black leading-snug text-slate-900 sm:text-base">
-                      {gate.prompt}
-                    </p>
-
-                    {currentWatched ? (
-                      <div className="space-y-3">
-                        <div className="space-y-1.5 rounded-xl border border-sky-200 bg-sky-50/80 px-3.5 py-3 text-sm leading-relaxed text-sky-950">
-                          <div className="flex items-start gap-2 font-semibold">
-                            <Lightbulb size={16} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
-                            <span>
-                              {gate.reviewHint || gate.reviewAnswer || 'Video này bạn đã hoàn thành. Hãy xem lại đoạn hướng dẫn rồi tiếp tục nhé.'}
-                            </span>
-                          </div>
-                          {gate.reviewHint && gate.reviewAnswer && gate.reviewAnswer !== gate.reviewHint && (
-                            <p className="pl-6 text-xs font-bold text-emerald-700">
-                              Đáp án gợi ý: {gate.reviewAnswer}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => finishCheck(gate.id)}
-                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 !shadow-none"
-                        >
-                          <Play size={14} fill="white" aria-hidden="true" />
-                          <span>Tiếp tục xem video</span>
-                        </button>
-                      </div>
-                    ) : hintStep && paidHint ? (
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm font-semibold leading-relaxed text-sky-900">
-                          <Lightbulb size={16} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
-                          <span>{paidHint}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => finishCheck(gate.id)}
-                          className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 !shadow-none"
-                        >
-                          Tiếp tục xem video
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        {gate.kind === 'choice' && (
-                          <div className="space-y-2">
-                            {(gate.choices || []).map((choice, index) => {
-                              const active = picked === index;
-                              return (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  onClick={() => setPicked(index)}
-                                  className={`flex w-full items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition !shadow-none ${
-                                    active
-                                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                                      : 'border-slate-200 bg-slate-50/60 text-slate-800 hover:border-slate-300 hover:bg-slate-100/70'
-                                  }`}
-                                >
-                                  <span
-                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
-                                      active ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'
-                                    }`}
-                                  >
-                                    {String.fromCharCode(65 + index)}
-                                  </span>
-                                  <span className="min-w-0 flex-1">{choice}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {gate.kind === 'text' && (
-                          <input
-                            className="w-full rounded-xl border-2 border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                            value={answerText}
-                            placeholder="Nhập câu trả lời của bạn…"
-                            onChange={(e) => setAnswerText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !checkBusy && answerText.trim()) {
-                                e.preventDefault();
-                                submitCheck('');
-                              }
-                            }}
-                          />
-                        )}
-
-                        {gate.kind === 'screen' && (uploadPct != null ? (
-                          <UploadProgress percent={uploadPct} grading={grading} />
-                        ) : (
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50/40">
-                            <span>{missed ? 'Chọn ảnh bài làm mới' : 'Tải ảnh chụp bài làm'}</span>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp"
-                              className="sr-only"
-                              onChange={(e) => { sendScreenshot(e.target.files?.[0]); e.target.value = ''; }}
-                            />
-                          </label>
-                        ))}
-
-                        {checkHint && (
-                          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                            <Lightbulb size={14} className="mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
-                            <span>{checkHint}</span>
-                          </div>
-                        )}
-                        {paidHint && (
-                          <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
-                            <Lightbulb size={14} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
-                            <span>{paidHint}</span>
-                          </div>
-                        )}
-                        {checkError && (
-                          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
-                            {checkError}
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-2 pt-0.5">
-                          {gate.kind !== 'screen' && (
-                            <button
-                              type="button"
-                              disabled={checkBusy || (gate.kind === 'choice' ? picked == null : !answerText.trim())}
-                              onClick={() => submitCheck('')}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 !shadow-none"
-                            >
-                              {checkBusy ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} aria-hidden="true" />}
-                              <span>{checkBusy ? 'Đang chấm…' : 'Trả lời'}</span>
-                            </button>
-                          )}
-                          {Number(gate.hintCostXp) > 0 && (
-                            <button
-                              type="button"
-                              disabled={checkBusy}
-                              onClick={buyHint}
-                              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 !shadow-none"
-                            >
-                              <Lightbulb size={14} className="text-amber-600" aria-hidden="true" />
-                              <span>{checkBusy ? 'Đang lấy…' : `Gợi ý · ${gate.hintCostXp} XP`}</span>
-                            </button>
-                          )}
-                        </div>
-
-                        <p className="text-center text-[11px] font-medium text-slate-400">
-                          Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP · Sai −{VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'gửi lại' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!isSingleMode && playlist.length > 0 && (
-            <div className="space-y-1.5 px-4 pt-3">
-              <p className="text-[11px] font-black uppercase tracking-wider text-white/50">Danh sách video ({playlist.length})</p>
-              {playlist.map((video, index) => {
-                const active = current?.id === video.id;
-                const locked = video.state === 'locked';
-                const done = video.source === 'unit' && watchedIds.has(video.id);
-                return (
-                  <button
-                    key={video.id}
-                    type="button"
-                    disabled={locked}
-                    onClick={() => { gameSounds.tap(); setCurrentId(video.id); }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition !shadow-none ${active ? 'bg-white/15 ring-1 ring-white/25' : 'hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-50`}
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white" style={{ background: active ? '#EF3B36' : 'rgba(255,255,255,0.12)' }}>
-                      {locked ? <Lock size={12} /> : active ? <Play size={12} fill="white" className="text-white" /> : index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-white">{video.title}</span>
-                      <span className="block text-[11px] font-semibold text-white/50">
-                        {video.source === 'lesson' ? `Bài giảng · ${lesson?.title || ''}` : video.stepLabel ? `${video.stepLabel} · Video cấp` : 'Video chặng'}
-                      </span>
-                    </span>
-                    {done && <CheckCircle2 size={16} className="shrink-0 text-emerald-400" aria-label="Đã xem" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {current && (
-            <div className="mx-3 my-3 sm:mx-4 rounded-2xl border border-white/10 bg-[#16181E] overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setNotesOpen((open) => {
-                  const next = !open;
-                  if (next) setAiOpen(false);
-                  return next;
-                })}
-                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none"
-              >
-                <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-400">
-                  <StickyNote size={14} aria-hidden="true" />
-                  Ghi chú theo mốc thời gian video
-                </span>
-                {notesOpen
-                  ? <ChevronUp size={15} className="text-white/50" />
-                  : <ChevronDown size={15} className="text-white/50" />}
-              </button>
-              {notesOpen && (
-                <div className="border-t border-white/10 p-3 sm:p-4">
-                  <NotesPanel
-                    storageKey={lmsStoreKey('notes', resolveCurrentStudentId(), `dp_${unit.id}`)}
-                    lessonId={current.id}
-                    lessonTitle={current.title || unit.title}
-                    courseTitle={unit.title || 'Luyện tập DewSkill'}
-                    getCurrentTime={getVideoCurrentTime}
-                    onSeekTo={seekVideoTo}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {current && (
-            <div className="mx-3 mb-3 sm:mx-4 rounded-2xl border border-emerald-400/20 bg-[#16181E] overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setAiOpen((open) => {
-                  const next = !open;
-                  if (next) setNotesOpen(false);
-                  return next;
-                })}
-                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-white/[0.04] transition cursor-pointer !shadow-none"
-              >
-                <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-300">
-                  <Bot size={14} aria-hidden="true" />
-                  Trợ lý AI trong bài học · Công thức Excel &amp; Hỏi đáp
-                </span>
-                {aiOpen
-                  ? <ChevronUp size={15} className="text-white/50" />
-                  : <ChevronDown size={15} className="text-white/50" />}
-              </button>
-              {aiOpen && (
-                <div className="border-t border-white/10 p-3 sm:p-4">
-                  <LessonAiAssistantPanel
-                    key={current.id}
-                    lessonTitle={current.title}
-                    unitTitle={unit.title}
-                    courseTitle={lesson?.title || unit.title || 'Tin học Văn phòng'}
-                    guide={current.guide || null}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {playerBody}
 
         {showFooterBar && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
             {watchStatusControl}
           </div>
         )}

@@ -159,3 +159,13 @@
 .dp-play-footer-explain:hover {
   background: #f8fafc;
 }
+
+.dp-play-video-status-text {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.dp-play-video-next-btn {
+  font-size: 0.8125rem;
+  line-height: 1.25;
+}

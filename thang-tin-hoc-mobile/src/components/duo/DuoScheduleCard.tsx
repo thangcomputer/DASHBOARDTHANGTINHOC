@@ -256,22 +256,22 @@ export function DuoScheduleCard({
               ) : item.meetLink && item.joinable ? (
                 <MeetJoinGlow>
                   <DuoButton
-                    variant={item.live ? 'primary' : 'blue'}
+                    variant="danger"
                     size="sm"
                     icon={<Video size={14} color="#FFFFFF" />}
-                    text="Vào Meet"
+                    text="Vào học"
                     onPress={() => {
                       if (item.meetLink) void Linking.openURL(item.meetLink);
                     }}
                   />
                 </MeetJoinGlow>
-              ) : item.meetLink ? (
+              ) : !item.joinable ? (
                 <DuoButton
                   variant="secondary"
                   size="sm"
                   disabled
                   icon={<Video size={14} color="#94A3B8" />}
-                  text="Vào Meet"
+                  text="Vào học"
                   accessibilityLabel={item.waitLabel || 'Chưa đến giờ vào lớp'}
                 />
               ) : (
@@ -430,13 +430,13 @@ const styles = StyleSheet.create({
     zIndex: 0,
     borderRadius: 18,
     borderWidth: 3,
-    borderColor: '#34D399',
-    backgroundColor: 'rgba(16, 185, 129, 0.35)',
+    borderColor: '#FCA5A5',
+    backgroundColor: 'rgba(239, 68, 68, 0.35)',
   },
   meetGlowButton: {
     zIndex: 2,
     borderRadius: 14,
-    shadowColor: '#059669',
+    shadowColor: '#EF4444',
     shadowOpacity: 0.9,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },

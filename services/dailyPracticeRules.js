@@ -3,8 +3,26 @@
 const TYPES = ['mcq', 'truefalse', 'order', 'match', 'fill', 'sort'];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const XP_BY_DIFFICULTY = { easy: 10, medium: 15, hard: 20 };
-/** Mỗi lần nộp đáp án ở mốc video: trừ XP luyện, đúng hay sai đều trừ. */
+/** Mỗi lần nộp đáp án ở mốc video: trừ XP luyện khi chưa hoàn thành bài/video. */
 const VIDEO_CHECK_ANSWER_XP = 5;
+/** Phí XP bỏ qua câu hỏi mốc video khi học viên bấm "Khó quá bỏ qua". */
+const VIDEO_CHECK_SKIP_XP = 15;
+
+/**
+ * Tính XP áp dụng cho câu hỏi mốc video.
+ * Khi học viên đang ôn lại video/chặng/bài đã hoàn thành thì không trừ hay cộng XP.
+ */
+function videoCheckXpConfig({ isReview = false, firstPass = false, hintCostXp = 0 } = {}) {
+  const review = Boolean(isReview);
+  const wrongCost = review ? 0 : VIDEO_CHECK_ANSWER_XP;
+  const hintCost = review ? 0 : Math.max(0, Number(hintCostXp) || 0);
+  const reward = review ? 0 : (firstPass ? VIDEO_CHECK_ANSWER_XP : 0);
+  return { review, wrongCost, hintCost, reward };
+}
+
+function videoCheckSkipCost(isReview = false) {
+  return isReview ? 0 : VIDEO_CHECK_SKIP_XP;
+}
 const SESSION_SIZE = 10;
 /** Mỗi câu lộ trình: sai −5 XP ngay; đạt % yêu cầu mới nhận +5/câu đúng. */
 const QUESTION_STAKE_XP = 5;
@@ -556,6 +574,9 @@ module.exports = {
   DIFFICULTIES,
   XP_BY_DIFFICULTY,
   VIDEO_CHECK_ANSWER_XP,
+  VIDEO_CHECK_SKIP_XP,
+  videoCheckXpConfig,
+  videoCheckSkipCost,
   QUESTION_STAKE_XP,
   SESSION_STAKE_XP,
   sessionStakeTotal,
@@ -570,6 +591,7 @@ module.exports = {
   FREE_PORTAL_DAILY_XP,
   RECOVERY_DAILY_CAP_XP,
   DAILY_REFILL_XP,
+  DEFAULT_HINT,
   allowanceForSubscription,
   applyDailyAllowance,
   applyXpDelta,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BookOpen, CheckCircle2, Download, ExternalLink, FileText, Gamepad2, Loader2, Paperclip, Play, X,
+  AlertTriangle, BookOpen, CheckCircle2, Download, ExternalLink, FastForward, FileText, Gamepad2, Loader2, Paperclip, Play, X,
 } from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
@@ -9,8 +9,13 @@ import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { gameSounds } from '../../../utils/sound';
-import { VIDEO_CHECK_ANSWER_XP } from '../../../utils/dailyPractice';
+import { VIDEO_CHECK_ANSWER_XP, VIDEO_CHECK_SKIP_XP } from '../../../utils/dailyPractice';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
+import {
+  canMediaSeekTo,
+  findTriggeredVideoCheck,
+  resolveVideoCheckResumeTarget,
+} from '../../../../../shared/dailyPractice/videoCheckpointPlayback.mjs';
 
 const WATCH_REQUIRED_RATIO = 2 / 3;
 
@@ -24,22 +29,32 @@ function isDirectVideo(url) {
 }
 
 function CheckCard({
-  gate, picked, setPicked, answerText, setAnswerText, checkHint, paidHint, checkError, checkBusy, missed, uploadPct, grading, hintStep, onHintNext, onSubmit, onFile, onHint, onQuit,
+  gate, picked, setPicked, answerText, setAnswerText, checkHint, paidHint, checkError, checkBusy, missed, uploadPct, grading, hintStep, review = false, onHintNext, onSubmit, onSkip, onFile, onHint, onQuit,
 }) {
+  const [confirmingSkip, setConfirmingSkip] = useState(false);
+  useEffect(() => { setConfirmingSkip(false); }, [gate?.id, gate?.atSec]);
   if (!gate) return null;
+  const penaltyNote = review ? '' : ` Mất ${VIDEO_CHECK_ANSWER_XP} XP.`;
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 p-4">
       <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
-        <p className="text-[11px] font-black uppercase tracking-wide text-amber-700">Dừng ở giây {gate.atSec}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] font-black uppercase tracking-wide text-amber-700">Dừng ở giây {gate.atSec}</p>
+          {review && (
+            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 ring-1 ring-sky-200/80">
+              Ôn lại · Miễn phí XP
+            </span>
+          )}
+        </div>
         {missed && (
           <div className="flex items-center gap-3 rounded-xl bg-rose-50 px-3 py-2">
             <img src={CRY_MASCOT} alt="" className="h-16 w-16 object-contain" />
             <p className="text-sm font-black text-rose-700">
               {gate.kind === 'screen'
-                ? `AI chưa chấp nhận. Mất ${VIDEO_CHECK_ANSWER_XP} XP. Hãy tải đáp án mới.`
+                ? `AI chưa chấp nhận.${penaltyNote} Hãy tải đáp án mới.`
                 : gate.kind === 'text'
-                  ? `Chưa đúng ý. Mất ${VIDEO_CHECK_ANSWER_XP} XP. Hãy nhập lại.`
-                  : `Chưa đúng. Mất ${VIDEO_CHECK_ANSWER_XP} XP. Hãy chọn lại.`}
+                  ? `Chưa đúng ý.${penaltyNote} Hãy nhập lại.`
+                  : `Chưa đúng.${penaltyNote} Hãy chọn lại.`}
             </p>
           </div>
         )}
@@ -83,12 +98,56 @@ function CheckCard({
           <button type="button" onClick={onQuit} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 !shadow-none">Thôi</button>
           {Number(gate.hintCostXp) > 0 && (
             <button type="button" disabled={checkBusy} onClick={onHint} className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white !shadow-none">
-              {checkBusy ? 'Đang lấy gợi ý…' : `Gợi ý thêm · ${gate.hintCostXp} XP`}
+              {checkBusy ? 'Đang lấy gợi ý…' : (review ? 'Gợi ý thêm · Miễn phí' : `Gợi ý thêm · ${gate.hintCostXp} XP`)}
+            </button>
+          )}
+          {onSkip && (
+            <button
+              type="button"
+              disabled={checkBusy || uploadPct != null || confirmingSkip}
+              onClick={() => setConfirmingSkip(true)}
+              className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-100 disabled:opacity-50 !shadow-none"
+            >
+              <FastForward size={14} aria-hidden="true" />
+              <span>Khó quá bỏ qua</span>
             </button>
           )}
         </div>
+        {confirmingSkip && onSkip && (
+          <div role="alert" className="space-y-2 rounded-xl border-2 border-rose-200 bg-rose-50 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-black text-rose-800">
+              <AlertTriangle size={14} className="shrink-0 text-rose-600" aria-hidden="true" />
+              <span>{review ? 'Xác nhận bỏ qua' : `Cảnh báo mất ${VIDEO_CHECK_SKIP_XP} XP`}</span>
+            </p>
+            <p className="text-xs font-semibold text-rose-700">
+              {review
+                ? 'Đang ở chế độ ôn lại (không mất XP). Bạn muốn bỏ qua câu hỏi này để xem tiếp video?'
+                : `Bỏ qua câu hỏi mốc video này sẽ bị trừ ${VIDEO_CHECK_SKIP_XP} XP để tiếp tục xem. Bạn có chắc muốn bỏ qua?`}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={checkBusy}
+                onClick={() => setConfirmingSkip(false)}
+                className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 !shadow-none"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={checkBusy}
+                onClick={() => { setConfirmingSkip(false); onSkip(); }}
+                className="flex-1 rounded-xl bg-red-500 px-3 py-1.5 text-xs font-black text-white hover:bg-red-600 disabled:opacity-60 !shadow-none"
+              >
+                {review ? 'Đồng ý bỏ qua' : `Bỏ qua (−${VIDEO_CHECK_SKIP_XP} XP)`}
+              </button>
+            </div>
+          </div>
+        )}
         <p className="text-[11px] font-semibold text-slate-500">
-          Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP và xem tiếp. Sai mất {VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.
+          {review
+            ? `Đang ôn lại (không cộng/trừ XP). Trả lời đúng để xem tiếp.`
+            : `Đúng lần đầu +${VIDEO_CHECK_ANSWER_XP} XP và xem tiếp. Sai mất ${VIDEO_CHECK_ANSWER_XP} XP rồi ${gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.`}
         </p>
         </>
         )}
@@ -121,6 +180,7 @@ export default function PathLessonModal({
   const [hintStep, setHintStep] = useState(false);
   const [started, setStarted] = useState(false);
   const playerApiRef = useRef(null);
+  const mediaElRef = useRef(null);
   const passedRef = useRef(passedKeys);
   const gateRef = useRef(null);
   const maxSeenRef = useRef(0);
@@ -186,6 +246,7 @@ export default function PathLessonModal({
 
   const onTick = (time, media) => {
     if (!video) return;
+    if (media) mediaElRef.current = media;
     maxSeenRef.current = Math.max(maxSeenRef.current, Math.min(time, (gateRef.current ? Number(gateRef.current.atSec) : time)));
     if (gateRef.current) {
       const at = Number(gateRef.current.atSec) || 0;
@@ -198,10 +259,10 @@ export default function PathLessonModal({
       }
       return;
     }
-    const next = checks
-      .filter((check) => !passedRef.current.has(`${video.id}:${check.id}`))
-      .sort((a, b) => a.atSec - b.atSec)
-      .find((check) => time + 0.3 >= Number(check.atSec));
+    const next = findTriggeredVideoCheck(
+      checks.filter((check) => !passedRef.current.has(`${video.id}:${check.id}`)),
+      time,
+    );
     if (next) openGate(next, media);
   };
 
@@ -215,13 +276,37 @@ export default function PathLessonModal({
   }, [yt, video?.id, passedKeys]);
 
   const finishCheck = (checkId) => {
+    const completedAtSec = Number(gateRef.current?.atSec) || 0;
     const next = new Set(passedRef.current);
     next.add(`${video.id}:${checkId}`);
     passedRef.current = next;
     setPassedKeys(next);
     gateRef.current = null;
     setGate(null);
-    playerApiRef.current?.play?.();
+    const currentTime = playerApiRef.current?.getCurrentTime?.() ?? mediaElRef.current?.currentTime ?? 0;
+    const duration = playerApiRef.current?.getDuration?.() ?? mediaElRef.current?.duration ?? 0;
+    const plan = resolveVideoCheckResumeTarget({
+      checkAtSec: completedAtSec,
+      currentTime,
+      duration,
+      remainingPendingChecks: checks.filter((c) => !next.has(`${video.id}:${c.id}`)),
+    });
+    if (plan.action === 'open_check' && plan.check) {
+      openGate(plan.check, mediaElRef.current);
+      return;
+    }
+    const resumeSec = typeof plan.seekToSec === 'number' ? plan.seekToSec : completedAtSec;
+    maxSeenRef.current = Math.max(maxSeenRef.current, resumeSec);
+    if (playerApiRef.current) {
+      playerApiRef.current.seekTo?.(resumeSec, { allowAdvance: true });
+      playerApiRef.current.play?.();
+    } else if (mediaElRef.current) {
+      const cur = Number(mediaElRef.current.currentTime) || 0;
+      if (resumeSec <= cur || canMediaSeekTo(mediaElRef.current, resumeSec)) {
+        mediaElRef.current.currentTime = resumeSec;
+      }
+      mediaElRef.current.play?.()?.catch?.(() => {});
+    }
   };
 
   const submitCheck = async (imageDataUrl) => {
@@ -286,17 +371,19 @@ export default function PathLessonModal({
     if (!gate || !video || !unitId || checkBusy) return;
     setCheckBusy(true);
     setCheckError('');
-    try {
-      const data = await dailyPracticeApi.student.overview();
-      const cost = Number(gate.hintCostXp) || 0;
-      const xp = Number(data?.stats?.xpTotal) || 0;
-      if (cost > 0 && xp < cost) {
-        setXpPacks(data?.stats?.xpPacks || []);
-        setBuyXpOpen(true);
-        setCheckBusy(false);
-        return;
-      }
-    } catch { /* server vẫn chặn nếu không đủ */ }
+    const cost = done ? 0 : (Number(gate.hintCostXp) || 0);
+    if (cost > 0) {
+      try {
+        const data = await dailyPracticeApi.student.overview();
+        const xp = Number(data?.stats?.xpTotal) || 0;
+        if (xp < cost) {
+          setXpPacks(data?.stats?.xpPacks || []);
+          setBuyXpOpen(true);
+          setCheckBusy(false);
+          return;
+        }
+      } catch { /* server vẫn chặn nếu không đủ */ }
+    }
     try {
       const res = await dailyPracticeApi.student.buyVideoHint(unitId, video.id, gate.id);
       setPaidHint(res.hint || '');
@@ -304,6 +391,22 @@ export default function PathLessonModal({
     } catch (err) {
       if (err.status === 402) openBuyXp();
       else setCheckError(err.message || 'Chưa đổi được gợi ý');
+    } finally {
+      setCheckBusy(false);
+    }
+  };
+
+  const skipCheck = async () => {
+    if (!gate || !video || !unitId || checkBusy || cheer) return;
+    setCheckBusy(true);
+    setCheckError('');
+    try {
+      await dailyPracticeApi.student.skipVideoCheck(unitId, video.id, gate.id);
+      gameSounds.tap();
+      finishCheck(gate.id);
+    } catch (err) {
+      if (err.status === 402) openBuyXp();
+      else setCheckError(err.message || 'Chưa bỏ qua được câu hỏi');
     } finally {
       setCheckBusy(false);
     }
@@ -418,11 +521,13 @@ export default function PathLessonModal({
                 )}
                 {!yt && !vimeo && isDirectVideo(url) && (
                   <video
+                    ref={mediaElRef}
                     src={resolveMediaUrl(url) || url}
                     className="h-full w-full bg-black object-contain"
                     controls
                     controlsList="nodownload noplaybackrate"
                     playsInline
+                    onPlay={(e) => { mediaElRef.current = e.currentTarget; }}
                     onTimeUpdate={(e) => {
                       const el = e.currentTarget;
                       onTick(el.currentTime, el);
@@ -450,8 +555,10 @@ export default function PathLessonModal({
                   uploadPct={uploadPct}
                   grading={grading}
                   hintStep={hintStep}
+                  review={done}
                   onHintNext={() => finishCheck(gate.id)}
                   onSubmit={submitCheck}
+                  onSkip={skipCheck}
                   onFile={sendScreenshot}
                   onHint={buyHint}
                   onQuit={onClose}

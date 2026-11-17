@@ -16,7 +16,7 @@ export type VideoPlayerApi = {
   getDuration: () => number;
   pause?: () => void;
   play?: () => void;
-  seekTo?: (sec: number) => void;
+  seekTo?: (sec: number, options?: { allowAdvance?: boolean }) => void;
 };
 
 export type VideoPlayerFrameProps = {
@@ -34,6 +34,8 @@ export type VideoPlayerFrameProps = {
   appearance?: 'default' | 'window';
   chromeBg?: string;
   initialAtSec?: number;
+  pausedCheckpointSec?: number | null;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 };
 
 export function VideoPlayerFrame(_props: VideoPlayerFrameProps): React.ReactElement | null {

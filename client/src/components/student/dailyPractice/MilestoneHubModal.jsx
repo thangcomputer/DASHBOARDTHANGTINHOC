@@ -13,11 +13,11 @@ import {
   Loader2,
   Lock,
   Paperclip,
-  Play,
 } from 'lucide-react';
 import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { saveLastStudySession } from '../../../utils/resumeLearning';
+import PathVideoModal from './PathVideoModal';
 
 const DEFAULT_SECTION_ORDER = ['content', 'file', 'video', 'practice'];
 const DIFFICULTY_STEP_MAP = { easy: 'learn', medium: 'practice', hard: 'challenge' };
@@ -127,6 +127,9 @@ export default function MilestoneHubModal({
   unit,
   node,
   milestoneIndex = 0,
+  initialDifficulty = null,
+  initialSection = null,
+  color = { from: '#10B981', to: '#059669' },
   onClose,
   onOpenVideo,
   onStartPractice,
@@ -149,13 +152,21 @@ export default function MilestoneHubModal({
   const mediumDone = isDiffDone('medium');
   const hardDone = isDiffDone('hard');
   const defaultDiff = !easyDone ? 'easy' : !mediumDone ? 'medium' : !hardDone ? 'hard' : 'easy';
-  const [activeDiff, setActiveDiff] = useState(defaultDiff);
-  const [activeSection, setActiveSection] = useState(null);
+  const [activeDiff, setActiveDiff] = useState(() => {
+    if (initialDifficulty && (initialDifficulty === 'easy' || unit?.testedOut || (initialDifficulty === 'medium' && easyDone) || (initialDifficulty === 'hard' && easyDone && mediumDone))) {
+      return initialDifficulty;
+    }
+    return defaultDiff;
+  });
+  const [activeSection, setActiveSection] = useState(
+    initialSection === 'content' || initialSection === 'file' ? initialSection : null,
+  );
   const [selectedReviewSection, setSelectedReviewSection] = useState(null);
   const [savingSection, setSavingSection] = useState(false);
   const cfg = useMemo(() => normalizeConfig(node, activeDiff), [node, activeDiff]);
   const [contentScrolledToEnd, setContentScrolledToEnd] = useState(false);
   const sectionScrollRef = useRef(null);
+  const prevCompletedKeyRef = useRef((unit?.completedSections || []).join('|'));
 
   const checkScrollAtBottom = useCallback(() => {
     const el = sectionScrollRef.current;
@@ -186,10 +197,63 @@ export default function MilestoneHubModal({
   }, [unit?.completedSections]);
 
   useEffect(() => {
-    setActiveDiff(defaultDiff);
-    setActiveSection(null);
+    const doneSet = new Set(unit?.completedSections || []);
+    const isDiffDoneNow = (diff) => {
+      const c = normalizeConfig(node, diff);
+      const hidden = new Set(c.hiddenSections || []);
+      const secs = c.sectionOrder.filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
+      return !secs.length || secs.every((secKey) => doneSet.has(`${node.key}:${diff}:${secKey}`));
+    };
+    const nextDiff = !isDiffDoneNow('easy') ? 'easy' : !isDiffDoneNow('medium') ? 'medium' : !isDiffDoneNow('hard') ? 'hard' : 'easy';
+    const unlockedInit = initialDifficulty && (
+      unit?.testedOut
+      || initialDifficulty === 'easy'
+      || (initialDifficulty === 'medium' && isDiffDoneNow('easy'))
+      || (initialDifficulty === 'hard' && isDiffDoneNow('easy') && isDiffDoneNow('medium'))
+    );
+    const pickedDiff = unlockedInit ? initialDifficulty : nextDiff;
+    setActiveDiff(pickedDiff);
+    if (initialSection && (initialSection === 'content' || initialSection === 'file')) {
+      const c = normalizeConfig(node, pickedDiff);
+      const hidden = new Set(c.hiddenSections || []);
+      const secList = c.sectionOrder.filter((k) => !hidden.has(k));
+      const secIdx = secList.indexOf(initialSection);
+      if (secIdx >= 0 && c.sectionLocks?.[initialSection] !== 'locked') {
+        const prevRequired = secList.slice(0, secIdx).filter((k) => c.sectionLocks?.[k] !== 'locked');
+        const unlocked = unit?.testedOut
+          || c.sequentialSections === false
+          || c.sectionLocks?.[initialSection] === 'unlocked'
+          || !prevRequired.some((k) => !doneSet.has(`${node.key}:${pickedDiff}:${k}`));
+        setActiveSection(unlocked ? initialSection : null);
+      } else {
+        setActiveSection(null);
+      }
+    } else {
+      setActiveSection(null);
+    }
     setSelectedReviewSection(null);
-  }, [node?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [node?.key, initialDifficulty, initialSection]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeSection || initialDifficulty || !node) {
+      prevCompletedKeyRef.current = (unit?.completedSections || []).join('|');
+      return;
+    }
+    const nextKey = (unit?.completedSections || []).join('|');
+    if (prevCompletedKeyRef.current === nextKey) return;
+    prevCompletedKeyRef.current = nextKey;
+    const doneSet = new Set(unit?.completedSections || []);
+    const isDiffDoneNow = (diff) => {
+      const c = normalizeConfig(node, diff);
+      const hidden = new Set(c.hiddenSections || []);
+      const secs = c.sectionOrder.filter((k) => !hidden.has(k) && c.sectionLocks?.[k] !== 'locked');
+      return !secs.length || secs.every((secKey) => doneSet.has(`${node.key}:${diff}:${secKey}`));
+    };
+    const nextDiff = !isDiffDoneNow('easy') ? 'easy' : !isDiffDoneNow('medium') ? 'medium' : !isDiffDoneNow('hard') ? 'hard' : activeDiff;
+    if (isDiffDoneNow(activeDiff) && nextDiff !== activeDiff) {
+      setActiveDiff(nextDiff);
+    }
+  }, [activeSection, initialDifficulty, unit?.completedSections, node, activeDiff]);
 
   useEffect(() => {
     setSelectedReviewSection(null);
@@ -295,6 +359,12 @@ export default function MilestoneHubModal({
     }
   }, [unit?.id, node?.key, activeDiff, completedSet, onProgressChanged]);
 
+  const handleEmbeddedVideoWatched = useCallback(async (videoId) => {
+    if (!unit?.id || !videoId) return;
+    await dailyPracticeApi.student.videoWatched(unit.id, videoId);
+    onProgressChanged?.();
+  }, [unit?.id, onProgressChanged]);
+
   useEffect(() => {
     if (!activeSection) return;
     if (activeSection === 'content' && contentScrolledToEnd) {
@@ -312,7 +382,7 @@ export default function MilestoneHubModal({
       onOpenVideo?.(unit, videoId);
       return;
     }
-    if (secKey === 'practice' && !cfg.practice?.video?.url) {
+    if (secKey === 'practice') {
       onClose();
       onStartPractice?.(DIFFICULTY_STEP_MAP[activeDiff]);
       return;
@@ -358,6 +428,15 @@ export default function MilestoneHubModal({
     () => String(cfg.content?.body || '').split(/\n+/).map((p) => p.trim()).filter(Boolean),
     [cfg.content?.body],
   );
+  const activeSectionCompleted = Boolean(
+    activeSection && (
+      isSectionDone(activeSection)
+      || savingSection
+      || activeSection === 'file'
+      || (activeSection === 'content' && contentScrolledToEnd)
+      || (activeSection === 'video' && !cfg.video?.url)
+    ),
+  );
 
   return createPortal(
     <div
@@ -367,7 +446,10 @@ export default function MilestoneHubModal({
     >
       <div
         className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 transition-[max-width] duration-200 ${
-          activeSection === 'content' ? 'max-w-3xl lg:max-w-4xl' : 'max-w-lg'
+          (activeSection === 'content'
+            || (activeSection === 'video' && Boolean(cfg.video?.url)))
+            ? 'max-w-3xl lg:max-w-4xl'
+            : 'max-w-lg'
         }`}
         role="dialog"
         aria-modal="true"
@@ -375,9 +457,17 @@ export default function MilestoneHubModal({
       >
         {/* Header */}
         <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-800">
-            <BookOpen size={22} />
-          </span>
+          <button
+            type="button"
+            onClick={() => {
+              if (activeSection) setActiveSection(null);
+              else onClose();
+            }}
+            aria-label={activeSection ? 'Quay lại bài học' : 'Trở về'}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 cursor-pointer !shadow-none"
+          >
+            <ArrowLeft size={18} />
+          </button>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               {activeSection ? `${node.label} · ${currentTabMeta.label}` : `Bài học ${String(milestoneIndex + 1).padStart(2, '0')}`}
@@ -400,14 +490,17 @@ export default function MilestoneHubModal({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer !shadow-none"
-          >
-            Đóng
-          </button>
+          {activeSection && activeSectionCompleted ? (
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50"
+              aria-label="Đã hoàn thành"
+              title="Đã hoàn thành"
+            >
+              {savingSection
+                ? <Loader2 size={18} className="animate-spin text-emerald-600" />
+                : <CheckCircle2 size={18} className="text-emerald-600" />}
+            </span>
+          ) : null}
         </div>
 
         {/* Body */}
@@ -592,70 +685,21 @@ export default function MilestoneHubModal({
             )}
 
             {activeSection === 'video' && (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm font-semibold text-slate-400">
-                {cfg.video?.url ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenVideo?.(unit, cfg.video.id || `${node.key}:level:${activeDiff}`)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white hover:bg-emerald-700 !shadow-none"
-                  >
-                    <Play size={16} fill="currentColor" /> Mở trình phát video
-                  </button>
-                ) : (
-                  `Mức độ ${currentTabMeta.label} chưa có video bài giảng.`
-                )}
-              </div>
-            )}
-
-            {activeSection === 'practice' && (
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Luyện tập · Mức {currentTabMeta.label}</p>
-                  <h4 className="mt-1 text-base font-black text-slate-900">
-                    {cfg.practice?.title || `Bài tập trắc nghiệm (${currentTabMeta.label})`}
-                  </h4>
-                  <p className="mt-1 text-xs font-medium text-slate-600">
-                    {cfg.practice?.description || 'Hoàn thành tối thiểu 60% số câu hỏi để đạt phần luyện tập này.'}
-                  </p>
-                  <p className="mt-2 text-xs font-bold text-emerald-800">
-                    Ngân hàng câu hỏi: {unit?.counts?.[activeDiff] || 0} câu {currentTabMeta.label}
-                  </p>
+              cfg.video?.url ? (
+                <PathVideoModal
+                  key={`${unit.id}:${cfg.video.id || `${node.key}:level:${activeDiff}`}`}
+                  unit={unit}
+                  initialVideoId={cfg.video.id || `${node.key}:level:${activeDiff}`}
+                  singleVideoOnly
+                  embedded
+                  color={color}
+                  onWatched={handleEmbeddedVideoWatched}
+                />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm font-semibold text-slate-400">
+                  Mức độ {currentTabMeta.label} chưa có video bài giảng.
                 </div>
-                {cfg.practice?.video?.url ? (
-                  <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black uppercase tracking-wider text-sky-700">Video hướng dẫn luyện tập</p>
-                        <p className="truncate text-sm font-black text-slate-900">
-                          {cfg.practice.video.title || `Video luyện tập (${currentTabMeta.label})`}
-                        </p>
-                      </div>
-                      {cfg.practice.video.checks?.length ? (
-                        <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-black text-sky-800">
-                          {cfg.practice.video.checks.length} mốc trắc nghiệm
-                        </span>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onOpenVideo?.(unit, cfg.practice.video.id || `${node.key}:practice:${activeDiff}`)}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 py-2.5 text-xs font-black text-white hover:bg-sky-700 transition cursor-pointer !shadow-none"
-                    >
-                      <Play size={15} fill="currentColor" /> Mở video hướng dẫn
-                    </button>
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onStartPractice?.(DIFFICULTY_STEP_MAP[activeDiff]);
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-sm font-black text-white hover:bg-emerald-700 !shadow-none"
-                >
-                  <Gamepad2 size={18} /> Bắt đầu làm bài luyện tập
-                </button>
-              </div>
+              )
             )}
           </div>
         )}
@@ -700,33 +744,27 @@ export default function MilestoneHubModal({
             )}
           </div>
         ) : (
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 border-t border-slate-100 bg-slate-50/60 px-4 sm:px-5 py-3">
+          <div className="flex flex-row items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 sm:px-5 py-3">
             <button
               type="button"
               onClick={() => setActiveSection(null)}
-              className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 sm:py-2 text-xs font-black text-slate-700 hover:bg-slate-50 !shadow-none"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 !shadow-none"
             >
               <ArrowLeft size={14} /> Quay lại bài học
             </button>
-            {(activeSection === 'content' || activeSection === 'file') && (
+            {(activeSection === 'content' || activeSection === 'file' || (activeSection === 'video' && !cfg.video?.url)) && (
               activeSection === 'content' && !isSectionDone('content') && !contentScrolledToEnd ? (
-                <span className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-500">
+                <span className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500">
                   Cuộn đọc hết nội dung để hoàn thành
                 </span>
               ) : (
-                <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2">
-                  <span className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
-                    {savingSection ? <Loader2 size={14} className="animate-spin text-emerald-600" /> : <CheckCircle2 size={14} className="text-emerald-600" />}
-                    Đã hoàn thành
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleContinueNextSection}
-                    className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1 whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700 transition cursor-pointer !shadow-none"
-                  >
-                    Tiếp tục <ChevronRight size={15} />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleContinueNextSection}
+                  className="inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700 transition cursor-pointer !shadow-none"
+                >
+                  Tiếp tục <ChevronRight size={15} />
+                </button>
               )
             )}
           </div>

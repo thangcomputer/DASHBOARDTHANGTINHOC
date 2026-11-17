@@ -40,7 +40,7 @@ test('Tổng quan học viên + giảng viên (web): dùng thẻ chào mừng, b
 test('trang chủ mobile: giáo viên thẻ chào mừng, học viên DuoHeaderBar, bỏ banner ảnh', () => {
   const home = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
   assert.ok(home.includes('role="teacher"'));
-  assert.ok(home.includes('<DuoHeroCard') || home.includes('<DuoHeaderBar'), 'học viên mobile dùng DuoHeaderBar');
+  assert.ok(home.includes('duoStudentContainer'), 'học viên mobile dùng bố cục trang chủ gọn mới');
   assert.ok(!home.includes('getDashboardBanners'), 'không còn tải banner ảnh');
   const hero = read('thang-tin-hoc-mobile/src/components/WelcomeHero.tsx');
   assert.ok(hero.includes("require('../assets/student-hero.png')"));

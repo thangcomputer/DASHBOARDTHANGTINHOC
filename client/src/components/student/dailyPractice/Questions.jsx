@@ -179,11 +179,9 @@ export function QuizAnswerOption({
 }
 
 // ── Trắc nghiệm ──────────────────────────────────────────────────────────────
-export function McqQuestion({ question, reveal, result, chosen, pending, retryCooldownSec = 0, onChange, onSubmit }) {
+export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
   const eliminated = new Set(reveal?.eliminate || []);
-  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
-  const retrying = Boolean(result && !result.correct);
-  const activeChoice = pending?.index ?? chosen;
+  const locked = Boolean(result);
   const allShort = useMemo(
     () => (question.options || []).every((opt) => String(opt || '').length <= 28),
     [question.options],
@@ -192,12 +190,11 @@ export function McqQuestion({ question, reveal, result, chosen, pending, retryCo
   return (
     <div className={`grid items-stretch gap-3.5 ${allShort ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
       {question.options.map((option, index) => {
-        const revealSolution = Boolean(result?.correct);
-        const isCorrect = revealSolution && (
+        const isCorrect = locked && (
           result.correctAnswer?.correctIndex === index
           || (result.correct && chosen === index)
         );
-        const isWrongPick = Boolean(result && !result.correct) && chosen === index && pending == null;
+        const isWrongPick = locked && chosen === index && !isCorrect;
         const out = eliminated.has(index);
         return (
           <QuizAnswerOption
@@ -207,12 +204,11 @@ export function McqQuestion({ question, reveal, result, chosen, pending, retryCo
             locked={locked}
             isCorrect={isCorrect}
             isWrongPick={isWrongPick}
-            isChosen={activeChoice === index}
+            isChosen={chosen === index}
             eliminated={out}
             onSelect={() => {
               gameSounds.tap();
-              if (retrying) onChange?.({ index });
-              else onSubmit({ index });
+              onSubmit({ index });
             }}
           />
         );
@@ -222,10 +218,8 @@ export function McqQuestion({ question, reveal, result, chosen, pending, retryCo
 }
 
 // ── Đúng / Sai ───────────────────────────────────────────────────────────────
-export function TrueFalseQuestion({ result, chosen, pending, retryCooldownSec = 0, onChange, onSubmit }) {
-  const locked = Boolean(result?.correct) || retryCooldownSec > 0;
-  const retrying = Boolean(result && !result.correct);
-  const activeChoice = pending?.value ?? chosen;
+export function TrueFalseQuestion({ result, chosen, onSubmit }) {
+  const locked = Boolean(result);
   const options = [
     { value: true, label: 'Đúng', icon: Check, tone: 'emerald' },
     { value: false, label: 'Sai', icon: X, tone: 'red' },
@@ -233,10 +227,8 @@ export function TrueFalseQuestion({ result, chosen, pending, retryCooldownSec = 
   return (
     <div className="grid grid-cols-2 gap-3">
       {options.map(({ value, label, icon: Icon, tone }) => {
-        const revealSolution = Boolean(result?.correct);
-        const isCorrect = revealSolution && result.correctAnswer?.answerBool === value;
-        const isWrongPick = Boolean(result && !result.correct) && chosen === value && pending == null;
-        const isPicked = activeChoice === value && !locked && retrying;
+        const isCorrect = locked && result.correctAnswer?.answerBool === value;
+        const isWrongPick = locked && chosen === value && !isCorrect;
         return (
           <button
             key={label}
@@ -244,11 +236,10 @@ export function TrueFalseQuestion({ result, chosen, pending, retryCooldownSec = 
             disabled={locked}
             onClick={() => {
               gameSounds.tap();
-              if (retrying) onChange?.({ value });
-              else onSubmit({ value });
+              onSubmit({ value });
             }}
             data-option-state={isCorrect ? 'correct' : isWrongPick ? 'wrong' : 'idle'}
-            className={`${CHIP} relative flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake' : isPicked ? 'border-emerald-500 bg-emerald-50/70 text-emerald-900 !shadow-[0_3px_0_#34D399]' : `${CHIP_IDLE} hover:scale-[1.01] hover:border-emerald-400 active:translate-y-[2px]`
+            className={`${CHIP} relative flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake' : `${CHIP_IDLE} hover:scale-[1.01] hover:border-emerald-400 active:translate-y-[2px]`
               }`}
           >
             {isCorrect && (
@@ -269,7 +260,7 @@ export function TrueFalseQuestion({ result, chosen, pending, retryCooldownSec = 
 
 // ── Sắp xếp thứ tự ───────────────────────────────────────────────────────────
 export function OrderQuestion({ question, reveal, result, onChange }) {
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const [list, setList] = useState(() => question.items);
   const [selected, setSelected] = useState(null);
   const lockedItem = reveal?.first || null;
@@ -310,7 +301,7 @@ export function OrderQuestion({ question, reveal, result, onChange }) {
     <ol className="space-y-2">
       {list.map((item, index) => {
         const isLocked = item === lockedItem;
-        const ok = Boolean(result?.correct) && result.correctAnswer?.items?.[index] === item;
+        const ok = locked && result.correctAnswer?.items?.[index] === item;
         return (
           <li key={item} data-drop={index} className="flex items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white">{index + 1}</span>
@@ -318,15 +309,14 @@ export function OrderQuestion({ question, reveal, result, onChange }) {
               type="button"
               disabled={locked || isLocked}
               {...(isLocked ? {} : bind(item, item))}
-              className={`${CHIP} flex flex-1 items-center gap-2 text-left ${result?.correct ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50')
-                : locked ? 'border-slate-200 bg-slate-50'
-                  : isLocked ? 'border-amber-300 bg-amber-50'
-                    : selected === item ? CHIP_SELECTED : CHIP_IDLE
+              className={`${CHIP} flex flex-1 items-center gap-2 text-left ${locked ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50')
+                : isLocked ? 'border-amber-300 bg-amber-50'
+                  : selected === item ? CHIP_SELECTED : CHIP_IDLE
                 } ${draggingId === item ? 'opacity-30' : ''}`}
             >
               {isLocked ? <Lock size={15} className="shrink-0 text-amber-500" /> : <GripVertical size={16} className="shrink-0 text-slate-300" />}
               <span className="flex-1">{item}</span>
-              {Boolean(result?.correct) && <ResultMark ok={ok} />}
+              {locked && <ResultMark ok={ok} />}
             </button>
             {!locked && !isLocked && (
               <span className="flex flex-col">
@@ -344,7 +334,7 @@ export function OrderQuestion({ question, reveal, result, onChange }) {
 
 // ── Ghép cặp ─────────────────────────────────────────────────────────────────
 export function MatchQuestion({ question, reveal, result, onChange }) {
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const [assign, setAssign] = useState(() => question.lefts.map(() => null));
   const [selected, setSelected] = useState(null);
   const lockedPair = reveal?.pair || null;
@@ -384,7 +374,7 @@ export function MatchQuestion({ question, reveal, result, onChange }) {
       <div className="space-y-2">
         {question.lefts.map((left, index) => {
           const value = assign[index];
-          const ok = Boolean(result?.correct) && correctMap.get(left) === value;
+          const ok = locked && correctMap.get(left) === value;
           return (
             <div key={left} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-2">
               <span className="rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-black text-white">{left}</span>
@@ -398,16 +388,15 @@ export function MatchQuestion({ question, reveal, result, onChange }) {
                     setAssign((prev) => prev.map((v, i) => (i === index ? null : v)));
                   }
                 }}
-                className={`${ZONE} flex min-h-[44px] items-center gap-2 px-3 py-2 text-left text-sm font-bold !shadow-none ${result?.correct ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-solid border-red-300 bg-red-50 text-red-700')
-                  : locked ? 'border-solid border-slate-200 bg-slate-50 text-slate-700'
-                    : index === lockedIndex ? 'border-solid border-amber-300 bg-amber-50 text-amber-800'
-                      : value ? 'border-solid border-sky-300 bg-sky-50 text-sky-800'
-                        : selected ? 'border-sky-400 bg-sky-50/50 text-slate-400' : 'border-slate-300 bg-slate-50 text-slate-400'
+                className={`${ZONE} flex min-h-[44px] items-center gap-2 px-3 py-2 text-left text-sm font-bold !shadow-none ${locked ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-solid border-red-300 bg-red-50 text-red-700')
+                  : index === lockedIndex ? 'border-solid border-amber-300 bg-amber-50 text-amber-800'
+                    : value ? 'border-solid border-sky-300 bg-sky-50 text-sky-800'
+                      : selected ? 'border-sky-400 bg-sky-50/50 text-slate-400' : 'border-slate-300 bg-slate-50 text-slate-400'
                   }`}
               >
                 {index === lockedIndex && <Lock size={14} className="shrink-0 text-amber-500" />}
                 <span className="flex-1">{value || 'Thả thẻ vào đây'}</span>
-                {Boolean(result?.correct) && <ResultMark ok={ok} />}
+                {locked && <ResultMark ok={ok} />}
               </button>
             </div>
           );
@@ -434,7 +423,7 @@ export function MatchQuestion({ question, reveal, result, onChange }) {
 
 // ── Điền vào chỗ trống ───────────────────────────────────────────────────────
 export function FillQuestion({ question, reveal, result, onChange }) {
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const blankCount = question.segments.filter((s) => s.blank !== undefined).length;
   const [blanks, setBlanks] = useState(() => Array(blankCount).fill(null));
   const [selected, setSelected] = useState(null);
@@ -479,7 +468,7 @@ export function FillQuestion({ question, reveal, result, onChange }) {
           const chip = blanks[slot];
           const word = chip === null ? '' : question.bank[chip];
           const isLocked = lockedBlank && slot === lockedBlank.index;
-          const ok = Boolean(result?.correct) && answers[slot]?.toLowerCase() === word.toLowerCase();
+          const ok = locked && answers[slot]?.toLowerCase() === word.toLowerCase();
           return (
             <button
               key={index}
@@ -492,15 +481,14 @@ export function FillQuestion({ question, reveal, result, onChange }) {
                   setBlanks((prev) => prev.map((v, i) => (i === slot ? null : v)));
                 }
               }}
-              className={`${ZONE} mx-1 inline-flex min-w-[84px] items-center justify-center px-3 py-0.5 align-middle text-[15px] font-black leading-8 !shadow-none ${result?.correct ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-solid border-red-300 bg-red-50 text-red-600')
-                : locked ? 'border-solid border-slate-200 bg-slate-50 text-slate-700'
-                  : isLocked ? 'border-solid border-amber-300 bg-amber-50 text-amber-700'
-                    : chip !== null ? 'border-solid border-sky-300 bg-sky-50 text-sky-700'
-                      : selected !== null ? 'border-sky-400 bg-sky-50/50' : 'border-slate-300 bg-slate-50'
+              className={`${ZONE} mx-1 inline-flex min-w-[84px] items-center justify-center px-3 py-0.5 align-middle text-[15px] font-black leading-8 !shadow-none ${locked ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-solid border-red-300 bg-red-50 text-red-600')
+                : isLocked ? 'border-solid border-amber-300 bg-amber-50 text-amber-700'
+                  : chip !== null ? 'border-solid border-sky-300 bg-sky-50 text-sky-700'
+                    : selected !== null ? 'border-sky-400 bg-sky-50/50' : 'border-slate-300 bg-slate-50'
                 }`}
             >
               {word || '\u00A0'}
-              {Boolean(result?.correct) && !ok && <span className="ml-1 text-xs text-emerald-600">({answers[slot]})</span>}
+              {locked && !ok && <span className="ml-1 text-xs text-emerald-600">({answers[slot]})</span>}
             </button>
           );
         })}
@@ -528,7 +516,7 @@ export function FillQuestion({ question, reveal, result, onChange }) {
 const BIN_TONES = ['#0EA5E9', '#A855F7', '#F97316', '#10B981'];
 
 export function SortQuestion({ question, reveal, result, onChange }) {
-  const locked = Boolean(result?.correct);
+  const locked = Boolean(result);
   const [placed, setPlaced] = useState({});
   const [selected, setSelected] = useState(null);
   const lockedItem = reveal?.item || null;
@@ -587,7 +575,7 @@ export function SortQuestion({ question, reveal, result, onChange }) {
               <div className="flex flex-wrap gap-1.5">
                 {items.map((item) => {
                   const isLocked = lockedItem?.name === item;
-                  const ok = Boolean(result?.correct) && expected.get(item) === group;
+                  const ok = locked && expected.get(item) === group;
                   return (
                     <button
                       key={item}
@@ -598,12 +586,12 @@ export function SortQuestion({ question, reveal, result, onChange }) {
                         gameSounds.tap();
                         setPlaced((prev) => { const next = { ...prev }; delete next[item]; return next; });
                       }}
-                      className={`${CHIP} flex items-center gap-1 !px-2.5 !py-1.5 text-xs ${result?.correct ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50') : locked ? 'border-slate-200 bg-slate-50' : isLocked ? 'border-amber-300 bg-amber-50' : CHIP_IDLE
+                      className={`${CHIP} flex items-center gap-1 !px-2.5 !py-1.5 text-xs ${locked ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50') : isLocked ? 'border-amber-300 bg-amber-50' : CHIP_IDLE
                         }`}
                     >
                       {isLocked && <Lock size={12} className="text-amber-500" />}
                       {item}
-                      {Boolean(result?.correct) && <ResultMark ok={ok} />}
+                      {locked && <ResultMark ok={ok} />}
                     </button>
                   );
                 })}
