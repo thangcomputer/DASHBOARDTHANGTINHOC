@@ -858,10 +858,13 @@ export default function PathView({
   const topics = useMemo(() => path?.topics || [], [path]);
   const [topicId, setTopicId] = useState('');
   const onTopicChangeRef = useRef(onTopicChange);
+  const lastNotifiedTopicRef = useRef('');
+  const lastSyncedPropTopicRef = useRef(activeTopicId);
   onTopicChangeRef.current = onTopicChange;
 
   useEffect(() => {
     if (!topicId) return;
+    lastNotifiedTopicRef.current = topicId;
     onTopicChangeRef.current?.(topicId);
     persistLastPathTopicId(topicId);
   }, [topicId]);
@@ -929,11 +932,17 @@ export default function PathView({
   }, [topicId, topics, initialTopicId, path?.activeTopicId]);
 
   useEffect(() => {
-    if (!activeTopicId || activeTopicId === topicId) return;
+    if (!activeTopicId) {
+      lastSyncedPropTopicRef.current = '';
+      return;
+    }
     if (!topics.some((item) => item.topic.id === activeTopicId)) return;
-    setTopicId(activeTopicId);
+    if (activeTopicId === lastSyncedPropTopicRef.current) return;
+    lastSyncedPropTopicRef.current = activeTopicId;
+    if (activeTopicId === lastNotifiedTopicRef.current) return;
+    setTopicId((prev) => (prev === activeTopicId ? prev : activeTopicId));
     setPopover(null);
-  }, [activeTopicId, topicId, topics]);
+  }, [activeTopicId, topics]);
 
   useEffect(() => {
     if (error) setPopover(null);
@@ -986,7 +995,10 @@ export default function PathView({
          || topics.find((item) => continueStageTarget(item))
          || topics[0]);
     const target = currentTarget || (preferred ? continueStageTarget(preferred) : null);
-    if (!preferred || !target) return;
+    if (!preferred || !target) {
+      onContinueOpenedRef.current?.();
+      return;
+    }
     if (topicId !== preferred.topic.id) {
       setTopicId(preferred.topic.id);
       return;

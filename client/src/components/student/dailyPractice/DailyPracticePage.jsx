@@ -1679,7 +1679,10 @@ export default function DailyPracticePage() {
   useEffect(() => {
     if (!practiceStage || session || summary || pathLoading || !path) return undefined;
     if (practiceLockRef.current) return undefined;
-    const topic = (path.topics || []).find((item) => continuePracticeTarget(item));
+    const preferredTopic = pickActivePathTopic(path, linkedTopicId);
+    const topic = (preferredTopic && continuePracticeTarget(preferredTopic))
+      ? preferredTopic
+      : (path.topics || []).find((item) => continuePracticeTarget(item));
     const target = topic ? continuePracticeTarget(topic) : null;
     practiceLockRef.current = true;
     if (!target) {
@@ -1701,7 +1704,7 @@ export default function DailyPracticePage() {
       practiceLockRef.current = false;
     });
     return undefined;
-  }, [practiceStage, session, summary, pathLoading, path, clearPracticeParam]);
+  }, [practiceStage, session, summary, pathLoading, path, linkedTopicId, clearPracticeParam]);
 
   const enterWelcome = () => {
     const target = welcomeTarget;

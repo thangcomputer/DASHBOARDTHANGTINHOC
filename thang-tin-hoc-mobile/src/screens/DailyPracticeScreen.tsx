@@ -2657,6 +2657,10 @@ function PathView({
   const [trophyCeremonyOpen, setTrophyCeremonyOpen] = useState(false);
   const [startedUnitIds, setStartedUnitIds] = useState<string[]>([]);
   const targetAppliedRef = useRef(false);
+  const lastNotifiedTopicRef = useRef('');
+  const lastSyncedPropTopicRef = useRef(activeTopicId);
+  const onTopicChangeRef = useRef(onTopicChange);
+  onTopicChangeRef.current = onTopicChange;
 
   useEffect(() => {
     AsyncStorage.getItem(STARTED_UNITS_STORAGE_KEY)
@@ -2836,18 +2840,25 @@ function PathView({
   }, [activeTopicId, user?.id, user?._id]);
 
   useEffect(() => {
-    if (!activeTopicId || activeTopicId === topicId) return;
+    if (!activeTopicId) {
+      lastSyncedPropTopicRef.current = '';
+      return;
+    }
     if (!topics.some((item) => item.topic.id === activeTopicId)) return;
-    setTopicId(activeTopicId);
+    if (activeTopicId === lastSyncedPropTopicRef.current) return;
+    lastSyncedPropTopicRef.current = activeTopicId;
+    if (activeTopicId === lastNotifiedTopicRef.current) return;
+    setTopicId((prev) => (prev === activeTopicId ? prev : activeTopicId));
     setPopover(null);
-  }, [activeTopicId, topicId, topics]);
+  }, [activeTopicId, topics]);
 
   useEffect(() => {
     if (!topicId) return;
-    onTopicChange?.(topicId);
+    lastNotifiedTopicRef.current = topicId;
+    onTopicChangeRef.current?.(topicId);
     const userKey = String(user?.id || user?._id || '').trim();
     void persistLastPathTopicId(topicId, userKey);
-  }, [topicId, onTopicChange, user?.id, user?._id]);
+  }, [topicId, user?.id, user?._id]);
 
   useEffect(() => {
     if (error) setPopover(null);
