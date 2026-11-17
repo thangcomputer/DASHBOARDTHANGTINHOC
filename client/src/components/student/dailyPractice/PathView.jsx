@@ -894,6 +894,29 @@ export default function PathView({
     onPathChanged?.();
   }, [onPathChanged]);
 
+  const [startedUnitIds, setStartedUnitIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cms_started_path_units');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const markUnitStarted = useCallback((unitId) => {
+    if (!unitId) return;
+    setStartedUnitIds((prev) => {
+      if (prev.includes(unitId)) return prev;
+      const next = [...prev, unitId];
+      try {
+        localStorage.setItem('cms_started_path_units', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (topicId && topics.some((item) => item.topic.id === topicId)) return;
     if (!topics.length) return;
@@ -1002,29 +1025,6 @@ export default function PathView({
   const currentRef = useRef(current);
   topicsRef.current = topics;
   currentRef.current = current;
-
-  const [startedUnitIds, setStartedUnitIds] = useState(() => {
-    try {
-      const raw = localStorage.getItem('cms_started_path_units');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const markUnitStarted = useCallback((unitId) => {
-    if (!unitId) return;
-    setStartedUnitIds((prev) => {
-      if (prev.includes(unitId)) return prev;
-      const next = [...prev, unitId];
-      try {
-        localStorage.setItem('cms_started_path_units', JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     const onFocus = () => {
