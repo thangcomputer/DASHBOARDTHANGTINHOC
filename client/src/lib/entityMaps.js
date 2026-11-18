@@ -64,6 +64,8 @@ export function mapStudent(s) {
   [...(Array.isArray(s.enrollments) ? s.enrollments : []), ...(Array.isArray(s.courses) ? s.courses : [])]
     .forEach((e) => {
       if (!e) return;
+      const st = String(e.status || '').toLowerCase();
+      if (st === 'cancelled' || st === 'refunded') return;
       const tid = typeof e.teacherId === 'object' && e.teacherId
         ? String(e.teacherId._id || e.teacherId.id || '')
         : String(e.teacherId || '');

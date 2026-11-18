@@ -52,6 +52,12 @@ export default function EditableAvatar({
     gender,
     name,
   });
+  const fallbackAvatar = resolveAvatarUrl({
+    role,
+    adminRole,
+    gender,
+    name,
+  });
   // Cache-bust /uploads để tránh browser giữ bản 401 cũ sau khi đổi quyền public
   const displayAvatar = resolved.startsWith('/uploads/')
     ? `${resolved}${resolved.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(localAvatar || avatar || '').slice(-24))}`
@@ -312,7 +318,11 @@ export default function EditableAvatar({
               className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
             />
           ) : (
-            <div className={`w-full h-full bg-slate-100/80 ${imgClassName}`} aria-hidden="true" />
+            <img
+              src={fallbackAvatar}
+              alt={name || 'Avatar'}
+              className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
+            />
           )}
           {editable && (
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-center text-white z-10 p-0.5 pointer-events-none">

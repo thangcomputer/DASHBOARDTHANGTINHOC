@@ -9,7 +9,8 @@ import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../utils/useToast';
-import { messagesAPI, callHistoryAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
+import { messagesAPI, studentsAPI, callHistoryAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
+import { mapStudent } from '../lib/entityMaps';
 import TeacherStudentWeekSlotSheet from './teacher/TeacherStudentWeekSlotSheet';
 import { displayFileName } from '../utils/validators';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -38,7 +39,11 @@ import ScheduleMessagePreviewModal, {
 } from './ScheduleMessagePreviewModal';
 import SupportAiHandoffPanel from './support/SupportAiHandoffPanel';
 import ScreenCaptureButton from './ScreenCaptureButton';
-import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
+import {
+  isFreePortalSelfRegistrationStudent,
+  getActiveClientEnrollments,
+  expandStudentsForTeacher,
+} from '../utils/enrollments';
 import {
   isAiSupportConversationId,
   AI_ESCALATE_MARKER,
@@ -695,6 +700,29 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [replyMessage, setReplyMessage] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showPeerInfo, setShowPeerInfo] = useState(false);
+  const [peerStudentDetail, setPeerStudentDetail] = useState(null);
+
+  useEffect(() => {
+    setPeerStudentDetail(null);
+  }, [activeConv?.user?.id, activeConv?.isGroup]);
+
+  useEffect(() => {
+    if ((!showPeerInfo && !showScheduleModal) || !activeConv?.user || activeConv.isGroup) return undefined;
+    const targetPeerRole = String(activeConv.user.role || '').toLowerCase();
+    if (targetPeerRole !== 'student') return undefined;
+    const peerId = String(activeConv.user.id || activeConv.user._id || '');
+    if (!peerId) return undefined;
+
+    let cancelled = false;
+    studentsAPI.getById(peerId)
+      .then((res) => {
+        if (!cancelled && res?.success && res?.data) {
+          setPeerStudentDetail(mapStudent(res.data));
+        }
+      })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [showPeerInfo, showScheduleModal, activeConv]);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [touchActionsMessageId, setTouchActionsMessageId] = useState(null);
@@ -730,15 +758,59 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (!activeConv?.user || activeConv.isGroup) return null;
     const peerId = String(activeConv.user.id || activeConv.user._id || '');
     const contactProfile = (contacts || []).find((person) => String(person.id || person._id || '') === peerId);
-    const localProfile = [students, teachers, staffs]
+    const fetchedStudent = (peerStudentDetail && String(peerStudentDetail.id || peerStudentDetail._id || '') === peerId)
+      ? peerStudentDetail
+      : null;
+    const localProfile = fetchedStudent || [students, teachers, staffs]
       .flatMap((list) => Array.isArray(list) ? list : [])
       .find((person) => String(person.id || person._id || '') === peerId);
-    return {
+    const merged = {
       ...activeConv.user,
-      ...(localProfile || {}),
       ...(contactProfile || {}),
+      ...(localProfile || {}),
+      // Giữ các trường liên lạc từ contactProfile nếu localProfile không có
+      personalPhone: localProfile?.personalPhone || contactProfile?.personalPhone || localProfile?.phone || contactProfile?.phone,
+      branchPhone: contactProfile?.branchPhone || localProfile?.branchPhone,
     };
-  }, [activeConv, contacts, students, teachers, staffs]);
+    const mergedRole = String(merged.role || activeConv.user.role || '').toLowerCase();
+    const isTeacherViewer = String(currentUserRole || '').toLowerCase() === 'teacher';
+    if (mergedRole === 'student') {
+      const activeEnrs = getActiveClientEnrollments(merged);
+      const myActiveEnrs = isTeacherViewer
+        ? activeEnrs.filter((e) => String(e.teacherId?._id || e.teacherId || '') === String(currentUserId || ''))
+        : [];
+      const targetEnrs = myActiveEnrs.length > 0 ? myActiveEnrs : activeEnrs;
+      const primaryActive = targetEnrs.find((e) => e.isPrimary && String(e.status || 'active').toLowerCase() === 'active')
+        || targetEnrs.find((e) => String(e.status || 'active').toLowerCase() === 'active')
+        || targetEnrs[0];
+      if (primaryActive) {
+        merged.course = primaryActive.courseName || primaryActive.name || merged.course;
+        merged.remainingSessions = primaryActive.remainingSessions ?? merged.remainingSessions;
+        merged.totalSessions = primaryActive.totalSessions ?? merged.totalSessions;
+        merged.completedSessions = primaryActive.completedSessions ?? merged.completedSessions;
+        if (String(primaryActive.status || '').toLowerCase() === 'active') {
+          merged.status = 'Đang học';
+        }
+      }
+      const collectAlerts = (pool) => {
+        const items = (pool || [])
+          .map((e) => ({
+            course: String(e?.courseName || e?.name || '').trim(),
+            alert: String(e?.teacherAlert || '').trim(),
+          }))
+          .filter((item) => item.alert);
+        if (!items.length) return '';
+        if (items.length === 1 && (targetEnrs.length <= 1 || !items[0].course)) return items[0].alert;
+        return items.map((item) => (item.course ? `[${item.course}] ${item.alert}` : item.alert)).join('\n');
+      };
+      merged.adminNoteForDisplay = collectAlerts(targetEnrs)
+        || collectAlerts(activeEnrs)
+        || String(merged.teacherAlert || '').trim()
+        || String(merged.adminNotes || '').trim()
+        || String(merged.notes || '').trim();
+    }
+    return merged;
+  }, [activeConv, contacts, students, teachers, staffs, peerStudentDetail, currentUserRole, currentUserId]);
 
   const peerRole = String(peerProfile?.role || activeConv?.user?.role || '').toLowerCase();
   const canViewTeacherDetails = ['student', 'admin', 'staff'].includes(String(currentUserRole).toLowerCase());
@@ -3109,7 +3181,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <>
                             <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1.5">
                               <p className="text-[10px] font-bold text-amber-700">Ghi chú Admin</p>
-                              <p className="text-[12px] leading-snug line-clamp-3 whitespace-pre-wrap break-words text-amber-900">{peerProfile?.notes || peerProfile?.adminNotes || 'Chưa có ghi chú'}</p>
+                              <p className="max-h-36 overflow-y-auto text-[12px] leading-snug whitespace-pre-wrap break-words text-amber-900">
+                                {peerProfile?.adminNoteForDisplay || peerProfile?.teacherAlert || peerProfile?.adminNotes || peerProfile?.notes || 'Chưa có ghi chú'}
+                              </p>
                             </div>
                             <div className="mt-2">
                               <p className="mb-1 text-[10px] font-bold text-slate-700">Lịch sắp tới</p>
@@ -3129,7 +3203,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <p className="rounded-lg bg-slate-50 px-2 py-1.5 text-slate-400">Chưa có lịch sắp tới</p>
                               )}
                             </div>
-                            {currentUserRole === 'teacher' && (
+                            {['teacher', 'admin', 'staff'].includes(String(currentUserRole || '').toLowerCase()) && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -4441,27 +4515,96 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         (() => {
           const targetId = String(activeConv.user.id || activeConv.user._id || '');
           const convCourse = String(activeConv.user.course || '').trim().toLowerCase();
-          const teacherRows = typeof getStudentsByTeacher === 'function'
+          const isTeacherViewer = String(currentUserRole || '').toLowerCase() === 'teacher';
+          const isAliveRow = (s) => {
+            if (!s || s.interactionLocked) return false;
+            const es = String(s.enrollmentStatus || '').toLowerCase();
+            const st = String(s.status || '').toLowerCase();
+            return es !== 'cancelled' && es !== 'refunded' && st !== 'thôi học';
+          };
+
+          const rawStudent = (
+            (peerStudentDetail && String(peerStudentDetail.id || peerStudentDetail._id || '') === targetId)
+              ? peerStudentDetail
+              : null
+          ) || (students || []).find((s) => String(s.id || s._id) === targetId) || peerProfile;
+          const teacherRowsFromCtx = (isTeacherViewer && typeof getStudentsByTeacher === 'function')
             ? (getStudentsByTeacher(currentUserId) || []).filter(
               (s) => String(s.id || s._id) === targetId,
             )
             : [];
-          const fromList = (students || []).filter((s) => String(s.id || s._id) === targetId);
-          const enrollments = (teacherRows.length ? teacherRows : fromList).slice();
-          const preferred = enrollments.find((s) => String(s.course || '').trim().toLowerCase() === convCourse)
+          const teacherRowsFallback = (isTeacherViewer && !teacherRowsFromCtx.length && rawStudent)
+            ? expandStudentsForTeacher([rawStudent], currentUserId)
+            : [];
+          const adminRows = (!isTeacherViewer && rawStudent)
+            ? getActiveClientEnrollments(rawStudent)
+              .filter((e) => e && e.teacherId && String(e.status || 'active').toLowerCase() !== 'completed')
+              .map((e, idx) => ({
+                ...rawStudent,
+                id: rawStudent.id || rawStudent._id || targetId,
+                _id: rawStudent._id || rawStudent.id || targetId,
+                _enrollmentKey: `${rawStudent._id || rawStudent.id || targetId}-${e.enrollmentId || idx}`,
+                _enrollmentId: e.enrollmentId || `enr-${idx}`,
+                registeredAt: e.registeredAt || null,
+                course: e.courseName || e.name || rawStudent.course,
+                teacherId: e.teacherId,
+                teacherName: e.teacherName || '',
+                totalSessions: e.totalSessions || 12,
+                remainingSessions: e.remainingSessions ?? Math.max(0, (e.totalSessions || 12) - (Number(e.completedSessions) || 0)),
+                completedSessions: e.completedSessions ?? 0,
+                enrollmentStatus: e.status || 'active',
+                interactionLocked: false,
+                status: 'Đang học',
+              }))
+            : [];
+
+          const candidateRows = isTeacherViewer
+            ? (teacherRowsFromCtx.length
+              ? teacherRowsFromCtx
+              : (teacherRowsFallback.length ? teacherRowsFallback : (rawStudent ? [rawStudent] : [])))
+            : (adminRows.length ? adminRows : (rawStudent ? [rawStudent] : []));
+
+          const aliveRows = candidateRows.filter(isAliveRow);
+          const enrollments = (aliveRows.length ? aliveRows : candidateRows).slice();
+          const preferred = enrollments.find((s) => String(s.enrollmentStatus || '').toLowerCase() === 'active' && String(s.course || '').trim().toLowerCase() === convCourse)
+            || enrollments.find((s) => String(s.enrollmentStatus || '').toLowerCase() === 'active')
+            || enrollments.find((s) => String(s.course || '').trim().toLowerCase() === convCourse)
             || enrollments[0]
             || {
-            id: activeConv.user.id,
-            _id: activeConv.user.id,
-            name: activeConv.user.name || 'Học viên',
-            course: activeConv.user.course || '',
-            branchCode: activeConv.user.branchCode || '',
-          };
+              id: activeConv.user.id,
+              _id: activeConv.user.id,
+              name: activeConv.user.name || 'Học viên',
+              course: peerProfile?.course || activeConv.user.course || '',
+              branchCode: activeConv.user.branchCode || '',
+            };
+          const resolvedSheetTeacherId = isTeacherViewer
+            ? currentUserId
+            : String(preferred?.teacherId?._id || preferred?.teacherId || rawStudent?.teacherId?._id || rawStudent?.teacherId || '');
+          if (!isTeacherViewer && !resolvedSheetTeacherId) {
+            return (
+              <div className="fixed inset-0 z-[10040] flex items-center justify-center bg-black/40 p-4">
+                <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-3 text-center">
+                  <p className="text-sm font-bold text-slate-800">
+                    {(!rawStudent?.enrollments && !rawStudent?.courses)
+                      ? 'Đang tải thông tin khóa học...'
+                      : 'Học viên chưa có khóa đang học được phân công giảng viên.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(false)}
+                    className="w-full h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            );
+          }
           return (
             <TeacherStudentWeekSlotSheet
               student={preferred}
               enrollments={enrollments.length ? enrollments : [preferred]}
-              teacherId={currentUserId}
+              teacherId={resolvedSheetTeacherId}
               schedules={schedules || []}
               addSchedule={addSchedule}
               updateSchedule={updateSchedule}

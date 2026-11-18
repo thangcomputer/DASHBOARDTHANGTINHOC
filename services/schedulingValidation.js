@@ -10,6 +10,7 @@
  * Teacher conflict is independent (time overlap on teacherId+date).
  */
 
+const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
 const Student = require('../models/Student');
 const { getEnrollmentsFromStudent, normCourseName } = require('./enrollmentService');
@@ -71,25 +72,88 @@ function dayRange(dateInput) {
   return { start, end };
 }
 
-function resolveEnrollmentForCourse(studentDoc, courseName) {
+function resolveEnrollmentForCourse(studentDoc, courseName, enrollmentId = null) {
   const list = getEnrollmentsFromStudent(studentDoc);
-  const key = normCourseName(courseName);
   if (!list.length) return null;
-  if (!key) return list.find((e) => e.isPrimary) || list[0];
-  return list.find((e) => normCourseName(e.courseName || e.course) === key) || null;
+
+  if (enrollmentId) {
+    const byId = list.find((e) => e?._id && String(e._id) === String(enrollmentId));
+    if (byId) return byId;
+  }
+
+  const key = normCourseName(courseName);
+  const notCancelled = (e) => !['cancelled', 'refunded'].includes(String(e?.status || '').toLowerCase());
+  const isActive = (e) => String(e?.status || '').toLowerCase() === 'active';
+
+  if (!key) {
+    return list.find((e) => e.isPrimary && isActive(e))
+      || list.find(isActive)
+      || list.find((e) => e.isPrimary && notCancelled(e))
+      || list.find(notCancelled)
+      || list.find((e) => e.isPrimary)
+      || list[0];
+  }
+
+  const matches = list.filter((e) => normCourseName(e.courseName || e.course) === key);
+  if (!matches.length) return null;
+
+  // Ưu tiên khóa đang active trước (tránh lấy nhầm khóa cũ đã hủy/hoàn tiền cùng tên môn)
+  return matches.find(isActive)
+    || matches.find(notCancelled)
+    || matches[0];
+}
+
+function buildEnrollmentScheduleScopeFilter(courseName, enrollment = null, allEnrollments = []) {
+  const course = String(courseName || '').trim();
+  const normTarget = normCourseName(course || enrollment?.courseName);
+  const sameCourseCount = normTarget
+    ? (allEnrollments || []).filter((e) => normCourseName(e.courseName || e.course) === normTarget).length
+    : 0;
+
+  if (enrollment?._id) {
+    const enrObjId = mongoose.Types.ObjectId.isValid(String(enrollment._id))
+      ? new mongoose.Types.ObjectId(String(enrollment._id))
+      : enrollment._id;
+    if (sameCourseCount > 1) {
+      // Nhiều khóa cùng tên (vd: khóa cũ hoàn phí + khóa mới active):
+      // chỉ tính lịch gắn đúng enrollmentId mới (hoặc lịch unlinked tạo sau registeredAt khóa mới)
+      const orConds = [{ enrollmentId: enrObjId }];
+      if (enrollment.registeredAt) {
+        const regDate = new Date(enrollment.registeredAt);
+        if (!Number.isNaN(regDate.getTime())) {
+          orConds.push({
+            enrollmentId: null,
+            ...(course ? { course } : {}),
+            createdAt: { $gte: regDate },
+          });
+        }
+      }
+      return { $or: orConds };
+    }
+    return {
+      $or: [
+        { enrollmentId: enrObjId },
+        { enrollmentId: null, ...(course ? { course } : {}) },
+      ],
+    };
+  }
+
+  return course ? { course } : {};
 }
 
 /**
  * Count sessions that consume enrollment capacity for student+course.
  * cancelled does NOT count. scheduled + completed count.
  */
-async function getEnrollmentSessionUsage({ studentId, courseName, excludeScheduleId } = {}) {
-  const course = String(courseName || '').trim();
+async function getEnrollmentSessionUsage({
+  studentId, courseName, excludeScheduleId, enrollment = null, allEnrollments = [],
+} = {}) {
+  const scopeFilter = buildEnrollmentScheduleScopeFilter(courseName, enrollment, allEnrollments);
   const filter = {
     studentId,
     status: { $in: SESSION_USAGE_STATUSES },
+    ...scopeFilter,
   };
-  if (course) filter.course = course;
   if (excludeScheduleId) filter._id = { $ne: excludeScheduleId };
   const used = await Schedule.countDocuments(filter);
   return { used, statuses: SESSION_USAGE_STATUSES };
@@ -126,15 +190,18 @@ async function findTeacherScheduleClash({
  * Assert enrollment can accept a new (or additional) schedule slot.
  * Loads student from DB - never trusts FE counters.
  */
-async function assertEnrollmentCanSchedule({ studentId, courseName, excludeScheduleId } = {}) {
-  const student = await Student.findById(studentId)
+async function assertEnrollmentCanSchedule({
+  studentId, courseName, excludeScheduleId, enrollmentId = null, studentDoc = null,
+} = {}) {
+  const student = studentDoc || await Student.findById(studentId)
     .select('name course totalSessions remainingSessions completedSessions enrollments status')
     .lean();
   if (!student) {
     throw schedulingError(ERROR_CODES.ENROLLMENT_NOT_FOUND, 'Không tìm thấy học viên', {});
   }
 
-  const enr = resolveEnrollmentForCourse(student, courseName);
+  const allEnrollments = getEnrollmentsFromStudent(student);
+  const enr = resolveEnrollmentForCourse(student, courseName, enrollmentId);
   if (!enr) {
     throw schedulingError(
       ERROR_CODES.ENROLLMENT_NOT_FOUND,
@@ -143,7 +210,7 @@ async function assertEnrollmentCanSchedule({ studentId, courseName, excludeSched
     );
   }
 
-  const status = String(enr.status || 'active');
+  const status = String(enr.status || 'active').toLowerCase();
   const totalSessions = Number(enr.totalSessions) > 0 ? Number(enr.totalSessions) : 12;
   const courseKey = enr.courseName || courseName || student.course || '';
 
@@ -163,20 +230,25 @@ async function assertEnrollmentCanSchedule({ studentId, courseName, excludeSched
     );
   }
 
-  const { used } = await getEnrollmentSessionUsage({
-    studentId,
-    courseName: courseKey,
-    excludeScheduleId,
-  });
+  const scopeFilter = buildEnrollmentScheduleScopeFilter(courseKey, enr, allEnrollments);
 
-  // Buổi ghi nhận trước (Admin chỉnh completedSessions cao hơn số ca completed trên lịch)
-  // vẫn chiếm slot - tránh xếp vượt «còn lại» trên hồ sơ.
-  const calendarCompleted = await Schedule.countDocuments({
-    studentId,
-    status: 'completed',
-    ...(courseKey ? { course: courseKey } : {}),
-    ...(excludeScheduleId ? { _id: { $ne: excludeScheduleId } } : {}),
-  });
+  // Chạy song song 2 count queries để giảm tối đa độ trễ
+  const [{ used }, calendarCompleted] = await Promise.all([
+    getEnrollmentSessionUsage({
+      studentId,
+      courseName: courseKey,
+      excludeScheduleId,
+      enrollment: enr,
+      allEnrollments,
+    }),
+    Schedule.countDocuments({
+      studentId,
+      status: 'completed',
+      ...scopeFilter,
+      ...(excludeScheduleId ? { _id: { $ne: excludeScheduleId } } : {}),
+    }),
+  ]);
+
   const storedDone = enr.completedSessions != null
     ? Math.max(0, Number(enr.completedSessions) || 0)
     : Math.max(0, totalSessions - (Number(enr.remainingSessions) || 0));
@@ -256,24 +328,29 @@ function assertScheduleDateNotPast(dateInput) {
 async function validateScheduleCreate(opts = {}) {
   const {
     studentId, teacherId, courseName, date, startTime, endTime,
+    enrollmentId = null, studentDoc = null,
   } = opts;
 
   assertScheduleDateNotPast(date);
 
-  const enrollmentInfo = await assertEnrollmentCanSchedule({
-    studentId,
-    courseName,
-  });
+  const results = await Promise.allSettled([
+    assertEnrollmentCanSchedule({
+      studentId,
+      courseName,
+      enrollmentId,
+      studentDoc,
+    }),
+    assertStudentDailyLimit({ studentId, date }),
+    teacherId
+      ? assertTeacherNoConflict({ teacherId, date, startTime, endTime })
+      : Promise.resolve(null),
+  ]);
 
-  await assertStudentDailyLimit({ studentId, date });
-
-  if (teacherId) {
-    await assertTeacherNoConflict({
-      teacherId, date, startTime, endTime,
-    });
+  for (const res of results) {
+    if (res.status === 'rejected') throw res.reason;
   }
 
-  return enrollmentInfo;
+  return results[0].value;
 }
 
 /**
@@ -283,30 +360,37 @@ async function validateScheduleCreate(opts = {}) {
 async function validateScheduleReschedule(opts = {}) {
   const {
     studentId, teacherId, courseName, date, startTime, endTime, excludeScheduleId,
-    originalDate,
+    originalDate, enrollmentId = null, studentDoc = null,
   } = opts;
 
   if (originalDate != null) assertScheduleDateNotPast(originalDate);
   assertScheduleDateNotPast(date);
 
-  // Enrollment cap: exclude self so editing alone does not trip limit
-  await assertEnrollmentCanSchedule({
-    studentId,
-    courseName,
-    excludeScheduleId,
-  });
+  const results = await Promise.allSettled([
+    assertEnrollmentCanSchedule({
+      studentId,
+      courseName,
+      excludeScheduleId,
+      enrollmentId,
+      studentDoc,
+    }),
+    assertStudentDailyLimit({
+      studentId,
+      date,
+      excludeScheduleId,
+    }),
+    teacherId
+      ? assertTeacherNoConflict({
+        teacherId, date, startTime, endTime, excludeScheduleId,
+      })
+      : Promise.resolve(null),
+  ]);
 
-  await assertStudentDailyLimit({
-    studentId,
-    date,
-    excludeScheduleId,
-  });
-
-  if (teacherId) {
-    await assertTeacherNoConflict({
-      teacherId, date, startTime, endTime, excludeScheduleId,
-    });
+  for (const res of results) {
+    if (res.status === 'rejected') throw res.reason;
   }
+
+  return results[0].value;
 }
 
 function sendSchedulingError(res, err) {

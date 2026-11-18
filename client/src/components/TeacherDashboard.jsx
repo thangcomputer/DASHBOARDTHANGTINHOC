@@ -340,12 +340,20 @@ const TeacherDashboard = () => {
     }
 
     if (studentId) {
+      const isAliveRow = (s) => {
+        if (!s || s.interactionLocked) return false;
+        const es = String(s.enrollmentStatus || '').toLowerCase();
+        const st = String(s.status || '').toLowerCase();
+        return es !== 'cancelled' && es !== 'refunded' && st !== 'thôi học';
+      };
       const matches = students.filter(
         (s) => String(s._id || s.id) === String(studentId),
       );
-      let match = matches[0];
-      if (courseParam && matches.length > 1) {
-        match = matches.find((s) => String(s.course || '') === String(courseParam)) || match;
+      const aliveMatches = matches.filter(isAliveRow);
+      const pool = aliveMatches.length > 0 ? aliveMatches : matches;
+      let match = pool[0];
+      if (courseParam && pool.length > 1) {
+        match = pool.find((s) => String(s.course || '') === String(courseParam)) || match;
       }
       if (match) {
         const key = match._enrollmentKey || match._id || match.id;
@@ -363,7 +371,13 @@ const TeacherDashboard = () => {
         if (stillThere) return prev;
       }
       if (students.length > 0) {
-        return students[0]._enrollmentKey || students[0]._id || students[0].id;
+        const firstActive = students.find(
+          (s) => !s.interactionLocked
+            && !['cancelled', 'refunded'].includes(String(s.enrollmentStatus || '').toLowerCase())
+            && String(s.status || '').toLowerCase() !== 'thôi học',
+        );
+        const pick = firstActive || students[0];
+        return pick._enrollmentKey || pick._id || pick.id;
       }
       return prev;
     });

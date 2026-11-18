@@ -12,7 +12,8 @@ import {
 import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
-import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
+import { getClientEnrollments, getActiveClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
+import TeacherStudentWeekSlotSheet from './teacher/TeacherStudentWeekSlotSheet';
 import { getExamSubjectMeta, teacherMatchesCourse } from '../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../utils/branchIds';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
@@ -287,12 +288,50 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   const [enrollmentSessionForms, setEnrollmentSessionForms] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const { updateStudent, assignTeacher, teachers, triggerBackgroundSync, examSubjectsCatalog, currentUser } = useData() || {};
+  const {
+    updateStudent, assignTeacher, teachers, triggerBackgroundSync, examSubjectsCatalog, currentUser,
+    schedules: allSchedules = [], addSchedule, updateSchedule, cancelSchedule,
+  } = useData() || {};
   const canManageStudentAccount = ['admin', 'staff'].includes(String(currentUser?.role || '').toLowerCase())
     || currentUser?.adminRole === 'SUPER_ADMIN'
     || String(currentUser?.id || currentUser?._id || '') === 'admin';
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
+  const [showWeekScheduleSheet, setShowWeekScheduleSheet] = useState(false);
   const [deviceBusy, setDeviceBusy] = useState('');
+
+  const schedulableEnrollments = React.useMemo(() => {
+    if (!data?.student) return [];
+    const alive = getActiveClientEnrollments(data.student)
+      .filter((e) => e && String(e.status || 'active').toLowerCase() === 'active' && e.teacherId && !isFreePortalCourse(e));
+    return alive.map((e, idx) => ({
+      ...data.student,
+      id: data.student._id || data.student.id,
+      _id: data.student._id || data.student.id,
+      _enrollmentKey: `${data.student._id || data.student.id}-${e.enrollmentId || idx}`,
+      _enrollmentId: e.enrollmentId || `enr-${idx}`,
+      registeredAt: e.registeredAt || null,
+      course: e.courseName || e.name || '',
+      teacherId: e.teacherId?._id || e.teacherId,
+      teacherName: e.teacherName || '',
+      totalSessions: e.totalSessions || 12,
+      remainingSessions: e.remainingSessions ?? Math.max(0, (e.totalSessions || 12) - (Number(e.completedSessions) || 0)),
+      completedSessions: e.completedSessions ?? 0,
+      enrollmentStatus: e.status || 'active',
+      interactionLocked: false,
+      status: 'Đang học',
+    }));
+  }, [data?.student]);
+
+  const mergedSchedulesForSheet = React.useMemo(() => {
+    const map = new Map();
+    [...(Array.isArray(allSchedules) ? allSchedules : []), ...(Array.isArray(data?.schedules) ? data.schedules : [])]
+      .forEach((s) => {
+        if (!s) return;
+        const k = String(s._id || s.id || '');
+        if (k) map.set(k, s);
+      });
+    return [...map.values()];
+  }, [allSchedules, data?.schedules]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
@@ -1960,7 +1999,22 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 
               {/* --- TAB 2: ATTENDANCE --- */}
               {activeTab === 'attendance' && (
-                <div className="animate-in slide-in-from-right-10 duration-500">
+                <div className="animate-in slide-in-from-right-10 duration-500 space-y-3">
+                  {canManageStudentAccount && schedulableEnrollments.length > 0 && addSchedule && (
+                    <div className="flex items-center justify-between gap-2 bg-violet-50/70 border border-violet-200 rounded-2xl px-4 py-2.5">
+                      <span className="text-xs font-bold text-violet-900">
+                        Sắp lịch tuần trực tiếp cho học viên ({schedulableEnrollments.length} khóa đang học)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowWeekScheduleSheet(true)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-700"
+                      >
+                        <Calendar size={14} />
+                        Xếp lịch tuần
+                      </button>
+                    </div>
+                  )}
                   <div className="bg-white rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-100">
                     {data.schedules.length === 0 ? (
                       <p className="cms-empty-cell">Chưa có dữ liệu điểm danh</p>
@@ -2962,6 +3016,21 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             </div>
           </div>
         </div>
+      )}
+      {showWeekScheduleSheet && schedulableEnrollments.length > 0 && (
+        <TeacherStudentWeekSlotSheet
+          student={schedulableEnrollments[0]}
+          enrollments={schedulableEnrollments}
+          teacherId={schedulableEnrollments[0].teacherId}
+          schedules={mergedSchedulesForSheet}
+          addSchedule={addSchedule}
+          updateSchedule={updateSchedule}
+          cancelSchedule={cancelSchedule}
+          onCreated={reloadProfile}
+          onUpdated={reloadProfile}
+          onCancelled={reloadProfile}
+          onClose={() => setShowWeekScheduleSheet(false)}
+        />
       )}
     </div>
   );

@@ -76,6 +76,11 @@ export default function TeacherStudentWeekSlotSheet({
     return rows.find((s) => enrollmentKey(s) === enrollmentKeyState) || rows[0] || student;
   }, [enrollments, student, enrollmentKeyState]);
 
+  const effectiveTeacherId = useMemo(
+    () => String(activeStudent?.teacherId?._id || activeStudent?.teacherId || teacherId || ''),
+    [activeStudent, teacherId],
+  );
+
   const dateKeys = useMemo(() => weekDateKeys(weekStart), [weekStart]);
   const todayKey = formatLocalDateKey(new Date());
   const schedulesRef = useRef(schedules);
@@ -143,7 +148,7 @@ export default function TeacherStudentWeekSlotSheet({
       }
       const conflict = findTeacherScheduleConflict({
         schedules: schedulesRef.current || [],
-        teacherId,
+        teacherId: effectiveTeacherId,
         date: dateKey,
         startTime: nextStart,
         endTime: slotEnd(nextStart),
@@ -162,7 +167,7 @@ export default function TeacherStudentWeekSlotSheet({
       return;
     }
     setDrafts((prev) => ({ ...prev, [dateKey]: nextStart }));
-  }, [savedByDay, teacherId, toast]);
+  }, [savedByDay, effectiveTeacherId, toast]);
 
   const handleCommit = useCallback(async () => {
     if (!activeStudent || saving || dirtyKeys.length === 0) return;
@@ -177,11 +182,14 @@ export default function TeacherStudentWeekSlotSheet({
       return;
     }
 
-    setSaving(true);
-    let created = 0;
-    let updated = 0;
-    let cancelled = 0;
-    let live = [...(schedulesRef.current || [])];
+    const rawEnrId = String(activeStudent?._enrollmentId || activeStudent?.activeEnrollmentId || '').trim();
+    const realEnrollmentId = (
+      rawEnrId && rawEnrId !== 'main' && !/^enr-\d+$/i.test(rawEnrId) && !/^course-\d+$/i.test(rawEnrId)
+    ) ? rawEnrId : undefined;
+
+    // Kiểm tra hợp lệ toàn bộ trước khi bắn request song song
+    const ops = [];
+    let simulatedLive = [...(schedulesRef.current || [])];
     try {
       for (const dateKey of dirtyKeys) {
         const saved = savedByDay[dateKey];
@@ -191,20 +199,8 @@ export default function TeacherStudentWeekSlotSheet({
 
         if (!next) {
           if (saved?.id && saved.status === 'scheduled') {
-            await cancelSchedule(saved.id, CLEAR_REASON);
-            cancelled += 1;
-            live = live.filter((s) => scheduleIdOf(s) !== String(saved.id));
-            if (typeof onCancelled === 'function') {
-              await onCancelled({
-                date: dateKey,
-                startTime: saved.start || prev || '',
-                endTime: saved.end || slotEnd(saved.start || prev) || '',
-                course: activeStudent.course || '',
-                studentName: activeStudent.displayName || activeStudent.name || '',
-                studentId: sid,
-                scheduleId: saved.id,
-              });
-            }
+            simulatedLive = simulatedLive.filter((s) => scheduleIdOf(s) !== String(saved.id));
+            ops.push({ kind: 'cancel', dateKey, saved, prev });
           }
           continue;
         }
@@ -216,8 +212,8 @@ export default function TeacherStudentWeekSlotSheet({
         }
 
         const conflict = findTeacherScheduleConflict({
-          schedules: live,
-          teacherId,
+          schedules: simulatedLive,
+          teacherId: effectiveTeacherId,
           date: dateKey,
           startTime: next,
           endTime,
@@ -227,84 +223,152 @@ export default function TeacherStudentWeekSlotSheet({
           throw new Error(formatTeacherConflictMessage(conflict));
         }
 
-        const gate = getStudentScheduleGate(activeStudent, live, dateKey, saved?.id || null);
         if (saved?.id && saved.status === 'scheduled') {
-          const prevEnd = saved.end || slotEnd(prev) || '';
-          const res = await updateSchedule(saved.id, {
-            date: dateKey,
-            startTime: next,
-            endTime,
-          });
-          if (res?.success === false) throw new Error(res.message);
-          updated += 1;
-          live = live.map((s) => (
+          simulatedLive = simulatedLive.map((s) => (
             scheduleIdOf(s) === String(saved.id) ? { ...s, date: dateKey, startTime: next, endTime } : s
           ));
-          if (typeof onUpdated === 'function') {
-            await onUpdated({
-              date: dateKey,
-              startTime: next,
-              endTime,
-              prevStartTime: prev || saved.start || '',
-              prevEndTime: prevEnd,
-              course: activeStudent.course || '',
-              studentName: activeStudent.displayName || activeStudent.name || '',
-              studentId: sid,
-              scheduleId: saved.id,
-            });
-          }
+          ops.push({ kind: 'update', dateKey, saved, prev, next, endTime });
           continue;
         }
 
+        const gate = getStudentScheduleGate(activeStudent, simulatedLive, dateKey, saved?.id || null);
         if (!gate.canSchedule) {
           throw new Error(gate.reason || `Không xếp được ca ngày ${dateKey}`);
         }
 
-        const res = await addSchedule({
+        simulatedLive = [...simulatedLive, {
+          _id: `local_${dateKey}`,
+          id: `local_${dateKey}`,
+          teacherId: effectiveTeacherId,
           studentId: sid,
-          teacherId,
-          date: dateKey,
-          startTime: next,
-          endTime,
+          enrollmentId: realEnrollmentId || null,
           course: activeStudent.course || '',
-          topic: '',
-          note: '',
-          studentName: activeStudent.displayName || activeStudent.name || '',
-        });
-        if (!res?.success) throw new Error(res?.message || 'Không thể xếp lịch');
-        created += 1;
-        const createdId = res.data?._id || res.data?.id || `local_${dateKey}`;
-        live = [...live, {
-          ...(res.data || {}),
-          _id: createdId,
-          id: createdId,
-          teacherId,
-          studentId: sid,
           date: dateKey,
           startTime: next,
           endTime,
           status: 'scheduled',
         }];
-        if (typeof onCreated === 'function') {
-          await onCreated({
-            date: dateKey,
-            startTime: next,
-            endTime,
-            course: activeStudent.course || '',
-            studentName: activeStudent.displayName || activeStudent.name || '',
+        ops.push({ kind: 'create', dateKey, next, endTime });
+      }
+    } catch (validationErr) {
+      toast.error(validationErr?.message || 'Dữ liệu lịch không hợp lệ');
+      return;
+    }
+
+    if (ops.length === 0) return;
+
+    setSaving(true);
+    let created = 0;
+    let updated = 0;
+    let cancelled = 0;
+    const succeededKeys = [];
+    let firstError = null;
+    try {
+      const results = await Promise.allSettled(
+        ops.map(async (op) => {
+          if (op.kind === 'cancel') {
+            await cancelSchedule(op.saved.id, CLEAR_REASON);
+            return { op };
+          }
+          if (op.kind === 'update') {
+            const res = await updateSchedule(op.saved.id, {
+              date: op.dateKey,
+              startTime: op.next,
+              endTime: op.endTime,
+            });
+            if (res?.success === false) throw new Error(res.message || 'Không cập nhật được lịch');
+            return { op, res };
+          }
+          const res = await addSchedule({
             studentId: sid,
-            scheduleId: res.data?._id || res.data?.id || null,
+            teacherId: effectiveTeacherId,
+            ...(realEnrollmentId ? { enrollmentId: realEnrollmentId } : {}),
+            date: op.dateKey,
+            startTime: op.next,
+            endTime: op.endTime,
+            course: activeStudent.course || '',
+            topic: '',
+            note: '',
+            studentName: activeStudent.displayName || activeStudent.name || '',
           });
+          if (!res?.success) throw new Error(res?.message || 'Không thể xếp lịch');
+          return { op, res };
+        }),
+      );
+
+      const postCallbacks = [];
+      for (const item of results) {
+        if (item.status === 'rejected') {
+          if (!firstError) firstError = item.reason;
+          continue;
+        }
+        const { op, res } = item.value;
+        succeededKeys.push(op.dateKey);
+        if (op.kind === 'cancel') {
+          cancelled += 1;
+          if (typeof onCancelled === 'function') {
+            postCallbacks.push(onCancelled({
+              date: op.dateKey,
+              startTime: op.saved.start || op.prev || '',
+              endTime: op.saved.end || slotEnd(op.saved.start || op.prev) || '',
+              course: activeStudent.course || '',
+              studentName: activeStudent.displayName || activeStudent.name || '',
+              studentId: sid,
+              scheduleId: op.saved.id,
+            }));
+          }
+        } else if (op.kind === 'update') {
+          updated += 1;
+          if (typeof onUpdated === 'function') {
+            const prevEnd = op.saved.end || slotEnd(op.prev) || '';
+            postCallbacks.push(onUpdated({
+              date: op.dateKey,
+              startTime: op.next,
+              endTime: op.endTime,
+              prevStartTime: op.prev || op.saved.start || '',
+              prevEndTime: prevEnd,
+              course: activeStudent.course || '',
+              studentName: activeStudent.displayName || activeStudent.name || '',
+              studentId: sid,
+              scheduleId: op.saved.id,
+            }));
+          }
+        } else if (op.kind === 'create') {
+          created += 1;
+          if (typeof onCreated === 'function') {
+            postCallbacks.push(onCreated({
+              date: op.dateKey,
+              startTime: op.next,
+              endTime: op.endTime,
+              course: activeStudent.course || '',
+              studentName: activeStudent.displayName || activeStudent.name || '',
+              studentId: sid,
+              scheduleId: res?.data?._id || res?.data?.id || null,
+            }));
+          }
         }
       }
 
-      setDrafts({});
-      const bits = [];
-      if (created) bits.push(`xếp ${created} ca`);
-      if (updated) bits.push(`đổi ${updated} ca`);
-      if (cancelled) bits.push(`bỏ ${cancelled} ca`);
-      toast.success(bits.length ? `Đã ${bits.join(', ')}` : 'Không có thay đổi');
-      onClose?.();
+      if (postCallbacks.length) {
+        await Promise.allSettled(postCallbacks);
+      }
+
+      if (firstError) {
+        setDrafts((prevDrafts) => {
+          const remainingDrafts = { ...prevDrafts };
+          succeededKeys.forEach((k) => { delete remainingDrafts[k]; });
+          return remainingDrafts;
+        });
+        toast.error(firstError?.message || 'Một số buổi chưa lưu được');
+      } else {
+        setDrafts({});
+        const bits = [];
+        if (created) bits.push(`xếp ${created} ca`);
+        if (updated) bits.push(`đổi ${updated} ca`);
+        if (cancelled) bits.push(`bỏ ${cancelled} ca`);
+        toast.success(bits.length ? `Đã ${bits.join(', ')}` : 'Không có thay đổi');
+        onClose?.();
+      }
     } catch (err) {
       toast.error(err?.message || 'Không cập nhật được lịch');
     } finally {
@@ -312,7 +376,7 @@ export default function TeacherStudentWeekSlotSheet({
     }
   }, [
     activeStudent, saving, dirtyKeys, savedByDay, valueOf, progress.remaining,
-    schedules, sid, teacherId, addSchedule, updateSchedule, cancelSchedule,
+    sid, effectiveTeacherId, addSchedule, updateSchedule, cancelSchedule,
     onCreated, onUpdated, onCancelled, onClose, toast,
   ]);
 
@@ -378,7 +442,7 @@ export default function TeacherStudentWeekSlotSheet({
               dateKey={dateKey}
               student={activeStudent}
               schedules={schedules}
-              teacherId={teacherId}
+              teacherId={effectiveTeacherId}
               saved={savedByDay[dateKey]}
               value={valueOf(dateKey)}
               dirty={dirtyKeys.includes(dateKey)}

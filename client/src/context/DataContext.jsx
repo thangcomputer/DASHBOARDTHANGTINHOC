@@ -69,7 +69,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     setStudentsLocal: setStudents,
   } = useStudentsContext();
   const { teachers, setTeachersLocal: setTeachers, refreshTeachers } = useTeachersContext();
-  const { schedules, setSchedulesLocal: setSchedules } = useScheduleContext();
+  const { schedules, setSchedulesLocal: setSchedules, refreshSchedules } = useScheduleContext();
   const { transactions, setTransactionsLocal: setTransactions } = useFinanceContext();
 
   const [staffs, setStaffs] = useState(() => loadState('thvp_staffs', []));
@@ -183,6 +183,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     students, setStudents, teachers, setTeachers, transactions, setTransactions,
     triggerBackgroundSync, addNotification,
     refreshStudents,
+    refreshSchedules,
   });
   setExamResultsRef.current = setExamResults;
 

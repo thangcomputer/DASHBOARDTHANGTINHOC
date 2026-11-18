@@ -18,7 +18,7 @@ const {
 
 const CONTACT_SELECT = [
   'name adminRole gender phone branchId branchCode avatar role status address',
-  'age course totalSessions remainingSessions completedSessions notes',
+  'age course totalSessions remainingSessions completedSessions notes enrollments',
   'specialty averageRating ratingCount voiceRegion startDate bio experience experienceYears',
 ].join(' ');
 
@@ -101,6 +101,40 @@ function mapContactFromDoc(doc, transportRoleHint, branchTenantMap, branchProfil
     role: doc.role || role,
     adminRole: doc.adminRole,
   });
+  const rawEnrollments = Array.isArray(doc.enrollments) ? doc.enrollments : [];
+  const aliveEnrollments = rawEnrollments.filter(
+    (e) => e && !['cancelled', 'refunded'].includes(String(e.status || '').toLowerCase()),
+  );
+  const primaryActive = aliveEnrollments.find((e) => e.isPrimary && String(e.status || '').toLowerCase() === 'active')
+    || aliveEnrollments.find((e) => String(e.status || '').toLowerCase() === 'active')
+    || aliveEnrollments.find((e) => e.isPrimary)
+    || aliveEnrollments[0]
+    || null;
+  const compactEnrollments = rawEnrollments.length
+    ? rawEnrollments.map((e, idx) => ({
+      _id: e._id ? String(e._id) : undefined,
+      id: e._id ? String(e._id) : `enr-${idx}`,
+      enrollmentId: e._id ? String(e._id) : `enr-${idx}`,
+      courseName: e.courseName || '',
+      teacherId: e.teacherId ? String(e.teacherId._id || e.teacherId) : '',
+      teacherName: e.teacherName || '',
+      teacherAlert: String(e.teacherAlert || '').trim(),
+      status: e.status || 'active',
+      totalSessions: e.totalSessions ?? 12,
+      remainingSessions: e.remainingSessions ?? null,
+      completedSessions: e.completedSessions ?? 0,
+      isPrimary: !!e.isPrimary,
+    }))
+    : undefined;
+  const resolvedCourse = (doc.course && doc.course !== '(Đã hủy)')
+    ? doc.course
+    : (primaryActive?.courseName || doc.course || '');
+  const contactTeacherAlert = String(
+    primaryActive?.teacherAlert
+    || aliveEnrollments.find((e) => String(e?.teacherAlert || '').trim())?.teacherAlert
+    || '',
+  ).trim();
+
   return {
     id,
     name: doc.name || 'Không rõ tên',
@@ -113,11 +147,13 @@ function mapContactFromDoc(doc, transportRoleHint, branchTenantMap, branchProfil
     personalPhone: doc.phone || '',
     branchPhone: branch?.phone || '',
     age: doc.age ?? null,
-    course: doc.course || '',
-    totalSessions: doc.totalSessions ?? null,
-    remainingSessions: doc.remainingSessions ?? null,
-    completedSessions: doc.completedSessions ?? null,
+    course: resolvedCourse,
+    totalSessions: primaryActive?.totalSessions ?? doc.totalSessions ?? null,
+    remainingSessions: primaryActive?.remainingSessions ?? doc.remainingSessions ?? null,
+    completedSessions: primaryActive?.completedSessions ?? doc.completedSessions ?? null,
     notes: doc.notes || '',
+    teacherAlert: contactTeacherAlert,
+    ...(compactEnrollments ? { enrollments: compactEnrollments } : {}),
     specialty: doc.specialty || '',
     averageRating: doc.averageRating ?? null,
     ratingCount: doc.ratingCount ?? 0,

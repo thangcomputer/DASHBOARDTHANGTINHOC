@@ -131,9 +131,9 @@ export function occupyingMatchesCourse(sch, courseName) {
 }
 
 /** Ca hôm nay đã hết (qua giờ kết thúc) - không xếp mới. Ca đang diễn ra vẫn được. */
-export function isWeekSlotElapsed(dateKey, startTime, endTime, now = new Date()) {
+export function isWeekSlotElapsed(dateKey, startTime, endTime, now = new Date(), todayKeyOverride = '') {
   const day = normalizeScheduleDate(dateKey);
-  const today = formatLocalDateKey(now);
+  const today = todayKeyOverride || formatLocalDateKey(now);
   if (!day || day !== today) return false;
   const start = normalizeTimeHHmm(startTime, '');
   if (!start) return false;
@@ -156,40 +156,27 @@ export function weekSlotSelectMeta(opt, dateKey, {
   const start = opt.start || opt.value;
   const elapsed = isWeekSlotElapsed(dateKey, start, opt.end, now);
   const optEnd = opt.end || endTimeFromStart(start);
-  const takenByHold = !elapsed && (extraTakenRanges || []).some((r) => (
-    r?.start && timeRangesOverlap(start, optEnd, r.start, r.end || endTimeFromStart(r.start))
-  ));
-  const taken = takenByHold || (!elapsed && isSlotTakenByOther(
-    conflictSchedules || schedules,
-    teacherId,
-    dateKey,
-    start,
-    excludeScheduleId,
-    opt.end,
-  ));
   const isCurrent = String(currentValue || '') === String(opt.value);
-  let bookedName = '';
-  if (!elapsed && taken && !isCurrent) {
-    const hold = (extraTakenRanges || []).find((r) => (
+  let holdMatch = null;
+  if (!elapsed) {
+    holdMatch = (extraTakenRanges || []).find((r) => (
       r?.start && timeRangesOverlap(start, optEnd, r.start, r.end || endTimeFromStart(r.start))
-    ));
-    bookedName = String(hold?.studentName || '').trim();
-    if (!bookedName) {
-      const clash = findTeacherScheduleConflict({
-        schedules: conflictSchedules || schedules,
-        teacherId,
-        date: dateKey,
-        startTime: start,
-        endTime: optEnd,
-        excludeScheduleId,
-      });
-      bookedName = String(
-        clash?.studentName
-        || clash?.studentId?.name
-        || '',
-      ).trim();
-    }
+    )) || null;
   }
+  const clash = (!elapsed && !holdMatch)
+    ? findTeacherScheduleConflict({
+      schedules: conflictSchedules || schedules,
+      teacherId,
+      date: dateKey,
+      startTime: start,
+      endTime: optEnd,
+      excludeScheduleId,
+    })
+    : null;
+  const taken = Boolean(holdMatch || clash);
+  const bookedName = (!elapsed && taken && !isCurrent)
+    ? String(holdMatch?.studentName || clash?.studentName || clash?.studentId?.name || '').trim()
+    : '';
   return {
     hidden: false,
     disabled: elapsed || (taken && !isCurrent),

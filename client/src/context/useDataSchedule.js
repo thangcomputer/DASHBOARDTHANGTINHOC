@@ -1,7 +1,46 @@
 import { useCallback } from 'react';
 import api from '../services/api';
+import { mapSchedule } from '../lib/entityMaps';
 import { normalizeScheduleDate, formatScheduleDateVi } from '../utils/scheduleTime';
 import { normalizeCourseName } from '../utils/teacherFinance';
+
+let tempScheduleSeq = 0;
+
+function nextTempScheduleId() {
+  tempScheduleSeq += 1;
+  return `temp_${Date.now()}_${tempScheduleSeq}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function normalizeScheduleRecord(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const mapped = mapSchedule(raw);
+  const studentName = raw.studentName || (typeof raw.studentId === 'object' ? raw.studentId?.name : '') || '';
+  const teacherName = raw.teacherName || (typeof raw.teacherId === 'object' ? raw.teacherId?.name : '') || '';
+  return {
+    ...mapped,
+    id: String(mapped.id || mapped._id || ''),
+    ...(studentName ? { studentName } : {}),
+    ...(teacherName ? { teacherName } : {}),
+  };
+}
+
+function mergeSavedSchedule(prevList, tempId, rawSaved) {
+  const saved = normalizeScheduleRecord(rawSaved);
+  const savedId = String(saved?._id || saved?.id || '');
+  const list = prevList || [];
+  if (!savedId) {
+    return list.map((s) => (String(s.id || s._id) === String(tempId) ? saved : s));
+  }
+  const existsReal = list.some(
+    (s) => String(s._id || s.id) === savedId && String(s.id || s._id) !== String(tempId),
+  );
+  if (existsReal) {
+    return list
+      .filter((s) => String(s.id || s._id) !== String(tempId))
+      .map((s) => (String(s._id || s.id) === savedId ? { ...s, ...saved, id: savedId } : s));
+  }
+  return list.map((s) => (String(s.id || s._id) === String(tempId) ? { ...saved, id: savedId } : s));
+}
 
 function localDateISO(date = new Date()) {
   const y = date.getFullYear();
@@ -179,7 +218,7 @@ export function useDataSchedule({
           }
           return true;
         }
-        const tempId = 'temp-' + Date.now();
+        const tempId = nextTempScheduleId();
 
         const newSch = {
           id: tempId,
@@ -201,7 +240,7 @@ export function useDataSchedule({
           throw new Error(resCreate?.message || 'Lỗi tạo lịch học mới');
         }
         const createdId = resCreate.data?._id || resCreate.data?.id;
-        setSchedules(prev => prev.map(s => s.id === tempId ? { ...resCreate.data, id: createdId } : s));
+        setSchedules(prev => mergeSavedSchedule(prev, tempId, resCreate.data));
 
         const resSch = await api.schedules?.update(createdId, schedulePayload);
         if (!resSch?.success) {
@@ -210,8 +249,9 @@ export function useDataSchedule({
           throw err;
         }
         if (resSch.data) {
+          const updatedRecord = normalizeScheduleRecord(resSch.data);
           setSchedules(prev => prev.map(s => String(s._id || s.id) === String(createdId)
-            ? { ...s, ...resSch.data }
+            ? { ...s, ...updatedRecord, id: String(createdId) }
             : s));
         }
       }
@@ -233,7 +273,7 @@ export function useDataSchedule({
     const studentDisplayName = student
       ? ((student.name && !/^\d{5,}$/.test(student.name)) ? student.name : student.email || student.phone || `HV-${String(student.id || student._id || '').slice(-4)}`)
       : (schedule.studentName || '');
-    const tempId = `temp_${Date.now()}`;
+    const tempId = nextTempScheduleId();
     const newSched = {
       ...schedule,
       id: tempId,
@@ -242,16 +282,21 @@ export function useDataSchedule({
       teacherName: teacher?.name || schedule.teacherName || '',
     };
     // Optimistic UI: hiện ngay
-    setSchedules(prev => [...prev, newSched]);
-    // Đồng bộ nextClass cho student
-    if (student) {
+    setSchedules(prev => [...(prev || []), newSched]);
+    // Đồng bộ nextClass cho student (chỉ cập nhật cho lịch từ hôm nay trở đi)
+    const schedDateKey = normalizeScheduleDate(schedule.date);
+    const todayISO = localDateISO();
+    const updatedNextClass = Boolean(student && schedDateKey && schedDateKey >= todayISO);
+    if (updatedNextClass) {
       const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-      const d = new Date(schedule.date);
-      const dayName = dayNames[d.getDay()];
-      const dateStr = `${schedule.startTime} - ${dayName} (${d.toLocaleDateString('vi-VN')})`;
+      const d = new Date(`${schedDateKey}T12:00:00`);
+      const dayName = Number.isNaN(d.getTime()) ? '' : dayNames[d.getDay()];
+      const dateStr = dayName
+        ? `${schedule.startTime} - ${dayName} (${formatScheduleDateVi(schedDateKey)})`
+        : `${schedule.startTime} (${formatScheduleDateVi(schedDateKey)})`;
       setStudents(prev => prev.map(s =>
         (String(s.id) === String(schedule.studentId) || String(s._id) === String(schedule.studentId))
-          ? { ...s, nextClass: dateStr, nextClassTime: `${schedule.date}T${schedule.startTime}:00` } : s
+          ? { ...s, nextClass: dateStr, nextClassTime: `${schedDateKey}T${schedule.startTime || '09:00'}:00` } : s
       ));
     }
     addNotification(schedule.studentId, 'student', `📅 Lịch học mới: ${schedule.course} lúc ${schedule.startTime} ngày ${formatScheduleDateVi(schedule.date)}`);
@@ -263,13 +308,11 @@ export function useDataSchedule({
 
     return api.schedules?.create(payload).then(res => {
       if (res?.success && res.data) {
-        setSchedules(prev => prev.map(s =>
-          s.id === tempId ? { ...res.data, id: res.data._id } : s
-        ));
+        setSchedules(prev => mergeSavedSchedule(prev, tempId, res.data));
         return res;
       }
-      setSchedules(prev => prev.filter(s => s.id !== tempId));
-      if (student) {
+      setSchedules(prev => (prev || []).filter(s => String(s.id || s._id) !== tempId));
+      if (updatedNextClass) {
         setStudents(prev => prev.map(s =>
           (String(s.id) === String(schedule.studentId) || String(s._id) === String(schedule.studentId))
             ? { ...s, nextClass: student.nextClass, nextClassTime: student.nextClassTime } : s
@@ -277,8 +320,8 @@ export function useDataSchedule({
       }
       return { success: false, message: res?.message || 'Lỗi không xác định' };
     }).catch(() => {
-      setSchedules(prev => prev.filter(s => s.id !== tempId));
-      if (student) {
+      setSchedules(prev => (prev || []).filter(s => String(s.id || s._id) !== tempId));
+      if (updatedNextClass) {
         setStudents(prev => prev.map(s =>
           (String(s.id) === String(schedule.studentId) || String(s._id) === String(schedule.studentId))
             ? { ...s, nextClass: student.nextClass, nextClassTime: student.nextClassTime } : s
@@ -286,7 +329,7 @@ export function useDataSchedule({
       }
       return { success: false, message: 'Lỗi mạng kết nối, không thể xếp lịch.' };
     });
-  }, [students, teachers, setStudents, triggerBackgroundSync, addNotification]);
+  }, [students, teachers, setStudents, setSchedules, addNotification]);
 
   // Cập nhật lịch học (GV đổi giờ/link/topic)
   const updateSchedule = useCallback(async (scheduleId, updates) => {
@@ -316,10 +359,11 @@ export function useDataSchedule({
       const res = await api.schedules?.update(scheduleId, payload);
       if (!res?.success) throw new Error(res?.message || 'Lỗi cập nhật lịch');
       if (res.data) {
-        const merged = { ...res.data, id: res.data._id || res.data.id };
-        setSchedules((prev) => prev.map((sch) =>
+        const merged = normalizeScheduleRecord(res.data);
+        const mergedId = String(merged._id || merged.id || scheduleId);
+        setSchedules((prev) => (prev || []).map((sch) =>
           (String(sch.id) === String(scheduleId) || String(sch._id) === String(scheduleId))
-            ? { ...sch, ...merged, topic: merged.note || sch.topic }
+            ? { ...sch, ...merged, id: mergedId, topic: merged.note || sch.topic }
             : sch
         ));
       }
@@ -334,7 +378,7 @@ export function useDataSchedule({
       setStudents(previousStudents);
       throw err;
     }
-  }, [schedules, students, setStudents, triggerBackgroundSync, addNotification]);
+  }, [schedules, students, setStudents, setSchedules, addNotification]);
 
   // Hủy buổi học
   const cancelSchedule = useCallback(async (scheduleId, reason) => {

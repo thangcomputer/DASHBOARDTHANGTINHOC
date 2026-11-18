@@ -45,7 +45,54 @@ export function countStudentSessionsOnDate(schedules, studentId, date, excludeSc
   }).length;
 }
 
-export function countEnrollmentUsage(schedules, studentId, courseName, excludeScheduleId) {
+function normalizeRealEnrollmentId(raw) {
+  const s = String(raw || '').trim();
+  if (!s || s === 'main' || /^enr-\d+$/i.test(s) || /^course-\d+$/i.test(s)) return '';
+  return s;
+}
+
+function scheduleMatchesEnrollmentScope(sch, { enrollmentId = '', registeredAt = null, hasMultipleSameCourse = false } = {}) {
+  const targetEnrId = normalizeRealEnrollmentId(enrollmentId);
+  const schEnrId = String(sch?.enrollmentId?._id || sch?.enrollmentId || '').trim();
+  if (targetEnrId) {
+    if (schEnrId) return schEnrId === targetEnrId;
+    if (hasMultipleSameCourse && registeredAt) {
+      if (sch.createdAt) {
+        const schCreated = new Date(sch.createdAt).getTime();
+        const regTime = new Date(registeredAt).getTime();
+        if (Number.isFinite(schCreated) && Number.isFinite(regTime) && schCreated < regTime) return false;
+      } else if (String(sch.status || '') === 'completed') {
+        const regDay = localDateKey(registeredAt);
+        const schDay = localDateKey(sch.date);
+        if (regDay && schDay && schDay < regDay) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function pickTargetEnrollmentForStudent(student, courseName) {
+  const list = Array.isArray(student?.enrollments) && student.enrollments.length
+    ? student.enrollments
+    : (Array.isArray(student?.courses) ? student.courses : []);
+  if (!list.length) return null;
+  const reqId = normalizeRealEnrollmentId(student?._enrollmentId || student?.activeEnrollmentId || student?.enrollmentId);
+  if (reqId) {
+    const byId = list.find((e) => String(e?._id || e?.id || e?.enrollmentId || '') === reqId);
+    if (byId) return byId;
+  }
+  const key = normCourse(courseName || student?.course || '');
+  const pool = key
+    ? list.filter((e) => normCourse(e?.courseName || e?.name || e?.course) === key)
+    : list;
+  const search = pool.length ? pool : list;
+  return search.find((e) => String(e?.status || '').toLowerCase() === 'active')
+    || search.find((e) => !['cancelled', 'refunded'].includes(String(e?.status || '').toLowerCase()))
+    || search[0]
+    || null;
+}
+
+export function countEnrollmentUsage(schedules, studentId, courseName, excludeScheduleId, options = {}) {
   const sid = String(studentId || '');
   const course = normCourse(courseName);
   const exclude = excludeScheduleId ? String(excludeScheduleId) : '';
@@ -56,12 +103,12 @@ export function countEnrollmentUsage(schedules, studentId, courseName, excludeSc
     const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
     if (schSid !== sid) return false;
     if (course && normCourse(sch.course) !== course) return false;
-    return true;
+    return scheduleMatchesEnrollmentScope(sch, options);
   }).length;
 }
 
 /** Số buổi đã điểm danh xong trên lịch (status=completed). */
-export function countEnrollmentCompleted(schedules, studentId, courseName) {
+export function countEnrollmentCompleted(schedules, studentId, courseName, options = {}) {
   const sid = String(studentId || '');
   const course = normCourse(courseName);
   return (schedules || []).filter((sch) => {
@@ -69,7 +116,7 @@ export function countEnrollmentCompleted(schedules, studentId, courseName) {
     const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
     if (schSid !== sid) return false;
     if (course && normCourse(sch.course) !== course) return false;
-    return true;
+    return scheduleMatchesEnrollmentScope(sch, options);
   }).length;
 }
 
@@ -80,13 +127,39 @@ export function countEnrollmentCompleted(schedules, studentId, courseName) {
  */
 export function resolveEnrollmentProgress(student, schedules, excludeScheduleId) {
   const studentId = String(student?._id || student?.id || '');
-  const course = student?.course || '';
-  const totalSessions = Number(student?.totalSessions) > 0 ? Number(student.totalSessions) : 12;
-  const storedDone = student?.completedSessions != null
-    ? Math.max(0, Number(student.completedSessions) || 0)
-    : Math.max(0, totalSessions - (Number(student?.remainingSessions) || 0));
-  const onCalendar = countEnrollmentCompleted(schedules, studentId, course);
-  const used = countEnrollmentUsage(schedules, studentId, course, excludeScheduleId);
+  const targetEnr = pickTargetEnrollmentForStudent(student, student?.course || '');
+  const course = student?.course || targetEnr?.courseName || targetEnr?.name || '';
+  const totalSessions = Number(student?.totalSessions || targetEnr?.totalSessions) > 0
+    ? Number(student?.totalSessions || targetEnr?.totalSessions)
+    : 12;
+  const storedDoneRaw = student?.completedSessions != null
+    ? student.completedSessions
+    : targetEnr?.completedSessions;
+  const remRaw = student?.remainingSessions != null
+    ? student.remainingSessions
+    : targetEnr?.remainingSessions;
+  const storedDone = storedDoneRaw != null
+    ? Math.max(0, Number(storedDoneRaw) || 0)
+    : Math.max(0, totalSessions - (Number(remRaw) || 0));
+
+  const enrollmentList = Array.isArray(student?.enrollments) && student.enrollments.length
+    ? student.enrollments
+    : (Array.isArray(student?.courses) ? student.courses : []);
+  const normCourseKey = normCourse(course);
+  const hasMultipleSameCourse = Boolean(
+    normCourseKey
+    && enrollmentList.filter((e) => normCourse(e?.courseName || e?.name || e?.course) === normCourseKey).length > 1,
+  );
+  const scopeOptions = {
+    enrollmentId: normalizeRealEnrollmentId(
+      targetEnr?._id || targetEnr?.id || targetEnr?.enrollmentId || student?._enrollmentId || student?.activeEnrollmentId,
+    ),
+    registeredAt: targetEnr?.registeredAt || student?.registeredAt || null,
+    hasMultipleSameCourse,
+  };
+
+  const onCalendar = countEnrollmentCompleted(schedules, studentId, course, scopeOptions);
+  const used = countEnrollmentUsage(schedules, studentId, course, excludeScheduleId, scopeOptions);
   const priorCredit = Math.max(0, storedDone - onCalendar);
   const displayDone = storedDone;
   const effectiveUsed = used + priorCredit;
@@ -109,13 +182,12 @@ export function resolveEnrollmentProgress(student, schedules, excludeScheduleId)
  * Build UX gate for one student enrollment row.
  */
 export function getStudentScheduleGate(student, schedules, date, excludeScheduleId) {
-  const course = student?.course || '';
+  const targetEnr = pickTargetEnrollmentForStudent(student, student?.course || '');
+  const course = student?.course || targetEnr?.courseName || targetEnr?.name || '';
   const enrStatus = String(
     student?.enrollmentStatus
+    || targetEnr?.status
     || student?.status
-    || (Array.isArray(student?.enrollments)
-      ? (student.enrollments.find((e) => normCourse(e.courseName) === normCourse(course))?.status)
-      : '')
     || 'active',
   ).toLowerCase();
 

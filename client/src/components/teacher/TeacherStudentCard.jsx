@@ -17,6 +17,7 @@ import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { formatLocalDateKey, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
+import { expandStudentsForTeacher } from '../../utils/enrollments';
 import { showGlossyAlert, getDisplayName } from './TeacherShared';
 import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
@@ -206,11 +207,39 @@ export const StudentCard = ({
   const isDroppedOut = Boolean(student.interactionLocked)
     || ['cancelled', 'refunded'].includes(String(student.enrollmentStatus || '').toLowerCase())
     || String(student.status || '') === 'Thôi học';
+  const activeEnrollmentsForSheet = useMemo(() => {
+    const sid = String(student._id || student.id || '');
+    const myTid = String(currentUser?.id || currentUser?._id || '');
+    const isAlive = (row) => (
+      row
+      && !row.interactionLocked
+      && !['cancelled', 'refunded'].includes(String(row.enrollmentStatus || '').toLowerCase())
+      && String(row.status || '') !== 'Thôi học'
+    );
+    const fromMyStudents = (myStudents || []).filter(
+      (row) => String(row._id || row.id || '') === sid && isAlive(row),
+    );
+    if (fromMyStudents.length > 0) return fromMyStudents;
+    const expanded = expandStudentsForTeacher([student], myTid).filter(isAlive);
+    if (expanded.length > 0) return expanded;
+    return isAlive(student) ? [student] : [];
+  }, [student, myStudents, currentUser?.id, currentUser?._id]);
+  const canQuickSchedule = !isDroppedOut || activeEnrollmentsForSheet.length > 0;
   const onCalendarDone = useMemo(() => {
     const sid = String(student._id || student.id || '');
     if (!sid || !Array.isArray(allSchedules) || allSchedules.length === 0) return 0;
-    return countEnrollmentCompleted(allSchedules, sid, student.course);
-  }, [allSchedules, student._id, student.id, student.course]);
+    const enrList = Array.isArray(student.enrollments) && student.enrollments.length
+      ? student.enrollments
+      : (Array.isArray(student.courses) ? student.courses : []);
+    const norm = (v) => String(v || '').trim().toLowerCase();
+    const hasMulti = norm(student.course)
+      && enrList.filter((e) => norm(e?.courseName || e?.name || e?.course) === norm(student.course)).length > 1;
+    return countEnrollmentCompleted(allSchedules, sid, student.course, {
+      enrollmentId: student._enrollmentId,
+      registeredAt: student.registeredAt,
+      hasMultipleSameCourse: Boolean(hasMulti),
+    });
+  }, [allSchedules, student._id, student.id, student.course, student._enrollmentId, student.registeredAt, student.enrollments, student.courses]);
   const priorCredit = Math.max(0, done - onCalendarDone);
   const remainingSessions = Math.max(0, sessionTotal - done);
   const nextSessionNumber = Math.max(0, Number(done) || 0) + 1;
@@ -1036,10 +1065,16 @@ export const StudentCard = ({
                   <img
                     src={resolveAvatarUrl({
                       avatar: student.avatarUrl || student.avatar || student.photo,
+                      name: student.name || getDisplayName(student),
                       role: 'student',
                       gender: student.gender,
                     })}
                     alt={getDisplayName(student)}
+                    onError={(e) => {
+                      if (e.currentTarget.dataset.fallbackApplied) return;
+                      e.currentTarget.dataset.fallbackApplied = '1';
+                      e.currentTarget.src = resolveAvatarUrl({ name: student.name || getDisplayName(student) });
+                    }}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -1162,25 +1197,22 @@ export const StudentCard = ({
               key={key}
               type="button"
               onClick={() => {
-                if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
-                  toast.info('Học viên đã thôi học - không thao tác được.');
-                  if (key === 'schedule') {
-                    // Cho xem nhật ký lịch qua panel logs; không mở xếp lịch mới
+                if (key === 'schedule') {
+                  if (!canQuickSchedule) {
+                    toast.info('Học viên đã thôi học - không xếp lịch mới.');
                     setActivePanel('logs');
+                    return;
                   }
+                  setShowQuickSchedule(true);
+                  return;
+                }
+                if (isDroppedOut && (key === 'quiz' || key === 'assignments' || key === 'link')) {
+                  toast.info('Học viên đã thôi học - không thao tác được.');
                   return;
                 }
                 if (key === 'quiz') {
                   if (isDroppedOut) return;
                   openQuizCreate();
-                  return;
-                }
-                if (key === 'schedule') {
-                  if (isDroppedOut) {
-                    toast.info('Học viên đã thôi học - không xếp lịch mới.');
-                    return;
-                  }
-                  setShowQuickSchedule(true);
                   return;
                 }
                 setActivePanel(key);
@@ -1931,10 +1963,10 @@ export const StudentCard = ({
           </div>
         )}
 
-        {showQuickSchedule && !isDroppedOut && (
+        {showQuickSchedule && canQuickSchedule && (
           <TeacherStudentWeekSlotSheet
-            student={student}
-            enrollments={[student]}
+            student={isDroppedOut && activeEnrollmentsForSheet[0] ? activeEnrollmentsForSheet[0] : student}
+            enrollments={activeEnrollmentsForSheet.length > 0 ? activeEnrollmentsForSheet : [student]}
             teacherId={currentUser?.id || currentUser?._id}
             schedules={allSchedules}
             addSchedule={addSchedule}
@@ -1961,7 +1993,21 @@ export const StudentCard = ({
           <div className="flex flex-col gap-4 min-[440px]:flex-row min-[440px]:items-start min-[440px]:justify-between min-w-0">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shrink-0 bg-white">
-                <img src={resolveAvatarUrl({ avatar: student.avatarUrl || student.avatar || student.photo, role: 'student', gender: student.gender })} alt="" className="w-full h-full object-cover" />
+                <img
+                  src={resolveAvatarUrl({
+                    avatar: student.avatarUrl || student.avatar || student.photo,
+                    name: student.name || getDisplayName(student),
+                    role: 'student',
+                    gender: student.gender,
+                  })}
+                  alt={getDisplayName(student)}
+                  onError={(e) => {
+                    if (e.currentTarget.dataset.fallbackApplied) return;
+                    e.currentTarget.dataset.fallbackApplied = '1';
+                    e.currentTarget.src = resolveAvatarUrl({ name: student.name || getDisplayName(student) });
+                  }}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="min-w-0">
                 <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
@@ -2013,16 +2059,20 @@ export const StudentCard = ({
               key={key}
               type="button"
               onClick={() => {
-                if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
+                if (key === 'schedule') {
+                  if (!canQuickSchedule) {
+                    toast.info('Học viên đã thôi học - không thao tác được.');
+                    return;
+                  }
+                  setShowQuickSchedule(true);
+                  return;
+                }
+                if (isDroppedOut && (key === 'quiz' || key === 'assignments' || key === 'link')) {
                   toast.info('Học viên đã thôi học - không thao tác được.');
                   return;
                 }
                 if (key === 'quiz') {
                   openQuizCreate();
-                  return;
-                }
-                if (key === 'schedule') {
-                  setShowQuickSchedule(true);
                   return;
                 }
                 setActivePanel(key);
@@ -2337,10 +2387,10 @@ export const StudentCard = ({
         </div>
       )}
 
-      {showQuickSchedule && !isDroppedOut && (
+      {showQuickSchedule && canQuickSchedule && (
         <TeacherStudentWeekSlotSheet
-          student={student}
-          enrollments={[student]}
+          student={isDroppedOut && activeEnrollmentsForSheet[0] ? activeEnrollmentsForSheet[0] : student}
+          enrollments={activeEnrollmentsForSheet.length > 0 ? activeEnrollmentsForSheet : [student]}
           teacherId={currentUser?.id || currentUser?._id}
           schedules={allSchedules}
           addSchedule={addSchedule}

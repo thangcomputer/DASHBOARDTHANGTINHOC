@@ -174,7 +174,12 @@ export function useDataSync({
 
     let offDataRefresh = null;
     if (onDataRefresh) {
-      offDataRefresh = onDataRefresh(() => {
+      offDataRefresh = onDataRefresh((payload) => {
+        const type = String(payload?.type || '').toLowerCase();
+        const action = String(payload?.action || '').toLowerCase();
+        if (type === 'schedule' && ['create', 'update', 'cancel', 'cancelled', 'scheduled'].includes(action)) {
+          return;
+        }
         triggerBackgroundSync();
       });
     }

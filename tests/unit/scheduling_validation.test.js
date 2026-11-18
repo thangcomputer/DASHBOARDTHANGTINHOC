@@ -76,3 +76,33 @@ test('resolveEnrollmentForCourse picks matching course (student isolation)', () 
   assert.equal(enr.courseName, 'Excel');
   assert.equal(enr.isPrimary, true);
 });
+
+test('resolveEnrollmentForCourse prefers active over refunded/cancelled with same course name', () => {
+  const student = {
+    course: 'Excel',
+    status: 'Thôi học',
+    enrollments: [
+      { _id: 'enr_old', courseName: 'Excel', status: 'refunded', totalSessions: 12, isPrimary: false },
+      { _id: 'enr_new', courseName: 'Excel', status: 'active', totalSessions: 12, isPrimary: false },
+    ],
+  };
+  const enr = resolveEnrollmentForCourse(student, 'Excel');
+  assert.equal(String(enr._id), 'enr_new');
+  assert.equal(enr.status, 'active');
+
+  const explicitOld = resolveEnrollmentForCourse(student, 'Excel', 'enr_old');
+  assert.equal(String(explicitOld._id), 'enr_old');
+});
+
+test('resolveEnrollmentForCourse without courseName falls back to active enrollment over cancelled primary', () => {
+  const student = {
+    course: '(Đã hủy)',
+    enrollments: [
+      { _id: 'enr_old', courseName: 'Word', status: 'cancelled', totalSessions: 12, isPrimary: true },
+      { _id: 'enr_new', courseName: 'PowerPoint', status: 'active', totalSessions: 12, isPrimary: false },
+    ],
+  };
+  const enr = resolveEnrollmentForCourse(student, '');
+  assert.equal(String(enr._id), 'enr_new');
+  assert.equal(enr.courseName, 'PowerPoint');
+});

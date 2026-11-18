@@ -307,7 +307,8 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     return doc;
   }
 
-  let sessionByCourse = {};
+  let unlinkedByCourse = {};
+  let allByCourse = {};
   let sessionByEnrollment = {};
   if (Schedule && studentId) {
     const sid = mongoose.Types.ObjectId.isValid(studentId)
@@ -323,18 +324,34 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
       },
     ]);
     // Gom theo tên khóa đã chuẩn hóa (trim / hoa thường / bỏ dấu) - tránh lệch
-    // "khóa học test" vs "Khóa học test" làm điểm danh bù không tăng tiến độ.
-    sessionByCourse = {};
+    // "khóa học test" vs "Khóa học test" và không cộng gộp lịch có enrollmentId của khóa cũ đã hoàn phí vào khóa mới.
+    unlinkedByCourse = {};
+    allByCourse = {};
     rows.forEach((r) => {
+      const cnt = Number(r.completed) || 0;
+      const key = normCourseName(r._id?.course);
+      if (key) {
+        allByCourse[key] = (allByCourse[key] || 0) + cnt;
+      }
       const enrollmentId = r._id?.enrollmentId ? String(r._id.enrollmentId) : '';
       if (enrollmentId) {
-        sessionByEnrollment[enrollmentId] = (sessionByEnrollment[enrollmentId] || 0) + (Number(r.completed) || 0);
+        sessionByEnrollment[enrollmentId] = (sessionByEnrollment[enrollmentId] || 0) + cnt;
+        return;
       }
-      const key = normCourseName(r._id?.course);
-      if (!key) return;
-      sessionByCourse[key] = (sessionByCourse[key] || 0) + (Number(r.completed) || 0);
+      if (key) {
+        unlinkedByCourse[key] = (unlinkedByCourse[key] || 0) + cnt;
+      }
     });
   }
+
+  const sameCourseCounts = {};
+  const firstIdxByCourse = {};
+  enrollments.forEach((e, idx) => {
+    const ck = normCourseName(e.courseName || e.course);
+    if (!ck) return;
+    sameCourseCounts[ck] = (sameCourseCounts[ck] || 0) + 1;
+    if (firstIdxByCourse[ck] == null) firstIdxByCourse[ck] = idx;
+  });
 
   for (let i = 0; i < enrollments.length; i++) {
     const e = enrollments[i];
@@ -372,9 +389,16 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     // → Điểm danh vẫn tăng tiến độ; Admin nhập tay "đã học" (migration / bù) không bị tụt về 0 khi chưa có lịch.
     const courseKey = normCourseName(courseName);
     const enrollmentKey = e._id ? String(e._id) : '';
-    const fromSchedule = (enrollmentKey && sessionByEnrollment[enrollmentKey] != null)
-      ? sessionByEnrollment[enrollmentKey]
-      : (courseKey ? sessionByCourse[courseKey] : undefined);
+    let fromSchedule;
+    if (enrollmentKey && sessionByEnrollment[enrollmentKey] != null) {
+      fromSchedule = sessionByEnrollment[enrollmentKey];
+    } else if (!enrollmentKey && courseKey && sameCourseCounts[courseKey] === 1) {
+      fromSchedule = allByCourse[courseKey];
+    } else if (courseKey && firstIdxByCourse[courseKey] === idx) {
+      fromSchedule = unlinkedByCourse[courseKey];
+    } else {
+      fromSchedule = undefined;
+    }
     const fromStored = Number(e.completedSessions) || 0;
     const completed = fromSchedule != null
       ? Math.max(Number(fromSchedule) || 0, fromStored)
@@ -409,19 +433,31 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
   doc.courses = doc.enrollments.map(toClientCourse);
 
   const activeEnrollments = doc.enrollments.filter((e) => e.status !== 'cancelled' && e.status !== 'refunded');
-  const primary = activeEnrollments.find((e) => e.isPrimary) || activeEnrollments[0];
+  const primary = activeEnrollments.find((e) => e.isPrimary && e.status === 'active')
+    || activeEnrollments.find((e) => e.status === 'active')
+    || activeEnrollments.find((e) => e.isPrimary)
+    || activeEnrollments[0];
   if (primary) {
     doc.course = primary.courseName;
     doc.teacherId = primary.teacherId;
-    doc.teacherName = primary.teacherName || doc.teacherName || '';
+    doc.teacherName = primary.teacherName || '';
+    doc.teacherAlert = sanitizeTeacherAlert(primary.teacherAlert)
+      || sanitizeTeacherAlert(activeEnrollments.find((e) => sanitizeTeacherAlert(e.teacherAlert))?.teacherAlert)
+      || '';
     doc.completedSessions = primary.completedSessions;
     doc.remainingSessions = primary.remainingSessions;
     doc.totalSessions = primary.totalSessions;
     doc.grades = primary.grades?.length ? primary.grades : doc.grades;
+    const rootSt = String(doc.status || '').trim().toLowerCase();
+    const isDroppedRoot = ['thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(rootSt);
+    if (activeEnrollments.some((e) => e.status === 'active') && isDroppedRoot) {
+      doc.status = 'Đang học';
+    }
   } else {
     doc.course = '';
     doc.teacherId = null;
     doc.teacherName = '';
+    doc.teacherAlert = '';
     doc.completedSessions = 0;
     doc.remainingSessions = 0;
     doc.totalSessions = 12;
@@ -429,7 +465,7 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
 
   const allNames = [];
   const seenN = new Set();
-  doc.enrollments.filter((e) => e.status !== 'cancelled' && e.status !== 'refunded').forEach((e) => {
+  activeEnrollments.forEach((e) => {
     const n = String(e.teacherName || '').trim();
     if (!n) return;
     const key = n.toLowerCase();
@@ -440,6 +476,8 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
   if (allNames.length) {
     doc.teacherNames = allNames;
     if (!doc.teacherName) doc.teacherName = allNames[0];
+  } else if (!primary) {
+    doc.teacherNames = [];
   }
 
   return doc;
@@ -455,13 +493,25 @@ function studentMatchesTeacher(student, teacherId) {
 function expandStudentsForTeacher(students, teacherId) {
   const tid = String(teacherId);
   const result = [];
+  const statusRank = (s) => {
+    const st = String(s || 'active').toLowerCase();
+    if (st === 'active') return 0;
+    if (st === 'paused' || st === 'pending_payment') return 1;
+    if (st === 'completed') return 2;
+    return 3;
+  };
 
   students.forEach((student) => {
     const enrollments = getEnrollmentsFromStudent(student);
-    // Giữ cả cancelled/refunded để GV vẫn thấy HV thôi học (UI khóa thao tác).
-    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid);
+    // Giữ cả cancelled/refunded để GV vẫn thấy HV thôi học (UI khóa thao tác),
+    // nhưng luôn xếp khóa đang học (active) lên đầu để thao tác mặc định vào khóa active.
+    const mine = enrollments
+      .filter((e) => teacherIdStr(e.teacherId) === tid)
+      .sort((a, b) => statusRank(a.status) - statusRank(b.status));
 
     if (mine.length > 0) {
+      const rawRootSt = String(student.status || '').trim();
+      const rootIsDropped = ['thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(rawRootSt.toLowerCase());
       mine.forEach((enr, idx) => {
         const courseName = enr.courseName || enr.course;
         const completed = enr.completedSessions != null
@@ -469,11 +519,15 @@ function expandStudentsForTeacher(students, teacherId) {
           : Math.max(0, (enr.totalSessions || 12) - (enr.remainingSessions ?? 0));
         const st = String(enr.status || 'active').toLowerCase();
         const locked = st === 'cancelled' || st === 'refunded';
+        const resolvedStatus = locked
+          ? 'Thôi học'
+          : (st === 'completed' ? 'Hoàn thành' : (rootIsDropped || !rawRootSt ? 'Đang học' : rawRootSt));
         result.push({
           ...student,
           id: student.id || student._id,
           _enrollmentKey: `${student._id || student.id}-${enr._id || idx}`,
           _enrollmentId: enr._id ? String(enr._id) : `enr-${idx}`,
+          registeredAt: enr.registeredAt || null,
           course: courseName,
           teacherId: teacherIdStr(enr.teacherId),
           teacherName: enr.teacherName,
@@ -490,13 +544,13 @@ function expandStudentsForTeacher(students, teacherId) {
           price: enr.price ?? student.price,
           enrollmentStatus: st,
           interactionLocked: locked,
-          status: locked ? 'Thôi học' : (student.status || 'Đang học'),
+          status: resolvedStatus,
         });
       });
       return;
     }
 
-    if (teacherIdStr(student.teacherId) === tid) {
+    if (enrollments.length === 0 && teacherIdStr(student.teacherId) === tid) {
       const rootSt = String(student.status || '').toLowerCase();
       const locked = rootSt === 'hủy' || rootSt === 'cancelled' || rootSt === 'refunded'
         || String(student.course || '').includes('Đã hủy');
@@ -535,8 +589,15 @@ function syncStudentFromPrimaryEnrollment(student) {
     student.totalSessions = 12;
     return;
   }
-  const primary = active.find((e) => e.isPrimary) || active[0];
+  const primary = active.find((e) => e.isPrimary && e.status === 'active')
+    || active.find((e) => e.status === 'active')
+    || active.find((e) => e.isPrimary)
+    || active[0];
   if (!primary) return;
+  list.forEach((e) => {
+    if (!e) return;
+    e.isPrimary = e === primary;
+  });
   student.course = primary.courseName;
   student.price = Number(primary.price) || 0;
   student.paid = !!primary.paid;
@@ -546,6 +607,13 @@ function syncStudentFromPrimaryEnrollment(student) {
   student.totalSessions = primary.totalSessions || 12;
   student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
   student.completedSessions = primary.completedSessions || 0;
+  const rootSt = String(student.status || '').trim().toLowerCase();
+  if (
+    primary.status === 'active'
+    && ['thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(rootSt)
+  ) {
+    student.status = 'Đang học';
+  }
 }
 
 /**

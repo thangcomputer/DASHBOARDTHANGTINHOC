@@ -254,20 +254,36 @@ export function isUnpaidTuitionAlertStudent(student) {
 }
 
 export function expandStudentsForTeacher(students, teacherId) {
-  const tid = String(teacherId); const result = [];
+  const tid = String(teacherId);
+  const result = [];
+  const statusRank = (s) => {
+    const st = String(s || 'active').toLowerCase();
+    if (st === 'active') return 0;
+    if (st === 'paused' || st === 'pending_payment') return 1;
+    if (st === 'completed') return 2;
+    return 3;
+  };
   (students || []).filter(Boolean).forEach((student) => {
     const enrollments = getClientEnrollments(student);
-    // Giữ cancelled/refunded → GV vẫn thấy HV thôi học (UI khóa).
-    const mine = enrollments.filter((e) => String(e.teacherId) === tid);
+    // Giữ cancelled/refunded → GV vẫn thấy HV thôi học, nhưng xếp khóa active lên đầu.
+    const mine = enrollments
+      .filter((e) => String(e.teacherId) === tid)
+      .sort((a, b) => statusRank(a.status) - statusRank(b.status));
     if (mine.length > 0) {
+      const rawRootSt = String(student.status || '').trim();
+      const rootIsDropped = ['thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(rawRootSt.toLowerCase());
       mine.forEach((enr, idx) => {
         const st = String(enr?.status || 'active').toLowerCase();
         const locked = st === 'cancelled' || st === 'refunded';
+        const resolvedStatus = locked
+          ? 'Thôi học'
+          : (st === 'completed' ? 'Hoàn thành' : (rootIsDropped || !rawRootSt ? 'Đang học' : rawRootSt));
         result.push({
           ...student,
           id: student.id || student._id,
           _enrollmentKey: `${student._id || student.id}-${enr.enrollmentId || idx}`,
           _enrollmentId: enr.enrollmentId || `enr-${idx}`,
+          registeredAt: enr.registeredAt || null,
           course: enr.courseName,
           teacherId: enr.teacherId,
           teacherName: enr.teacherName,
@@ -285,12 +301,12 @@ export function expandStudentsForTeacher(students, teacherId) {
           price: enr.price ?? student.price,
           enrollmentStatus: st,
           interactionLocked: locked,
-          status: locked ? 'Thôi học' : (student.status || 'Đang học'),
+          status: resolvedStatus,
         });
       });
       return;
     }
-    if (teacherIdStr(student.teacherId) === tid) {
+    if (enrollments.length === 0 && teacherIdStr(student.teacherId) === tid) {
       const rootSt = String(student.status || '').toLowerCase();
       const locked = rootSt === 'hủy' || rootSt === 'cancelled' || rootSt === 'refunded'
         || String(student.course || '').includes('Đã hủy');

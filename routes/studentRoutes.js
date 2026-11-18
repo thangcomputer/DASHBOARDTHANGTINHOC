@@ -1592,7 +1592,14 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
           student.enrollments[0].isPrimary = true;
         }
         if (student.enrollments?.length) {
-          let alertIdx = student.enrollments.findIndex((e) => e.isPrimary);
+          let alertIdx = student.enrollments.findIndex(
+            (e) => e?.isPrimary && e?.status !== 'cancelled' && e?.status !== 'refunded',
+          );
+          if (alertIdx < 0) {
+            alertIdx = student.enrollments.findIndex(
+              (e) => e?.status === 'active' || (e?.status !== 'cancelled' && e?.status !== 'refunded'),
+            );
+          }
           if (alertIdx < 0) alertIdx = 0;
           student.enrollments[alertIdx].teacherAlert = pendingTeacherAlert;
           student.markModified('enrollments');
@@ -2838,13 +2845,18 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
 
-    if (!student.enrollments?.length && student.course) {
+    if (
+      !student.enrollments?.length
+      && student.course
+      && !['(đã hủy)', 'chưa xếp lớp'].includes(String(student.course).trim().toLowerCase())
+    ) {
       student.enrollments = [legacyEnrollmentFromStudent(student)];
       student.enrollments[0].isPrimary = true;
     }
 
     const duplicate = (student.enrollments || []).some((e) => {
-      if (String(e.status || '') === 'cancelled') return false;
+      const st = String(e.status || '').toLowerCase();
+      if (st === 'cancelled' || st === 'refunded') return false;
       if (catalogCourse?._id && e.courseId && String(e.courseId) === String(catalogCourse._id)) return true;
       return (e.courseName || '').toLowerCase() === resolvedName.toLowerCase();
     });
@@ -2867,6 +2879,15 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
       courseId: catalogCourse?._id || courseId,
     });
 
+    const hasActiveExisting = (student.enrollments || []).some(
+      (e) => e && !['cancelled', 'refunded'].includes(String(e.status || '').toLowerCase()),
+    );
+    if (!hasActiveExisting && Array.isArray(student.enrollments)) {
+      student.enrollments.forEach((e) => {
+        if (e) e.isPrimary = false;
+      });
+    }
+
     student.enrollments.push({
       courseName: resolvedName,
       courseId: catalogCourse?._id || courseId || null,
@@ -2882,12 +2903,22 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
       grades: [],
       status: isPaid ? 'active' : 'pending_payment',
       learningAccess: !!isPaid,
-      isPrimary: false,
+      isPrimary: !hasActiveExisting,
       registeredAt: new Date(),
       requireWebcam: false,
       examUnlocked: false,
       teacherAlert: sanitizeTeacherAlert(teacherAlert),
     });
+
+    // Đồng bộ khóa chính/trạng thái HV nếu trước đó các khóa cũ đều đã hủy/hoàn phí
+    syncStudentFromPrimaryEnrollment(student);
+    const rootStatusLower = String(student.status || '').trim().toLowerCase();
+    if (['thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(rootStatusLower)) {
+      student.status = 'Đang học';
+    } else if (rootStatusLower === 'chờ xếp lớp' && teacherId) {
+      student.status = 'Đang học';
+    }
+    student.markModified('enrollments');
 
     // Cộng doanh thu thực nhận khi khóa phụ được đánh dấu đã thanh toán
     if (isPaid && resolvedPrice > 0) {
@@ -2897,6 +2928,13 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
     }
 
     await student.save();
+
+    if (teacherId) {
+      try {
+        const Teacher = require('../models/Teacher');
+        await Teacher.findByIdAndUpdate(teacherId, { $addToSet: { assignedStudents: student._id } });
+      } catch { /* ignore */ }
+    }
 
     if (isPaid && resolvedPrice > 0) {
       const lastEnr = student.enrollments[student.enrollments.length - 1];
@@ -3182,6 +3220,12 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
       if (!fresh.paidAt) fresh.paidAt = paidAt;
       fresh.paymentMethod = paymentMethod;
     }
+    syncStudentFromPrimaryEnrollment(fresh);
+    const freshSt = String(fresh.status || '').trim().toLowerCase();
+    if (['thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(freshSt)) {
+      fresh.status = 'Đang học';
+    }
+    fresh.markModified('enrollments');
     await fresh.save({ validateModifiedOnly: true });
 
     let invoice = null;
@@ -3528,34 +3572,52 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       teacherName = t.name || 'Giảng viên';
     }
 
+    const pickAssignEnrollmentIndex = (list) => {
+      const arr = Array.isArray(list) ? list : [];
+      if (!arr.length) return -1;
+      const alive = (e) => e && e.status !== 'cancelled' && e.status !== 'refunded';
+      const pActive = arr.findIndex((e) => e?.isPrimary && e?.status === 'active');
+      if (pActive >= 0) return pActive;
+      const anyActive = arr.findIndex((e) => e?.status === 'active');
+      if (anyActive >= 0) return anyActive;
+      const pAlive = arr.findIndex((e) => e?.isPrimary && alive(e));
+      if (pAlive >= 0) return pAlive;
+      const anyAlive = arr.findIndex(alive);
+      if (anyAlive >= 0) return anyAlive;
+      const pAny = arr.findIndex((e) => e?.isPrimary);
+      return pAny >= 0 ? pAny : 0;
+    };
+
+    const mongoose = require('mongoose');
+    const hasValidEnrollmentId = enrollmentId
+      && enrollmentId !== 'main'
+      && mongoose.Types.ObjectId.isValid(String(enrollmentId));
+
     // Khớp môn: khóa học HV ↔ chuyên môn GV - lệch môn thì từ chối phân công
     let targetCourse = student.course;
     let targetExamSubjects = [];
-    if (enrollmentId && student.enrollments?.length) {
-      const idxPreview = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
+    let previewEnr = null;
+    if (student.enrollments?.length) {
+      const idxPreview = hasValidEnrollmentId
+        ? student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId))
+        : (enrollmentId && enrollmentId !== 'main'
+          ? resolveEnrollmentIndex(student.enrollments, enrollmentId)
+          : pickAssignEnrollmentIndex(student.enrollments));
       if (idxPreview >= 0) {
-        targetCourse = student.enrollments[idxPreview].courseName || targetCourse;
-        targetExamSubjects = (student.enrollments[idxPreview].examSubjects || [])
+        previewEnr = student.enrollments[idxPreview];
+        targetCourse = previewEnr.courseName || targetCourse;
+        targetExamSubjects = (previewEnr.examSubjects || [])
           .filter((id) => !isExcludedExamSubjectId(id));
       }
-    } else if (student.enrollments?.length) {
-      const primaryIdx = student.enrollments.findIndex((e) => e.isPrimary);
-      const idx = primaryIdx >= 0 ? primaryIdx : 0;
-      targetCourse = student.enrollments[idx]?.courseName || targetCourse;
-      targetExamSubjects = (student.enrollments[idx]?.examSubjects || [])
-        .filter((id) => !isExcludedExamSubjectId(id));
     }
 
     if (
       !isUnassign && teacherDoc && targetCourse
       && (!Array.isArray(targetExamSubjects) || !targetExamSubjects.filter(Boolean).length)
     ) {
-      const enrForCourse = enrollmentId && student.enrollments?.length
-        ? student.enrollments.find((e) => String(e._id) === String(enrollmentId))
-        : (student.enrollments?.find((e) => e.isPrimary) || student.enrollments?.[0]);
       targetExamSubjects = await resolveEnrollmentExamSubjects({
         courseName: targetCourse,
-        courseId: enrForCourse?.courseId,
+        courseId: previewEnr?.courseId,
       }) || [];
     }
 
@@ -3574,11 +3636,6 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       }
     }
 
-    const mongoose = require('mongoose');
-    const hasValidEnrollmentId = enrollmentId
-      && enrollmentId !== 'main'
-      && mongoose.Types.ObjectId.isValid(String(enrollmentId));
-
     if (hasValidEnrollmentId && student.enrollments?.length) {
       const idx = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
       if (idx < 0) {
@@ -3587,57 +3644,87 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       activeEnrollmentIdx = idx;
       activeEnrollmentId = String(student.enrollments[idx]._id);
       const prevEnrTeacher = student.enrollments[idx].teacherId;
-      prevTeacherIdForReassign = prevEnrTeacher ? String(prevEnrTeacher) : null;
+      prevTeacherIdForReassign = prevEnrTeacher ? String(prevEnrTeacher._id || prevEnrTeacher) : null;
       student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
-      student.enrollments[idx].teacherName = teacherName;
+      student.enrollments[idx].teacherName = isUnassign ? '' : teacherName;
       targetCourse = student.enrollments[idx].courseName;
-      const isPrimary = !!student.enrollments[idx].isPrimary || student.enrollments.length === 1;
-      if (isUnassign) {
-        // Bỏ phân công: luôn xóa teacherId cấp HV nếu là khóa chính / khóa duy nhất
-        // hoặc teacherId cấp HV đang trùng GV của khóa này
-        const topTid = student.teacherId?._id || student.teacherId;
-        if (isPrimary || String(topTid || '') === String(prevEnrTeacher || '')) {
-          student.teacherId = null;
-          student.teacherName = '';
-        }
-      } else if (isPrimary) {
-        student.teacherId = teacherId;
-        student.teacherName = teacherName;
-      }
     } else {
-      const primaryIdx = student.enrollments?.findIndex((e) => e.isPrimary);
-      const idx = primaryIdx >= 0 ? primaryIdx : 0;
-      if (student.enrollments?.[idx]) {
+      const idx = pickAssignEnrollmentIndex(student.enrollments);
+      if (idx >= 0 && student.enrollments?.[idx]) {
         activeEnrollmentIdx = idx;
         activeEnrollmentId = String(student.enrollments[idx]._id);
         prevTeacherIdForReassign = student.enrollments[idx].teacherId
-          ? String(student.enrollments[idx].teacherId)
+          ? String(student.enrollments[idx].teacherId._id || student.enrollments[idx].teacherId)
           : (student.teacherId ? String(student.teacherId._id || student.teacherId) : null);
         student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
-        student.enrollments[idx].teacherName = teacherName;
+        student.enrollments[idx].teacherName = isUnassign ? '' : teacherName;
         targetCourse = student.enrollments[idx].courseName;
+      } else {
+        prevTeacherIdForReassign = student.teacherId ? String(student.teacherId._id || student.teacherId) : null;
+        student.teacherId = isUnassign ? null : teacherId;
+        student.teacherName = isUnassign ? '' : teacherName;
       }
-      student.teacherId = isUnassign ? null : teacherId;
-      student.teacherName = isUnassign ? '' : teacherName;
     }
 
-    // Mark enrollments modified for Mongoose subdocument arrays
+    // Luôn đồng bộ khóa chính & trạng thái lên root Student (tránh root giữ teacherId cũ khi HV từng hoàn phí khóa cũ)
     if (student.enrollments?.length) {
+      syncStudentFromPrimaryEnrollment(student);
       student.markModified('enrollments');
     }
 
-    if (student.status === 'Chờ xếp lớp' && !isUnassign) {
+    const rootStLower = String(student.status || '').trim().toLowerCase();
+    if (!isUnassign && ['chờ xếp lớp', 'thôi học', 'hủy', '(đã hủy)', 'đã hoàn phí', 'cancelled', 'refunded'].includes(rootStLower)) {
       student.status = 'Đang học';
     }
 
     await student.save();
     await student.populate('teacherId', 'name phone specialty');
 
+    // Đồng bộ Teacher.assignedStudents cho cả GV mới và GV cũ
+    try {
+      const TeacherModel = require('../models/Teacher');
+      if (!isUnassign && teacherId) {
+        await TeacherModel.findByIdAndUpdate(teacherId, {
+          $addToSet: { assignedStudents: student._id },
+        });
+      }
+      if (prevTeacherIdForReassign && String(prevTeacherIdForReassign) !== String(!isUnassign ? teacherId || '' : '')) {
+        const stillTeaches = (student.enrollments || []).some(
+          (e) => e
+            && e.status !== 'cancelled'
+            && e.status !== 'refunded'
+            && String(e.teacherId?._id || e.teacherId || '') === String(prevTeacherIdForReassign),
+        ) || String(student.teacherId?._id || student.teacherId || '') === String(prevTeacherIdForReassign);
+        if (!stillTeaches) {
+          await TeacherModel.findByIdAndUpdate(prevTeacherIdForReassign, {
+            $pull: { assignedStudents: student._id },
+          });
+        }
+      }
+    } catch (teachSyncErr) {
+      logger.warn('[ASSIGN_TEACHER] assignedStudents sync err: %s', teachSyncErr.message);
+    }
+
     const ScheduleModel = require('../models/Schedule');
+    const schedMatchConditions = [];
+    if (activeEnrollmentId && mongoose.Types.ObjectId.isValid(activeEnrollmentId)) {
+      schedMatchConditions.push({ enrollmentId: new mongoose.Types.ObjectId(activeEnrollmentId) });
+    }
+    if (targetCourse && targetCourse !== '(Đã hủy)') {
+      const courseCond = { course: new RegExp(`^${sanitizeRegex(String(targetCourse).trim())}$`, 'i') };
+      if (activeEnrollmentId && mongoose.Types.ObjectId.isValid(activeEnrollmentId)) {
+        schedMatchConditions.push({
+          ...courseCond,
+          $or: [{ enrollmentId: null }, { enrollmentId: { $exists: false } }],
+        });
+      } else {
+        schedMatchConditions.push(courseCond);
+      }
+    }
     const schedFilter = {
       studentId: student._id,
       status: 'scheduled',
-      ...(targetCourse ? { course: targetCourse } : {}),
+      ...(schedMatchConditions.length ? { $or: schedMatchConditions } : {}),
     };
     let futureSchedulesUpdated = 0;
     if (isUnassign) {
@@ -3645,7 +3732,13 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       futureSchedulesUpdated = r.modifiedCount || 0;
     } else {
       const r = await ScheduleModel.updateMany(schedFilter, {
-        $set: { teacherId, teacherName },
+        $set: {
+          teacherId,
+          teacherName,
+          ...(activeEnrollmentId && mongoose.Types.ObjectId.isValid(activeEnrollmentId)
+            ? { enrollmentId: new mongoose.Types.ObjectId(activeEnrollmentId) }
+            : {}),
+        },
       });
       futureSchedulesUpdated = r.modifiedCount || 0;
     }
@@ -3790,13 +3883,53 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         }
 
 
+        const affectedUserIds = [...new Set([
+          student._id,
+          student.teacherId?._id || student.teacherId,
+          teacherId,
+          prevTeacherIdForReassign,
+        ].filter(Boolean).map(String))];
+
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
+        if (prevTeacherIdForReassign && prevTeacherIdForReassign !== String(teacherId)) {
+          io.to(prevTeacherIdForReassign).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
+          io.to(prevTeacherIdForReassign).emit('student:assigned', {
+            teacherId: teacherId.toString(),
+            previousTeacherId: prevTeacherIdForReassign,
+            studentId: student._id.toString(),
+          });
+        }
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
-        studentRealtime(io, student, 'student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
-        studentDataRefresh(io, student, { type: 'student', id: student._id });
+        studentRealtime(io, student, 'student:assigned', {
+          teacherId: teacherId.toString(),
+          previousTeacherId: prevTeacherIdForReassign || null,
+          studentId: student._id.toString(),
+        });
+        emitDataRefresh(io, { type: 'student', id: String(student._id), action: 'assign-teacher' }, {
+          branchId: student.branchId,
+          userIds: affectedUserIds,
+        });
+        emitDataRefresh(io, { type: 'schedule', action: 'assign-teacher', studentId: String(student._id) }, {
+          branchId: student.branchId,
+          userIds: affectedUserIds,
+        });
       } else if (io && isUnassign) {
+        const affectedUserIds = [...new Set([
+          student._id,
+          prevTeacherIdForReassign,
+        ].filter(Boolean).map(String))];
+        if (prevTeacherIdForReassign) {
+          io.to(prevTeacherIdForReassign).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
+        }
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId: null });
-        studentDataRefresh(io, student, { type: 'student', id: student._id });
+        emitDataRefresh(io, { type: 'student', id: String(student._id), action: 'assign-teacher' }, {
+          branchId: student.branchId,
+          userIds: affectedUserIds,
+        });
+        emitDataRefresh(io, { type: 'schedule', action: 'assign-teacher', studentId: String(student._id) }, {
+          branchId: student.branchId,
+          userIds: affectedUserIds,
+        });
       }
     } catch (notifErr) {
       logger.error('[ASSIGN_TEACHER] Notification error:', notifErr);

@@ -41,7 +41,14 @@ async function fetchSchedules([, role, userId]) {
 function shouldRefreshSchedules(payload) {
   if (!payload || typeof payload !== 'object') return false;
   const type = String(payload.type || '').toLowerCase();
-  if (type === 'schedule' || type === 'schedules') return true;
+  if (type === 'schedule' || type === 'schedules') {
+    const action = String(payload.action || '').toLowerCase();
+    // create/update/cancel/scheduled đã patch trực tiếp qua schedule:new / schedule:updated / schedule:cancelled
+    if (['create', 'update', 'cancel', 'cancelled', 'scheduled'].includes(action)) {
+      return false;
+    }
+    return true;
+  }
   const ev = String(payload.eventName || '');
   return ev.startsWith('schedule:');
 }
@@ -88,7 +95,8 @@ export function ScheduleProvider({ user, children }) {
       let patched = false;
       // Patch tức thì - HV thấy hủy/đổi lịch trước khi refetch xong
       if (eventName === 'schedule:cancelled' && payload) {
-        const sid = String(payload.scheduleId || payload._id || payload.id || '');
+        const raw = payload?.schedule && typeof payload.schedule === 'object' ? payload.schedule : payload;
+        const sid = String(payload.scheduleId || raw?.scheduleId || raw?._id || raw?.id || '');
         if (sid) {
           patched = true;
           setSchedulesLocal((prev) => (prev || []).map((sch) => {
@@ -96,18 +104,19 @@ export function ScheduleProvider({ user, children }) {
             return {
               ...sch,
               status: 'cancelled',
-              note: payload.reason || payload.note || sch.note,
-              ...(payload.date ? { date: payload.date } : {}),
-              ...(payload.startTime ? { startTime: payload.startTime } : {}),
-              ...(payload.endTime ? { endTime: payload.endTime } : {}),
+              note: payload.reason || raw?.reason || payload.note || raw?.note || sch.note,
+              ...(raw?.date ? { date: raw.date } : {}),
+              ...(raw?.startTime ? { startTime: raw.startTime } : {}),
+              ...(raw?.endTime ? { endTime: raw.endTime } : {}),
             };
           }));
         }
       } else if (eventName === 'schedule:updated' && payload && typeof payload === 'object') {
-        const sid = String(payload._id || payload.id || payload.scheduleId || '');
+        const raw = payload?.schedule && typeof payload.schedule === 'object' ? payload.schedule : payload;
+        const sid = String(raw?._id || raw?.id || payload?.scheduleId || '');
         if (sid) {
           patched = true;
-          const mapped = mapSchedule(payload);
+          const mapped = mapSchedule(raw);
           setSchedulesLocal((prev) => {
             let found = false;
             const next = (prev || []).map((sch) => {
@@ -119,7 +128,8 @@ export function ScheduleProvider({ user, children }) {
           });
         }
       } else if (eventName === 'schedule:new' && payload && typeof payload === 'object') {
-        const mapped = mapSchedule(payload);
+        const raw = payload?.schedule && typeof payload.schedule === 'object' ? payload.schedule : payload;
+        const mapped = mapSchedule(raw);
         const sid = String(mapped._id || mapped.id || '');
         if (sid) {
           patched = true;

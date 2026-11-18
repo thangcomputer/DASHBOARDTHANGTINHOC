@@ -30,6 +30,7 @@ import {
 } from '../../utils/weeklySlotGrid';
 
 const LOCKED_STATUSES = new Set(['completed', 'no_show']);
+const OCCUPYING_STATUSES = new Set(['scheduled', 'completed', 'no_show']);
 const CLEAR_REASON = 'Bỏ ca từ bảng tuần lịch';
 /** Số HV hiện mặc định trên bảng tuần; bấm «Xem thêm» để hiện hết. */
 const ROSTER_PAGE_SIZE = 8;
@@ -219,8 +220,11 @@ export default function TeacherWeeklySlotGrid({
       if (!sid) continue;
       if (!byStudent.has(sid)) byStudent.set(sid, []);
       byStudent.get(sid).push(schedule);
+      if (!OCCUPYING_STATUSES.has(String(schedule?.status || 'scheduled'))) continue;
       const dayKey = normalizeScheduleDate(schedule.date);
-      if (dayKey) byStudentDay.set(`${sid}|${dayKey}`, schedule);
+      if (dayKey && !byStudentDay.has(`${sid}|${dayKey}`)) {
+        byStudentDay.set(`${sid}|${dayKey}`, schedule);
+      }
     }
     return { byStudent, byStudentDay };
   }, [schedules]);

@@ -11,22 +11,45 @@ export function parseTimeToMinutes(raw) {
 
 export const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
-function vietnamDateParts(date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: VIETNAM_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  return Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+const VN_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: VIETNAM_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const VN_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: VIETNAM_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+const VN_DATE_DISPLAY_FORMATTER = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: VIETNAM_TIME_ZONE,
+});
+
+const NORMALIZED_DATE_CACHE = new Map();
+
+function formatVietnamYmd(date) {
+  const parts = VN_DATE_FORMATTER.formatToParts(date);
+  let y = '';
+  let m = '';
+  let d = '';
+  for (let i = 0; i < parts.length; i += 1) {
+    const p = parts[i];
+    if (p.type === 'year') y = p.value;
+    else if (p.type === 'month') m = p.value;
+    else if (p.type === 'day') d = p.value;
+  }
+  return y && m && d ? `${y}-${m}-${d}` : '';
 }
 
 /** YYYY-MM-DD theo giờ Việt Nam, không phụ thuộc múi giờ máy người dùng. */
 export function formatLocalDateKey(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.getTime())) return '';
-  const { year, month, day } = vietnamDateParts(d);
-  return `${year}-${month}-${day}`;
+  return formatVietnamYmd(d);
 }
 
 /** Ngày lịch (YYYY-MM-DD local) đã trước hôm nay - không cho xếp/sửa. */
@@ -54,9 +77,16 @@ export function normalizeScheduleDate(raw) {
   const s = String(raw).trim();
   // Chỉ YYYY-MM-DD thuần (không có giờ) - giữ nguyên ngày lịch
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const cached = NORMALIZED_DATE_CACHE.get(s);
+  if (cached !== undefined) return cached;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return formatLocalDateKey(new Date());
-  return formatLocalDateKey(d);
+  const ymd = formatLocalDateKey(d);
+  if (ymd) {
+    if (NORMALIZED_DATE_CACHE.size > 2000) NORMALIZED_DATE_CACHE.clear();
+    NORMALIZED_DATE_CACHE.set(s, ymd);
+  }
+  return ymd;
 }
 
 /** Ngày lịch → dd/MM/yyyy (thông báo / UI). Không đổi empty thành hôm nay. */
@@ -66,7 +96,7 @@ export function formatScheduleDateVi(raw) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
   const d = raw instanceof Date ? raw : new Date(s);
   if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  return VN_DATE_DISPLAY_FORMATTER.format(d);
 }
 
 export function normalizeTimeHHmm(raw, fallback = '19:30') {
@@ -78,12 +108,7 @@ export function normalizeTimeHHmm(raw, fallback = '19:30') {
 
 /** Gio hien tai theo gio Viet Nam (HH:mm, 24h) */
 export function getCurrentTimeHHmm(date = new Date()) {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: VIETNAM_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(date);
+  return VN_TIME_FORMATTER.format(date);
 }
 
 export const SESSION_DURATION_MINS = 90;
@@ -160,12 +185,7 @@ export function isScheduleOngoingNow(schedule, now = new Date()) {
 
   const start = parseTimeToMinutes(schedule.startTime);
   const end = parseTimeToMinutes(schedule.endTime);
-  const currentParts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: VIETNAM_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
+  const currentParts = VN_TIME_FORMATTER.formatToParts(now);
   const current = Number(currentParts.find((part) => part.type === 'hour')?.value || 0) * 60
     + Number(currentParts.find((part) => part.type === 'minute')?.value || 0);
   if (start == null) return false;

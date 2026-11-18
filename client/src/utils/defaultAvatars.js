@@ -4,7 +4,7 @@
  */
 
 export const BLANK_AVATAR_SVG =
-  'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2232%22%20fill%3D%22%23F1F5F9%22%2F%3E%3C%2Fsvg%3E';
+  `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#E2E8F0"/><circle cx="32" cy="24" r="10" fill="#64748B"/><path d="M14 54c0-9.94 8.06-16 18-16s18 6.06 18 16" fill="#64748B"/></svg>')}`;
 
 export const DEFAULT_AVATARS = {
   admin: BLANK_AVATAR_SVG,
@@ -98,15 +98,14 @@ export function getNameInitial(name = '', fallback = '') {
 
 export function buildInitialAvatarDataUrl(name = '') {
   const initial = getNameInitial(name).replace(/[<>&"']/g, '');
-  const svg = initial
-    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#E2E8F0"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#334155" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="700">${initial}</text></svg>`
-    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#F1F5F9"/></svg>`;
+  if (!initial) return BLANK_AVATAR_SVG;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#E2E8F0"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#334155" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="700">${initial}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 /**
  * Resolve avatar hien thi.
- * Chi dung anh upload that; neu chua co anh thi tra ve avatar chu cai dau hoac nen trong.
+ * Chi dung anh upload that; neu chua co anh thi tra ve avatar chu cai dau hoac icon hinh nguoi.
  */
 export function resolveAvatarUrl(userObj = {}) {
   let avatar, name;
@@ -118,7 +117,7 @@ export function resolveAvatarUrl(userObj = {}) {
       ?? userObj.photo
       ?? userObj.photoUrl
       ?? userObj.src;
-    name = userObj.name ?? userObj.fullName ?? userObj.username ?? '';
+    name = userObj.name ?? userObj.displayName ?? userObj.fullName ?? userObj.username ?? '';
   }
 
   const raw = String(avatar || '').trim();

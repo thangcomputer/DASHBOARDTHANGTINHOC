@@ -398,7 +398,16 @@ export default function TeacherOverviewTab({
                   className="w-full text-left bg-[#F7F9FC] rounded-xl p-2.5 sm:p-3 border border-slate-100 flex items-center gap-2.5 sm:gap-3 hover:bg-indigo-50/60 hover:border-indigo-200 transition group cursor-pointer"
                 >
                   <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-slate-200">
-                    <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={resolveAvatarUrl({ avatar: s.avatar, name: s.name, role: 'student', gender: s.gender })}
+                      alt={s.name || ''}
+                      onError={(e) => {
+                        if (e.currentTarget.dataset.fallbackApplied) return;
+                        e.currentTarget.dataset.fallbackApplied = '1';
+                        e.currentTarget.src = resolveAvatarUrl({ name: s.name });
+                      }}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
