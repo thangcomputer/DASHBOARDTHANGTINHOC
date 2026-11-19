@@ -2342,6 +2342,8 @@ export const VI_EN_EXTRA = {
   'Ảnh quá lớn (tối đa 4.5 MB).': 'Image is too large (max 4.5 MB).',
   'Hỗ trợ ảnh (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD hoặc tệp Office.': 'Supports images (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD, or Office files.',
   'Xóa câu hỏi này?': 'Delete this question?',
+  'Chỉnh sửa hồ sơ': 'Edit Profile',
+  'Nhận lương': 'Payout',
   'Bạn có chắc muốn đặt lại ví XP của toàn bộ học viên về mức mới ngay bây giờ không?': "Are you sure you want to reset all students' XP wallets to the new level now?",
   'Bạn có thay đổi chưa lưu. Rời khỏi trang này sẽ mất các thay đổi đó?': 'You have unsaved changes. Leaving this page will discard them?',
   'Bạn có thay đổi chưa lưu. Đổi mục sẽ mất nội dung đang soạn. Tiếp tục?': 'You have unsaved changes. Switching sections will discard your draft. Continue?',

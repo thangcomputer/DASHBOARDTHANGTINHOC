@@ -12,7 +12,7 @@ import { useToast } from '../../utils/useToast';
 import EditableAvatar from '../EditableAvatar';
 import LanguageSwitcher from '../LanguageSwitcher';
 import CmsSelect from '../ui/CmsSelect';
-import { VOICE_REGION_OPTIONS } from '../../constants/voiceRegions';
+import { VOICE_REGION_OPTIONS, voiceRegionLabel } from '../../constants/voiceRegions';
 
 function openChangePassword() {
   window.dispatchEvent(new CustomEvent('open-change-password-modal'));
@@ -147,178 +147,244 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     ? String(currentTeacher.testScore)
     : '0';
 
-  return (
-    <div className="max-w-xl mx-auto space-y-3.5 sm:space-y-4 py-3 px-2 sm:px-4 animate-in fade-in duration-300">
-      {/* ── 1. Thẻ Hero hồ sơ cá nhân giảng viên (Căn giữa chuẩn Mobile App) ── */}
-      <div className="rounded-[24px] sm:rounded-[28px] bg-gradient-to-br from-[#0c6b5b] via-[#0a584b] to-[#073d34] text-white p-6 sm:p-7 shadow-md relative overflow-hidden flex flex-col items-center text-center">
-        {/* Họa tiết trang trí mờ phía sau */}
-        <div className="absolute -right-10 -bottom-10 w-44 h-44 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute -left-10 -top-10 w-36 h-36 rounded-full bg-emerald-400/10 pointer-events-none" />
+  const teacherVoiceLabel = voiceRegionLabel(currentTeacher?.voiceRegion || form.voiceRegion);
+  const teacherBankLabel = [
+    currentTeacher?.bankAccount?.bankName || form.bankName,
+    currentTeacher?.bankAccount?.accountNumber || form.accountNumber
+      ? `•••${String(currentTeacher?.bankAccount?.accountNumber || form.accountNumber).slice(-4)}`
+      : '',
+  ].filter(Boolean).join(' · ');
 
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="relative">
+  return (
+    <div className="w-full max-w-6xl mx-auto space-y-4 sm:space-y-5 py-2 sm:py-4 px-1 sm:px-2 animate-in fade-in duration-300">
+      {/* ── 1. Thẻ Hero hồ sơ cá nhân giảng viên (Responsive Banner Mobile -> Desktop) ── */}
+      <div className="rounded-[24px] sm:rounded-[28px] bg-gradient-to-br from-[#0c6b5b] via-[#0a584b] to-[#073d34] text-white p-5 sm:p-7 lg:px-8 lg:py-7 shadow-md relative overflow-hidden flex flex-col md:flex-row items-center md:justify-between gap-4 sm:gap-6 text-center md:text-left">
+        {/* Họa tiết trang trí mờ phía sau */}
+        <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -left-10 -top-10 w-40 h-40 rounded-full bg-emerald-400/10 pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 sm:gap-5 min-w-0">
+          <div className="relative shrink-0">
             <EditableAvatar
               avatar={currentTeacher?.avatar}
               name={currentTeacher?.name}
               role="teacher"
               gender={currentTeacher?.gender}
               mobileStyle={true}
-              className="w-20 h-20 min-w-[80px] min-h-[80px] rounded-full border-2 border-white/20 bg-white/10 shadow-lg cursor-pointer shrink-0"
+              className="w-20 h-20 lg:w-24 lg:h-24 min-w-[80px] min-h-[80px] rounded-full border-2 border-white/25 bg-white/10 shadow-lg cursor-pointer shrink-0"
             />
           </div>
 
-          <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-emerald-200/90 mt-3.5">
-            Hồ sơ cá nhân
-          </p>
+          <div className="min-w-0">
+            <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-emerald-200/90">
+              Hồ sơ cá nhân
+            </p>
 
-          <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wide mt-1 truncate max-w-full">
-            {currentTeacher?.name || 'GIẢNG VIÊN'}
-          </h2>
+            <h2 className="text-xl sm:text-2xl lg:text-[28px] font-black text-white uppercase tracking-wide mt-1 truncate max-w-full">
+              {currentTeacher?.name || 'GIẢNG VIÊN'}
+            </h2>
 
-          <p className="text-xs sm:text-sm font-medium text-emerald-100/80 mt-1 truncate max-w-full">
-            {[currentTeacher?.branchCode ? `Cơ sở ${currentTeacher.branchCode}` : '', currentTeacher?.phone].filter(Boolean).join(' · ') || 'Thông tin giảng viên'}
-          </p>
+            <p className="text-xs sm:text-sm font-medium text-emerald-100/85 mt-1 truncate max-w-full">
+              {[currentTeacher?.branchCode ? `Cơ sở ${currentTeacher.branchCode}` : '', currentTeacher?.phone].filter(Boolean).join(' · ') || 'Thông tin giảng viên'}
+            </p>
 
-          <div className="mt-3">
-            <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white border border-white/20 shadow-xs">
-              Trạng thái: {teacherStatus}
-            </span>
+            <div className="mt-2.5 flex flex-wrap items-center justify-center md:justify-start gap-2">
+              <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white border border-white/20 shadow-xs">
+                Trạng thái: {teacherStatus}
+              </span>
+              {teacherVoiceLabel ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-400/20 px-3 py-1 text-xs font-bold text-emerald-100 border border-emerald-300/25">
+                  Giọng: {teacherVoiceLabel}
+                </span>
+              ) : null}
+            </div>
           </div>
+        </div>
+
+        <div className="relative z-10 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowEditModal(true)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition cursor-pointer shadow-xs"
+          >
+            <Edit3 size={15} />
+            <span>Chỉnh sửa hồ sơ</span>
+          </button>
         </div>
       </div>
 
-      {/* ── 2. Thông tin cá nhân (1 dòng chuẩn Mobile App) ── */}
-      <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm p-4 sm:p-4.5 flex items-center justify-between gap-3">
-        <h3 className="text-sm sm:text-base font-extrabold text-slate-800">
-          Thông tin cá nhân
-        </h3>
-        <button
-          type="button"
-          onClick={() => setShowEditModal(true)}
-          className="text-xs sm:text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition-colors cursor-pointer"
-        >
-          Chỉnh sửa
-        </button>
-      </div>
+      {/* ── Lưới 2 cột Responsive cho Màn hình Vừa & Rộng ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
+        <div className="lg:col-span-5 space-y-4">
+          {/* ── 2. Thông tin cá nhân ── */}
+          <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm p-4 sm:p-5 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-800">
+                Thông tin cá nhân
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(true)}
+                className="text-xs sm:text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition-colors cursor-pointer"
+              >
+                Chỉnh sửa
+              </button>
+            </div>
+            <div className="space-y-2 border-t border-slate-100 pt-2.5 text-xs sm:text-[13px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+                  <Phone size={13} className="text-emerald-600 shrink-0" /> Zalo
+                </span>
+                <span className="font-bold text-slate-800 truncate">{currentTeacher?.zalo || currentTeacher?.phone || 'Chưa cập nhật'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+                  <Mail size={13} className="text-emerald-600 shrink-0" /> Email
+                </span>
+                <span className="font-bold text-slate-800 truncate">{currentTeacher?.email || 'Chưa cập nhật'}</span>
+              </div>
+              {currentTeacher?.address ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+                    <MapPin size={13} className="text-emerald-600 shrink-0" /> Địa chỉ
+                  </span>
+                  <span className="font-bold text-slate-800 truncate max-w-[60%] text-right">{currentTeacher.address}</span>
+                </div>
+              ) : null}
+              {teacherBankLabel ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+                    <Landmark size={13} className="text-emerald-600 shrink-0" /> Nhận lương
+                  </span>
+                  <span className="font-bold text-slate-800 truncate max-w-[60%] text-right">{teacherBankLabel}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
 
-      {/* ── 3. Thông tin giảng dạy (Chuẩn Mobile App) ── */}
-      <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm p-4 sm:p-4.5 space-y-2.5">
-        <h3 className="text-sm sm:text-base font-extrabold text-slate-800 mb-1">
-          Thông tin giảng dạy
-        </h3>
-        <div className="flex items-center justify-between py-1">
-          <span className="text-xs sm:text-sm text-slate-500 font-medium">Điểm test</span>
-          <span className="text-xs sm:text-sm font-extrabold text-slate-900">{testScoreDisplay}</span>
+          {/* ── 3. Thông tin giảng dạy ── */}
+          <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm p-4 sm:p-5 space-y-3">
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-800">
+              Thông tin giảng dạy
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-slate-50/80 border border-slate-100 p-3.5">
+                <p className="text-xs text-slate-500 font-semibold">Điểm test</p>
+                <p className="mt-1 text-lg sm:text-xl font-black text-slate-900 tabular-nums">{testScoreDisplay}</p>
+              </div>
+              <div className="rounded-2xl bg-emerald-50/80 border border-emerald-100 p-3.5">
+                <p className="text-xs text-slate-500 font-semibold">Lương/buổi</p>
+                <p className="mt-1 text-lg sm:text-xl font-black text-emerald-700 tabular-nums">{formattedSalary}</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="border-b border-slate-100" />
-        <div className="flex items-center justify-between py-1">
-          <span className="text-xs sm:text-sm text-slate-500 font-medium">Lương/buổi</span>
-          <span className="text-xs sm:text-sm font-extrabold text-slate-900">{formattedSalary}</span>
-        </div>
-      </div>
 
-      {/* ── 4. Menu Bảo mật & Tiện ích (Icon tròn xanh chuẩn Mobile App) ── */}
-      <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
-        <button
-          type="button"
-          onClick={openChangePassword}
-          className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
-        >
-          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
-            <Settings size={18} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Thay đổi mật khẩu</p>
-            <p className="text-xs text-slate-400 mt-0.5">Cập nhật mật khẩu đăng nhập</p>
-          </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
-        </button>
-
-        <button
-          type="button"
-          onClick={openPinLockSettings}
-          className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
-        >
-          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
-            <KeyRound size={18} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Khóa mã PIN</p>
-            <p className="text-xs text-slate-400 mt-0.5">Tự khóa màn hình khi không thao tác</p>
-          </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/teacher/center-info')}
-          className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
-        >
-          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
-            <Users size={18} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Liên hệ Trung tâm</p>
-            <p className="text-xs text-slate-400 mt-0.5">Thông tin trung tâm</p>
-          </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
-        </button>
-      </div>
-
-      {/* ── 5. Cài đặt và hỗ trợ (mặc định ẩn, bấm vào mới mở) ── */}
-      <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowSupportSettings((prev) => !prev)}
-          aria-expanded={showSupportSettings}
-          className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50/70 transition-colors cursor-pointer ${showSupportSettings ? 'border-b border-slate-100' : ''}`}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <Settings size={16} className="text-[#059669] shrink-0" />
-            <h4 className="text-sm sm:text-base font-extrabold text-slate-800 truncate">
-              Cài đặt và hỗ trợ
-            </h4>
-          </div>
-          <ChevronDown
-            size={17}
-            className={`text-slate-400 shrink-0 transition-transform duration-200 ${showSupportSettings ? 'rotate-180' : ''}`}
-          />
-        </button>
-        {showSupportSettings && (
-          <div className="p-4 sm:p-4.5 space-y-3">
-            <LanguageSwitcher variant="card" />
+        <div className="lg:col-span-7 space-y-4">
+          {/* ── 4. Menu Bảo mật & Tiện ích ── */}
+          <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
             <button
               type="button"
-              onClick={handleEnableNotification}
-              className="w-full flex items-center gap-3.5 text-left hover:bg-slate-50/70 -mx-1 px-1 py-1 rounded-xl transition-colors cursor-pointer"
+              onClick={openChangePassword}
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
             >
               <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
-                <Bell size={18} />
+                <Settings size={18} />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-800">Bật thông báo trên thiết bị</p>
-                <p className="text-xs text-slate-400 mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+                <p className="text-sm font-bold text-slate-800">Thay đổi mật khẩu</p>
+                <p className="text-xs text-slate-400 mt-0.5">Cập nhật mật khẩu đăng nhập</p>
               </div>
               <ChevronRight size={18} className="text-slate-300 shrink-0" />
             </button>
-            <div className="border-t border-slate-100" />
-            <p className="text-xs text-slate-400 italic">
-              Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* ── 6. Nút Đăng xuất (Duolingo 3D button) ── */}
-      <div className="pt-2 pb-6 flex justify-center">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="cms-profile-logout min-h-[46px] px-8 rounded-2xl border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white text-[#DC2626] font-extrabold text-sm flex items-center justify-center gap-2 hover:bg-[#FEF2F2] active:translate-y-[2px] active:border-b-2 transition-all cursor-pointer shadow-sm !shadow-none"
-        >
-          <LogOut size={17} />
-          <span>Đăng xuất</span>
-        </button>
+            <button
+              type="button"
+              onClick={openPinLockSettings}
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
+            >
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
+                <KeyRound size={18} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-800">Khóa mã PIN</p>
+                <p className="text-xs text-slate-400 mt-0.5">Tự khóa màn hình khi không thao tác</p>
+              </div>
+              <ChevronRight size={18} className="text-slate-300 shrink-0" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/teacher/center-info')}
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-slate-50/70 transition-colors cursor-pointer"
+            >
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
+                <Users size={18} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-800">Liên hệ Trung tâm</p>
+                <p className="text-xs text-slate-400 mt-0.5">Thông tin trung tâm</p>
+              </div>
+              <ChevronRight size={18} className="text-slate-300 shrink-0" />
+            </button>
+          </div>
+
+          {/* ── 5. Cài đặt và hỗ trợ (mặc định ẩn, bấm vào mới mở) ── */}
+          <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowSupportSettings((prev) => !prev)}
+              aria-expanded={showSupportSettings}
+              className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50/70 transition-colors cursor-pointer ${showSupportSettings ? 'border-b border-slate-100' : ''}`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Settings size={16} className="text-[#059669] shrink-0" />
+                <h4 className="text-sm sm:text-base font-extrabold text-slate-800 truncate">
+                  Cài đặt và hỗ trợ
+                </h4>
+              </div>
+              <ChevronDown
+                size={17}
+                className={`text-slate-400 shrink-0 transition-transform duration-200 ${showSupportSettings ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {showSupportSettings && (
+              <div className="p-4 sm:p-5 space-y-3">
+                <LanguageSwitcher variant="card" />
+                <button
+                  type="button"
+                  onClick={handleEnableNotification}
+                  className="w-full flex items-center gap-3.5 text-left hover:bg-slate-50/70 -mx-1 px-1 py-1 rounded-xl transition-colors cursor-pointer"
+                >
+                  <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
+                    <Bell size={18} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800">Bật thông báo trên thiết bị</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+                  </div>
+                  <ChevronRight size={18} className="text-slate-300 shrink-0" />
+                </button>
+                <div className="border-t border-slate-100" />
+                <p className="text-xs text-slate-400 italic">
+                  Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── 6. Nút Đăng xuất (Duolingo 3D button) ── */}
+          <div className="pt-1 pb-6 flex justify-center lg:justify-end">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="cms-profile-logout min-h-[46px] px-8 rounded-2xl border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white text-[#DC2626] font-extrabold text-sm flex items-center justify-center gap-2 hover:bg-[#FEF2F2] active:translate-y-[2px] active:border-b-2 transition-all cursor-pointer shadow-sm !shadow-none"
+            >
+              <LogOut size={17} />
+              <span>Đăng xuất</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── 7. Modal Chỉnh sửa thông tin hồ sơ & Ngân hàng ── */}

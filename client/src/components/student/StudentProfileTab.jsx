@@ -400,35 +400,48 @@ export default function StudentProfileTab({
           : 'Kích hoạt hoặc gia hạn để học tiếp';
 
   return (
-    <div className="max-w-2xl mx-auto space-y-3.5 sm:space-y-4 py-3 px-2 sm:px-4 animate-in fade-in duration-300">
-      {/* ── 1. Thẻ Hero hồ sơ cá nhân (Đồng bộ 100% Mobile App) ── */}
-      <div className="rounded-[20px] border-[1.5px] p-4 sm:p-5 flex items-center gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] border-[#CCFBF1] bg-[#F0FDFA] dark:border-emerald-800/60 dark:bg-emerald-950/35">
-        <div className="relative shrink-0">
-          <EditableAvatar
-            avatar={studentData?.avatar}
-            name={studentData?.name}
-            role="student"
-            gender={profileGender}
-            className="w-[76px] h-[76px] rounded-full border-2 border-white dark:border-emerald-700 shadow-xs cursor-pointer bg-[#CCFBF1] dark:bg-emerald-900/60"
-          />
-          <div className="absolute right-0 bottom-0 w-[25px] h-[25px] rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-xs pointer-events-none bg-[#0FAF9F]">
-            <Camera size={14} className="text-white" />
+    <div className="w-full max-w-6xl mx-auto space-y-4 sm:space-y-5 py-2 sm:py-4 px-1 sm:px-2 animate-in fade-in duration-300">
+      {/* ── 1. Thẻ Hero hồ sơ cá nhân (Đồng bộ 100% Mobile App + Responsive Desktop) ── */}
+      <div className="rounded-[22px] sm:rounded-[24px] border-[1.5px] p-4 sm:p-6 lg:px-7 flex items-center justify-between gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] border-[#CCFBF1] bg-[#F0FDFA] dark:border-emerald-800/60 dark:bg-emerald-950/35">
+        <div className="flex items-center gap-4 sm:gap-5 min-w-0 flex-1">
+          <div className="relative shrink-0">
+            <EditableAvatar
+              avatar={studentData?.avatar}
+              name={studentData?.name}
+              role="student"
+              gender={profileGender}
+              className="w-[76px] h-[76px] lg:w-[88px] lg:h-[88px] rounded-full border-2 border-white dark:border-emerald-700 shadow-xs cursor-pointer bg-[#CCFBF1] dark:bg-emerald-900/60"
+            />
+            <div className="absolute right-0 bottom-0 w-[25px] h-[25px] lg:w-[28px] lg:h-[28px] rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-xs pointer-events-none bg-[#0FAF9F]">
+              <Camera size={14} className="text-white" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
+            <p className="text-[11px] font-black tracking-[0.8px] uppercase text-[#0F766E] dark:text-teal-300">
+              Hồ sơ cá nhân
+            </p>
+            <h2 className="text-[18px] sm:text-[22px] lg:text-[24px] font-black text-[#0F172A] dark:text-slate-50 truncate leading-tight">
+              {studentData?.name || studentData?.phone || 'Học viên'}
+            </h2>
+            <p className="text-[12px] sm:text-[13px] font-medium text-[#64748B] dark:text-slate-300">
+              Chạm vào ảnh để thay đổi ảnh đại diện
+            </p>
           </div>
         </div>
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <p className="text-[11px] font-black tracking-[0.8px] uppercase text-[#0F766E] dark:text-teal-300">
-            Hồ sơ cá nhân
-          </p>
-          <h2 className="text-[18px] sm:text-[20px] font-black text-[#0F172A] dark:text-slate-50 truncate leading-tight">
-            {studentData?.name || studentData?.phone || 'Học viên'}
-          </h2>
-          <p className="text-[12px] sm:text-[13px] font-medium text-[#64748B] dark:text-slate-300">
-            Chạm vào ảnh để thay đổi ảnh đại diện
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowUpdateProfileModal(true)}
+          className="hidden sm:inline-flex items-center gap-1.5 min-h-[38px] px-4 rounded-xl text-[13px] font-bold transition cursor-pointer !shadow-none shrink-0 bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] dark:bg-emerald-900/50 dark:text-emerald-300 dark:hover:bg-emerald-900/80 border border-emerald-200/80 dark:border-emerald-700/60"
+        >
+          <Settings size={15} />
+          <span>Chỉnh sửa hồ sơ</span>
+        </button>
       </div>
 
-      {/* ── 2. Gói học Meet & Lịch sử gia hạn (Ngay dưới Hero theo đúng Mobile App) ── */}
+      {/* ── Lưới 2 cột Responsive cho Màn hình Vừa & Rộng ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
+        <div className="lg:col-span-6 space-y-4">
+          {/* ── 2. Gói học Meet & Lịch sử gia hạn (Ngay dưới Hero theo đúng Mobile App) ── */}
       <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] p-4 sm:p-5">
         <div className="flex items-center gap-2 pb-3 border-b border-[#F1F5F9]">
           <Crown size={18} className="text-[#F59E0B]" />
@@ -769,7 +782,70 @@ export default function StudentProfileTab({
         </div>
       )}
 
-      {/* ── 5. Menu Bảo mật & Tiện ích (Đồng bộ vị trí & giao diện Mobile App) ── */}
+          {/* ── 6. Đơn mua khóa video (chỉ hiển thị khi có đơn, mặc định thu gọn) ── */}
+          {videoOrders.length > 0 && (
+            <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleSection('videoOrders')}
+                aria-expanded={openSections.videoOrders}
+                className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-slate-50/60 transition cursor-pointer !shadow-none ${openSections.videoOrders ? 'border-b border-[#E9EEF2]' : ''}`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Receipt size={16} className="text-violet-600 shrink-0" />
+                  <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Đơn mua khóa video</h3>
+                  <span className="text-[11px] font-extrabold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                    {videoOrders.length}
+                  </span>
+                </div>
+                <ChevronDown size={17} className={`text-[#64748B] shrink-0 transition-transform duration-200 ${openSections.videoOrders ? 'rotate-180' : ''}`} />
+              </button>
+              {openSections.videoOrders && (
+                <div className="p-4 space-y-2">
+                  {videoOrders.map((order) => {
+                    const paid = isOrderPaid(order);
+                    return (
+                      <div key={order._id || order.id || order.orderCode} className="p-3 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between gap-3 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-800 truncate">{order.courseTitle || order.courseName || 'Khóa học video'}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Mã: {order.orderCode || '-'} {order.amount ? `· ${formatVnd(order.amount)}đ` : ''}
+                          </p>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${paid ? 'cms-profile-soft' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                            {paid ? 'Đã thanh toán' : 'Chờ TT'}
+                          </span>
+                          {paid ? (
+                            <button
+                              type="button"
+                              onClick={() => handleContinueVideoLearning(order)}
+                              className="cms-btn cms-btn-primary cms-btn-sm !min-h-7 !px-2.5 !text-[11px]"
+                            >
+                              Vào học
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleResumeVideoPay(order)}
+                              className="cms-btn cms-btn-warning cms-btn-sm !min-h-7 !px-2.5 !text-[11px]"
+                            >
+                              Thanh toán
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="lg:col-span-6 space-y-4">
+          {/* ── 5. Menu Bảo mật & Tiện ích (Đồng bộ vị trí & giao diện Mobile App) ── */}
       <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] px-4 py-1 divide-y divide-[#F1F5F9]">
         <button
           type="button"
@@ -920,67 +996,6 @@ export default function StudentProfileTab({
         })()}
       </div>
 
-      {/* ── 6. Đơn mua khóa video (chỉ hiển thị khi có đơn, mặc định thu gọn) ── */}
-      {videoOrders.length > 0 && (
-        <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
-          <button
-            type="button"
-            onClick={() => toggleSection('videoOrders')}
-            aria-expanded={openSections.videoOrders}
-            className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-slate-50/60 transition cursor-pointer !shadow-none ${openSections.videoOrders ? 'border-b border-[#E9EEF2]' : ''}`}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Receipt size={16} className="text-violet-600 shrink-0" />
-              <h3 className="text-[14px] font-extrabold text-[#0F172A] truncate">Đơn mua khóa video</h3>
-              <span className="text-[11px] font-extrabold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
-                {videoOrders.length}
-              </span>
-            </div>
-            <ChevronDown size={17} className={`text-[#64748B] shrink-0 transition-transform duration-200 ${openSections.videoOrders ? 'rotate-180' : ''}`} />
-          </button>
-          {openSections.videoOrders && (
-            <div className="p-4 space-y-2">
-              {videoOrders.map((order) => {
-                const paid = isOrderPaid(order);
-                return (
-                  <div key={order._id || order.id || order.orderCode} className="p-3 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between gap-3 text-xs">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-800 truncate">{order.courseTitle || order.courseName || 'Khóa học video'}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Mã: {order.orderCode || '-'} {order.amount ? `· ${formatVnd(order.amount)}đ` : ''}
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${paid ? 'cms-profile-soft' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                        {paid ? 'Đã thanh toán' : 'Chờ TT'}
-                      </span>
-                      {paid ? (
-                        <button
-                          type="button"
-                          onClick={() => handleContinueVideoLearning(order)}
-                          className="cms-btn cms-btn-primary cms-btn-sm !min-h-7 !px-2.5 !text-[11px]"
-                        >
-                          Vào học
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleResumeVideoPay(order)}
-                          className="cms-btn cms-btn-warning cms-btn-sm !min-h-7 !px-2.5 !text-[11px]"
-                        >
-                          Thanh toán
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── 7. Cài đặt và hỗ trợ (mặc định thu gọn, bấm vào mới mở) ── */}
       <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
         <button
@@ -1025,7 +1040,7 @@ export default function StudentProfileTab({
       </div>
 
       {/* ── 8. Nút Đăng xuất (Chuẩn 3D) ── */}
-      <div className="pt-2 pb-6 flex justify-center">
+      <div className="pt-1 pb-6 flex justify-center lg:justify-end">
         <button
           type="button"
           onClick={handleLogout}
@@ -1034,6 +1049,8 @@ export default function StudentProfileTab({
           <LogOut size={18} />
           <span>Đăng xuất</span>
         </button>
+      </div>
+        </div>
       </div>
 
       <DigitalCertificateModal

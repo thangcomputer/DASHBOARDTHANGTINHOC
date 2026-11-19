@@ -73,4 +73,11 @@ test('key components provide explicit dark-mode contrast classes and protect cer
 
   const certModal = read('client/src/components/student/DigitalCertificateModal.jsx');
   assert.match(certModal, /id="th-digital-cert-sheet"[\s\S]*data-keep-light="true"/);
+
+  const teacherProfile = read('client/src/components/teacher/TeacherProfileTab.jsx');
+  assert.match(teacherProfile, /max-w-6xl/);
+  assert.match(teacherProfile, /lg:grid-cols-12/);
+
+  assert.match(profileTab, /max-w-6xl/);
+  assert.match(profileTab, /lg:grid-cols-12/);
 });
