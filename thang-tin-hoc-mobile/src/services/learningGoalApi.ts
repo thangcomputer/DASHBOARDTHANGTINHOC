@@ -1,4 +1,8 @@
-﻿import { mobileApiRequest } from './apiClient';
+import { mobileApiRequest } from './apiClient';
+import { coalesceCached, invalidateCache, setCached } from '../utils/requestCache';
+
+const LEARNING_GOAL_CACHE_KEY = 'learning-goal:my';
+const LEARNING_GOAL_TTL_MS = 20 * 1000;
 
 export type LearningGoalPeriod = 'week' | 'month' | 'quarter';
 
@@ -84,8 +88,10 @@ function normalize(data: unknown): LearningGoalData {
 
 /** Dùng chung API với web: /api/lesson-practice/my/learning-goal + study-heartbeat. */
 export async function getLearningGoal() {
-  const payload = await mobileApiRequest<{ data?: unknown }>('/lesson-practice/my/learning-goal');
-  return normalize(payload.data);
+  return coalesceCached(LEARNING_GOAL_CACHE_KEY, LEARNING_GOAL_TTL_MS, async () => {
+    const payload = await mobileApiRequest<{ data?: unknown }>('/lesson-practice/my/learning-goal');
+    return normalize(payload.data);
+  });
 }
 
 export async function saveLearningGoal(period: LearningGoalPeriod, hoursPerDay: number) {
@@ -93,7 +99,9 @@ export async function saveLearningGoal(period: LearningGoalPeriod, hoursPerDay: 
     method: 'PUT',
     body: JSON.stringify({ period, hoursPerDay }),
   });
-  return normalize(payload.data);
+  const next = normalize(payload.data);
+  setCached(LEARNING_GOAL_CACHE_KEY, next, LEARNING_GOAL_TTL_MS);
+  return next;
 }
 
 export type LeaderboardRow = {
@@ -136,5 +144,6 @@ export async function sendStudyHeartbeat() {
     method: 'POST',
     body: '{}',
   });
+  invalidateCache(LEARNING_GOAL_CACHE_KEY);
   return { todayMinutes: Number(payload.data?.todayMinutes) || 0 };
 }

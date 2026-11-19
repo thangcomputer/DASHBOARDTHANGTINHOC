@@ -34,6 +34,7 @@ export const StandardBottomSheet: React.FC<StandardBottomSheetProps> = ({
   scrollable = true,
   children,
 }) => {
+  if (!visible) return null;
   return (
     <Modal
       visible={visible}

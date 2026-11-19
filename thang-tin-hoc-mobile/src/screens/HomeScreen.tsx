@@ -272,7 +272,17 @@ export function HomeScreen() {
       .catch(() => { });
   }, [isTeacher, user]);
 
+  const didInitialStudentFocusRef = useRef(false);
+  const lastStudentReloadAtRef = useRef(Date.now());
   useFocusEffect(useCallback(() => {
+    if (!didInitialStudentFocusRef.current) {
+      didInitialStudentFocusRef.current = true;
+      lastStudentReloadAtRef.current = Date.now();
+      reloadStudentHomeData();
+      return;
+    }
+    if (Date.now() - lastStudentReloadAtRef.current < 10_000) return;
+    lastStudentReloadAtRef.current = Date.now();
     reloadStudentHomeData();
   }, [reloadStudentHomeData]));
 
@@ -372,25 +382,34 @@ export function HomeScreen() {
   const profile = useMockResource(profileLoader);
   const quizzes = useMockResource(quizzesLoader);
   const evaluationActivity = useMockResource(evaluationActivityLoader);
+  const didInitialResourceFocusRef = useRef(false);
+  const lastResourceFocusAtRef = useRef(Date.now());
   useFocusEffect(useCallback(() => {
-    schedules.reload();
-    assignments.reload();
-    students.reload();
-    teacherMetrics.reload();
-    profile.reload();
-    quizzes.reload();
-    evaluationActivity.reload();
+    if (!didInitialResourceFocusRef.current) {
+      didInitialResourceFocusRef.current = true;
+      lastResourceFocusAtRef.current = Date.now();
+      return;
+    }
+    if (Date.now() - lastResourceFocusAtRef.current < 10_000) return;
+    lastResourceFocusAtRef.current = Date.now();
+    schedules.silentReload();
+    assignments.silentReload();
+    students.silentReload();
+    teacherMetrics.silentReload();
+    profile.silentReload();
+    quizzes.silentReload();
+    evaluationActivity.silentReload();
   }, [
-    assignments.reload, evaluationActivity.reload, profile.reload, quizzes.reload, schedules.reload, students.reload, teacherMetrics.reload,
+    assignments.silentReload, evaluationActivity.silentReload, profile.silentReload, quizzes.silentReload, schedules.silentReload, students.silentReload, teacherMetrics.silentReload,
   ]));
   useEffect(() => {
     const subscriptions = [
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_NEW, schedules.reload),
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_UPDATED, schedules.reload),
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_CANCELLED, schedules.reload),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_NEW, schedules.silentReload),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_UPDATED, schedules.silentReload),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_CANCELLED, schedules.silentReload),
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
-  }, [schedules.reload]);
+  }, [schedules.silentReload]);
 
   const studentEnrollments = profile.data?.enrollments || user?.enrollments || [];
   const freeMenu = isFreePortalMenu(user, studentEnrollments);

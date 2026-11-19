@@ -1054,9 +1054,9 @@ export function ConversationScreen() {
   }, []);
   useEffect(() => {
     if (isFreePortal) return undefined;
-    const interval = setInterval(scheduleResource.reload, 30000);
+    const interval = setInterval(scheduleResource.silentReload, 30000);
     return () => clearInterval(interval);
-  }, [scheduleResource.reload, isFreePortal]);
+  }, [scheduleResource.silentReload, isFreePortal]);
   useEffect(() => {
     const scheduleEvents = [
       SOCKET_EVENTS.SCHEDULE_NEW,
@@ -1080,23 +1080,23 @@ export function ConversationScreen() {
         ? idOf(schedule.studentId || event.studentId)
         : idOf(schedule.teacherId || event.teacherId);
       if (peerId && peerId !== String(route.params.participantId || '')) return;
-      scheduleResource.reload();
+      scheduleResource.silentReload();
     }));
     const refreshSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.DATA_REFRESH, (payload: unknown) => {
       if (!payload || typeof payload !== 'object') return;
       const type = String((payload as Record<string, unknown>).type || '').toLowerCase();
-      if (type === 'schedule' || type === 'schedules') scheduleResource.reload();
+      if (type === 'schedule' || type === 'schedules') scheduleResource.silentReload();
     });
     return () => {
       subscriptions.forEach((subscription) => subscription.remove());
       refreshSubscription.remove();
     };
-  }, [route.params.participantId, scheduleResource.reload, user?.role]);
+  }, [route.params.participantId, scheduleResource.silentReload, user?.role]);
   useEffect(() => {
     if (isFreePortal) return undefined;
-    const interval = setInterval(pendingAttendanceResource.reload, 30000);
+    const interval = setInterval(pendingAttendanceResource.silentReload, 30000);
     return () => clearInterval(interval);
-  }, [pendingAttendanceResource.reload, isFreePortal]);
+  }, [pendingAttendanceResource.silentReload, isFreePortal]);
   useEffect(() => {
     if (!user) return undefined;
     const eventNames = [
@@ -1116,8 +1116,8 @@ export function ConversationScreen() {
     }) => {
       if (payload?.studentId && user.role === 'student' && String(payload.studentId) !== user.id) return;
       if (payload?.teacherId && user.role === 'teacher' && String(payload.teacherId) !== user.id) return;
-      scheduleResource.reload();
-      pendingAttendanceResource.reload();
+      scheduleResource.silentReload();
+      pendingAttendanceResource.silentReload();
       if (eventName === SOCKET_EVENTS.ATTENDANCE_AWAITING_CONFIRM) return;
 
       const currentParticipantId = String(route.params.participantId || '');

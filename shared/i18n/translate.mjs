@@ -1392,7 +1392,11 @@ export function translateText(raw, lang = DEFAULT_LANGUAGE) {
   const hasViDiacritic = VI_DIACRITIC_RE.test(core);
   if (!inDict && !hasViDiacritic) {
     const hasPatternMatch = PATTERN_RULES.some(([re]) => re.test(core));
-    if (!hasPatternMatch) return raw;
+    if (!hasPatternMatch) {
+      if (translateMemo.size >= MEMO_LIMIT) translateMemo.clear();
+      translateMemo.set(raw, raw);
+      return raw;
+    }
   }
 
   const outCore = translateCore(core);

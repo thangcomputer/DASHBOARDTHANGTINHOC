@@ -30,6 +30,7 @@ import type {
 } from '../types';
 import { Platform } from 'react-native';
 import { getMobileDeviceAuthFields, rememberMobileDeviceSecret } from '../utils/deviceRegistry';
+import { coalesceCached, invalidateCache } from '../utils/requestCache';
 import {
   clearMobileSession,
   loadMobileSession,
@@ -746,7 +747,7 @@ export const scheduleService = {
       };
       return readMockList([item]);
     }
-    return readRealScheduleList(role);
+    return coalesceCached(`schedule:list:${role}`, 12 * 1000, () => readRealScheduleList(role));
   },
   async pendingAttendanceConfirm(user?: DemoUser | null) {
     if (!user || user.role !== 'student') {
@@ -802,6 +803,7 @@ export const scheduleService = {
     if (response.success !== true || !response.data) {
       throw new Error('Máy chủ không xác nhận lịch học đã được tạo.');
     }
+    invalidateCache('schedule:list');
     return response.data;
   },
   async update(
@@ -827,6 +829,7 @@ export const scheduleService = {
     if (response.success !== true || !response.data) {
       throw new Error('Máy chủ không xác nhận lịch học đã được cập nhật.');
     }
+    invalidateCache('schedule:list');
     return response.data;
   },
   async markAttendance(
@@ -856,6 +859,8 @@ export const scheduleService = {
     if (response.success !== true || !response.data) {
       throw new Error('Máy chủ không xác nhận đã ghi nhận điểm danh.');
     }
+    invalidateCache('schedule:list');
+    invalidateCache('teacher-finance:overview');
     return response.data;
   },
   async cancel(scheduleId: string, reason: string, user?: DemoUser | null) {
@@ -877,6 +882,7 @@ export const scheduleService = {
     if (response.success !== true) {
       throw new Error('Máy chủ không xác nhận lịch học đã được hủy.');
     }
+    invalidateCache('schedule:list');
   },
   async confirmAttendance(
     scheduleId: string,
@@ -899,6 +905,7 @@ export const scheduleService = {
       body: JSON.stringify({ decision }),
     });
     if (!response.data) throw new Error('Máy chủ không xác nhận đã cập nhật điểm danh.');
+    invalidateCache('schedule:list');
     return { disputed: response.disputed === true };
   },
   async saveStudentNote(scheduleId: string, note: string, user?: DemoUser | null) {
@@ -912,6 +919,7 @@ export const scheduleService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studentNote: note }),
     });
+    invalidateCache('schedule:list');
   },
 };
 
@@ -1055,11 +1063,13 @@ export const notificationService = {
       return result.unread;
     }
     if (!user || user.previewMode) return 0;
-    const payload = await mobileApiRequest<{ count?: number }>('/notifications/count');
-    if (typeof payload.count !== 'number' || !Number.isInteger(payload.count) || payload.count < 0) {
-      throw new Error('Phản hồi số lượng thông báo chưa đọc không hợp lệ.');
-    }
-    return payload.count;
+    return coalesceCached(`notifications:unread:${user.id}`, 8 * 1000, async () => {
+      const payload = await mobileApiRequest<{ count?: number }>('/notifications/count');
+      if (typeof payload.count !== 'number' || !Number.isInteger(payload.count) || payload.count < 0) {
+        throw new Error('Phản hồi số lượng thông báo chưa đọc không hợp lệ.');
+      }
+      return payload.count;
+    });
   },
   async markRead(notificationId?: string) {
     if (__DEV__ && qaState) {
@@ -1072,6 +1082,7 @@ export const notificationService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(notificationId ? { notificationId } : { markAll: true }),
     });
+    invalidateCache('notifications:unread');
   },
   async dismiss(notificationId: string) {
     if (__DEV__ && qaState) {
@@ -1079,6 +1090,7 @@ export const notificationService = {
       return;
     }
     await mobileApiRequest(`/notifications/${encodeURIComponent(notificationId)}`, { method: 'DELETE' });
+    invalidateCache('notifications:unread');
   },
 };
 
@@ -1086,7 +1098,10 @@ export const messageService = {
   async conversations(_role: UserRole = 'student', user?: DemoUser | null) {
     if (!user) throw new Error('Không thể tải danh bạ khi chưa đăng nhập.');
     if (isFreePortalWithoutRealCourse(user) && user.freeUnlocked !== true) return [];
-    return getMessageContacts(user);
+    if (user.previewMode || (__DEV__ && qaState)) {
+      return getMessageContacts(user);
+    }
+    return coalesceCached(`messages:conversations:${user.id}:${user.role}`, 8 * 1000, () => getMessageContacts(user));
   },
   async thread(conversationId = 'chat-1', role: UserRole = 'student', user?: DemoUser | null) {
     if (qaState === 'chat-empty') return readMockList([]);
@@ -1100,13 +1115,16 @@ export const messageService = {
   async markRead(conversationId: string, user?: DemoUser | null) {
     if (user && !user.previewMode) {
       await markConversationRead(conversationId);
+      invalidateCache('messages:conversations');
       emitMessageRead(conversationId);
     }
   },
   async send(conversation: Conversation, content: string, user?: DemoUser | null, attachment?: ChatAttachmentUpload, replyTo?: ChatMessage) {
     if (user && !user.previewMode) {
       const uploaded = attachment ? await uploadChatAttachment(attachment) : undefined;
-      return sendChatMessage(conversation, user, content, uploaded, replyTo);
+      const sent = await sendChatMessage(conversation, user, content, uploaded, replyTo);
+      invalidateCache('messages:conversations');
+      return sent;
     }
     throw new Error('Gửi tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
   },
@@ -1116,15 +1134,21 @@ export const messageService = {
   },
   async react(messageId: string, emoji: string, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Thả cảm xúc chỉ khả dụng với tài khoản đã đăng nhập.');
-    return reactToChatMessage(messageId, emoji, user);
+    const reacted = await reactToChatMessage(messageId, emoji, user);
+    invalidateCache('messages:conversations');
+    return reacted;
   },
   async recall(messageId: string, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Thu hồi tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
-    return recallChatMessage(messageId);
+    const recalled = await recallChatMessage(messageId);
+    invalidateCache('messages:conversations');
+    return recalled;
   },
   async deleteForMe(messageId: string, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Xóa tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
-    return deleteChatMessageForMe(messageId);
+    const deleted = await deleteChatMessageForMe(messageId);
+    invalidateCache('messages:conversations');
+    return deleted;
   },
   async togglePin(conversationId: string, messageId: string, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Ghim tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
@@ -1133,25 +1157,30 @@ export const messageService = {
   async setConversationPinned(conversationId: string, pinned: boolean, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Ghim cuộc trò chuyện chỉ khả dụng với tài khoản đã đăng nhập.');
     await setPinnedConversation(conversationId, pinned);
+    invalidateCache('messages:conversations');
   },
   async createGroup(name: string, members: Conversation[], user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Tạo nhóm thật chỉ khả dụng với tài khoản đã đăng nhập.');
     const group = await createMessageGroup(name, members);
+    invalidateCache('messages:conversations');
     joinChatGroup(group.participantId || '');
     return group;
   },
   async addGroupMembers(groupId: string, members: Conversation[], user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Quản lý nhóm chỉ khả dụng với tài khoản đã đăng nhập.');
     await addMessageGroupMembers(groupId, members);
+    invalidateCache('messages:conversations');
   },
   async leaveGroup(groupId: string, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Rời nhóm chỉ khả dụng với tài khoản đã đăng nhập.');
     await leaveMessageGroup(groupId);
+    invalidateCache('messages:conversations');
     leaveSocketChatGroup(groupId);
   },
   async deleteGroup(groupId: string, user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Xóa nhóm chỉ khả dụng với tài khoản đã đăng nhập.');
     await deleteMessageGroup(groupId);
+    invalidateCache('messages:conversations');
   },
 };
 
@@ -1686,6 +1715,10 @@ export const teacherFinanceService = {
         pendingSessions: [],
       };
     }
-    return getTeacherFinanceOverview(user);
+    return coalesceCached(
+      `teacher-finance:overview:${user.id}`,
+      12 * 1000,
+      () => getTeacherFinanceOverview(user),
+    );
   },
 };

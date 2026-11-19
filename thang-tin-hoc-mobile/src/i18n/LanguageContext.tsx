@@ -88,6 +88,8 @@ const LanguageContext = createContext<LanguageContextValue>({
   isEnglish: false,
 });
 
+export const LanguageCodeContext = createContext<AppLanguage | null>(null);
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>(currentLanguage);
 
@@ -160,7 +162,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     [language, setLanguage, toggleLanguage, t, tr]
   );
 
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return (
+    <LanguageCodeContext.Provider value={language}>
+      <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
+    </LanguageCodeContext.Provider>
+  );
 }
 
 export function useLanguage(): LanguageContextValue {

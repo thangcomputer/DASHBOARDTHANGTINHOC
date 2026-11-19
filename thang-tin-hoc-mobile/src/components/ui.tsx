@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   ActivityIndicator,
+  AppState,
   DeviceEventEmitter,
   Easing,
   Image,
@@ -27,7 +28,7 @@ import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-na
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { Assignment, ScheduleItem } from '../types';
-import { getWebLogoUrl } from '../services/webSettingsApi';
+import { getWebLogoUrl, peekCachedWebLogoUrl } from '../services/webSettingsApi';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import type { AppStackParamList } from '../navigation/types';
 import { useAuth } from '../app/AuthContext';
@@ -71,7 +72,17 @@ export function animateChrome(value: Animated.Value, visible: boolean) {
   }).start();
 }
 
+let latestUnreadNotificationCount = 0;
+let lastEmittedChromeVisible: boolean | null = null;
+let lastEmittedChromeAt = 0;
+
 function emitChromeVisibility(visible: boolean) {
+  const now = Date.now();
+  if (lastEmittedChromeVisible === visible && now - lastEmittedChromeAt < 1500) {
+    return;
+  }
+  lastEmittedChromeVisible = visible;
+  lastEmittedChromeAt = now;
   DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, visible);
   DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, visible);
 }
@@ -157,6 +168,8 @@ export function AppScreen({
   const handleScroll = useBrandingHeaderScrollHandler();
 
   useFocusEffect(useCallback(() => {
+    lastEmittedChromeVisible = true;
+    lastEmittedChromeAt = Date.now();
     DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
     DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
   }, []));
@@ -187,7 +200,7 @@ export function AppScreen({
   );
 }
 
-function BrandingTopBar() {
+const BrandingTopBar = React.memo(function BrandingTopBar() {
   const { width: windowWidth } = useWindowDimensions();
   const compactTopBar = windowWidth < 380;
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -200,14 +213,25 @@ function BrandingTopBar() {
     auth?.user?.role === 'student'
     && (auth?.user?.freePortal === true || String(auth?.user?.course || '').toLowerCase().includes('miễn phí'))
     && !hasRealCourseEnrollment(auth?.user);
-  const [logoUrl, setLogoUrl] = useState('');
+  const [logoUrl, setLogoUrl] = useState(() => peekCachedWebLogoUrl());
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(() => latestUnreadNotificationCount);
+  const [appIsActive, setAppIsActive] = useState(() => AppState.currentState === 'active');
   const headerProgress = useRef(new Animated.Value(1)).current;
   const headerVisible = useRef(true);
   const aiBorderSpin = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const appSub = AppState.addEventListener('change', (state) => {
+      setAppIsActive(state === 'active');
+    });
+    return () => appSub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!isFocused || !appIsActive) {
+      return undefined;
+    }
     aiBorderSpin.setValue(0);
     const loop = Animated.loop(
       Animated.timing(aiBorderSpin, {
@@ -219,7 +243,7 @@ function BrandingTopBar() {
     );
     loop.start();
     return () => loop.stop();
-  }, [aiBorderSpin]);
+  }, [aiBorderSpin, appIsActive, isFocused]);
 
   const aiBorderRotate = aiBorderSpin.interpolate({
     inputRange: [0, 1],
@@ -244,7 +268,9 @@ function BrandingTopBar() {
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:notification-count-changed', (count: number) => {
-      setUnreadCount(Number.isInteger(count) ? Math.max(0, count) : 0);
+      const next = Number.isInteger(count) ? Math.max(0, count) : 0;
+      latestUnreadNotificationCount = next;
+      setUnreadCount(next);
     });
     return () => subscription.remove();
   }, []);
@@ -252,10 +278,15 @@ function BrandingTopBar() {
   useFocusEffect(useCallback(() => {
     let active = true;
     DeviceEventEmitter.emit('mobile:notification-count-refresh');
+    if (peekCachedWebLogoUrl()) {
+      const cachedUrl = peekCachedWebLogoUrl();
+      setLogoUrl((prev) => (prev === cachedUrl ? prev : cachedUrl));
+      return () => { active = false; };
+    }
     getWebLogoUrl()
       .then((url) => {
         if (active) {
-          setLogoUrl(url);
+          setLogoUrl((prev) => (prev === url ? prev : url));
           setLogoLoadFailed(false);
         }
       })
@@ -270,6 +301,11 @@ function BrandingTopBar() {
     };
   }, []));
 
+  const TopBarShell = Platform.OS === 'android' ? View : BlurView;
+  const topBarShellProps = Platform.OS === 'android'
+    ? {}
+    : { intensity: 48, tint: 'light' as const };
+
   return (
     <Animated.View
       style={[
@@ -281,11 +317,11 @@ function BrandingTopBar() {
         },
       ]}
     >
-      <BlurView
-        intensity={Platform.OS === 'android' ? 65 : 48}
-        tint="light"
+      <TopBarShell
+        {...topBarShellProps}
         style={[
           styles.brandingTopBar,
+          Platform.OS === 'android' && styles.brandingTopBarAndroid,
           compactTopBar && styles.brandingTopBarCompact,
           isStudent && styles.brandingTopBarStudent,
         ]}
@@ -386,12 +422,12 @@ function BrandingTopBar() {
             </View>
           </Pressable>
         </View>
-      </BlurView>
+      </TopBarShell>
     </Animated.View>
   );
-}
+});
 
-export function AppHeader({
+export const AppHeader = React.memo(function AppHeader({
   title,
   subtitle,
   onBack,
@@ -425,11 +461,20 @@ export function AppHeader({
 
   if (isMainTab) return null;
 
+  const HeaderShell = Platform.OS === 'android' ? View : BlurView;
+  const headerShellProps = Platform.OS === 'android' ? {} : { intensity: 38, tint: 'light' as const };
+
   return (
-    <BlurView
-      intensity={Platform.OS === 'android' ? 55 : 38}
-      tint="light"
-      style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, centered ? styles.headerCentered : null, containerStyle]}
+    <HeaderShell
+      {...headerShellProps}
+      style={[
+        styles.header,
+        Platform.OS === 'android' && styles.headerAndroid,
+        Icon ? styles.headerWithIcon : null,
+        compact ? styles.headerCompact : null,
+        centered ? styles.headerCentered : null,
+        containerStyle,
+      ]}
     >
       {Icon ? <View style={[styles.headerIcon, isBrandStudent && { backgroundColor: '#ECFDF5' }]}><Icon size={19} color={isBrandStudent ? '#059669' : theme.brand} /></View> : null}
       {handleBack ? (
@@ -447,13 +492,13 @@ export function AppHeader({
         {subtitle ? <Text style={[styles.headerSubtitle, compact ? styles.headerSubtitleCompact : null, centered ? styles.headerSubtitleCentered : null]}>{subtitle}</Text> : null}
       </View>
       {right}
-    </BlurView>
+    </HeaderShell>
   );
-}
+});
 
-export function Card({ children, style }: React.PropsWithChildren<{ style?: ViewStyle }>) {
+export const Card = React.memo(function Card({ children, style }: React.PropsWithChildren<{ style?: ViewStyle }>) {
   return <View style={[styles.card, style]}>{children}</View>;
-}
+});
 
 export function SectionHeading({
   title,
@@ -762,6 +807,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
   brandingTopBarContainer: { overflow: 'hidden' },
   brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
+  brandingTopBarAndroid: { backgroundColor: 'rgba(255,255,255,0.94)' },
   brandingTopBarCompact: { paddingHorizontal: spacing.md, gap: 4 },
   brandingTopBarStudent: { paddingHorizontal: 12, gap: 8 },
   topBarSideLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4 },
@@ -795,6 +841,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   fill: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.68)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.86)', borderRadius: 18, shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
+  headerAndroid: { backgroundColor: 'rgba(255,255,255,0.92)' },
   headerCentered: { justifyContent: 'center' },
   headerCompact: { minHeight: 48, gap: spacing.sm, paddingVertical: spacing.xs },
   headerWithIcon: { minHeight: 64, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(255,255,255,0.76)' },

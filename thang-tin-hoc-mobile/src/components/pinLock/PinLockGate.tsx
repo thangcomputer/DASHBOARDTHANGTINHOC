@@ -61,7 +61,9 @@ export function PinLockGate({
   const checkIdle = useCallback(async () => {
     const current = configRef.current;
     if (!current || lockedRef.current) return;
-    const lastActive = Math.max(await readLastActive(userKey), getMemoryActiveAt());
+    const memoryActiveAt = getMemoryActiveAt();
+    if (memoryActiveAt && !isIdleExpired(memoryActiveAt, current.timeoutMinutes)) return;
+    const lastActive = Math.max(await readLastActive(userKey), memoryActiveAt);
     if (isIdleExpired(lastActive, current.timeoutMinutes)) await lock();
   }, [lock, userKey]);
 

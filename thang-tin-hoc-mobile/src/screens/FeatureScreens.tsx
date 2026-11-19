@@ -268,10 +268,15 @@ export function ScheduleScreen() {
     setTimeout(() => screenScrollRef.current?.scrollToEnd({ animated: true }), 120);
     navigation.setParams({ focusScheduleId: undefined });
   }, [isTeacher, navigation, resource.data, resource.loading, route.params?.focusScheduleId]);
+  const didInitialScheduleFocusRef = useRef(false);
   useFocusEffect(useCallback(() => {
     setScheduleNow(Date.now());
-    resource.reload();
-  }, [resource.reload]));
+    if (!didInitialScheduleFocusRef.current) {
+      didInitialScheduleFocusRef.current = true;
+      return;
+    }
+    resource.silentReload();
+  }, [resource.silentReload]));
   useEffect(() => {
     const interval = setInterval(() => setScheduleNow(Date.now()), 15_000);
     return () => clearInterval(interval);
@@ -2296,27 +2301,32 @@ export function AssignmentsScreen({
   }, [embedded, focusAssignmentId, navigation, onAssignmentFocused, resource.data, resource.loading, route.params?.assignmentId]);
   const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
   const studentsResource = useMockResource(studentsLoader);
+  const didInitialAssignmentsFocusRef = useRef(false);
   useFocusEffect(useCallback(() => {
-    resource.reload();
-  }, [resource.reload]));
+    if (!didInitialAssignmentsFocusRef.current) {
+      didInitialAssignmentsFocusRef.current = true;
+      return;
+    }
+    resource.silentReload();
+  }, [resource.silentReload]));
   useEffect(() => {
     const assignmentSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.ASSIGNMENT_CHANGED, () => {
-      resource.reload();
+      resource.silentReload();
     });
     const submissionSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.SUBMISSION_CHANGED, () => {
-      resource.reload();
+      resource.silentReload();
     });
     const refreshSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.DATA_REFRESH, (payload: unknown) => {
       if (!payload || typeof payload !== 'object') return;
       const type = String((payload as Record<string, unknown>).type || '').toLowerCase();
-      if (type === 'assignment' || type === 'submission') resource.reload();
+      if (type === 'assignment' || type === 'submission') resource.silentReload();
     });
     return () => {
       assignmentSubscription.remove();
       submissionSubscription.remove();
       refreshSubscription.remove();
     };
-  }, [resource.reload]);
+  }, [resource.silentReload]);
   const allItems = overrides || resource.data || [];
   const teacherStudents = studentsResource.data || [];
   const courses = useMemo(

@@ -41,6 +41,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const [subscription, setSubscription] = useState<SubscriptionOverview | null>(null);
   const userRef = useRef<DemoUser | null>(null);
   userRef.current = user;
+  const lastSubRefreshAtRef = useRef(0);
+  const lastUserRefreshAtRef = useRef(0);
 
   const refreshSubscription = useMemo(() => async () => {
     const current = userRef.current;
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       return;
     }
     try {
+      lastSubRefreshAtRef.current = Date.now();
       setSubscription(await subscriptionApi.overview());
     } catch {
       // Lỗi mạng: giữ trạng thái cũ.
@@ -60,7 +63,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     if (!user || user.role !== 'student' || user.previewMode) return undefined;
     const expired = DeviceEventEmitter.addListener('mobile:subscription-expired', () => { void refreshSubscription(); });
     const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refreshSubscription();
+      if (state === 'active' && Date.now() - lastSubRefreshAtRef.current >= 15_000) {
+        void refreshSubscription();
+      }
     });
     return () => {
       expired.remove();
@@ -72,6 +77,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     const sessionUser = userRef.current;
     if (!sessionUser || sessionUser.previewMode) return;
     try {
+      lastUserRefreshAtRef.current = Date.now();
       const me = await mobileApiRequest<{
         data?: {
           status?: string;
@@ -143,7 +149,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     if (!current || current.previewMode) return undefined;
     void refreshUser();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refreshUser();
+      if (state === 'active' && Date.now() - lastUserRefreshAtRef.current >= 15_000) {
+        void refreshUser();
+      }
     });
     const applyRealtimeSubscriptionState = (
       unlocked: boolean | undefined,
@@ -222,7 +230,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     registerPush();
     const unsubscribe = subscribeToMobileSoundPreference(registerPush);
     return unsubscribe;
-  }, [user]);
+  }, [user?.id, user?.role, user?.previewMode]);
 
   useEffect(() => {
     let active = true;

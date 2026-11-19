@@ -1,5 +1,6 @@
 import { DeviceEventEmitter, Platform, type ImageSourcePropType } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { clearAllRequestCaches } from '../utils/requestCache';
 
 export type MobileApiTokens = {
   accessToken: string;
@@ -347,6 +348,9 @@ export function getMobileApiTokens() {
 }
 
 export async function saveMobileSession<TUser>(session: MobileStoredSession<TUser>) {
+  if (tokens?.sessionId !== session.tokens.sessionId) {
+    clearAllRequestCaches();
+  }
   if (Platform.OS === 'web') {
     globalThis.localStorage.setItem(sessionStorageKey, JSON.stringify(session));
     tokens = session.tokens;
@@ -375,6 +379,7 @@ export async function loadMobileSession<TUser>() {
 export async function clearMobileSession() {
   tokens = null;
   csrfToken = null;
+  clearAllRequestCaches();
   if (Platform.OS === 'web') {
     globalThis.sessionStorage.removeItem(sessionStorageKey);
     globalThis.localStorage.removeItem(sessionStorageKey);

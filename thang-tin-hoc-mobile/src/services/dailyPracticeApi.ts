@@ -1,6 +1,18 @@
 import { DeviceEventEmitter } from 'react-native';
 import { MobileApiError, mobileApiRequest } from './apiClient';
 import { LEARNING_GOAL_CHANGED_EVENT } from './learningGoalApi';
+import { coalesceCached, invalidateCache, peekCached, setCached } from '../utils/requestCache';
+
+const DP_OVERVIEW_CACHE_KEY = 'daily-practice:overview';
+const DP_PATH_CACHE_KEY = 'daily-practice:path';
+const DP_CACHE_TTL_MS = 15 * 1000;
+
+export type DpOverviewPayload = {
+  topics: DpTopic[];
+  stats: DpStats;
+  spacedRepetition?: DpSpacedRepetitionSummary | null;
+  referral?: DpReferralInfo | null;
+};
 
 export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
 export const QUESTION_STAKE_XP = 5;
@@ -37,6 +49,14 @@ export function emitDailyPracticeStats(payload: unknown) {
     }
   }
   if (Object.keys(stats).length === 0) return;
+  const cachedOverview = peekCached<DpOverviewPayload>(DP_OVERVIEW_CACHE_KEY);
+  if (cachedOverview?.stats) {
+    setCached(
+      DP_OVERVIEW_CACHE_KEY,
+      { ...cachedOverview, stats: { ...cachedOverview.stats, ...(stats as Partial<DpStats>) } },
+      DP_CACHE_TTL_MS,
+    );
+  }
   DeviceEventEmitter.emit(DAILY_PRACTICE_STATS_EVENT, stats);
 }
 
@@ -521,30 +541,38 @@ async function call<T>(path: string, body?: unknown, method: 'POST' | 'PUT' | 'D
 
 /** Luyện tập hằng ngày - cùng API với web. */
 export const dailyPracticeApi = {
-  overview: () => call<{
-    topics: DpTopic[];
-    stats: DpStats;
-    spacedRepetition?: DpSpacedRepetitionSummary | null;
-    referral?: DpReferralInfo | null;
-  }>('/overview').then((data) => {
-    emitDailyPracticeStats(data);
-    return data;
-  }),
+  peekOverview: () => peekCached<DpOverviewPayload>(DP_OVERVIEW_CACHE_KEY),
+  overview: () => coalesceCached(DP_OVERVIEW_CACHE_KEY, DP_CACHE_TTL_MS, () =>
+    call<DpOverviewPayload>('/overview').then((data) => {
+      emitDailyPracticeStats(data);
+      return data;
+    }),
+  ),
   start: (topicId: string, difficulty: DpDifficulty) => call<DpSession>('/sessions', { topicId, difficulty }).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
-  path: () => call<{ topics: DpTopicPath[] }>('/path') as Promise<{ topics: DpTopicPath[]; activeTopicId?: string; canTestOut?: boolean }>,
-  setActivePathTopic: (topicId: string) => call<{ topicId: string }>('/path/active-topic', { topicId }, 'PUT'),
+  path: () => coalesceCached(
+    DP_PATH_CACHE_KEY,
+    DP_CACHE_TTL_MS,
+    () => call<{ topics: DpTopicPath[] }>('/path') as Promise<{ topics: DpTopicPath[]; activeTopicId?: string; canTestOut?: boolean }>,
+  ),
+  setActivePathTopic: (topicId: string) => call<{ topicId: string }>('/path/active-topic', { topicId }, 'PUT').then((data) => {
+    invalidateCache(DP_PATH_CACHE_KEY);
+    return data;
+  }),
   claimUnitChest: (unitId: string) => call<{ xp: number; chestClaimed: boolean; profileXp?: number; already?: boolean }>(
     `/path/units/${encodeURIComponent(unitId)}/chest/claim`,
     {},
   ).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
   unitVideos: (unitId: string) => call<DpUnitVideos>(`/path/units/${encodeURIComponent(unitId)}/videos`),
   videoWatched: (unitId: string, videoId: string) => call<{ watched: boolean }>('/path/videos/watched', { unitId, videoId }).then((data) => {
+    invalidateCache('daily-practice:');
     DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
     return data;
   }),
@@ -555,6 +583,7 @@ export const dailyPracticeApi = {
     `/path/units/${encodeURIComponent(unitId)}/sections/complete`,
     payload,
   ).then((data) => {
+    invalidateCache('daily-practice:');
     if (payload?.sectionKey === 'video' && payload?.completed !== false) {
       DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
     }
@@ -575,6 +604,7 @@ export const dailyPracticeApi = {
     hint?: string;
     needsReview?: boolean;
   }>('/path/videos/check', { unitId, videoId, checkIndex, choiceIndex: optionIndex, optionIndex, ...extra }).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -586,6 +616,7 @@ export const dailyPracticeApi = {
     purchasedXp?: number;
     dailyXp?: number;
   }>('/path/videos/hint', { unitId, videoId, checkIndex, ...(checkId ? { checkId } : {}) }).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -600,6 +631,7 @@ export const dailyPracticeApi = {
     purchasedXp?: number;
     dailyXp?: number;
   }>('/path/videos/skip', { unitId, videoId, checkIndex, ...(checkId ? { checkId } : {}) }).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -607,6 +639,7 @@ export const dailyPracticeApi = {
     '/sessions',
     { mode: 'path', unitId, step, testOut, nodeKey, review: Boolean(opts.review) },
   ).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -619,11 +652,13 @@ export const dailyPracticeApi = {
     return data;
   }),
   finish: (sessionId: string) => call<DpSummary>(`/sessions/${sessionId}/finish`, {}).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
     return data;
   }),
   abandon: (sessionId: string) => call<{ abandoned?: boolean; profileXp?: number; stats?: DpStats }>(`/sessions/${sessionId}/abandon`, {}).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -639,6 +674,7 @@ export const dailyPracticeApi = {
   }) => call<{ answer: string; text?: string }>('/ai-assistant', body),
   placementAdvice: (body: Record<string, unknown>) => call<DpPlacementAdvice>('/placement-advice', body),
   startSpacedReview: () => call<DpSession>('/spaced-review/start', {}).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -649,6 +685,7 @@ export const dailyPracticeApi = {
     profileXp: number;
     referral?: DpReferralInfo | null;
   }>('/referral/redeem', { code }).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),
@@ -662,6 +699,7 @@ export const dailyPracticeApi = {
     return data;
   }),
   simulateXpPaid: (sessionId: string) => call<DpXpPurchaseStatus>(`/xp/purchase/${encodeURIComponent(sessionId)}/simulate-paid`, {}).then((data) => {
+    invalidateCache('daily-practice:');
     emitDailyPracticeStats(data);
     return data;
   }),

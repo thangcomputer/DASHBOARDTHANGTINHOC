@@ -78,6 +78,8 @@ import { notePinActivity, pinUserKey } from '../services/pinLock';
 import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, MOBILE_OPEN_MENU_EVENT, animateChrome } from '../components/ui';
 import type { AppStackParamList, MainTabsParamList } from './types';
 import { navigationRef } from './navigationRef';
+import { BackHandler, Easing } from 'react-native';
+import type { DemoUser } from '../types';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
@@ -151,17 +153,141 @@ type IncomingCallPrompt = {
   callerName: string;
 };
 
+const FreeLockOverlayHost = React.memo(function FreeLockOverlayHost({
+  freeLocked,
+  onUnlocked,
+}: {
+  freeLocked: boolean;
+  onUnlocked: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!freeLocked) setVisible(false);
+  }, [freeLocked]);
+
+  useEffect(() => {
+    const lockSub = DeviceEventEmitter.addListener(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT, () => setVisible(true));
+    return () => lockSub.remove();
+  }, []);
+
+  if (!visible) return null;
+  return (
+    <FreeFeatureLockModal
+      visible
+      onClose={() => setVisible(false)}
+      onUnlocked={onUnlocked}
+    />
+  );
+});
+
+const NotificationOverlayHost = React.memo(function NotificationOverlayHost() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('mobile:open-notifications', () => setVisible(true));
+    return () => subscription.remove();
+  }, []);
+
+  if (!visible) return null;
+  return (
+    <NotificationsScreen
+      overlay
+      onClose={() => setVisible(false)}
+    />
+  );
+});
+
+const QuickAiOverlayHost = React.memo(function QuickAiOverlayHost({
+  user,
+}: {
+  user: DemoUser;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('mobile:open-search', () => setVisible(true));
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setVisible((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  if (!visible) return null;
+  return (
+    <QuickAiPopupModal
+      role={user.role}
+      freeMenu={isFreePortalMenu(user)}
+      onClose={() => setVisible(false)}
+    />
+  );
+});
+
+const MainStackScreens = React.memo(function MainStackScreens({ isStudent }: { isStudent: boolean }) {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
+      <>
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="Assignments" component={isStudent ? StudentResourcesScreen : AssignmentsScreen} />
+        <Stack.Screen name="NotificationCenter" component={NotificationsScreen} />
+        <Stack.Screen name="Conversation" component={ConversationScreen} />
+        <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
+        <Stack.Screen name="Call" component={CallScreen} options={{ gestureEnabled: false }} />
+        <Stack.Screen name="MobileMenu" component={MobileMenuScreen} />
+        <Stack.Screen name="Feed" component={FeedScreen} />
+        <Stack.Screen name="News" component={NewsScreen} />
+        <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+        <Stack.Screen name="CenterInfo" component={CenterInfoScreen} />
+        <Stack.Screen name="SoftwareLinks" component={SoftwareLinksScreen} />
+        {isStudent ? (
+          <>
+            <Stack.Screen name="CourseVideos" component={CourseVideosScreen} />
+            <Stack.Screen name="Materials" component={MaterialsScreen} />
+            <Stack.Screen name="Grades" component={GradesScreen} />
+            <Stack.Screen name="StudentLearning" component={StudentLearningScreen} />
+            <Stack.Screen name="StudentExam" component={StudentExamScreen} />
+            <Stack.Screen name="LearningLesson" component={LearningLessonScreen} />
+            <Stack.Screen name="Evaluations" component={EvaluationsScreen} />
+            <Stack.Screen name="Tuition" component={TuitionScreen} />
+            <Stack.Screen name="CertPrepCatalog" component={CertPrepCatalogScreen} />
+            <Stack.Screen name="CertPrepLevel" component={CertPrepLevelScreen} />
+            <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
+            <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
+            <Stack.Screen name="DailyPractice" component={DailyPracticeScreen} />
+            <Stack.Screen name="Support" component={SupportEntryScreen} />
+          </>
+        ) : null}
+        {!isStudent ? (
+          <>
+            <Stack.Screen name="Students" component={StudentsScreen} />
+            <Stack.Screen name="Attendance" component={AttendanceScreen} />
+            <Stack.Screen name="TeacherQuizzes" component={TeacherQuizzesScreen} />
+            <Stack.Screen name="TeacherTraining" component={TeacherTrainingScreen} />
+            <Stack.Screen name="TeacherFinance" component={TeacherFinanceScreen} />
+          </>
+        ) : null}
+      </>
+    </Stack.Navigator>
+  );
+});
+
 export function RootNavigator() {
   const { user, isRestoringSession, signOut, subscription, refreshUser, refreshSubscription, markPasswordChanged } = useAuth();
   const insets = useSafeAreaInsets();
   const { focusMode } = useMobileFocusMode();
   const practiceSessionActive = useMobilePracticeSessionActive();
-  const [notificationOverlayVisible, setNotificationOverlayVisible] = useState(false);
-  const [freeLockModalVisible, setFreeLockModalVisible] = useState(false);
   const [surveyDismissed, setSurveyDismissed] = useState(false);
   const unreadNotificationCountRef = useRef(0);
   const handledReadNotificationIds = useRef(new Set<string>());
-  const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCallPrompt | null>(null);
   const [pendingPushResponse, setPendingPushResponse] = useState<MobileNotificationResponse | null>(null);
   const handledPushResponses = useRef(new Set<string>());
@@ -185,24 +311,6 @@ export function RootNavigator() {
     }
   }, [stackRouteName, activeTab]);
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined' || !user) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setSearchOverlayVisible((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [user]);
-  useEffect(() => {
-    if (!isFreePortalLocked(user) || hasMeetAccessClient(subscription?.subscription)) {
-      setFreeLockModalVisible(false);
-    }
-  }, [user, subscription?.subscription]);
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('mobile:open-notifications', () => setNotificationOverlayVisible(true));
-    const lockSub = DeviceEventEmitter.addListener(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT, () => setFreeLockModalVisible(true));
     const revokedSub = DeviceEventEmitter.addListener(
       SOCKET_EVENTS.SCHEDULE_REMINDER_REVOKED,
       (payload: { scheduleId?: string } | undefined) => {
@@ -221,8 +329,6 @@ export function RootNavigator() {
       },
     );
     return () => {
-      subscription.remove();
-      lockSub.remove();
       revokedSub.remove();
       readSyncSub.remove();
     };
@@ -378,10 +484,13 @@ export function RootNavigator() {
         }
       }
     };
-    const scheduleRefresh = () => {
+    let lastNotificationFetchAt = 0;
+    const scheduleRefresh = (force = false) => {
+      if (!force && Date.now() - lastNotificationFetchAt < 8000) return;
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
         refreshTimer = null;
+        lastNotificationFetchAt = Date.now();
         void refreshCount();
       }, 120);
     };
@@ -390,35 +499,31 @@ export function RootNavigator() {
       handledReadNotificationIds.current.add(event.id);
       unreadNotificationCountRef.current = Math.max(0, unreadNotificationCountRef.current - 1);
       DeviceEventEmitter.emit('mobile:notification-count-changed', unreadNotificationCountRef.current);
-      scheduleRefresh();
+      scheduleRefresh(true);
     };
     const clearUnreadCount = () => {
       unreadNotificationCountRef.current = 0;
       DeviceEventEmitter.emit('mobile:notification-count-changed', 0);
-      scheduleRefresh();
+      scheduleRefresh(true);
     };
     const subscriptions = [
-      DeviceEventEmitter.addListener('mobile:notification-count-refresh', scheduleRefresh),
+      DeviceEventEmitter.addListener('mobile:notification-count-refresh', () => scheduleRefresh(false)),
       DeviceEventEmitter.addListener('mobile:notification-read', decrementForNotification),
       DeviceEventEmitter.addListener('mobile:notifications-mark-all-read', clearUnreadCount),
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.NOTIFICATION, scheduleRefresh),
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.CONNECTED, scheduleRefresh),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.NOTIFICATION, () => scheduleRefresh(true)),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.CONNECTED, () => scheduleRefresh(true)),
       AppState.addEventListener('change', (state) => {
-        if (state === 'active') scheduleRefresh();
+        if (state === 'active') scheduleRefresh(false);
       }),
     ];
     publishCount(0);
-    scheduleRefresh();
+    scheduleRefresh(true);
     return () => {
       active = false;
       if (refreshTimer) clearTimeout(refreshTimer);
       subscriptions.forEach((subscription) => subscription.remove());
     };
   }, [isRestoringSession, user?.id, user?.role, user?.previewMode]);
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('mobile:open-search', () => setSearchOverlayVisible(true));
-    return () => subscription.remove();
-  }, []);
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:exam-room-active', setExamRoomActive);
     return () => subscription.remove();
@@ -551,6 +656,15 @@ export function RootNavigator() {
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
   }, []);
+  const handleSignOut = useCallback(() => {
+    void signOut().catch((error: unknown) => {
+      Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
+    });
+  }, [signOut]);
+  const handleUnlocked = useCallback(() => {
+    void refreshUser();
+    void refreshSubscription();
+  }, [refreshSubscription, refreshUser]);
   if (isRestoringSession) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }}>
@@ -570,22 +684,14 @@ export function RootNavigator() {
         visible={Boolean(user.mustChangePassword)}
         userName={user.name}
         onCompleted={markPasswordChanged}
-        onSignOut={() => {
-          void signOut().catch((error: unknown) => {
-            Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
-          });
-        }}
+        onSignOut={handleSignOut}
       />
       {!user.mustChangePassword ? (
         <>
           <PinLockGate
             userKey={pinUserKey(user)}
             userName={user.name}
-            onSignOut={() => {
-              void signOut().catch((error: unknown) => {
-                Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
-              });
-            }}
+            onSignOut={handleSignOut}
           />
           <TeacherPaymentNoticeModal
             user={user}
@@ -594,13 +700,9 @@ export function RootNavigator() {
             }}
           />
           <LearningGoalHost user={user} />
-          <FreeFeatureLockModal
-            visible={freeLockModalVisible}
-            onClose={() => setFreeLockModalVisible(false)}
-            onUnlocked={() => {
-              void refreshUser();
-              void refreshSubscription();
-            }}
+          <FreeLockOverlayHost
+            freeLocked={isFreePortalLocked(user) && !hasMeetAccessClient(subscription?.subscription)}
+            onUnlocked={handleUnlocked}
           />
           <FreeSurveyModal
             visible={Boolean(user.role === 'student' && user.needsFreeSurvey && !surveyDismissed)}
@@ -611,57 +713,9 @@ export function RootNavigator() {
           />
         </>
       ) : null}
-      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
-        <>
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="Assignments" component={user.role === 'student' ? StudentResourcesScreen : AssignmentsScreen} />
-          <Stack.Screen name="NotificationCenter" component={NotificationsScreen} />
-          <Stack.Screen name="Conversation" component={ConversationScreen} />
-          <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
-          <Stack.Screen name="Call" component={CallScreen} options={{ gestureEnabled: false }} />
-          <Stack.Screen name="MobileMenu" component={MobileMenuScreen} />
-          <Stack.Screen name="Feed" component={FeedScreen} />
-          <Stack.Screen name="News" component={NewsScreen} />
-          <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
-          <Stack.Screen name="CenterInfo" component={CenterInfoScreen} />
-          <Stack.Screen name="SoftwareLinks" component={SoftwareLinksScreen} />
-          {user.role === 'student' ? (
-            <>
-              <Stack.Screen name="CourseVideos" component={CourseVideosScreen} />
-              <Stack.Screen name="Materials" component={MaterialsScreen} />
-              <Stack.Screen name="Grades" component={GradesScreen} />
-              <Stack.Screen name="StudentLearning" component={StudentLearningScreen} />
-              <Stack.Screen name="StudentExam" component={StudentExamScreen} />
-              <Stack.Screen name="LearningLesson" component={LearningLessonScreen} />
-              <Stack.Screen name="Evaluations" component={EvaluationsScreen} />
-              <Stack.Screen name="Tuition" component={TuitionScreen} />
-              <Stack.Screen name="CertPrepCatalog" component={CertPrepCatalogScreen} />
-              <Stack.Screen name="CertPrepLevel" component={CertPrepLevelScreen} />
-              <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
-              <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
-              <Stack.Screen name="DailyPractice" component={DailyPracticeScreen} />
-              <Stack.Screen name="Support" component={SupportEntryScreen} />
-            </>
-          ) : null}
-          {user.role === 'teacher' ? (
-            <>
-              <Stack.Screen name="Students" component={StudentsScreen} />
-              <Stack.Screen name="Attendance" component={AttendanceScreen} />
-              <Stack.Screen name="TeacherQuizzes" component={TeacherQuizzesScreen} />
-              <Stack.Screen name="TeacherTraining" component={TeacherTrainingScreen} />
-              <Stack.Screen name="TeacherFinance" component={TeacherFinanceScreen} />
-            </>
-          ) : null}
-        </>
-      </Stack.Navigator>
+      <MainStackScreens isStudent={user.role === 'student'} />
       {!examRoomActive && !practiceSessionActive ? (
-        <FloatingNavigationMenu
-          onSignOut={() => {
-            void signOut().catch((error: unknown) => {
-              Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
-            });
-          }}
-        />
+        <FloatingNavigationMenu onSignOut={handleSignOut} />
       ) : null}
       {!examRoomActive
         && !practiceSessionActive
@@ -700,19 +754,8 @@ export function RootNavigator() {
           <Text style={styles.focusExitText}>Thoát tập trung</Text>
         </Pressable>
       ) : null}
-      {notificationOverlayVisible ? (
-        <NotificationsScreen
-          overlay
-          onClose={() => setNotificationOverlayVisible(false)}
-        />
-      ) : null}
-      {searchOverlayVisible ? (
-        <QuickAiPopupModal
-          role={user.role}
-          freeMenu={isFreePortalMenu(user)}
-          onClose={() => setSearchOverlayVisible(false)}
-        />
-      ) : null}
+      <NotificationOverlayHost />
+      <QuickAiOverlayHost user={user} />
       <MobilePopupBanner role={user?.role || 'student'} />
       <Modal
         visible={Boolean(incomingCall)}
@@ -884,7 +927,22 @@ function getStudentFiveTabItems(freeMenu: boolean): StudentBarTabItem[] {
   ];
 }
 
-function StudentFiveTabBar({
+const TabBarGlassBackdrop = React.memo(function TabBarGlassBackdrop() {
+  if (Platform.OS === 'android') {
+    return (
+      <View style={styles.navigationGlassBackground}>
+        <View style={[styles.navigationGlassTint, styles.navigationGlassTintAndroid]} />
+      </View>
+    );
+  }
+  return (
+    <BlurView intensity={60} tint="light" style={styles.navigationGlassBackground}>
+      <View style={styles.navigationGlassTint} />
+    </BlurView>
+  );
+});
+
+const StudentFiveTabBar = React.memo(function StudentFiveTabBar({
   activeTab,
   unreadConversationCount,
   todayScheduleCount,
@@ -912,7 +970,7 @@ function StudentFiveTabBar({
     return unsubscribe;
   }, [setVisible]);
 
-  const items = getStudentFiveTabItems(freeMenu);
+  const items = useMemo(() => getStudentFiveTabItems(freeMenu), [freeMenu]);
   const barHeight = 96 + insets.bottom;
 
   return (
@@ -934,13 +992,7 @@ function StudentFiveTabBar({
         },
       ]}
     >
-      <BlurView
-        intensity={Platform.OS === 'android' ? 75 : 60}
-        tint="light"
-        style={styles.navigationGlassBackground}
-      >
-        <View style={styles.navigationGlassTint} />
-      </BlurView>
+      <TabBarGlassBackdrop />
       {items.map(({ name, label, shortLabel, icon: Icon, matchTabs }) => {
         const selected = matchTabs.includes(activeTab);
         const locked = freeLocked && FREE_LOCKED_DESTINATIONS.has(name);
@@ -978,9 +1030,9 @@ function StudentFiveTabBar({
       })}
     </Animated.View>
   );
-}
+});
 
-function PersistentTabBar({
+const PersistentTabBar = React.memo(function PersistentTabBar({
   role,
   activeTab,
   unreadConversationCount,
@@ -1009,6 +1061,10 @@ function PersistentTabBar({
     return unsubscribe;
   }, [setVisible]);
 
+  const selectStudentTab = useCallback((name: keyof MainTabsParamList) => {
+    navigationRef.navigate('MainTabs', { screen: name });
+  }, []);
+
   if (!isTeacher) {
     return (
       <StudentFiveTabBar
@@ -1018,7 +1074,7 @@ function PersistentTabBar({
         freeMenu={freeMenu}
         freeLocked={freeLocked}
         isBrandStudent={isBrandStudent}
-        onSelect={(name) => navigationRef.navigate('MainTabs', { screen: name })}
+        onSelect={selectStudentTab}
       />
     );
   }
@@ -1052,13 +1108,7 @@ function PersistentTabBar({
         },
       ]}
     >
-      <BlurView
-        intensity={Platform.OS === 'android' ? 75 : 60}
-        tint="light"
-        style={styles.navigationGlassBackground}
-      >
-        <View style={styles.navigationGlassTint} />
-      </BlurView>
+      <TabBarGlassBackdrop />
       {orderedItems.map(({ name, label, shortLabel, icon: Icon }) => {
         const selected = name === activeTab;
         const locked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(name));
@@ -1095,7 +1145,7 @@ function PersistentTabBar({
       })}
     </Animated.View>
   );
-}
+});
 
 type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVideos' | 'Feed'
   | 'Profile' | 'Assignments' | 'Materials' | 'StudentExam'
@@ -1105,12 +1155,56 @@ type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVi
 type MenuEntry = { label: string; destination: MenuDestination; icon: LucideIcon };
 type MenuSection = { label: string; items: MenuEntry[] };
 
-function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
+const DrawerMenuRow = React.memo(function DrawerMenuRow({
+  label,
+  destination,
+  icon: Icon,
+  selected,
+  itemLocked,
+  isBrandStudent,
+  onSelect,
+}: {
+  label: string;
+  destination: MenuDestination;
+  icon: LucideIcon;
+  selected: boolean;
+  itemLocked: boolean;
+  isBrandStudent: boolean;
+  onSelect: (destination: MenuDestination) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onSelect(destination)}
+      style={({ pressed }) => [
+        styles.drawerItem,
+        selected && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive),
+        pressed && styles.drawerItemPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+    >
+      <View style={[styles.drawerItemIcon, selected && (isBrandStudent ? styles.drawerItemIconActiveBrand : styles.drawerItemIconActive)]}>
+        <Icon size={18} color={selected ? '#FFFFFF' : '#A8B6CC'} strokeWidth={2} />
+      </View>
+      <Text style={[styles.drawerItemText, selected && styles.drawerItemTextActive]}>{label}</Text>
+      {itemLocked ? <Lock size={14} color="#FBBF24" /> : selected ? (
+        <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
+      ) : null}
+    </Pressable>
+  );
+});
+
+const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   const { user, subscription } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const [hasRenderedDrawer, setHasRenderedDrawer] = useState(false);
   const [menuMounted, setMenuMounted] = useState(false);
-  const drawerTranslateX = useRef(new Animated.Value(0)).current;
+  const menuMountedRef = useRef(false);
+  menuMountedRef.current = menuMounted;
+  const drawerWidth = Math.min(windowWidth * 0.82, 280);
+  const drawerTranslateX = useRef(new Animated.Value(-drawerWidth)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
@@ -1123,107 +1217,150 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   });
   const [activeDestination, setActiveDestination] = useState<MenuDestination | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const drawerWidth = Math.min(windowWidth * 0.82, 280);
-  const menuSections: MenuSection[] = isTeacher
-    ? [
-      {
-        label: 'KHÔNG GIAN LÀM VIỆC',
-        items: [
-          { label: 'Tổng quan', destination: 'Home', icon: LayoutDashboard },
-          { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-          { label: 'Quản lý học viên', destination: 'Students', icon: Users },
-          { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
-        ],
-      },
-      {
-        label: 'QUẢN LÝ ĐÀO TẠO',
-        items: [
-          { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
-          { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
-          { label: 'Tài chính', destination: 'TeacherFinance', icon: DollarSign },
-        ],
-      },
-      {
-        label: 'THÔNG TIN',
-        items: [
-          { label: 'Bảng tin', destination: 'Feed', icon: Radio },
-          { label: 'Tin tức', destination: 'News', icon: Newspaper },
-          { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
-          { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText }
-        ],
-      },
-    ]
-    : [
-      {
-        label: 'KHÔNG GIAN HỌC TẬP',
-        items: [
-          { label: 'Tổng quan', destination: 'Home', icon: House },
-          { label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 },
-          ...(!freeMenu ? [{ label: 'Bài giảng', destination: 'CourseVideos' as const, icon: BookOpen }] : []),
-          { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-          ...(!freeMenu ? [{ label: 'Lịch học', destination: 'Schedule' as const, icon: CalendarDays }] : []),
-          { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
-          { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
-        ],
-      },
-      {
-        label: 'THÔNG TIN & HỖ TRỢ',
-        items: [
-          { label: 'Bảng tin', destination: 'Feed' as const, icon: Radio },
-          ...(!freeMenu ? [
-            { label: 'Tin tức', destination: 'News' as const, icon: Newspaper },
-            { label: 'Đánh giá giảng viên', destination: 'Evaluations' as const, icon: Star },
-            { label: 'Liên hệ Trung tâm', destination: 'CenterInfo' as const, icon: Building2 },
-          ] : []),
-          { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
-        ],
-      },
-    ];
-  const menuItems = menuSections.flatMap((section) => section.items);
-  const openMenu = () => {
+
+  const menuSections = useMemo<MenuSection[]>(() => (
+    isTeacher
+      ? [
+        {
+          label: 'KHÔNG GIAN LÀM VIỆC',
+          items: [
+            { label: 'Tổng quan', destination: 'Home', icon: LayoutDashboard },
+            { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+            { label: 'Quản lý học viên', destination: 'Students', icon: Users },
+            { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
+          ],
+        },
+        {
+          label: 'QUẢN LÝ ĐÀO TẠO',
+          items: [
+            { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
+            { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
+            { label: 'Tài chính', destination: 'TeacherFinance', icon: DollarSign },
+          ],
+        },
+        {
+          label: 'THÔNG TIN',
+          items: [
+            { label: 'Bảng tin', destination: 'Feed', icon: Radio },
+            { label: 'Tin tức', destination: 'News', icon: Newspaper },
+            { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
+            { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
+          ],
+        },
+      ]
+      : [
+        {
+          label: 'KHÔNG GIAN HỌC TẬP',
+          items: [
+            { label: 'Tổng quan', destination: 'Home', icon: House },
+            { label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 },
+            ...(!freeMenu ? [{ label: 'Bài giảng', destination: 'CourseVideos' as const, icon: BookOpen }] : []),
+            { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+            ...(!freeMenu ? [{ label: 'Lịch học', destination: 'Schedule' as const, icon: CalendarDays }] : []),
+            { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
+            { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
+          ],
+        },
+        {
+          label: 'THÔNG TIN & HỖ TRỢ',
+          items: [
+            { label: 'Bảng tin', destination: 'Feed' as const, icon: Radio },
+            ...(!freeMenu ? [
+              { label: 'Tin tức', destination: 'News' as const, icon: Newspaper },
+              { label: 'Đánh giá giảng viên', destination: 'Evaluations' as const, icon: Star },
+              { label: 'Liên hệ Trung tâm', destination: 'CenterInfo' as const, icon: Building2 },
+            ] : []),
+            { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
+          ],
+        },
+      ]
+  ), [freeMenu, isTeacher]);
+
+  const menuItems = useMemo(() => menuSections.flatMap((section) => section.items), [menuSections]);
+
+  // Làm nóng cấu trúc drawer ngầm sau khi app khởi động ổn định để bấm Menu phản hồi ngay lập tức.
+  useEffect(() => {
+    if (hasRenderedDrawer) return undefined;
+    const warmTimer = setTimeout(() => setHasRenderedDrawer(true), 450);
+    return () => clearTimeout(warmTimer);
+  }, [hasRenderedDrawer]);
+
+  const animateDrawerOpen = useCallback(() => {
     drawerTranslateX.stopAnimation();
     backdropOpacity.stopAnimation();
     drawerTranslateX.setValue(-drawerWidth);
     backdropOpacity.setValue(0);
+    Animated.parallel([
+      Animated.timing(drawerTranslateX, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  }, [backdropOpacity, drawerTranslateX, drawerWidth]);
+
+  const openMenu = useCallback(() => {
+    if (!hasRenderedDrawer) {
+      setHasRenderedDrawer(true);
+      setMenuMounted(true);
+      requestAnimationFrame(animateDrawerOpen);
+      return;
+    }
     setMenuMounted(true);
-    requestAnimationFrame(() => {
-      Animated.parallel([
-        Animated.timing(drawerTranslateX, {
-          toValue: 0,
-          duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]).start();
-    });
-  };
+    animateDrawerOpen();
+  }, [animateDrawerOpen, hasRenderedDrawer]);
+
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(MOBILE_OPEN_MENU_EVENT, openMenu);
     return () => subscription.remove();
   }, [openMenu]);
-  const closeMenu = () => {
-    if (!menuMounted) return;
+
+  const closeMenuImmediate = useCallback(() => {
+    drawerTranslateX.stopAnimation();
+    backdropOpacity.stopAnimation();
+    drawerTranslateX.setValue(-drawerWidth);
+    backdropOpacity.setValue(0);
+    setMenuMounted(false);
+  }, [backdropOpacity, drawerTranslateX, drawerWidth]);
+
+  const closeMenu = useCallback(() => {
+    if (!menuMountedRef.current) return;
     drawerTranslateX.stopAnimation();
     backdropOpacity.stopAnimation();
     Animated.parallel([
       Animated.timing(drawerTranslateX, {
         toValue: -drawerWidth,
-        duration: 280,
+        duration: 140,
+        easing: Easing.in(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(backdropOpacity, {
         toValue: 0,
-        duration: 280,
+        duration: 140,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(({ finished }) => {
       if (finished) setMenuMounted(false);
     });
-  };
+  }, [backdropOpacity, drawerTranslateX, drawerWidth]);
+
+  useEffect(() => {
+    if (!menuMounted || Platform.OS !== 'android') return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeMenu();
+      return true;
+    });
+    return () => sub.remove();
+  }, [closeMenu, menuMounted]);
+
   useEffect(() => {
     let active = true;
     getMobileSoundEnabled()
@@ -1235,6 +1372,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       unsubscribe();
     };
   }, []);
+
   useEffect(() => {
     const updateActiveDestination = () => {
       const currentRoute = navigationRef.getCurrentRoute()?.name;
@@ -1246,13 +1384,15 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
           : currentRoute === 'Profile'
             ? 'Profile'
             : null;
-      setActiveDestination(activeItem?.destination || activeAlias);
+      const next = activeItem?.destination || activeAlias;
+      setActiveDestination((prev) => (prev === next ? prev : next));
     };
     updateActiveDestination();
     return navigationRef.addListener('state', updateActiveDestination);
-  }, [isTeacher]);
-  const openDestination = (destination: MenuDestination) => {
-    closeMenu();
+  }, [isTeacher, menuItems]);
+
+  const openDestination = useCallback((destination: MenuDestination) => {
+    closeMenuImmediate();
     if (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination)) {
       DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
       return;
@@ -1277,7 +1417,6 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     else if (destination === 'Materials') navigationRef.navigate('Materials');
     else if (destination === 'StudentExam') navigationRef.navigate('StudentExam');
     else if (destination === 'StudentLearning') navigationRef.navigate('StudentLearning');
-    else if (destination === 'DailyPractice') navigationRef.navigate('DailyPractice');
     else if (destination === 'Evaluations') navigationRef.navigate('Evaluations');
     else if (destination === 'News') navigationRef.navigate('News');
     else if (destination === 'CenterInfo') navigationRef.navigate('CenterInfo');
@@ -1286,126 +1425,123 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     else if (destination === 'TeacherQuizzes') navigationRef.navigate('TeacherQuizzes');
     else if (destination === 'TeacherTraining') navigationRef.navigate('TeacherTraining');
     else if (destination === 'TeacherFinance') navigationRef.navigate('TeacherFinance');
-  };
+  }, [closeMenuImmediate, freeLocked, isTeacher]);
 
-  const toggleSound = () => {
-    void setMobileSoundEnabled(!soundEnabled)
-      .then(() => setSoundEnabled(!soundEnabled))
-      .catch((error: unknown) => {
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((current) => {
+      const next = !current;
+      void setMobileSoundEnabled(next).catch((error: unknown) => {
+        setSoundEnabled(current);
         Alert.alert('Không thể đổi âm thanh', error instanceof Error ? error.message : 'Vui lòng thử lại.');
       });
-  };
+      return next;
+    });
+  }, []);
+
+  if (!hasRenderedDrawer) return null;
 
   return (
-    <>
-      <Modal visible={menuMounted} transparent animationType="none" onRequestClose={closeMenu}>
-        <View style={styles.drawerOverlay}>
-          <Animated.View style={[styles.drawerBackdrop, { opacity: backdropOpacity }]}>
-            <Pressable style={styles.drawerDismiss} onPress={closeMenu} accessibilityLabel="Đóng danh mục" />
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.drawer,
-              {
-                width: drawerWidth,
-                paddingTop: insets.top + spacing.sm,
-                paddingBottom: insets.bottom + spacing.sm,
-                transform: [{ translateX: drawerTranslateX }],
-              },
-            ]}
-          >
-            <BlurView intensity={72} tint="dark" pointerEvents="none" style={styles.drawerGlassBackground}>
-              <View style={styles.drawerGlassTint} />
-            </BlurView>
-            <View style={styles.drawerHeader}>
-              <View style={styles.drawerProfileCard}>
-                <View style={styles.drawerProfileTop}>
-                  <EditableMobileAvatar size={46} name={user?.name} showBadge />
-                  <View style={styles.drawerIdentity}>
-                    <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
-                    <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
-                      <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
-                        {isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}
-                      </Text>
-                    </View>
+    <View
+      pointerEvents={menuMounted ? 'auto' : 'none'}
+      accessibilityViewIsModal={menuMounted}
+      accessibilityElementsHidden={!menuMounted}
+      importantForAccessibility={menuMounted ? 'yes' : 'no-hide-descendants'}
+      style={[styles.drawerOverlayRoot, !menuMounted && styles.drawerOverlayHidden]}
+    >
+      <View style={styles.drawerOverlay}>
+        <Animated.View style={[styles.drawerBackdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={styles.drawerDismiss} onPress={closeMenu} accessibilityLabel="Đóng danh mục" />
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.drawer,
+            styles.drawerFastSurface,
+            {
+              width: drawerWidth,
+              paddingTop: insets.top + spacing.sm,
+              paddingBottom: insets.bottom + spacing.sm,
+              transform: [{ translateX: drawerTranslateX }],
+            },
+          ]}
+        >
+          <View style={styles.drawerHeader}>
+            <View style={styles.drawerProfileCard}>
+              <View style={styles.drawerProfileTop}>
+                <EditableMobileAvatar size={46} name={user?.name} showBadge />
+                <View style={styles.drawerIdentity}>
+                  <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
+                  <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
+                    <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
+                      {isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}
+                    </Text>
                   </View>
                 </View>
-                {!isTeacher ? <SubscriptionStatusCard compact variant="drawer" /> : null}
               </View>
+              {!isTeacher ? <SubscriptionStatusCard compact variant="drawer" /> : null}
             </View>
-            <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
-              {menuSections.map((section) => (
-                <View key={section.label} style={styles.drawerSection}>
-                  <Text style={styles.drawerSectionLabel}>{section.label}</Text>
-                  <View style={styles.drawerSectionItems}>
-                    {section.items.map(({ label, destination, icon: Icon }) => {
-                      const selected = activeDestination === destination;
-                      const itemLocked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination)) || (destination === 'Feed' && feedPostLocked);
-                      return (
-                        <Pressable
-                          key={destination}
-                          onPress={() => openDestination(destination)}
-                          style={({ pressed }) => [
-                            styles.drawerItem,
-                            selected && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive),
-                            pressed && styles.drawerItemPressed,
-                          ]}
-                          accessibilityRole="button"
-                          accessibilityLabel={label}
-                          accessibilityState={{ selected }}
-                        >
-                          <View style={[styles.drawerItemIcon, selected && (isBrandStudent ? styles.drawerItemIconActiveBrand : styles.drawerItemIconActive)]}>
-                            <Icon size={18} color={selected ? '#FFFFFF' : '#A8B6CC'} strokeWidth={2} />
-                          </View>
-                          <Text style={[styles.drawerItemText, selected && styles.drawerItemTextActive]}>{label}</Text>
-                          {itemLocked ? <Lock size={14} color="#FBBF24" /> : selected ? (
-                            <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
-                          ) : null}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+          </View>
+          <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
+            {menuSections.map((section) => (
+              <View key={section.label} style={styles.drawerSection}>
+                <Text style={styles.drawerSectionLabel}>{section.label}</Text>
+                <View style={styles.drawerSectionItems}>
+                  {section.items.map(({ label, destination, icon }) => {
+                    const selected = activeDestination === destination;
+                    const itemLocked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination)) || (destination === 'Feed' && feedPostLocked);
+                    return (
+                      <DrawerMenuRow
+                        key={destination}
+                        label={label}
+                        destination={destination}
+                        icon={icon}
+                        selected={selected}
+                        itemLocked={itemLocked}
+                        isBrandStudent={isBrandStudent}
+                        onSelect={openDestination}
+                      />
+                    );
+                  })}
                 </View>
-              ))}
-            </ScrollView>
-            <View style={styles.drawerFooter}>
-              <View style={[styles.drawerItem, { justifyContent: 'space-between' }]}>
-                <Text style={styles.drawerItemText}>Ngôn ngữ</Text>
-                <LanguageSwitcher variant="pill" theme="dark" />
               </View>
-              <Pressable
-                onPress={() => openDestination('Profile')}
-                style={[styles.drawerItem, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive)]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: activeDestination === 'Profile' }}
-              >
-                <View style={[styles.drawerItemIcon, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemIconActiveBrand : styles.drawerItemIconActive)]}>
-                  <UserRound size={18} color={activeDestination === 'Profile' ? '#FFFFFF' : '#A8B6CC'} />
-                </View>
-                <Text style={[styles.drawerItemText, activeDestination === 'Profile' && styles.drawerItemTextActive]}>Hồ sơ</Text>
-                {activeDestination === 'Profile' ? (
-                  <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
-                ) : null}
-              </Pressable>
-              <Pressable onPress={() => { closeMenu(); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
-                <View style={styles.drawerItemIcon}><LogOut size={18} color="#34D399" /></View>
-                <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Đăng xuất</Text>
-              </Pressable>
-              <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'} accessibilityState={{ checked: soundEnabled }}>
-                <View style={styles.drawerItemIcon}>
-                  {soundEnabled ? <Volume2 size={18} color="#A8B6CC" /> : <VolumeX size={18} color="#A8B6CC" />}
-                </View>
-                <Text style={styles.drawerItemText}>{soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}</Text>
-              </Pressable>
+            ))}
+          </ScrollView>
+          <View style={styles.drawerFooter}>
+            <View style={[styles.drawerItem, { justifyContent: 'space-between' }]}>
+              <Text style={styles.drawerItemText}>Ngôn ngữ</Text>
+              <LanguageSwitcher variant="pill" theme="dark" />
             </View>
-          </Animated.View>
-        </View>
-      </Modal>
-    </>
+            <Pressable
+              onPress={() => openDestination('Profile')}
+              style={[styles.drawerItem, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive)]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: activeDestination === 'Profile' }}
+            >
+              <View style={[styles.drawerItemIcon, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemIconActiveBrand : styles.drawerItemIconActive)]}>
+                <UserRound size={18} color={activeDestination === 'Profile' ? '#FFFFFF' : '#A8B6CC'} />
+              </View>
+              <Text style={[styles.drawerItemText, activeDestination === 'Profile' && styles.drawerItemTextActive]}>Hồ sơ</Text>
+              {activeDestination === 'Profile' ? (
+                <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
+              ) : null}
+            </Pressable>
+            <Pressable onPress={() => { closeMenuImmediate(); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
+              <View style={styles.drawerItemIcon}><LogOut size={18} color="#34D399" /></View>
+              <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Đăng xuất</Text>
+            </Pressable>
+            <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'} accessibilityState={{ checked: soundEnabled }}>
+              <View style={styles.drawerItemIcon}>
+                {soundEnabled ? <Volume2 size={18} color="#A8B6CC" /> : <VolumeX size={18} color="#A8B6CC" />}
+              </View>
+              <Text style={styles.drawerItemText}>{soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </View>
   );
-}
+});
 
-function FloatingSupportButton() {
+const FloatingSupportButton = React.memo(function FloatingSupportButton() {
   const { user, subscription } = useAuth();
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
@@ -1419,21 +1555,26 @@ function FloatingSupportButton() {
   const bottomNavigationHeight = 96 + insets.bottom;
   const minTop = headerBottom + 8;
   const maxTop = Math.max(minTop, windowHeight - bottomNavigationHeight - buttonSize - 8);
-  const [top, setTop] = useState((minTop + maxTop) / 2);
+  const topAnim = useRef(new Animated.Value((minTop + maxTop) / 2)).current;
+  const currentTopRef = useRef((minTop + maxTop) / 2);
 
   useEffect(() => {
-    setTop((currentTop) => Math.max(minTop, Math.min(maxTop, currentTop)));
-  }, [maxTop, minTop]);
+    const clamped = Math.max(minTop, Math.min(maxTop, currentTopRef.current));
+    currentTopRef.current = clamped;
+    topAnim.setValue(clamped);
+  }, [maxTop, minTop, topAnim]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderMove: (_event, gesture) => {
-      setTop(Math.max(minTop, Math.min(maxTop, gesture.moveY - buttonSize / 2)));
+      const nextTop = Math.max(minTop, Math.min(maxTop, gesture.moveY - buttonSize / 2));
+      currentTopRef.current = nextTop;
+      topAnim.setValue(nextTop);
     },
-  }), [buttonSize, maxTop, minTop]);
+  }), [buttonSize, maxTop, minTop, topAnim]);
 
   return (
-    <View {...panResponder.panHandlers} style={[styles.floatingSupportHandle, { top }]}>
+    <Animated.View {...panResponder.panHandlers} style={[styles.floatingSupportHandle, { top: topAnim }]}>
       <Pressable
         onPress={() => {
           if (freeLocked) {
@@ -1464,11 +1605,11 @@ function FloatingSupportButton() {
           <Text style={styles.floatingSupportLabelText}>Hỗ trợ</Text>
         </View>
       </Pressable>
-    </View>
+    </Animated.View>
   );
-}
+});
 
-function MainTabs() {
+const MainTabs = React.memo(function MainTabs() {
   const { user, subscription } = useAuth();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -1588,12 +1729,25 @@ function MainTabs() {
     }
   }, [financeSnapshotKey, isTeacher, user]);
 
+  const didInitialBadgeFocusRef = useRef(false);
   useFocusEffect(useCallback(() => {
+    if (!didInitialBadgeFocusRef.current) {
+      didInitialBadgeFocusRef.current = true;
+      void refreshTabBadges();
+      return;
+    }
     void refreshTabBadges();
   }, [refreshTabBadges]));
 
   useEffect(() => {
-    const refresh = () => { void refreshTabBadges(); };
+    let badgeTimer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      if (badgeTimer) clearTimeout(badgeTimer);
+      badgeTimer = setTimeout(() => {
+        badgeTimer = null;
+        void refreshTabBadges();
+      }, 350);
+    };
     const refreshEvents = [
       SOCKET_EVENTS.MESSAGE_RECEIVED,
       SOCKET_EVENTS.MESSAGE_SENT_ACK,
@@ -1620,8 +1774,13 @@ function MainTabs() {
     const financeViewedSubscription = DeviceEventEmitter.addListener('mobile:finance-viewed', () => {
       void markFinanceTransactionsViewed();
     });
-    const interval = setInterval(refresh, 30000);
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void refreshTabBadges();
+      }
+    }, 60000);
     return () => {
+      if (badgeTimer) clearTimeout(badgeTimer);
       subscriptions.forEach((subscription) => subscription.remove());
       financeViewedSubscription.remove();
       clearInterval(interval);
@@ -1714,15 +1873,7 @@ function MainTabs() {
             />
           );
         },
-        tabBarBackground: () => (
-          <BlurView
-            intensity={Platform.OS === 'android' ? 75 : 60}
-            tint="light"
-            style={styles.navigationGlassBackground}
-          >
-            <View style={styles.navigationGlassTint} />
-          </BlurView>
-        ),
+        tabBarBackground: () => <TabBarGlassBackdrop />,
         tabBarItemStyle: isTeacher
           ? {
             position: 'absolute',
@@ -1799,7 +1950,7 @@ function MainTabs() {
         )}
     </Tab.Navigator >
   );
-}
+});
 
 function useNavigationBarVisibility() {
   const visibility = useRef(new Animated.Value(1)).current;
@@ -1840,6 +1991,7 @@ const styles = StyleSheet.create({
   persistentTabBar: { position: 'absolute', zIndex: 15, left: 6, right: 6, bottom: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingHorizontal: 2, paddingTop: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.65)', boxShadow: droplet.navBar },
   navigationGlassBackground: { ...StyleSheet.absoluteFill, borderRadius: 24, overflow: 'hidden' },
   navigationGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.65)', backgroundImage: 'linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(241,245,249,0.66) 100%)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24 },
+  navigationGlassTintAndroid: { backgroundColor: 'rgba(255,255,255,0.95)' },
   persistentTabItem: { flex: 1, minWidth: 0, height: 64, alignItems: 'stretch', justifyContent: 'flex-start' },
   navItem: { alignSelf: 'stretch', marginHorizontal: 1, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 0, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
   navItemCard: { borderColor: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.45)', boxShadow: droplet.button },
@@ -1866,10 +2018,13 @@ const styles = StyleSheet.create({
   floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
   floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand, boxShadow: 'inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' },
   floatingSupportIconBrand: { backgroundColor: '#059669', boxShadow: 'inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' } as never,
+  drawerOverlayRoot: { ...StyleSheet.absoluteFill, zIndex: 90 },
+  drawerOverlayHidden: { display: 'none' },
   drawerOverlay: { flex: 1, flexDirection: 'row' },
   drawerBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
   drawer: { width: '82%', maxWidth: 280, height: '100%', backgroundColor: 'rgba(13, 21, 36, 0.9)', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', borderRightColor: 'rgba(103,232,249,0.45)', borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden', shadowColor: '#22D3EE', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 3, height: 0 }, elevation: 18 },
+  drawerFastSurface: { backgroundColor: 'rgba(11, 18, 32, 0.96)' },
   drawerGlassBackground: { ...StyleSheet.absoluteFill, borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden' },
   drawerGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(8, 15, 28, 0.52)', borderTopRightRadius: 26, borderBottomRightRadius: 26 },
   drawerHeader: { paddingBottom: spacing.md },

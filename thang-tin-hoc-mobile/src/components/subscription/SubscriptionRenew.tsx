@@ -265,7 +265,7 @@ const FALLBACK_XP_PACKS: DpXpPack[] = [
 ];
 
 /** Thẻ hạn dùng cho Hồ sơ / drawer; bấm Gia hạn mở popup chọn gói + nhập mã, hết XP hiện nút Mua XP. */
-export function SubscriptionStatusCard({
+export const SubscriptionStatusCard = React.memo(function SubscriptionStatusCard({
   compact = false,
   variant = 'default',
 }: {
@@ -275,7 +275,7 @@ export function SubscriptionStatusCard({
   const { user, subscription, refreshSubscription } = useAuth();
   const [open, setOpen] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
-  const [dpStats, setDpStats] = useState<DpStats | null>(null);
+  const [dpStats, setDpStats] = useState<DpStats | null>(() => dailyPracticeApi.peekOverview()?.stats ?? null);
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [selectedXpPackId, setSelectedXpPackId] = useState('');
   const [xpCheckout, setXpCheckout] = useState<CoursePaymentCheckout | null>(null);
@@ -290,6 +290,11 @@ export function SubscriptionStatusCard({
       },
     );
     if (!user || user.role !== 'student' || user.previewMode) {
+      return () => subEv.remove();
+    }
+    const cachedStats = dailyPracticeApi.peekOverview()?.stats;
+    if (cachedStats) {
+      setDpStats((prev) => prev || cachedStats);
       return () => subEv.remove();
     }
     let alive = true;
@@ -357,67 +362,71 @@ export function SubscriptionStatusCard({
     }
   };
 
-  const xpPurchaseUi = (
+  const xpPurchaseUi = (buyXpOpen || xpCheckout) ? (
     <>
-      <StandardBottomSheet
-        visible={buyXpOpen}
-        onClose={() => setBuyXpOpen(false)}
-        title="Mua thêm XP luyện tập"
-        subtitle="Nạp nhanh XP để tiếp tục làm bài trên lộ trình"
-        icon={<Zap size={18} color="#D97706" />}
-      >
-        <View style={styles.gapSm}>
-          {xpPacks.map((pack) => {
-            const pid = pack.id || `xp_${pack.xp}`;
-            const active = (activeXpPack?.id || `xp_${activeXpPack?.xp}`) === pid;
-            return (
-              <Pressable
-                key={pid}
-                onPress={() => setSelectedXpPackId(pid)}
-                style={[styles.buyXpPackRow, active && styles.buyXpPackActive]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-              >
-                <View style={[styles.planRadio, active && { borderColor: '#D97706', backgroundColor: '#F59E0B' }]}>
-                  {active ? <Check size={11} color="#FFFFFF" strokeWidth={3} /> : null}
-                </View>
-                <View style={styles.flex}>
-                  <Text style={styles.buyXpPackTitle}>{`+${pack.xp} XP`}</Text>
-                  <Text style={styles.muted}>{`Đủ khoảng ${Math.max(1, Math.round(pack.xp / 20))} lượt luyện`}</Text>
-                </View>
-                <Text style={styles.buyXpPackPrice}>{formatVnd(pack.priceVnd)}</Text>
-              </Pressable>
-            );
-          })}
-          <DuoButton
-            variant="gold"
-            size="lg"
-            fullWidth
-            text={activeXpPack ? `Mua ${activeXpPack.xp} XP (${formatVnd(activeXpPack.priceVnd)})` : 'Mua XP'}
-            loading={xpBusy}
-            disabled={!activeXpPack || xpBusy}
-            onPress={() => { void startXpCheckout(); }}
-          />
-        </View>
-      </StandardBottomSheet>
-      <CoursePaymentModal
-        checkout={xpCheckout}
-        title="Mua XP luyện tập"
-        getSession={(sessionId) => dailyPracticeApi.xpPurchaseStatus(sessionId).then((res) => ({
-          paid: res.paid === true || res.status === 'paid',
-        }))}
-        simulate={(sessionId) => dailyPracticeApi.simulateXpPaid(sessionId)}
-        onClose={() => setXpCheckout(null)}
-        onPaid={() => {
-          setXpCheckout(null);
-          void dailyPracticeApi.overview()
-            .then((res) => { if (res?.stats) setDpStats(res.stats); })
-            .catch(() => {});
-          Alert.alert('Thanh toán thành công', 'Ví XP của bạn đã được cập nhật.');
-        }}
-      />
+      {buyXpOpen ? (
+        <StandardBottomSheet
+          visible={buyXpOpen}
+          onClose={() => setBuyXpOpen(false)}
+          title="Mua thêm XP luyện tập"
+          subtitle="Nạp nhanh XP để tiếp tục làm bài trên lộ trình"
+          icon={<Zap size={18} color="#D97706" />}
+        >
+          <View style={styles.gapSm}>
+            {xpPacks.map((pack) => {
+              const pid = pack.id || `xp_${pack.xp}`;
+              const active = (activeXpPack?.id || `xp_${activeXpPack?.xp}`) === pid;
+              return (
+                <Pressable
+                  key={pid}
+                  onPress={() => setSelectedXpPackId(pid)}
+                  style={[styles.buyXpPackRow, active && styles.buyXpPackActive]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                >
+                  <View style={[styles.planRadio, active && { borderColor: '#D97706', backgroundColor: '#F59E0B' }]}>
+                    {active ? <Check size={11} color="#FFFFFF" strokeWidth={3} /> : null}
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.buyXpPackTitle}>{`+${pack.xp} XP`}</Text>
+                    <Text style={styles.muted}>{`Đủ khoảng ${Math.max(1, Math.round(pack.xp / 20))} lượt luyện`}</Text>
+                  </View>
+                  <Text style={styles.buyXpPackPrice}>{formatVnd(pack.priceVnd)}</Text>
+                </Pressable>
+              );
+            })}
+            <DuoButton
+              variant="gold"
+              size="lg"
+              fullWidth
+              text={activeXpPack ? `Mua ${activeXpPack.xp} XP (${formatVnd(activeXpPack.priceVnd)})` : 'Mua XP'}
+              loading={xpBusy}
+              disabled={!activeXpPack || xpBusy}
+              onPress={() => { void startXpCheckout(); }}
+            />
+          </View>
+        </StandardBottomSheet>
+      ) : null}
+      {xpCheckout ? (
+        <CoursePaymentModal
+          checkout={xpCheckout}
+          title="Mua XP luyện tập"
+          getSession={(sessionId) => dailyPracticeApi.xpPurchaseStatus(sessionId).then((res) => ({
+            paid: res.paid === true || res.status === 'paid',
+          }))}
+          simulate={(sessionId) => dailyPracticeApi.simulateXpPaid(sessionId)}
+          onClose={() => setXpCheckout(null)}
+          onPaid={() => {
+            setXpCheckout(null);
+            void dailyPracticeApi.overview()
+              .then((res) => { if (res?.stats) setDpStats(res.stats); })
+              .catch(() => {});
+            Alert.alert('Thanh toán thành công', 'Ví XP của bạn đã được cập nhật.');
+          }}
+        />
+      ) : null}
     </>
-  );
+  ) : null;
 
   if (isDrawer) {
     return (
@@ -514,21 +523,23 @@ export function SubscriptionStatusCard({
           </View>
         </View>
 
-        <StandardBottomSheet
-          visible={open}
-          onClose={() => setOpen(false)}
-          title={`${actionLabel} tài khoản`}
-          subtitle="Chọn gói phù hợp hoặc nhập mã kích hoạt"
-          icon={<Crown size={18} color={colors.brand} />}
-        >
-          <SubscriptionRenewPanel
-            overview={subscription}
-            onRenewed={() => {
-              setOpen(false);
-              void refreshSubscription();
-            }}
-          />
-        </StandardBottomSheet>
+        {open ? (
+          <StandardBottomSheet
+            visible={open}
+            onClose={() => setOpen(false)}
+            title={`${actionLabel} tài khoản`}
+            subtitle="Chọn gói phù hợp hoặc nhập mã kích hoạt"
+            icon={<Crown size={18} color={colors.brand} />}
+          >
+            <SubscriptionRenewPanel
+              overview={subscription}
+              onRenewed={() => {
+                setOpen(false);
+                void refreshSubscription();
+              }}
+            />
+          </StandardBottomSheet>
+        ) : null}
         {xpPurchaseUi}
       </>
     );
@@ -618,25 +629,27 @@ export function SubscriptionStatusCard({
           ) : null}
         </View>
       )}
-      <StandardBottomSheet
-        visible={open}
-        onClose={() => setOpen(false)}
-        title={`${actionLabel} tài khoản`}
-        subtitle="Chọn gói phù hợp hoặc nhập mã kích hoạt"
-        icon={<Crown size={18} color={colors.brand} />}
-      >
-        <SubscriptionRenewPanel
-          overview={subscription}
-          onRenewed={() => {
-            setOpen(false);
-            void refreshSubscription();
-          }}
-        />
-      </StandardBottomSheet>
+      {open ? (
+        <StandardBottomSheet
+          visible={open}
+          onClose={() => setOpen(false)}
+          title={`${actionLabel} tài khoản`}
+          subtitle="Chọn gói phù hợp hoặc nhập mã kích hoạt"
+          icon={<Crown size={18} color={colors.brand} />}
+        >
+          <SubscriptionRenewPanel
+            overview={subscription}
+            onRenewed={() => {
+              setOpen(false);
+              void refreshSubscription();
+            }}
+          />
+        </StandardBottomSheet>
+      ) : null}
       {xpPurchaseUi}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },

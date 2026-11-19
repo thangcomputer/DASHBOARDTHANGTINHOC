@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { useContext } from 'react';
 import * as RN from 'react-native';
 import type {
   AlertButton,
@@ -14,13 +14,14 @@ import {
   translateInterpolatedParts,
   translateText,
 } from '../../../shared/i18n/translate.mjs';
-import { getCurrentLanguage, subscribeLanguage, type AppLanguage } from './LanguageContext';
+import { getCurrentLanguage, LanguageCodeContext, type AppLanguage } from './LanguageContext';
 import { dispatchAppAlert } from './appAlertBus';
 
 export * from 'react-native';
 
 function useAppLanguage(): AppLanguage {
-  return useSyncExternalStore(subscribeLanguage, getCurrentLanguage, getCurrentLanguage);
+  const ctx = useContext(LanguageCodeContext);
+  return ctx ?? getCurrentLanguage();
 }
 
 function flattenChildren(node: React.ReactNode, out: React.ReactNode[] = []): React.ReactNode[] {
@@ -34,6 +35,16 @@ function flattenChildren(node: React.ReactNode, out: React.ReactNode[] = []): Re
   return out;
 }
 
+function hasNestedOrBoolean(parts: React.ReactNode[]) {
+  for (let i = 0; i < parts.length; i += 1) {
+    const item = parts[i];
+    if (Array.isArray(item) || item === null || item === undefined || typeof item === 'boolean') {
+      return true;
+    }
+  }
+  return false;
+}
+
 function translateChildren(children: React.ReactNode, lang: AppLanguage): React.ReactNode {
   if (lang !== 'en' || children === null || children === undefined || typeof children === 'boolean') {
     return children;
@@ -45,7 +56,7 @@ function translateChildren(children: React.ReactNode, lang: AppLanguage): React.
     return children;
   }
   if (Array.isArray(children)) {
-    const flat = flattenChildren(children);
+    const flat = hasNestedOrBoolean(children) ? flattenChildren(children) : children;
     const translated = translateInterpolatedParts(flat, lang);
     return translated.map((part) => (typeof part === 'string' ? translateText(part, lang) : part)) as React.ReactNode[];
   }
@@ -59,18 +70,19 @@ export const RawAlert = RN.Alert;
 type TextInstance = React.ComponentRef<typeof RN.Text>;
 type TextInputInstance = React.ComponentRef<typeof RN.TextInput>;
 
-export const Text = React.forwardRef<TextInstance, TextProps>(function TranslatedText(
-  { children, accessibilityLabel, accessibilityHint, ...rest },
-  ref
-) {
+export const Text = React.forwardRef<TextInstance, TextProps>(function TranslatedText(props, ref) {
   const lang = useAppLanguage();
+  if (lang !== 'en') {
+    return React.createElement(RN.Text, ref == null ? props : { ...props, ref });
+  }
+  const { children, accessibilityLabel, accessibilityHint, ...rest } = props;
   const nextChildren = translateChildren(children, lang);
   const nextA11yLabel =
-    lang === 'en' && typeof accessibilityLabel === 'string'
+    typeof accessibilityLabel === 'string'
       ? translateText(accessibilityLabel, lang)
       : accessibilityLabel;
   const nextA11yHint =
-    lang === 'en' && typeof accessibilityHint === 'string'
+    typeof accessibilityHint === 'string'
       ? translateText(accessibilityHint, lang)
       : accessibilityHint;
 
@@ -87,21 +99,22 @@ export const Text = React.forwardRef<TextInstance, TextProps>(function Translate
 });
 
 export const TextInput = React.forwardRef<TextInputInstance, TextInputProps>(
-  function TranslatedTextInput(
-    { placeholder, accessibilityLabel, accessibilityHint, ...rest },
-    ref
-  ) {
+  function TranslatedTextInput(props, ref) {
     const lang = useAppLanguage();
+    if (lang !== 'en') {
+      return React.createElement(RN.TextInput, ref == null ? props : { ...props, ref });
+    }
+    const { placeholder, accessibilityLabel, accessibilityHint, ...rest } = props;
     const nextPlaceholder =
-      lang === 'en' && typeof placeholder === 'string'
+      typeof placeholder === 'string'
         ? translateText(placeholder, lang)
         : placeholder;
     const nextA11yLabel =
-      lang === 'en' && typeof accessibilityLabel === 'string'
+      typeof accessibilityLabel === 'string'
         ? translateText(accessibilityLabel, lang)
         : accessibilityLabel;
     const nextA11yHint =
-      lang === 'en' && typeof accessibilityHint === 'string'
+      typeof accessibilityHint === 'string'
         ? translateText(accessibilityHint, lang)
         : accessibilityHint;
 

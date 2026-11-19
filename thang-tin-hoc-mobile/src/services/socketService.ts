@@ -1,6 +1,7 @@
 import { DeviceEventEmitter } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getMobileApiBaseUrl } from './apiClient';
+import { invalidateCache } from '../utils/requestCache';
 
 export const SOCKET_EVENTS = {
   MESSAGE_RECEIVED: 'socket:message:received',
@@ -92,7 +93,57 @@ export function getLastSeenUsersSnapshot() {
   return lastSeenUsersSnapshot;
 }
 
+function invalidateCachesForSocketEvent(name: string) {
+  switch (name) {
+    case SOCKET_EVENTS.SCHEDULE_NEW:
+    case SOCKET_EVENTS.SCHEDULE_UPDATED:
+    case SOCKET_EVENTS.SCHEDULE_CANCELLED:
+    case SOCKET_EVENTS.ATTENDANCE_AWAITING_CONFIRM:
+    case SOCKET_EVENTS.ATTENDANCE_DISPUTED:
+    case SOCKET_EVENTS.ATTENDANCE_CONFIRMED:
+    case SOCKET_EVENTS.ATTENDANCE_REJECTED:
+    case SOCKET_EVENTS.ATTENDANCE_ADMIN_MAKEUP_COMPLETED:
+      invalidateCache('schedule:list');
+      invalidateCache('teacher-finance:overview');
+      break;
+    case SOCKET_EVENTS.MESSAGE_RECEIVED:
+    case SOCKET_EVENTS.MESSAGE_SENT_ACK:
+    case SOCKET_EVENTS.MESSAGE_RECALLED:
+    case SOCKET_EVENTS.MESSAGE_DELETED:
+    case SOCKET_EVENTS.GROUP_NEW:
+    case SOCKET_EVENTS.GROUP_DELETE:
+    case SOCKET_EVENTS.CONTACT_UPDATED:
+    case SOCKET_EVENTS.READ_ACK:
+      invalidateCache('messages:conversations');
+      break;
+    case SOCKET_EVENTS.FINANCE_TRANSACTION:
+    case SOCKET_EVENTS.TEACHER_PAYMENT_RECEIVED:
+      invalidateCache('teacher-finance:overview');
+      break;
+    case SOCKET_EVENTS.NOTIFICATION:
+    case SOCKET_EVENTS.NOTIFICATION_READ_SYNC:
+      invalidateCache('notifications:unread');
+      break;
+    case SOCKET_EVENTS.FREE_PORTAL_UNLOCKED:
+    case SOCKET_EVENTS.FREE_PORTAL_LOCKED:
+    case SOCKET_EVENTS.SUBSCRIPTION_UPDATED:
+      invalidateCache('daily-practice:');
+      invalidateCache('schedule:list');
+      invalidateCache('messages:conversations');
+      break;
+    case SOCKET_EVENTS.DATA_REFRESH:
+      invalidateCache('schedule:list');
+      invalidateCache('messages:conversations');
+      invalidateCache('teacher-finance:overview');
+      invalidateCache('notifications:unread');
+      break;
+    default:
+      break;
+  }
+}
+
 function emitDeviceEvent(name: string, data?: unknown) {
+  invalidateCachesForSocketEvent(name);
   DeviceEventEmitter.emit(name, data);
 }
 

@@ -1,5 +1,9 @@
 import { Platform } from 'react-native';
 import { getMobileApiBaseUrl, mobileApiRequest } from './apiClient';
+import { coalesceCached, peekCached } from '../utils/requestCache';
+
+const WEB_SETTINGS_CACHE_KEY = 'settings:web';
+const WEB_SETTINGS_TTL_MS = 5 * 60 * 1000;
 
 type WebSettings = {
   data?: {
@@ -11,13 +15,33 @@ type WebSettings = {
   };
 };
 
+async function fetchWebSettingsCached() {
+  return coalesceCached(
+    WEB_SETTINGS_CACHE_KEY,
+    WEB_SETTINGS_TTL_MS,
+    () => mobileApiRequest<WebSettings>('/settings/web', {}, false),
+  );
+}
+
+function resolveWebLogoFromResponse(response: WebSettings | undefined): string {
+  const logoUrl = response?.data?.logoUrl?.trim();
+  if (!logoUrl) {
+    const configuredWebBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').trim().replace(/\/+$/, '');
+    const webBaseUrl = configuredWebBaseUrl || (__DEV__ && Platform.OS === 'web' ? 'http://localhost:5173' : '');
+    return webBaseUrl ? `${webBaseUrl}/logo-thang-tin-hoc.svg` : '';
+  }
+  if (/^https?:\/\//i.test(logoUrl)) return logoUrl;
+
+  return new URL(logoUrl, `${getMobileApiBaseUrl()}/`).toString();
+}
+
 export type DashboardBanner = {
   imageUrl: string;
   linkUrl: string;
 };
 
 export async function getDashboardBanners(role: 'student' | 'teacher') {
-  const response = await mobileApiRequest<WebSettings>('/settings/web', {}, false);
+  const response = await fetchWebSettingsCached();
   const data = response.data || {};
   const key = role === 'teacher' ? 'teacherBanners' : 'studentBanners';
   const rawBanners = data[key];
@@ -54,15 +78,12 @@ function resolveWebAssetUrl(value: string) {
   return new URL(value, `${getMobileApiBaseUrl()}/`).toString();
 }
 
-export async function getWebLogoUrl(): Promise<string> {
-  const response = await mobileApiRequest<WebSettings>('/settings/web', {}, false);
-  const logoUrl = response.data?.logoUrl?.trim();
-  if (!logoUrl) {
-    const configuredWebBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').trim().replace(/\/+$/, '');
-    const webBaseUrl = configuredWebBaseUrl || (__DEV__ && Platform.OS === 'web' ? 'http://localhost:5173' : '');
-    return webBaseUrl ? `${webBaseUrl}/logo-thang-tin-hoc.svg` : '';
-  }
-  if (/^https?:\/\//i.test(logoUrl)) return logoUrl;
+export function peekCachedWebLogoUrl(): string {
+  const cached = peekCached<WebSettings>(WEB_SETTINGS_CACHE_KEY);
+  return cached ? resolveWebLogoFromResponse(cached) : '';
+}
 
-  return new URL(logoUrl, `${getMobileApiBaseUrl()}/`).toString();
+export async function getWebLogoUrl(): Promise<string> {
+  const response = await fetchWebSettingsCached();
+  return resolveWebLogoFromResponse(response);
 }
