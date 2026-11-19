@@ -22,7 +22,7 @@ import api, { setTokens, csrfFetch } from '../services/api';
 import {
   Bell, MessageCircle, CheckCircle2, Clock, X, Lock, Eye, EyeOff, ShieldCheck, LogOut,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
-  Sun, Moon, Minimize2,
+  Sparkles, Sun, Moon, Minimize2,
 } from 'lucide-react';
 import { useTheme } from '../utils/theme';
 import { useFocusMode } from '../utils/focusMode';
@@ -2020,7 +2020,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
-                  className="group relative inline-flex h-8 sm:h-9 shrink-0 items-center justify-center overflow-hidden rounded-xl p-[2px] shadow-[0_2px_10px_rgba(16,185,129,0.22)] active:translate-y-[1px] transition cursor-pointer"
+                  className="group relative inline-flex h-8 sm:h-9 shrink-0 items-center justify-center overflow-hidden rounded-xl p-[2px] shadow-[0_2px_12px_rgba(6,182,212,0.28)] active:translate-y-[1px] transition cursor-pointer"
                   title="DewSkill AI & Tìm nhanh (Ctrl+K)"
                   aria-label="DewSkill AI & Tìm nhanh"
                 >
@@ -2029,20 +2029,23 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                     className="pointer-events-none absolute inset-0 flex items-center justify-center"
                   >
                     <span
-                      className="h-44 w-44 shrink-0 animate-[spin_2.4s_linear_infinite]"
+                      className="h-32 w-32 shrink-0 animate-[spin_2.6s_linear_infinite]"
                       style={{
-                        background: 'conic-gradient(from 0deg, #059669 0deg, #10b981 60deg, #34d399 115deg, #6ee7b7 155deg, rgba(16,185,129,0.18) 215deg, rgba(16,185,129,0.18) 305deg, #059669 360deg)',
+                        background: 'conic-gradient(from 0deg, #10b981 0deg, #06b6d4 90deg, #6366f1 180deg, #ec4899 240deg, #10b981 360deg)',
                       }}
                     />
                   </span>
-                  <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-emerald-50/95 px-2.5 sm:px-3 text-xs font-black tracking-tight text-emerald-700 group-hover:bg-emerald-100/95 dark:bg-slate-900 dark:text-emerald-300 dark:group-hover:bg-emerald-950/90 transition">
+                  <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-white/95 px-2.5 sm:px-3 group-hover:bg-emerald-50/95 dark:bg-slate-900 dark:group-hover:bg-slate-800/95 transition">
                     <img
                       src="/dewskill-ai-icon.webp"
                       alt=""
                       aria-hidden="true"
                       className="h-5 w-5 shrink-0 object-contain"
                     />
-                    <span>DewSkill AI</span>
+                    <Sparkles size={13} className="shrink-0 text-teal-500 dark:text-teal-300 animate-pulse" aria-hidden="true" />
+                    <span className="bg-gradient-to-r from-emerald-700 via-teal-600 to-indigo-600 dark:from-emerald-300 dark:via-teal-200 dark:to-indigo-300 bg-clip-text text-xs font-black tracking-wide text-transparent">
+                      AI
+                    </span>
                   </span>
                 </button>
 

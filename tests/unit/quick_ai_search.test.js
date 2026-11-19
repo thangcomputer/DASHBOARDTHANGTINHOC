@@ -89,16 +89,19 @@ test('Web and Mobile headers merge AI + Search into a single AI button wired to 
   const webHeader = read('client/src/components/DashboardLayout.jsx');
   assert.match(webHeader, /aria-label="DewSkill AI & Tìm nhanh"/);
   assert.match(webHeader, /dewskill-ai-icon\.webp/);
-  assert.match(webHeader, /<span>DewSkill AI<\/span>/);
+  assert.match(webHeader, /<Sparkles\b/);
+  assert.match(webHeader, />\s*AI\s*<\/span>/);
   assert.match(webHeader, /conic-gradient\(/);
-  assert.match(webHeader, /animate-\[spin_2\.4s_linear_infinite\]/);
+  assert.match(webHeader, /animate-\[spin_2\.6s_linear_infinite\]/);
   assert.doesNotMatch(webHeader, /aria-label="Tìm kiếm nhanh \(Ctrl\+K\)"/);
 
   const mobileHeader = read('thang-tin-hoc-mobile/src/components/ui.tsx');
   assert.match(mobileHeader, /accessibilityLabel="DewSkill AI và tìm kiếm nhanh"/);
   assert.match(mobileHeader, /dewskill-ai-icon\.webp/);
-  assert.match(mobileHeader, />DewSkill AI</);
+  assert.match(mobileHeader, /<Sparkles\b/);
+  assert.match(mobileHeader, />AI</);
   assert.match(mobileHeader, /topBarAiBorderSpinner/);
+  assert.match(mobileHeader, /topBarAiBorderArcTertiary/);
   assert.match(mobileHeader, /Animated\.loop/);
   assert.doesNotMatch(mobileHeader, /accessibilityLabel="Tìm kiếm và tác vụ nhanh"/);
   assert.doesNotMatch(mobileHeader, /accessibilityLabel="Mở Trợ lý AI và Hỗ trợ"/);

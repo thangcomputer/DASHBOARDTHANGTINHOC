@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, type LucideIcon } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, Sparkles, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
@@ -354,6 +354,7 @@ function BrandingTopBar() {
             >
               <View style={styles.topBarAiBorderArcPrimary} />
               <View style={styles.topBarAiBorderArcSecondary} />
+              <View style={styles.topBarAiBorderArcTertiary} />
             </Animated.View>
             <View style={[styles.topBarAiChipInner, compactLogoWithAi && styles.topBarAiChipInnerCompact]}>
               <Image
@@ -361,7 +362,8 @@ function BrandingTopBar() {
                 style={styles.topBarAiLogo}
                 resizeMode="contain"
               />
-              <Text style={styles.topBarAiText} numberOfLines={1}>DewSkill AI</Text>
+              <Sparkles size={12} color="#0D9488" />
+              <Text style={styles.topBarAiText} numberOfLines={1}>AI</Text>
             </View>
           </Pressable>
           <Pressable
@@ -773,15 +775,16 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
   topBarActionsRow: { zIndex: 1, flexShrink: 0, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
   topBarActionsRowStudent: { gap: 5 },
-  topBarAiChip: { position: 'relative', zIndex: 1, height: 38, borderRadius: 12, padding: 2, overflow: 'hidden', backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  topBarAiBorderSpinner: { position: 'absolute', width: 160, height: 160, alignItems: 'center', justifyContent: 'center' },
-  topBarAiBorderArcPrimary: { position: 'absolute', top: 0, left: 0, width: 84, height: 84, backgroundColor: '#059669', borderBottomRightRadius: 36 },
-  topBarAiBorderArcSecondary: { position: 'absolute', bottom: 0, right: 0, width: 84, height: 84, backgroundColor: '#34D399', borderTopLeftRadius: 36 },
-  topBarAiChipInner: { height: '100%', paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#ECFDF5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  topBarAiChipInnerCompact: { paddingHorizontal: 7, gap: 4 },
-  topBarAiLogo: { width: 18, height: 18 },
+  topBarAiChip: { position: 'relative', zIndex: 1, height: 38, borderRadius: 12, padding: 2, overflow: 'hidden', backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', shadowColor: '#06B6D4', shadowOpacity: 0.28, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  topBarAiBorderSpinner: { position: 'absolute', width: 132, height: 132, alignItems: 'center', justifyContent: 'center' },
+  topBarAiBorderArcPrimary: { position: 'absolute', top: 0, left: 0, width: 68, height: 68, backgroundColor: '#10B981', borderBottomRightRadius: 28 },
+  topBarAiBorderArcSecondary: { position: 'absolute', top: 0, right: 0, width: 68, height: 68, backgroundColor: '#06B6D4', borderBottomLeftRadius: 28 },
+  topBarAiBorderArcTertiary: { position: 'absolute', bottom: 0, right: 0, width: 68, height: 68, backgroundColor: '#6366F1', borderTopLeftRadius: 28 },
+  topBarAiChipInner: { height: '100%', paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  topBarAiChipInnerCompact: { paddingHorizontal: 8, gap: 3 },
+  topBarAiLogo: { width: 19, height: 19 },
   topBarAiChipPressed: { transform: [{ translateY: 1 }], opacity: 0.9 },
-  topBarAiText: { color: '#047857', fontSize: 11.5, fontWeight: '900' },
+  topBarAiText: { color: '#0F766E', fontSize: 12.5, fontWeight: '900', letterSpacing: 0.3 },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarActionCompact: { width: 38, height: 38 },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },
