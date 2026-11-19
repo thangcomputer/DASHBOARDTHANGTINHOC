@@ -177,11 +177,29 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
     const userRec = (currentUser || {}) as Record<string, unknown>;
     const subReminder = DeviceEventEmitter.addListener(SOCKET_EVENTS.CLASS_REMINDER, (data: any) => {
       if (!data) return;
+      if (Number(data.offsetMinutes) > 1) return;
       const clock = vnScheduleClock();
       const day = String(data.day || clock.day);
+      if (data.startTime && !isMeetJoinWindow({
+        day,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        nowDay: clock.day,
+        nowMinutes: clock.minutes,
+        earlyMinutes: 1,
+      })) {
+        return;
+      }
       if (data.endTime && isMeetEnded({ day, endTime: data.endTime, nowDay: clock.day, nowMinutes: clock.minutes })) {
         return;
       }
+      const isLive = Boolean(data.isLive) || (data.startTime ? isMeetLiveNow({
+        day,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        nowDay: clock.day,
+        nowMinutes: clock.minutes,
+      }) : data.isLive !== false);
       const incoming: AlertClassItem = {
         id: String(data.scheduleId || data.id || `socket-${data.startTime || Date.now()}`),
         scheduleId: data.scheduleId ? String(data.scheduleId) : '',
@@ -200,7 +218,7 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
         personInfo: isTeacher
           ? (data.studentName ? `Học viên: ${data.studentName}` : '')
           : (data.teacherName ? `Giảng viên: ${data.teacherName}` : ''),
-        isLive: data.isLive !== false,
+        isLive,
       };
       if (isDismissed(incoming)) return;
       setItem((current) => {
@@ -383,14 +401,16 @@ export function MeetStartAlert({ user }: { user?: DemoUser | null }) {
         } else {
           setItem((current) => {
             if (!current) return null;
-            return isMeetEnded({
+            return isMeetJoinWindow({
               day: current.day,
+              startTime: current.startTime,
               endTime: current.endTime,
               nowDay: clock.day,
               nowMinutes: clock.minutes,
+              earlyMinutes: 1,
             })
-              ? null
-              : current;
+              ? current
+              : null;
           });
         }
       } catch {

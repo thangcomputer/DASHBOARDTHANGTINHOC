@@ -137,3 +137,27 @@ test('COMPLETED / CANCELLED', () => {
   assert.equal(resolveAttendanceState(mkSchedule({ status: 'completed' })).state, 'COMPLETED');
   assert.equal(resolveAttendanceState(mkSchedule({ status: 'cancelled' })).state, 'CANCELLED');
 });
+
+test('Nhật ký giảng dạy opens AttendanceMakeupRequestModal inline for both overdue_attendance and makeup_attendance', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const scheduleTab = fs.readFileSync(
+    path.join(__dirname, '../../client/src/components/teacher/TeacherScheduleTab.jsx'),
+    'utf8',
+  );
+  const teachingLog = fs.readFileSync(
+    path.join(__dirname, '../../client/src/components/teacher/TeacherTeachingLog.jsx'),
+    'utf8',
+  );
+
+  assert.ok(
+    scheduleTab.includes("kind !== 'overdue_attendance' && kind !== 'makeup_attendance'"),
+    'TeacherScheduleTab handles both overdue_attendance and makeup_attendance with inline modal instead of navigating away',
+  );
+  assert.ok(scheduleTab.includes('setMakeupTarget({ schedule: sch, student })'));
+  assert.ok(
+    teachingLog.includes("kind === 'overdue_attendance' || kind === 'makeup_attendance'")
+    && teachingLog.includes('<AttendanceMakeupRequestModal'),
+    'TeacherTeachingLog provides built-in AttendanceMakeupRequestModal fallback for direct Điểm danh bù',
+  );
+});

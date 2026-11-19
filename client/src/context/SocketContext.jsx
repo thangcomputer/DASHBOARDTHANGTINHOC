@@ -378,6 +378,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const onClassReminder = (reminder) => {
       if (!reminder || typeof reminder !== 'object') return;
+      if (Number(reminder.offsetMinutes) > 1) return;
       playNotifySound();
       setNotifications((prev) => [{
         id: Date.now(),

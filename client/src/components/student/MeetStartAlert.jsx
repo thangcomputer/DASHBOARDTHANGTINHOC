@@ -115,13 +115,32 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
     const onClassReminder = (e) => {
       const reminder = e?.detail;
       if (!reminder) return;
+      if (Number(reminder.offsetMinutes) > 1) return;
       const clock = vnScheduleClock();
+      const reminderDay = reminder.day || clock.day;
+      if (reminder.startTime && !isMeetJoinWindow({
+        day: reminderDay,
+        startTime: reminder.startTime,
+        endTime: reminder.endTime,
+        nowDay: clock.day,
+        nowMinutes: clock.minutes,
+        earlyMinutes: 1,
+      })) {
+        return;
+      }
+      const isLive = Boolean(reminder.isLive) || (reminder.startTime ? isMeetLiveNow({
+        day: reminderDay,
+        startTime: reminder.startTime,
+        endTime: reminder.endTime,
+        nowDay: clock.day,
+        nowMinutes: clock.minutes,
+      }) : reminder.isLive !== false);
       const incoming = {
         id: String(reminder.scheduleId || reminder.id || `socket-${reminder.startTime || Date.now()}`),
         scheduleId: reminder.scheduleId ? String(reminder.scheduleId) : '',
         title: reminder.course || reminder.title || 'Buổi học trực tuyến',
         course: reminder.course || reminder.title || 'Buổi học trực tuyến',
-        day: reminder.day || clock.day,
+        day: reminderDay,
         startTime: reminder.startTime || '',
         endTime: reminder.endTime || '',
         linkHoc: resolveMeetJoinLink(
@@ -132,7 +151,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
           session?.online_meeting_url,
         ),
         personInfo: role === 'teacher' ? (reminder.studentName ? `Học viên: ${reminder.studentName}` : '') : (reminder.teacherName ? `Giảng viên: ${reminder.teacherName}` : ''),
-        isLive: reminder.isLive !== false,
+        isLive,
       };
       if (isDismissed(incoming)) return;
       setItem((current) => {
@@ -204,7 +223,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
             endTime: s.endTime,
             nowDay: clock.day,
             nowMinutes: clock.minutes,
-            earlyMinutes: 2,
+            earlyMinutes: 1,
           });
 
           if (inWindow) {
@@ -248,7 +267,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
             endTime: m.endTime,
             nowDay: clock.day,
             nowMinutes: clock.minutes,
-            earlyMinutes: 2,
+            earlyMinutes: 1,
           });
 
           if (inWindow) {
@@ -292,6 +311,20 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
             }
             return current || target;
           });
+        } else if (active) {
+          setItem((current) => {
+            if (!current) return null;
+            return isMeetJoinWindow({
+              day: current.day,
+              startTime: current.startTime,
+              endTime: current.endTime,
+              nowDay: clock.day,
+              nowMinutes: clock.minutes,
+              earlyMinutes: 1,
+            })
+              ? current
+              : null;
+          });
         }
       } catch {
         /* Im lặng khi mất kết nối */
@@ -300,7 +333,7 @@ export default function MeetStartAlert({ role = 'student', session = null }) {
 
     tickRef.current = tick;
     tick();
-    const timer = setInterval(tick, 45000); // Quét lại mỗi 45 giây thay vì 15 giây
+    const timer = setInterval(tick, 15000); // Quét lại mỗi 15 giây để khớp cửa sổ báo trước 1 phút
     return () => {
       active = false;
       tickRef.current = null;

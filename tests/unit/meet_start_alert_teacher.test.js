@@ -133,10 +133,11 @@ test('server cron resolves fallback links before emitting class:reminder', () =>
   assert.ok(notifyIdx > attachIdx, 'attachFallbackScheduleLinks runs before class:reminder emission');
 });
 
-test('MeetStartAlert uses earlyMinutes: 2, immediately triggers tickRef when reminder lacks link, and keeps join CTA button for teachers', () => {
+test('MeetStartAlert uses earlyMinutes: 1, filters advance offsetMinutes > 1, immediately triggers tickRef when reminder lacks link, and keeps join CTA button for teachers', () => {
   const alertCode = readUtf8('client/src/components/student/MeetStartAlert.jsx');
-  const earlyMatches = alertCode.match(/earlyMinutes:\s*2\b/g) || [];
-  assert.equal(earlyMatches.length, 2, 'both scheduleRows and meetRows use earlyMinutes: 2');
+  const earlyMatches = alertCode.match(/earlyMinutes:\s*1\b/g) || [];
+  assert.ok(earlyMatches.length >= 3, 'socket listener, scheduleRows, and meetRows use earlyMinutes: 1');
+  assert.ok(alertCode.includes('Number(reminder.offsetMinutes) > 1'), 'ignores early advance reminders (> 1 minute)');
   assert.ok(alertCode.includes('if (!incoming.linkHoc)'), 'checks empty incoming linkHoc');
   assert.ok(alertCode.includes('tickRef.current?.()'), 'triggers immediate schedule refetch when link missing');
   assert.ok(alertCode.includes(') : isTeacher ? ('), 'teacher branch renders primary join button even if link missing');

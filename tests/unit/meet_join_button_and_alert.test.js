@@ -79,16 +79,26 @@ test('Web overview, DuoScheduleCard, StudentDiaryLog & CSS use red live "VÃ o há
   assert.ok(diary.includes('bg-red-500 hover:bg-red-600'), 'Web StudentDiaryLog uses red CTA when ongoing');
 });
 
-test('Server cron and Mobile MeetStartAlert handle 1-minute pre-class reminders for both Schedule and MeetClass', () => {
+test('Server cron and Web/Mobile MeetStartAlert enforce 1-minute pre-class reminder window without 60-minute popups', () => {
   const server = readUtf8('server.js');
   assert.ok(server.includes("const MeetClass = require('./models/MeetClass');"), 'server cron imports MeetClass');
   assert.ok(server.includes('todayMeetClasses'), 'server cron checks MeetClass 1 minute before startTime');
+  assert.ok(server.includes('nowMinutes >= startMinutes - 1 && nowMinutes < endMinutes'), 'server cron triggers 1 minute before start');
+  assert.equal(server.includes('ADVANCE_REMINDER_OFFSETS'), false, 'server cron no longer emits 1440/60/15-minute advance reminder popups');
+
+  const socketCtx = readUtf8('client/src/context/SocketContext.jsx');
+  assert.ok(socketCtx.includes('Number(reminder.offsetMinutes) > 1'), 'SocketContext skips advance reminders > 1 minute');
+
+  const webAlert = readUtf8('client/src/components/student/MeetStartAlert.jsx');
+  assert.ok(webAlert.includes('Number(reminder.offsetMinutes) > 1'), 'Web MeetStartAlert skips advance reminders > 1 minute');
+  assert.ok((webAlert.match(/earlyMinutes:\s*1\b/g) || []).length >= 3, 'Web MeetStartAlert enforces earlyMinutes: 1');
 
   const mobileAlert = readUtf8('thang-tin-hoc-mobile/src/components/MeetStartAlert.tsx');
+  assert.ok(mobileAlert.includes('Number(data.offsetMinutes) > 1'), 'Mobile MeetStartAlert skips advance reminders > 1 minute');
   assert.ok(mobileAlert.includes('function resolveScheduleFallbackLink'), 'Mobile MeetStartAlert ports Web link fallback helper');
   assert.ok(mobileAlert.includes('if (!incoming.linkHoc)'), 'Mobile MeetStartAlert refetches when socket reminder lacks link');
   assert.ok(mobileAlert.includes('tickRef.current?.()'), 'Mobile MeetStartAlert calls tickRef');
   assert.ok(mobileAlert.includes('SOCKET_EVENTS.SCHEDULE_NEW'), 'Mobile MeetStartAlert refreshes on schedule:new');
   assert.ok(mobileAlert.includes('15000'), 'Mobile MeetStartAlert polls every 15s for 1-minute pre-class accuracy');
-  assert.ok((mobileAlert.match(/earlyMinutes:\s*1\b/g) || []).length === 2, 'Mobile MeetStartAlert uses 1-minute pre-class window for both schedules and meet-classes');
+  assert.ok((mobileAlert.match(/earlyMinutes:\s*1\b/g) || []).length >= 3, 'Mobile MeetStartAlert uses 1-minute pre-class window across socket & polling');
 });

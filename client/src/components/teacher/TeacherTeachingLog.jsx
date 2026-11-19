@@ -17,6 +17,7 @@ import {
   makeupPendingKey,
   subscribeMakeupPending,
 } from '../../utils/attendanceMakeupPendingStore';
+import AttendanceMakeupRequestModal from './AttendanceMakeupRequestModal';
 
 const PENDING_KINDS = new Set(['pending_attendance', 'overdue_attendance', 'past_pending', 'makeup_attendance']);
 
@@ -154,7 +155,15 @@ export default function TeacherTeachingLog({
   const copy = COPY[variant] || COPY.teacher;
   const navigate = useNavigate();
   const [tab, setTab] = useState('all');
+  const [makeupTarget, setMakeupTarget] = useState(null);
   const [, refreshMakeupPending] = useReducer((revision) => revision + 1, 0);
+  const teacherSession = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('teacher_user') || '{}') || {};
+    } catch {
+      return {};
+    }
+  }, []);
   const todayKey = formatLocalDateKey(new Date());
   const now = useMemo(() => new Date(), []);
   const weekKeys = useMemo(() => weekDateKeys(startOfWeekMonday(now)), [now]);
@@ -218,7 +227,27 @@ export default function TeacherTeachingLog({
     if (variant !== 'teacher') return;
     const sid = resolveStudentId(sch);
     if (!sid) return;
+    const kind = getScheduleDisplayKind(sch, now);
     const course = String(sch.course || sch.courseName || '').trim();
+    if (kind === 'overdue_attendance' || kind === 'makeup_attendance') {
+      const schCourse = course.toLowerCase();
+      const found = (students || []).find(
+        (s) => String(s._id || s.id) === sid && (!schCourse || String(s.course || '').trim().toLowerCase() === schCourse),
+      ) || studentById.get(sid);
+      const student = found
+        ? { ...found, course: course || found.course || '' }
+        : {
+            _id: sid,
+            id: sid,
+            name: sch.studentName || 'Học viên',
+            course,
+            completedSessions: sch.completedSessions,
+            remainingSessions: sch.remainingSessions,
+            totalSessions: sch.totalSessions,
+          };
+      setMakeupTarget({ schedule: sch, student });
+      return;
+    }
     const q = new URLSearchParams();
     q.set('studentId', sid);
     if (course) q.set('course', course);
@@ -444,6 +473,14 @@ export default function TeacherTeachingLog({
             </div>
           )}
         </div>
+        <AttendanceMakeupRequestModal
+          open={Boolean(makeupTarget)}
+          onClose={() => setMakeupTarget(null)}
+          student={makeupTarget?.student}
+          schedule={makeupTarget?.schedule}
+          teacherName={teacherSession.name || 'Giảng viên'}
+          teacherId={String(teacherSession.id || teacherSession._id || '')}
+        />
       </section>
     );
   }
@@ -627,6 +664,14 @@ export default function TeacherTeachingLog({
           </ol>
         )}
       </div>
+      <AttendanceMakeupRequestModal
+        open={Boolean(makeupTarget)}
+        onClose={() => setMakeupTarget(null)}
+        student={makeupTarget?.student}
+        schedule={makeupTarget?.schedule}
+        teacherName={teacherSession.name || 'Giảng viên'}
+        teacherId={String(teacherSession.id || teacherSession._id || '')}
+      />
     </div>
   );
 }

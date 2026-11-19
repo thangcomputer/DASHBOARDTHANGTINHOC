@@ -95,8 +95,18 @@ function canTeacherMarkAttendance(item: ScheduleItem | undefined, now = Date.now
   return Boolean(bounds && now >= bounds.startAt + 15 * 60 * 1000 && now <= bounds.deadline);
 }
 
+function isConfirmExpiredPastGrace(item: ScheduleItem | undefined, now = Date.now()) {
+  if (!item) return false;
+  const confirmStatus = String(item.attendanceConfirmStatus || '').toLowerCase();
+  if (confirmStatus !== 'confirm_expired') return false;
+  const bounds = getAttendanceBounds(item);
+  return !bounds || now > bounds.deadline;
+}
+
 function canTeacherRequestMakeup(item: ScheduleItem | undefined, now = Date.now()) {
-  if (!item || !isTeacherAttendanceActionPending(item)) return false;
+  if (!item || item.status === 'cancelled' || item.status === 'completed') return false;
+  if (isConfirmExpiredPastGrace(item, now)) return true;
+  if (!isTeacherAttendanceActionPending(item)) return false;
   const bounds = getAttendanceBounds(item);
   return Boolean(bounds && now > bounds.deadline);
 }
@@ -109,6 +119,8 @@ function isScheduleRescheduleLocked(item: ScheduleItem) {
 
 function isTeacherAttendanceActionPending(item: ScheduleItem) {
   const confirmStatus = String(item.attendanceConfirmStatus || '').toLowerCase();
+  if (item.status === 'cancelled' || item.status === 'completed') return false;
+  if (isConfirmExpiredPastGrace(item, Date.now())) return true;
   return item.status === 'upcoming'
     && item.attendanceStatus === 'pending'
     && !item.attendanceConfirmPending
@@ -119,6 +131,7 @@ function isAttendanceAwaitingStudentConfirmation(item: ScheduleItem) {
   const confirmStatus = String(item.attendanceConfirmStatus || '').toLowerCase();
   return item.status !== 'cancelled'
     && item.status !== 'completed'
+    && !isConfirmExpiredPastGrace(item, Date.now())
     && (
       confirmStatus === 'pending'
       || confirmStatus === 'confirm_expired'
@@ -139,6 +152,7 @@ function attendanceStatusLabel(item: ScheduleItem, now = Date.now()) {
   const confirmStatus = String(item.attendanceConfirmStatus || '').toLowerCase();
   if (confirmStatus === 'admin_rejected' || item.attendanceRejected) return 'Không được tính';
   if (confirmStatus === 'disputed' || item.attendanceDisputed) return 'Chờ Admin xử lý';
+  if (isConfirmExpiredPastGrace(item, now)) return 'Điểm danh bù';
   if (confirmStatus === 'pending' || item.attendanceConfirmPending) return 'Chờ học viên xác nhận';
   if (confirmStatus === 'admin_approved') return 'Đã điểm danh bù';
   if (confirmStatus === 'accepted' || item.confirmedByStudent) return 'Đã điểm danh';

@@ -37,7 +37,7 @@ export default function AttendanceMakeupRequestModal({
     scheduleId: schedule?._id || schedule?.id,
     studentId: student?._id || student?.id,
     date: schedule?.date,
-    course: student?.course || schedule?.course,
+    course: schedule?.course || schedule?.courseName || student?.course,
   }), [schedule, student]);
 
   const alreadyPending = Boolean(pendingKey && getMakeupPending(pendingKey));

@@ -1497,17 +1497,10 @@ if (!isTest) {
 const Schedule = require('./models/Schedule');
 const MeetClass = require('./models/MeetClass');
 
-const ADVANCE_REMINDER_OFFSETS = [1440, 60, 15];
-const ADVANCE_REMINDER_SENT = new Map();
-
-// Chạy mỗi 1 phút - kiểm tra lịch học sắp tới và đang diễn ra để gửi nhắc nhở
+// Chạy mỗi 1 phút - kiểm tra lịch học sắp tới (trước 1 phút) và đang diễn ra để gửi nhắc nhở
 if (!isTest) cron.schedule('* * * * *', async () => {
   try {
     const nowMs = Date.now();
-    for (const [k, exp] of ADVANCE_REMINDER_SENT.entries()) {
-      if (exp <= nowMs) ADVANCE_REMINDER_SENT.delete(k);
-    }
-
     const vnNow = new Date(nowMs + 7 * 3600 * 1000);
     const y = vnNow.getUTCFullYear();
     const m = vnNow.getUTCMonth();
@@ -1515,9 +1508,9 @@ if (!isTest) cron.schedule('* * * * *', async () => {
     const todayStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const nowMinutes = vnNow.getUTCHours() * 60 + vnNow.getUTCMinutes();
 
-    // Quét tới +2 ngày để hỗ trợ nhắc trước 24 giờ, 60 phút, 15 phút và bắt đầu buổi học
+    // Lấy các lịch hôm nay (quét trong khoảng +-1 ngày UTC để bao quát múi giờ)
     const rangeStart = new Date(Date.UTC(y, m, d - 1, 0, 0, 0));
-    const rangeEnd = new Date(Date.UTC(y, m, d + 2, 23, 59, 59));
+    const rangeEnd = new Date(Date.UTC(y, m, d + 1, 23, 59, 59));
 
     const upcomingSchedules = await Schedule.find({
       date: { $gte: rangeStart, $lte: rangeEnd },
@@ -1532,54 +1525,12 @@ if (!isTest) cron.schedule('* * * * *', async () => {
     for (const sched of upcomingSchedules) {
       const sDateObj = new Date(sched.date);
       const sVnDate = new Date(sDateObj.getTime() + 7 * 3600 * 1000);
-      const sY = sVnDate.getUTCFullYear();
-      const sM = sVnDate.getUTCMonth();
-      const sD = sVnDate.getUTCDate();
-      const sDayStr = `${sY}-${String(sM + 1).padStart(2, '0')}-${String(sD).padStart(2, '0')}`;
+      const sDayStr = `${sVnDate.getUTCFullYear()}-${String(sVnDate.getUTCMonth() + 1).padStart(2, '0')}-${String(sVnDate.getUTCDate()).padStart(2, '0')}`;
+      if (sDayStr !== todayStr) continue;
 
       const [sh, sm] = String(sched.startTime || '').split(':').map(Number);
       if (!Number.isFinite(sh)) continue;
       const startMinutes = sh * 60 + (Number.isFinite(sm) ? sm : 0);
-      const startAtMs = Date.UTC(sY, sM, sD, sh - 7, Number.isFinite(sm) ? sm : 0);
-      const minsUntilStart = (startAtMs - nowMs) / 60_000;
-
-      for (const offset of ADVANCE_REMINDER_OFFSETS) {
-        if (minsUntilStart <= offset && minsUntilStart > offset - 2) {
-          const advanceKey = `${sched._id}:${startAtMs}:${offset}`;
-          if (!ADVANCE_REMINDER_SENT.has(advanceKey)) {
-            ADVANCE_REMINDER_SENT.set(advanceKey, startAtMs + 3600_000);
-            const advLabel = offset === 1440 ? '24 giờ' : `${offset} phút`;
-            const advPayload = {
-              scheduleId: sched._id,
-              course: sched.course,
-              teacherName: sched.teacherName,
-              studentName: sched.studentName,
-              studentId: sched.studentId,
-              teacherId: sched.teacherId,
-              day: sDayStr,
-              startTime: sched.startTime,
-              endTime: sched.endTime,
-              linkHoc: String(sched.linkHoc || '').trim(),
-              offsetMinutes: offset,
-              isLive: false,
-            };
-            if (sched.studentId) {
-              app.notifyUser('student', sched.studentId, 'class:reminder', {
-                ...advPayload,
-                message: `⏰ Nhắc lịch học (còn ${advLabel}): ${sched.course} lúc ${sched.startTime} ngày ${sDayStr}`,
-              });
-            }
-            if (sched.teacherId) {
-              app.notifyUser('teacher', sched.teacherId, 'class:reminder', {
-                ...advPayload,
-                message: `⏰ Nhắc lịch dạy (còn ${advLabel}): ${sched.course} (${sched.studentName || 'Học viên'}) lúc ${sched.startTime}`,
-              });
-            }
-          }
-        }
-      }
-
-      if (sDayStr !== todayStr) continue;
 
       const [eh, em] = String(sched.endTime || '').split(':').map(Number);
       const endMinutes = Number.isFinite(eh) ? eh * 60 + (Number.isFinite(em) ? em : 0) : startMinutes + 60;

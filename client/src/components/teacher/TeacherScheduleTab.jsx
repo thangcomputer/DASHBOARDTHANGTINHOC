@@ -334,10 +334,10 @@ export default function TeacherScheduleTab({
     navigate(`/teacher#students?${q.toString()}`);
   }, [navigate, toast]);
 
-  /** Nhật ký: quá hạn → popup điểm danh bù; còn lại → hồ sơ HV (điểm danh thường). */
+  /** Nhật ký: quá hạn / hết hạn xác nhận → popup điểm danh bù tại chỗ; còn lại → hồ sơ HV. */
   const handleOpenAttendance = useCallback((sch) => {
     const kind = getScheduleDisplayKind(sch);
-    if (kind !== 'overdue_attendance') {
+    if (kind !== 'overdue_attendance' && kind !== 'makeup_attendance') {
       openStudentProfile(sch);
       return;
     }
@@ -346,18 +346,21 @@ export default function TeacherScheduleTab({
       toast.error('Không tìm thấy học viên của ca này.');
       return;
     }
+    const schCourse = String(sch.course || sch.courseName || '').trim().toLowerCase();
     const found = (students || []).find(
-      (s) => String(s._id || s.id) === sid,
-    );
-    const student = found || {
-      _id: sid,
-      id: sid,
-      name: sch.studentName || 'Học viên',
-      course: sch.course || sch.courseName || '',
-      completedSessions: sch.completedSessions,
-      remainingSessions: sch.remainingSessions,
-      totalSessions: sch.totalSessions,
-    };
+      (s) => String(s._id || s.id) === sid && (!schCourse || String(s.course || '').trim().toLowerCase() === schCourse),
+    ) || (students || []).find((s) => String(s._id || s.id) === sid);
+    const student = found
+      ? { ...found, course: sch.course || sch.courseName || found.course || '' }
+      : {
+          _id: sid,
+          id: sid,
+          name: sch.studentName || 'Học viên',
+          course: sch.course || sch.courseName || '',
+          completedSessions: sch.completedSessions,
+          remainingSessions: sch.remainingSessions,
+          totalSessions: sch.totalSessions,
+        };
     setMakeupTarget({ schedule: sch, student });
   }, [openStudentProfile, students, toast]);
 
