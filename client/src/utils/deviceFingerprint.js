@@ -75,28 +75,46 @@ export function getDeviceFingerprint() {
 
 const SECRET_KEY = 'cms_device_secret_v1';
 
-/** Khóa chứng minh thiết bị (không phải hardware ID). Trình duyệt chỉ giữ trong localStorage. */
-export function getStoredDeviceSecret() {
+function buildScopedSecretKey(scope = null) {
+  if (!scope || typeof scope !== 'object') return '';
+  const role = String(scope.role || '').trim().toLowerCase();
+  const identifier = String(scope.identifier || scope.phone || scope.email || '').trim().toLowerCase();
+  if (!identifier) return '';
+  return `${SECRET_KEY}:${role || 'user'}:${identifier}`;
+}
+
+/** Khóa chứng minh thiết bị (không phải hardware ID). Giữ bền vững qua các lần đăng xuất. */
+export function getStoredDeviceSecret(scope = null) {
   try {
+    const scopedKey = buildScopedSecretKey(scope);
+    if (scopedKey) {
+      const scopedVal = localStorage.getItem(scopedKey);
+      if (scopedVal) return scopedVal;
+    }
     return localStorage.getItem(SECRET_KEY) || '';
   } catch {
     return '';
   }
 }
 
-export function rememberDeviceSecret(secret) {
+export function rememberDeviceSecret(secret, scope = null) {
   if (!secret) return;
+  const value = String(secret);
   try {
-    localStorage.setItem(SECRET_KEY, String(secret));
+    localStorage.setItem(SECRET_KEY, value);
+    const scopedKey = buildScopedSecretKey(scope);
+    if (scopedKey) {
+      localStorage.setItem(scopedKey, value);
+    }
   } catch {
     /* ignore */
   }
 }
 
-export function getDeviceAuthFields() {
+export function getDeviceAuthFields(scope = null) {
   return {
     deviceFingerprint: getDeviceFingerprint(),
     deviceKey: getDeviceFingerprint(),
-    deviceSecret: getStoredDeviceSecret(),
+    deviceSecret: getStoredDeviceSecret(scope),
   };
 }

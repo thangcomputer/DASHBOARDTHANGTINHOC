@@ -29,6 +29,7 @@ const LoginPage = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notFoundError, setNotFoundError] = useState(false);
+  const [reEnrollError, setReEnrollError] = useState(false);
   const [deviceConflict, setDeviceConflict] = useState(false); // cảnh báo máy khác
   const pendingLoginRef = useRef(null); // lưu payload để force login
   const [dynamicLogo, setDynamicLogo] = useState('');
@@ -55,7 +56,7 @@ const LoginPage = ({ onLogin }) => {
   }, [API]);
 
   const doLogin = async (forceDevice = false) => {
-    setLoading(true); setError(null); setNotFoundError(false);
+    setLoading(true); setError(null); setNotFoundError(false); setReEnrollError(false);
     const rawContact = String(phone || '').trim();
     const normalized = normalizePhone(rawContact);
     const trimmedEmail = rawContact.toLowerCase();
@@ -66,7 +67,8 @@ const LoginPage = ({ onLogin }) => {
     }
     const id = isPhoneOk ? normalized : trimmedEmail;
     try {
-      const deviceAuth = getDeviceAuthFields();
+      const deviceScope = { role, identifier: id };
+      const deviceAuth = getDeviceAuthFields(deviceScope);
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/login/public`, {
         method: 'POST',
@@ -78,9 +80,9 @@ const LoginPage = ({ onLogin }) => {
         body: JSON.stringify({ identifier: id, phone: id, password, role, force: forceDevice, ...deviceAuth }),
       });
       const data = await response.json();
-      if (data.code === 'DEVICE_NOT_REGISTERED_LIMIT_REACHED') {
-        setError(data.message || 'Tài khoản này đã được đăng ký trên 2 thiết bị cố định.');
-        toast.error(data.title || 'Đã đạt giới hạn thiết bị');
+      if (data.code === 'DEVICE_NOT_REGISTERED_LIMIT_REACHED' || data.code === 'DEVICE_PROOF_INVALID' || data.code === 'DEVICE_KEY_REQUIRED') {
+        setError(data.message || 'Không xác minh được thiết bị đã đăng ký.');
+        toast.error(data.title || 'Không xác minh được thiết bị');
         return;
       }
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') {
@@ -90,7 +92,7 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
       if (data.success) {
-        rememberDeviceSecret(data.data?.deviceSecret);
+        rememberDeviceSecret(data.data?.deviceSecret, deviceScope);
         setDeviceConflict(false);
         const user = data.data.user ? { ...data.data.user } : { ...data.data };
         const accessToken = data.data.accessToken || user.accessToken;
@@ -116,6 +118,7 @@ const LoginPage = ({ onLogin }) => {
         navigate(teacherHome);
       } else if (data.code === 'NEEDS_RE_ENROLL' || data.redirect === '/dangkykhoahoc') {
         const p = String(data.phone || phone || '').trim();
+        setReEnrollError(true);
         setError(data.message || 'Bạn cần đăng ký và thanh toán khóa học mới để đăng nhập.');
         const q = new URLSearchParams({ reEnroll: '1' });
         if (p) q.set('phone', p);
@@ -288,7 +291,7 @@ const LoginPage = ({ onLogin }) => {
                         Đăng ký tài khoản ngay
                         <NavArrow size={14} className="text-white" />
                       </button>
-                    ) : (String(error).includes('đăng ký') || String(error).includes('khóa học')) && (
+                    ) : reEnrollError && (
                       <button
                         type="button"
                         onClick={() => {

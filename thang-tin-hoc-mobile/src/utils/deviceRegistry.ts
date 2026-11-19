@@ -4,6 +4,21 @@ import * as SecureStore from 'expo-secure-store';
 const KEY_ID = 'cms_registered_device_key_v1';
 const KEY_SECRET = 'cms_registered_device_secret_v1';
 
+export type DeviceAuthScope = {
+  role?: string | null;
+  identifier?: string | null;
+};
+
+function buildScopedSecretKey(scope?: DeviceAuthScope | null): string {
+  if (!scope) return '';
+  const role = String(scope.role || '').trim().toLowerCase();
+  const identifier = String(scope.identifier || '').trim().toLowerCase();
+  if (!identifier) return '';
+  const raw = `${KEY_SECRET}:${role || 'user'}:${identifier}`;
+  // expo-secure-store allows alphanumeric, '.', '-', and '_' on native platforms.
+  return Platform.OS === 'web' ? raw : raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 async function read(key: string): Promise<string> {
   if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
     return localStorage.getItem(key) || '';
@@ -26,17 +41,23 @@ function randomId() {
 }
 
 /** Định danh ổn định trên máy + khóa bí mật do server cấp lần đăng ký đầu. */
-export async function getMobileDeviceAuthFields() {
+export async function getMobileDeviceAuthFields(scope?: DeviceAuthScope | null) {
   let deviceKey = await read(KEY_ID);
   if (!deviceKey) {
     deviceKey = randomId();
     await write(KEY_ID, deviceKey);
   }
-  const deviceSecret = await read(KEY_SECRET);
+  const scopedKey = buildScopedSecretKey(scope);
+  const deviceSecret = (scopedKey ? await read(scopedKey) : '') || (await read(KEY_SECRET));
   return { deviceKey, deviceFingerprint: deviceKey, deviceSecret };
 }
 
-export async function rememberMobileDeviceSecret(secret?: string | null) {
+export async function rememberMobileDeviceSecret(secret?: string | null, scope?: DeviceAuthScope | null) {
   if (!secret) return;
-  await write(KEY_SECRET, String(secret));
+  const value = String(secret);
+  await write(KEY_SECRET, value);
+  const scopedKey = buildScopedSecretKey(scope);
+  if (scopedKey) {
+    await write(scopedKey, value);
+  }
 }

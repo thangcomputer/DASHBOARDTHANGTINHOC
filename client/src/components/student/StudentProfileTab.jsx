@@ -23,6 +23,7 @@ import { useStudentSubscription } from './subscription/subscriptionContext';
 import { formatVnd } from '../../utils/subscription';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/useToast';
+import { clearStorageKeepingPreferences } from '../../utils/logoutStorage';
 import LanguageSwitcher from '../LanguageSwitcher';
 
 function openChangePassword() {
@@ -367,7 +368,7 @@ export default function StudentProfileTab({
     if (onLogout) {
       onLogout();
     } else {
-      localStorage.clear();
+      clearStorageKeepingPreferences();
       window.location.href = '/login';
     }
   };

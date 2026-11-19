@@ -9,6 +9,7 @@ import { BankSelect } from '../BankSelect';
 import { openPinLockSettings } from '../../utils/pinLock';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/useToast';
+import { clearStorageKeepingPreferences } from '../../utils/logoutStorage';
 import EditableAvatar from '../EditableAvatar';
 import LanguageSwitcher from '../LanguageSwitcher';
 import CmsSelect from '../ui/CmsSelect';
@@ -125,7 +126,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     if (onLogout) {
       onLogout();
     } else {
-      localStorage.clear();
+      clearStorageKeepingPreferences();
       window.location.href = '/login';
     }
   };

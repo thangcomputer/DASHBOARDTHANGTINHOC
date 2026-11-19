@@ -624,7 +624,8 @@ export const authService = {
     if (!phone.trim() || !password.trim()) throw new Error('Vui lòng nhập số điện thoại và mật khẩu.');
     const platform = Platform.OS === 'web' ? 'web' : Platform.OS;
     if (!['android', 'ios', 'web'].includes(platform)) throw new Error('Nền tảng đăng nhập chưa được hỗ trợ.');
-    const deviceAuth = await getMobileDeviceAuthFields();
+    const deviceScope = { role, identifier: phone.trim().toLowerCase() };
+    const deviceAuth = await getMobileDeviceAuthFields(deviceScope);
     const payload = await mobileApiRequest<MobileAuthSessionPayload & { deviceSecret?: string }>('/auth/login/mobile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -638,7 +639,7 @@ export const authService = {
         ...deviceAuth,
       }),
     }, false);
-    await rememberMobileDeviceSecret(payload.deviceSecret);
+    await rememberMobileDeviceSecret(payload.deviceSecret, deviceScope);
     return finalizeMobileAuthSession(role, phone, payload);
   },
   async requestForgotPasswordOtp(role: UserRole, identifier: string) {

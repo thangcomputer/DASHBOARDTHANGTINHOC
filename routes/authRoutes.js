@@ -271,21 +271,52 @@ async function checkDeviceConflict(Model, userId, fp, force, req) {
   };
 }
 
+function deviceProofCookieName(userId) {
+  const cleanId = String(userId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  return cleanId ? `cms_dp_${cleanId}` : '';
+}
+
+function getIncomingDeviceSecret(req, userId) {
+  const fromBody = String(req?.body?.deviceSecret || '').trim();
+  if (fromBody) return fromBody;
+  const cookieName = deviceProofCookieName(userId);
+  return cookieName ? String(req?.cookies?.[cookieName] || '').trim() : '';
+}
+
+function syncDeviceProofCookie(res, req, userId, secret) {
+  const cookieName = deviceProofCookieName(userId);
+  if (!res || typeof res.cookie !== 'function' || !cookieName || !secret) return;
+  const secure = req?.secure || String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+  res.cookie(cookieName, String(secret), {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/api/auth',
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    secure: Boolean(secure),
+  });
+}
+
 /** HV/GV: 2 thiết bị cố định. Không xóa đăng ký khi logout. Không khóa tài khoản khi máy thứ 3. */
 async function gateFixedRegisteredDevice(req, res, user, userRole) {
   if (!['student', 'teacher'].includes(userRole)) return true;
   const deviceKey = String(req.body?.deviceKey || req.body?.deviceFingerprint || '').trim();
   if (!deviceKey) return true;
   try {
+    const incomingSecret = getIncomingDeviceSecret(req, user._id);
     const claim = await registeredDeviceService.claimLoginDevice({
       userId: user._id,
       role: userRole,
       deviceKey,
-      deviceSecret: req.body?.deviceSecret,
+      deviceSecret: incomingSecret,
       platform: req.body?.platform || 'web',
       req,
     });
     req.fixedDeviceClaim = claim;
+    const effectiveSecret = claim?.deviceSecret || incomingSecret;
+    if (effectiveSecret) {
+      req.resolvedDeviceSecret = effectiveSecret;
+      syncDeviceProofCookie(res, req, user._id, effectiveSecret);
+    }
     return true;
   } catch (err) {
     if (sendFixedDeviceError(res, err)) return false;
@@ -1150,7 +1181,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
           userId: user._id,
           role: userRole,
           deviceKey: previewKey2,
-          deviceSecret: req.body?.deviceSecret,
+          deviceSecret: getIncomingDeviceSecret(req, user._id),
         });
       } catch (previewErr) {
         if (sendFixedDeviceError(res, previewErr)) return;
@@ -1223,7 +1254,9 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
         accessToken,
         refreshToken,
         deviceSessionId: dsid,
-        ...(req.fixedDeviceClaim?.deviceSecret ? { deviceSecret: req.fixedDeviceClaim.deviceSecret } : {}),
+        ...((req.fixedDeviceClaim?.deviceSecret || (!req.body?.deviceSecret && req.resolvedDeviceSecret))
+          ? { deviceSecret: req.fixedDeviceClaim?.deviceSecret || req.resolvedDeviceSecret }
+          : {}),
         registeredDeviceSlot: req.fixedDeviceClaim?.slot || null,
       },
     });
@@ -1312,7 +1345,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
           userId: user._id,
           role: userRole,
           deviceKey: mobileFp,
-          deviceSecret: req.body?.deviceSecret,
+          deviceSecret: getIncomingDeviceSecret(req, user._id),
         });
       } catch (previewErr) {
         if (sendFixedDeviceError(res, previewErr)) return;

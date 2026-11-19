@@ -5,6 +5,9 @@
  */
 const PRESERVED_KEYS = new Set([
   'cms_device_id_v1',
+  'cms_device_secret_v1',
+  'cms_registered_device_key_v1',
+  'cms_registered_device_secret_v1',
   'cms_sidebar_pinned',
   'cms_sidebar_groups',
   'thvp_muted',
@@ -17,7 +20,14 @@ const PRESERVED_KEYS = new Set([
   'dewskill_lang',
 ]);
 
-const PRESERVED_PREFIXES = ['cms_login_alert', 'cms_pin_lock:', 'cms_daily_practice_reminder:', 'cms_subscription_reminder:'];
+const PRESERVED_PREFIXES = [
+  'cms_device_secret_v1:',
+  'cms_registered_device_secret_v1:',
+  'cms_login_alert',
+  'cms_pin_lock:',
+  'cms_daily_practice_reminder:',
+  'cms_subscription_reminder:',
+];
 
 export function isPreservedPreferenceKey(key) {
   if (!key) return false;

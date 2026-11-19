@@ -23,7 +23,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
-import { getDeviceFingerprint } from '../utils/deviceFingerprint';
+import { getDeviceFingerprint, getDeviceAuthFields, rememberDeviceSecret } from '../utils/deviceFingerprint';
 import { isValidVNPhone, isValidEmail, limitPhoneInput, normalizePhone } from '../utils/validators';
 import { unlockAudio } from '../utils/sound';
 import ForgotPasswordModal from './ForgotPasswordModal';
@@ -235,7 +235,8 @@ export default function FreePortalPage({ onLogin }) {
     return () => { cancelled = true; };
   }, []);
 
-  const acceptSession = (data) => {
+  const acceptSession = (data, scope = null) => {
+    rememberDeviceSecret(data?.deviceSecret, scope);
     const user = data.user ? { ...data.user } : { ...data };
     const accessToken = data.accessToken || user.accessToken;
     const refreshToken = data.refreshToken || user.refreshToken;
@@ -262,11 +263,13 @@ export default function FreePortalPage({ onLogin }) {
     const loginId = isPhoneOk ? normalized : trimmedEmail;
     setLoading(true); setError(''); setNotFoundAccount(false);
     try {
+      const deviceScope = { role: 'student', identifier: loginId };
+      const deviceAuth = getDeviceAuthFields(deviceScope);
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/login/public`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ identifier: loginId, phone: loginId, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: isForce }),
+        body: JSON.stringify({ identifier: loginId, phone: loginId, password, role: 'student', ...deviceAuth, force: isForce }),
       });
       const data = await response.json();
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') { setDeviceConflict(true); return; }
@@ -277,7 +280,7 @@ export default function FreePortalPage({ onLogin }) {
         setError(data.message || 'Số điện thoại/Gmail hoặc mật khẩu không đúng');
         return;
       }
-      acceptSession(data.data);
+      acceptSession(data.data, deviceScope);
     } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
   };
 
