@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck, Lock, User, Eye, EyeOff, AlertTriangle, ChevronRight, Fingerprint, Activity, MonitorX,
   RefreshCw, KeyRound, Users, ScrollText, LayoutDashboard, BarChart3,
@@ -19,6 +19,8 @@ const ADMIN_HIGHLIGHTS = [
 
 const AdminLoginPage = ({ onLogin }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const sessionReplacedMsg = new URLSearchParams(location.search).get('msg') === 'session_replaced';
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -337,6 +339,12 @@ const AdminLoginPage = ({ onLogin }) => {
               </div>
 
               <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-4">
+                {sessionReplacedMsg && (
+                  <div role="alert" className="bg-amber-500/15 border border-amber-400/35 p-3.5 rounded-xl flex items-start gap-3 text-amber-200 text-xs sm:text-sm font-bold leading-relaxed">
+                    <MonitorX size={18} className="shrink-0 mt-0.5 text-amber-400" aria-hidden="true" />
+                    <span>Phiên đăng nhập đã kết thúc do tài khoản vừa được đăng nhập ở trình duyệt hoặc thiết bị khác.</span>
+                  </div>
+                )}
                 {error && (
                   <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm font-bold">
                     <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />

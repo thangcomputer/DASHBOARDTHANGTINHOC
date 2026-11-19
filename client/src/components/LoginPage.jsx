@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Eye, EyeOff, CheckCircle2, AlertCircle, BookOpen, Lock, User, KeyRound, MonitorX, UserPlus,
-  GraduationCap, Award, Headphones, LogIn, Monitor,
+  GraduationCap, Award, Headphones, LogIn, Monitor, Clock,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { setTokens, clearOtherRoleSessions, ensureCsrfToken, API_BASE } from '../services/api';
@@ -34,8 +34,10 @@ const LoginPage = ({ onLogin }) => {
   const pendingLoginRef = useRef(null); // lưu payload để force login
   const [dynamicLogo, setDynamicLogo] = useState('');
 
-  // Hiển thị thông báo nếu bị đăng xuất do không hoạt động
-  const inactivityMsg = new URLSearchParams(location.search).get('msg') === 'inactivity';
+  // Hiển thị thông báo nếu bị đăng xuất do không hoạt động hoặc do nơi khác đăng nhập
+  const urlMsg = new URLSearchParams(location.search).get('msg');
+  const inactivityMsg = urlMsg === 'inactivity';
+  const sessionReplacedMsg = urlMsg === 'session_replaced';
 
 
   // ── Forgot Password State ──
@@ -270,6 +272,12 @@ const LoginPage = ({ onLogin }) => {
                 {inactivityMsg && (
                   <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-2.5 text-amber-300 text-xs font-bold">
                     <Clock size={16} aria-hidden="true" className="shrink-0" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
+                  </div>
+                )}
+                {sessionReplacedMsg && (
+                  <div role="alert" className="bg-amber-500/15 border border-amber-400/35 p-3 rounded-xl flex items-start gap-2.5 text-amber-200 text-xs font-bold leading-relaxed">
+                    <MonitorX size={16} aria-hidden="true" className="shrink-0 mt-0.5 text-amber-400" />
+                    <span>Phiên đăng nhập đã kết thúc do tài khoản vừa được đăng nhập ở trình duyệt hoặc thiết bị khác.</span>
                   </div>
                 )}
                 {error && (

@@ -157,12 +157,15 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       }, 320);
     };
 
+    let sessionReplaced = false;
+
     const pauseReconnectIfOffline = () => {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
       }
     };
     const resumeReconnectIfOnline = () => {
+      if (sessionReplaced) return;
       try {
         newSocket.io.opts.reconnection = true;
         if (!newSocket.connected) newSocket.connect();
@@ -209,9 +212,23 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       }
     };
 
-    const onConnectError = () => {
+    const onConnectError = (err) => {
       setIsConnected(false);
       setOnlineUsers([]);
+      const msg = String(err?.message || '');
+      if (
+        msg.includes('Token version mismatch')
+        || msg.includes('Device session revoked')
+        || msg.includes('Session revoked')
+        || msg.includes('Token revoked')
+      ) {
+        sessionReplaced = true;
+        try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
+        window.dispatchEvent(new CustomEvent('cms:session-replaced', {
+          detail: { token, reason: 'session_replaced' },
+        }));
+        return;
+      }
       pauseReconnectIfOffline();
     };
 
@@ -225,14 +242,15 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       }
     };
 
-    let sessionReplaced = false;
     const onSessionReplaced = () => {
       sessionReplaced = true;
-      window.dispatchEvent(new CustomEvent('cms:session-replaced', { detail: { token } }));
+      try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
+      window.dispatchEvent(new CustomEvent('cms:session-replaced', { detail: { token, reason: 'session_replaced' } }));
     };
 
     const onForceLogout = (payload = {}) => {
       sessionReplaced = true;
+      try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
       window.dispatchEvent(new CustomEvent('cms:force-logout', { detail: { token, ...(payload || {}) } }));
     };
 

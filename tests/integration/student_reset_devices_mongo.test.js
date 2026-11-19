@@ -234,8 +234,17 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
     });
     assert.equal(reloginWithCookieFallback.status, 200, JSON.stringify(reloginWithCookieFallback.json));
     assert.equal(reloginWithCookieFallback.json?.data?.deviceSecret, secretA);
+    const chromeTokenBeforeEdge = reloginWithCookieFallback.json?.data?.accessToken;
+    const chromeDsidBeforeEdge = reloginWithCookieFallback.json?.data?.deviceSessionId;
+    assert.ok(chromeTokenBeforeEdge);
+    assert.ok(chromeDsidBeforeEdge);
+    const chromeAliveBeforeEdge = await requestJson(baseUrl, '/api/test-me', { token: chromeTokenBeforeEdge });
+    assert.equal(chromeAliveBeforeEdge.status, 200);
 
     // 1d. Different browser / Incognito on the SAME physical PC (Edge/Windows, empty secret/cookie) must log in on Slot 1
+    //     and IMMEDIATELY kick out the Chrome session (TOKEN_VERSION_MISMATCH / SESSION_REVOKED + socket kick events)
+    socketEmits.length = 0;
+    disconnectedRooms.length = 0;
     const edgeSamePc = await requestJson(baseUrl, '/api/auth/login/public', {
       method: 'POST',
       headers: {
@@ -253,6 +262,28 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
     assert.equal(edgeSamePc.status, 200, JSON.stringify(edgeSamePc.json));
     assert.equal(edgeSamePc.json?.data?.registeredDeviceSlot, 1);
     assert.ok(edgeSamePc.json?.data?.deviceSecret);
+    const edgeToken = edgeSamePc.json?.data?.accessToken;
+    assert.ok(edgeToken);
+
+    const chromeAfterEdge = await requestJson(baseUrl, '/api/test-me', { token: chromeTokenBeforeEdge });
+    assert.equal(chromeAfterEdge.status, 401);
+    assert.ok(['TOKEN_VERSION_MISMATCH', 'SESSION_REVOKED'].includes(chromeAfterEdge.json?.code), JSON.stringify(chromeAfterEdge.json));
+    assert.ok(
+      socketEmits.some(
+        (e) => e.kind === 'in'
+          && e.room === `dsid:${chromeDsidBeforeEdge}`
+          && e.event === 'auth:forceLogout'
+          && e.payload?.reason === 'session_replaced',
+      ),
+      'Must emit auth:forceLogout to replaced Chrome dsid room',
+    );
+    assert.ok(
+      socketEmits.some(
+        (e) => e.kind === 'in' && e.room === String(student._id) && e.event === 'auth:session-replaced',
+      ),
+      'Must emit auth:session-replaced to user room',
+    );
+    assert.ok(disconnectedRooms.some((r) => r.room === `dsid:${chromeDsidBeforeEdge}` && r.close === true));
 
     // Chrome's original secretA remains valid after Edge issued its own browser secret on Slot 1
     const chromeStillWorks = await requestJson(baseUrl, '/api/auth/login/public', {
@@ -271,8 +302,12 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
     });
     assert.equal(chromeStillWorks.status, 200, JSON.stringify(chromeStillWorks.json));
     assert.equal(chromeStillWorks.json?.data?.registeredDeviceSlot, 1);
+    const tokenChrome2 = chromeStillWorks.json?.data?.accessToken;
+    const edgeAfterChromeRelogin = await requestJson(baseUrl, '/api/test-me', { token: edgeToken });
+    assert.equal(edgeAfterChromeRelogin.status, 401);
 
     // 1e. Cross-OS/mobile spoofing of PC's deviceKey WITHOUT secret must still fail with DEVICE_PROOF_INVALID
+    //     and must NOT kick out the currently valid Chrome session
     const spoofedAndroid = await requestJson(baseUrl, '/api/auth/login/public', {
       method: 'POST',
       headers: {
@@ -290,8 +325,10 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
     });
     assert.equal(spoofedAndroid.status, 403);
     assert.equal(spoofedAndroid.json?.code, 'DEVICE_PROOF_INVALID');
+    const chromeStillAliveAfterSpoof = await requestJson(baseUrl, '/api/test-me', { token: tokenChrome2 });
+    assert.equal(chromeStillAliveAfterSpoof.status, 200);
 
-    // 2. Machine B logs in -> claims Slot 2 + creates UserDeviceSession + knownDevices[1]
+    // 2. Machine B logs in (no force flag needed) -> claims Slot 2 + IMMEDIATELY kicks out Machine A
     const loginB = await requestJson(baseUrl, '/api/auth/login/public', {
       method: 'POST',
       headers: {
@@ -303,13 +340,15 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
         role: 'student',
         deviceKey: `mac-b-${suffix}`,
         platform: 'web',
-        force: true,
       },
     });
     assert.equal(loginB.status, 200, JSON.stringify(loginB.json));
     assert.equal(loginB.json?.data?.registeredDeviceSlot, 2);
     const tokenB = loginB.json?.data?.accessToken;
     assert.ok(tokenB);
+    const machineAAfterMachineB = await requestJson(baseUrl, '/api/test-me', { token: tokenChrome2 });
+    assert.equal(machineAAfterMachineB.status, 401);
+    assert.ok(['TOKEN_VERSION_MISMATCH', 'SESSION_REVOKED'].includes(machineAAfterMachineB.json?.code), JSON.stringify(machineAAfterMachineB.json));
 
     // 3. Also seed a Mobile AuthSession history row for this student
     await AuthSession.create({

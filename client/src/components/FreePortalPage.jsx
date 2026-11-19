@@ -21,6 +21,7 @@ import {
   RefreshCw,
   UserPlus,
   ArrowRight,
+  MonitorX,
 } from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
 import { getDeviceFingerprint, getDeviceAuthFields, rememberDeviceSecret } from '../utils/deviceFingerprint';
@@ -131,7 +132,8 @@ function CompactField({ label, icon: Icon, type = 'text', value, onChange, place
 export default function FreePortalPage({ onLogin }) {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const initialMode = searchParams.get('mode') === 'login' || searchParams.get('dangnhap') !== null ? 'login' : 'register';
+  const sessionReplacedMsg = searchParams.get('msg') === 'session_replaced';
+  const initialMode = searchParams.get('mode') === 'login' || searchParams.get('dangnhap') !== null || sessionReplacedMsg ? 'login' : 'register';
   const initialContact = searchParams.get('contact') || '';
   const [mode, setMode] = useState(initialMode);
   const [name, setName] = useState('');
@@ -855,6 +857,14 @@ export default function FreePortalPage({ onLogin }) {
                       </button>
                     </div>
                   ) : null}
+
+                  {/* Session replaced notice */}
+                  {sessionReplacedMsg && (
+                    <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-400/35 bg-amber-500/15 px-3 py-2 text-xs font-bold text-amber-200 leading-relaxed">
+                      <MonitorX size={15} aria-hidden="true" className="shrink-0 mt-0.5 text-amber-400" />
+                      <span>Phiên đăng nhập đã kết thúc do tài khoản vừa được đăng nhập ở trình duyệt hoặc thiết bị khác.</span>
+                    </div>
+                  )}
 
                   {/* Error message */}
                   {error && (

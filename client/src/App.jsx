@@ -62,7 +62,7 @@ import DashboardLayout from './components/DashboardLayout';
 import StudentLearningAccessGate from './components/student/StudentLearningAccessGate';
 import { SelfStudyLock } from './components/student/subscription/SubscriptionGate';
 import FreeFeatureLock, { FreeHiddenRoute } from './components/student/dailyPractice/FreeFeatureLock';
-import api, { clearTokens, NetworkOfflineError } from './services/api';
+import api, { clearTokens, getAccessToken, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { useIsDesktopExamDevice } from './utils/examDevice';
 import { BranchProvider } from './context/BranchContext';
@@ -605,10 +605,13 @@ function App() {
         const res = await api.auth.me();
 
         if (res.success && res.data) {
+          const storageRole = savedUser.adminRole === 'STAFF' || savedUser.role === 'staff' ? 'staff' : (savedUser.role || 'student');
+          const storedToken = getAccessToken(storageRole) || savedUser.token || savedUser.accessToken || '';
           // /me cũ có thể thiếu key gender → không xóa gender đã có trong session
           const freshUser = {
             ...savedUser,
             ...res.data,
+            ...(storedToken ? { token: storedToken, accessToken: storedToken } : {}),
             gender: Object.prototype.hasOwnProperty.call(res.data, 'gender')
               ? (res.data.gender || savedUser.gender || '')
               : (savedUser.gender || ''),
@@ -675,27 +678,43 @@ function App() {
         return '';
       }
     };
-    const clearAndRedirect = () => {
-      clearTokens(session.role);
-      localStorage.removeItem(`${session.role || 'student'}_user`);
-      setSession(null);
-      navigate('/login');
-    };
-    const onSessionReplaced = (event) => {
-      const currentToken = session.token || session.accessToken;
-      if (!currentToken || event.detail?.token !== currentToken) return;
-      clearAndRedirect();
-    };
-    const onForceLogout = (event) => {
-      const currentToken = session.token || session.accessToken;
-      if (!currentToken || event.detail?.token !== currentToken) return;
-      const targetDsid = event.detail?.deviceSessionId;
-      if (targetDsid) {
-        const currentDsid = decodeDsid(currentToken);
-        if (currentDsid && currentDsid !== targetDsid) return;
+    const storageRole = session.adminRole === 'STAFF' || session.role === 'staff'
+      ? 'staff'
+      : (session.role || 'student');
+    const loginPath = session.role === 'admin' || session.role === 'staff' || session.adminRole === 'STAFF'
+      ? '/admin/login?msg=session_replaced'
+      : '/login?msg=session_replaced';
+    const currentSessionToken = session.token || session.accessToken || getAccessToken(storageRole) || '';
+
+    const handleKickOrSync = (event, checkDsid = false) => {
+      const eventToken = event?.detail?.token;
+      if (eventToken && currentSessionToken && eventToken !== currentSessionToken) return;
+      if (checkDsid) {
+        const targetDsid = event?.detail?.deviceSessionId;
+        if (targetDsid && currentSessionToken) {
+          const currentDsid = decodeDsid(currentSessionToken);
+          if (currentDsid && currentDsid !== targetDsid) return;
+        }
       }
-      clearAndRedirect();
+
+      const latestStoredToken = getAccessToken(storageRole);
+      if (latestStoredToken && currentSessionToken && latestStoredToken !== currentSessionToken) {
+        const latestUser = loadSession();
+        if (latestUser) {
+          setSession({ ...latestUser, token: latestStoredToken, accessToken: latestStoredToken });
+          return;
+        }
+      }
+
+      clearTokens(storageRole);
+      if (session.role && session.role !== storageRole) clearTokens(session.role);
+      setSession(null);
+      navigate(loginPath, { replace: true });
     };
+
+    const onSessionReplaced = (event) => handleKickOrSync(event, false);
+    const onForceLogout = (event) => handleKickOrSync(event, true);
+
     window.addEventListener('cms:session-replaced', onSessionReplaced);
     window.addEventListener('cms:force-logout', onForceLogout);
     return () => {
@@ -703,6 +722,32 @@ function App() {
       window.removeEventListener('cms:force-logout', onForceLogout);
     };
   }, [navigate, session]);
+
+  // Tab nền chuyển lại sang active → kiểm tra nhanh phiên với server để đá ngay nếu đã đăng nhập nơi khác
+  useEffect(() => {
+    if (!session) return undefined;
+    let lastCheckAt = Date.now();
+    const verifyActiveSession = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastCheckAt < 5000) return;
+      lastCheckAt = now;
+      try {
+        await api.auth.me();
+      } catch {
+        /* apiFetch đã xử lý 401 fatal và điều hướng */
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') verifyActiveSession();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', verifyActiveSession);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', verifyActiveSession);
+    };
+  }, [session]);
 
   const handleLogout = useCallback(async () => {
     if (!session) {
@@ -818,7 +863,7 @@ function App() {
         role={getMessagingRole(session) || session?.role || ''}
         adminRole={session?.adminRole || ''}
         name={session?.name || ''}
-        token={session?.token || session?.accessToken || ''}
+        token={session ? (session.token || session.accessToken || getAccessToken(session.adminRole === 'STAFF' || session.role === 'staff' ? 'staff' : (session.role || 'student')) || '') : ''}
       >
         <ModalProvider>
           <SecurityGuard />

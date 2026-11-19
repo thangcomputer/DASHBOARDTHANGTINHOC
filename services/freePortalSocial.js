@@ -8,6 +8,9 @@ const Student = require('../models/Student');
 const { FREE_COURSE_NAME, freePortalFlags } = require('./freePortal');
 const { normalizeVNPhone } = require('../utils/phoneIdentity');
 const { assertUniqueContact } = require('../utils/uniqueContact');
+const deviceSessionService = require('./deviceSessionService');
+const { revokeMobileSessionsForUser } = require('./mobileAuthSessionSecurity');
+const socketHub = require('../config/socketHub');
 
 const PROVIDERS = {
   google: 'googleId',
@@ -228,14 +231,16 @@ async function fetchProfile(provider, req, code) {
   };
 }
 
-async function issueSession(student, fingerprint) {
+async function issueSession(student, fingerprint, req = null) {
   const fresh = await Student.findById(student._id);
   if (!fresh) {
     const error = new Error('Không thấy tài khoản');
     error.status = 404;
     throw error;
   }
+  const io = req?.app?.get?.('io') || socketHub.getIo();
   const tokenVersion = (fresh.tokenVersion || 0) + 1;
+  const dsid = deviceSessionService.createDeviceSessionId();
   const payload = {
     id: fresh._id,
     role: 'student',
@@ -245,6 +250,7 @@ async function issueSession(student, fingerprint) {
     branchId: null,
     branchCode: '',
     tokenVersion,
+    dsid,
     aud: 'public',
   };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -260,9 +266,43 @@ async function issueSession(student, fingerprint) {
   if (fingerprint) fresh.deviceFingerprint = String(fingerprint).slice(0, 200);
   fresh.markModified('tokenVersion');
   await fresh.save({ validateModifiedOnly: true });
+
+  await deviceSessionService.recordWebDeviceSession({
+    sessionId: dsid,
+    userId: String(fresh._id),
+    userName: fresh.name,
+    role: 'student',
+    adminRole: '',
+    req,
+    fingerprint: fingerprint ? String(fingerprint).slice(0, 200) : '',
+    loginChannel: 'free_portal',
+  });
+  await revokeMobileSessionsForUser({
+    userId: fresh._id,
+    role: 'student',
+    reason: 'session_replaced',
+    io,
+  }).catch(() => {});
+  await deviceSessionService.revokeOtherDeviceSessions({
+    currentSessionId: dsid,
+    userId: String(fresh._id),
+    scope: 'mine',
+    actor: { id: String(fresh._id), role: 'student' },
+    io,
+    reason: 'session_replaced',
+  }).catch(() => {});
+  if (io) {
+    try {
+      const userRoom = io.in(String(fresh._id));
+      userRoom.emit('auth:session-replaced', {});
+      userRoom.disconnectSockets(true);
+    } catch { /* ignore */ }
+  }
+
   return {
     accessToken,
     refreshToken,
+    deviceSessionId: dsid,
     user: {
       _id: fresh._id,
       id: fresh._id,
@@ -307,7 +347,7 @@ function ticketFor(profile) {
   return signTicket(profile);
 }
 
-async function exchangeTicket(token, fingerprint) {
+async function exchangeTicket(token, fingerprint, req = null) {
   const profile = readTicket(token);
   let student = await findByProvider(profile);
   if (!student) {
@@ -346,10 +386,10 @@ async function exchangeTicket(token, fingerprint) {
       }],
     });
   }
-  return { needsProfile: false, session: await issueSession(student, fingerprint) };
+  return { needsProfile: false, session: await issueSession(student, fingerprint, req) };
 }
 
-async function completeProfile({ token, name, age, phone, email, fingerprint }) {
+async function completeProfile({ token, name, age, phone, email, fingerprint, req = null }) {
   const profile = readTicket(token);
   const parsedAge = parseAge(age);
   const canonicalPhone = normalizeVNPhone(phone);
@@ -373,7 +413,7 @@ async function completeProfile({ token, name, age, phone, email, fingerprint }) 
   const field = PROVIDERS[profile.provider];
   let student = await findByProvider(profile);
   if (student && profileReady(student)) {
-    return issueSession(student, fingerprint);
+    return issueSession(student, fingerprint, req);
   }
   const byPhone = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
   if (byPhone && (!student || String(byPhone._id) !== String(student._id))) {
@@ -405,7 +445,7 @@ async function completeProfile({ token, name, age, phone, email, fingerprint }) 
     if (profile.avatar && !student.avatar) student.avatar = profile.avatar;
     student.freePortal = true;
     await student.save();
-    return issueSession(student, fingerprint);
+    return issueSession(student, fingerprint, req);
   }
   student = await Student.create({
     name: displayName,
@@ -437,7 +477,7 @@ async function completeProfile({ token, name, age, phone, email, fingerprint }) 
       remainingSessions: 0,
     }],
   });
-  return issueSession(student, fingerprint);
+  return issueSession(student, fingerprint, req);
 }
 
 module.exports = {

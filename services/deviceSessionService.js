@@ -465,6 +465,7 @@ async function revokeOtherDeviceSessions({
   scope = 'mine',
   actor = null,
   io = null,
+  reason = 'revoke_others',
 }) {
   if (!isDbReady()) return { revokedCount: 0 };
 
@@ -489,11 +490,11 @@ async function revokeOtherDeviceSessions({
     const ids = targets.map((t) => t.sessionId);
     await UserDeviceSession.updateMany(
       { sessionId: { $in: ids }, revokedAt: null },
-      { $set: { revokedAt: now, revocationReason: 'revoke_others', revokedBy: String(actor?.id || '') } },
+      { $set: { revokedAt: now, revocationReason: reason, revokedBy: String(actor?.id || '') } },
     );
     for (const t of targets) {
       markRevokedInCache(t.sessionId);
-      emitForceLogoutForSession({ io, sessionId: t.sessionId, userId: t.userId, role: t.role, reason: 'revoke_others' });
+      emitForceLogoutForSession({ io, sessionId: t.sessionId, userId: t.userId, role: t.role, reason });
     }
   }
 
@@ -507,9 +508,9 @@ async function revokeOtherDeviceSessions({
         sessionId: m.sessionId,
         userId: m.userId,
         role: m.role,
-        reason: 'revoke_others',
+        reason,
       });
-      emitForceLogoutForSession({ io, sessionId: m.sessionId, userId: m.userId, role: m.role, reason: 'revoke_others' });
+      emitForceLogoutForSession({ io, sessionId: m.sessionId, userId: m.userId, role: m.role, reason });
       mobileCount += 1;
     }
   }

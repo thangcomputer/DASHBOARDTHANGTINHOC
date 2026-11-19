@@ -346,23 +346,26 @@ function sendFixedDeviceError(res, err) {
   return false;
 }
 
-/** Máy đã được phép, nhưng tài khoản đang online ở máy khác → hỏi trước khi đá phiên. Không gỡ đăng ký. */
+/** Bất cứ lần đăng nhập mới nào hợp lệ (khác trình duyệt cùng máy hoặc máy khác) → đá phiên cũ tức thì. */
 async function confirmOrKickActiveSession(req, res, user, userRole, fingerprint) {
   const Model = userRole === 'student' ? Student : Teacher;
-  const conflict = await checkDeviceConflict(Model, user._id, fingerprint, false, req);
-  if (!conflict) return true;
-  if (req.body?.force !== true) {
-    res.status(409).json(conflict);
-    return false;
-  }
+  await checkDeviceConflict(Model, user._id, fingerprint, false, req);
+  const io = req.app.get('io');
   user.tokenVersion = (user.tokenVersion || 0) + 1;
   user.markModified('tokenVersion');
   await revokePreviousMobileSessions({
     userId: user._id,
     role: userRole,
-    io: req.app.get('io'),
+    io,
   });
-  disconnectUserSockets(req.app.get('io'), user._id);
+  await deviceSessionService.revokeOtherDeviceSessions({
+    userId: String(user._id),
+    scope: 'mine',
+    actor: { id: String(user._id), role: userRole },
+    io,
+    reason: 'session_replaced',
+  });
+  disconnectUserSockets(io, user._id);
   return true;
 }
 
@@ -558,7 +561,6 @@ async function issueUserOtpMfaChallenge(user, deviceFingerprint = null) {
  */
 async function completeInternalLogin(user, userRole, deviceFingerprint, io, req = null) {
   if (deviceFingerprint) user.deviceFingerprint = deviceFingerprint;
-  disconnectUserSockets(io, user._id);
 
   const newTokenVersion = (user.tokenVersion || 0) + 1;
   user.tokenVersion = newTokenVersion;
@@ -592,6 +594,15 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io, req 
     fingerprint: deviceFingerprint || '',
     loginChannel: 'internal',
   });
+  await deviceSessionService.revokeOtherDeviceSessions({
+    currentSessionId: dsid,
+    userId: String(user._id),
+    scope: 'mine',
+    actor: { id: String(user._id), role: userRole },
+    io,
+    reason: 'session_replaced',
+  });
+  disconnectUserSockets(io, user._id);
 
   return {
     success: true,
@@ -625,7 +636,6 @@ async function issueAdminTokens(sysSettings, audience = 'public', io, req = null
     { upsert: true, new: true },
   ).select('adminTokenVersion');
   const tokenVersion = versionSettings?.adminTokenVersion || 1;
-  disconnectUserSockets(io, 'admin');
   const dsid = deviceSessionService.createDeviceSessionId();
   const { accessToken, refreshToken } = generateTokens(
     {
@@ -650,6 +660,15 @@ async function issueAdminTokens(sysSettings, audience = 'public', io, req = null
     req,
     loginChannel: audience,
   });
+  await deviceSessionService.revokeOtherDeviceSessions({
+    currentSessionId: dsid,
+    userId: 'admin',
+    scope: 'mine',
+    actor: { id: 'admin', role: 'admin' },
+    io,
+    reason: 'session_replaced',
+  });
+  disconnectUserSockets(io, 'admin');
   return {
     success: true,
     data: {
@@ -961,7 +980,6 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
       role: userRole,
       io: req.app.get('io'),
     });
-    disconnectUserSockets(req.app.get('io'), user._id);
     if (fp1) user.deviceFingerprint = fp1;
 
     // ⭐ Fix 1: Increment tokenVersion → vô hiệu token cũ trên thiết bị khác
@@ -1001,6 +1019,15 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
       fingerprint: fp1 || '',
       loginChannel: 'legacy',
     });
+    await deviceSessionService.revokeOtherDeviceSessions({
+      currentSessionId: dsid,
+      userId: String(user._id),
+      scope: 'mine',
+      actor: { id: String(user._id), role: userRole },
+      io: req.app.get('io'),
+      reason: 'session_replaced',
+    });
+    disconnectUserSockets(req.app.get('io'), user._id);
     fireStudentDeviceAlert(req, user, userRole, knownDevice1);
 
     // ── Chuẩn bị response data (không trả password) ───────────────
@@ -1190,8 +1217,8 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
         throw previewErr;
       }
     }
-    if (!(await confirmOrKickActiveSession(req, res, user, userRole, fp2))) return;
     if (!(await gateFixedRegisteredDevice(req, res, user, userRole))) return;
+    if (!(await confirmOrKickActiveSession(req, res, user, userRole, fp2))) return;
     if (fp2) user.deviceFingerprint = fp2;
 
     const newTokenVersion = user.tokenVersion || 0;
@@ -1356,8 +1383,8 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
         throw previewErr;
       }
     }
-    if (!(await confirmOrKickActiveSession(req, res, user, userRole, mobileFp))) return;
     if (!(await gateFixedRegisteredDevice(req, res, user, userRole))) return;
+    if (!(await confirmOrKickActiveSession(req, res, user, userRole, mobileFp))) return;
 
     user.lastLogin = new Date();
     user.loginAttempts = 0;
@@ -3096,7 +3123,6 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
       role: userRole,
       io: req.app.get('io'),
     });
-    disconnectUserSockets(req.app.get('io'), user._id);
 
     const newTokenVersion = (user.tokenVersion || 0) + 1;
     user.tokenVersion = newTokenVersion;
@@ -3156,6 +3182,15 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
         refreshFamilyId: crypto.randomUUID(),
         currentRefreshJtiHash: sessionService.hashRefreshJti(refreshJti),
       });
+      await deviceSessionService.revokeOtherDeviceSessions({
+        currentSessionId: sessionId,
+        userId: String(user._id),
+        scope: 'mine',
+        actor: { id: String(user._id), role: userRole },
+        io: req.app.get('io'),
+        reason: 'session_replaced',
+      });
+      disconnectUserSockets(req.app.get('io'), user._id);
 
       return res.json({
         success: true,
@@ -3226,6 +3261,15 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
       fingerprint: webFp,
       loginChannel: 'forgot_password_otp',
     });
+    await deviceSessionService.revokeOtherDeviceSessions({
+      currentSessionId: dsid,
+      userId: String(user._id),
+      scope: 'mine',
+      actor: { id: String(user._id), role: userRole },
+      io: req.app.get('io'),
+      reason: 'session_replaced',
+    });
+    disconnectUserSockets(req.app.get('io'), user._id);
     fireStudentDeviceAlert(req, user, userRole, knownDeviceWeb);
 
     return res.json({
@@ -3719,7 +3763,7 @@ router.post('/free-portal/social/exchange', loginLimiter, policyShadowAuth('logi
   try {
     const { ticket, deviceFingerprint } = req.body || {};
     if (!ticket) return res.status(400).json({ success: false, message: 'Thiếu phiên mạng xã hội' });
-    const result = await freePortalSocial.exchangeTicket(String(ticket), deviceFingerprint);
+    const result = await freePortalSocial.exchangeTicket(String(ticket), deviceFingerprint, req);
     if (result.needsProfile) {
       return res.json({
         success: true,
@@ -3748,6 +3792,7 @@ router.post('/free-portal/social/complete', sensitiveFlowLimiter, policyShadowAu
       phone,
       email,
       fingerprint: deviceFingerprint,
+      req,
     });
     return res.json({ success: true, data: session });
   } catch (err) {

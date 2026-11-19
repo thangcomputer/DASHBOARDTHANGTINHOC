@@ -514,19 +514,35 @@ let _refreshPromise = null;
 
 const FATAL_AUTH_CODES = new Set([
   'TOKEN_VERSION_MISMATCH',
+  'SESSION_REVOKED',
   'UNAUTHORIZED',
   'TOKEN_REVOKED',
   'REFRESH_REUSE',
+  'REFRESH_REPLAY',
   'DEVICE_CONFLICT',
   'ACCOUNT_DISABLED',
   'ACCOUNT_LOCKED',
   'USER_NOT_FOUND',
 ]);
 
-const redirectToLogin = (prefix) => {
+const SESSION_REPLACED_CODES = new Set([
+  'TOKEN_VERSION_MISMATCH',
+  'SESSION_REVOKED',
+  'REFRESH_REUSE',
+  'REFRESH_REPLAY',
+]);
+
+const redirectToLogin = (prefix, code = '') => {
   if (typeof window === 'undefined') return;
-  const target = prefix === 'admin' || prefix === 'staff' ? '/admin/login' : '/login';
-  if (window.location.pathname !== target) {
+  const isReplaced = Boolean(code && SESSION_REPLACED_CODES.has(code));
+  if (isReplaced) {
+    try {
+      window.dispatchEvent(new CustomEvent('cms:session-replaced', { detail: { code, reason: 'session_replaced' } }));
+    } catch { /* ignore */ }
+  }
+  const base = prefix === 'admin' || prefix === 'staff' ? '/admin/login' : '/login';
+  const target = isReplaced ? `${base}?msg=session_replaced` : base;
+  if (window.location.pathname !== base) {
     window.location.href = target;
   }
 };
@@ -554,6 +570,7 @@ const tryRefreshAccessToken = async () => {
       if (!res.ok || !body?.success || !body.accessToken) {
         return {
           ok: false,
+          code: body?.code || '',
           fatal: !!(body?.code && FATAL_AUTH_CODES.has(body.code)) || res.status === 401 || res.status === 403,
         };
       }
@@ -714,7 +731,7 @@ export const apiFetch = async (endpoint, options = {}) => {
   if (code && FATAL_AUTH_CODES.has(code)) {
     const prefix = getRolePrefix();
     clearTokens(prefix);
-    redirectToLogin(prefix);
+    redirectToLogin(prefix, code);
     return res;
   }
 
@@ -727,7 +744,7 @@ export const apiFetch = async (endpoint, options = {}) => {
   if (!refreshed?.ok || !refreshed.accessToken) {
     const prefix = getRolePrefix();
     clearTokens(prefix);
-    redirectToLogin(prefix);
+    redirectToLogin(prefix, refreshed?.code || code || '');
     return res;
   }
 

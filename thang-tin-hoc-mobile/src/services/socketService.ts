@@ -157,8 +157,28 @@ function bindSocketEvents(instance: Socket, token: string) {
     emitDeviceEvent(SOCKET_EVENTS.ONLINE_USERS, onlineUsersSnapshot);
     emitDeviceEvent(SOCKET_EVENTS.DISCONNECTED, { reason });
   });
-  instance.on('connect_error', (error: Error) => emitDeviceEvent(SOCKET_EVENTS.ERROR, { message: error.message }));
-  instance.on('auth:session-replaced', () => emitDeviceEvent('mobile:session-replaced', { token }));
+  instance.on('connect_error', (error: Error) => {
+    const msg = String(error?.message || '');
+    if (
+      msg.includes('Token version mismatch')
+      || msg.includes('Session revoked')
+      || msg.includes('Device session revoked')
+      || msg.includes('Token revoked')
+    ) {
+      try { instance.io.opts.reconnection = false; } catch { /* ignore */ }
+      emitDeviceEvent('mobile:session-replaced', { token });
+      return;
+    }
+    emitDeviceEvent(SOCKET_EVENTS.ERROR, { message: error.message });
+  });
+  instance.on('auth:session-replaced', () => {
+    try { instance.io.opts.reconnection = false; } catch { /* ignore */ }
+    emitDeviceEvent('mobile:session-replaced', { token });
+  });
+  instance.on('auth:forceLogout', () => {
+    try { instance.io.opts.reconnection = false; } catch { /* ignore */ }
+    emitDeviceEvent('mobile:session-replaced', { token });
+  });
   instance.on('message:receive', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_RECEIVED, data));
   instance.on('message:sent', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_SENT_ACK, data));
   instance.on('message:error', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_SEND_ERROR, data));
