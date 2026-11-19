@@ -8,6 +8,7 @@ const AuthSession = require('../models/AuthSession');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const mobileAuthSessionService = require('./mobileAuthSessionService');
+const { revokeMobileSessionsForUser } = require('./mobileAuthSessionSecurity');
 
 // Fast in-memory revocation & activity throttle caches to avoid per-request DB load.
 const revokedSessionCache = new Map(); // sessionId -> expiresAtMs
@@ -516,6 +517,75 @@ async function revokeOtherDeviceSessions({
   return { revokedCount: targets.length + mobileCount };
 }
 
+/**
+ * Clears all Web and Mobile login session history for an account, marks active Web
+ * sessions as revoked in cache, and disconnects live socket connections.
+ */
+async function resetAccountDeviceSessions(
+  {
+    userId,
+    role = '',
+    reason = 'devices_reset',
+    io = null,
+  },
+  {
+    UserDeviceSessionModel = UserDeviceSession,
+    AuthSessionModel = AuthSession,
+    revokeMobileFn = revokeMobileSessionsForUser,
+    forceDbReady = false,
+  } = {},
+) {
+  if (!userId) {
+    return { clearedWebSessions: 0, clearedMobileSessions: 0, revokedActiveWebCount: 0 };
+  }
+  const usingCustomModels = UserDeviceSessionModel !== UserDeviceSession || AuthSessionModel !== AuthSession;
+  if (!usingCustomModels && !forceDbReady && !isDbReady()) {
+    return { clearedWebSessions: 0, clearedMobileSessions: 0, revokedActiveWebCount: 0 };
+  }
+
+  const uid = String(userId);
+  const filter = { userId: uid, ...(role ? { role } : {}) };
+
+  let clearedMobileSessions = 0;
+  const mobileRoles = role ? (role === 'student' || role === 'teacher' ? [role] : []) : ['student', 'teacher'];
+  for (const mobileRole of mobileRoles) {
+    await revokeMobileFn({
+      userId: uid,
+      role: mobileRole,
+      reason,
+      io,
+    });
+  }
+  if (mobileRoles.length > 0) {
+    const mDeleted = await AuthSessionModel.deleteMany(filter);
+    clearedMobileSessions = Number(mDeleted?.deletedCount) || 0;
+  }
+
+  const webTargets = await UserDeviceSessionModel.find({ ...filter, revokedAt: null })
+    .select('sessionId userId role')
+    .lean();
+  for (const session of webTargets || []) {
+    markRevokedInCache(session.sessionId);
+    lastTouchCache.delete(String(session.sessionId));
+    emitForceLogoutForSession({
+      io,
+      sessionId: session.sessionId,
+      userId: session.userId || uid,
+      role: session.role || role,
+      reason,
+    });
+  }
+
+  const wDeleted = await UserDeviceSessionModel.deleteMany(filter);
+  const clearedWebSessions = Number(wDeleted?.deletedCount) || 0;
+
+  return {
+    clearedWebSessions,
+    clearedMobileSessions,
+    revokedActiveWebCount: Array.isArray(webTargets) ? webTargets.length : 0,
+  };
+}
+
 module.exports = {
   parseUserAgent,
   extractRequestMeta,
@@ -527,6 +597,7 @@ module.exports = {
   listDeviceSessions,
   revokeDeviceSession,
   revokeOtherDeviceSessions,
+  resetAccountDeviceSessions,
   canActorRevokeSession,
   hasAdminDeviceManageAccess,
 };

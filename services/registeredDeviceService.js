@@ -188,6 +188,20 @@ async function revokeByAdmin({ id, actorId, reason }) {
   return doc.toObject();
 }
 
+/**
+ * Removes all registered device records (active slots and revoked history) for an account
+ * so the user can re-register and log in on new machines starting from slot 1.
+ */
+async function resetAllForAccount({ userId, role }, { model = RegisteredDevice } = {}) {
+  if (!userId) return { deletedCount: 0 };
+  const filter = {
+    userId: String(userId),
+    ...(role ? { role } : {}),
+  };
+  const result = await model.deleteMany(filter);
+  return { deletedCount: Number(result?.deletedCount) || 0 };
+}
+
 module.exports = {
   LIMIT_MESSAGE,
   decideRegisteredDeviceAccess,
@@ -196,5 +210,6 @@ module.exports = {
   claimLoginDevice,
   listForAccount,
   revokeByAdmin,
+  resetAllForAccount,
   hashSecret,
 };

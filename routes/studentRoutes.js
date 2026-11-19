@@ -19,6 +19,8 @@ const { effectiveCoursePrice } = require('../utils/coursePricing');
 const { isExcludedExamSubjectId } = require('../services/examSubjectCatalog');
 const { createTuitionInvoice } = require('../modules/finance/services/tuitionInvoiceService');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
+const { resetAllForAccount: resetRegisteredDevicesForAccount } = require('../services/registeredDeviceService');
+const { resetAccountDeviceSessions } = require('../services/deviceSessionService');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -78,7 +80,7 @@ const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../s
 const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
 const { notifyTeacherPaymentReceived } = require('../services/teacherPaymentNotice');
 const cache = require('../utils/cache');
-const { emitDataRefresh, emitBranch } = require('../utils/realtimeEmit');
+const { emitDataRefresh, emitBranch, emitUser } = require('../utils/realtimeEmit');
 const { getCachedSettings } = require('../services/settingsCache');
 const {
   createExamAttempt,
@@ -4044,7 +4046,8 @@ router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation
 });
 
 // ─── POST /api/students/:id/reset-devices ─────────────────────────────────────
-// Xóa lịch sử trình duyệt HV (không đụng khóa phiên 1 máy của lần login sau).
+// Xóa toàn bộ lịch sử thiết bị đã đăng nhập (thiết bị đã ghi, 2 slot cố định,
+// phiên Web/Mobile cũ) để học viên đăng nhập và cập nhật lại máy mới.
 router.post('/:id/reset-devices', [
   authMiddleware,
   branchFilter,
@@ -4062,41 +4065,64 @@ router.post('/:id/reset-devices', [
           knownDeviceSummary: '',
           accountLockReason: '',
         },
+        $inc: { tokenVersion: 1 },
+        $unset: { refreshToken: '', deviceFingerprint: '' },
       },
       { returnDocument: 'after' },
     );
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     const io = req.app.get('io');
-    try {
-      await revokeMobileSessionsForUser({
-        userId: student._id,
-        role: 'student',
-        reason: 'account_locked',
-        io,
-      });
-    } catch (revokeError) {
-      logger.error('[STUDENTS] Account locked but mobile session revocation failed:', revokeError);
-      return res.status(503).json({
-        success: false,
-        code: 'MOBILE_SESSION_REVOCATION_FAILED',
-        message: 'Tài khoản đã bị khóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
-      });
-    }
+    const [registeredReset, sessionReset] = await (async () => {
+      try {
+        const regResult = await resetRegisteredDevicesForAccount({
+          userId: student._id,
+          role: 'student',
+        });
+        const sessResult = await resetAccountDeviceSessions({
+          userId: student._id,
+          role: 'student',
+          reason: 'devices_reset',
+          io,
+        });
+        return [regResult, sessResult];
+      } catch (resetError) {
+        logger.error('[STUDENTS] Devices reset session/registry cleanup failed:', resetError);
+        const err = new Error('Đã xóa danh sách thiết bị nhưng chưa thể thu hồi toàn bộ phiên đăng nhập cũ.');
+        err.statusCode = 503;
+        err.code = 'MOBILE_SESSION_REVOCATION_FAILED';
+        throw err;
+      }
+    })();
     if (io) {
+      emitUser(io, student._id, 'auth:forceLogout', {
+        userId: String(student._id),
+        role: 'student',
+        reason: 'devices_reset',
+      });
       studentRealtime(io, student, 'student:updated', student._id);
       studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
     return res.json({
       success: true,
-      message: 'Đã xóa danh sách thiết bị. Học viên có thể đăng nhập lại tối đa 3 thiết bị (Laptop, Điện thoại, Tablet).',
+      message: 'Đã xóa toàn bộ lịch sử thiết bị đã đăng nhập và đăng xuất các phiên cũ. Học viên có thể đăng nhập để cập nhật lại máy mới.',
       data: {
         _id: student._id,
         knownDeviceCount: 0,
         knownDeviceSummary: '',
         accountLocked: !!student.accountLocked,
+        clearedRegisteredDevices: registeredReset.deletedCount,
+        clearedWebSessions: sessionReset.clearedWebSessions,
+        clearedMobileSessions: sessionReset.clearedMobileSessions,
       },
     });
   } catch (error) {
+    if (error?.statusCode === 503) {
+      return res.status(503).json({
+        success: false,
+        code: error.code || 'DEVICE_RESET_INCOMPLETE',
+        message: error.message,
+      });
+    }
     logger.error('[STUDENTS] reset-devices: %s', error.message);
     return res.status(500).json({ success: false, message: error.message });
   }

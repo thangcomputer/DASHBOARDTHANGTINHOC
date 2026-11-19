@@ -316,7 +316,7 @@ function StudentRowActions({
             setActionMenuId(null);
             const ok = await confirmAdminAction({
               title: 'Reset thiết bị',
-              content: `Xóa danh sách thiết bị đã ghi của ${s.name || 'học viên'}? Học viên sẽ đăng nhập lại tối đa 3 thiết bị (Laptop, Điện thoại, Tablet) trước khi hệ thống báo Admin hoặc tự khóa nếu phát hiện bất thường ở vị trí khác.`,
+              content: `Xóa toàn bộ lịch sử thiết bị đã đăng nhập của ${s.name || 'học viên'} (bao gồm thiết bị đã ghi, 2 thiết bị cố định và các phiên Web/Mobile cũ)? Học viên sẽ đăng xuất khỏi các máy cũ và đăng nhập lại để cập nhật máy mới.`,
               confirmText: 'Reset thiết bị',
               confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm',
             });
