@@ -249,6 +249,7 @@ export default function DigitalCertificateModal({
       >
         <div
           id="th-digital-cert-sheet"
+          data-keep-light="true"
           className="relative flex flex-col justify-between aspect-[148/210] bg-gradient-to-br from-[#ECFDF5] via-white to-[#FEFCE8] p-4 sm:p-5 border-[5px] border-emerald-700/90 m-2.5 sm:m-3.5 rounded-2xl overflow-hidden"
         >
           <div className="pointer-events-none absolute inset-1.5 rounded-xl border border-amber-500/40" />

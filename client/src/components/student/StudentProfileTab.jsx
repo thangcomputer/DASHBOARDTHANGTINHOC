@@ -402,27 +402,27 @@ export default function StudentProfileTab({
   return (
     <div className="max-w-2xl mx-auto space-y-3.5 sm:space-y-4 py-3 px-2 sm:px-4 animate-in fade-in duration-300">
       {/* ── 1. Thẻ Hero hồ sơ cá nhân (Đồng bộ 100% Mobile App) ── */}
-      <div className="rounded-[20px] border-[1.5px] p-4 sm:p-5 flex items-center gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] border-[#CCFBF1] bg-[#F0FDFA]">
+      <div className="rounded-[20px] border-[1.5px] p-4 sm:p-5 flex items-center gap-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] border-[#CCFBF1] bg-[#F0FDFA] dark:border-emerald-800/60 dark:bg-emerald-950/35">
         <div className="relative shrink-0">
           <EditableAvatar
             avatar={studentData?.avatar}
             name={studentData?.name}
             role="student"
             gender={profileGender}
-            className="w-[76px] h-[76px] rounded-full border-2 border-white shadow-xs cursor-pointer bg-[#CCFBF1]"
+            className="w-[76px] h-[76px] rounded-full border-2 border-white dark:border-emerald-700 shadow-xs cursor-pointer bg-[#CCFBF1] dark:bg-emerald-900/60"
           />
-          <div className="absolute right-0 bottom-0 w-[25px] h-[25px] rounded-full border-2 border-white flex items-center justify-center text-white shadow-xs pointer-events-none bg-[#0FAF9F]">
+          <div className="absolute right-0 bottom-0 w-[25px] h-[25px] rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-xs pointer-events-none bg-[#0FAF9F]">
             <Camera size={14} className="text-white" />
           </div>
         </div>
         <div className="flex-1 min-w-0 space-y-0.5">
-          <p className="text-[11px] font-black tracking-[0.8px] uppercase text-[#0F766E]">
+          <p className="text-[11px] font-black tracking-[0.8px] uppercase text-[#0F766E] dark:text-teal-300">
             Hồ sơ cá nhân
           </p>
-          <h2 className="text-[18px] sm:text-[20px] font-black text-[#0F172A] truncate leading-tight">
+          <h2 className="text-[18px] sm:text-[20px] font-black text-[#0F172A] dark:text-slate-50 truncate leading-tight">
             {studentData?.name || studentData?.phone || 'Học viên'}
           </h2>
-          <p className="text-[12px] sm:text-[13px] font-medium text-[#64748B]">
+          <p className="text-[12px] sm:text-[13px] font-medium text-[#64748B] dark:text-slate-300">
             Chạm vào ảnh để thay đổi ảnh đại diện
           </p>
         </div>
@@ -1029,7 +1029,7 @@ export default function StudentProfileTab({
         <button
           type="button"
           onClick={handleLogout}
-          className="cms-profile-logout min-h-[48px] px-7 rounded-[14px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white text-[#DC2626] font-extrabold text-[14px] flex items-center justify-center gap-2 hover:bg-[#FEF2F2] active:translate-y-[3px] active:border-b transition-all cursor-pointer !shadow-none"
+          className="cms-profile-logout min-h-[48px] px-7 rounded-[14px] border-[1.5px] border-[#FECACA] border-b-4 border-b-[#F87171] bg-white text-[#DC2626] dark:bg-rose-950/30 dark:border-rose-800/70 dark:border-b-rose-700 dark:text-rose-300 font-extrabold text-[14px] flex items-center justify-center gap-2 hover:bg-[#FEF2F2] dark:hover:bg-rose-950/50 active:translate-y-[3px] active:border-b transition-all cursor-pointer !shadow-none"
         >
           <LogOut size={18} />
           <span>Đăng xuất</span>

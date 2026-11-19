@@ -1937,7 +1937,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       currentUserRole={getMessagingRole(session) || role}
       getConversations={getConversations}
     >
-      <div className={`flex h-[100dvh] max-h-[100dvh] ${isFreePortalStudent ? 'bg-[#f4fbf8]' : 'bg-[#f8fafc]'} relative font-sans overflow-hidden`}>
+      <div className={`flex h-[100dvh] max-h-[100dvh] ${isFreePortalStudent ? 'bg-[#f4fbf8]' : 'bg-[#f8fafc]'} dark:bg-[#0b1018] relative font-sans overflow-hidden`}>
         {isRefetching ? (
           <div className="sr-only" role="status" aria-live="polite">
             Đang đồng bộ dữ liệu
@@ -2071,7 +2071,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   >
                     <Bell size={18} aria-hidden="true" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900" aria-hidden="true">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}

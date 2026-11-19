@@ -22,14 +22,14 @@ export default function LanguageSwitcher({
     return (
       <div
         data-no-translate="true"
-        className={`rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm ${className}`}
+        className={`rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-3.5 shadow-sm ${className}`}
       >
         <div className="mb-2.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-500">
-            <Globe className="h-4 w-4 text-emerald-600" />
+          <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-300">
+            <Globe className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span>{language === 'en' ? 'Language' : 'Ngôn ngữ'}</span>
           </div>
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+          <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/70 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
             {language === 'en' ? 'English' : 'Tiếng Việt'}
           </span>
         </div>
@@ -42,10 +42,10 @@ export default function LanguageSwitcher({
                 type="button"
                 onClick={() => setLanguage(opt.code)}
                 aria-pressed={active}
-                className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer ${
                   active
-                    ? 'border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-sm ring-1 ring-emerald-500/30'
-                    : 'border-slate-200 bg-slate-50/60 text-slate-700 hover:border-slate-300 hover:bg-slate-100/70'
+                    ? 'border-emerald-500 bg-emerald-50/90 text-emerald-900 dark:border-emerald-400 dark:bg-emerald-950/55 dark:text-emerald-100 shadow-sm ring-1 ring-emerald-500/30 dark:ring-emerald-400/30'
+                    : 'border-slate-200 bg-slate-50/60 text-slate-700 hover:border-slate-300 hover:bg-slate-100/70 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800'
                 }`}
               >
                 <span className="text-lg leading-none" aria-hidden="true">
@@ -53,7 +53,7 @@ export default function LanguageSwitcher({
                 </span>
                 <div className="min-w-0">
                   <div className="truncate text-xs font-extrabold">{opt.label}</div>
-                  <div className="truncate text-[10px] font-semibold text-slate-500">
+                  <div className={`truncate text-[10px] font-semibold ${active ? 'text-emerald-700/80 dark:text-emerald-200/85' : 'text-slate-500 dark:text-slate-400'}`}>
                     {opt.sub}
                   </div>
                 </div>
