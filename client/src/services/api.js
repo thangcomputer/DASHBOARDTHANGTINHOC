@@ -1391,10 +1391,23 @@ export const aiSupportAPI = {
     const res = await apiFetch('/ai-support/clear-history', { method: 'POST', body: '{}' });
     return res.json();
   },
-  quickAsk: async ({ question, history = [], preferredLang = 'vi' }) => {
+  quickAsk: async ({ question = '', history = [], preferredLang = 'vi', attachment = null }) => {
+    const cleanAttachment = attachment
+      ? {
+        name: attachment.name || '',
+        mimeType: attachment.mimeType || '',
+        ...(attachment.dataBase64 ? { dataBase64: attachment.dataBase64 } : {}),
+        ...(attachment.textContent ? { textContent: attachment.textContent } : {}),
+      }
+      : null;
     const res = await apiFetch('/ai-support/quick-ask', {
       method: 'POST',
-      body: JSON.stringify({ question, history, preferredLang }),
+      body: JSON.stringify({
+        question,
+        history,
+        preferredLang,
+        ...(cleanAttachment ? { attachment: cleanAttachment } : {}),
+      }),
     });
     return res.json();
   },

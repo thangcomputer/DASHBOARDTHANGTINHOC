@@ -402,15 +402,24 @@ router.post('/reply', authMiddleware, async (req, res) => {
 
 router.post('/quick-ask', authMiddleware, quickAskLimiter, async (req, res) => {
   try {
-    const { question, history, preferredLang } = req.body || {};
-    if (!String(question || '').trim()) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập câu hỏi' });
+    const { question, history, preferredLang, attachment } = req.body || {};
+    const hasQuestion = Boolean(String(question || '').trim());
+    const hasAttachment = Boolean(
+      attachment
+      && typeof attachment === 'object'
+      && (String(attachment.dataBase64 || '').trim()
+        || String(attachment.textContent || '').trim()
+        || String(attachment.name || '').trim())
+    );
+    if (!hasQuestion && !hasAttachment) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập câu hỏi hoặc đính kèm ảnh/tệp' });
     }
     const data = await quickAskAssistant({
       user: req.user,
       question,
       history: Array.isArray(history) ? history : [],
       preferredLang: String(preferredLang || ''),
+      attachment: hasAttachment ? attachment : null,
     });
     return res.json({ success: true, data });
   } catch (err) {

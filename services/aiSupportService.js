@@ -2716,9 +2716,28 @@ function buildQuickAskSystemPrompt(userRole, userName, lang = 'vi') {
   ].join('\n');
 }
 
-async function quickAskAssistant({ user, question, history = [], preferredLang = '' }) {
+/**
+ * Normalize an uploaded or pasted attachment for DewSkill Quick Ask.
+ */
+function normalizeQuickAttachment(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const name = String(raw.name || '').trim().slice(0, 180);
+  const mimeType = String(raw.mimeType || '').trim().toLowerCase().slice(0, 120);
+  const dataBase64 = String(raw.dataBase64 || '')
+    .replace(/^data:[^;]+;base64,/i, '')
+    .replace(/\s+/g, '')
+    .trim()
+    .slice(0, 5_500_000);
+  const textContent = String(raw.textContent || '').trim().slice(0, 15_000);
+  if (!dataBase64 && !textContent && !name) return null;
+  return { name, mimeType, dataBase64, textContent };
+}
+
+async function quickAskAssistant({ user, question, history = [], preferredLang = '', attachment = null } = {}) {
   const rawQuestion = String(question || '').trim().slice(0, 1500);
-  if (!rawQuestion) {
+  const att = normalizeQuickAttachment(attachment);
+  const hasAttachment = Boolean(att);
+  if (!rawQuestion && !hasAttachment) {
     const err = new Error('Nội dung câu hỏi không được để trống');
     err.status = 400;
     throw err;
@@ -2737,15 +2756,15 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
 
   const lang = detectQueryLanguage(rawQuestion, historyMessages, preferredLang);
 
-  // Tier 1: Built-in fast memory
-  if (isSimpleGreeting(rawQuestion)) {
+  // Tier 1: Built-in fast memory (bypass greeting/FAQ/office shortcuts when attachment is provided)
+  if (!hasAttachment && isSimpleGreeting(rawQuestion)) {
     const greeting = lang === 'en'
       ? 'Hello! I am **DewSkill AI**. Ask me any question about Excel, Word, PowerPoint, MOS, or how to use LMS features.'
       : 'Xin chào! Mình là **DewSkill AI**. Bạn có thể hỏi bất kỳ điều gì về Excel, Word, PowerPoint, MOS hoặc cách dùng LMS nhé!';
     return { answer: greeting, source: 'memory', lang, actions: [] };
   }
 
-  if (isImageGenRequest(rawQuestion)) {
+  if (rawQuestion && isImageGenRequest(rawQuestion)) {
     return {
       answer: lang === 'en' ? IMAGE_GEN_REFUSE_EN : IMAGE_GEN_REFUSE,
       source: 'memory',
@@ -2754,7 +2773,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     };
   }
 
-  if (isGhostwriteRequest(rawQuestion)) {
+  if (rawQuestion && isGhostwriteRequest(rawQuestion)) {
     return {
       answer: lang === 'en' ? GHOSTWRITE_REFUSE_EN : GHOSTWRITE_REFUSE,
       source: 'memory',
@@ -2763,17 +2782,58 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     };
   }
 
-  const faqHit = teacherFaqReply(userRole, rawQuestion, lang)
-    || studentFaqReply(userRole, rawQuestion, lang)
-    || lmsFaqReply(userRole, rawQuestion, lang);
-  if (faqHit) {
-    const { cleanText, actions } = extractActionLinks(faqHit);
-    return { answer: cleanText, source: 'memory', lang, actions };
+  if (!hasAttachment) {
+    const faqHit = teacherFaqReply(userRole, rawQuestion, lang)
+      || studentFaqReply(userRole, rawQuestion, lang)
+      || lmsFaqReply(userRole, rawQuestion, lang);
+    if (faqHit) {
+      const { cleanText, actions } = extractActionLinks(faqHit);
+      return { answer: cleanText, source: 'memory', lang, actions };
+    }
+
+    const officeHit = officeItQuickMemory(rawQuestion, lang);
+    if (officeHit) {
+      return { answer: officeHit, source: 'memory', lang, actions: [] };
+    }
   }
 
-  const officeHit = officeItQuickMemory(rawQuestion, lang);
-  if (officeHit) {
-    return { answer: officeHit, source: 'memory', lang, actions: [] };
+  const images = [];
+  if (att?.dataBase64 && (!att.mimeType || att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf')) {
+    images.push({
+      mimeType: att.mimeType || 'image/png',
+      data: att.dataBase64,
+    });
+  }
+
+  let finalUserContent = rawQuestion;
+  if (att) {
+    if (att.textContent) {
+      const header = lang === 'en'
+        ? `[Attached file: ${att.name || 'document'}]`
+        : `[Tệp đính kèm: ${att.name || 'tài liệu'}]`;
+      const promptNote = rawQuestion || (lang === 'en'
+        ? 'Please analyze and summarize the attached file content or explain what is inside.'
+        : 'Hãy phân tích, tóm tắt hoặc giải thích nội dung tệp đính kèm này.');
+      finalUserContent = `${promptNote}\n\n${header}\n\`\`\`\n${att.textContent}\n\`\`\``;
+    } else if (images.length > 0) {
+      if (!rawQuestion) {
+        const docLabel = att.mimeType === 'application/pdf'
+          ? (lang === 'en' ? 'PDF document' : 'tài liệu PDF')
+          : (lang === 'en' ? 'image' : 'hình ảnh');
+        finalUserContent = lang === 'en'
+          ? `Please examine the attached ${docLabel}${att.name ? ` ("${att.name}")` : ''} and explain or help solve what is shown step by step.`
+          : `Hãy xem ${docLabel} đính kèm${att.name ? ` ("${att.name}")` : ''} và giải thích hoặc hướng dẫn xử lý chi tiết từng bước.`;
+      } else if (att.name) {
+        finalUserContent = `${rawQuestion}\n\n(${lang === 'en' ? 'Attached' : 'Đính kèm'}: ${att.name})`;
+      }
+    } else {
+      const fileLabel = `[${lang === 'en' ? 'Attached file' : 'Tệp đính kèm'}: ${att.name || 'file'}${att.mimeType ? ` (${att.mimeType})` : ''}]`;
+      finalUserContent = rawQuestion
+        ? `${rawQuestion}\n\n${fileLabel}`
+        : `${fileLabel}\n${lang === 'en'
+          ? 'The user attached this file. Explain how to inspect or use its content, or ask what specific help they need.'
+          : 'Người dùng vừa đính kèm tệp này. Hãy hướng dẫn cách kiểm tra/xử lý hoặc hỏi người dùng cần hỗ trợ phần nào trong tệp.'}`;
+    }
   }
 
   // Tier 2: Gemini AI LLM fallback
@@ -2795,11 +2855,11 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: String(m.text || m.content || '').trim().slice(0, 1500),
       })),
-    { role: 'user', content: rawQuestion },
+    { role: 'user', content: finalUserContent },
   ];
 
   try {
-    const result = await callSupportLlm(messages);
+    const result = await callSupportLlm(messages, { images });
     const sanitized = sanitizeSupportReply(result?.content, { stripGreeting: historyMessages.length > 0 });
     const { cleanText, actions } = extractActionLinks(sanitized);
     if (!cleanText) {
@@ -2866,5 +2926,6 @@ module.exports = {
   replyAsSupport,
   extractActionLinks,
   officeItQuickMemory,
+  normalizeQuickAttachment,
   quickAskAssistant,
 };

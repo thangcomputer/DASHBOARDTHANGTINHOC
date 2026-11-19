@@ -111,4 +111,94 @@ test('Web and Mobile headers merge AI + Search into a single AI button wired to 
 
   const routesSrc = read('routes/aiSupportRoutes.js');
   assert.match(routesSrc, /router\.post\('\/quick-ask'/);
+  assert.match(routesSrc, /attachment/);
+
+  // Image paste + file attachment wiring on Web and Mobile popups
+  assert.match(webPopup, /onPaste=\{handlePaste\}/);
+  assert.match(webPopup, /type="file"/);
+  assert.match(webPopup, /fileInputRef\.current\?\.click\(\)/);
+  assert.match(webPopup, /processQuickAttachFile/);
+
+  assert.match(mobilePopup, /DocumentPicker\.getDocumentAsync/);
+  assert.match(mobilePopup, /window\.addEventListener\('paste', onWindowPaste\)/);
+  assert.match(mobilePopup, /handlePickAttachment/);
+});
+
+test('quickAskAssistant normalizes and forwards pasted images and attached text files to LLM', async () => {
+  const { normalizeQuickAttachment } = require('../../services/aiSupportService');
+
+  assert.equal(normalizeQuickAttachment(null), null);
+  assert.equal(normalizeQuickAttachment({}), null);
+
+  const imgNorm = normalizeQuickAttachment({
+    name: 'screenshot.png',
+    mimeType: 'IMAGE/PNG',
+    dataBase64: 'data:image/png;base64,iVBORw0KGgo=',
+  });
+  assert.deepEqual(imgNorm, {
+    name: 'screenshot.png',
+    mimeType: 'image/png',
+    dataBase64: 'iVBORw0KGgo=',
+    textContent: '',
+  });
+
+  const llmPath = require.resolve('../../services/ai/llmClient');
+  const svcPath = require.resolve('../../services/aiSupportService');
+  const origLlmEntry = require.cache[llmPath];
+  const origSvcEntry = require.cache[svcPath];
+
+  const capturedCalls = [];
+  require.cache[llmPath] = {
+    id: llmPath,
+    filename: llmPath,
+    loaded: true,
+    exports: {
+      isAiConfigured: () => true,
+      chatCompletion: async (opts) => {
+        capturedCalls.push(opts);
+        return { content: '**Bước 1:** Kiểm tra công thức.', model: 'gemini-test' };
+      },
+    },
+  };
+  delete require.cache[svcPath];
+
+  try {
+    const { quickAskAssistant } = require('../../services/aiSupportService');
+
+    const imgReply = await quickAskAssistant({
+      user: { id: 'stu-2', role: 'student', name: 'Binh' },
+      question: '',
+      preferredLang: 'vi',
+      attachment: {
+        name: 'excel-error.png',
+        mimeType: 'image/png',
+        dataBase64: 'data:image/png;base64,AAAA',
+      },
+    });
+    assert.equal(imgReply.source, 'ai');
+    assert.match(imgReply.answer, /Kiểm tra công thức/);
+    assert.equal(capturedCalls.length, 1);
+    assert.deepEqual(capturedCalls[0].images, [{ mimeType: 'image/png', data: 'AAAA' }]);
+
+    const txtReply = await quickAskAssistant({
+      user: { id: 'tea-2', role: 'teacher', name: 'Minh' },
+      question: 'VLOOKUP',
+      preferredLang: 'en',
+      attachment: {
+        name: 'formulas.csv',
+        mimeType: 'text/csv',
+        textContent: 'A,B\n1,2',
+      },
+    });
+    assert.equal(txtReply.source, 'ai');
+    assert.equal(capturedCalls.length, 2);
+    const lastMsg = capturedCalls[1].messages[capturedCalls[1].messages.length - 1];
+    assert.match(lastMsg.content, /formulas\.csv/);
+    assert.match(lastMsg.content, /1,2/);
+  } finally {
+    if (origLlmEntry) require.cache[llmPath] = origLlmEntry;
+    else delete require.cache[llmPath];
+    if (origSvcEntry) require.cache[svcPath] = origSvcEntry;
+    else delete require.cache[svcPath];
+  }
 });

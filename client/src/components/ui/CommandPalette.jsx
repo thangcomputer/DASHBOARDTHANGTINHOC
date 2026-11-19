@@ -212,9 +212,139 @@ function AiMarkdownMessage({ text }) {
   );
 }
 
+const QUICK_TEXT_EXT_RE = /\.(txt|csv|tsv|json|md|markdown|xml|html|htm|css|js|jsx|ts|tsx|py|sql|log|yml|yaml|ini|conf)$/i;
+const QUICK_PDF_EXT_RE = /\.pdf$/i;
+const QUICK_OFFICE_EXT_RE = /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i;
+const MAX_QUICK_PDF_BYTES = 3.5 * 1024 * 1024;
+const MAX_QUICK_TEXT_BYTES = 2 * 1024 * 1024;
+
+function formatQuickFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (!size) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Không đọc được tệp đã chọn'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function readFileAsTextContent(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Không đọc được nội dung tệp'));
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function compressQuickImageDataUrl(dataUrl, originalMime, originalSize) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1400;
+      let { width, height } = img;
+      const needsResize = width > maxDim || height > maxDim || originalSize > 450 * 1024;
+      if (!needsResize && originalMime) {
+        resolve({ previewUrl: dataUrl, mimeType: originalMime });
+        return;
+      }
+      if (width > maxDim || height > maxDim) {
+        const scale = Math.min(maxDim / width, maxDim / height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Không khởi tạo được bộ xử lý ảnh'));
+        return;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const outMime = originalMime === 'image/png' && originalSize <= 350 * 1024 ? 'image/png' : 'image/jpeg';
+      const outUrl = canvas.toDataURL(outMime, 0.84);
+      resolve({ previewUrl: outUrl, mimeType: outMime });
+    };
+    img.onerror = () => reject(new Error('Không đọc được dữ liệu hình ảnh'));
+    img.src = dataUrl;
+  });
+}
+
+async function processQuickAttachFile(file) {
+  if (!file) return null;
+  const name = String(file.name || 'image.png').trim();
+  const mime = String(file.type || '').toLowerCase();
+  const size = Number(file.size || 0);
+
+  if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(name)) {
+    const rawUrl = await readFileAsDataUrl(file);
+    const { previewUrl, mimeType } = await compressQuickImageDataUrl(rawUrl, mime || 'image/png', size);
+    const dataBase64 = previewUrl.includes(',') ? previewUrl.split(',')[1] : previewUrl;
+    return {
+      name: name || 'pasted-image.png',
+      mimeType,
+      dataBase64,
+      previewUrl,
+      isImage: true,
+      size,
+    };
+  }
+
+  if (mime === 'application/pdf' || QUICK_PDF_EXT_RE.test(name)) {
+    if (size > MAX_QUICK_PDF_BYTES) {
+      throw new Error('Tệp PDF quá lớn (tối đa 3.5 MB).');
+    }
+    const rawUrl = await readFileAsDataUrl(file);
+    const dataBase64 = rawUrl.includes(',') ? rawUrl.split(',')[1] : rawUrl;
+    return {
+      name,
+      mimeType: 'application/pdf',
+      dataBase64,
+      isImage: false,
+      size,
+    };
+  }
+
+  if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || QUICK_TEXT_EXT_RE.test(name)) {
+    if (size > MAX_QUICK_TEXT_BYTES) {
+      throw new Error('Tệp văn bản quá lớn (tối đa 2 MB).');
+    }
+    const textContent = (await readFileAsTextContent(file)).slice(0, 15000);
+    return {
+      name,
+      mimeType: mime || 'text/plain',
+      textContent,
+      isImage: false,
+      size,
+    };
+  }
+
+  if (QUICK_OFFICE_EXT_RE.test(name)) {
+    return {
+      name,
+      mimeType: mime || 'application/octet-stream',
+      textContent: `[Tệp Office đính kèm: ${name}]`,
+      isImage: false,
+      size,
+    };
+  }
+
+  throw new Error('Hỗ trợ ảnh (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD hoặc tệp Office.');
+}
+
 export default function CommandPalette({ role = 'student' }) {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const dataCtx = useData?.() || {};
   const { students = [], teachers = [], studentTrainingData = [] } = dataCtx;
   const { isDark, toggle } = useTheme();
@@ -227,7 +357,11 @@ export default function CommandPalette({ role = 'student' }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [messages, setMessages] = useState([]);
   const [asking, setAsking] = useState(false);
+  const [attachment, setAttachment] = useState(null);
+  const [attachError, setAttachError] = useState('');
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
   const chatScrollRef = useRef(null);
 
   useEffect(() => {
@@ -267,6 +401,9 @@ export default function CommandPalette({ role = 'student' }) {
       setActiveIndex(0);
       setMessages([]);
       setAsking(false);
+      setAttachment(null);
+      setAttachError('');
+      setIsDraggingOver(false);
       return;
     }
     const timer = window.setTimeout(() => inputRef.current?.focus(), 30);
@@ -442,22 +579,83 @@ export default function CommandPalette({ role = 'student' }) {
     setActiveIndex(0);
   }, [items.length, query]);
 
-  const askAiQuestion = useCallback(async (rawText) => {
-    const question = String(rawText || '').trim();
-    if (!question || asking) return;
+  const handlePickedQuickFile = useCallback(async (file) => {
+    if (!file) return;
+    setAttachError('');
+    try {
+      const processed = await processQuickAttachFile(file);
+      if (processed) {
+        setAttachment(processed);
+        window.setTimeout(() => inputRef.current?.focus(), 20);
+      }
+    } catch (err) {
+      setAttachError(err?.message || t('Không đọc được tệp đã chọn'));
+    }
+  }, [t]);
 
-    const userMsg = { id: `u_${Date.now()}`, role: 'user', text: question };
+  const handleFileInputChange = useCallback((e) => {
+    const file = e.target?.files?.[0];
+    if (file) {
+      void handlePickedQuickFile(file);
+    }
+    if (e.target) {
+      e.target.value = '';
+    }
+  }, [handlePickedQuickFile]);
+
+  const handlePaste = useCallback((e) => {
+    const dt = e?.clipboardData;
+    if (!dt) return;
+    let pickedFile = null;
+    if (dt.items && dt.items.length) {
+      for (let i = 0; i < dt.items.length; i += 1) {
+        const item = dt.items[i];
+        if (item.kind === 'file') {
+          const f = item.getAsFile?.();
+          if (f) {
+            pickedFile = f;
+            break;
+          }
+        }
+      }
+    }
+    if (!pickedFile && dt.files && dt.files.length) {
+      pickedFile = dt.files[0];
+    }
+    if (!pickedFile) return;
+    e.preventDefault();
+    void handlePickedQuickFile(pickedFile);
+  }, [handlePickedQuickFile]);
+
+  const askAiQuestion = useCallback(async (rawText, rawAttachment = attachment) => {
+    const question = String(rawText || '').trim();
+    const activeAttachment = rawAttachment || null;
+    if ((!question && !activeAttachment) || asking) return;
+
+    const userMsg = {
+      id: `u_${Date.now()}`,
+      role: 'user',
+      text: question,
+      ...(activeAttachment ? { attachment: activeAttachment } : {}),
+    };
+    const priorHistory = messages.slice(-8).map((m) => ({
+      role: m.role,
+      text: m.text || (m.attachment?.name ? `[Đính kèm: ${m.attachment.name}]` : ''),
+    }));
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
     setQuery('');
+    setAttachment(null);
+    setAttachError('');
     setAsking(true);
 
     // Local office memory first when instant hit is available & not an explicit follow-up conversation
     try {
       const res = await aiSupportAPI.quickAsk({
         question,
-        history: messages.slice(-8).map((m) => ({ role: m.role, text: m.text })),
+        history: priorHistory,
         preferredLang: language,
+        attachment: activeAttachment,
       });
       const payload = res?.data || res;
       const answerText = String(payload?.answer || '').trim();
@@ -480,7 +678,7 @@ export default function CommandPalette({ role = 'student' }) {
       setAsking(false);
     }
 
-    const localFallback = matchLocalOfficeMemory(question, language);
+    const localFallback = question ? matchLocalOfficeMemory(question, language) : null;
     setMessages((prev) => [
       ...prev,
       localFallback
@@ -501,12 +699,13 @@ export default function CommandPalette({ role = 'student' }) {
           actions: [],
         },
     ]);
-  }, [asking, language, messages]);
+  }, [asking, attachment, language, messages]);
 
   if (!open || typeof document === 'undefined') return null;
 
   const isChatMode = messages.length > 0 || asking;
   const trimmedQuery = query.trim();
+  const canSend = Boolean(trimmedQuery || attachment) && !asking;
   const starterPrompts = STARTER_PROMPTS[roleKey] || STARTER_PROMPTS.student;
 
   const executeItem = (item) => {
@@ -518,8 +717,31 @@ export default function CommandPalette({ role = 'student' }) {
   const resetToSearch = () => {
     setMessages([]);
     setQuery('');
+    setAttachment(null);
+    setAttachError('');
     setAsking(false);
     window.setTimeout(() => inputRef.current?.focus(), 20);
+  };
+
+  const handleDragOver = (e) => {
+    if (e.dataTransfer?.types?.includes('Files')) {
+      e.preventDefault();
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    if (e.dataTransfer?.files?.length) {
+      e.preventDefault();
+      setIsDraggingOver(false);
+      void handlePickedQuickFile(e.dataTransfer.files[0]);
+    }
   };
 
   const handleInputKeyDown = (e) => {
@@ -528,7 +750,7 @@ export default function CommandPalette({ role = 'student' }) {
       setOpen(false);
       return;
     }
-    if (!isChatMode && trimmedQuery) {
+    if (!isChatMode && trimmedQuery && !attachment) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveIndex((prev) => (items.length ? (prev + 1) % items.length : 0));
@@ -542,19 +764,69 @@ export default function CommandPalette({ role = 'student' }) {
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!trimmedQuery) return;
-      if (isChatMode || items.length === 0 || isLikelyQuestion(trimmedQuery)) {
-        void askAiQuestion(trimmedQuery);
+      if (!trimmedQuery && !attachment) return;
+      if (attachment || isChatMode || items.length === 0 || isLikelyQuestion(trimmedQuery)) {
+        void askAiQuestion(trimmedQuery, attachment);
       } else if (items[activeIndex]) {
         executeItem(items[activeIndex]);
       } else {
-        void askAiQuestion(trimmedQuery);
+        void askAiQuestion(trimmedQuery, attachment);
       }
     }
   };
 
   const renderComposerPill = (placeholderText) => (
     <div className="rounded-[24px] border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:focus-within:ring-emerald-950/60 transition">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+      {attachment ? (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 px-2.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {attachment.isImage && attachment.previewUrl ? (
+              <img
+                src={attachment.previewUrl}
+                alt={attachment.name || 'Ảnh đính kèm'}
+                className="h-11 w-11 shrink-0 rounded-xl border border-emerald-200/70 object-cover bg-white"
+              />
+            ) : (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600/15 text-emerald-700 dark:text-emerald-300">
+                <FileText size={18} />
+              </span>
+            )}
+            <div className="min-w-0">
+              <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
+                {attachment.name || t('Ảnh đính kèm')}
+              </div>
+              <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                {[attachment.isImage ? t('Hình ảnh') : t('Tệp đính kèm'), formatQuickFileSize(attachment.size)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setAttachment(null);
+              setAttachError('');
+            }}
+            aria-label={t('Gỡ tệp đính kèm')}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/90 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition cursor-pointer"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ) : null}
+      {attachError ? (
+        <div className="mb-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-[11.5px] font-semibold text-rose-600 dark:text-rose-300">
+          {attachError}
+        </div>
+      ) : null}
       <div className="flex items-center gap-2.5">
         <Search size={17} className="shrink-0 text-slate-400" aria-hidden="true" />
         <input
@@ -563,38 +835,36 @@ export default function CommandPalette({ role = 'student' }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder={placeholderText}
+          placeholder={attachment ? t('Nhập câu hỏi về ảnh/tệp này (hoặc nhấn Gửi ngay)…') : placeholderText}
           className="w-full min-w-0 bg-transparent text-[14px] font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none"
         />
       </div>
-      <div className="mt-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => {
-            if (isChatMode) {
-              resetToSearch();
-            } else {
-              setQuery('');
-              inputRef.current?.focus();
-            }
-          }}
-          title={isChatMode ? 'Tìm nhanh / Cuộc trò chuyện mới' : 'Xóa & xem tất cả tác vụ'}
-          aria-label={isChatMode ? 'Tìm nhanh / Cuộc trò chuyện mới' : 'Xóa & xem tất cả tác vụ'}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
-        >
-          <Plus size={15} />
-        </button>
-        <div className="flex items-center gap-2">
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title={t('Đính kèm ảnh hoặc tệp (hoặc dán Ctrl+V)')}
+            aria-label={t('Đính kèm ảnh hoặc tệp')}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-slate-700 transition cursor-pointer"
+          >
+            <Plus size={15} />
+          </button>
+          <span className="truncate text-[11px] font-medium text-slate-400">
+            {t('Dán ảnh (Ctrl+V) hoặc thêm tệp')}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <span className="hidden sm:inline text-[11px] font-medium text-slate-400">
             Ctrl / ⌘ + K
           </span>
           <button
             type="button"
-            disabled={!trimmedQuery || asking}
-            onClick={() => void askAiQuestion(trimmedQuery)}
+            disabled={!canSend}
+            onClick={() => void askAiQuestion(trimmedQuery, attachment)}
             aria-label="Gửi câu hỏi cho AI"
             className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
-              trimmedQuery && !asking
+              canSend
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer'
                 : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-400 cursor-not-allowed'
             }`}
@@ -617,7 +887,15 @@ export default function CommandPalette({ role = 'student' }) {
         aria-modal="true"
         aria-label="DewSkill AI và tìm kiếm nhanh"
         onClick={(e) => e.stopPropagation()}
-        className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-[var(--cms-surface,#ffffff)] shadow-2xl max-h-[84vh]"
+        onPaste={handlePaste}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border bg-[var(--cms-surface,#ffffff)] shadow-2xl max-h-[84vh] transition ${
+          isDraggingOver
+            ? 'border-emerald-500 ring-4 ring-emerald-400/25'
+            : 'border-slate-200/90 dark:border-slate-800'
+        }`}
       >
         {isChatMode ? (
           <>
@@ -656,7 +934,21 @@ export default function CommandPalette({ role = 'student' }) {
                 msg.role === 'user' ? (
                   <div key={msg.id} className="flex justify-end">
                     <div className="max-w-[82%] rounded-[20px] bg-emerald-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-xs">
-                      {msg.text}
+                      {msg.attachment ? (
+                        msg.attachment.isImage && msg.attachment.previewUrl ? (
+                          <img
+                            src={msg.attachment.previewUrl}
+                            alt={msg.attachment.name || 'Ảnh đính kèm'}
+                            className={`max-h-48 max-w-full rounded-xl object-contain bg-white/10 ${msg.text ? 'mb-2' : ''}`}
+                          />
+                        ) : (
+                          <div className={`inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-2.5 py-1 text-xs font-bold ${msg.text ? 'mb-2' : ''}`}>
+                            <FileText size={13} />
+                            <span className="truncate max-w-[220px]">{msg.attachment.name || t('Tệp đính kèm')}</span>
+                          </div>
+                        )
+                      ) : null}
+                      {msg.text ? <div>{msg.text}</div> : null}
                     </div>
                   </div>
                 ) : (
@@ -760,10 +1052,10 @@ export default function CommandPalette({ role = 'student' }) {
               ) : null}
 
               <div className="mx-auto mt-4 max-w-xl">
-                {trimmedQuery ? (
+                {trimmedQuery || attachment ? (
                   <button
                     type="button"
-                    onClick={() => void askAiQuestion(trimmedQuery)}
+                    onClick={() => void askAiQuestion(trimmedQuery, attachment)}
                     className="mb-2 flex w-full items-center justify-between gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-950/50 px-3.5 py-2.5 text-left transition hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60 cursor-pointer"
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
@@ -772,10 +1064,14 @@ export default function CommandPalette({ role = 'student' }) {
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-bold text-emerald-900 dark:text-emerald-100">
-                          {`Hỏi DewSkill AI: “${trimmedQuery}”`}
+                          {trimmedQuery
+                            ? `Hỏi DewSkill AI: “${trimmedQuery}”`
+                            : t('Phân tích ảnh/tệp đính kèm với DewSkill AI')}
                         </span>
                         <span className="block truncate text-xs text-emerald-700/80 dark:text-emerald-300/80">
-                          Tìm trong bộ nhớ nhanh trước, nếu chưa có AI sẽ trả lời
+                          {attachment
+                            ? (attachment.name || t('Ảnh đính kèm'))
+                            : 'Tìm trong bộ nhớ nhanh trước, nếu chưa có AI sẽ trả lời'}
                         </span>
                       </span>
                     </span>

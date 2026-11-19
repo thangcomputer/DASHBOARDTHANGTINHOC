@@ -157,19 +157,44 @@ export type QuickAiReply = {
   model?: string;
 };
 
+export type QuickAiAttachment = {
+  name?: string;
+  mimeType?: string;
+  dataBase64?: string;
+  textContent?: string;
+  previewUrl?: string;
+  isImage?: boolean;
+  size?: number;
+};
+
 export async function quickAskAi({
-  question,
+  question = '',
   history = [],
   preferredLang = 'vi',
+  attachment = null,
 }: {
-  question: string;
+  question?: string;
   history?: Array<{ role: 'user' | 'assistant'; text: string }>;
   preferredLang?: 'vi' | 'en';
+  attachment?: QuickAiAttachment | null;
 }): Promise<QuickAiReply> {
+  const cleanAttachment = attachment
+    ? {
+      name: attachment.name || '',
+      mimeType: attachment.mimeType || '',
+      ...(attachment.dataBase64 ? { dataBase64: attachment.dataBase64 } : {}),
+      ...(attachment.textContent ? { textContent: attachment.textContent } : {}),
+    }
+    : null;
   const payload = await mobileApiRequest<{ data?: QuickAiReply }>('/ai-support/quick-ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, history, preferredLang }),
+    body: JSON.stringify({
+      question,
+      history,
+      preferredLang,
+      ...(cleanAttachment ? { attachment: cleanAttachment } : {}),
+    }),
   });
   return {
     answer: String(payload?.data?.answer || '').trim(),

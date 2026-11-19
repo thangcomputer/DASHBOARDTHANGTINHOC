@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   DeviceEventEmitter,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,6 +14,8 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
@@ -21,6 +24,7 @@ import {
   CalendarDays,
   Check,
   DollarSign,
+  FileText,
   Gamepad2,
   Headphones,
   House,
@@ -45,7 +49,7 @@ import { useAuth } from '../app/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { navigationRef } from '../navigation/navigationRef';
-import { quickAskAi, type QuickAiAction } from '../services/aiSupportApi';
+import { quickAskAi, type QuickAiAction, type QuickAiAttachment } from '../services/aiSupportApi';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import {
   getMobileSoundEnabled,
@@ -80,9 +84,107 @@ type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  attachment?: QuickAiAttachment;
   source?: 'memory' | 'ai' | 'fallback';
   actions?: QuickAiAction[];
 };
+
+const MOBILE_TEXT_EXT_RE = /\.(txt|csv|tsv|json|md|markdown|xml|html|htm|css|js|jsx|ts|tsx|py|sql|log|yml|yaml|ini|conf)$/i;
+const MOBILE_PDF_EXT_RE = /\.pdf$/i;
+const MOBILE_IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|bmp)$/i;
+const MOBILE_OFFICE_EXT_RE = /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i;
+
+function formatMobileFileSize(bytes?: number) {
+  const size = Number(bytes || 0);
+  if (!size) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readWebBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Không đọc được tệp đã chọn'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function readWebBlobAsText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Không đọc được nội dung tệp'));
+    reader.readAsText(blob, 'utf-8');
+  });
+}
+
+function compressWebImageDataUrl(dataUrl: string, originalMime: string, originalSize: number): Promise<{ previewUrl: string; mimeType: string }> {
+  if (typeof document === 'undefined' || typeof globalThis.Image === 'undefined') {
+    return Promise.resolve({ previewUrl: dataUrl, mimeType: originalMime || 'image/png' });
+  }
+  return new Promise((resolve) => {
+    const ImgCtor = globalThis.Image;
+    const img = new ImgCtor();
+    img.onload = () => {
+      const maxDim = 1400;
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim && originalSize <= 450 * 1024) {
+        resolve({ previewUrl: dataUrl, mimeType: originalMime || 'image/png' });
+        return;
+      }
+      if (width > maxDim || height > maxDim) {
+        const scale = Math.min(maxDim / width, maxDim / height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve({ previewUrl: dataUrl, mimeType: originalMime || 'image/png' });
+        return;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const outMime = originalMime === 'image/png' && originalSize <= 350 * 1024 ? 'image/png' : 'image/jpeg';
+      resolve({ previewUrl: canvas.toDataURL(outMime, 0.84), mimeType: outMime });
+    };
+    img.onerror = () => resolve({ previewUrl: dataUrl, mimeType: originalMime || 'image/png' });
+    img.src = dataUrl;
+  });
+}
+
+async function processWebBlobToAttachment(blob: Blob, rawName = 'pasted-image.png', rawMime = ''): Promise<QuickAiAttachment> {
+  const name = String(rawName || 'pasted-image.png').trim();
+  const mime = String(rawMime || blob.type || '').toLowerCase();
+  const size = Number(blob.size || 0);
+
+  if (mime.startsWith('image/') || MOBILE_IMAGE_EXT_RE.test(name)) {
+    const rawUrl = await readWebBlobAsDataUrl(blob);
+    const { previewUrl, mimeType } = await compressWebImageDataUrl(rawUrl, mime || 'image/png', size);
+    const dataBase64 = previewUrl.includes(',') ? previewUrl.split(',')[1] : previewUrl;
+    return { name, mimeType, dataBase64, previewUrl, isImage: true, size };
+  }
+  if (mime === 'application/pdf' || MOBILE_PDF_EXT_RE.test(name)) {
+    if (size > 3.5 * 1024 * 1024) throw new Error('Tệp PDF quá lớn (tối đa 3.5 MB).');
+    const rawUrl = await readWebBlobAsDataUrl(blob);
+    const dataBase64 = rawUrl.includes(',') ? rawUrl.split(',')[1] : rawUrl;
+    return { name, mimeType: 'application/pdf', dataBase64, isImage: false, size };
+  }
+  if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || MOBILE_TEXT_EXT_RE.test(name)) {
+    if (size > 2 * 1024 * 1024) throw new Error('Tệp văn bản quá lớn (tối đa 2 MB).');
+    const textContent = (await readWebBlobAsText(blob)).slice(0, 15000);
+    return { name, mimeType: mime || 'text/plain', textContent, isImage: false, size };
+  }
+  if (MOBILE_OFFICE_EXT_RE.test(name)) {
+    return { name, mimeType: mime || 'application/octet-stream', textContent: `[Tệp Office đính kèm: ${name}]`, isImage: false, size };
+  }
+  throw new Error('Hỗ trợ ảnh (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD hoặc tệp Office.');
+}
 
 const STARTER_PROMPTS: Record<'student' | 'teacher', string[]> = {
   student: [
@@ -224,6 +326,8 @@ export function QuickAiPopupModal({
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [asking, setAsking] = useState(false);
+  const [attachment, setAttachment] = useState<QuickAiAttachment | null>(null);
+  const [attachError, setAttachError] = useState('');
 
   const inputRef = useRef<React.ComponentRef<typeof TextInput> | null>(null);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
@@ -253,6 +357,43 @@ export function QuickAiPopupModal({
     }
     return undefined;
   }, [messages.length, asking]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    const onWindowPaste = (e: Event) => {
+      const clip = (e as ClipboardEvent).clipboardData;
+      if (!clip) return;
+      let file: File | null = null;
+      if (clip.items && clip.items.length) {
+        for (let i = 0; i < clip.items.length; i += 1) {
+          const item = clip.items[i];
+          if (item.kind === 'file') {
+            const candidate = item.getAsFile?.();
+            if (candidate) {
+              file = candidate;
+              break;
+            }
+          }
+        }
+      }
+      if (!file && clip.files && clip.files.length) {
+        file = clip.files[0];
+      }
+      if (!file) return;
+      e.preventDefault();
+      setAttachError('');
+      void processWebBlobToAttachment(file, file.name || 'pasted-image.png', file.type || 'image/png')
+        .then((att) => {
+          setAttachment(att);
+          setTimeout(() => inputRef.current?.focus(), 30);
+        })
+        .catch((err) => {
+          setAttachError(err instanceof Error ? err.message : 'Không đọc được ảnh/tệp đã dán');
+        });
+    };
+    window.addEventListener('paste', onWindowPaste);
+    return () => window.removeEventListener('paste', onWindowPaste);
+  }, []);
 
   const navigateTab = useCallback((screen: keyof MainTabsParamList, locked = false) => {
     triggerMobileHaptic('light');
@@ -390,17 +531,126 @@ export function QuickAiPopupModal({
   const firstMatch = filteredDestinations[0] || filteredActions[0] || null;
   const trimmedQuery = query.trim();
   const isChatMode = messages.length > 0 || asking;
+  const canSend = Boolean(trimmedQuery || attachment) && !asking;
   const starterList = STARTER_PROMPTS[role === 'teacher' ? 'teacher' : 'student'];
 
-  const askAiQuestion = useCallback(async (rawQuestion: string) => {
+  const handlePickAttachment = useCallback(async () => {
+    triggerMobileHaptic('light');
+    setAttachError('');
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf', 'text/*', '*/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const fileName = String(asset.name || 'file').trim();
+      const mime = String(asset.mimeType || '').toLowerCase();
+
+      if (Platform.OS === 'web') {
+        const webFile = (asset as { file?: File }).file;
+        const blob: Blob = webFile || await (await fetch(asset.uri)).blob();
+        const att = await processWebBlobToAttachment(blob, fileName, mime || blob.type || '');
+        setAttachment(att);
+        setTimeout(() => inputRef.current?.focus(), 40);
+        return;
+      }
+
+      const info = asset.size == null
+        ? await FileSystem.getInfoAsync(asset.uri)
+        : { exists: true, size: asset.size };
+      const size = info.exists && 'size' in info && typeof info.size === 'number' ? info.size : Number(asset.size || 0);
+
+      if (mime.startsWith('image/') || MOBILE_IMAGE_EXT_RE.test(fileName)) {
+        if (size > 4.5 * 1024 * 1024) {
+          throw new Error('Ảnh quá lớn (tối đa 4.5 MB).');
+        }
+        const dataBase64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        setAttachment({
+          name: fileName,
+          mimeType: mime || 'image/jpeg',
+          dataBase64,
+          previewUrl: asset.uri,
+          isImage: true,
+          size,
+        });
+        return;
+      }
+
+      if (mime === 'application/pdf' || MOBILE_PDF_EXT_RE.test(fileName)) {
+        if (size > 3.5 * 1024 * 1024) {
+          throw new Error('Tệp PDF quá lớn (tối đa 3.5 MB).');
+        }
+        const dataBase64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        setAttachment({
+          name: fileName,
+          mimeType: 'application/pdf',
+          dataBase64,
+          isImage: false,
+          size,
+        });
+        return;
+      }
+
+      if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || MOBILE_TEXT_EXT_RE.test(fileName)) {
+        if (size > 2 * 1024 * 1024) {
+          throw new Error('Tệp văn bản quá lớn (tối đa 2 MB).');
+        }
+        const textContent = (await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        })).slice(0, 15000);
+        setAttachment({
+          name: fileName,
+          mimeType: mime || 'text/plain',
+          textContent,
+          isImage: false,
+          size,
+        });
+        return;
+      }
+
+      if (MOBILE_OFFICE_EXT_RE.test(fileName)) {
+        setAttachment({
+          name: fileName,
+          mimeType: mime || 'application/octet-stream',
+          textContent: `[Tệp Office đính kèm: ${fileName}]`,
+          isImage: false,
+          size,
+        });
+        return;
+      }
+
+      throw new Error('Hỗ trợ ảnh (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD hoặc tệp Office.');
+    } catch (err) {
+      setAttachError(err instanceof Error ? err.message : 'Không đọc được tệp đã chọn');
+    }
+  }, []);
+
+  const askAiQuestion = useCallback(async (rawQuestion: string, rawAttachment: QuickAiAttachment | null = attachment) => {
     const question = String(rawQuestion || '').trim();
-    if (!question || asking) return;
+    const activeAttachment = rawAttachment || null;
+    if ((!question && !activeAttachment) || asking) return;
     triggerMobileHaptic('light');
 
-    const userMsg: ChatMessage = { id: `u_${Date.now()}`, role: 'user', text: question };
-    const prior = messages.slice(-8).map((m) => ({ role: m.role, text: m.text }));
+    const userMsg: ChatMessage = {
+      id: `u_${Date.now()}`,
+      role: 'user',
+      text: question,
+      ...(activeAttachment ? { attachment: activeAttachment } : {}),
+    };
+    const prior = messages.slice(-8).map((m) => ({
+      role: m.role,
+      text: m.text || (m.attachment?.name ? `[Đính kèm: ${m.attachment.name}]` : ''),
+    }));
     setMessages((prev) => [...prev, userMsg]);
     setQuery('');
+    setAttachment(null);
+    setAttachError('');
     setAsking(true);
 
     try {
@@ -408,6 +658,7 @@ export function QuickAiPopupModal({
         question,
         history: prior,
         preferredLang: language,
+        attachment: activeAttachment,
       });
       if (result.answer) {
         setMessages((prev) => [
@@ -428,7 +679,7 @@ export function QuickAiPopupModal({
       setAsking(false);
     }
 
-    const localHit = matchLocalOfficeMemory(question, language);
+    const localHit = question ? matchLocalOfficeMemory(question, language) : null;
     setMessages((prev) => [
       ...prev,
       localHit
@@ -449,16 +700,16 @@ export function QuickAiPopupModal({
           actions: [],
         },
     ]);
-  }, [asking, language, messages]);
+  }, [asking, attachment, language, messages]);
 
   const handleSubmit = () => {
-    if (!trimmedQuery) return;
-    if (isChatMode || (!firstMatch && trimmedQuery) || isLikelyQuestion(trimmedQuery)) {
-      void askAiQuestion(trimmedQuery);
+    if (!trimmedQuery && !attachment) return;
+    if (attachment || isChatMode || (!firstMatch && trimmedQuery) || isLikelyQuestion(trimmedQuery)) {
+      void askAiQuestion(trimmedQuery, attachment);
     } else if (firstMatch) {
       firstMatch.onSelect();
     } else {
-      void askAiQuestion(trimmedQuery);
+      void askAiQuestion(trimmedQuery, attachment);
     }
   };
 
@@ -466,6 +717,8 @@ export function QuickAiPopupModal({
     triggerMobileHaptic('light');
     setMessages([]);
     setQuery('');
+    setAttachment(null);
+    setAttachError('');
     setAsking(false);
     setTimeout(() => inputRef.current?.focus(), 40);
   };
@@ -537,7 +790,23 @@ export function QuickAiPopupModal({
                 msg.role === 'user' ? (
                   <View key={msg.id} style={styles.userBubbleWrap}>
                     <View style={styles.userBubble}>
-                      <Text style={styles.userBubbleText}>{msg.text}</Text>
+                      {msg.attachment ? (
+                        msg.attachment.isImage && msg.attachment.previewUrl ? (
+                          <Image
+                            source={{ uri: msg.attachment.previewUrl }}
+                            style={[styles.userBubbleImage, msg.text ? styles.userBubbleMediaMargin : null]}
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <View style={[styles.userBubbleFileChip, msg.text ? styles.userBubbleMediaMargin : null]}>
+                            <FileText size={14} color="#FFFFFF" />
+                            <Text style={styles.userBubbleFileName} numberOfLines={1}>
+                              {msg.attachment.name || 'Tệp đính kèm'}
+                            </Text>
+                          </View>
+                        )
+                      ) : null}
+                      {msg.text ? <Text style={styles.userBubbleText}>{msg.text}</Text> : null}
                     </View>
                   </View>
                 ) : (
@@ -590,7 +859,7 @@ export function QuickAiPopupModal({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {!trimmedQuery ? (
+              {!trimmedQuery && !attachment ? (
                 <View style={styles.heroWrap}>
                   <DewSkillAiOrb size={56} />
                   <Text style={styles.heroSubtext}>
@@ -599,7 +868,7 @@ export function QuickAiPopupModal({
                 </View>
               ) : (
                 <Pressable
-                  onPress={() => void askAiQuestion(trimmedQuery)}
+                  onPress={() => void askAiQuestion(trimmedQuery, attachment)}
                   style={({ pressed }) => [styles.askDirectCard, pressed && styles.rowPressed]}
                   accessibilityRole="button"
                 >
@@ -608,10 +877,14 @@ export function QuickAiPopupModal({
                   </View>
                   <View style={styles.rowTextWrap}>
                     <Text style={styles.askDirectTitle} numberOfLines={2}>
-                      {`Hỏi DewSkill AI: “${trimmedQuery}”`}
+                      {trimmedQuery
+                        ? `Hỏi DewSkill AI: “${trimmedQuery}”`
+                        : 'Phân tích ảnh/tệp đính kèm với DewSkill AI'}
                     </Text>
                     <Text style={styles.askDirectSub} numberOfLines={1}>
-                      Tìm trong bộ nhớ nhanh trước, nếu chưa có AI sẽ trả lời
+                      {attachment
+                        ? (attachment.name || 'Ảnh đính kèm')
+                        : 'Tìm trong bộ nhớ nhanh trước, nếu chưa có AI sẽ trả lời'}
                     </Text>
                   </View>
                 </Pressable>
@@ -709,12 +982,49 @@ export function QuickAiPopupModal({
           )}
 
           <View style={styles.composerOuter}>
+            {attachment ? (
+              <View style={styles.attachPreviewBar}>
+                <View style={styles.attachPreviewInfo}>
+                  {attachment.isImage && attachment.previewUrl ? (
+                    <Image source={{ uri: attachment.previewUrl }} style={styles.attachThumb} />
+                  ) : (
+                    <View style={styles.attachFileIconBox}>
+                      <FileText size={16} color="#059669" />
+                    </View>
+                  )}
+                  <View style={styles.rowTextWrap}>
+                    <Text style={styles.attachNameText} numberOfLines={1}>
+                      {attachment.name || 'Ảnh đính kèm'}
+                    </Text>
+                    <Text style={styles.attachMetaText} numberOfLines={1}>
+                      {[attachment.isImage ? 'Hình ảnh' : 'Tệp đính kèm', formatMobileFileSize(attachment.size)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    setAttachment(null);
+                    setAttachError('');
+                  }}
+                  style={styles.attachRemoveBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Gỡ tệp đính kèm"
+                >
+                  <X size={14} color="#64748B" />
+                </Pressable>
+              </View>
+            ) : null}
+            {attachError ? (
+              <Text style={styles.attachErrorText}>{attachError}</Text>
+            ) : null}
             <View style={styles.composerPill}>
               <Pressable
-                onPress={isChatMode ? handleResetToExplore : () => { setQuery(''); inputRef.current?.focus(); }}
+                onPress={() => void handlePickAttachment()}
                 style={styles.composerPlusBtn}
                 accessibilityRole="button"
-                accessibilityLabel={isChatMode ? 'Mới' : 'Xóa nội dung tìm kiếm'}
+                accessibilityLabel="Đính kèm ảnh hoặc tệp"
               >
                 <Plus size={18} color="#334155" />
               </Pressable>
@@ -722,7 +1032,7 @@ export function QuickAiPopupModal({
                 ref={inputRef}
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Hỏi bất kỳ điều gì…"
+                placeholder={attachment ? 'Hỏi về ảnh/tệp này hoặc nhấn gửi…' : 'Hỏi bất kỳ điều gì…'}
                 placeholderTextColor="#94A3B8"
                 style={styles.composerInput}
                 returnKeyType="send"
@@ -730,16 +1040,16 @@ export function QuickAiPopupModal({
                 accessibilityLabel="Hỏi bất kỳ điều gì…"
               />
               <Pressable
-                disabled={!trimmedQuery || asking}
-                onPress={() => void askAiQuestion(trimmedQuery)}
+                disabled={!canSend}
+                onPress={() => void askAiQuestion(trimmedQuery, attachment)}
                 style={[
                   styles.composerSendBtn,
-                  trimmedQuery && !asking ? styles.composerSendBtnActive : styles.composerSendBtnIdle,
+                  canSend ? styles.composerSendBtnActive : styles.composerSendBtnIdle,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Gửi câu hỏi cho AI"
               >
-                {trimmedQuery ? (
+                {canSend || asking ? (
                   <ArrowUp size={16} color={asking ? '#059669' : '#FFFFFF'} strokeWidth={2.5} />
                 ) : (
                   <Sparkles size={15} color="#059669" />
@@ -956,6 +1266,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  userBubbleImage: {
+    width: 190,
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  userBubbleMediaMargin: {
+    marginBottom: 8,
+  },
+  userBubbleFileChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  userBubbleFileName: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
+    maxWidth: 180,
+  },
   userBubbleText: {
     color: '#FFFFFF',
     fontSize: 14,
@@ -1095,6 +1429,65 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+    gap: 8,
+  },
+  attachPreviewBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  attachPreviewInfo: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  attachThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  attachFileIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachNameText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  attachMetaText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#047857',
+    marginTop: 1,
+  },
+  attachRemoveBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachErrorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#DC2626',
+    paddingHorizontal: 4,
   },
   composerPill: {
     flexDirection: 'row',

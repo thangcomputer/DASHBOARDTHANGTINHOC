@@ -192,7 +192,7 @@ app.use(session(sessionOptions));
 app.use(pinoHttp({ logger }));
 app.use(require('./shared/middleware/requestContext'));
 
-const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '1mb';
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '6mb';
 app.use(express.json({
   limit: JSON_BODY_LIMIT,
   verify: (req, _res, buf) => {
