@@ -1182,6 +1182,8 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
           role: userRole,
           deviceKey: previewKey2,
           deviceSecret: getIncomingDeviceSecret(req, user._id),
+          platform: req.body?.platform || 'web',
+          req,
         });
       } catch (previewErr) {
         if (sendFixedDeviceError(res, previewErr)) return;
@@ -1346,6 +1348,8 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
           role: userRole,
           deviceKey: mobileFp,
           deviceSecret: getIncomingDeviceSecret(req, user._id),
+          platform: platform || 'web',
+          req,
         });
       } catch (previewErr) {
         if (sendFixedDeviceError(res, previewErr)) return;

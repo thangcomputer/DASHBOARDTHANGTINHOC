@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const RegisteredDevice = require('../models/RegisteredDevice');
 const { parseUserAgent } = require('./deviceSessionService');
+const { detectOsFamily } = require('./studentKnownDevices');
 
 const LIMIT_MESSAGE = 'Tài khoản này đã được đăng ký trên 2 thiết bị cố định. Bạn không thể đăng nhập bằng thiết bị khác. Vui lòng liên hệ trung tâm nếu cần thay đổi thiết bị.';
 
@@ -72,7 +73,72 @@ async function claimInMemory(store, deviceKey) {
   return { action: 'register', slot: decision.slot, deviceKey: key };
 }
 
-async function previewLoginDevice({ userId, role, deviceKey, deviceSecret }) {
+function matchesAnyDeviceSecret(doc, deviceSecret) {
+  if (!doc || !deviceSecret) return false;
+  if (secretsMatch(doc.secretHash, deviceSecret)) return true;
+  if (!Array.isArray(doc.secretHashes)) return false;
+  return doc.secretHashes.some((hash) => secretsMatch(hash, deviceSecret));
+}
+
+function appendSecretHash(existingDoc, nextHash) {
+  const list = Array.isArray(existingDoc?.secretHashes) ? [...existingDoc.secretHashes] : [];
+  if (existingDoc?.secretHash && !list.includes(existingDoc.secretHash)) {
+    list.unshift(existingDoc.secretHash);
+  }
+  if (nextHash && !list.includes(nextHash)) {
+    list.push(nextHash);
+  }
+  return list.slice(-15);
+}
+
+/**
+ * Allows switching between different browsers or Incognito on the same physical Web device
+ * (same hardware deviceKey, OS family, and deviceType) while rejecting cross-OS/blank-UA spoofing
+ * and keeping native mobile platforms strictly bound to their registered deviceSecret.
+ */
+function samePhysicalWebDevice(existingDoc, { platform = 'web', ua = null } = {}) {
+  const incomingPlatform = String(platform || 'web').trim().toLowerCase();
+  const storedPlatform = String(existingDoc?.platform || 'web').trim().toLowerCase();
+  if (incomingPlatform !== 'web' || storedPlatform !== 'web') return false;
+
+  const existingOs = detectOsFamily(existingDoc?.os || '');
+  const incomingOs = detectOsFamily(ua?.os || '');
+  if (existingOs !== 'other' && incomingOs === 'other') return false;
+
+  const appleSet = new Set(['mac', 'ios', 'ipad']);
+  const osMatches = (
+    existingOs === 'other'
+    || existingOs === incomingOs
+    || (appleSet.has(existingOs) && appleSet.has(incomingOs))
+  );
+  if (!osMatches) return false;
+
+  const existingType = String(existingDoc?.deviceType || 'unknown');
+  const incomingType = String(ua?.deviceType || 'unknown');
+  if (
+    existingType !== 'unknown'
+    && incomingType !== 'unknown'
+    && existingType !== incomingType
+    && !(appleSet.has(existingOs) && ['desktop', 'tablet'].includes(existingType) && ['desktop', 'tablet'].includes(incomingType))
+  ) {
+    return false;
+  }
+  if (existingType !== 'unknown' && incomingType === 'unknown') return false;
+
+  return true;
+}
+
+function verifyExistingDeviceProof(existingDoc, { deviceSecret, platform = 'web', ua = null } = {}) {
+  if (matchesAnyDeviceSecret(existingDoc, deviceSecret)) {
+    return { ok: true, needsNewBrowserSecret: false };
+  }
+  if (samePhysicalWebDevice(existingDoc, { platform, ua })) {
+    return { ok: true, needsNewBrowserSecret: true };
+  }
+  return { ok: false, needsNewBrowserSecret: false };
+}
+
+async function previewLoginDevice({ userId, role, deviceKey, deviceSecret, platform = 'web', req = null }) {
   const key = normalizeKey(deviceKey);
   if (!userId || !['student', 'teacher'].includes(role)) {
     throw deviceError('DEVICE_ROLE_UNSUPPORTED', 'Chỉ áp dụng cho học viên và giảng viên', 400);
@@ -84,7 +150,8 @@ async function previewLoginDevice({ userId, role, deviceKey, deviceSecret }) {
     status: 'active',
   }).lean();
   const mine = rows.find((row) => row.deviceKey === key);
-  if (mine && !secretsMatch(mine.secretHash, deviceSecret)) {
+  const ua = parseUserAgent(req?.headers?.['user-agent'] || '');
+  if (mine && !verifyExistingDeviceProof(mine, { deviceSecret, platform, ua }).ok) {
     throw deviceError(
       'DEVICE_PROOF_INVALID',
       'Không xác minh được thiết bị đã đăng ký. Nếu bạn đã xóa dữ liệu trình duyệt, hãy liên hệ trung tâm.',
@@ -109,6 +176,7 @@ async function claimLoginDevice({
   }
   if (!key) throw deviceError('DEVICE_KEY_REQUIRED', 'Thiếu định danh thiết bị', 400);
 
+  const ua = parseUserAgent(req?.headers?.['user-agent'] || '');
   const existing = await RegisteredDevice.findOne({
     userId: String(userId),
     role,
@@ -116,24 +184,34 @@ async function claimLoginDevice({
     status: 'active',
   });
   if (existing) {
-    if (!secretsMatch(existing.secretHash, deviceSecret)) {
+    const proof = verifyExistingDeviceProof(existing, { deviceSecret, platform, ua });
+    if (!proof.ok) {
       throw deviceError(
         'DEVICE_PROOF_INVALID',
         'Không xác minh được thiết bị đã đăng ký. Nếu bạn đã xóa dữ liệu trình duyệt, hãy liên hệ trung tâm.',
       );
     }
     existing.lastActiveAt = new Date();
+    if (ua.browser && ua.browser !== 'Không rõ') existing.browser = ua.browser;
+    if (ua.deviceLabel) existing.deviceLabel = ua.deviceLabel;
+    let issuedSecret = null;
+    if (proof.needsNewBrowserSecret) {
+      issuedSecret = crypto.randomBytes(32).toString('hex');
+      existing.secretHashes = appendSecretHash(existing, hashSecret(issuedSecret));
+      existing.markModified('secretHashes');
+    }
     await existing.save();
-    return { newlyRegistered: false, slot: existing.slot, deviceSecret: null };
+    return { newlyRegistered: false, slot: existing.slot, deviceSecret: issuedSecret };
   }
 
-  const ua = parseUserAgent(req?.headers?.['user-agent'] || '');
   const secret = crypto.randomBytes(32).toString('hex');
+  const initialHash = hashSecret(secret);
   const base = {
     userId: String(userId),
     role,
     deviceKey: key,
-    secretHash: hashSecret(secret),
+    secretHash: initialHash,
+    secretHashes: [initialHash],
     status: 'active',
     platform: String(platform || 'web').slice(0, 24),
     deviceLabel: ua.deviceLabel,
@@ -157,7 +235,7 @@ async function claimLoginDevice({
         status: 'active',
       });
       if (won) {
-        if (!secretsMatch(won.secretHash, deviceSecret) && won.secretHash !== base.secretHash) {
+        if (!verifyExistingDeviceProof(won, { deviceSecret, platform, ua }).ok && won.secretHash !== base.secretHash) {
           return { newlyRegistered: false, slot: won.slot, deviceSecret: null, raced: true };
         }
         return { newlyRegistered: won.secretHash === base.secretHash, slot: won.slot, deviceSecret: won.secretHash === base.secretHash ? secret : null };
@@ -212,4 +290,6 @@ module.exports = {
   revokeByAdmin,
   resetAllForAccount,
   hashSecret,
+  samePhysicalWebDevice,
+  verifyExistingDeviceProof,
 };

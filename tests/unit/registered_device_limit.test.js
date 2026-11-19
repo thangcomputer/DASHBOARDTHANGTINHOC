@@ -8,6 +8,8 @@ const path = require('node:path');
 const {
   decideRegisteredDeviceAccess,
   claimInMemory,
+  hashSecret,
+  verifyExistingDeviceProof,
 } = require('../../services/registeredDeviceService');
 
 test('device A and B register, C is rejected even after A and B log out of sessions', () => {
@@ -81,4 +83,51 @@ test('login routes keep registry separate from session logout', () => {
   assert.doesNotMatch(auth, /RegisteredDevice\.deleteMany/);
   assert.match(model, /partialFilterExpression: \{ status: 'active' \}/);
   assert.doesNotMatch(model, /expireAfterSeconds/);
+});
+
+test('cross-browser and incognito logins on the same physical PC pass proof while cross-OS/mobile spoofing is rejected', () => {
+  const registeredWinDoc = {
+    platform: 'web',
+    os: 'Windows 10/11',
+    deviceType: 'desktop',
+    secretHash: hashSecret('chrome-secret'),
+    secretHashes: [hashSecret('chrome-secret')],
+  };
+
+  assert.deepEqual(
+    verifyExistingDeviceProof(registeredWinDoc, {
+      deviceSecret: 'chrome-secret',
+      platform: 'web',
+      ua: { os: 'Windows 10/11', deviceType: 'desktop' },
+    }),
+    { ok: true, needsNewBrowserSecret: false },
+  );
+
+  // Edge / Firefox / Incognito on same Windows PC without Chrome's secret -> allowed on same slot
+  assert.deepEqual(
+    verifyExistingDeviceProof(registeredWinDoc, {
+      deviceSecret: '',
+      platform: 'web',
+      ua: { os: 'Windows 10/11', deviceType: 'desktop' },
+    }),
+    { ok: true, needsNewBrowserSecret: true },
+  );
+
+  // Android or blank-UA spoofing without secret -> still blocked
+  assert.deepEqual(
+    verifyExistingDeviceProof(registeredWinDoc, {
+      deviceSecret: '',
+      platform: 'web',
+      ua: { os: 'Android', deviceType: 'mobile' },
+    }),
+    { ok: false, needsNewBrowserSecret: false },
+  );
+  assert.deepEqual(
+    verifyExistingDeviceProof(registeredWinDoc, {
+      deviceSecret: '',
+      platform: 'web',
+      ua: { os: 'Không rõ HĐH', deviceType: 'unknown' },
+    }),
+    { ok: false, needsNewBrowserSecret: false },
+  );
 });

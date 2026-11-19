@@ -12,6 +12,7 @@ const registeredDeviceSchema = new mongoose.Schema({
   slot: { type: Number, required: true, min: 1, max: 2 },
   deviceKey: { type: String, required: true, trim: true },
   secretHash: { type: String, required: true },
+  secretHashes: { type: [String], default: [] },
   status: { type: String, default: 'active', enum: ['active', 'revoked'] },
   platform: { type: String, default: 'web', trim: true },
   deviceLabel: { type: String, default: '', trim: true },

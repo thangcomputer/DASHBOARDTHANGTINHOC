@@ -26,6 +26,9 @@ if (!process.env.JWT_SECRET) {
 if (!process.env.JWT_REFRESH_SECRET) {
   process.env.JWT_REFRESH_SECRET = crypto.randomBytes(32).toString('hex');
 }
+if (!process.env.RATE_LIMIT_LOGIN_BURST_MAX) {
+  process.env.RATE_LIMIT_LOGIN_BURST_MAX = '50';
+}
 
 const { assertTestDatabaseEnvironment } = require('../setup/testDatabaseGuard');
 const Student = require('../../models/Student');
@@ -232,11 +235,48 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
     assert.equal(reloginWithCookieFallback.status, 200, JSON.stringify(reloginWithCookieFallback.json));
     assert.equal(reloginWithCookieFallback.json?.data?.deviceSecret, secretA);
 
-    // 1d. Spoofing same hardware deviceKey from another browser WITHOUT secret & WITHOUT cookie must still fail
-    const spoofedA = await requestJson(baseUrl, '/api/auth/login/public', {
+    // 1d. Different browser / Incognito on the SAME physical PC (Edge/Windows, empty secret/cookie) must log in on Slot 1
+    const edgeSamePc = await requestJson(baseUrl, '/api/auth/login/public', {
+      method: 'POST',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/130.0.0.0',
+      },
+      body: {
+        identifier: phone,
+        password: rawPassword,
+        role: 'student',
+        deviceKey: `pc-a-${suffix}`,
+        deviceSecret: '',
+        platform: 'web',
+      },
+    });
+    assert.equal(edgeSamePc.status, 200, JSON.stringify(edgeSamePc.json));
+    assert.equal(edgeSamePc.json?.data?.registeredDeviceSlot, 1);
+    assert.ok(edgeSamePc.json?.data?.deviceSecret);
+
+    // Chrome's original secretA remains valid after Edge issued its own browser secret on Slot 1
+    const chromeStillWorks = await requestJson(baseUrl, '/api/auth/login/public', {
       method: 'POST',
       headers: {
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36',
+      },
+      body: {
+        identifier: phone,
+        password: rawPassword,
+        role: 'student',
+        deviceKey: `pc-a-${suffix}`,
+        deviceSecret: secretA,
+        platform: 'web',
+      },
+    });
+    assert.equal(chromeStillWorks.status, 200, JSON.stringify(chromeStillWorks.json));
+    assert.equal(chromeStillWorks.json?.data?.registeredDeviceSlot, 1);
+
+    // 1e. Cross-OS/mobile spoofing of PC's deviceKey WITHOUT secret must still fail with DEVICE_PROOF_INVALID
+    const spoofedAndroid = await requestJson(baseUrl, '/api/auth/login/public', {
+      method: 'POST',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/130.0.0.0 Mobile Safari/537.36',
       },
       body: {
         identifier: phone,
@@ -248,8 +288,8 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
         force: true,
       },
     });
-    assert.equal(spoofedA.status, 403);
-    assert.equal(spoofedA.json?.code, 'DEVICE_PROOF_INVALID');
+    assert.equal(spoofedAndroid.status, 403);
+    assert.equal(spoofedAndroid.json?.code, 'DEVICE_PROOF_INVALID');
 
     // 2. Machine B logs in -> claims Slot 2 + creates UserDeviceSession + knownDevices[1]
     const loginB = await requestJson(baseUrl, '/api/auth/login/public', {
@@ -327,7 +367,7 @@ test('Real MongoDB + Express flow: Reset thiết bị clears all login machine h
     assert.equal(resetRes.status, 200, JSON.stringify(resetRes.json));
     assert.equal(resetRes.json?.success, true);
     assert.equal(resetRes.json?.data?.clearedRegisteredDevices, 2);
-    assert.equal(resetRes.json?.data?.clearedWebSessions, 4);
+    assert.equal(resetRes.json?.data?.clearedWebSessions, 6);
     assert.equal(resetRes.json?.data?.clearedMobileSessions, 1);
 
     // 5. Verify ALL MongoDB collections & Student fields are completely clean
