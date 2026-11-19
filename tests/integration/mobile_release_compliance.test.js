@@ -45,9 +45,19 @@ test('Giai doan 1: self-service account deletion and public legal URLs are prope
 test('Giai doan 1 & 5: mobile app removes vulnerable xlsx package and round-trips quiz Excel via fflate', async () => {
   const pkg = JSON.parse(read('thang-tin-hoc-mobile/package.json'));
   assert.equal(Object.prototype.hasOwnProperty.call(pkg.dependencies || {}, 'xlsx'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(pkg.devDependencies || {}, 'xlsx'), false);
+  assert.ok(Object.prototype.hasOwnProperty.call(pkg.dependencies || {}, 'fflate'));
 
-  const ts = require('../../thang-tin-hoc-mobile/node_modules/typescript');
   const tsSource = read('thang-tin-hoc-mobile/src/services/teacherQuizExcel.ts');
+  assert.ok(tsSource.includes("from 'fflate'") || tsSource.includes('from "fflate"'));
+  assert.ok(tsSource.includes('createTeacherQuizQuestionWorkbook'));
+  assert.ok(tsSource.includes('parseTeacherQuizQuestionsExcel'));
+
+  const tsPath = path.join(ROOT, 'thang-tin-hoc-mobile/node_modules/typescript');
+  const fflatePath = path.join(ROOT, 'thang-tin-hoc-mobile/node_modules/fflate');
+  if (!fs.existsSync(tsPath) || !fs.existsSync(fflatePath)) return;
+
+  const ts = require(tsPath);
   const transpiled = ts.transpileModule(tsSource, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,

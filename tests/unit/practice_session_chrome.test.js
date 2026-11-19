@@ -29,7 +29,9 @@ test('practiceSessionMode toggles document dataset attribute and dispatches cust
   };
 
   try {
-    const mod = await import('../../client/src/utils/practiceSessionMode.js');
+    const mod = await import('../../client/src/utils/practiceSessionState.js');
+    const modeSrc = read('client/src/utils/practiceSessionMode.js');
+    assert.ok(modeSrc.includes("from './practiceSessionState'"));
     assert.equal(mod.isPracticeSessionActive(), false);
 
     assert.equal(mod.setPracticeSessionActive(true), true);
