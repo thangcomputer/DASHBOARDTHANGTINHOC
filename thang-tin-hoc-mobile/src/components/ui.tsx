@@ -31,7 +31,7 @@ import { getWebLogoUrl } from '../services/webSettingsApi';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import type { AppStackParamList } from '../navigation/types';
 import { useAuth } from '../app/AuthContext';
-import { hasRealCourseEnrollment, isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
+import { hasRealCourseEnrollment, isFreePortalMenu } from '../utils/freePortalHelper';
 import { KineticDotsLoader } from './KineticDotsLoader';
 
 export { KineticDotsLoader };
@@ -194,8 +194,7 @@ function BrandingTopBar() {
   const isFocused = useIsFocused();
   const auth = useAuth();
   const isStudent = auth?.user?.role === 'student';
-  const studentAiLocked = isStudent && isFreePortalLocked(auth?.user);
-  const compactLogoWithAi = isStudent && windowWidth < 430;
+  const compactLogoWithAi = windowWidth < 430;
   const hideMenuLabel = compactTopBar || compactLogoWithAi;
   const isFreeStudent =
     auth?.user?.role === 'student'
@@ -319,35 +318,15 @@ function BrandingTopBar() {
             ))}
           </Pressable>
         </View>
-        <View style={[styles.topBarActionsRow, isStudent && styles.topBarActionsRowStudent]}>
-          {isStudent ? (
-            <Pressable
-              onPress={() => {
-                if (studentAiLocked) {
-                  DeviceEventEmitter.emit('mobile:open-free-lock-modal');
-                  return;
-                }
-                navigation.navigate('Support');
-              }}
-              style={({ pressed }) => [styles.topBarAiChip, pressed && styles.topBarAiChipPressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Mở Trợ lý AI và Hỗ trợ"
-            >
-              <Sparkles size={14} color="#059669" />
-              <Text style={styles.topBarAiText}>AI</Text>
-            </Pressable>
-          ) : null}
+        <View style={[styles.topBarActionsRow, styles.topBarActionsRowStudent]}>
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
-            style={({ pressed }) => [
-              styles.topBarAction,
-              compactLogoWithAi && styles.topBarActionCompact,
-              pressed && styles.topBarNeoPressed,
-            ]}
+            style={({ pressed }) => [styles.topBarAiChip, pressed && styles.topBarAiChipPressed]}
             accessibilityRole="button"
-            accessibilityLabel="Tìm kiếm và tác vụ nhanh"
+            accessibilityLabel="DewSkill AI và tìm kiếm nhanh"
           >
-            <Search size={18} color={colors.muted} />
+            <Sparkles size={14} color="#059669" />
+            <Text style={styles.topBarAiText}>AI</Text>
           </Pressable>
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
@@ -747,10 +726,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
   brandingTopBarCompact: { paddingHorizontal: spacing.md, gap: 4 },
   brandingTopBarStudent: { paddingHorizontal: 12, gap: 8 },
-  topBarSideLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 },
-  topBarSideLeftCompact: { gap: 6 },
-  brandingHomeCentered: { width: 122, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 5, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 14, backgroundColor: '#FFFFFF', ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)' } : {}), boxShadow: droplet.logo },
-  brandingHomeCompact: { width: 92, height: 36, paddingHorizontal: 6, paddingVertical: 4 },
+  topBarSideLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4 },
+  topBarSideLeftCompact: { gap: 2 },
+  brandingHomeCentered: { width: 112, height: 36, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: 0, paddingVertical: 0, backgroundColor: 'transparent' },
+  brandingHomeCompact: { width: 88, height: 32, paddingHorizontal: 0, paddingVertical: 0 },
   brandingLogo: { width: '100%', height: '100%' },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
   topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },

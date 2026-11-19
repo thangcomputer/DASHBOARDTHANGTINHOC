@@ -51,6 +51,50 @@ export const subscriptionApi = {
   simulatePaid: (sessionId: string) => call<unknown>(`/sessions/${encodeURIComponent(sessionId)}/simulate-paid`, {}),
 };
 
+export type MobileBillingRestoreResult = {
+  restoredCourseIds: string[];
+  subscription: StudentSubscription | null;
+  verifiedTransactionCount: number;
+  reconciledCount: number;
+};
+
+export async function getMobileBillingCatalog() {
+  return mobileApiRequest<{
+    data?: {
+      storeStatus: {
+        billingMode: 'reader_companion' | 'sandbox' | 'production';
+        appleConfigured: boolean;
+        googleConfigured: boolean;
+        missingCredentials: { apple_iap: string[]; google_play: string[] };
+      };
+      products: Array<Record<string, unknown>>;
+    };
+  }>('/mobile-billing/catalog');
+}
+
+export async function restoreMobileBillingPurchases(): Promise<{
+  message: string;
+  data: MobileBillingRestoreResult;
+}> {
+  const payload = await mobileApiRequest<{
+    message?: string;
+    data?: MobileBillingRestoreResult;
+  }>('/mobile-billing/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  return {
+    message: payload.message || 'Đã đồng bộ quyền truy cập khóa học và gói tài khoản.',
+    data: payload.data || {
+      restoredCourseIds: [],
+      subscription: null,
+      verifiedTransactionCount: 0,
+      reconciledCount: 0,
+    },
+  };
+}
+
 export function formatExpiryDate(iso: string | null | undefined) {
   if (!iso) return '';
   const date = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);

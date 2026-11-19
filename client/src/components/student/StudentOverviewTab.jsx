@@ -9,6 +9,8 @@ import {
   PlayCircle, Trophy, Video, Zap,
 } from 'lucide-react';
 import DigitalCertificateModal from './DigitalCertificateModal';
+import ShareAchievementModal, { ShareTriggerButton } from './ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
 import { CompactCoursePicker } from './StudentShared';
 import WelcomeHero from '../WelcomeHero';
@@ -141,6 +143,7 @@ export default function StudentOverviewTab({
   const [pendingQuizzes, setPendingQuizzes] = useState([]);
   const [meetPlanOpen, setMeetPlanOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
+  const [shareResumeOpen, setShareResumeOpen] = useState(false);
   const [referralInput, setReferralInput] = useState('');
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralCopied, setReferralCopied] = useState(false);
@@ -177,8 +180,15 @@ export default function StudentOverviewTab({
     const onVisible = () => {
       if (document.visibilityState === 'visible') reloadMeetClasses();
     };
+    const onUnlock = () => reloadMeetClasses();
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    window.addEventListener('free-portal-unlocked', onUnlock);
+    window.addEventListener('cms:subscription-updated', onUnlock);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('free-portal-unlocked', onUnlock);
+      window.removeEventListener('cms:subscription-updated', onUnlock);
+    };
   }, []);
 
   useEffect(() => {
@@ -222,22 +232,30 @@ export default function StudentOverviewTab({
 
   useEffect(() => {
     let cancelled = false;
-    let portalSession = null;
-    try {
-      portalSession = JSON.parse(localStorage.getItem('student_user') || 'null');
-    } catch { /* ignore */ }
-    if (isFreePortalLocked(portalSession)) return () => { cancelled = true; };
-    api.quizzes.getStudentQuizzes()
-      .then((res) => {
-        if (!res?.success || cancelled) return;
-        const nowMs = Date.now();
-        setPendingQuizzes((res.data || []).filter((q) => {
-          if (q.mySubmission) return false;
-          return !q.deadline || new Date(q.deadline).getTime() > nowMs;
-        }));
-      })
-      .catch(() => { if (!cancelled) setPendingQuizzes([]); });
-    return () => { cancelled = true; };
+    const loadQuizzes = (forceUnlocked = false) => {
+      let portalSession = null;
+      try {
+        portalSession = JSON.parse(localStorage.getItem('student_user') || 'null');
+      } catch { /* ignore */ }
+      if (!forceUnlocked && isFreePortalLocked(portalSession)) return;
+      api.quizzes.getStudentQuizzes()
+        .then((res) => {
+          if (!res?.success || cancelled) return;
+          const nowMs = Date.now();
+          setPendingQuizzes((res.data || []).filter((q) => {
+            if (q.mySubmission) return false;
+            return !q.deadline || new Date(q.deadline).getTime() > nowMs;
+          }));
+        })
+        .catch(() => { if (!cancelled) setPendingQuizzes([]); });
+    };
+    loadQuizzes(false);
+    const onUnlock = () => loadQuizzes(true);
+    window.addEventListener('free-portal-unlocked', onUnlock);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('free-portal-unlocked', onUnlock);
+    };
   }, []);
 
   useEffect(() => {
@@ -264,9 +282,15 @@ export default function StudentOverviewTab({
     };
     window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
     window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+    window.addEventListener('free-portal-unlocked', load);
+    window.addEventListener('free-portal-locked', load);
+    window.addEventListener('cms:subscription-updated', load);
     return () => {
       window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
       window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStats);
+      window.removeEventListener('free-portal-unlocked', load);
+      window.removeEventListener('free-portal-locked', load);
+      window.removeEventListener('cms:subscription-updated', load);
       document.removeEventListener('visibilitychange', onFocus);
     };
   }, []);
@@ -721,14 +745,22 @@ export default function StudentOverviewTab({
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
                     {freePortalUi && activeResumeCertReady ? (
-                      <button
-                        type="button"
-                        onClick={() => setCertOpen(true)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-                      >
-                        <Award size={14} className="text-emerald-600" aria-hidden="true" />
-                        Chứng nhận QR
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setCertOpen(true)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+                        >
+                          <Award size={14} className="text-emerald-600" aria-hidden="true" />
+                          Chứng nhận QR
+                        </button>
+                        <ShareTriggerButton
+                          onClick={() => setShareResumeOpen(true)}
+                          label="SHARE"
+                          size="sm"
+                          className="!py-2"
+                        />
+                      </>
                     ) : null}
                     <DuoButton
                       variant="primary"
@@ -1100,6 +1132,16 @@ export default function StudentOverviewTab({
           completionRate={activeResumeCertReady ? 100 : (effectiveLastStudy?.progressPct ?? (Number.isFinite(Number(progressPct)) ? Number(progressPct) : heroProgress))}
         />
       )}
+      <ShareAchievementModal
+        open={shareResumeOpen}
+        onClose={() => setShareResumeOpen(false)}
+        data={buildCourseOrCertShareData({
+          title: effectiveLastStudy?.courseTitle || currentCourseName || pathTopic?.topic?.name || 'Lộ trình Tin học DewSkill',
+          scope: freePortalUi ? 'subject' : 'course',
+          studentName: studentData?.name || viewStudent?.name || '',
+          completionRate: 100,
+        })}
+      />
     </div>
   );
 }

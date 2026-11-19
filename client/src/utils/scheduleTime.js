@@ -237,15 +237,33 @@ export const SCHEDULE_DISPLAY = {
 const ATTENDANCE_GRACE_MS = 60 * 60 * 1000; // sync with services/attendanceWindow.js default
 const STUDENT_CONFIRM_MS = 60 * 60 * 1000;
 
-/** HV chưa xác nhận quá 1 giờ kể từ lúc GV gửi điểm danh. */
+/** HV chỉ hết hạn xác nhận khi đã quá cả (1 giờ sau lúc GV gửi) VÀ (1 giờ sau giờ kết thúc buổi học). */
 export function isStudentConfirmExpired(schedule, now = new Date()) {
   const confirm = String(schedule?.studentConfirmStatus || '').toLowerCase();
-  if (confirm === 'confirm_expired') return true;
-  if (confirm !== 'pending') return false;
+  if (confirm !== 'pending' && confirm !== 'confirm_expired') return false;
   const requested = schedule?.studentConfirmRequestedAt
     ? new Date(schedule.studentConfirmRequestedAt).getTime()
     : 0;
-  return requested > 0 && now.getTime() - requested >= STUDENT_CONFIRM_MS;
+  let graceEndMs = 0;
+  try {
+    const dateStr = normalizeScheduleDate(schedule?.date);
+    const parts = String(dateStr || '').split('-').map((n) => parseInt(n, 10));
+    if (parts.length === 3 && !parts.some((n) => !Number.isFinite(n))) {
+      const [y, m, d] = parts;
+      const startMins = parseTimeToMinutes(schedule?.startTime);
+      let endMins = parseTimeToMinutes(schedule?.endTime);
+      if (endMins == null && startMins != null) {
+        endMins = Math.min(startMins + SESSION_DURATION_MINS, 23 * 60 + 59);
+      }
+      if (endMins != null) {
+        const endAtMs = Date.UTC(y, m - 1, d, Math.floor(endMins / 60) - 7, endMins % 60, 0, 0);
+        graceEndMs = endAtMs + ATTENDANCE_GRACE_MS;
+      }
+    }
+  } catch { /* fall back to requested time */ }
+  const deadlineMs = Math.max(requested > 0 ? requested + STUDENT_CONFIRM_MS : 0, graceEndMs);
+  if (deadlineMs > 0) return now.getTime() >= deadlineMs;
+  return confirm === 'confirm_expired';
 }
 
 /**

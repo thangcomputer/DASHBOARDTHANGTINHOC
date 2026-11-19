@@ -13,10 +13,13 @@ import {
   Loader2,
   Lock,
   Paperclip,
+  X,
 } from 'lucide-react';
 import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { saveLastStudySession } from '../../../utils/resumeLearning';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
+import { buildMilestoneShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 import PathVideoModal from './PathVideoModal';
 
 const DEFAULT_SECTION_ORDER = ['content', 'file', 'video', 'practice'];
@@ -163,6 +166,7 @@ export default function MilestoneHubModal({
   );
   const [selectedReviewSection, setSelectedReviewSection] = useState(null);
   const [savingSection, setSavingSection] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const cfg = useMemo(() => normalizeConfig(node, activeDiff), [node, activeDiff]);
   const [contentScrolledToEnd, setContentScrolledToEnd] = useState(false);
   const sectionScrollRef = useRef(null);
@@ -442,7 +446,9 @@ export default function MilestoneHubModal({
     <div
       className="fixed inset-0 z-[9100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs sm:p-4"
       role="presentation"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && activeSection !== 'video') onClose();
+      }}
     >
       <div
         className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 transition-[max-width] duration-200 ${
@@ -456,52 +462,91 @@ export default function MilestoneHubModal({
         aria-label={node.label}
       >
         {/* Header */}
-        <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
-          <button
-            type="button"
-            onClick={() => {
-              if (activeSection) setActiveSection(null);
-              else onClose();
-            }}
-            aria-label={activeSection ? 'Quay lại bài học' : 'Trở về'}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 cursor-pointer !shadow-none"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              {activeSection ? `${node.label} · ${currentTabMeta.label}` : `Bài học ${String(milestoneIndex + 1).padStart(2, '0')}`}
-            </p>
-            <h3 className="truncate text-lg font-black text-slate-900 sm:text-xl">
-              {activeSection ? SECTION_META[activeSection]?.title : node.label}
-            </h3>
-            {!activeSection && (
-              <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                <p className="text-xs font-medium text-slate-500">
-                  {allThreeDone
-                    ? 'Đã hoàn thành cả 3 mức độ'
-                    : `Hoàn thành lần lượt Dễ → Vừa → Khó (${completedDiffCount}/3 mức)`}
-                </p>
-                {allThreeDone && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-800">
-                    <CheckCircle2 size={12} /> Hoàn thành bài học
-                  </span>
-                )}
+        {(() => {
+          const activeMeta = activeSection ? SECTION_META[activeSection] : null;
+          const HeaderIcon = activeMeta?.icon || BookOpen;
+          const headerIconTone = activeMeta?.iconBg || 'bg-emerald-50 text-emerald-700 ring-emerald-200/80';
+          return (
+            <div className="border-b border-slate-100 bg-gradient-to-b from-emerald-50/75 via-emerald-50/20 to-white px-4 pt-3.5 pb-4 sm:px-5">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeSection) setActiveSection(null);
+                    else onClose();
+                  }}
+                  aria-label={activeSection ? 'Quay lại bài học' : 'Trở về lộ trình'}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50/70 hover:text-emerald-800 focus:outline-none focus-visible:outline-2 focus-visible:outline-emerald-600 focus-visible:outline-offset-2 cursor-pointer !shadow-none"
+                >
+                  <ArrowLeft size={14} className="shrink-0" aria-hidden="true" />
+                  <span>{activeSection ? 'Quay lại bài học' : 'Trở về lộ trình'}</span>
+                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {activeSection && activeSectionCompleted ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700"
+                      aria-label="Đã hoàn thành"
+                    >
+                      {savingSection
+                        ? <Loader2 size={13} className="animate-spin text-emerald-600" />
+                        : <CheckCircle2 size={13} className="text-emerald-600" />}
+                      <span>Đã hoàn thành</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-emerald-100/85 px-2.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wider text-emerald-800">
+                      {activeSection ? `Mức ${currentTabMeta.label}` : `Bài học ${String(milestoneIndex + 1).padStart(2, '0')}`}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Đóng"
+                    title="Đóng"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/90 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:outline-2 focus-visible:outline-emerald-600 focus-visible:outline-offset-2 cursor-pointer !shadow-none"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
-          {activeSection && activeSectionCompleted ? (
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50"
-              aria-label="Đã hoàn thành"
-              title="Đã hoàn thành"
-            >
-              {savingSection
-                ? <Loader2 size={18} className="animate-spin text-emerald-600" />
-                : <CheckCircle2 size={18} className="text-emerald-600" />}
-            </span>
-          ) : null}
-        </div>
+
+              <div className="mt-3 flex items-center gap-3">
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 shadow-2xs ${headerIconTone}`}>
+                  <HeaderIcon size={20} aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  {activeSection ? (
+                    <p className="truncate text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      {node.label}
+                    </p>
+                  ) : null}
+                  <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900 leading-snug line-clamp-2">
+                    {activeSection ? activeMeta?.title : node.label}
+                  </h3>
+                  {!activeSection && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${
+                          allThreeDone
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {allThreeDone ? <CheckCircle2 size={11} /> : null}
+                        <span>{allThreeDone ? 'Hoàn thành 3/3 mức' : `${completedDiffCount}/3 mức`}</span>
+                      </span>
+                      <p className="text-xs font-medium text-slate-500">
+                        {allThreeDone
+                          ? 'Đã xong Dễ · Vừa · Khó'
+                          : 'Hoàn thành lần lượt Dễ → Vừa → Khó'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Body */}
         {!activeSection ? (
@@ -707,9 +752,18 @@ export default function MilestoneHubModal({
         {/* Footer */}
         {!activeSection ? (
           <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+            <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-700">
               <span>Tiến độ học tập ({currentTabMeta.label})</span>
-              <span>{doneCount}/{totalCount} phần</span>
+              <div className="flex items-center gap-2">
+                {doneCount === totalCount && totalCount > 0 ? (
+                  <ShareTriggerButton
+                    onClick={() => setShareOpen(true)}
+                    label="SHARE"
+                    size="sm"
+                  />
+                ) : null}
+                <span>{doneCount}/{totalCount} phần</span>
+              </div>
             </div>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
               <div
@@ -769,6 +823,17 @@ export default function MilestoneHubModal({
             )}
           </div>
         )}
+        <ShareAchievementModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={buildMilestoneShareData({
+            nodeTitle: node?.label || '',
+            difficultyLabel: currentTabMeta.label,
+            sectionsDone: doneCount,
+            sectionsTotal: totalCount,
+            allThreeDone,
+          })}
+        />
       </div>
     </div>,
     document.body,

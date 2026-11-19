@@ -14,6 +14,7 @@ const PRESERVED_KEYS = new Set([
   'cms-news-view',
   'cms_screen_capture_guide_skip',
   'thvp_recent_chat_stickers_v1',
+  'dewskill_lang',
 ]);
 
 const PRESERVED_PREFIXES = ['cms_login_alert', 'cms_pin_lock:', 'cms_daily_practice_reminder:', 'cms_subscription_reminder:'];

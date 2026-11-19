@@ -2,6 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChatStickerFromMessage } from './chatStickers';
 import ChatStickerImage from '../components/ChatStickerImage';
+import { useLanguage } from '../context/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 import {
   CHAT_DEEP_LINK_RE,
   GO_LINK_RE,
@@ -168,7 +170,7 @@ function renderMdTable(rawRows, key, mine) {
   );
 }
 
-function renderTextBlocks(chunk, segIdx, mine, highlight = '') {
+function renderTextBlocks(chunk, segIdx, mine, highlight = '', language = 'vi') {
   const lines = String(chunk || '').replace(/\r\n/g, '\n').split('\n');
   const out = [];
   let i = 0;
@@ -187,12 +189,14 @@ function renderTextBlocks(chunk, segIdx, mine, highlight = '') {
         continue;
       }
       rows.forEach((line, li) => {
-        out.push(...renderTextWithUrls(emphasizeStepLine(line), `${segIdx}-${start}-${li}`, mine, highlight));
+        const trLine = language === 'en' ? translateText(line, 'en') : line;
+        out.push(...renderTextWithUrls(emphasizeStepLine(trLine), `${segIdx}-${start}-${li}`, mine, highlight));
         if (start + li < lines.length - 1) out.push('\n');
       });
       continue;
     }
-    out.push(...renderTextWithUrls(emphasizeStepLine(lines[i]), `${segIdx}-${i}`, mine, highlight));
+    const trLine = language === 'en' ? translateText(lines[i], 'en') : lines[i];
+    out.push(...renderTextWithUrls(emphasizeStepLine(trLine), `${segIdx}-${i}`, mine, highlight));
     if (i < lines.length - 1) out.push('\n');
     i += 1;
   }
@@ -204,7 +208,9 @@ function renderTextBlocks(chunk, segIdx, mine, highlight = '') {
  */
 export function MessageRichText({ text, mine = false, highlight = '', payload = null }) {
   const navigate = useNavigate();
-  const raw = String(text || '');
+  const { language } = useLanguage();
+  const baseRaw = String(text || '');
+  const raw = language === 'en' ? translateText(baseRaw, 'en') : baseRaw;
   if (!raw) return null;
   const sticker = getChatStickerFromMessage({ content: raw, payload });
   if (sticker) {
@@ -295,9 +301,10 @@ export function MessageRichText({ text, mine = false, highlight = '', payload = 
       return;
     }
     if (seg.type === 'go') {
+      const goLabel = language === 'en' ? translateText(seg.label, 'en') : seg.label;
       const ok = GO_PATH_RE.test(String(seg.path || ''));
       if (!ok) {
-        nodes.push(seg.label || seg.path);
+        nodes.push(goLabel || seg.path);
         return;
       }
       nodes.push(
@@ -309,24 +316,24 @@ export function MessageRichText({ text, mine = false, highlight = '', payload = 
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const raw = String(seg.path || '');
-            const hashIdx = raw.indexOf('#');
+            const rawPath = String(seg.path || '');
+            const hashIdx = rawPath.indexOf('#');
             if (hashIdx === -1) {
-              navigate(raw);
+              navigate(rawPath);
               return;
             }
             navigate({
-              pathname: raw.slice(0, hashIdx) || '/',
-              hash: raw.slice(hashIdx + 1),
+              pathname: rawPath.slice(0, hashIdx) || '/',
+              hash: rawPath.slice(hashIdx + 1),
             });
           }}
         >
-          {seg.label}
+          {goLabel}
         </button>,
       );
       return;
     }
-    nodes.push(...renderTextBlocks(seg.value, segIdx, mine, highlight));
+    nodes.push(...renderTextBlocks(seg.value, segIdx, mine, highlight, language));
   });
 
   return <>{nodes.length ? nodes : raw}</>;

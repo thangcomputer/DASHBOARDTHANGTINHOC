@@ -6,6 +6,7 @@ import {
 import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { useToast } from '../../../utils/useToast';
+import { cmsConfirmAction } from '../../../utils/cmsDialog';
 
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100';
 const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
@@ -248,7 +249,7 @@ export default function AdminFreePortalMaterialsPanel({ topics = [] }) {
   };
 
   const handleDeleteItem = async (mode, item) => {
-    if (!window.confirm(`Xóa "${item.title}" khỏi tài nguyên tài khoản miễn phí?`)) return;
+    if (!(await cmsConfirmAction(`Xóa "${item.title}" khỏi tài nguyên tài khoản miễn phí?`))) return;
     const nextList = (data[mode] || []).filter((entry) => String(entry.id) !== String(item.id));
     await persistData({ ...data, [mode]: nextList }, 'Đã xóa');
   };

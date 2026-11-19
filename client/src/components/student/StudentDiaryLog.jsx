@@ -14,6 +14,13 @@ function getStudentDiaryStatus(sch, now = Date.now()) {
   if (status === 'cancelled') {
     return { label: 'Đã hủy', tone: 'cancelled' };
   }
+  const confirmStatus = String(sch?.studentConfirmStatus || '').toLowerCase();
+  if (status === 'scheduled' && (confirmStatus === 'pending' || confirmStatus === 'confirm_expired')) {
+    return { label: 'Chờ xác nhận điểm danh', tone: 'awaiting_confirm' };
+  }
+  if (status === 'scheduled' && confirmStatus === 'disputed') {
+    return { label: 'Chờ Admin xử lý', tone: 'disputed' };
+  }
 
   const schDateStr = normalizeScheduleDate(sch?.date);
   if (!schDateStr) return { label: 'Sắp tới', tone: 'upcoming' };
@@ -96,7 +103,7 @@ export default function StudentDiaryLog({
         return dayKey.startsWith(monthPrefix);
       }
       if (filter === 'Chưa điểm danh') {
-        return diaryStatus.tone === 'pending' || diaryStatus.tone === 'overdue';
+        return diaryStatus.tone === 'pending' || diaryStatus.tone === 'overdue' || diaryStatus.tone === 'awaiting_confirm';
       }
       if (filter === 'Hủy') {
         return String(item.status) === 'cancelled';
@@ -182,13 +189,17 @@ export default function StudentDiaryLog({
                 ? 'text-emerald-600 font-bold'
                 : diaryStatus.tone === 'ongoing'
                   ? 'text-emerald-600 font-black'
-                  : diaryStatus.tone === 'cancelled'
-                    ? 'text-rose-600 font-bold'
-                    : diaryStatus.tone === 'overdue'
-                      ? 'text-red-600 font-black'
-                      : diaryStatus.tone === 'pending'
-                        ? 'text-[#D97706] font-black'
-                        : 'text-slate-600 font-bold';
+                  : diaryStatus.tone === 'awaiting_confirm'
+                    ? 'text-emerald-700 font-black'
+                    : diaryStatus.tone === 'disputed'
+                      ? 'text-amber-600 font-black'
+                      : diaryStatus.tone === 'cancelled'
+                        ? 'text-rose-600 font-bold'
+                        : diaryStatus.tone === 'overdue'
+                          ? 'text-red-600 font-black'
+                          : diaryStatus.tone === 'pending'
+                            ? 'text-[#D97706] font-black'
+                            : 'text-slate-600 font-bold';
 
               return (
                 <div
@@ -210,6 +221,19 @@ export default function StudentDiaryLog({
                     </span>
 
                     <div className="flex items-center gap-2">
+                      {diaryStatus.tone === 'awaiting_confirm' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('cms:open-student-attendance-confirm', {
+                              detail: { scheduleId: String(item._id || item.id) },
+                            }));
+                          }}
+                          className="inline-flex min-h-[34px] items-center justify-center rounded-xl active:scale-95 px-4 py-1.5 text-xs font-black text-white transition bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          Xác nhận điểm danh
+                        </button>
+                      ) : null}
                       {canJoin ? (
                         <a
                           href={meetingUrl}

@@ -132,27 +132,56 @@ async function askLessonAssistant({
   if (!cleanQuestion) throw httpError(400, 'Vui lòng nhập câu hỏi');
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
 
-  const contextParts = [
-    courseTitle ? `Khóa học/Chủ đề: ${String(courseTitle).trim().slice(0, 160)}` : '',
-    unitTitle ? `Chặng/Chương: ${String(unitTitle).trim().slice(0, 160)}` : '',
-    lessonTitle ? `Bài học đang xem: ${String(lessonTitle).trim().slice(0, 160)}` : '',
-  ].filter(Boolean);
+  const VI_DIACRITIC_RE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+  const isEn = (() => {
+    if (!cleanQuestion || VI_DIACRITIC_RE.test(cleanQuestion)) return false;
+    if (/\b(xin chao|chao ban|la gi|nhu the nao|cach dung|huong dan|bai tap|trac nghiem|hoc vien)\b/i.test(cleanQuestion)) return false;
+    return /\b(hello|hi|hey|what|how|why|where|when|who|which|can|could|would|should|do|does|did|is|are|was|were|please|help|explain|tell|show|guide|use|using|formula|function|difference|between|example|error|fix|schedule|class|course|lesson|video|exam|quiz|score|in|of|for|to|with|from|about|the|and|or)\b/i.test(cleanQuestion);
+  })();
 
-  const systemPrompt = [
-    'Bạn là Trợ lý AI Tin Học của trung tâm Thắng Tin Học.',
-    'Nhiệm vụ: giải đáp thắc mắc của học viên về bài học đang xem và kiến thức Tin học văn phòng (Windows 10/11, Microsoft Word, Excel, PowerPoint, IC3, phím tắt, thao tác thực hành).',
-    'Quy tắc trình bày Markdown để hiển thị đẹp, dễ đọc trên giao diện tối:',
-    '- Mở đầu ngắn gọn 1–2 câu đi thẳng vào vấn đề.',
-    '- Dùng tiêu đề `###` kèm 1 icon phù hợp (ví dụ: `### 🔍 Nguyên nhân chính`, `### 🛠️ Cách khắc phục từng bước`, `### 📊 Bảng tra nhanh`).',
-    '- **In đậm (`**...**`)** cho tên nút bấm, mục menu, từ khóa quan trọng và tên bước.',
-    '- *In nghiêng (`*...*`)* cho thuật ngữ tiếng Anh hoặc ghi chú bổ sung ngắn.',
-    '- Dùng `` `backtick` `` cho công thức Excel, phím tắt (`Ctrl + S`), tên lệnh (`sfc /scannow`) hoặc mã lỗi (`#N/A`).',
-    '- Khi liệt kê cặp Nguyên nhân – Cách xử lý, so sánh tính năng, hoặc tổng hợp hàm/phím tắt, hãy ưu tiên trình bày bằng **Bảng Markdown** (`| ... | ... |`).',
-    '- Dùng khối trích dẫn `> 💡 **Mẹo:** ...` hoặc `> ⚠️ **Lưu ý:** ...` cho cảnh báo hoặc mẹo quan trọng.',
-    '- Câu văn ngắn gọn, tách ý rõ ràng, không viết đoạn văn dài đặc chữ.',
-    'Nếu câu hỏi hoàn toàn không liên quan đến học tập/tin học, hãy từ chối lịch sự và hướng học viên quay lại nội dung bài học.',
-    contextParts.length ? `Ngữ cảnh bài học hiện tại:\n${contextParts.join('\n')}` : '',
-  ].filter(Boolean).join('\n');
+  const contextParts = isEn
+    ? [
+      courseTitle ? `Course/Topic: ${String(courseTitle).trim().slice(0, 160)}` : '',
+      unitTitle ? `Unit/Chapter: ${String(unitTitle).trim().slice(0, 160)}` : '',
+      lessonTitle ? `Current Lesson: ${String(lessonTitle).trim().slice(0, 160)}` : '',
+    ].filter(Boolean)
+    : [
+      courseTitle ? `Khóa học/Chủ đề: ${String(courseTitle).trim().slice(0, 160)}` : '',
+      unitTitle ? `Chặng/Chương: ${String(unitTitle).trim().slice(0, 160)}` : '',
+      lessonTitle ? `Bài học đang xem: ${String(lessonTitle).trim().slice(0, 160)}` : '',
+    ].filter(Boolean);
+
+  const systemPrompt = isEn
+    ? [
+      'You are the Office IT AI Assistant at Thang Tin Hoc.',
+      'Task: help the student understand the current lesson and Office IT concepts (Windows 10/11, Microsoft Word, Excel, PowerPoint, IC3, shortcuts, and hands-on workflows).',
+      'CRITICAL LANGUAGE RULE: The student is asking in English. Write your ENTIRE response 100% in clear, natural English.',
+      'Markdown formatting rules for readability on dark backgrounds:',
+      '- Open with 1–2 concise sentences directly answering the core question.',
+      '- Use `###` headings with helpful icons (e.g., `### 🔍 Key Cause`, `### 🛠️ Step-by-Step Fix`, `### 📊 Quick Reference`).',
+      '- Use **bold (`**...**`)** for UI buttons, menu paths, important keywords, and step labels.',
+      '- Use `` `backtick` `` for Excel formulas, keyboard shortcuts (`Ctrl + S`), commands (`sfc /scannow`), or errors (`#N/A`).',
+      '- Prefer **Markdown Tables** (`| ... | ... |`) when comparing options or listing cause/fix pairs.',
+      '- Use blockquotes `> 💡 **Tip:** ...` or `> ⚠️ **Note:** ...` for helpful tips and warnings.',
+      '- Politely decline questions unrelated to studying or Office IT and guide back to the lesson.',
+      contextParts.length ? `Current lesson context:\n${contextParts.join('\n')}` : '',
+    ].filter(Boolean).join('\n')
+    : [
+      'Bạn là Trợ lý AI Tin Học của trung tâm Thắng Tin Học.',
+      'Nhiệm vụ: giải đáp thắc mắc của học viên về bài học đang xem và kiến thức Tin học văn phòng (Windows 10/11, Microsoft Word, Excel, PowerPoint, IC3, phím tắt, thao tác thực hành).',
+      'NGÔN NGỮ: Nếu người dùng hỏi bằng tiếng Anh, hãy trả lời 100% bằng tiếng Anh. Nếu người dùng hỏi bằng tiếng Việt, hãy trả lời bằng tiếng Việt.',
+      'Quy tắc trình bày Markdown để hiển thị đẹp, dễ đọc trên giao diện tối:',
+      '- Mở đầu ngắn gọn 1–2 câu đi thẳng vào vấn đề.',
+      '- Dùng tiêu đề `###` kèm 1 icon phù hợp (ví dụ: `### 🔍 Nguyên nhân chính`, `### 🛠️ Cách khắc phục từng bước`, `### 📊 Bảng tra nhanh`).',
+      '- **In đậm (`**...**`)** cho tên nút bấm, mục menu, từ khóa quan trọng và tên bước.',
+      '- *In nghiêng (`*...*`)* cho thuật ngữ tiếng Anh hoặc ghi chú bổ sung ngắn.',
+      '- Dùng `` `backtick` `` cho công thức Excel, phím tắt (`Ctrl + S`), tên lệnh (`sfc /scannow`) hoặc mã lỗi (`#N/A`).',
+      '- Khi liệt kê cặp Nguyên nhân – Cách xử lý, so sánh tính năng, hoặc tổng hợp hàm/phím tắt, hãy ưu tiên trình bày bằng **Bảng Markdown** (`| ... | ... |`).',
+      '- Dùng khối trích dẫn `> 💡 **Mẹo:** ...` hoặc `> ⚠️ **Lưu ý:** ...` cho cảnh báo hoặc mẹo quan trọng.',
+      '- Câu văn ngắn gọn, tách ý rõ ràng, không viết đoạn văn dài đặc chữ.',
+      'Nếu câu hỏi hoàn toàn không liên quan đến học tập/tin học, hãy từ chối lịch sự và hướng học viên quay lại nội dung bài học.',
+      contextParts.length ? `Ngữ cảnh bài học hiện tại:\n${contextParts.join('\n')}` : '',
+    ].filter(Boolean).join('\n');
 
   const safeHistory = (Array.isArray(history) ? history : [])
     .slice(-6)

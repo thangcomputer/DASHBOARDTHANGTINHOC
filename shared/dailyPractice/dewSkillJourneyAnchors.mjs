@@ -69,8 +69,8 @@ function cubicBezierPoint(p0, p1, p2, p3, t) {
   };
 }
 
-/** Các điểm trang trí trên mỗi đoạn nối (2 giọt nước + 1 ngôi sao vàng). */
-export function dewSkillDropletPoints(positions, tsp = [0.28, 0.54, 0.78]) {
+/** Các điểm giọt nước bóng bẩy trên mỗi đoạn nối (đặt gọn giữa nhãn trên và nút dưới, không đè chữ). */
+export function dewSkillDropletPoints(positions, tsp = [0.51, 0.65]) {
   const drops = [];
   const usePct = positions[0]?.xPct != null;
   for (let i = 0; i < positions.length - 1; i += 1) {
@@ -84,8 +84,7 @@ export function dewSkillDropletPoints(positions, tsp = [0.28, 0.54, 0.78]) {
       const p3 = [b.xPct, b.yPct];
       tsp.forEach((t, tIdx) => {
         const { viewX: xPct, viewY: yPct } = cubicBezierPoint(p0, p1, p2, p3, t);
-        const kind = tIdx === 2 ? 'star' : 'droplet';
-        drops.push({ xPct, yPct, plain: true, segmentIndex: i, kind });
+        drops.push({ xPct, yPct, plain: true, segmentIndex: i, stepIndex: tIdx, kind: 'droplet' });
       });
     } else {
       const midY = (a.viewY + b.viewY) / 2;
@@ -94,8 +93,7 @@ export function dewSkillDropletPoints(positions, tsp = [0.28, 0.54, 0.78]) {
       const p2 = [b.viewX, midY];
       const p3 = [b.viewX, b.viewY];
       tsp.forEach((t, tIdx) => {
-        const kind = tIdx === 2 ? 'star' : 'droplet';
-        drops.push({ ...cubicBezierPoint(p0, p1, p2, p3, t), segmentIndex: i, kind });
+        drops.push({ ...cubicBezierPoint(p0, p1, p2, p3, t), segmentIndex: i, stepIndex: tIdx, kind: 'droplet' });
       });
     }
   }

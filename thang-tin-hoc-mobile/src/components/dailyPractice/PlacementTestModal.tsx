@@ -25,6 +25,8 @@ import {
   type DpPlacementAdvice,
   type DpPlacementSkillRow,
 } from '../../services/dailyPracticeApi';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../ShareAchievementModal';
+import { buildPlacementShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 
 const STORAGE_PREFIX = 'dewskill_placement_v1';
 
@@ -253,6 +255,7 @@ export function PlacementTestModal({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [showIntro, setShowIntro] = useState(Boolean(intro));
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -548,6 +551,12 @@ export function PlacementTestModal({
                     <RotateCcw size={14} color="#334155" />
                     <Text style={styles.secondaryBtnText}>Làm lại bài 10 câu</Text>
                   </Pressable>
+                  <ShareTriggerButton
+                    onPress={() => setShareOpen(true)}
+                    label="SHARE"
+                    size="sm"
+                    style={{ borderRadius: 12, paddingVertical: 10 }}
+                  />
                   <Pressable
                     disabled={aiLoading}
                     onPress={() => {
@@ -634,6 +643,12 @@ export function PlacementTestModal({
             )}
           </ScrollView>
         </View>
+        <ShareAchievementModal
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={activeResult ? (buildPlacementShareData(activeResult) as ShareAchievementData) : null}
+          inlineOverlay
+        />
       </View>
     </Modal>
   );

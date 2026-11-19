@@ -396,7 +396,7 @@ async function completeScheduleAttendance({
   let sessionTotal = null;
 
   if (forceFinalizeConfirm) {
-    if (!['pending', 'disputed'].includes(confirmStatus)) {
+    if (!['pending', 'confirm_expired', 'disputed'].includes(confirmStatus)) {
       throw attendanceError('Buổi học không ở trạng thái chờ xác nhận.', 'ATTENDANCE_CONFIRM_INVALID', 409);
     }
     attendanceMethod = confirmOutcome === 'admin_approved' ? 'admin_dispute_approve' : 'student_confirm';
@@ -746,7 +746,7 @@ async function respondStudentAttendanceConfirm({ schedule, actor, decision }) {
   if (!sid || sid !== actorId) {
     throw attendanceError('Bạn chỉ xác nhận được lịch của mình', 'ATTENDANCE_FORBIDDEN', 403);
   }
-  if (String(schedule.status) !== 'scheduled' || String(schedule.studentConfirmStatus) !== 'pending') {
+  if (String(schedule.status) !== 'scheduled' || !['pending', 'confirm_expired'].includes(String(schedule.studentConfirmStatus))) {
     throw attendanceError('Không còn yêu cầu xác nhận điểm danh.', 'ATTENDANCE_CONFIRM_INVALID', 409);
   }
 
@@ -763,7 +763,7 @@ async function respondStudentAttendanceConfirm({ schedule, actor, decision }) {
   if (dec === 'dispute' || dec === 'reject' || dec === 'khong_dong_y') {
     const scheduleId = schedule._id || schedule.id;
     const updated = await Schedule.findOneAndUpdate(
-      { _id: scheduleId, status: 'scheduled', studentConfirmStatus: 'pending' },
+      { _id: scheduleId, status: 'scheduled', studentConfirmStatus: { $in: ['pending', 'confirm_expired'] } },
       {
         $set: {
           studentConfirmStatus: 'disputed',

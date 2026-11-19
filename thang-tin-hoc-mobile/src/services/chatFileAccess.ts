@@ -1,6 +1,8 @@
 import { Linking, Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { getCurrentLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 import { getMobileApiBaseUrl, getMobileApiTokens, resolveMobilePublicUrl } from './apiClient';
 
 type SaveFileHandle = {
@@ -77,8 +79,10 @@ export async function openChatAttachment(value: string) {
 
 export async function downloadChatAttachment(value: string, fileName: string) {
   const url = buildAttachmentUrl(value, fileName, true);
+  const lang = getCurrentLanguage();
+  const tx = (msg: string) => translateText(msg, lang);
   const token = getMobileApiTokens()?.accessToken;
-  if (!token && isProtectedUpload(url)) throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+  if (!token && isProtectedUpload(url)) throw new Error(tx('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.'));
 
   if (Platform.OS === 'web') {
     const pickerWindow = window as SaveFilePickerWindow;
@@ -95,7 +99,7 @@ export async function downloadChatAttachment(value: string, fileName: string) {
       credentials: 'include',
       headers: token && isProtectedUpload(url) ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    if (!response.ok) throw new Error(`Không tải được tệp (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(tx(`Không tải được tệp (HTTP ${response.status}).`));
     const blob = await response.blob();
     if (saveHandle) {
       const writable = await saveHandle.createWritable();
@@ -107,14 +111,14 @@ export async function downloadChatAttachment(value: string, fileName: string) {
     return;
   }
 
-  if (!FileSystem.cacheDirectory) throw new Error('Không thể truy cập vùng lưu tệp trên thiết bị.');
+  if (!FileSystem.cacheDirectory) throw new Error(tx('Không thể truy cập vùng lưu tệp trên thiết bị.'));
   const safeName = fileName.replace(/[\\/:*?"<>|]/g, '_');
   const temporaryUri = `${FileSystem.cacheDirectory}${Date.now()}-${safeName}`;
   try {
     const headers = isProtectedUpload(url) ? { Authorization: `Bearer ${token}` } : undefined;
     const result = await FileSystem.downloadAsync(url.toString(), temporaryUri, { headers });
     if (result.status < 200 || result.status >= 300) {
-      throw new Error(`Không tải được tệp (HTTP ${result.status}).`);
+      throw new Error(tx(`Không tải được tệp (HTTP ${result.status}).`));
     }
 
     if (Platform.OS === 'android') {
@@ -131,11 +135,11 @@ export async function downloadChatAttachment(value: string, fileName: string) {
     }
 
     if (!(await Sharing.isAvailableAsync())) {
-      throw new Error('Thiết bị không hỗ trợ hộp thoại lưu tệp.');
+      throw new Error(tx('Thiết bị không hỗ trợ hộp thoại lưu tệp.'));
     }
     await Sharing.shareAsync(result.uri, {
       mimeType: getMimeType(safeName),
-      dialogTitle: `Lưu ${safeName}`,
+      dialogTitle: tx(`Lưu ${safeName}`),
     });
   } finally {
     await FileSystem.deleteAsync(temporaryUri, { idempotent: true });

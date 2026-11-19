@@ -21,6 +21,7 @@ import { DropletMark, PathITBackdrop } from '../components/dailyPractice/PathDec
 import { pathNodeMapLabel, pathNodeStartBubbleLabel } from '../../../shared/dailyPractice/pathNodeNudge.mjs';
 import {
   PATH_HUB_PROGRESS_RING,
+  pathHubLevelStates,
   pathHubNodeProgress,
   pathHubProgressColor,
 } from '../../../shared/dailyPractice/pathHubProgressRing.mjs';
@@ -39,6 +40,8 @@ import { DailyPracticeHero } from '../components/dailyPractice/DailyPracticeHero
 import { WelcomeBackModal, takeWelcomeBackTurn } from '../components/dailyPractice/WelcomeBackModal';
 import { FreeMeetPlanModal } from '../components/FreePortalModals';
 import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../components/ShareAchievementModal';
+import { buildPracticeShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 import { buildVietQrUrl, getCenterBankAccount, type CenterBankAccount } from '../services/courseVideoApi';
 import { subscriptionApi } from '../services/subscriptionApi';
 import { reviewItemFollowUpLine } from '../../../shared/dailyPractice/reviewDisplay.mjs';
@@ -50,10 +53,13 @@ import { resolveMobilePublicUrl, getMobileImageSource } from '../services/apiCli
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/videoSource';
 import { useAuth } from '../app/AuthContext';
 import { isFreePortalMenu } from '../utils/freePortalHelper';
+import { SOCKET_EVENTS } from '../services/socketService';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from '../components/dailyPractice/Questions';
 import { useGameSounds, type GameSound } from '../components/dailyPractice/useGameSounds';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { useMobileFocusMode } from '../utils/focusMode';
+import { setMobilePracticeSessionActive } from '../utils/practiceSessionMode';
+import { readReloadAbandonNotice, writeReloadAbandonNotice } from '../utils/dailyPracticeReloadNotice';
 import { DuoButton } from '../components/duo/DuoButton';
 import { formatStudyMinutes, getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
 import {
@@ -1057,26 +1063,56 @@ const maxXpFor = (step: DpPathStep) => 10 * (DP_DIFFICULTIES.find((d) => d.id ==
 
 function ProgressRing({
   size,
-  progress,
+  progress = 0,
   progressColor,
+  segments,
   dimmed = false,
 }: {
   size: number;
-  progress: number;
+  progress?: number;
   progressColor: string;
+  segments?: boolean[];
   dimmed?: boolean;
 }) {
   const stroke = PATH_HUB_PROGRESS_RING.stroke;
+  const half = size / 2;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
+
+  if (Array.isArray(segments) && segments.length > 0) {
+    const angles = PATH_HUB_PROGRESS_RING.segmentAngles;
+    const arcLen = circumference * (PATH_HUB_PROGRESS_RING.segmentSweepDeg / 360);
+    return (
+      <Svg width={size} height={size} style={[styles.ring, dimmed && { opacity: 0.55 }]} pointerEvents="none">
+        {angles.map((startDeg, idx) => {
+          const done = Boolean(segments[idx]);
+          return (
+            <SvgCircle
+              key={idx}
+              cx={half}
+              cy={half}
+              r={radius}
+              fill="none"
+              stroke={done ? progressColor : PATH_HUB_PROGRESS_RING.track}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={`${arcLen} ${circumference}`}
+              transform={`rotate(${startDeg} ${half} ${half})`}
+            />
+          );
+        })}
+      </Svg>
+    );
+  }
+
   const clamped = Math.max(0, Math.min(1, progress));
   const visibleArc = clamped > 0 && clamped < 1 ? Math.max(clamped, 0.06) : clamped;
   return (
     <Svg width={size} height={size} style={[styles.ring, dimmed && { opacity: 0.55 }]} pointerEvents="none">
-      <SvgCircle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={PATH_HUB_PROGRESS_RING.track} strokeWidth={stroke} />
+      <SvgCircle cx={half} cy={half} r={radius} fill="none" stroke={PATH_HUB_PROGRESS_RING.track} strokeWidth={stroke} />
       <SvgCircle
-        cx={size / 2}
-        cy={size / 2}
+        cx={half}
+        cy={half}
         r={radius}
         fill="none"
         stroke={progressColor}
@@ -1084,7 +1120,7 @@ function ProgressRing({
         strokeLinecap="round"
         strokeDasharray={`${circumference} ${circumference}`}
         strokeDashoffset={circumference * (1 - visibleArc)}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        transform={`rotate(-90 ${half} ${half})`}
       />
     </Svg>
   );
@@ -1192,7 +1228,7 @@ function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { fro
   );
 }
 
-/** Một nút trên lộ trình - nút tròn 3D vàng kim + icon trắng + 3 chấm + sao viền theo mẫu thiết kế. */
+/** Một nút trên lộ trình - nút tròn 3D + đường vòng 3 nấc + bubble Bắt đầu / Tiếp tục. */
 function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0, completedSections = [] }: {
   node: DpPathNode;
   color: { from: string; to: string };
@@ -1203,49 +1239,35 @@ function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0
   completedSections?: string[];
 }) {
   const locked = node.state === 'locked';
-  const done = node.state === 'completed';
-  const levels = node.levels || [];
-  const completedSet = new Set(completedSections || []);
-  const LEVEL_DOTS: Array<{ diff: 'easy' | 'medium' | 'hard'; color: string }> = [
-    { diff: 'easy', color: '#22C55E' },
-    { diff: 'medium', color: '#F97316' },
-    { diff: 'hard', color: '#10B981' },
-  ];
-  const isDotDone = (i: number) => {
-    if (done) return true;
-    const isStudy = node.kind === 'study' || node.icon === 'book';
-    if (isStudy) {
-      const diff = LEVEL_DOTS[i].diff;
-      const cfg = node.levelConfigs?.[diff];
-      const hidden = new Set(cfg?.hiddenSections || []);
-      const locks = cfg?.sectionLocks || {};
-      const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length
-        ? cfg.sectionOrder
-        : (['content', 'file', 'video', 'practice'] as DpSectionKey[]))
-        .filter((k) => !hidden.has(k as DpSectionKey) && locks[k as DpSectionKey] !== 'locked');
-      return order.length > 0 && order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
-    }
-    return levels[i]?.state === 'completed';
-  };
+  const levelStates = pathHubLevelStates(node, completedSections);
+  const doneLevels = levelStates.filter(Boolean).length;
   const size = PATH_HUB_DUO.buttonSize.mobile;
-  const progress = pathHubNodeProgress(node);
-  const progressColor = pathHubProgressColor(node, progress, color);
-  const showRing =
-    PATH_HUB_DUO.showProgressRing && !locked && isNext && progress > 0 && progress < 1;
-  const box = showRing ? size + PATH_HUB_PROGRESS_RING.pad : size;
+  const showRing = PATH_HUB_DUO.showProgressRing && !locked && (isNext || doneLevels > 0);
+  const box = size + PATH_HUB_PROGRESS_RING.pad;
+  const ringColor = doneLevels >= 3 ? PATH_HUB_PROGRESS_RING.progressDone : PATH_HUB_PROGRESS_RING.progressActive;
   const HubIcon = NODE_ICONS[node.icon] || Dumbbell;
   const mapLabel = pathNodeMapLabel(node);
-  const startBubble = pathNodeStartBubbleLabel(node);
+  const startBubble = pathNodeStartBubbleLabel(node, completedSections);
+  const isContinueBubble = startBubble === 'TIẾP TỤC';
   const badgeCorner = nodeIndex % 2 === 0 ? 'top-right' : 'top-left';
   return (
     <View style={[styles.hubRoot, styles.hubRootColumn, { width: box }]}>
       <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' }}>
         {isNext && !selected ? (
           <View style={styles.pathStartBubbleMap}>
-            <Text style={[styles.pathStartBubbleText, { color: '#D97706' }]}>{startBubble}</Text>
+            <Text style={[styles.pathStartBubbleText, { color: isContinueBubble ? '#D97706' : '#059669' }]}>
+              {startBubble}
+            </Text>
+            <View style={styles.pathStartBubblePointer} pointerEvents="none" />
           </View>
         ) : null}
-        {showRing ? <ProgressRing size={box} progress={progress} progressColor={progressColor} /> : null}
+        {showRing ? (
+          <ProgressRing
+            size={box}
+            segments={levelStates}
+            progressColor={ringColor}
+          />
+        ) : null}
         <Pressable
           onPress={onPress}
           disabled={locked}
@@ -1254,9 +1276,10 @@ function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0
           accessibilityState={{ expanded: selected, disabled: locked }}
           style={({ pressed }) => [
             styles.node,
+            Platform.OS === 'web' ? ({ outlineStyle: 'none' } as never) : null,
             locked
-              ? { backgroundColor: '#E8EDF2', borderBottomColor: '#C4C9D1' }
-              : { backgroundColor: '#FBBF24', borderBottomColor: '#D97706', borderTopColor: '#FEF08A', borderTopWidth: 1 },
+              ? { backgroundColor: '#E5E7EB', borderWidth: 0, borderBottomColor: '#CBD5E1' }
+              : { backgroundColor: '#FBBF24', borderWidth: 0, borderBottomColor: '#D97706' },
             {
               width: size,
               height: size,
@@ -1265,31 +1288,10 @@ function PracticeHubNode({ node, color, isNext, selected, onPress, nodeIndex = 0
               transform: [{ translateY: pressed ? 4 : 0 }],
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 2,
             },
           ]}
         >
-          <HubIcon size={26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={PATH_HUB_DUO.iconStroke} />
-          {!locked ? (
-            <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
-              {LEVEL_DOTS.map((dot, i) => {
-                const dotDone = isDotDone(i);
-                return (
-                  <View
-                    key={dot.diff}
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: 'rgba(255,255,255,0.95)',
-                      backgroundColor: dotDone ? dot.color : '#94A3B8',
-                    }}
-                  />
-                );
-              })}
-            </View>
-          ) : null}
+          <HubIcon size={28} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={PATH_HUB_DUO.iconStroke} />
           {/* Ngôi sao vàng đính góc trên phải nút */}
           {!locked && (
             <View style={{ position: 'absolute', top: -4, right: -2, zIndex: 10 }} pointerEvents="none">
@@ -3681,8 +3683,43 @@ function StakeSessionConfirm({
   );
 }
 
+// ── Thông báo sau khi tải lại / rời giữa lượt ────────────────────────────────
+function ReloadAbandonNoticeModal({
+  lostXp, play, onClose,
+}: {
+  lostXp: number;
+  play: (s: GameSound) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => { play('sad'); }, [play]);
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.quitBackdrop}>
+        <View style={styles.quitCard} accessibilityViewIsModal>
+          <View style={styles.quitHero}>
+            <Mascot mood="thinking" size={88} />
+            <Text style={styles.quitTitle}>Lượt luyện tập trước đã hủy</Text>
+            <Text style={styles.quitText}>
+              {lostXp > 0
+                ? `Bạn vừa tải lại hoặc rời trang khi đang luyện. Lượt đó đã bị hủy (có thể mất tối đa −${lostXp} XP). Lần sau xác nhận trước khi rời.`
+                : 'Bạn vừa tải lại hoặc rời trang khi đang luyện. Lượt trước đã bị hủy — bắt đầu lượt mới khi sẵn sàng.'}
+            </Text>
+          </View>
+          <View style={styles.quitActions}>
+            <DuoButton variant="primary" size="lg" fullWidth text="Đã hiểu" onPress={onClose} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Xác nhận thoát ───────────────────────────────────────────────────────────
-function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, busy, play, onStay, onQuit }: {
+function QuitConfirm({
+  mode = 'quit', answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, busy, play, onStay, onQuit,
+}: {
+  mode?: 'quit' | 'reload';
   stats?: DpStats | null;
   answered: number;
   total: number;
@@ -3697,6 +3734,7 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
   const left = Math.max(0, total - answered);
   const lossOnQuit = Math.max(stakeXp, quitLossXp);
   const loseXp = lossOnQuit > 0;
+  const isReload = mode === 'reload';
   useEffect(() => { play('sad'); }, [play]);
 
   return (
@@ -3705,18 +3743,30 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
         <View style={styles.quitCard} accessibilityViewIsModal>
           <View style={styles.quitHero}>
             <Mascot mood="quit" size={92} />
-            <Text style={styles.quitTitle}>{loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?'}</Text>
+            <Text style={styles.quitTitle}>
+              {isReload
+                ? (loseXp ? 'Tải lại trang sẽ mất XP!' : 'Tải lại trang lúc này?')
+                : (loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?')}
+            </Text>
             <Text style={styles.quitText}>
-              {loseXp
-                ? mandatory
-                  ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
-                  : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`
-                : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.'}
+              {isReload
+                ? (loseXp
+                  ? (mandatory
+                    ? `Đây là lượt bắt buộc. Tải lại trang lúc này sẽ hủy lượt và mất tối đa −${lossOnQuit} XP.`
+                    : `Tải lại trang lúc này sẽ hủy lượt luyện tập và mất tối đa −${lossOnQuit} XP.`)
+                  : 'Tải lại trang lúc này sẽ hủy tiến độ lượt luyện tập hiện tại.')
+                : (loseXp
+                  ? (mandatory
+                    ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
+                    : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`)
+                  : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.')}
             </Text>
             {loseXp ? (
               <View style={[styles.quitProgress, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
                 <Zap size={13} color="#EF4444" fill="#FCA5A5" />
-                <Text style={[styles.quitProgressText, { color: '#B91C1C' }]}>{`Mất tối đa −${lossOnQuit} XP nếu thoát`}</Text>
+                <Text style={[styles.quitProgressText, { color: '#B91C1C' }]}>
+                  {isReload ? `Mất tối đa −${lossOnQuit} XP nếu tải lại` : `Mất tối đa −${lossOnQuit} XP nếu thoát`}
+                </Text>
               </View>
             ) : null}
             {left > 0 ? (
@@ -3740,7 +3790,9 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
               variant="secondary"
               size="md"
               fullWidth
-              text={loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát'}
+              text={isReload
+                ? (loseXp ? `Tải lại và mất tối đa ${lossOnQuit} XP` : 'Vẫn tải lại trang')
+                : (loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát')}
               loading={busy}
               disabled={busy}
               onPress={onQuit}
@@ -3764,7 +3816,9 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
 }) {
   const { user } = useAuth();
   const [quitOpen, setQuitOpen] = useState(false);
+  const [quitMode, setQuitMode] = useState<'quit' | 'reload'>('quit');
   const [quitting, setQuitting] = useState(false);
+  const allowUnloadRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [pending, setPending] = useState<DpAnswer | null>(null);
   const [chosen, setChosen] = useState<number | boolean | null>(null);
@@ -3938,8 +3992,22 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
     setQuitting(true);
     try {
       const data = await dailyPracticeApi.abandon(session.id);
+      allowUnloadRef.current = true;
+      if (quitMode === 'reload' && Platform.OS === 'web' && typeof window !== 'undefined') {
+        await writeReloadAbandonNotice(quitLossXp);
+        setQuitOpen(false);
+        window.location.reload();
+        return;
+      }
       onQuit(data);
     } catch {
+      allowUnloadRef.current = true;
+      if (quitMode === 'reload' && Platform.OS === 'web' && typeof window !== 'undefined') {
+        await writeReloadAbandonNotice(quitLossXp);
+        setQuitOpen(false);
+        window.location.reload();
+        return;
+      }
       onQuit(null);
     } finally {
       setQuitting(false);
@@ -3957,6 +4025,57 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
       : `Luyện tự do · ${level.label}`;
   const answeredCount = index + ((isVideoQuestion ? videoCompleted : Boolean(result)) ? 1 : 0);
   const quitLossXp = xpDisabled ? 0 : (isPerQuestionStake ? Math.max(0, total - answeredCount) * perQuestionStakeXp : stakeXp);
+  const leaveGuardRef = useRef({ sessionId: session.id, lossOnQuit: 0 });
+  leaveGuardRef.current = { sessionId: session.id, lossOnQuit: quitLossXp };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+
+    const handleReloadShortcut = (event: KeyboardEvent) => {
+      if (allowUnloadRef.current) return;
+      const key = String(event.key || '');
+      const isReloadKey = key === 'F5' || ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 'r');
+      if (!isReloadKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setQuitMode('reload');
+      setQuitOpen(true);
+    };
+
+    const handlePageHide = () => {
+      if (allowUnloadRef.current) return;
+      allowUnloadRef.current = true;
+      const { sessionId, lossOnQuit: loss } = leaveGuardRef.current;
+      if (sessionId) {
+        void dailyPracticeApi.abandon(sessionId).catch(() => undefined);
+      }
+      void writeReloadAbandonNotice(loss);
+    };
+
+    const handleNavigate = (event: { navigationType?: string; preventDefault?: () => void }) => {
+      if (allowUnloadRef.current) return;
+      if (event?.navigationType !== 'reload') return;
+      event.preventDefault?.();
+      setQuitMode('reload');
+      setQuitOpen(true);
+    };
+
+    window.addEventListener('keydown', handleReloadShortcut, true);
+    window.addEventListener('pagehide', handlePageHide);
+    type ReloadNavListener = (event: { navigationType?: string; preventDefault?: () => void }) => void;
+    type ReloadNavApi = {
+      addEventListener?: (type: string, listener: ReloadNavListener) => void;
+      removeEventListener?: (type: string, listener: ReloadNavListener) => void;
+    };
+    const nav = (window as unknown as { navigation?: ReloadNavApi }).navigation;
+    nav?.addEventListener?.('navigate', handleNavigate);
+    return () => {
+      window.removeEventListener('keydown', handleReloadShortcut, true);
+      window.removeEventListener('pagehide', handlePageHide);
+      nav?.removeEventListener?.('navigate', handleNavigate);
+    };
+  }, [session.id]);
+
   const confirmedQuestionXp = result?.correct
     ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
       ? result.xpDelta
@@ -4314,6 +4433,7 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
 
         {quitOpen ? (
           <QuitConfirm
+            mode={quitMode}
             stats={stats}
             answered={answeredCount}
             total={total}
@@ -4322,7 +4442,7 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
             mandatory={mandatory}
             busy={quitting}
             play={play}
-            onStay={() => setQuitOpen(false)}
+            onStay={() => { setQuitOpen(false); setQuitMode('quit'); }}
             onQuit={() => { void confirmQuit(); }}
           />
         ) : null}
@@ -4392,6 +4512,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
   onBuyXp: () => void;
 }) {
   const [showReview, setShowReview] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const pathResult = summary.path || null;
   const nextStep = pathResult?.passed ? pathResult.next : null;
   const good = summary.stars >= 2;
@@ -4509,6 +4630,14 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
         </View>
       ) : null}
 
+      <ShareTriggerButton
+        onPress={() => {
+          play('tap');
+          setShareOpen(true);
+        }}
+        label="SHARE THÀNH TÍCH"
+      />
+
       <View style={styles.row}>
         <Pressable onPress={onHome} style={[styles.secondary, styles.flex]} accessibilityRole="button">
           <ArrowLeft size={17} color={colors.ink} />
@@ -4532,6 +4661,11 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
           </Pressable>
         )}
       </View>
+      <ShareAchievementModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={buildPracticeShareData(summary) as ShareAchievementData}
+      />
     </View>
   );
 }
@@ -4780,8 +4914,21 @@ export function DailyPracticeScreen() {
         ...(typeof detail.xpTotal === 'number' ? { xpTotal: detail.xpTotal } : {}),
       });
     });
-    return () => sub.remove();
-  }, [applyStats]);
+    const reloadOnUnlock = () => {
+      load(true);
+      loadPath(true);
+    };
+    const unlockSubs = [
+      DeviceEventEmitter.addListener('mobile:free-portal-unlocked', reloadOnUnlock),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_UNLOCKED, reloadOnUnlock),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_LOCKED, reloadOnUnlock),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.SUBSCRIPTION_UPDATED, reloadOnUnlock),
+    ];
+    return () => {
+      sub.remove();
+      unlockSubs.forEach((s) => s.remove());
+    };
+  }, [applyStats, load, loadPath]);
 
   const begin = useCallback(async (pick: PracticePick) => {
     setStarting(true);
@@ -5122,13 +5269,34 @@ export function DailyPracticeScreen() {
     setBuyXpOpen(true);
   };
 
+  useFocusEffect(useCallback(() => {
+    setMobilePracticeSessionActive(Boolean(session));
+    return () => {
+      setMobilePracticeSessionActive(false);
+    };
+  }, [session]));
+
+  const [reloadNotice, setReloadNotice] = useState<{ lostXp: number } | null>(null);
+  const [reloadNoticeOpen, setReloadNoticeOpen] = useState(false);
+  useEffect(() => {
+    void readReloadAbandonNotice().then((notice) => {
+      if (!notice) return;
+      setReloadNotice(notice);
+      setReloadNoticeOpen(true);
+    });
+  }, []);
+
   return (
     <AppScreen scroll={false} hideBrandingTopBar={Boolean(session)} contentStyle={styles.appScreenZeroPad}>
       <ChromeScrollView
         ref={scrollRef}
         scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={mode !== 'path'}
-        contentContainerStyle={[styles.screen, !session && mode === 'path' && styles.screenPathMode]}
+        contentContainerStyle={[
+          styles.screen,
+          !session && mode === 'path' && styles.screenPathMode,
+          Boolean(session) && styles.screenPlayMode,
+        ]}
         style={mode === 'path' ? ({ scrollbarWidth: 'none' } as never) : undefined}
         keyboardShouldPersistTaps="handled"
       >
@@ -5306,6 +5474,16 @@ export function DailyPracticeScreen() {
           scrollRef.current?.scrollTo({ y: 0, animated: false });
         }}
       />
+      {reloadNoticeOpen && reloadNotice ? (
+        <ReloadAbandonNoticeModal
+          lostXp={reloadNotice.lostXp}
+          play={play}
+          onClose={() => {
+            setReloadNoticeOpen(false);
+            setReloadNotice(null);
+          }}
+        />
+      ) : null}
     </AppScreen>
   );
 }
@@ -5314,6 +5492,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   appScreenZeroPad: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 },
   screen: { padding: spacing.lg, paddingBottom: 120 },
   screenPathMode: { paddingBottom: spacing.lg },
+  screenPlayMode: { paddingBottom: spacing.xl },
   relatedCard: { gap: spacing.md, padding: spacing.md, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.brandSoft },
   relatedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   relatedIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand },
@@ -5912,14 +6091,32 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   pathStartBubbleMap: {
     position: 'absolute',
     bottom: '100%',
-    marginBottom: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E8E2D5',
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
-    zIndex: 5,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 6,
+  },
+  pathStartBubblePointer: {
+    position: 'absolute',
+    bottom: -6,
+    width: 10,
+    height: 10,
+    backgroundColor: '#FFFFFF',
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: '#E2E8F0',
+    transform: [{ rotate: '45deg' }],
   },
   pathStartBubble: {
     marginBottom: 4,

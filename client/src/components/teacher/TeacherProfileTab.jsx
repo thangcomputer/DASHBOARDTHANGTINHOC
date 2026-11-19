@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Phone, Mail, Building2, CreditCard, Landmark, Edit3, Shield, MapPin, Save, X,
-  Clock, ChevronRight, KeyRound, Camera, Bell, LogOut, Users, Settings,
+  Clock, ChevronRight, ChevronDown, KeyRound, Camera, Bell, LogOut, Users, Settings,
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
 import { openPinLockSettings } from '../../utils/pinLock';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/useToast';
 import EditableAvatar from '../EditableAvatar';
+import LanguageSwitcher from '../LanguageSwitcher';
 import CmsSelect from '../ui/CmsSelect';
 import { VOICE_REGION_OPTIONS } from '../../constants/voiceRegions';
 
@@ -23,6 +24,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   const { updateTeacher, onLogout } = useData();
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSupportSettings, setShowSupportSettings] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -263,29 +265,48 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         </button>
       </div>
 
-      {/* ── 5. Cài đặt và hỗ trợ (Chuẩn Mobile App) ── */}
-      <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm p-4 sm:p-4.5 space-y-3">
-        <h4 className="text-sm sm:text-base font-extrabold text-slate-800">
-          Cài đặt và hỗ trợ
-        </h4>
+      {/* ── 5. Cài đặt và hỗ trợ (mặc định ẩn, bấm vào mới mở) ── */}
+      <div className="rounded-[20px] sm:rounded-[22px] bg-white border border-slate-100 shadow-sm overflow-hidden">
         <button
           type="button"
-          onClick={handleEnableNotification}
-          className="w-full flex items-center gap-3.5 text-left hover:bg-slate-50/70 -mx-1 px-1 py-1 rounded-xl transition-colors cursor-pointer"
+          onClick={() => setShowSupportSettings((prev) => !prev)}
+          aria-expanded={showSupportSettings}
+          className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50/70 transition-colors cursor-pointer ${showSupportSettings ? 'border-b border-slate-100' : ''}`}
         >
-          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
-            <Bell size={18} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800">Bật thông báo trên thiết bị</p>
-            <p className="text-xs text-slate-400 mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <Settings size={16} className="text-[#059669] shrink-0" />
+            <h4 className="text-sm sm:text-base font-extrabold text-slate-800 truncate">
+              Cài đặt và hỗ trợ
+            </h4>
           </div>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+          <ChevronDown
+            size={17}
+            className={`text-slate-400 shrink-0 transition-transform duration-200 ${showSupportSettings ? 'rotate-180' : ''}`}
+          />
         </button>
-        <div className="border-t border-slate-100" />
-        <p className="text-xs text-slate-400 italic">
-          Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
-        </p>
+        {showSupportSettings && (
+          <div className="p-4 sm:p-4.5 space-y-3">
+            <LanguageSwitcher variant="card" />
+            <button
+              type="button"
+              onClick={handleEnableNotification}
+              className="w-full flex items-center gap-3.5 text-left hover:bg-slate-50/70 -mx-1 px-1 py-1 rounded-xl transition-colors cursor-pointer"
+            >
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#ECFDF5] text-[#059669] flex items-center justify-center shrink-0">
+                <Bell size={18} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-800">Bật thông báo trên thiết bị</p>
+                <p className="text-xs text-slate-400 mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+              </div>
+              <ChevronRight size={18} className="text-slate-300 shrink-0" />
+            </button>
+            <div className="border-t border-slate-100" />
+            <p className="text-xs text-slate-400 italic">
+              Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── 6. Nút Đăng xuất (Duolingo 3D button) ── */}

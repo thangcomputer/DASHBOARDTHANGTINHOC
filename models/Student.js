@@ -292,6 +292,10 @@ const StudentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
     /** Đã xem pháo hoa chào mừng lần đầu (HV/GV). Tài khoản cũ thiếu field = coi như đã xem. */
     welcomeCelebrationSeen: {
       type: Boolean,

@@ -23,6 +23,8 @@ import certPrepApi, {
   type CertPrepQuestion,
 } from '../services/certPrepApi';
 import { useAuth } from '../app/AuthContext';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../components/ShareAchievementModal';
+import { buildExamShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
@@ -702,6 +704,7 @@ export function CertPrepResultScreen() {
   const [attempts, setAttempts] = useState<CertPrepAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -789,8 +792,30 @@ export function CertPrepResultScreen() {
             ))}
           </View>
         ) : null}
-        <PrimaryButton title="Về danh sách đề thi" onPress={() => navigation.navigate('CertPrepCatalog')} />
+        <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+          <ShareTriggerButton
+            onPress={() => setShareOpen(true)}
+            label="SHARE KẾT QUẢ"
+            style={{ borderRadius: 14, paddingHorizontal: 14 }}
+          />
+          <View style={{ flex: 1 }}>
+            <PrimaryButton title="Về danh sách đề thi" onPress={() => navigation.navigate('CertPrepCatalog')} />
+          </View>
+        </View>
       </View>
+      <ShareAchievementModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={buildExamShareData({
+          title: testTitle || 'Đề luyện thi MOS/IC3',
+          kindLabel: 'LUYỆN THI MOS / IC3',
+          score: result.score ?? 0,
+          scoreMax: 100,
+          correctCount: result.correctCount ?? 0,
+          totalQuestions: result.total ?? 0,
+          passed,
+        }) as ShareAchievementData}
+      />
     </AppScreen>
   );
 }

@@ -8,6 +8,7 @@ import { FinanceProvider } from './context/FinanceContext';
 import { DataProvider } from './context/DataContext';
 import { ToastProvider } from './utils/toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
+import { LanguageProvider } from './context/LanguageContext';
 // Giai đoạn 1 (hiệu năng): trang đăng nhập/đăng ký tách chunk riêng,
 // người đã đăng nhập không phải tải các trang này.
 const LoginPage = lazy(() => import('./components/LoginPage'));
@@ -744,24 +745,51 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unlock = () => {
+    const unlock = (event) => {
+      const nextSub = event?.detail?.subscription;
       setSession((prev) => {
-        if (!prev?.freePortal || prev.freeUnlocked) return prev;
-        const next = { ...prev, freeUnlocked: true };
+        if (!prev?.freePortal) return prev;
+        if (prev.freeUnlocked && !nextSub) return prev;
+        const next = {
+          ...prev,
+          freeUnlocked: true,
+          ...(nextSub ? { subscription: nextSub } : {}),
+        };
         saveSession(next);
         return next;
       });
     };
     window.addEventListener('free-portal-unlocked', unlock);
-    const lockMenus = () => {
+    const lockMenus = (event) => {
+      const nextSub = event?.detail?.subscription;
       setSession((prev) => {
-        if (!prev?.freePortal || prev.freeUnlocked === false) return prev;
-        const next = { ...prev, freeUnlocked: false };
+        if (!prev?.freePortal) return prev;
+        if (prev.freeUnlocked === false && !nextSub) return prev;
+        const next = {
+          ...prev,
+          freeUnlocked: false,
+          ...(nextSub ? { subscription: nextSub } : {}),
+        };
         saveSession(next);
         return next;
       });
     };
     window.addEventListener('free-portal-locked', lockMenus);
+    const onSubUpdated = (event) => {
+      const detail = event?.detail;
+      if (!detail || typeof detail !== 'object') return;
+      setSession((prev) => {
+        if (!prev || prev.role !== 'student') return prev;
+        const next = {
+          ...prev,
+          ...(typeof detail.freeUnlocked === 'boolean' ? { freeUnlocked: detail.freeUnlocked } : {}),
+          ...(detail.subscription ? { subscription: detail.subscription } : {}),
+        };
+        saveSession(next);
+        return next;
+      });
+    };
+    window.addEventListener('cms:subscription-updated', onSubUpdated);
     const surveyDone = () => {
       setSession((prev) => {
         if (!prev?.freePortal || prev.needsFreeSurvey === false) return prev;
@@ -774,13 +802,15 @@ function App() {
     return () => {
       window.removeEventListener('free-portal-unlocked', unlock);
       window.removeEventListener('free-portal-locked', lockMenus);
+      window.removeEventListener('cms:subscription-updated', onSubUpdated);
       window.removeEventListener('free-survey-done', surveyDone);
     };
   }, []);
 
   return (
-    <ErrorBoundary>
-      <TopLoadingBar />
+    <LanguageProvider>
+      <ErrorBoundary>
+        <TopLoadingBar />
       <LoadingScreen splash onReady={() => {}} />
       <OfflineBanner />
       <SocketProvider
@@ -820,7 +850,8 @@ function App() {
           </StudentsProvider>
         </ModalProvider>
       </SocketProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </LanguageProvider>
   );
 }
 

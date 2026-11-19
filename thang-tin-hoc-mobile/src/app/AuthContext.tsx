@@ -2,12 +2,12 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { AppState, DeviceEventEmitter, Platform } from 'react-native';
 import { authService } from '../services/mockService';
 import { clearMobileSession, getMobileApiTokens, mobileApiRequest, saveMobileSession } from '../services/apiClient';
-import { connect as connectSocket, disconnect as disconnectSocket } from '../services/socketService';
+import { connect as connectSocket, disconnect as disconnectSocket, SOCKET_EVENTS } from '../services/socketService';
 import { registerMobilePushNotifications, unregisterMobilePushNotifications } from '../services/mobilePushNotifications';
 import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { clearLastActive, pinUserKey } from '../services/pinLock';
-import { authenticateWithBiometrics, saveBiometricCredential } from '../services/biometricAuth';
-import { subscriptionApi, type SubscriptionOverview } from '../services/subscriptionApi';
+import { authenticateWithBiometrics, clearBiometricCredential, saveBiometricCredential } from '../services/biometricAuth';
+import { subscriptionApi, type StudentSubscription, type SubscriptionOverview } from '../services/subscriptionApi';
 import type { DemoUser, UserRole } from '../types';
 import { themeState } from '../theme/tokens';
 import { isFreePortalMenu } from '../utils/freePortalHelper';
@@ -21,8 +21,10 @@ type AuthContextValue = {
   subscription: SubscriptionOverview | null;
   refreshSubscription: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  signIn: (role: UserRole, phone: string, password: string, options?: { saveBiometric?: boolean }) => Promise<void>;
+  signIn: (role: UserRole, phone: string, password: string, options?: { saveBiometric?: boolean; force?: boolean }) => Promise<void>;
   signInWithBiometrics: () => Promise<void>;
+  verifyForgotPasswordOtp: (role: UserRole, identifier: string, otp: string) => Promise<void>;
+  markPasswordChanged: () => Promise<void>;
   updateAvatar: (avatar: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -77,6 +79,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           freePortal?: boolean;
           freeUnlocked?: boolean;
           needsFreeSurvey?: boolean;
+          isFirstLogin?: boolean;
+          mustChangePassword?: boolean;
           course?: string;
           avatar?: string;
         };
@@ -96,19 +100,27 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setAuthError(reason);
         return;
       }
-      if (sessionUser.role === 'student' && me.data) {
-        const nextFreePortal = me.data.freePortal === true;
-        const nextFreeUnlocked = me.data.freeUnlocked === true;
-        const nextNeedsFreeSurvey = me.data.needsFreeSurvey === true;
-        const nextCourse = typeof me.data.course === 'string' && me.data.course ? me.data.course : sessionUser.course;
+      if (me.data) {
+        const nextMustChangePassword = me.data.mustChangePassword === true;
+        const nextIsFirstLogin = me.data.isFirstLogin === true;
+        const nextFreePortal = sessionUser.role === 'student' ? me.data.freePortal === true : sessionUser.freePortal;
+        const nextFreeUnlocked = sessionUser.role === 'student' ? me.data.freeUnlocked === true : sessionUser.freeUnlocked;
+        const nextNeedsFreeSurvey = sessionUser.role === 'student' ? me.data.needsFreeSurvey === true : sessionUser.needsFreeSurvey;
+        const nextCourse = sessionUser.role === 'student' && typeof me.data.course === 'string' && me.data.course
+          ? me.data.course
+          : sessionUser.course;
         if (
-          sessionUser.freePortal !== nextFreePortal
+          Boolean(sessionUser.mustChangePassword) !== nextMustChangePassword
+          || Boolean(sessionUser.isFirstLogin) !== nextIsFirstLogin
+          || sessionUser.freePortal !== nextFreePortal
           || sessionUser.freeUnlocked !== nextFreeUnlocked
           || sessionUser.needsFreeSurvey !== nextNeedsFreeSurvey
           || sessionUser.course !== nextCourse
         ) {
           const updatedUser: DemoUser = {
             ...sessionUser,
+            mustChangePassword: nextMustChangePassword,
+            isFirstLogin: nextIsFirstLogin,
             freePortal: nextFreePortal,
             freeUnlocked: nextFreeUnlocked,
             needsFreeSurvey: nextNeedsFreeSurvey,
@@ -133,13 +145,53 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void refreshUser();
     });
-    const freeUnlockedListener = DeviceEventEmitter.addListener('mobile:free-portal-unlocked', () => {
+    const applyRealtimeSubscriptionState = (
+      unlocked: boolean | undefined,
+      payload?: { studentId?: string; subscription?: StudentSubscription | null; freeUnlocked?: boolean },
+    ) => {
+      const activeUser = userRef.current;
+      if (!activeUser) return;
+      if (payload?.studentId && String(payload.studentId) !== String(activeUser.id || activeUser._id || '')) return;
+
+      const resolvedUnlocked = typeof payload?.freeUnlocked === 'boolean' ? payload.freeUnlocked : unlocked;
+      if (activeUser.role === 'student' && typeof resolvedUnlocked === 'boolean' && activeUser.freeUnlocked !== resolvedUnlocked) {
+        const nextUser: DemoUser = { ...activeUser, freeUnlocked: resolvedUnlocked };
+        userRef.current = nextUser;
+        setUser(nextUser);
+        const tokens = getMobileApiTokens();
+        if (tokens) {
+          void saveMobileSession({ user: nextUser, tokens }).catch(() => { });
+        }
+      }
+      if (payload?.subscription) {
+        setSubscription((prev) => ({
+          plans: prev?.plans || [],
+          history: prev?.history || [],
+          subscription: payload.subscription as StudentSubscription,
+        }));
+      }
       void refreshUser();
       void refreshSubscription();
+    };
+
+    const freeUnlockedListener = DeviceEventEmitter.addListener('mobile:free-portal-unlocked', (payload) => {
+      applyRealtimeSubscriptionState(true, payload);
+    });
+    const socketUnlockedListener = DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_UNLOCKED, (payload) => {
+      applyRealtimeSubscriptionState(true, payload);
+    });
+    const socketLockedListener = DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_LOCKED, (payload) => {
+      applyRealtimeSubscriptionState(false, payload);
+    });
+    const socketSubUpdatedListener = DeviceEventEmitter.addListener(SOCKET_EVENTS.SUBSCRIPTION_UPDATED, (payload) => {
+      applyRealtimeSubscriptionState(payload?.freeUnlocked, payload);
     });
     return () => {
       subscription.remove();
       freeUnlockedListener.remove();
+      socketUnlockedListener.remove();
+      socketLockedListener.remove();
+      socketSubUpdatedListener.remove();
     };
   }, [user?.id, user?.role, user?.previewMode, refreshUser, refreshSubscription]);
 
@@ -158,7 +210,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       tokenSubscription.remove();
       disconnectSocket();
     };
-  }, [user]);
+  }, [user?.id, user?.role, user?.previewMode]);
 
   useEffect(() => {
     if (!user || user.previewMode) return undefined;
@@ -223,7 +275,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       setIsSigningIn(true);
       setAuthError('');
       try {
-        const session = await authService.signIn(role, phone, password);
+        const session = await authService.signIn(role, phone, password, { force: options?.force === true });
         if (options?.saveBiometric) {
           await saveBiometricCredential({
             role,
@@ -254,6 +306,31 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       } finally {
         setIsSigningIn(false);
       }
+    },
+    async verifyForgotPasswordOtp(role, identifier, otp) {
+      setIsSigningIn(true);
+      setAuthError('');
+      try {
+        const session = await authService.verifyForgotPasswordOtp(role, identifier, otp);
+        await clearBiometricCredential().catch(() => { });
+        setUser(session.user);
+      } finally {
+        setIsSigningIn(false);
+      }
+    },
+    async markPasswordChanged() {
+      const current = userRef.current;
+      if (!current) return;
+      const updatedUser: DemoUser = {
+        ...current,
+        mustChangePassword: false,
+        isFirstLogin: false,
+      };
+      const tokens = getMobileApiTokens();
+      if (tokens) {
+        await saveMobileSession({ user: updatedUser, tokens }).catch(() => { });
+      }
+      setUser(updatedUser);
     },
     async updateAvatar(avatar) {
       if (!user || !avatar) throw new Error('Không thể cập nhật ảnh đại diện khi chưa đăng nhập.');

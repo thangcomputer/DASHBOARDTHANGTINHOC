@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Check, Gift, Loader2, Lock, Sparkles, X, Zap } from 'lucide-react';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
+import { buildChestShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
 
 export const UNIT_CHEST_REWARD_XP = 50;
 
@@ -93,6 +95,7 @@ export function UnitStageChest({
   const [showCelebration, setShowCelebration] = useState(false);
   const [claimedXp, setClaimedXp] = useState(rewardXp);
   const [lastResult, setLastResult] = useState(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const liveCounter = useAnimatedCount(claimedXp, 850, showCelebration);
 
@@ -320,15 +323,30 @@ export function UnitStageChest({
               {liveCounter >= claimedXp ? `✨ ${claimedXp} XP đã được cộng vào tài khoản của bạn!` : 'Đang đồng bộ phần thưởng...'}
             </p>
 
-            {/* Nút hành động 3D nổi bật */}
-            <button
-              type="button"
-              onClick={handleCloseCelebration}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-b-[4px] border-emerald-700 bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/30 transition hover:brightness-105 active:border-b-0 active:translate-y-1"
-            >
-              <Check size={18} strokeWidth={3} />
-              <span>Tuyệt vời · Nhận ngay</span>
-            </button>
+            {/* Nút hành động 3D nổi bật + SHARE */}
+            <div className="mt-5 grid grid-cols-[auto_1fr] items-stretch gap-2">
+              <ShareTriggerButton
+                onClick={() => {
+                  gameSounds.tap();
+                  setShareOpen(true);
+                }}
+                label="SHARE"
+                className="!rounded-2xl !px-4"
+              />
+              <button
+                type="button"
+                onClick={handleCloseCelebration}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-[4px] border-emerald-700 bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/30 transition hover:brightness-105 active:border-b-0 active:translate-y-1 cursor-pointer"
+              >
+                <Check size={18} strokeWidth={3} />
+                <span>Tuyệt vời · Nhận ngay</span>
+              </button>
+            </div>
+            <ShareAchievementModal
+              open={shareOpen}
+              onClose={() => setShareOpen(false)}
+              data={buildChestShareData({ unitTitle: unit?.title || '', rewardXp: claimedXp })}
+            />
           </div>
         </div>,
         document.body,

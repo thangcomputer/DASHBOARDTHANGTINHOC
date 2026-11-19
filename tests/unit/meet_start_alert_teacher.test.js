@@ -122,7 +122,10 @@ test('attachFallbackScheduleLinks resolves active enrollment link before cancell
 test('server cron resolves fallback links before emitting class:reminder', () => {
   const serverCode = readUtf8('server.js');
   const cronIdx = serverCode.indexOf("cron.schedule('* * * * *'");
-  const attachIdx = serverCode.indexOf('scheduleRoutes.attachFallbackScheduleLinks(todaySchedules)', cronIdx);
+  const attachIdx = Math.max(
+    serverCode.indexOf('scheduleRoutes.attachFallbackScheduleLinks(todaySchedules)', cronIdx),
+    serverCode.indexOf('scheduleRoutes.attachFallbackScheduleLinks(upcomingSchedules)', cronIdx),
+  );
   const notifyIdx = serverCode.indexOf("'class:reminder'", cronIdx);
 
   assert.ok(cronIdx > 0, 'cron job present in server.js');

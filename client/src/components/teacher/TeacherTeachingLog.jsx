@@ -18,23 +18,23 @@ import {
   subscribeMakeupPending,
 } from '../../utils/attendanceMakeupPendingStore';
 
-const PENDING_KINDS = new Set(['pending_attendance', 'overdue_attendance', 'past_pending']);
+const PENDING_KINDS = new Set(['pending_attendance', 'overdue_attendance', 'past_pending', 'makeup_attendance']);
 
 function isCancelledSchedule(sch) {
   const st = String(sch?.status || '').trim().toLowerCase();
   return st === 'cancelled' || st === 'canceled' || st === 'no_show';
 }
 
-function isAwaitingStudentConfirmation(sch) {
+function isAwaitingStudentConfirmation(sch, now = new Date()) {
   const confirmation = String(sch?.studentConfirmStatus || sch?.attendanceConfirmStatus || '').toLowerCase();
-  if (isStudentConfirmExpired(sch)) return false;
-  return !isCancelledSchedule(sch)
-    && (confirmation === 'pending' || Boolean(sch?.attendanceConfirmPending));
+  if (isCancelledSchedule(sch) || String(sch?.status || '').toLowerCase() === 'completed') return false;
+  if (isStudentConfirmExpired(sch, now)) return false;
+  return confirmation === 'pending' || confirmation === 'confirm_expired' || Boolean(sch?.attendanceConfirmPending);
 }
 
 function isTeacherAttendancePending(sch, now) {
   return !isCancelledSchedule(sch)
-    && !isAwaitingStudentConfirmation(sch)
+    && !isAwaitingStudentConfirmation(sch, now)
     && PENDING_KINDS.has(getScheduleDisplayKind(sch, now));
 }
 
@@ -89,6 +89,8 @@ const KIND_TONE = {
   pending_attendance: 'text-orange-700 bg-orange-50',
   overdue_attendance: 'text-red-700 bg-red-50',
   past_pending: 'text-orange-700 bg-orange-50',
+  awaiting_confirm: 'text-sky-700 bg-sky-50',
+  makeup_attendance: 'text-amber-700 bg-amber-50',
 };
 
 function scheduleKey(sch) {
@@ -193,7 +195,7 @@ export default function TeacherTeachingLog({
       );
     }
     if (tab === 'confirmation') {
-      return sortSchedules(all.filter(isAwaitingStudentConfirmation));
+      return sortSchedules(all.filter((s) => isAwaitingStudentConfirmation(s, now)));
     }
     const inRange = all.filter((s) => {
       if (isCancelledSchedule(s)) return false;
@@ -225,7 +227,7 @@ export default function TeacherTeachingLog({
 
   if (variant === 'teacher') {
     const pendingCount = (schedules || []).filter((sch) => isTeacherAttendancePending(sch, now)).length;
-    const confirmationCount = (schedules || []).filter(isAwaitingStudentConfirmation).length;
+    const confirmationCount = (schedules || []).filter((s) => isAwaitingStudentConfirmation(s, now)).length;
     const cancelledCount = (schedules || []).filter(isCancelledSchedule).length;
     const dateFilters = [
       { id: 'day', label: 'Ngày' },
@@ -330,7 +332,9 @@ export default function TeacherTeachingLog({
                     const meta = getScheduleDisplayMeta(sch, now);
                     const tone = KIND_TONE[kind] || KIND_TONE.upcoming;
                     const cancelled = isCancelledSchedule(sch);
-                    const awaitingConfirmation = isAwaitingStudentConfirmation(sch);
+                    const awaitingConfirmation = isAwaitingStudentConfirmation(sch, now);
+                    const isDisputed = !cancelled && String(sch?.studentConfirmStatus || '').toLowerCase() === 'disputed';
+                    const isOverdueKind = kind === 'overdue_attendance' || kind === 'makeup_attendance';
                     const course = String(sch.course || sch.courseName || '').trim();
                     const title = course || String(sch.topic || sch.title || 'Ca dạy').trim();
                     const startTime = String(sch.startTime || '').trim();
@@ -341,10 +345,11 @@ export default function TeacherTeachingLog({
                     const makeupRequestSent = variant === 'teacher'
                       && Boolean(getMakeupPending(getMakeupKey(sch)));
                     const canOpenAttendance = !awaitingConfirmation
+                      && !isDisputed
                       && !makeupRequestSent
                       && PENDING_KINDS.has(kind)
                       && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
-                    const actionLabel = kind === 'overdue_attendance' ? 'Điểm danh bù' : 'Điểm danh';
+                    const actionLabel = isOverdueKind ? 'Điểm danh bù' : 'Điểm danh';
 
                     return (
                       <tr
@@ -372,25 +377,57 @@ export default function TeacherTeachingLog({
                           {studentName}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${makeupRequestSent ? 'bg-slate-100 text-slate-600 border border-slate-200' : tone}`}>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${makeupRequestSent ? 'bg-slate-100 text-slate-600 border border-slate-200' : awaitingConfirmation ? KIND_TONE.awaiting_confirm : isDisputed ? 'bg-amber-50 text-amber-700' : tone}`}>
                             {makeupRequestSent ? <CheckCircle size={12} className="text-emerald-600" /> : null}
-                            {awaitingConfirmation
-                              ? 'Chờ học viên xác nhận'
-                              : makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
+                            {isDisputed
+                              ? 'Chờ Admin xử lý'
+                              : awaitingConfirmation
+                                ? 'Chờ học viên xác nhận'
+                                : makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
                           </span>
                         </td>
                         <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                          {canOpenAttendance ? (
+                          {awaitingConfirmation ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-extrabold text-sky-700 cursor-not-allowed"
+                              title="Giảng viên đã gửi điểm danh - học viên đang xác nhận"
+                            >
+                              <Clock3 size={12} />
+                              Học viên đang xác nhận
+                            </button>
+                          ) : isDisputed ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-700 cursor-not-allowed"
+                              title="Học viên không đồng ý - đang chờ Admin xử lý"
+                            >
+                              <Clock3 size={12} />
+                              Đang giải quyết
+                            </button>
+                          ) : makeupRequestSent ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-500 cursor-not-allowed"
+                              title="Yêu cầu điểm danh bù đã gửi Admin"
+                            >
+                              <CheckCircle size={12} />
+                              Đã gửi Admin
+                            </button>
+                          ) : canOpenAttendance ? (
                             <button
                               type="button"
                               onClick={() => openAttendanceFor(sch)}
-                              className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-extrabold transition-colors cursor-pointer ${kind === 'overdue_attendance'
+                              className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-extrabold transition-colors cursor-pointer ${isOverdueKind
                                   ? 'border-amber-600 bg-amber-500 text-white hover:bg-amber-600'
                                   : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'
                                 }`}
-                              title={kind === 'overdue_attendance' ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
+                              title={isOverdueKind ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
                             >
-                              {kind !== 'overdue_attendance'
+                              {!isOverdueKind
                                 ? <CheckCircle size={12} />
                                 : <UserCheck size={12} />}
                               {actionLabel}
@@ -463,14 +500,17 @@ export default function TeacherTeachingLog({
               const canAct = variant === 'student'
                 && String(sch.status) === 'scheduled'
                 && typeof onOpenSession === 'function';
-              const needsAttendance = variant === 'teacher' && PENDING_KINDS.has(kind);
+              const awaitingConfirmation = variant === 'teacher' && isAwaitingStudentConfirmation(sch, now);
+              const isDisputed = variant === 'teacher' && !isCancelledSchedule(sch) && String(sch?.studentConfirmStatus || '').toLowerCase() === 'disputed';
+              const isOverdueKind = kind === 'overdue_attendance' || kind === 'makeup_attendance';
+              const needsAttendance = variant === 'teacher' && !awaitingConfirmation && !isDisputed && PENDING_KINDS.has(kind);
               const canOpenAttendance = needsAttendance
                 && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
               const makeupRequestSent = variant === 'teacher'
                 && Boolean(getMakeupPending(getMakeupKey(sch)));
               const attendanceLabel = makeupRequestSent
                 ? 'Đã gửi Admin'
-                : kind === 'overdue_attendance'
+                : isOverdueKind
                   ? 'Điểm danh bù'
                   : 'Điểm danh';
               const studentNote = String(sch.studentNote || '').trim();
@@ -507,7 +547,7 @@ export default function TeacherTeachingLog({
                         title={
                           makeupRequestSent
                             ? 'Yêu cầu đã gửi Admin'
-                            : kind === 'overdue_attendance'
+                            : isOverdueKind
                               ? 'Mở yêu cầu điểm danh bù'
                               : `Mở hồ sơ học viên - ${attendanceLabel}`
                         }
@@ -515,8 +555,12 @@ export default function TeacherTeachingLog({
                         {makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
                       </button>
                     ) : (
-                      <span className={`inline-flex text-xs font-black  tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
-                        {makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
+                      <span className={`inline-flex text-xs font-black  tracking-wide px-1.5 py-0.5 rounded-md ${awaitingConfirmation ? KIND_TONE.awaiting_confirm : isDisputed ? 'text-amber-700 bg-amber-50' : tone}`}>
+                        {awaitingConfirmation
+                          ? 'Học viên đang xác nhận'
+                          : isDisputed
+                            ? 'Chờ Admin xử lý'
+                            : makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
                       </span>
                     )}
                   </p>
@@ -525,7 +569,17 @@ export default function TeacherTeachingLog({
                       Ghi chú: {note}
                     </p>
                   ) : null}
-                  {canOpenAttendance ? (
+                  {awaitingConfirmation ? (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 text-xs font-black cursor-not-allowed"
+                      >
+                        <Clock3 size={12} /> Học viên đang xác nhận
+                      </button>
+                    </div>
+                  ) : canOpenAttendance && !makeupRequestSent ? (
                     <div className="flex flex-wrap gap-2 mt-2">
                       <button
                         type="button"

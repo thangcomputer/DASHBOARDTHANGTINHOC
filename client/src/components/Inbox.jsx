@@ -77,18 +77,6 @@ const formatDisplayName = (name) => {
 
 /** Bỏ epoch / ngày rác (tránh hiện "01/01" khi chưa có tin nhắn). */
 const MIN_ACTIVITY_MS = Date.UTC(2000, 0, 1);
-const ATTENDANCE_CONFIRM_UNLOCK_MS = 15 * 60 * 1000;
-
-function getAttendanceConfirmUnlockAt(schedule) {
-  const date = normalizeScheduleDate(schedule?.date);
-  const time = String(schedule?.startTime || '').trim().match(/^(\d{1,2}):(\d{2})/);
-  if (!date || !time) return null;
-  const [year, month, day] = date.split('-').map(Number);
-  const hour = Number(time[1]);
-  const minute = Number(time[2]);
-  if (![year, month, day, hour, minute].every(Number.isFinite) || hour > 23 || minute > 59) return null;
-  return Date.UTC(year, month - 1, day, hour - 7, minute) + ATTENDANCE_CONFIRM_UNLOCK_MS;
-}
 
 function normalizeClassroomUrl(value) {
   const url = String(value || '').trim();
@@ -902,10 +890,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     ? (Array.isArray(schedules) ? schedules : [])
       .filter((schedule) => (
         String(schedule?.status || '') === 'scheduled'
-        && String(schedule?.studentConfirmStatus || '').toLowerCase() === 'pending'
+        && ['pending', 'confirm_expired'].includes(String(schedule?.studentConfirmStatus || '').toLowerCase())
         && entityId(schedule.studentId) === String(currentUserId || '')
         && entityId(schedule.teacherId) === entityId(activeConv?.user)
-        && (getAttendanceConfirmUnlockAt(schedule) || Infinity) <= scheduleNow.getTime()
       ))
       .sort((a, b) => normalizeScheduleDate(a.date).localeCompare(normalizeScheduleDate(b.date))
         || String(a.startTime || '').localeCompare(String(b.startTime || '')))[0] || null

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, Check, Crown, Flame, Gift, Sparkles, Star, Trophy } from 'lucide-react';
+import { buildPracticeShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 import { gameSounds } from '../../../utils/sound';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
 import Mascot from './Mascot';
 import AchievementPopup from './AchievementPopup';
 import StreakCelebration from './StreakCelebration';
@@ -126,6 +128,7 @@ function QuestStage({ onNext }) {
 function CourseTrophyStage({ summary, onNext }) {
   const pathResult = summary.path || {};
   const isFullCourse = Boolean(pathResult.topicCompleted);
+  const [shareOpen, setShareOpen] = useState(false);
   useEffect(() => {
     gameSounds.win();
   }, []);
@@ -186,13 +189,29 @@ function CourseTrophyStage({ summary, onNext }) {
           <span>Danh hiệu Học Viên Xuất Sắc</span>
         </div>
 
-        <button
-          type="button"
-          onClick={onNext}
-          className="dp-3d-btn mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
-        >
-          <Trophy size={18} aria-hidden="true" /> Nhận Cúp Vinh Danh
-        </button>
+        <div className="mt-6 grid grid-cols-[auto_1fr] items-stretch gap-2.5">
+          <ShareTriggerButton
+            onClick={() => {
+              gameSounds.tap();
+              setShareOpen(true);
+            }}
+            label="SHARE"
+            variant="white"
+            className="!rounded-2xl !px-4 !py-3.5"
+          />
+          <button
+            type="button"
+            onClick={onNext}
+            className="dp-3d-btn flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-base font-black uppercase tracking-wide text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
+          >
+            <Trophy size={18} aria-hidden="true" /> Nhận Cúp Vinh Danh
+          </button>
+        </div>
+        <ShareAchievementModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={buildPracticeShareData(summary)}
+        />
       </div>
     </div>
   );

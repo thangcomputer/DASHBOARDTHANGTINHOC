@@ -230,7 +230,7 @@ function renderScreenBody(screenId, v, state) {
             </div>
 
             <div style="margin-top:auto;text-align:center;padding-top:6px;">
-              <span class="txt-xs muted">Cần hỗ trợ kích hoạt? </span>
+              <span class="txt-xs muted">Đăng ký tin học văn phòng 1 kèm 1</span>
               <span class="link-txt txt-xs">Chat Zalo Admin (093 5758 462)</span>
             </div>
           </div>
@@ -350,10 +350,10 @@ function renderScreenBody(screenId, v, state) {
           </div>
           <div class="col gap-6">
             ${[
-              'A. Tìm kiếm xấp xỉ theo thứ tự tăng dần',
-              'B. Tìm kiếm chính xác tuyệt đối mã tra cứu',
-              'C. Trả về tổng giá trị ở cột thứ 3',
-            ].map((txt, idx) => `
+          'A. Tìm kiếm xấp xỉ theo thứ tự tăng dần',
+          'B. Tìm kiếm chính xác tuyệt đối mã tra cứu',
+          'C. Trả về tổng giá trị ở cột thứ 3',
+        ].map((txt, idx) => `
               <button class="quiz-opt ${choiceIdx === idx ? 'selected' : ''}" data-action="quizChoice" data-val="${idx}">
                 <span style="flex:1;text-align:left;">${txt}</span>
                 ${choiceIdx === idx ? '<span style="color:var(--brand);font-weight:800;">●</span>' : ''}
@@ -515,10 +515,10 @@ function renderScreenBody(screenId, v, state) {
 
         <div class="col gap-8">
           ${[
-            { id: '1m', name: 'Gói 1 tháng', price: '299.000đ', desc: 'Tất cả khóa tự học & luyện tập XP', badge: '' },
-            { id: '3m', name: 'Gói 3 tháng (Phổ biến)', price: '699.000đ', desc: 'Tiết kiệm 22% · Tặng +200 XP & Ôn thi MOS', badge: 'Tiết kiệm nhất' },
-            { id: 'lifetime', name: 'VIP Trọn đời', price: '3.490.000đ', desc: 'Cập nhật trọn đời tất cả khóa Office mới', badge: 'VIP' },
-          ].map((pkg) => `
+          { id: '1m', name: 'Gói 1 tháng', price: '299.000đ', desc: 'Tất cả khóa tự học & luyện tập XP', badge: '' },
+          { id: '3m', name: 'Gói 3 tháng (Phổ biến)', price: '699.000đ', desc: 'Tiết kiệm 22% · Tặng +200 XP & Ôn thi MOS', badge: 'Tiết kiệm nhất' },
+          { id: 'lifetime', name: 'VIP Trọn đời', price: '3.490.000đ', desc: 'Cập nhật trọn đời tất cả khóa Office mới', badge: 'VIP' },
+        ].map((pkg) => `
             <div class="card col gap-6" style="cursor:pointer;${plan === pkg.id ? 'border:2px solid var(--brand);background:var(--brand-soft);' : ''}" data-action="selectedPlan" data-val="${pkg.id}">
               <div class="row between">
                 <span class="bold txt-md">${pkg.name}</span>
@@ -747,12 +747,12 @@ function renderScreenBody(screenId, v, state) {
           </div>
           <div class="mini-bar-chart">
             ${[
-              { m: 'T7', h: 42, muted: true },
-              { m: 'T8', h: 52, muted: true },
-              { m: 'T9', h: 46, muted: true },
-              { m: 'T10', h: 68, muted: false },
-              { m: 'T11*', h: 44, muted: false },
-            ].map((b) => `
+          { m: 'T7', h: 42, muted: true },
+          { m: 'T8', h: 52, muted: true },
+          { m: 'T9', h: 46, muted: true },
+          { m: 'T10', h: 68, muted: false },
+          { m: 'T11*', h: 44, muted: false },
+        ].map((b) => `
               <div class="mini-bar-col">
                 <div class="mini-bar-fill ${b.muted ? 'muted' : ''}" style="height:${b.h}px;"></div>
                 <span class="txt-xs muted">${b.m}</span>

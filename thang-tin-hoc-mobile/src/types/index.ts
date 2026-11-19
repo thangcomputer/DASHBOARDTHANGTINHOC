@@ -26,6 +26,8 @@ export type DemoUser = {
   freePortal?: boolean;
   freeUnlocked?: boolean;
   needsFreeSurvey?: boolean;
+  isFirstLogin?: boolean;
+  mustChangePassword?: boolean;
   enrollments?: DemoEnrollment[];
   videoOrders?: DemoVideoOrder[];
 };

@@ -29,6 +29,8 @@ import {
 } from 'lucide-react-native';
 import { saveLastStudySession } from '../../utils/resumeLearning';
 import { PathVideoModal } from './PathVideoModal';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../ShareAchievementModal';
+import { buildMilestoneShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 import type { GameSound } from './useGameSounds';
 import {
   dailyPracticeApi,
@@ -248,6 +250,7 @@ export default function MilestoneHubModal({
   const [startedVideos, setStartedVideos] = useState<Record<string, boolean>>({});
   const [savingSection, setSavingSection] = useState(false);
   const [contentScrolledToEnd, setContentScrolledToEnd] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const autoCompletedRef = useRef<Set<string>>(new Set());
   const prevCompletedKeyRef = useRef('');
   const scrollOffsetYRef = useRef(0);
@@ -563,51 +566,81 @@ export default function MilestoneHubModal({
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable
-            onPress={() => {
-              if (activeSection) setActiveSection(null);
-              else onClose();
-            }}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
-            accessibilityRole="button"
-            accessibilityLabel={activeSection ? 'Quay lại bài học' : 'Trở về'}
-          >
-            <ArrowLeft size={19} color="#0F172A" />
-          </Pressable>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.eyebrow}>
-              {activeSection
-                ? `${node.label} · ${currentTab.label}`
-                : `BÀI HỌC ${String(milestoneIndex + 1).padStart(2, '0')}`}
-            </Text>
-            <Text numberOfLines={1} style={styles.title}>
-              {activeSection ? SECTION_META[activeSection].title : node.label}
-            </Text>
-            {!activeSection && (
-              <View style={styles.subtitleRow}>
-                <Text style={styles.subtitle}>
-                  {allThreeDone
-                    ? 'Đã hoàn thành cả 3 mức độ'
-                    : `Hoàn thành lần lượt Dễ → Vừa → Khó (${completedDiffCount}/3 mức)`}
-                </Text>
-                {allThreeDone && (
-                  <View style={styles.lessonDoneBadge}>
-                    <CheckCircle2 size={11} color="#065F46" />
-                    <Text style={styles.lessonDoneBadgeText}>Hoàn thành bài học</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-          {activeSection && activeSectionCompleted ? (
-            <View style={styles.headerDoneIconBadge} accessibilityLabel="Đã hoàn thành">
-              {savingSection ? (
-                <ActivityIndicator size="small" color="#059669" />
+          <View style={styles.headerNavRow}>
+            <Pressable
+              onPress={() => {
+                if (activeSection) setActiveSection(null);
+                else onClose();
+              }}
+              style={({ pressed }) => [
+                styles.backPillBtn,
+                Platform.OS === 'web' ? ({ outlineStyle: 'none' } as never) : null,
+                pressed && styles.backPillBtnPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={activeSection ? 'Quay lại bài học' : 'Trở về lộ trình'}
+            >
+              <ArrowLeft size={14} color="#334155" />
+              <Text style={styles.backPillText}>
+                {activeSection ? 'Quay lại bài học' : 'Trở về lộ trình'}
+              </Text>
+            </Pressable>
+
+            <View style={styles.headerNavRight}>
+              {activeSection && activeSectionCompleted ? (
+                <View style={styles.headerDonePill} accessibilityLabel="Đã hoàn thành">
+                  {savingSection ? (
+                    <ActivityIndicator size="small" color="#059669" />
+                  ) : (
+                    <CheckCircle2 size={13} color="#059669" />
+                  )}
+                  <Text style={styles.headerDonePillText}>Đã hoàn thành</Text>
+                </View>
               ) : (
-                <CheckCircle2 size={18} color="#059669" />
+                <View style={styles.headerLessonBadge}>
+                  <Text style={styles.headerLessonBadgeText}>
+                    {activeSection ? `Mức ${currentTab.label}` : `BÀI HỌC ${String(milestoneIndex + 1).padStart(2, '0')}`}
+                  </Text>
+                </View>
               )}
             </View>
-          ) : null}
+          </View>
+
+          <View style={styles.headerTitleRow}>
+            <View
+              style={[
+                styles.headerIconTile,
+                { backgroundColor: activeSection ? SECTION_META[activeSection].iconBg : '#D1FAE5' },
+              ]}
+            >
+              {activeSection
+                ? renderSectionIcon(activeSection, SECTION_META[activeSection].iconColor)
+                : <BookOpen size={20} color="#059669" />}
+            </View>
+            <View style={styles.headerTextWrap}>
+              {activeSection ? (
+                <Text numberOfLines={1} style={styles.headerBreadcrumb}>{node.label}</Text>
+              ) : null}
+              <Text numberOfLines={2} style={styles.title}>
+                {activeSection ? SECTION_META[activeSection].title : node.label}
+              </Text>
+              {!activeSection && (
+                <View style={styles.subtitleRow}>
+                  <View style={[styles.levelCountBadge, allThreeDone && styles.lessonDoneBadge]}>
+                    {allThreeDone ? <CheckCircle2 size={11} color="#065F46" /> : null}
+                    <Text style={[styles.levelCountBadgeText, allThreeDone && styles.lessonDoneBadgeText]}>
+                      {allThreeDone ? 'Hoàn thành 3/3 mức' : `${completedDiffCount}/3 mức`}
+                    </Text>
+                  </View>
+                  <Text style={styles.subtitle}>
+                    {allThreeDone
+                      ? 'Đã xong Dễ · Vừa · Khó'
+                      : 'Hoàn thành lần lượt Dễ → Vừa → Khó'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
         </View>
 
         {/* Body */}
@@ -840,7 +873,19 @@ export default function MilestoneHubModal({
           <View style={styles.footer}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressLabel}>Tiến độ học tập ({currentTab.label})</Text>
-              <Text style={styles.progressCount}>{doneCount}/{totalCount} phần</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {doneCount === totalCount && totalCount > 0 ? (
+                  <ShareTriggerButton
+                    onPress={() => {
+                      play?.('tap');
+                      setShareOpen(true);
+                    }}
+                    label="SHARE"
+                    size="sm"
+                  />
+                ) : null}
+                <Text style={styles.progressCount}>{doneCount}/{totalCount} phần</Text>
+              </View>
             </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progressPct}%`, backgroundColor: currentTab.barColor }]} />
@@ -901,6 +946,18 @@ export default function MilestoneHubModal({
             )}
           </View>
         )}
+        <ShareAchievementModal
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={buildMilestoneShareData({
+            nodeTitle: node?.label || '',
+            difficultyLabel: currentTab.label,
+            sectionsDone: doneCount,
+            sectionsTotal: totalCount,
+            allThreeDone,
+          }) as ShareAchievementData}
+          inlineOverlay
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -909,49 +966,114 @@ export default function MilestoneHubModal({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+    backgroundColor: '#F6FCF9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  headerNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  backPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  backPillBtnPressed: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#6EE7B7',
+  },
+  backPillText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  headerNavRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  headerLessonBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#D1FAE5',
+  },
+  headerLessonBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#065F46',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  headerDonePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  headerDonePillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+  headerIconTile: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   headerTextWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '900', color: '#0F172A', marginTop: 1 },
-  subtitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 2 },
+  headerBreadcrumb: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 1,
+  },
+  title: { fontSize: 18, fontWeight: '900', color: '#0F172A', lineHeight: 23 },
+  subtitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 },
   subtitle: { fontSize: 12, fontWeight: '500', color: '#64748B' },
-  lessonDoneBadge: {
+  levelCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 2.5,
     borderRadius: 999,
   },
-  lessonDoneBadgeText: { fontSize: 11, fontWeight: '800', color: '#065F46' },
-  headerDoneIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
+  levelCountBadgeText: { fontSize: 11, fontWeight: '800', color: '#334155' },
+  lessonDoneBadge: {
+    backgroundColor: '#D1FAE5',
   },
+  lessonDoneBadgeText: { fontSize: 11, fontWeight: '800', color: '#065F46' },
   scroll: { flex: 1 },
   scrollContent: { padding: 18, gap: 16 },
   tabRow: {

@@ -26,12 +26,12 @@ export function dewSkillPlainAnchorsForCount(nodeCount) {
   return positions;
 }
 
-/** Chiều cao khung lộ trình (px) — khoảng cách thoáng đãng cho nút 3D + giọt nước + sao. */
+/** Chiều cao khung lộ trình (px) — khoảng cách thoáng cho vòng 3 nấc, bubble Bắt đầu/Tiếp tục và giọt nước. */
 export function pathPlainStageMinHeightPx(nodeCount, laneWidth = 320) {
   const count = Math.max(1, Number(nodeCount) || 1);
   const w = Math.min(laneWidth, 420);
-  const nodeStep = 135;
-  const chrome = 120;
+  const nodeStep = 164;
+  const chrome = 136;
   const h = chrome + Math.max(0, count - 1) * nodeStep;
   return Math.round(h * (w / 320));
 }

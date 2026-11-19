@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { cmsConfirmAction } from '../../../utils/cmsDialog';
 import { createPortal } from 'react-dom';
 import {
   ArrowDown,
@@ -648,17 +649,6 @@ export default function AdminMilestoneEditor({
   const currentSnapshot = JSON.stringify({ title, active, lockMode, levelConfigs });
   const dirty = currentSnapshot !== initialSnapshot;
 
-  // Cảnh báo khi đóng trình duyệt nếu có thay đổi chưa lưu
-  useEffect(() => {
-    if (!dirty) return undefined;
-    const handler = (e) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [dirty]);
-
   // Tải danh sách câu hỏi thuộc chặng
   useEffect(() => {
     let alive = true;
@@ -794,7 +784,7 @@ export default function AdminMilestoneEditor({
   };
 
   const removeQuestion = async (q) => {
-    if (!window.confirm(`Xóa câu hỏi "${q.prompt}"?`)) return;
+    if (!(await cmsConfirmAction(`Xóa câu hỏi "${q.prompt}"?`))) return;
     try {
       await dailyPracticeApi.admin.deleteQuestion(q.id);
       setUnitQuestions((prev) => prev.filter((item) => item.id !== q.id));
@@ -804,8 +794,8 @@ export default function AdminMilestoneEditor({
     }
   };
 
-  const handleClose = () => {
-    if (dirty && !window.confirm('Bạn có thay đổi chưa lưu. Rời khỏi trang này sẽ mất các thay đổi đó?')) return;
+  const handleClose = async () => {
+    if (dirty && !(await cmsConfirmAction('Bạn có thay đổi chưa lưu. Rời khỏi trang này sẽ mất các thay đổi đó?'))) return;
     onClose();
   };
 

@@ -98,20 +98,39 @@ test('exact endTime still IN_PROGRESS', () => {
   assert.equal(resolveAttendanceState(mkSchedule(), now).state, 'IN_PROGRESS');
 });
 
-test('HV chưa xác nhận quá 1 giờ thì thành điểm danh bù', () => {
-  const requested = vn(14, 30);
-  const schedule = {
+test('HV chưa xác nhận không hết hạn trước hạn điểm danh bù (end+60m)', () => {
+  // Ca học 13:51–15:21 -> hạn chót (end+60m) = 16:21.
+  // GV điểm danh lúc 14:30: 15:31 vẫn trong hạn (chưa quá 16:21), sau 16:21 mới thành điểm danh bù.
+  const requestedEarly = vn(14, 30);
+  const scheduleEarly = {
     ...mkSchedule(),
     studentConfirmStatus: 'pending',
-    studentConfirmRequestedAt: requested,
+    studentConfirmRequestedAt: requestedEarly,
   };
-  const waiting = resolveAttendanceState(schedule, vn(15, 0));
-  assert.equal(waiting.state, 'AWAITING_STUDENT_CONFIRM');
-  assert.equal(waiting.canAdminMakeup, false);
-  const expired = resolveAttendanceState(schedule, vn(15, 31));
-  assert.equal(expired.state, 'STUDENT_CONFIRM_EXPIRED');
-  assert.equal(expired.canTeacherAttend, false);
-  assert.equal(expired.canAdminMakeup, true);
+  const waiting1 = resolveAttendanceState(scheduleEarly, vn(15, 0));
+  assert.equal(waiting1.state, 'AWAITING_STUDENT_CONFIRM');
+  assert.equal(waiting1.canAdminMakeup, false);
+  const waiting2 = resolveAttendanceState(scheduleEarly, vn(15, 31));
+  assert.equal(waiting2.state, 'AWAITING_STUDENT_CONFIRM');
+  assert.equal(waiting2.canAdminMakeup, false);
+  const expiredAfterGrace = resolveAttendanceState(scheduleEarly, vn(16, 22));
+  assert.equal(expiredAfterGrace.state, 'STUDENT_CONFIRM_EXPIRED');
+  assert.equal(expiredAfterGrace.canTeacherAttend, false);
+  assert.equal(expiredAfterGrace.canAdminMakeup, true);
+
+  // Ngay cả khi DB đã bị gắn confirm_expired sớm trước hạn end+60m, vẫn phải giữ AWAITING_STUDENT_CONFIRM.
+  const prematurelyMarked = { ...scheduleEarly, studentConfirmStatus: 'confirm_expired' };
+  assert.equal(resolveAttendanceState(prematurelyMarked, vn(15, 31)).state, 'AWAITING_STUDENT_CONFIRM');
+
+  // GV điểm danh trong grace window (15:50): HV vẫn có đủ 60 phút tới 16:50.
+  const requestedLate = vn(15, 50);
+  const scheduleLate = {
+    ...mkSchedule(),
+    studentConfirmStatus: 'pending',
+    studentConfirmRequestedAt: requestedLate,
+  };
+  assert.equal(resolveAttendanceState(scheduleLate, vn(16, 30)).state, 'AWAITING_STUDENT_CONFIRM');
+  assert.equal(resolveAttendanceState(scheduleLate, vn(16, 51)).state, 'STUDENT_CONFIRM_EXPIRED');
 });
 
 test('COMPLETED / CANCELLED', () => {

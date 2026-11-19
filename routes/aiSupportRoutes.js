@@ -1,4 +1,5 @@
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowMessage } = require('../middleware/policyShadowMessage');
@@ -12,6 +13,7 @@ const {
   isSupportAgent,
   escalateToHuman,
   resetAiSession,
+  endAiSession,
   getSession,
   sendWelcomeIfEmpty,
   clearAiHistory,
@@ -20,11 +22,22 @@ const {
   claimHandoff,
   resolveHandoff,
   replyAsSupport,
+  quickAskAssistant,
   sessionToClient,
   AI_PEER_ID,
   AI_PEER_NAME,
 } = require('../services/aiSupportService');
 const { buildConversationId } = require('../utils/chatConversationId');
+
+const quickAskLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => `quick-ask:${req.user?.id || req.ip || 'anon'}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'development',
+  message: { success: false, code: 'RATE_LIMITED', message: 'Bạn hỏi hơi nhanh, vui lòng đợi một lát rồi thử lại.' },
+});
 
 function denyAiRoles(req, res) {
   if (!isAiChatUser(req.user)) {
@@ -130,7 +143,10 @@ router.post('/open', authMiddleware, async (req, res) => {
     }
 
     const io = req.app.get('io');
-    const session = await getSession(conversationId);
+    let session = await getSession(conversationId);
+    if (session && sessionToClient(session)?.status === 'CLOSED') {
+      session = await resetAiSession({ conversationId, user: req.user, io });
+    }
     const welcome = session && sessionToClient(session)?.escalated
       ? null
       : await sendWelcomeIfEmpty({
@@ -234,6 +250,30 @@ router.post('/reset', authMiddleware, async (req, res) => {
       success: true,
       data: { session: sessionToClient(session), escalated: false },
       message: 'Đã bật lại Trợ lý AI',
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.post('/end', authMiddleware, async (req, res) => {
+  try {
+    if (denyAiRoles(req, res)) return;
+    const { conversationId } = req.body || {};
+    if (!conversationId) {
+      return res.status(400).json({ success: false, message: 'Thiếu conversationId' });
+    }
+    const access = canViewConversation(req.user, conversationId);
+    if (!access.allowed) {
+      return res.status(403).json({ success: false, message: 'Không có quyền' });
+    }
+    const io = req.app.get('io');
+    const session = await endAiSession({ conversationId, user: req.user, io });
+    return res.json({
+      success: true,
+      data: { session: sessionToClient(session), ended: true },
+      message: 'Đã kết thúc phiên trả lời với Trợ lý AI',
     });
   } catch (err) {
     const status = err.status || 500;
@@ -354,6 +394,25 @@ router.post('/reply', authMiddleware, async (req, res) => {
       notifyUser: req.app.notifyUser,
     });
     return res.json({ success: true, data: result });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.post('/quick-ask', authMiddleware, quickAskLimiter, async (req, res) => {
+  try {
+    const { question, history, preferredLang } = req.body || {};
+    if (!String(question || '').trim()) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập câu hỏi' });
+    }
+    const data = await quickAskAssistant({
+      user: req.user,
+      question,
+      history: Array.isArray(history) ? history : [],
+      preferredLang: String(preferredLang || ''),
+    });
+    return res.json({ success: true, data });
   } catch (err) {
     const status = err.status || 500;
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });

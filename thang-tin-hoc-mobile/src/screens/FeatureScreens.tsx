@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, DeviceEventEmitter, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -7,10 +7,13 @@ import {
   FileText, Film, GraduationCap, KeyRound, Landmark, Laptop, Link2, Lock, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Save, ScanFace, Search, Send, Settings, Shield, Smartphone, Sparkles, Table2, Target, Trash2, UserRound, Users, WalletCards, X,
 } from 'lucide-react-native';
 import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
+import { getCurrentLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 import {
   AppHeader, AppScreen, AssignmentCard, Avatar, Card, ChromeScrollView, EmptyState, ErrorState,
   LoadingSkeleton, MenuRow, PrimaryButton, ProgressBar, SearchField,
@@ -31,11 +34,20 @@ import type { AppNotification, Assignment, Conversation, DemoGradeRecord, DemoSt
 import type { TeacherProfile, TeacherProfileUpdate } from '../services/teacherApi';
 import { updateStudentProfile } from '../services/studentApi';
 import { buildDirectConversationId } from '../services/messageApi';
-import { enableMobilePushNotifications, requestWebNotificationPermission, scheduleCategorizedLocalNotification } from '../services/mobilePushNotifications';
+import {
+  DEFAULT_MOBILE_PUSH_PREFERENCES,
+  enableMobilePushNotifications,
+  getMobilePushPreferences,
+  requestWebNotificationPermission,
+  scheduleCategorizedLocalNotification,
+  updateMobilePushPreferences,
+  type MobilePushPreferences,
+} from '../services/mobilePushNotifications';
 import { clearBiometricCredential, getBiometricAvailability, type BiometricAvailability } from '../services/biometricAuth';
 import { checkAndApplyOtaUpdate, getOtaUpdateInfo, reloadAppForOtaUpdate } from '../services/otaUpdates';
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
 import { SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
+import { restoreMobileBillingPurchases } from '../services/subscriptionApi';
 import { DuoButton } from '../components/duo/DuoButton';
 import { isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
 import { pinUserKey } from '../services/pinLock';
@@ -66,6 +78,7 @@ function isOverdueAttendance(item: ScheduleItem, now = Date.now()) {
 function getStudentDiaryStatus(item: ScheduleItem, now = Date.now()) {
   if (item.status === 'completed') return { label: 'Đã học', tone: 'completed' as const };
   if (item.status === 'cancelled') return { label: 'Đã hủy', tone: 'cancelled' as const };
+  if (item.attendanceConfirmPending) return { label: 'Chờ xác nhận điểm danh', tone: 'pending' as const };
   const bounds = getAttendanceBounds(item);
   if (bounds && now >= bounds.startAt && now <= bounds.endAt) return { label: 'Đang diễn ra', tone: 'ongoing' as const };
   if (bounds && now > bounds.endAt) {
@@ -105,7 +118,12 @@ function isTeacherAttendanceActionPending(item: ScheduleItem) {
 function isAttendanceAwaitingStudentConfirmation(item: ScheduleItem) {
   const confirmStatus = String(item.attendanceConfirmStatus || '').toLowerCase();
   return item.status !== 'cancelled'
-    && (confirmStatus === 'pending' || (['', 'none'].includes(confirmStatus) && Boolean(item.attendanceConfirmPending)));
+    && item.status !== 'completed'
+    && (
+      confirmStatus === 'pending'
+      || confirmStatus === 'confirm_expired'
+      || (['', 'none'].includes(confirmStatus) && Boolean(item.attendanceConfirmPending))
+    );
 }
 
 function teacherAttendanceActionLabel(item: ScheduleItem, now = Date.now()) {
@@ -274,9 +292,16 @@ export function ScheduleScreen() {
       const type = String((payload as Record<string, unknown>).type || '').toLowerCase();
       if (type === 'schedule' || type === 'schedules') resource.reload();
     });
+    const reloadOnUnlock = () => { resource.reload(); };
+    const unlockSubs = [
+      DeviceEventEmitter.addListener('mobile:free-portal-unlocked', reloadOnUnlock),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_UNLOCKED, reloadOnUnlock),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.SUBSCRIPTION_UPDATED, reloadOnUnlock),
+    ];
     return () => {
       subscriptions.forEach((subscription) => subscription.remove());
       refreshSubscription.remove();
+      unlockSubs.forEach((s) => s.remove());
     };
   }, [isTeacher, resource.reload, user?.id]);
   const courseProfileLoader = useCallback(
@@ -1086,11 +1111,11 @@ export function ScheduleScreen() {
                                     disabled
                                     style={[styles.calendarAttendanceAction, styles.calendarAttendanceActionSubmitted]}
                                     accessibilityRole="button"
-                                    accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
+                                    accessibilityLabel={`Học viên đang xác nhận ${item.studentName || item.title}`}
                                     accessibilityState={{ disabled: true }}
                                   >
                                     <CheckCircle size={14} color="#047857" />
-                                    <Text style={[styles.calendarAttendanceActionText, styles.calendarAttendanceActionTextSubmitted]}>Điểm danh</Text>
+                                    <Text style={[styles.calendarAttendanceActionText, styles.calendarAttendanceActionTextSubmitted]}>Học viên đang xác nhận</Text>
                                   </Pressable>
                                 </>
                               ) : attendancePending ? (
@@ -1486,6 +1511,19 @@ export function ScheduleScreen() {
                             <Text style={[styles.studentDiaryJoinButtonText, { color: '#94A3B8' }]}>Vào học</Text>
                           </Pressable>
                         ) : null}
+                        {item.attendanceConfirmPending ? (
+                          <Pressable
+                            onPress={() => {
+                              setSelectedId(item.id);
+                              setTimeout(() => screenScrollRef.current?.scrollToEnd({ animated: true }), 120);
+                            }}
+                            style={[styles.studentDiaryJoinButton, { backgroundColor: '#059669' }]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Xác nhận điểm danh ${item.courseName || item.title}`}
+                          >
+                            <Text style={styles.studentDiaryJoinButtonText}>Xác nhận điểm danh</Text>
+                          </Pressable>
+                        ) : null}
                         <Pressable
                           onPress={() => {
                             setSelectedId(item.id);
@@ -1653,11 +1691,11 @@ export function ScheduleScreen() {
                             disabled
                             style={[styles.teacherDiaryAttendanceButton, styles.teacherDiaryAttendanceButtonSubmitted]}
                             accessibilityRole="button"
-                            accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
+                            accessibilityLabel={`Học viên đang xác nhận ${item.studentName || item.title}`}
                             accessibilityState={{ disabled: true }}
                           >
                             <CheckCircle size={15} color="#047857" />
-                            <Text style={[styles.teacherDiaryAttendanceButtonText, styles.teacherDiaryAttendanceButtonTextSubmitted]}>Điểm danh</Text>
+                            <Text style={[styles.teacherDiaryAttendanceButtonText, styles.teacherDiaryAttendanceButtonTextSubmitted]}>Học viên đang xác nhận</Text>
                           </Pressable>
                         ) : (
                           <Pressable
@@ -3854,7 +3892,7 @@ export function AttendanceScreen() {
   useEffect(() => {
     if (!selectedStudent || !selectedSession) return;
     setGrade(String(selectedStudent.avgGrade || 0));
-    setNote(`Buổi ${sessionNumber}: Đã điểm danh hoàn thành buổi học`);
+    setNote(translateText(`Buổi ${sessionNumber}: Đã điểm danh hoàn thành buổi học`, getCurrentLanguage()));
     setMakeupRequestedScheduleId(
       mobileMakeupRequestsSent.has(`${user?.id}:${selectedSession.id}`) ? selectedSession.id : '',
     );
@@ -4259,9 +4297,10 @@ export function GradesScreen() {
 }
 
 export function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshSubscription } = useAuth();
   const navigation = useNavigation<Navigation>();
   const isTeacher = user?.role === 'teacher';
+  const [restoringPurchases, setRestoringPurchases] = useState(false);
   const handleSignOut = () => {
     void signOut().catch((error: unknown) => {
       Alert.alert('Đăng xuất', error instanceof Error ? error.message : 'Không thể thu hồi phiên đăng nhập.');
@@ -4270,7 +4309,10 @@ export function ProfileScreen() {
   const [showStudentProfileForm, setShowStudentProfileForm] = useState(false);
   const [showTeacherProfileForm, setShowTeacherProfileForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showDeleteAccountForm, setShowDeleteAccountForm] = useState(false);
+  const [showPushSettingsModal, setShowPushSettingsModal] = useState(false);
   const [showPinSettings, setShowPinSettings] = useState(false);
+  const [showSupportSettings, setShowSupportSettings] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState<{ title: string; message: string } | null>(null);
   const [biometricInfo, setBiometricInfo] = useState<BiometricAvailability | null>(null);
@@ -4386,11 +4428,15 @@ export function ProfileScreen() {
   const configuredLinks = [
     {
       title: 'Chính sách quyền riêng tư',
-      url: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || '',
+      url: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || 'https://thangtinhoc.vn/privacy-policy',
     },
     {
       title: 'Điều khoản sử dụng',
-      url: process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL || '',
+      url: process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL || 'https://thangtinhoc.vn/terms-of-service',
+    },
+    {
+      title: 'Trang yêu cầu xóa tài khoản (Web)',
+      url: process.env.EXPO_PUBLIC_DELETE_ACCOUNT_URL || 'https://thangtinhoc.vn/delete-account',
     },
     {
       title: 'Liên hệ hỗ trợ',
@@ -4575,104 +4621,156 @@ export function ProfileScreen() {
         <PinLockSettingsModal userKey={pinUserKey(user)} onClose={() => setShowPinSettings(false)} isBrandStudent={isBrandStudent} />
       ) : null}
       {!user?.previewMode ? (
-        <Card style={styles.menuCard}>
-          <SectionHeading title="Cài đặt và hỗ trợ" />
-          <MenuRow
-            icon={<Bell size={18} color={theme.brand} />}
-            title={enablingPush ? 'Đang bật thông báo…' : 'Bật thông báo trên thiết bị'}
-            subtitle={Platform.OS === 'web' ? 'Bật quyền thông báo cho trình duyệt này' : 'Chỉ hỏi quyền khi bạn chọn bật'}
-            onPress={() => { void enablePush(); }}
-          />
-          {Platform.OS !== 'web' ? (
-            <MenuRow
-              icon={<Sparkles size={18} color="#2563EB" />}
-              title="Thử thông báo phân loại & nút nhanh"
-              subtitle="Gửi thử kênh Lịch học có nút Vào Meet / Xem lịch"
-              onPress={() => {
-                void scheduleCategorizedLocalNotification({
-                  category: 'schedule',
-                  title: 'Nhắc lịch học sắp bắt đầu',
-                  body: 'Lớp Thực hành Excel buổi tối bắt đầu sau 15 phút.',
-                  data: { category: 'schedule', deepLink: 'thangtinhoc://schedule' },
-                }).then(() => {
-                  Alert.alert('Đã gửi thông báo thử', 'Hãy kiểm tra khay thông báo của điện thoại để thấy nút hành động nhanh.');
-                }).catch((err: unknown) => {
-                  Alert.alert('Thông báo', err instanceof Error ? err.message : 'Chưa bật quyền thông báo.');
-                });
-              }}
-            />
-          ) : null}
-          {Platform.OS !== 'web' ? (
-            <MenuRow
-              icon={<ScanFace size={18} color="#059669" />}
-              title={`Đăng nhập ${biometricInfo?.label || 'Vân tay / Face ID'}`}
-              subtitle={
-                biometricInfo?.hasSavedCredential
-                  ? `Đang bật cho ${biometricInfo.savedDisplayName || biometricInfo.savedContact} • Chạm để quản lý`
-                  : biometricInfo?.enrolled
-                    ? 'Chưa kích hoạt — Chọn "Lưu Vân tay/Face ID" khi đăng nhập lại'
-                    : 'Thiết bị chưa bật Face ID / Vân tay'
-              }
-              onPress={() => {
-                if (biometricInfo?.hasSavedCredential) {
-                  Alert.alert(
-                    'Quản lý đăng nhập sinh trắc học',
-                    `Đang lưu đăng nhập nhanh cho ${biometricInfo.savedContact}.`,
-                    [
-                      { text: 'Đóng', style: 'cancel' },
-                      {
-                        text: 'Tắt & xóa dữ liệu lưu',
-                        style: 'destructive',
-                        onPress: () => {
-                          void clearBiometricCredential().then(() => getBiometricAvailability()).then((next) => {
-                            setBiometricInfo(next);
-                          });
-                        },
-                      },
-                    ],
-                  );
-                } else {
-                  Alert.alert(
-                    'Đăng nhập sinh trắc học',
-                    biometricInfo?.enrolled
-                      ? 'Khi đăng xuất và đăng nhập bằng mật khẩu, hãy giữ chọn "Lưu Face ID / Vân tay" để mở khóa 1 chạm ở lần sau.'
-                      : 'Hãy cài đặt Face ID hoặc Vân tay trong phần Cài đặt của điện thoại trước.',
-                  );
-                }
-              }}
-            />
-          ) : null}
-          <MenuRow
-            icon={<RefreshCw size={18} color="#7C3AED" />}
-            title={checkingOta ? 'Đang kiểm tra bản cập nhật OTA…' : 'Cập nhật ứng dụng (EAS Update OTA)'}
-            subtitle={`Phiên bản ${otaInfo.appVersion} • Kênh ${otaInfo.channel}${otaInfo.updateId ? ` (${otaInfo.updateId.slice(0, 8)})` : ''}`}
-            onPress={() => {
-              if (checkingOta) return;
-              setCheckingOta(true);
-              void checkAndApplyOtaUpdate().then((res) => {
-                if (res.requiresReload) {
-                  Alert.alert('Có bản cập nhật mới', res.message, [
-                    { text: 'Để sau', style: 'cancel' },
-                    { text: 'Khởi động lại ngay', onPress: () => { void reloadAppForOtaUpdate(); } },
-                  ]);
-                } else {
-                  Alert.alert('EAS Update OTA', res.message);
-                }
-              }).finally(() => setCheckingOta(false));
-            }}
-            borderless={configuredLinks.length === 0}
-          />
-          {configuredLinks.map((item, index) => (
-            <MenuRow
-              key={item.title}
-              icon={<Link2 size={18} color={theme.brand} />}
-              title={item.title}
-              onPress={() => openConfiguredUrl(item.url, item.title)}
-              borderless={index === configuredLinks.length - 1}
-            />
-          ))}
-          {!configuredLinks.length ? (
-            <Text style={styles.note}>Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.</Text>
+        <Card style={styles.profileDetails}>
+          <Pressable
+            onPress={() => setShowSupportSettings((prev) => !prev)}
+            style={[styles.studentProfileSectionHeader, !showSupportSettings && { borderBottomWidth: 0 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Cài đặt và hỗ trợ"
+            accessibilityState={{ expanded: showSupportSettings }}
+          >
+            <View style={styles.studentProfileSectionTitle}>
+              <Settings size={16} color={isBrandStudent ? '#059669' : theme.brand} />
+              <Text style={styles.studentProfileSectionText}>Cài đặt và hỗ trợ</Text>
+            </View>
+            <ChevronDown size={17} color={colors.muted} style={showSupportSettings ? styles.studentProfileChevronOpen : undefined} />
+          </Pressable>
+          {showSupportSettings ? (
+            <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
+              <LanguageSwitcher variant="card" />
+              <MenuRow
+                icon={<Bell size={18} color={theme.brand} />}
+                title={enablingPush ? 'Đang bật thông báo…' : 'Bật thông báo trên thiết bị'}
+                subtitle={Platform.OS === 'web' ? 'Bật quyền thông báo cho trình duyệt này' : 'Chỉ hỏi quyền khi bạn chọn bật'}
+                onPress={() => { void enablePush(); }}
+              />
+              <MenuRow
+                icon={<Settings size={18} color={theme.brand} />}
+                title="Cài đặt loại thông báo & nhắc lịch"
+                subtitle="Bật/tắt từng loại sự kiện (24h, 60m, 15m, tin nhắn, học phí…)"
+                onPress={() => setShowPushSettingsModal(true)}
+              />
+              {Platform.OS !== 'web' ? (
+                <MenuRow
+                  icon={<Sparkles size={18} color="#2563EB" />}
+                  title="Thử thông báo phân loại & nút nhanh"
+                  subtitle="Gửi thử kênh Lịch học có nút Vào Meet / Xem lịch"
+                  onPress={() => {
+                    void scheduleCategorizedLocalNotification({
+                      category: 'schedule',
+                      title: 'Nhắc lịch học sắp bắt đầu',
+                      body: 'Lớp Thực hành Excel buổi tối bắt đầu sau 15 phút.',
+                      data: { category: 'schedule', deepLink: 'thangtinhoc://schedule' },
+                    }).then(() => {
+                      Alert.alert('Đã gửi thông báo thử', 'Hãy kiểm tra khay thông báo của điện thoại để thấy nút hành động nhanh.');
+                    }).catch((err: unknown) => {
+                      Alert.alert('Thông báo', err instanceof Error ? err.message : 'Chưa bật quyền thông báo.');
+                    });
+                  }}
+                />
+              ) : null}
+              {Platform.OS !== 'web' ? (
+                <MenuRow
+                  icon={<ScanFace size={18} color="#059669" />}
+                  title={`Đăng nhập ${biometricInfo?.label || 'Vân tay / Face ID'}`}
+                  subtitle={
+                    biometricInfo?.hasSavedCredential
+                      ? `Đang bật cho ${biometricInfo.savedDisplayName || biometricInfo.savedContact} • Chạm để quản lý`
+                      : biometricInfo?.enrolled
+                        ? 'Chưa kích hoạt — Chọn "Lưu Vân tay/Face ID" khi đăng nhập lại'
+                        : 'Thiết bị chưa bật Face ID / Vân tay'
+                  }
+                  onPress={() => {
+                    if (biometricInfo?.hasSavedCredential) {
+                      Alert.alert(
+                        'Quản lý đăng nhập sinh trắc học',
+                        `Đang lưu đăng nhập nhanh cho ${biometricInfo.savedContact}.`,
+                        [
+                          { text: 'Đóng', style: 'cancel' },
+                          {
+                            text: 'Tắt & xóa dữ liệu lưu',
+                            style: 'destructive',
+                            onPress: () => {
+                              void clearBiometricCredential().then(() => getBiometricAvailability()).then((next) => {
+                                setBiometricInfo(next);
+                              });
+                            },
+                          },
+                        ],
+                      );
+                    } else {
+                      Alert.alert(
+                        'Đăng nhập sinh trắc học',
+                        biometricInfo?.enrolled
+                          ? 'Khi đăng xuất và đăng nhập bằng mật khẩu, hãy giữ chọn "Lưu Face ID / Vân tay" để mở khóa 1 chạm ở lần sau.'
+                          : 'Hãy cài đặt Face ID hoặc Vân tay trong phần Cài đặt của điện thoại trước.',
+                      );
+                    }
+                  }}
+                />
+              ) : null}
+              <MenuRow
+                icon={<RefreshCw size={18} color="#7C3AED" />}
+                title={checkingOta ? 'Đang kiểm tra bản cập nhật OTA…' : 'Cập nhật ứng dụng (EAS Update OTA)'}
+                subtitle={`Phiên bản ${otaInfo.appVersion} • Kênh ${otaInfo.channel}${otaInfo.updateId ? ` (${otaInfo.updateId.slice(0, 8)})` : ''}`}
+                onPress={() => {
+                  if (checkingOta) return;
+                  setCheckingOta(true);
+                  void checkAndApplyOtaUpdate().then((res) => {
+                    if (res.requiresReload) {
+                      Alert.alert('Có bản cập nhật mới', res.message, [
+                        { text: 'Để sau', style: 'cancel' },
+                        { text: 'Khởi động lại ngay', onPress: () => { void reloadAppForOtaUpdate(); } },
+                      ]);
+                    } else {
+                      Alert.alert('EAS Update OTA', res.message);
+                    }
+                  }).finally(() => setCheckingOta(false));
+                }}
+                borderless={false}
+              />
+              {!isTeacher ? (
+                <MenuRow
+                  icon={<WalletCards size={18} color="#059669" />}
+                  title={restoringPurchases ? 'Đang khôi phục giao dịch mua…' : 'Khôi phục giao dịch mua'}
+                  subtitle="Đồng bộ lại khóa học và gói thuê bao đã kích hoạt"
+                  onPress={() => {
+                    if (restoringPurchases) return;
+                    setRestoringPurchases(true);
+                    void restoreMobileBillingPurchases()
+                      .then(async (res) => {
+                        await refreshSubscription();
+                        studentProfileResource.reload();
+                        Alert.alert('Khôi phục giao dịch mua', res.message);
+                      })
+                      .catch((error: unknown) => {
+                        Alert.alert('Không thể khôi phục', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+                      })
+                      .finally(() => setRestoringPurchases(false));
+                  }}
+                  borderless={false}
+                />
+              ) : null}
+              {configuredLinks.map((item) => (
+                <MenuRow
+                  key={item.title}
+                  icon={<Link2 size={18} color={theme.brand} />}
+                  title={item.title}
+                  onPress={() => openConfiguredUrl(item.url, item.title)}
+                  borderless={false}
+                />
+              ))}
+              <MenuRow
+                icon={<Trash2 size={18} color={colors.red} />}
+                title="Xóa tài khoản vĩnh viễn"
+                subtitle="Xóa hồ sơ cá nhân, lịch học và tin nhắn khỏi hệ thống"
+                onPress={() => setShowDeleteAccountForm(true)}
+                borderless
+              />
+              {!configuredLinks.length ? (
+                <Text style={styles.note}>Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.</Text>
+              ) : null}
+            </View>
           ) : null}
         </Card>
       ) : null}
@@ -4716,6 +4814,23 @@ export function ProfileScreen() {
             setShowPasswordForm(false);
             Alert.alert('Thành công', 'Mật khẩu đã được thay đổi.');
           }}
+          isBrandStudent={isBrandStudent}
+        />
+      ) : null}
+      {showDeleteAccountForm ? (
+        <DeleteAccountModal
+          onClose={() => setShowDeleteAccountForm(false)}
+          onDeleted={() => {
+            setShowDeleteAccountForm(false);
+            void clearBiometricCredential().catch(() => { });
+            void signOut().catch(() => { });
+            Alert.alert('Đã xóa tài khoản', 'Tài khoản của bạn đã được xóa vĩnh viễn khỏi hệ thống.');
+          }}
+        />
+      ) : null}
+      {showPushSettingsModal ? (
+        <NotificationPreferencesModal
+          onClose={() => setShowPushSettingsModal(false)}
           isBrandStudent={isBrandStudent}
         />
       ) : null}
@@ -5120,6 +5235,285 @@ function ChangePasswordModal({
               icon={saving ? undefined : <Save size={16} color="#FFFFFF" />}
               loading={saving}
               disabled={saving}
+              onPress={() => { void submit(); }}
+              style={{ flex: 1.5 }}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+function NotificationPreferencesModal({
+  onClose,
+  isBrandStudent = false,
+}: {
+  onClose: () => void;
+  isBrandStudent?: boolean;
+}) {
+  const [prefs, setPrefs] = useState<MobilePushPreferences>(DEFAULT_MOBILE_PUSH_PREFERENCES);
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    getMobilePushPreferences()
+      .then((data) => { if (alive) setPrefs(data); })
+      .catch(() => { /* giữ mặc định khi thiết bị chưa đăng ký push token */ })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const togglePref = async (key: Exclude<keyof MobilePushPreferences, 'reminderOffsetsMinutes'>) => {
+    const nextValue = !prefs[key];
+    setPrefs((prev) => ({ ...prev, [key]: nextValue }));
+    setSavingKey(key);
+    try {
+      const updated = await updateMobilePushPreferences({ [key]: nextValue });
+      setPrefs(updated);
+    } catch (error) {
+      setPrefs((prev) => ({ ...prev, [key]: !nextValue }));
+      Alert.alert('Không lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setSavingKey('');
+    }
+  };
+
+  const toggleOffset = async (offset: number) => {
+    const exists = prefs.reminderOffsetsMinutes.includes(offset);
+    const nextOffsets = exists
+      ? prefs.reminderOffsetsMinutes.filter((item) => item !== offset)
+      : [...prefs.reminderOffsetsMinutes, offset].sort((a, b) => b - a);
+    setPrefs((prev) => ({ ...prev, reminderOffsetsMinutes: nextOffsets }));
+    setSavingKey(`offset-${offset}`);
+    try {
+      const updated = await updateMobilePushPreferences({ reminderOffsetsMinutes: nextOffsets });
+      setPrefs(updated);
+    } catch (error) {
+      setPrefs((prev) => ({ ...prev, reminderOffsetsMinutes: prefs.reminderOffsetsMinutes }));
+      Alert.alert('Không lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setSavingKey('');
+    }
+  };
+
+  const rows: Array<{
+    key: Exclude<keyof MobilePushPreferences, 'reminderOffsetsMinutes'>;
+    label: string;
+    desc: string;
+  }> = [
+    { key: 'scheduleReminders', label: 'Nhắc lịch học & vào lớp', desc: 'Nhắc trước giờ học và khi lớp bắt đầu' },
+    { key: 'scheduleChanges', label: 'Đổi, hủy hoặc dời lịch', desc: 'Thông báo tức thì khi lịch học thay đổi' },
+    { key: 'messages', label: 'Tin nhắn mới', desc: 'Tin nhắn từ giảng viên, học viên hoặc trung tâm' },
+    { key: 'calls', label: 'Cuộc gọi đến & nhỡ', desc: 'Chuông và cảnh báo cuộc gọi thoại' },
+    { key: 'assignmentsAndQuizzes', label: 'Bài tập & chấm điểm', desc: 'Bài tập mới, hạn nộp và kết quả' },
+    { key: 'financeAndCourses', label: 'Học phí & khóa học', desc: 'Giao dịch, gia hạn và mở khóa học' },
+    { key: 'adminAnnouncements', label: 'Thông báo từ trung tâm', desc: 'Thông báo chung từ quản trị viên' },
+  ];
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={[styles.modalBackdrop, styles.teacherEditBackdrop]}>
+        <View style={styles.changePasswordModal}>
+          <View style={[styles.teacherEditHeader, isBrandStudent && { backgroundColor: '#ECFDF5', borderBottomColor: '#D1FAE5' }]}>
+            <View>
+              <Text style={[styles.teacherEditTitle, isBrandStudent && { color: '#059669' }]}>Cài đặt thông báo đẩy</Text>
+              <Text style={styles.teacherEditSubtitle}>Tùy chỉnh loại thông báo & mốc nhắc lịch</Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Đóng cài đặt thông báo"
+              style={styles.teacherEditClose}
+            >
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          </View>
+          <ScrollView style={styles.changePasswordBody} contentContainerStyle={styles.changePasswordFields}>
+            {loading ? <LoadingSkeleton /> : (
+              <>
+                {rows.map((item) => (
+                  <View
+                    key={item.key}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: 6 }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardTitle}>{item.label}</Text>
+                      <Text style={styles.metaText}>{item.desc}</Text>
+                    </View>
+                    <Switch
+                      value={prefs[item.key]}
+                      disabled={savingKey === item.key}
+                      onValueChange={() => { void togglePref(item.key); }}
+                    />
+                  </View>
+                ))}
+                <View style={{ paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, gap: spacing.xs }}>
+                  <Text style={styles.cardTitle}>Nhắc trước giờ học</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+                    {[
+                      { offset: 1440, label: 'Trước 24 giờ' },
+                      { offset: 60, label: 'Trước 60 phút' },
+                      { offset: 15, label: 'Trước 15 phút' },
+                    ].map((opt) => {
+                      const active = prefs.reminderOffsetsMinutes.includes(opt.offset);
+                      return (
+                        <Pressable
+                          key={opt.offset}
+                          onPress={() => { void toggleOffset(opt.offset); }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: radius.pill,
+                            borderWidth: 1,
+                            borderColor: active ? '#059669' : colors.line,
+                            backgroundColor: active ? '#ECFDF5' : colors.surface,
+                          }}
+                        >
+                          <Text style={{ fontSize: typography.caption, fontWeight: '700', color: active ? '#047857' : colors.muted }}>
+                            {active ? `✓ ${opt.label}` : opt.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              </>
+            )}
+          </ScrollView>
+          <View style={styles.teacherEditActions}>
+            <DuoButton variant="primary" size="md" fullWidth text="Xong" onPress={onClose} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function DeleteAccountModal({
+  onClose,
+  onDeleted,
+}: {
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [reason, setReason] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const submit = async () => {
+    if (!password.trim() && confirmText.trim().toUpperCase() !== 'XOA TAI KHOAN') {
+      Alert.alert(
+        'Cần xác nhận',
+        'Vui lòng nhập mật khẩu hiện tại (hoặc nhập chính xác cụm XOA TAI KHOAN nếu bạn đăng nhập bằng Google/Facebook).',
+      );
+      return;
+    }
+    Alert.alert(
+      'Xác nhận xóa vĩnh viễn',
+      'Thao tác này sẽ xóa hồ sơ cá nhân, lịch học, tin nhắn và token thiết bị của bạn và không thể khôi phục. Chứng từ hóa đơn kế toán hợp pháp (nếu có) được lưu giữ tách biệt theo quy định.',
+      [
+        { text: 'Hủy bỏ', style: 'cancel' },
+        {
+          text: 'Xóa vĩnh viễn',
+          style: 'destructive',
+          onPress: () => {
+            setDeleting(true);
+            void authService.deleteAccount(password, reason, confirmText)
+              .then(() => {
+                onDeleted();
+              })
+              .catch((error: unknown) => {
+                Alert.alert(
+                  'Không thể xóa tài khoản',
+                  error instanceof Error ? error.message : 'Vui lòng kiểm tra lại mật khẩu xác nhận.',
+                );
+              })
+              .finally(() => setDeleting(false));
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={[styles.modalBackdrop, styles.teacherEditBackdrop]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          style={styles.changePasswordModal}
+        >
+          <View style={[styles.teacherEditHeader, { backgroundColor: '#FEF2F2', borderBottomColor: '#FECACA' }]}>
+            <View>
+              <Text style={[styles.teacherEditTitle, { color: colors.red }]}>Xóa tài khoản vĩnh viễn</Text>
+              <Text style={styles.teacherEditSubtitle}>Hành động không thể hoàn tác sau khi xác nhận</Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              disabled={deleting}
+              accessibilityRole="button"
+              accessibilityLabel="Đóng hộp thoại xóa tài khoản"
+              style={styles.teacherEditClose}
+            >
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.changePasswordBody}
+            contentContainerStyle={styles.changePasswordFields}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.metaText}>
+              Hồ sơ, tin nhắn 1-1, lịch học gắn với tài khoản và các thiết bị đăng nhập sẽ bị xóa/thu hồi ngay lập tức. Hóa đơn/sổ cái kế toán theo luật định được lưu tách biệt và ẩn danh khỏi phiên đăng nhập.
+            </Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Mật khẩu hiện tại (bắt buộc với tài khoản mật khẩu)"
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="current-password"
+              textContentType="password"
+              style={[styles.formInput, styles.passwordInput3d]}
+            />
+            <TextInput
+              value={confirmText}
+              onChangeText={setConfirmText}
+              placeholder="Hoặc nhập XOA TAI KHOAN (nếu dùng đăng nhập MXH)"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={styles.formInput}
+            />
+            <TextInput
+              value={reason}
+              onChangeText={setReason}
+              placeholder="Lý do xóa tài khoản (tùy chọn)"
+              placeholderTextColor="#94A3B8"
+              multiline
+              style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top' }]}
+            />
+          </ScrollView>
+          <View style={styles.teacherEditActions}>
+            <DuoButton
+              variant="secondary"
+              size="md"
+              text="Quay lại"
+              disabled={deleting}
+              onPress={onClose}
+              style={{ flex: 1 }}
+            />
+            <DuoButton
+              variant="danger"
+              size="md"
+              text={deleting ? 'Đang xóa…' : 'Xóa tài khoản'}
+              icon={deleting ? undefined : <Trash2 size={16} color="#FFFFFF" />}
+              loading={deleting}
+              disabled={deleting}
               onPress={() => { void submit(); }}
               style={{ flex: 1.5 }}
             />

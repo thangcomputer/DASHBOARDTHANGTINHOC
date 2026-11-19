@@ -29,6 +29,7 @@ import type {
   AppNotification, ChatMessage, Conversation, DemoNewsItem, DemoSoftwareLink, DemoTeacherTrainingOverview, DemoTrainingCourse, DemoTrainingFile, DemoTrainingGuide, DemoUser, LearningMaterial, ScheduleItem, UserRole,
 } from '../types';
 import { Platform } from 'react-native';
+import { getMobileDeviceAuthFields, rememberMobileDeviceSecret } from '../utils/deviceRegistry';
 import {
   clearMobileSession,
   loadMobileSession,
@@ -164,7 +165,8 @@ function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleI
     learningMode: raw?.linkHoc ? 'Trực tuyến' : 'Trực tiếp',
     meetingUrl: String(raw?.linkHoc || raw?.meetingUrl || '').trim(),
     confirmedByStudent: ['accepted', 'admin_approved'].includes(String(raw?.studentConfirmStatus || '')),
-    attendanceConfirmPending: String(raw?.studentConfirmStatus || '') === 'pending',
+    attendanceConfirmPending: ['pending', 'confirm_expired'].includes(String(raw?.studentConfirmStatus || ''))
+      && String(raw?.status || 'scheduled') === 'scheduled',
     attendanceConfirmStatus: String(raw?.studentConfirmStatus || 'none'),
     attendanceDisputed: String(raw?.studentConfirmStatus || '') === 'disputed',
     attendanceRejected: String(raw?.studentConfirmStatus || '') === 'admin_rejected',
@@ -548,19 +550,81 @@ function dateTimeHoursAgo(hours: number) {
   return { dateKey, time: `${time} – ${endTime}` };
 }
 
+type MobileAuthSessionPayload = {
+  data?: {
+    user?: Record<string, unknown>;
+    accessToken?: string;
+    refreshToken?: string;
+    sessionId?: string;
+  };
+};
+
+async function finalizeMobileAuthSession(
+  role: UserRole,
+  fallbackContact: string,
+  payload: MobileAuthSessionPayload,
+): Promise<MobileStoredSession<DemoUser>> {
+  const data = payload.data;
+  const rawUser = data?.user;
+  if (
+    !rawUser
+    || typeof data?.accessToken !== 'string'
+    || typeof data.refreshToken !== 'string'
+    || typeof data.sessionId !== 'string'
+  ) {
+    throw new Error('Phản hồi đăng nhập từ máy chủ không hợp lệ.');
+  }
+  const returnedRole = rawUser.role === 'teacher' ? 'teacher' : rawUser.role === 'student' ? 'student' : null;
+  const id = String(rawUser._id || rawUser.id || '').trim();
+  const name = String(rawUser.name || '').trim();
+  if (!returnedRole || returnedRole !== role || !id || !name) {
+    throw new Error('Thông tin tài khoản trả về không hợp lệ.');
+  }
+  const user: DemoUser = {
+    id,
+    name,
+    role: returnedRole,
+    adminRole: typeof rawUser.adminRole === 'string' ? rawUser.adminRole : null,
+    phone: String(rawUser.phone || fallbackContact).trim(),
+    email: typeof rawUser.email === 'string' ? rawUser.email : undefined,
+    code: String(rawUser.code || rawUser.studentCode || rawUser.teacherCode || ''),
+    course: String(rawUser.course || rawUser.specialty || ''),
+    branch: String(rawUser.branchName || rawUser.branchCode || ''),
+    avatarColor: returnedRole === 'teacher' ? '#E9E5FA' : '#DDF1EB',
+    avatar: typeof rawUser.avatar === 'string' ? rawUser.avatar : undefined,
+    completedSessions: typeof rawUser.completedSessions === 'number' ? rawUser.completedSessions : undefined,
+    totalSessions: typeof rawUser.totalSessions === 'number' ? rawUser.totalSessions : undefined,
+    avgGrade: typeof rawUser.avgGrade === 'number' ? rawUser.avgGrade : undefined,
+    freePortal: rawUser.freePortal === true,
+    freeUnlocked: rawUser.freeUnlocked === true,
+    needsFreeSurvey: rawUser.needsFreeSurvey === true,
+    isFirstLogin: rawUser.isFirstLogin === true,
+    mustChangePassword: rawUser.mustChangePassword === true,
+  };
+  const session: MobileStoredSession<DemoUser> = {
+    user,
+    tokens: {
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      sessionId: data.sessionId,
+    },
+  };
+  try {
+    await saveMobileSession(session);
+  } catch (error) {
+    setMobileApiTokens(null);
+    throw error;
+  }
+  return session;
+}
+
 export const authService = {
-  async signIn(role: UserRole, phone: string, password: string): Promise<MobileStoredSession<DemoUser>> {
+  async signIn(role: UserRole, phone: string, password: string, options?: { force?: boolean }): Promise<MobileStoredSession<DemoUser>> {
     if (!phone.trim() || !password.trim()) throw new Error('Vui lòng nhập số điện thoại và mật khẩu.');
     const platform = Platform.OS === 'web' ? 'web' : Platform.OS;
     if (!['android', 'ios', 'web'].includes(platform)) throw new Error('Nền tảng đăng nhập chưa được hỗ trợ.');
-    const payload = await mobileApiRequest<{
-      data?: {
-        user?: Record<string, unknown>;
-        accessToken?: string;
-        refreshToken?: string;
-        sessionId?: string;
-      };
-    }>('/auth/login/mobile', {
+    const deviceAuth = await getMobileDeviceAuthFields();
+    const payload = await mobileApiRequest<MobileAuthSessionPayload & { deviceSecret?: string }>('/auth/login/mobile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -569,57 +633,57 @@ export const authService = {
         role,
         platform,
         deviceLabel: platform === 'web' ? 'Expo Web trên máy tính' : `${platform} app`,
+        force: options?.force === true,
+        ...deviceAuth,
       }),
     }, false);
-    const data = payload.data;
-    const rawUser = data?.user;
-    if (
-      !rawUser
-      || typeof data?.accessToken !== 'string'
-      || typeof data.refreshToken !== 'string'
-      || typeof data.sessionId !== 'string'
-    ) {
-      throw new Error('Phản hồi đăng nhập từ máy chủ không hợp lệ.');
+    await rememberMobileDeviceSecret(payload.deviceSecret);
+    return finalizeMobileAuthSession(role, phone, payload);
+  },
+  async requestForgotPasswordOtp(role: UserRole, identifier: string) {
+    const clean = identifier.trim();
+    if (!clean) throw new Error('Vui lòng nhập số điện thoại hoặc Gmail.');
+    const isEmail = clean.includes('@');
+    return mobileApiRequest<{
+      success?: boolean;
+      channel?: 'email' | 'sms';
+      channelConfigured?: boolean;
+      emailConfigured?: boolean;
+      smsConfigured?: boolean;
+      expiresIn?: number;
+      resendAfterSec?: number;
+      message?: string;
+    }>('/auth/forgot-password/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: clean,
+        ...(isEmail ? { email: clean } : { phone: clean }),
+        role,
+      }),
+    }, false);
+  },
+  async verifyForgotPasswordOtp(role: UserRole, identifier: string, otp: string): Promise<MobileStoredSession<DemoUser>> {
+    const clean = identifier.trim();
+    const cleanOtp = otp.replace(/\D/g, '');
+    if (!clean || cleanOtp.length !== 6) {
+      throw new Error('Vui lòng nhập đủ 6 chữ số mã xác nhận.');
     }
-    const returnedRole = rawUser.role === 'teacher' ? 'teacher' : rawUser.role === 'student' ? 'student' : null;
-    const id = String(rawUser._id || rawUser.id || '').trim();
-    const name = String(rawUser.name || '').trim();
-    if (!returnedRole || returnedRole !== role || !id || !name) {
-      throw new Error('Thông tin tài khoản trả về không hợp lệ.');
-    }
-    const user: DemoUser = {
-      id,
-      name,
-      role: returnedRole,
-      adminRole: typeof rawUser.adminRole === 'string' ? rawUser.adminRole : null,
-      phone: String(rawUser.phone || phone).trim(),
-      code: String(rawUser.code || rawUser.studentCode || rawUser.teacherCode || ''),
-      course: String(rawUser.course || rawUser.specialty || ''),
-      branch: String(rawUser.branchName || rawUser.branchCode || ''),
-      avatarColor: returnedRole === 'teacher' ? '#E9E5FA' : '#DDF1EB',
-      avatar: typeof rawUser.avatar === 'string' ? rawUser.avatar : undefined,
-      completedSessions: typeof rawUser.completedSessions === 'number' ? rawUser.completedSessions : undefined,
-      totalSessions: typeof rawUser.totalSessions === 'number' ? rawUser.totalSessions : undefined,
-      avgGrade: typeof rawUser.avgGrade === 'number' ? rawUser.avgGrade : undefined,
-      freePortal: rawUser.freePortal === true,
-      freeUnlocked: rawUser.freeUnlocked === true,
-      needsFreeSurvey: rawUser.needsFreeSurvey === true,
-    };
-    const session: MobileStoredSession<DemoUser> = {
-      user,
-      tokens: {
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        sessionId: data.sessionId,
-      },
-    };
-    try {
-      await saveMobileSession(session);
-    } catch (error) {
-      setMobileApiTokens(null);
-      throw error;
-    }
-    return session;
+    const platform = Platform.OS === 'web' ? 'web' : Platform.OS;
+    if (!['android', 'ios', 'web'].includes(platform)) throw new Error('Nền tảng chưa được hỗ trợ.');
+    const payload = await mobileApiRequest<MobileAuthSessionPayload>('/auth/forgot-password/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: clean,
+        role,
+        otp: cleanOtp,
+        clientType: 'mobile',
+        platform,
+        deviceLabel: platform === 'web' ? 'Expo Web trên máy tính' : `${platform} app`,
+      }),
+    }, false);
+    return finalizeMobileAuthSession(role, clean, payload);
   },
   async restore() {
     return loadMobileSession<DemoUser>();
@@ -645,6 +709,16 @@ export const authService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ oldPassword, newPassword }),
     });
+  },
+  async deleteAccount(password: string, reason = '', confirmText = '') {
+    if (__DEV__ && qaState) throw new Error('Không thể xóa tài khoản thật trong chế độ UI QA.');
+    const response = await mobileApiRequest<{ success?: boolean; message?: string }>('/auth/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, reason, confirmText }),
+    });
+    await clearMobileSession();
+    return response;
   },
 };
 

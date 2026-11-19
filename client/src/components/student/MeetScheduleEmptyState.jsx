@@ -66,7 +66,9 @@ export default function MeetScheduleEmptyState({
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
         <Calendar size={20} aria-hidden="true" />
       </div>
-      <p className="mt-2 text-sm font-bold text-slate-700">Hôm nay không có lịch</p>
+      <p className="mt-2 text-sm font-bold text-slate-700">
+        {freePortalUi ? 'Hôm nay chưa có lịch Meet' : 'Hôm nay không có lịch'}
+      </p>
       {nextSchedule ? (
         <p className="mt-1 text-xs font-medium text-slate-500">
           Lịch tới: <strong className="text-slate-800">{nextSchedule.title || nextSchedule.subject || 'Buổi học'}</strong>

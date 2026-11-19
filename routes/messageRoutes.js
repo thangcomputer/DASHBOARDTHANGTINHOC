@@ -363,6 +363,191 @@ router.put('/pin-conversation/:conversationId', messagesGuard('pin_conversation'
   }
 });
 
+// ── Báo cáo tin nhắn / người dùng vi phạm (UGC Safety) ──
+router.post('/report', async (req, res) => {
+  try {
+    const reporterId = String(req.user?.id || req.user?._id || '');
+    const reporterRole = getMessagingRole(req.user);
+    const {
+      conversationId = '',
+      messageId = null,
+      reportedUserId = '',
+      reportedUserRole = '',
+      reason = 'inappropriate',
+      details = '',
+    } = req.body || {};
+
+    if (!conversationId && !reportedUserId && !messageId) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin cuộc trò chuyện hoặc nội dung cần báo cáo.' });
+    }
+
+    const ChatReport = require('../models/ChatReport');
+    const ALLOWED_REASONS = new Set(['spam', 'harassment', 'inappropriate', 'scam', 'other']);
+    const normalizedReason = ALLOWED_REASONS.has(String(reason)) ? String(reason) : 'other';
+
+    let messageExcerpt = '';
+    let resolvedReportedUserId = String(reportedUserId || '');
+    let resolvedReportedRole = String(reportedUserRole || '');
+    let resolvedConversationId = String(conversationId || '');
+
+    if (messageId) {
+      const msg = await Message.findById(messageId).select('senderId senderRole content conversationId').lean();
+      if (msg) {
+        messageExcerpt = String(msg.content || '').slice(0, 500);
+        if (!resolvedReportedUserId) resolvedReportedUserId = String(msg.senderId || '');
+        if (!resolvedReportedRole) resolvedReportedRole = String(msg.senderRole || '');
+        if (!resolvedConversationId) resolvedConversationId = String(msg.conversationId || '');
+      }
+    }
+
+    if (!resolvedConversationId) {
+      resolvedConversationId = buildConversationId(reporterRole, reporterId, resolvedReportedRole || 'user', resolvedReportedUserId || 'unknown');
+    }
+
+    const report = await ChatReport.create({
+      reporterId,
+      reporterRole,
+      reportedUserId: resolvedReportedUserId,
+      reportedUserRole: resolvedReportedRole,
+      conversationId: resolvedConversationId,
+      messageId: messageId ? String(messageId) : null,
+      messageExcerpt,
+      reason: normalizedReason,
+      details: String(details || '').trim().slice(0, 1000),
+    });
+
+    const io = req.app?.get?.('io');
+    const NotificationService = require('../services/NotificationService');
+    await NotificationService.notifyAdmins(
+      io,
+      'Báo cáo nội dung tin nhắn',
+      `Người dùng ${req.user?.name || reporterId} đã báo cáo vi phạm (${normalizedReason}) trong hội thoại ${resolvedConversationId}.`,
+      { kind: 'chat_report', reportId: String(report._id), conversationId: resolvedConversationId },
+      '/admin',
+    ).catch((e) => logger.warn('[MESSAGES] notifyAdmins report error:', e.message));
+
+    const { writeAudit } = require('../services/auditLogService');
+    await writeAudit({
+      action: 'CHAT_UGC_REPORTED',
+      actorUserId: reporterId,
+      actorRole: reporterRole,
+      entityType: 'ChatReport',
+      entityId: String(report._id),
+      newValue: {
+        reportedUserId: resolvedReportedUserId,
+        conversationId: resolvedConversationId,
+        messageId: messageId ? String(messageId) : null,
+        reason: normalizedReason,
+      },
+      ip: req.ip || '',
+      userAgent: String(req.headers['user-agent'] || ''),
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: report,
+      message: 'Đã ghi nhận báo cáo vi phạm. Quản trị viên sẽ xem xét xử lý.',
+    });
+  } catch (err) {
+    logger.error('[MESSAGES] report error:', err);
+    return res.status(500).json({ success: false, message: 'Không thể gửi báo cáo lúc này.' });
+  }
+});
+
+// ── Danh sách người dùng đã chặn trong Chat ──
+router.get('/blocks', async (req, res) => {
+  try {
+    const blockerId = String(req.user?.id || req.user?._id || '');
+    const UserBlock = require('../models/UserBlock');
+    const docs = await UserBlock.find({ blockerId }).sort({ createdAt: -1 }).lean();
+    return res.json({
+      success: true,
+      data: docs,
+      blockedUserIds: docs.map((d) => String(d.blockedId)),
+    });
+  } catch (err) {
+    logger.error('[MESSAGES] get blocks error:', err);
+    return res.status(500).json({ success: false, message: 'Không thể tải danh sách chặn.' });
+  }
+});
+
+// ── Chặn người dùng trong Chat ──
+router.post('/block', async (req, res) => {
+  try {
+    const blockerId = String(req.user?.id || req.user?._id || '');
+    const blockerRole = getMessagingRole(req.user);
+    const blockedId = String(req.body?.blockedUserId || '').trim();
+    const blockedRole = String(req.body?.blockedUserRole || '').trim();
+    const reason = String(req.body?.reason || '').trim().slice(0, 300);
+
+    if (!blockedId || blockedId === blockerId) {
+      return res.status(400).json({ success: false, message: 'Người dùng cần chặn không hợp lệ.' });
+    }
+    if (blockedId === 'admin' || blockedId === 'ai_support') {
+      return res.status(403).json({ success: false, message: 'Không thể chặn tài khoản hỗ trợ hệ thống.' });
+    }
+
+    const UserBlock = require('../models/UserBlock');
+    const doc = await UserBlock.findOneAndUpdate(
+      { blockerId, blockedId },
+      { $set: { blockerRole, blockedRole, reason } },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
+    ).lean();
+
+    const { writeAudit } = require('../services/auditLogService');
+    await writeAudit({
+      action: 'CHAT_USER_BLOCKED',
+      actorUserId: blockerId,
+      actorRole: blockerRole,
+      entityType: 'UserBlock',
+      entityId: blockedId,
+      newValue: { blockedId, blockedRole, reason },
+      ip: req.ip || '',
+      userAgent: String(req.headers['user-agent'] || ''),
+    });
+
+    const io = req.app?.get?.('io');
+    if (io) {
+      io.to(blockerId).emit('chat:block-updated', { blockedId, blocked: true });
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: doc,
+      message: 'Đã chặn liên lạc với người dùng này.',
+    });
+  } catch (err) {
+    logger.error('[MESSAGES] block error:', err);
+    return res.status(500).json({ success: false, message: 'Không thể chặn người dùng lúc này.' });
+  }
+});
+
+// ── Bỏ chặn người dùng trong Chat ──
+router.delete('/block/:blockedUserId', async (req, res) => {
+  try {
+    const blockerId = String(req.user?.id || req.user?._id || '');
+    const blockedId = String(req.params.blockedUserId || '').trim();
+    if (!blockedId) {
+      return res.status(400).json({ success: false, message: 'Thiếu mã người dùng.' });
+    }
+    const UserBlock = require('../models/UserBlock');
+    await UserBlock.deleteOne({ blockerId, blockedId });
+
+    const io = req.app?.get?.('io');
+    if (io) {
+      io.to(blockerId).emit('chat:block-updated', { blockedId, blocked: false });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Đã bỏ chặn người dùng.',
+    });
+  } catch (err) {
+    logger.error('[MESSAGES] unblock error:', err);
+    return res.status(500).json({ success: false, message: 'Không thể bỏ chặn lúc này.' });
+  }
+});
+
 // ── Lấy tin nhắn của cuộc trò chuyện ──
 router.get('/:conversationId', messagesGuard('get_conversation'), async (req, res) => {
   try {

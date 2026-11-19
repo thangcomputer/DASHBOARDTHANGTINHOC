@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
+  ArrowUp,
   Award,
   BarChart3,
   Bell,
   BookOpen,
   Calendar,
+  Check,
   CornerDownLeft,
   DollarSign,
   FileText,
@@ -20,6 +22,8 @@ import {
   MessageSquare,
   Moon,
   Newspaper,
+  Plus,
+  RotateCcw,
   Search,
   Settings,
   Sparkles,
@@ -31,15 +35,24 @@ import {
   Volume2,
   VolumeX,
   X,
+  Zap,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { aiSupportAPI } from '../../services/api';
 import { useTheme } from '../../utils/theme';
 import { prefetchRouteByPath } from '../../utils/routePrefetch';
 import { OPEN_LEARNING_GOAL_EVENT } from '../../utils/learningGoal';
 import { PIN_SETTINGS_EVENT } from '../../utils/pinLock';
 import { isSoundMuted, toggleSoundMuted, SOUND_MUTE_CHANGED_EVENT } from '../../utils/sound';
 import { useFocusMode } from '../../utils/focusMode';
+import { isPracticeSessionActive, usePracticeSessionActive } from '../../utils/practiceSessionMode';
 import { readLastStudySession } from '../../utils/resumeLearning';
+import {
+  isLikelyQuestion,
+  matchLocalOfficeMemory,
+  normalizeQuickQuery,
+} from '../../../../shared/ai/quickSearchMemory.mjs';
 
 export const OPEN_COMMAND_PALETTE_EVENT = 'cms:open-command-palette';
 
@@ -88,28 +101,138 @@ const ROLE_COMMANDS = {
   ],
 };
 
-function normalizeVi(text) {
+const STARTER_PROMPTS = {
+  student: [
+    'Hàm VLOOKUP dùng thế nào?',
+    'Cách tạo mục lục tự động Word',
+    'Bộ phím tắt Excel hay dùng nhất',
+  ],
+  teacher: [
+    'Hướng dẫn tạo lịch dạy cho học viên',
+    'Hàm SUMIFS khác gì SUMIF?',
+    'Cách dùng Slide Master nhanh',
+  ],
+  admin: [
+    'Hàm VLOOKUP dùng thế nào?',
+    'PivotTable tạo như thế nào?',
+    'Chỉnh lề chuẩn Nghị định 30 Word',
+  ],
+};
+
+function DewSkillAiOrb({ size = 44 }) {
+  const idRef = useRef(`ds-orb-${Math.random().toString(36).slice(2, 8)}`);
+  const gradId = idRef.current;
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" className="shrink-0">
+      <defs>
+        <linearGradient id={gradId} x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#10B981" />
+          <stop offset="50%" stopColor="#06B6D4" />
+          <stop offset="100%" stopColor="#6366F1" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="24" stroke={`url(#${gradId})`} strokeWidth="8.5" strokeLinecap="round" strokeDasharray="116 14" />
+      <circle cx="32" cy="32" r="14" stroke="#34D399" strokeWidth="2.5" strokeOpacity="0.4" />
+    </svg>
+  );
+}
+
+function renderCodeOrPlain(text, keyPrefix = '') {
   return String(text || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .toLowerCase()
-    .trim();
+    .split(/(`[^`]+`)/g)
+    .map((seg, i) => {
+      if (seg.startsWith('`') && seg.endsWith('`') && seg.length > 2) {
+        return (
+          <code
+            key={`${keyPrefix}-c-${i}`}
+            className="rounded-md bg-emerald-50 dark:bg-emerald-950/70 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70"
+          >
+            {seg.slice(1, -1)}
+          </code>
+        );
+      }
+      return <span key={`${keyPrefix}-t-${i}`}>{seg}</span>;
+    });
+}
+
+function renderInlineMarkdown(text) {
+  const parts = String(text || '').split(/(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`)/g);
+  return parts.map((part, idx) => {
+    if (!part) return null;
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={idx} className="font-bold text-slate-900 dark:text-white">{renderCodeOrPlain(part.slice(2, -2), `b-${idx}`)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return <em key={idx} className="italic text-slate-600 dark:text-slate-300">{renderCodeOrPlain(part.slice(1, -1), `i-${idx}`)}</em>;
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return (
+        <code
+          key={idx}
+          className="rounded-md bg-emerald-50 dark:bg-emerald-950/70 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return <span key={idx}>{part}</span>;
+  });
+}
+
+function AiMarkdownMessage({ text }) {
+  const lines = String(text || '').split('\n');
+  return (
+    <div className="space-y-1.5 text-[13.5px] leading-relaxed text-slate-800 dark:text-slate-100">
+      {lines.map((rawLine, idx) => {
+        const trimmed = rawLine.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+        const bulletMatch = /^[-•*]\s+(.+)$/.exec(trimmed);
+        if (bulletMatch) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+              <div className="min-w-0 flex-1">{renderInlineMarkdown(bulletMatch[1])}</div>
+            </div>
+          );
+        }
+        const numberedMatch = /^(\d+)\.\s+(.+)$/.exec(trimmed);
+        if (numberedMatch) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-0.5">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                {numberedMatch[1]}
+              </span>
+              <div className="min-w-0 flex-1">{renderInlineMarkdown(numberedMatch[2])}</div>
+            </div>
+          );
+        }
+        return <p key={idx}>{renderInlineMarkdown(trimmed)}</p>;
+      })}
+    </div>
+  );
 }
 
 export default function CommandPalette({ role = 'student' }) {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const dataCtx = useData?.() || {};
   const { students = [], teachers = [], studentTrainingData = [] } = dataCtx;
   const { isDark, toggle } = useTheme();
   const { focusMode, toggle: toggleFocus } = useFocusMode();
+  const practiceSessionActive = usePracticeSessionActive();
   const [soundMuted, setSoundMutedState] = useState(isSoundMuted);
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [messages, setMessages] = useState([]);
+  const [asking, setAsking] = useState(false);
   const inputRef = useRef(null);
+  const chatScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (practiceSessionActive) setOpen(false);
+  }, [practiceSessionActive]);
 
   useEffect(() => {
     const syncSound = () => setSoundMutedState(isSoundMuted());
@@ -121,11 +244,15 @@ export default function CommandPalette({ role = 'student' }) {
   useEffect(() => {
     const onKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && String(e.key || '').toLowerCase() === 'k') {
+        if (isPracticeSessionActive()) return;
         e.preventDefault();
         setOpen((prev) => !prev);
       }
     };
-    const onOpenEvent = () => setOpen(true);
+    const onOpenEvent = () => {
+      if (isPracticeSessionActive()) return;
+      setOpen(true);
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenEvent);
     return () => {
@@ -138,29 +265,39 @@ export default function CommandPalette({ role = 'student' }) {
     if (!open) {
       setQuery('');
       setActiveIndex(0);
+      setMessages([]);
+      setAsking(false);
       return;
     }
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 20);
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 30);
     return () => window.clearTimeout(timer);
   }, [open]);
 
+  useEffect(() => {
+    if (messages.length && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages.length, asking]);
+
   const roleKey = role === 'staff' ? 'admin' : (ROLE_COMMANDS[role] ? role : 'student');
 
+  const navigatePath = useCallback((rawPath) => {
+    const [pathname, hash] = String(rawPath || '').split('#');
+    prefetchRouteByPath(pathname);
+    if (hash) {
+      navigate({ pathname, hash });
+      window.location.hash = hash;
+    } else {
+      navigate(pathname);
+    }
+  }, [navigate]);
+
   const items = useMemo(() => {
-    const q = normalizeVi(query);
+    const q = normalizeQuickQuery(query);
     const navItems = (ROLE_COMMANDS[roleKey] || []).map((cmd) => ({
       ...cmd,
       group: 'Điều hướng nhanh',
-      run: () => {
-        const [pathname, hash] = cmd.path.split('#');
-        prefetchRouteByPath(pathname);
-        if (hash) {
-          navigate({ pathname, hash });
-          window.location.hash = hash;
-        } else {
-          navigate(pathname);
-        }
-      },
+      run: () => navigatePath(cmd.path),
     }));
 
     const lastStudy = open && role === 'student' ? readLastStudySession() : null;
@@ -172,15 +309,7 @@ export default function CommandPalette({ role = 'student' }) {
         hint: lastStudy.courseTitle || lastStudy.subjectName || 'Quay lại đúng vị trí đang học',
         icon: Video,
         keywords: 'hoc tiep resume tiep tuc bai hoc video',
-        run: () => {
-          const [pathname, hash] = String(lastStudy.href || '').split('#');
-          if (hash) {
-            navigate({ pathname: pathname || '/student', hash });
-            window.location.hash = hash;
-          } else {
-            navigate(lastStudy.href);
-          }
-        },
+        run: () => navigatePath(lastStudy.href),
       }] : []),
       {
         id: 'act-theme',
@@ -237,7 +366,7 @@ export default function CommandPalette({ role = 'student' }) {
       if (role === 'admin' || role === 'staff' || role === 'teacher') {
         const matchedStudents = (Array.isArray(students) ? students : [])
           .filter((s) => {
-            const hay = normalizeVi(`${s?.name || ''} ${s?.phone || ''} ${s?.course || ''} ${s?.sbd || ''}`);
+            const hay = normalizeQuickQuery(`${s?.name || ''} ${s?.phone || ''} ${s?.course || ''} ${s?.sbd || ''}`);
             return hay.includes(q);
           })
           .slice(0, 5);
@@ -251,8 +380,7 @@ export default function CommandPalette({ role = 'student' }) {
             icon: GraduationCap,
             run: () => {
               if (role === 'teacher') {
-                navigate({ pathname: '/teacher', hash: 'students' });
-                window.location.hash = 'students';
+                navigatePath('/teacher#students');
               } else {
                 window.dispatchEvent(new CustomEvent('open-student-detail', {
                   detail: { id: sid, tab: 'summary' },
@@ -265,7 +393,7 @@ export default function CommandPalette({ role = 'student' }) {
 
       if (role === 'admin' || role === 'staff') {
         const matchedTeachers = (Array.isArray(teachers) ? teachers : [])
-          .filter((t) => normalizeVi(`${t?.name || ''} ${t?.phone || ''} ${t?.email || ''}`).includes(q))
+          .filter((t) => normalizeQuickQuery(`${t?.name || ''} ${t?.phone || ''} ${t?.email || ''}`).includes(q))
           .slice(0, 4);
         matchedTeachers.forEach((t) => {
           dataMatches.push({
@@ -274,16 +402,13 @@ export default function CommandPalette({ role = 'student' }) {
             label: t.name || t.email || 'Giảng viên',
             hint: [t.phone, t.email].filter(Boolean).join(' · ') || 'Mở danh sách giảng viên',
             icon: Users,
-            run: () => {
-              navigate({ pathname: '/admin', hash: 'teachers' });
-              window.location.hash = 'teachers';
-            },
+            run: () => navigatePath('/admin#teachers'),
           });
         });
       }
 
       const matchedCourses = (Array.isArray(studentTrainingData) ? studentTrainingData : [])
-        .filter((c) => normalizeVi(`${c?.title || ''} ${c?.category || ''}`).includes(q))
+        .filter((c) => normalizeQuickQuery(`${c?.title || ''} ${c?.category || ''}`).includes(q))
         .slice(0, 4);
       matchedCourses.forEach((c) => {
         dataMatches.push({
@@ -294,12 +419,11 @@ export default function CommandPalette({ role = 'student' }) {
           icon: BookOpen,
           run: () => {
             if (role === 'admin' || role === 'staff') {
-              navigate({ pathname: '/admin', hash: 'student-training' });
-              window.location.hash = 'student-training';
+              navigatePath('/admin#student-training');
             } else if (role === 'teacher') {
-              navigate('/teacher/finance');
+              navigatePath('/teacher/finance');
             } else {
-              navigate('/student/lesson-practice');
+              navigatePath('/student/lesson-practice');
             }
           },
         });
@@ -308,17 +432,82 @@ export default function CommandPalette({ role = 'student' }) {
 
     const baseList = [...quickActions, ...navItems].filter((item) => {
       if (!q) return true;
-      return normalizeVi(`${item.label} ${item.hint} ${item.keywords || ''}`).includes(q);
+      return normalizeQuickQuery(`${item.label} ${item.hint} ${item.keywords || ''}`).includes(q);
     });
 
-    return [...dataMatches, ...baseList].slice(0, 14);
-  }, [open, query, role, roleKey, students, teachers, studentTrainingData, isDark, toggle, soundMuted, focusMode, toggleFocus, navigate]);
+    return [...dataMatches, ...baseList].slice(0, 12);
+  }, [open, query, role, roleKey, students, teachers, studentTrainingData, isDark, toggle, soundMuted, focusMode, toggleFocus, navigatePath]);
 
   useEffect(() => {
     setActiveIndex(0);
   }, [items.length, query]);
 
+  const askAiQuestion = useCallback(async (rawText) => {
+    const question = String(rawText || '').trim();
+    if (!question || asking) return;
+
+    const userMsg = { id: `u_${Date.now()}`, role: 'user', text: question };
+    const nextHistory = [...messages, userMsg];
+    setMessages(nextHistory);
+    setQuery('');
+    setAsking(true);
+
+    // Local office memory first when instant hit is available & not an explicit follow-up conversation
+    try {
+      const res = await aiSupportAPI.quickAsk({
+        question,
+        history: messages.slice(-8).map((m) => ({ role: m.role, text: m.text })),
+        preferredLang: language,
+      });
+      const payload = res?.data || res;
+      const answerText = String(payload?.answer || '').trim();
+      if (answerText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `a_${Date.now()}`,
+            role: 'assistant',
+            text: answerText,
+            source: payload?.source || 'ai',
+            actions: Array.isArray(payload?.actions) ? payload.actions : [],
+          },
+        ]);
+        return;
+      }
+    } catch {
+      // Fallback to offline local office memory below
+    } finally {
+      setAsking(false);
+    }
+
+    const localFallback = matchLocalOfficeMemory(question, language);
+    setMessages((prev) => [
+      ...prev,
+      localFallback
+        ? {
+          id: `a_${Date.now()}`,
+          role: 'assistant',
+          text: localFallback.answer,
+          source: 'memory',
+          actions: localFallback.actions || [],
+        }
+        : {
+          id: `a_${Date.now()}`,
+          role: 'assistant',
+          text: language === 'en'
+            ? 'Unable to connect to DewSkill AI right now. Please try again shortly.'
+            : 'Chưa kết nối được DewSkill AI lúc này. Bạn vui lòng thử lại sau ít giây nhé.',
+          source: 'fallback',
+          actions: [],
+        },
+    ]);
+  }, [asking, language, messages]);
+
   if (!open || typeof document === 'undefined') return null;
+
+  const isChatMode = messages.length > 0 || asking;
+  const trimmedQuery = query.trim();
+  const starterPrompts = STARTER_PROMPTS[roleKey] || STARTER_PROMPTS.student;
 
   const executeItem = (item) => {
     if (!item) return;
@@ -326,119 +515,331 @@ export default function CommandPalette({ role = 'student' }) {
     item.run?.();
   };
 
+  const resetToSearch = () => {
+    setMessages([]);
+    setQuery('');
+    setAsking(false);
+    window.setTimeout(() => inputRef.current?.focus(), 20);
+  };
+
   const handleInputKeyDown = (e) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       setOpen(false);
-    } else if (e.key === 'ArrowDown') {
+      return;
+    }
+    if (!isChatMode && trimmedQuery) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex((prev) => (items.length ? (prev + 1) % items.length : 0));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex((prev) => (items.length ? (prev - 1 + items.length) % items.length : 0));
+        return;
+      }
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      setActiveIndex((prev) => (items.length ? (prev + 1) % items.length : 0));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveIndex((prev) => (items.length ? (prev - 1 + items.length) % items.length : 0));
-    } else if (e.key === 'Enter' && items[activeIndex]) {
-      e.preventDefault();
-      executeItem(items[activeIndex]);
+      if (!trimmedQuery) return;
+      if (isChatMode || items.length === 0 || isLikelyQuestion(trimmedQuery)) {
+        void askAiQuestion(trimmedQuery);
+      } else if (items[activeIndex]) {
+        executeItem(items[activeIndex]);
+      } else {
+        void askAiQuestion(trimmedQuery);
+      }
     }
   };
 
+  const renderComposerPill = (placeholderText) => (
+    <div className="rounded-[24px] border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:focus-within:ring-emerald-950/60 transition">
+      <div className="flex items-center gap-2.5">
+        <Search size={17} className="shrink-0 text-slate-400" aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleInputKeyDown}
+          placeholder={placeholderText}
+          className="w-full min-w-0 bg-transparent text-[14px] font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none"
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            if (isChatMode) {
+              resetToSearch();
+            } else {
+              setQuery('');
+              inputRef.current?.focus();
+            }
+          }}
+          title={isChatMode ? 'Tìm nhanh / Cuộc trò chuyện mới' : 'Xóa & xem tất cả tác vụ'}
+          aria-label={isChatMode ? 'Tìm nhanh / Cuộc trò chuyện mới' : 'Xóa & xem tất cả tác vụ'}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+        >
+          <Plus size={15} />
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-[11px] font-medium text-slate-400">
+            Ctrl / ⌘ + K
+          </span>
+          <button
+            type="button"
+            disabled={!trimmedQuery || asking}
+            onClick={() => void askAiQuestion(trimmedQuery)}
+            aria-label="Gửi câu hỏi cho AI"
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+              trimmedQuery && !asking
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer'
+                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-400 cursor-not-allowed'
+            }`}
+          >
+            <ArrowUp size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-start justify-center bg-slate-900/50 px-3 pt-[10vh] backdrop-blur-xs"
+      className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-900/50 px-3 py-4 backdrop-blur-xs"
       onClick={() => setOpen(false)}
       role="presentation"
     >
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Tìm kiếm và lệnh nhanh"
+        aria-label="DewSkill AI và tìm kiếm nhanh"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-[var(--cms-surface)] shadow-2xl"
+        className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-[var(--cms-surface,#ffffff)] shadow-2xl max-h-[84vh]"
       >
-        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-          <Search size={18} className="shrink-0 text-emerald-600" aria-hidden="true" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder="Tìm trang, học viên, khóa học hoặc lệnh nhanh…"
-            className="w-full min-w-0 bg-transparent text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="Đóng bảng lệnh"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 cursor-pointer"
-          >
-            <X size={15} />
-          </button>
-        </div>
-
-        <div className="max-h-[58vh] overflow-y-auto p-2">
-          {items.length === 0 ? (
-            <div className="py-10 text-center text-sm font-medium text-slate-400">
-              Không tìm thấy kết quả phù hợp cho “{query}”
+        {isChatMode ? (
+          <>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <DewSkillAiOrb size={28} />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[15px] font-extrabold text-slate-900 dark:text-white">DewSkill AI</span>
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white" aria-hidden="true">
+                    <Check size={10} strokeWidth={3} />
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={resetToSearch}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+                >
+                  <RotateCcw size={12} />
+                  <span>Tìm nhanh</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Đóng bảng lệnh"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 transition cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
-          ) : (
-            <ul role="listbox" className="space-y-0.5">
-              {items.map((item, idx) => {
-                const Icon = item.icon || Search;
-                const active = idx === activeIndex;
-                const showGroupHeader = idx === 0 || items[idx - 1].group !== item.group;
-                return (
-                  <li key={item.id}>
-                    {showGroupHeader ? (
-                      <div className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        {item.group}
+
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {messages.map((msg) => (
+                msg.role === 'user' ? (
+                  <div key={msg.id} className="flex justify-end">
+                    <div className="max-w-[82%] rounded-[20px] bg-emerald-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-xs">
+                      {msg.text}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={msg.id} className="flex justify-start">
+                    <div className="max-w-[90%] rounded-[20px] bg-slate-100/90 dark:bg-slate-800/90 px-4 py-3.5">
+                      <div className="mb-1.5 flex items-center gap-1.5">
+                        {msg.source === 'memory' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-300">
+                            <Zap size={10} />
+                            <span>Bộ nhớ nhanh</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 dark:bg-sky-950/80 px-2 py-0.5 text-[10.5px] font-bold text-sky-700 dark:text-sky-300">
+                            <Sparkles size={10} />
+                            <span>DewSkill AI</span>
+                          </span>
+                        )}
                       </div>
-                    ) : null}
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      onClick={() => executeItem(item)}
-                      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition cursor-pointer ${active
-                          ? 'bg-emerald-50 text-emerald-900'
-                          : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-100 text-slate-500'
-                            }`}
-                        >
-                          <Icon size={16} aria-hidden="true" />
+                      <AiMarkdownMessage text={msg.text} />
+                      {Array.isArray(msg.actions) && msg.actions.length > 0 ? (
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {msg.actions.map((act) => (
+                            <button
+                              key={`${act.path}-${act.label}`}
+                              type="button"
+                              onClick={() => {
+                                setOpen(false);
+                                navigatePath(act.path);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition cursor-pointer"
+                            >
+                              <span>{act.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              ))}
+
+              {asking ? (
+                <div className="flex justify-start">
+                  <div className="inline-flex items-center gap-2 rounded-[20px] bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <Sparkles size={14} className="animate-pulse text-emerald-600" />
+                    <span>DewSkill AI đang suy nghĩ…</span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/50 dark:bg-slate-950/40">
+              {renderComposerPill('Hỏi tiếp DewSkill AI bất kỳ điều gì…')}
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Đóng bảng lệnh"
+              className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 transition cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="overflow-y-auto px-5 pb-5 pt-7">
+              <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+                <DewSkillAiOrb size={50} />
+                <h2 className="mt-3 text-[22px] sm:text-[25px] font-extrabold tracking-tight text-slate-900 dark:text-white leading-snug">
+                  DewSkill AI, trợ lý cá nhân
+                </h2>
+                <p className="text-[19px] sm:text-[22px] font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-indigo-500 bg-clip-text text-transparent leading-snug">
+                  tìm nhanh &amp; giải đáp mọi chủ đề
+                </p>
+              </div>
+
+              <div className="mx-auto mt-5 max-w-xl">
+                {renderComposerPill('Hỏi DewSkill AI hoặc tìm nhanh bất kỳ điều gì…')}
+              </div>
+
+              {!trimmedQuery ? (
+                <div className="mx-auto mt-4 max-w-xl">
+                  <div className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Gợi ý hỏi AI
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {starterPrompts.map((promptText) => (
+                      <button
+                        key={promptText}
+                        type="button"
+                        onClick={() => void askAiQuestion(promptText)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
+                      >
+                        <Sparkles size={12} className="shrink-0" />
+                        <span>{promptText}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mx-auto mt-4 max-w-xl">
+                {trimmedQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => void askAiQuestion(trimmedQuery)}
+                    className="mb-2 flex w-full items-center justify-between gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-950/50 px-3.5 py-2.5 text-left transition hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60 cursor-pointer"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                        <Sparkles size={15} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                          {`Hỏi DewSkill AI: “${trimmedQuery}”`}
                         </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-bold leading-tight">{item.label}</span>
-                          {item.hint ? (
-                            <span className="mt-0.5 block truncate text-xs text-slate-500">{item.hint}</span>
-                          ) : null}
+                        <span className="block truncate text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                          Tìm trong bộ nhớ nhanh trước, nếu chưa có AI sẽ trả lời
                         </span>
                       </span>
-                      {active ? (
-                        <CornerDownLeft size={14} className="shrink-0 text-emerald-600" aria-hidden="true" />
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+                    </span>
+                    <CornerDownLeft size={14} className="shrink-0 text-emerald-600" />
+                  </button>
+                ) : null}
 
-        <div className="hidden sm:flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] font-medium text-slate-400">
-          <span>↑↓ di chuyển · Enter để chọn · Esc để đóng</span>
-          <span className="tabular-nums">Ctrl / ⌘ + K</span>
-        </div>
+                {items.length > 0 ? (
+                  <ul role="listbox" className="space-y-0.5">
+                    {items.map((item, idx) => {
+                      const Icon = item.icon || Search;
+                      const active = idx === activeIndex;
+                      const showGroupHeader = idx === 0 || items[idx - 1].group !== item.group;
+                      return (
+                        <li key={item.id}>
+                          {showGroupHeader ? (
+                            <div className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                              {item.group}
+                            </div>
+                          ) : null}
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={active}
+                            onMouseEnter={() => setActiveIndex(idx)}
+                            onClick={() => executeItem(item)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition cursor-pointer ${
+                              active
+                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-100'
+                                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              <span
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                                  active
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300'
+                                }`}
+                              >
+                                <Icon size={15} aria-hidden="true" />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-bold leading-tight">{item.label}</span>
+                                {item.hint ? (
+                                  <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">{item.hint}</span>
+                                ) : null}
+                              </span>
+                            </span>
+                            {active ? (
+                              <CornerDownLeft size={14} className="shrink-0 text-emerald-600" aria-hidden="true" />
+                            ) : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>,
     document.body,
   );
 }
-

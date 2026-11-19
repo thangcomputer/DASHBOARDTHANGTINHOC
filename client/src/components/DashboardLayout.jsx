@@ -20,12 +20,13 @@ import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/useToast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import {
-  Bell, MessageCircle, CheckCircle2, Clock, X, Lock,
+  Bell, MessageCircle, CheckCircle2, Clock, X, Lock, Eye, EyeOff, ShieldCheck, LogOut,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
-  Search, Sun, Moon, Minimize2,
+  Sparkles, Sun, Moon, Minimize2,
 } from 'lucide-react';
 import { useTheme } from '../utils/theme';
 import { useFocusMode } from '../utils/focusMode';
+import { usePracticeSessionActive, setPracticeSessionActive } from '../utils/practiceSessionMode';
 import { isStudyLocation } from '../utils/learningGoal';
 
 const OPEN_COMMAND_PALETTE_EVENT = 'cms:open-command-palette';
@@ -283,6 +284,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const toast = useToast();
   const { isDark, toggle: toggleTheme } = useTheme();
   const { focusMode, setFocusMode } = useFocusMode();
+  const practiceSessionActive = usePracticeSessionActive();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileFooterHiddenRouteKey, setMobileFooterHiddenRouteKey] = useState(null);
   const [mobileFooterInputFocused, setMobileFooterInputFocused] = useState(false);
@@ -314,6 +316,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   }, [focusMode, role, location.pathname, location.hash, setFocusMode]);
   useEffect(() => () => setFocusMode(false), [setFocusMode]);
+  useEffect(() => {
+    if (practiceSessionActive && !isStudyLocation(location.pathname, location.hash)) {
+      setPracticeSessionActive(false);
+    }
+  }, [practiceSessionActive, location.pathname, location.hash]);
+  useEffect(() => () => setPracticeSessionActive(false), []);
+  useEffect(() => {
+    if (practiceSessionActive) {
+      setMobileNavOpen(false);
+    }
+  }, [practiceSessionActive]);
   const scrollPositions = useRef(new WeakMap());
   const focusRestoreTimer = useRef(null);
   const [ratingDetail, setRatingDetail] = useState(null);
@@ -516,21 +529,22 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       return {};
     }
   }, [role]);
-  const [firstLoginPwDone, setFirstLoginPwDone] = useState(() => {
+  const [mustResetPwDone, setMustResetPwDone] = useState(() => {
     try {
       const uid = session?.id || session?._id || '';
-      if (uid && sessionStorage.getItem(`cms_first_login_pw_done_${uid}`) === '1') return true;
+      if (uid && sessionStorage.getItem(`cms_first_login_pw_done_${uid}`) === '1' && session?.mustChangePassword !== true) return true;
       const stored = JSON.parse(localStorage.getItem(`${role === 'staff' ? 'staff' : role}_user`) || '{}');
-      if (stored?.isFirstLogin === false) return true;
+      if (stored?.mustChangePassword === false) return true;
     } catch { /* ignore */ }
-    return session?.isFirstLogin !== true;
+    return session?.mustChangePassword !== true;
   });
   useEffect(() => {
     const stored = readStoredSessionFlags();
     const uid = session?.id || session?._id;
-    // Đồng bộ App session nếu localStorage đã ghi nhận xong first-login / welcome
+    // Đồng bộ App session nếu localStorage đã ghi nhận xong welcome / reset password
     if (uid && (
       (session?.isFirstLogin === true && stored.isFirstLogin === false)
+      || (session?.mustChangePassword === true && stored.mustChangePassword === false)
       || (session?.showWelcomeCelebration === true && stored.showWelcomeCelebration === false)
     )) {
       window.dispatchEvent(new CustomEvent('cms:session-patched', {
@@ -538,28 +552,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           id: uid,
           _id: uid,
           ...(stored.isFirstLogin === false ? { isFirstLogin: false } : {}),
+          ...(stored.mustChangePassword === false ? { mustChangePassword: false } : {}),
           ...(stored.showWelcomeCelebration === false ? { showWelcomeCelebration: false } : {}),
         },
       }));
     }
-    let done = session?.isFirstLogin !== true || stored.isFirstLogin === false;
-    if (!done && firstLoginDoneKey) {
-      try {
-        if (sessionStorage.getItem(firstLoginDoneKey) === '1') done = true;
-      } catch { /* ignore */ }
-    }
-    setFirstLoginPwDone(done);
+    const done = session?.mustChangePassword !== true || stored.mustChangePassword === false;
+    setMustResetPwDone(done);
   }, [
     session?.isFirstLogin,
+    session?.mustChangePassword,
     session?.showWelcomeCelebration,
     session?.id,
     session?._id,
-    firstLoginDoneKey,
     readStoredSessionFlags,
   ]);
   useEffect(() => {
     const onDone = () => {
-      setFirstLoginPwDone(true);
+      setMustResetPwDone(true);
       if (firstLoginDoneKey) {
         try { sessionStorage.setItem(firstLoginDoneKey, '1'); } catch { /* ignore */ }
       }
@@ -568,14 +578,15 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     return () => window.removeEventListener('cms:first-login-password-done', onDone);
   }, [firstLoginDoneKey]);
   useEffect(() => {
-    const needFirstPw = session?.isFirstLogin === true && role !== 'teacher' && !firstLoginPwDone;
-    setLoginOverlay('change-password-pending', needFirstPw);
-    if (!needFirstPw) return undefined;
+    const stored = readStoredSessionFlags();
+    const mustResetPw = session?.mustChangePassword === true && stored.mustChangePassword !== false && !mustResetPwDone;
+    setLoginOverlay('change-password-pending', mustResetPw);
+    if (!mustResetPw) return undefined;
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
-    }, 500);
+    }, 120);
     return () => clearTimeout(timer);
-  }, [session?.isFirstLogin, role, firstLoginPwDone]);
+  }, [session?.mustChangePassword, mustResetPwDone, readStoredSessionFlags]);
 
   const [showWelcomeCelebration, setShowWelcomeCelebration] = useState(false);
   const [showPlacementPrompt, setShowPlacementPrompt] = useState(false);
@@ -780,13 +791,32 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     };
     const onPortalLocked = (payload) => {
       if (payload?.studentId && myId && String(payload.studentId) !== String(myId)) return;
-      window.dispatchEvent(new CustomEvent('free-portal-locked'));
+      window.dispatchEvent(new CustomEvent('free-portal-locked', { detail: payload }));
+      window.dispatchEvent(new CustomEvent('cms:subscription-updated', { detail: { ...(payload || {}), freeUnlocked: false } }));
+    };
+    const onPortalUnlocked = (payload) => {
+      if (payload?.studentId && myId && String(payload.studentId) !== String(myId)) return;
+      window.dispatchEvent(new CustomEvent('free-portal-unlocked', { detail: payload }));
+      window.dispatchEvent(new CustomEvent('cms:subscription-updated', { detail: { ...(payload || {}), freeUnlocked: true } }));
+    };
+    const onSubscriptionUpdated = (payload) => {
+      if (payload?.studentId && myId && String(payload.studentId) !== String(myId)) return;
+      if (payload?.freeUnlocked === true) {
+        window.dispatchEvent(new CustomEvent('free-portal-unlocked', { detail: payload }));
+      } else if (payload?.freeUnlocked === false) {
+        window.dispatchEvent(new CustomEvent('free-portal-locked', { detail: payload }));
+      }
+      window.dispatchEvent(new CustomEvent('cms:subscription-updated', { detail: payload }));
     };
     socket.on('course:celebration', onCourseCelebration);
     socket.on('free-portal-locked', onPortalLocked);
+    socket.on('free-portal-unlocked', onPortalUnlocked);
+    socket.on('subscription:updated', onSubscriptionUpdated);
     return () => {
       socket.off('course:celebration', onCourseCelebration);
       socket.off('free-portal-locked', onPortalLocked);
+      socket.off('free-portal-unlocked', onPortalUnlocked);
+      socket.off('subscription:updated', onSubscriptionUpdated);
     };
   }, [socket, role, myId, queueCourseCelebration]);
 
@@ -944,13 +974,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         const res = await api.schedules.getPendingConfirm();
         if (cancelled || requestRevision !== attendanceConfirmRevisionRef.current) return;
         const list = Array.isArray(res?.data) ? res.data : [];
-        // Chỉ auto-mở khi còn bắt buộc xác nhận (pending). Disputed → không chặn.
+        // Chỉ auto-mở khi còn bắt buộc xác nhận (pending / confirm_expired chưa quá hạn). Disputed → không chặn.
         const firstPending = list.find((p) => (
-          String(p?.studentConfirmStatus || '').toLowerCase() === 'pending'
+          ['pending', 'confirm_expired'].includes(String(p?.studentConfirmStatus || '').toLowerCase())
           && !isStudentConfirmExpired(p)
         ));
         if (firstPending?.scheduleId) {
-          setAttendanceConfirm({ ...firstPending, resolved: false, waiting: false });
+          setAttendanceConfirm({
+            ...firstPending,
+            studentConfirmStatus: 'pending',
+            resolved: false,
+            waiting: false,
+          });
         }
       } catch { /* ignore */ }
     };
@@ -1174,14 +1209,50 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       const list = Array.isArray(res?.data) ? res.data : [];
       const live = list.find((p) => String(p?.scheduleId) === String(scheduleId));
       const st = String(live?.studentConfirmStatus || '').toLowerCase();
-      if (live && st === 'pending') {
-        setAttendanceConfirm({ ...live, resolved: false, waiting: false });
+      if (live && (st === 'pending' || st === 'confirm_expired')) {
+        setAttendanceConfirm({ ...live, studentConfirmStatus: 'pending', resolved: false, waiting: false });
         return;
       }
       if (live && st === 'disputed') {
         setAttendanceConfirm({ ...live, resolved: false, waiting: true });
         return;
       }
+      let sch = (schedules || []).find((s) => String(s._id || s.id) === String(scheduleId)) || null;
+      if (!sch) {
+        try {
+          const one = await api.schedules.getById(scheduleId);
+          if (one?.success && one?.data) sch = one.data;
+        } catch { /* ignore */ }
+      }
+      const schStatus = String(sch?.status || '').toLowerCase();
+      const schConfirm = String(sch?.studentConfirmStatus || '').toLowerCase();
+      if (sch && schStatus === 'scheduled' && (schConfirm === 'pending' || schConfirm === 'confirm_expired')) {
+        const extra = formatScheduleForConfirmModal(sch);
+        setAttendanceConfirm({
+          ...base,
+          ...extra,
+          scheduleId,
+          teacherName: base.teacherName || extra.teacherName || sch.teacherName || 'Giảng viên',
+          course: base.course || sch.course || extra.course,
+          studentConfirmStatus: 'pending',
+          resolved: false,
+          waiting: false,
+        });
+        return;
+      }
+      if (sch && schStatus === 'scheduled' && schConfirm === 'disputed') {
+        const extra = formatScheduleForConfirmModal(sch);
+        setAttendanceConfirm({
+          ...base,
+          ...extra,
+          scheduleId,
+          studentConfirmStatus: 'disputed',
+          resolved: false,
+          waiting: true,
+        });
+        return;
+      }
+      const rejected = schConfirm === 'admin_rejected' || schStatus === 'cancelled' || schStatus === 'no_show';
       setAttendanceConfirm({
         ...base,
         ...(live || {}),
@@ -1195,13 +1266,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           || live?.totalSessions,
         resolved: true,
         waiting: false,
-        studentConfirmStatus: base.studentConfirmStatus || 'accepted',
-        kind: base.kind || 'attendance_taken',
+        resolveOutcome: rejected ? 'rejected' : 'approved',
+        studentConfirmStatus: rejected ? 'admin_rejected' : (base.studentConfirmStatus || sch?.studentConfirmStatus || 'accepted'),
+        kind: rejected ? 'attendance_rejected' : (base.kind || 'attendance_taken'),
       });
     } catch {
       setAttendanceConfirm({ ...base, scheduleId, resolved: false, waiting: false });
     }
-  }, [myId, session]);
+  }, [myId, schedules, session]);
 
   const dismissStudentAttendanceConfirm = React.useCallback(() => {
     attendanceConfirmRevisionRef.current += 1;
@@ -1210,9 +1282,13 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   React.useEffect(() => {
     const onOpenAttendanceConfirm = (event) => {
-      const scheduleId = event?.detail?.scheduleId;
+      const detail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
+      const scheduleId = detail.scheduleId;
       if (role !== 'student' || !scheduleId) return;
-      void openStudentAttendanceFromNotif({ scheduleId });
+      const kind = String(detail.kind || '');
+      const forceResolved = ['attendance_admin_approved', 'attendance_confirmed', 'attendance_taken'].includes(kind);
+      const forceRejected = kind === 'attendance_rejected';
+      void openStudentAttendanceFromNotif(detail, { forceResolved, forceRejected });
     };
     window.addEventListener('cms:open-student-attendance-confirm', onOpenAttendanceConfirm);
     return () => window.removeEventListener('cms:open-student-attendance-confirm', onOpenAttendanceConfirm);
@@ -1430,6 +1506,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   };
 
   const [showNotif, setShowNotif] = React.useState(false);
+  useEffect(() => {
+    if (practiceSessionActive) {
+      setShowNotif(false);
+    }
+  }, [practiceSessionActive]);
   const [notifLimit, setNotifLimit] = React.useState(5);
   const [notifPos, setNotifPos] = React.useState({ top: 72, right: 16 });
   const [assignedTeacherModal, setAssignedTeacherModal] = React.useState({
@@ -1843,10 +1924,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   const showMobileFooter = mobileFooterVisible
     && !mobileFooterInputFocused
-    && !isLessonPracticeCoursePage;
+    && !isLessonPracticeCoursePage
+    && !practiceSessionActive;
   const mobileScrollChromeHidden = mobileFooterHiddenRouteKey === mobileFooterRouteKey
     && !mobileFooterInputFocused
-    && !isLessonPracticeCoursePage;
+    && !isLessonPracticeCoursePage
+    && !practiceSessionActive;
 
   return (
     <FloatingMessengerProvider
@@ -1874,12 +1957,13 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           onMobileOpenChange={setMobileNavOpen}
           mobileNavVisible={!isImmersivePage || isInboxPage}
           mobileFooterVisible={showMobileFooter}
+          hidden={practiceSessionActive}
           onBrandLogoChange={setBrandLogo}
         />
 
         <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
           <header className={`cms-topbar flex flex-col ${!isImmersivePage ? 'cms-shell-gutter' : ''
-            } ${role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
+            } ${(role === 'teacher' && location.pathname === '/teacher/test') || practiceSessionActive ? 'hidden' : ''
             } ${mobileScrollChromeHidden ? 'cms-topbar--scroll-away' : ''
             }`}>
             <div className="cms-topbar__row">
@@ -1936,15 +2020,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
-                  className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white transition text-xs font-medium shrink-0"
-                  title="Tìm kiếm nhanh (Ctrl+K)"
-                  aria-label="Tìm kiếm nhanh (Ctrl+K)"
+                  className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3 rounded-xl border-[1.5px] border-emerald-300 border-b-[3px] border-b-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:translate-y-[1px] active:border-b-[1.5px] dark:bg-emerald-950/60 dark:border-emerald-700 dark:border-b-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition text-xs font-black tracking-tight shrink-0 cursor-pointer"
+                  title="DewSkill AI & Tìm nhanh (Ctrl+K)"
+                  aria-label="DewSkill AI & Tìm nhanh"
                 >
-                  <Search size={14} className="shrink-0" />
-                  <span className="hidden lg:inline">Tìm nhanh</span>
-                  <kbd className="hidden xl:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-700/80 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600">
-                    Ctrl K
-                  </kbd>
+                  <Sparkles size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                  <span>AI</span>
                 </button>
 
                 <button
@@ -2043,7 +2124,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               || (canManageAttendanceAdminPopups && !!attendanceDispute)
               || (role === 'teacher' && !!teacherAttendanceConfirm)
               || (role === 'teacher' && !!studentNotePopup)
-              || (session?.isFirstLogin === true && role !== 'teacher')
+              || (session?.mustChangePassword === true)
             }
           />
         </IdleMount>
@@ -2606,7 +2687,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           document.body
         )}
 
-        <ChangePasswordModal session={session} role={role} />
+        <ChangePasswordModal session={session} role={role} onLogout={handleLogout} />
         {pinUserKey ? (
           <>
             <PinLockSettingsModal userKey={pinUserKey} />
@@ -2732,7 +2813,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
         {/* Chat nổi toàn site + Command Palette (Ctrl+K) tải nền sau initial paint */}
         <IdleMount>
-          <FloatingMessenger session={session} role={role} />
+          <FloatingMessenger session={session} role={role} hidden={practiceSessionActive} />
           <CommandPalette role={role} />
         </IdleMount>
         {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
@@ -2794,14 +2875,19 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   );
 };
 
-const ChangePasswordModal = ({ session, role }) => {
+const ChangePasswordModal = ({ session, role, onLogout }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [oldPassword, setOldPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [showNewPassword, setShowNewPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [success, setSuccess] = React.useState(false);
+
+  const isOtpReset = session?.mustChangePassword === true;
+  const skipOldPassword = isOtpReset;
 
   React.useEffect(() => {
     const handleOpen = () => {
@@ -2809,6 +2895,8 @@ const ChangePasswordModal = ({ session, role }) => {
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
       setError('');
       setSuccess(false);
     };
@@ -2822,10 +2910,10 @@ const ChangePasswordModal = ({ session, role }) => {
       setLoginOverlay('change-password-pending', false);
       return () => setLoginOverlay('change-password', false);
     }
-    // Đóng modal: nếu local vẫn bắt buộc đổi MK → giữ gate
+    // Đóng modal: nếu đang buộc đặt lại MK từ Quên mật khẩu → giữ gate
     try {
       const stored = JSON.parse(localStorage.getItem(`${role}_user`) || '{}');
-      if (stored?.isFirstLogin === true && role !== 'teacher') {
+      if (stored?.mustChangePassword === true) {
         setLoginOverlay('change-password-pending', true);
       }
     } catch { /* ignore */ }
@@ -2836,8 +2924,7 @@ const ChangePasswordModal = ({ session, role }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const isFirst = session?.isFirstLogin === true;
-    if ((!isFirst && !oldPassword) || !newPassword || !confirmPassword) return setError('Vui lòng nhập đầy đủ thông tin.');
+    if ((!skipOldPassword && !oldPassword) || !newPassword || !confirmPassword) return setError('Vui lòng nhập đầy đủ thông tin.');
     if (newPassword !== confirmPassword) return setError('Mật khẩu mới không khớp.');
     if (newPassword.length < 6) return setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
 
@@ -2846,25 +2933,23 @@ const ChangePasswordModal = ({ session, role }) => {
       const res = await api.auth.changePassword(oldPassword, newPassword);
       if (res.success) {
         setSuccess(true);
-        // Cập nhật lại session local storage nếu là first login
-        if (session?.isFirstLogin === true) {
-          const key = `${role}_user`;
-          try {
-            const stored = JSON.parse(localStorage.getItem(key) || '{}');
-            const next = { ...stored, isFirstLogin: false };
-            localStorage.setItem(key, JSON.stringify(next));
-            window.dispatchEvent(new CustomEvent('cms:session-patched', {
-              detail: {
-                id: stored.id || stored._id || session.id || session._id,
-                _id: stored._id || stored.id || session._id || session.id,
-                isFirstLogin: false,
-              },
-            }));
-          } catch { /* ignore */ }
-          setLoginOverlay('change-password-pending', false);
-          window.dispatchEvent(new CustomEvent('cms:first-login-password-done'));
-        }
-        setTimeout(() => setIsOpen(false), 2000);
+        const key = `${role}_user`;
+        try {
+          const stored = JSON.parse(localStorage.getItem(key) || '{}');
+          const next = { ...stored, isFirstLogin: false, mustChangePassword: false };
+          localStorage.setItem(key, JSON.stringify(next));
+          window.dispatchEvent(new CustomEvent('cms:session-patched', {
+            detail: {
+              id: stored.id || stored._id || session?.id || session?._id,
+              _id: stored._id || stored.id || session?._id || session?.id,
+              isFirstLogin: false,
+              mustChangePassword: false,
+            },
+          }));
+        } catch { /* ignore */ }
+        setLoginOverlay('change-password-pending', false);
+        window.dispatchEvent(new CustomEvent('cms:first-login-password-done'));
+        setTimeout(() => setIsOpen(false), 1600);
       } else {
         setError(res.message || 'Lỗi khi đổi mật khẩu.');
       }
@@ -2877,18 +2962,21 @@ const ChangePasswordModal = ({ session, role }) => {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center p-3 sm:p-4 bg-black/60"
+      className="fixed inset-0 z-[10050] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-[2px]"
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="change-password-title"
     >
       <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-sm max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden shadow-xl">
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-600 px-6 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 flex items-center justify-between">
           <h3 id="change-password-title" className="text-white font-black text-lg flex items-center gap-2">
-            <Lock size={20} aria-hidden="true" /> {session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
+            <Lock size={20} aria-hidden="true" />
+            {isOtpReset ? 'Đặt lại mật khẩu mới' : session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
           </h3>
-          <button type="button" onClick={() => setIsOpen(false)} aria-label="Đóng" className="text-white/80 hover:text-white transition"><X size={20} aria-hidden="true" /></button>
+          {!isOtpReset ? (
+            <button type="button" onClick={() => setIsOpen(false)} aria-label="Đóng" className="text-white/80 hover:text-white transition cursor-pointer"><X size={20} aria-hidden="true" /></button>
+          ) : null}
         </div>
         <div className="p-6">
           {success ? (
@@ -2901,28 +2989,59 @@ const ChangePasswordModal = ({ session, role }) => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isOtpReset ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex items-start gap-2.5">
+                  <ShieldCheck size={17} className="text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+                  <p className="text-xs font-semibold text-emerald-800 leading-relaxed">
+                    Xác thực OTP thành công. Hãy tạo mật khẩu mới để bảo vệ tài khoản và tiếp tục sử dụng hệ thống.
+                  </p>
+                </div>
+              ) : null}
               {error && <div role="alert" className="bg-red-50 text-red-700 text-xs font-bold p-3 rounded-xl border border-red-100">{error}</div>}
-              {session?.isFirstLogin !== true && (
+              {!skipOldPassword && (
                 <div>
-                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600  block mb-1">Mật khẩu hiện tại</label>
+                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600 block mb-1">Mật khẩu hiện tại</label>
                   <input id="cms-old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoComplete="current-password"
                     className="input-field" />
                 </div>
               )}
               <div>
-                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600  block mb-1">Mật khẩu mới</label>
-                <input id="cms-new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
-                  className="input-field" />
+                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600 block mb-1">Mật khẩu mới (ít nhất 6 ký tự)</label>
+                <div className="relative">
+                  <input id="cms-new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
+                    className="input-field pr-10" />
+                  <button type="button" onClick={() => setShowNewPassword((v) => !v)} aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
-                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600  block mb-1">Nhập lại mật khẩu mới</label>
-                <input id="cms-confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password"
-                  className="input-field" />
+                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600 block mb-1">Nhập lại mật khẩu mới</label>
+                <div className="relative">
+                  <input id="cms-confirm-password" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password"
+                    className="input-field pr-10" />
+                  <button type="button" onClick={() => setShowConfirmPassword((v) => !v)} aria-label={showConfirmPassword ? 'Ẩn xác nhận mật khẩu' : 'Hiện xác nhận mật khẩu'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <button type="submit" disabled={loading}
-                className="w-full btn-primary-blue py-3">
-                {loading ? 'Đang xử lý...' : 'Xác nhận đổi'}
+                className="w-full btn-primary-blue py-3 cursor-pointer">
+                {loading ? 'Đang xử lý...' : isOtpReset ? 'Lưu mật khẩu mới' : 'Xác nhận đổi'}
               </button>
+              {isOtpReset && typeof onLogout === 'function' ? (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  disabled={loading}
+                  className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <LogOut size={13} aria-hidden="true" />
+                  Đăng xuất về trang đăng nhập
+                </button>
+              ) : null}
             </form>
           )}
         </div>

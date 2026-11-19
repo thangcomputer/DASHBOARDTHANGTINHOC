@@ -2,6 +2,7 @@ import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { applyAnchorNewTabPolicy, sanitizeRichHtml } from '../../../utils/htmlContent';
 import api, { resolveMediaUrl } from '../../../services/api';
+import { cmsAlertMessage } from '../../../utils/cmsDialog';
 
 function hydrateEditorHtml(html) {
   return String(html || '').replace(
@@ -149,7 +150,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
           }
         }
       } catch (err) {
-        window.alert?.(err?.message || 'Không tải được ảnh đã dán');
+        void cmsAlertMessage(err?.message || 'Không tải được ảnh đã dán', 'error');
         uploadFailed = true;
       } finally {
         setImageUploading(false);
@@ -187,7 +188,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
     e.target.value = '';
     if (!file) return;
     if (!String(file.type || '').startsWith('image/')) {
-      window.alert?.('Chỉ chọn file ảnh (JPG, PNG, WEBP, GIF).');
+      void cmsAlertMessage('Chỉ chọn file ảnh (JPG, PNG, WEBP, GIF).', 'warning');
       return;
     }
     setImageUploading(true);
@@ -203,7 +204,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
       document.execCommand('insertImage', false, displayUrl);
       handleInput();
     } catch (err) {
-      window.alert?.(err?.message || 'Không tải được ảnh');
+      void cmsAlertMessage(err?.message || 'Không tải được ảnh', 'error');
     } finally {
       setImageUploading(false);
     }

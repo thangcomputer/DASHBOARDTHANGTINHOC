@@ -8,6 +8,7 @@ import RichTextEditor from '../admin/shared/RichTextEditor';
 import CmsSelect from '../ui/CmsSelect';
 import { useToast } from '../../utils/useToast';
 import { CENTER_SECTIONS, SECTION_ITEM_KEYS, blankItem } from './centerInfoConstants';
+import { cmsConfirmAction } from '../../utils/cmsDialog';
 
 function Field({ label, children }) {
   return (
@@ -30,10 +31,7 @@ function snapshotOf(obj) {
 }
 
 async function confirmDiscard(message) {
-  if (typeof window.cmsConfirm === 'function') {
-    return window.cmsConfirm(message);
-  }
-  return window.confirm(message);
+  return cmsConfirmAction(message, { title: 'Thay đổi chưa lưu' });
 }
 
 /** Tách ra ngoài page - tránh remount input file khi parent re-render (mất lần chọn ảnh đầu). */
@@ -229,16 +227,6 @@ export default function CenterInfoManagePage() {
     return () => { cancelled = true; };
   }, [section, loadOverview, loadItems]);
 
-  useEffect(() => {
-    if (!hasUnsaved) return undefined;
-    const onBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [hasUnsaved]);
-
   const requestSectionChange = async (nextKey) => {
     if (nextKey === section) return;
     if (hasUnsaved) {
@@ -320,7 +308,7 @@ export default function CenterInfoManagePage() {
   };
 
   const removeItem = async (id) => {
-    if (!(await window.cmsConfirm?.('Xóa mục này?') ?? window.confirm('Xóa mục này?'))) return;
+    if (!(await cmsConfirmAction('Xóa mục này?'))) return;
     try {
       const res = await api.centerInfo.removeItem(id);
       if (!res?.success) throw new Error(res?.message || 'Xóa thất bại');

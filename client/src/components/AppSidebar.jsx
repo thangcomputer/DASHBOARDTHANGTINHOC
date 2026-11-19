@@ -199,6 +199,7 @@ const AppSidebar = ({
   onMobileOpenChange,
   mobileNavVisible = true,
   mobileFooterVisible = true,
+  hidden = false,
   onBrandLogoChange,
 }) => {
   const PINNED_MENU_KEY = 'cms_sidebar_pinned';
@@ -244,9 +245,9 @@ const AppSidebar = ({
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('cms-sidebar-pinned', pinnedSidebarVisible);
+    document.documentElement.classList.toggle('cms-sidebar-pinned', pinnedSidebarVisible && !hidden);
     return () => document.documentElement.classList.remove('cms-sidebar-pinned');
-  }, [pinnedSidebarVisible]);
+  }, [pinnedSidebarVisible, hidden]);
 
   const toggleMenuPin = () => {
     const nextPinned = !menuPinned;
@@ -1282,6 +1283,8 @@ const AppSidebar = ({
       </div>
     </div>
   );
+
+  if (hidden) return null;
 
   return (
     <>

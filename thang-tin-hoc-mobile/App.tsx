@@ -4,9 +4,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/app/AuthContext';
+import { LanguageProvider } from './src/i18n/LanguageContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import { mobileLinkingConfig } from './src/navigation/linking';
+import { AppAlertHost } from './src/components/AppAlertHost';
 import { colors } from './src/theme/tokens';
 
 const mobileSystemFont = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -28,12 +30,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer ref={navigationRef} linking={mobileLinkingConfig}>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <NavigationContainer ref={navigationRef} linking={mobileLinkingConfig}>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </NavigationContainer>
+          <AppAlertHost />
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

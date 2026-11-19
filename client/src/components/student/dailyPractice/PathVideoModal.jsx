@@ -301,15 +301,12 @@ export default function PathVideoModal({
 
   useEffect(() => {
     if (embedded) return undefined;
-    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
     };
-  }, [embedded, onClose]);
+  }, [embedded]);
 
   const isSingleMode = Boolean(singleVideoOnly || /:(level|practice):(easy|medium|hard)$/.test(String(initialVideoId || '')));
   const allPlaylist = useMemo(() => [
@@ -1082,13 +1079,12 @@ export default function PathVideoModal({
   }
 
   return createPortal(
-    <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation" onClick={onClose}>
+    <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation">
       <div
         className="dp-pop flex max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-[22px] bg-[#1C1F26] shadow-[0_30px_80px_rgba(69,10,10,0.55)] ring-1 ring-white/10"
         role="dialog"
         aria-modal="true"
         aria-label={`Video chặng ${unit.index}`}
-        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 sm:gap-3 border-b border-white/5 bg-[#16181E] px-3 py-2.5 sm:px-4 sm:py-3">
           <h2 className="flex min-w-0 flex-1 items-center justify-start gap-1.5 text-left text-xs sm:text-base font-black text-white" title={current?.title || ''}>

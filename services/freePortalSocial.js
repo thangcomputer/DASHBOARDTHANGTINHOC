@@ -274,6 +274,7 @@ async function issueSession(student, fingerprint) {
       avatar: fresh.avatar || '',
       gender: fresh.gender || '',
       isFirstLogin: Boolean(fresh.isFirstLogin),
+      mustChangePassword: Boolean(fresh.mustChangePassword),
       showWelcomeCelebration: fresh.welcomeCelebrationSeen === false,
       ...freePortalFlags(fresh),
     },
@@ -331,7 +332,8 @@ async function exchangeTicket(token, fingerprint) {
       learningMode: 'ONLINE',
       freePortal: true,
       freeUnlocked: false,
-      isFirstLogin: true,
+      isFirstLogin: false,
+      mustChangePassword: false,
       enrollments: [{
         courseName: FREE_COURSE_NAME,
         price: 0,
@@ -422,7 +424,8 @@ async function completeProfile({ token, name, age, phone, email, fingerprint }) 
     learningMode: 'ONLINE',
     freePortal: true,
     freeUnlocked: false,
-    isFirstLogin: true,
+    isFirstLogin: false,
+    mustChangePassword: false,
     enrollments: [{
       courseName: FREE_COURSE_NAME,
       price: 0,

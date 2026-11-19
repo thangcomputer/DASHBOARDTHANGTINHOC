@@ -377,6 +377,21 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       window.location.assign(String(n.payload.linkHoc).trim());
       return;
     }
+    if (
+      role === 'student'
+      && (
+        ['attendance_confirm_pending', 'attendance_dispute', 'attendance_admin_approved', 'attendance_confirmed', 'attendance_taken', 'attendance_rejected'].includes(String(n.payload?.kind || ''))
+        || String(n.title || '').includes('Xác nhận điểm danh buổi học')
+      )
+    ) {
+      window.dispatchEvent(new CustomEvent('cms:open-student-attendance-confirm', {
+        detail: {
+          ...(n.payload || {}),
+          kind: n.payload?.kind || 'attendance_confirm_pending',
+        },
+      }));
+      return;
+    }
     const path = resolveNavPath(n.path, n);
     if (!path && String(n.type || '').toUpperCase() === 'MESSAGE') {
       navigate(`/${role}/inbox`);

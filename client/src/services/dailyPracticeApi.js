@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, keepalivePost } from './api';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../utils/learningGoal';
 
 export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
@@ -87,6 +87,7 @@ const dailyPracticeApi = {
     hint: async (sessionId, questionId) => parse(await apiFetch(`/daily-practice/my/sessions/${sessionId}/hint`, json('POST', { questionId })), true),
     finish: async (sessionId) => parse(await apiFetch(`/daily-practice/my/sessions/${sessionId}/finish`, json('POST')), true),
     abandon: async (sessionId) => parse(await apiFetch(`/daily-practice/my/sessions/${sessionId}/abandon`, json('POST')), true),
+    abandonBeacon: (sessionId) => keepalivePost(`/daily-practice/my/sessions/${sessionId}/abandon`, {}, 'student'),
     relatedTopics: async (subjectId, unitId = '') => {
       const query = new URLSearchParams({ subjectId, ...(unitId ? { unitId } : {}) }).toString();
       return parse(await apiFetch(`/daily-practice/my/related-topics?${query}`));

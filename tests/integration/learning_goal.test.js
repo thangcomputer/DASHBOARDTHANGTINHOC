@@ -232,7 +232,7 @@ test('Tổng quan có thẻ mục tiêu + xếp hạng; chọn khóa nằm trong
 
   const home = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
   assert.ok(
-    home.includes('<LearningLeaderboardCard />')
+    home.includes('<LearningLeaderboardCard')
     || home.includes('<LmsGoalMergedCard />')
     || home.includes('<DuoHeroCard')
   );

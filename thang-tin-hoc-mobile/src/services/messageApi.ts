@@ -582,3 +582,39 @@ export async function setPinnedConversation(conversationId: string, pinned: bool
     body: JSON.stringify({ pinned }),
   });
 }
+
+export type ChatReportReason = 'spam' | 'harassment' | 'inappropriate' | 'scam' | 'other';
+
+export async function reportChatViolation(params: {
+  conversationId: string;
+  messageId?: string;
+  reportedUserId?: string;
+  reportedUserRole?: string;
+  reason?: ChatReportReason;
+  details?: string;
+}) {
+  return mobileApiRequest<{ success: boolean; message?: string }>('/messages/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getBlockedChatUsers(): Promise<string[]> {
+  const payload = await mobileApiRequest<{ blockedUserIds?: string[] }>('/messages/blocks');
+  return Array.isArray(payload.blockedUserIds) ? payload.blockedUserIds.map(String) : [];
+}
+
+export async function blockChatUser(blockedUserId: string, blockedUserRole = '', reason = '') {
+  return mobileApiRequest<{ success: boolean; message?: string }>('/messages/block', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blockedUserId, blockedUserRole, reason }),
+  });
+}
+
+export async function unblockChatUser(blockedUserId: string) {
+  return mobileApiRequest<{ success: boolean; message?: string }>(`/messages/block/${encodeURIComponent(blockedUserId)}`, {
+    method: 'DELETE',
+  });
+}

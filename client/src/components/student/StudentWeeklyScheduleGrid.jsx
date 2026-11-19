@@ -22,6 +22,8 @@ const KIND_CELL = {
   pending_attendance: 'bg-orange-50 border-orange-200 text-orange-700 font-extrabold',
   overdue_attendance: 'bg-red-50 border-red-200 text-red-700 font-extrabold',
   past_pending: 'bg-orange-50 border-orange-200 text-orange-700 font-extrabold',
+  awaiting_confirm: 'bg-amber-50 border-amber-300 text-amber-800 font-black ring-1 ring-amber-400',
+  makeup_attendance: 'bg-orange-50 border-orange-200 text-orange-700 font-extrabold',
 };
 
 function courseKeyOf(name) {
@@ -230,9 +232,14 @@ export default function StudentWeeklyScheduleGrid({
                 }
                 const kind = getScheduleDisplayKind(sch);
                 const tone = KIND_CELL[kind] || KIND_CELL.upcoming;
-                const clickable = String(sch.status) === 'scheduled' && typeof onOpenSession === 'function';
+                const confirmStatus = String(sch.studentConfirmStatus || '').toLowerCase();
+                const awaitingConfirm = String(sch.status) === 'scheduled'
+                  && (confirmStatus === 'pending' || confirmStatus === 'confirm_expired');
+                const clickable = awaitingConfirm || (String(sch.status) === 'scheduled' && typeof onOpenSession === 'function');
                 const hasNote = Boolean(String(sch.studentNote || '').trim());
-                const hoverHint = hasNote ? 'Chỉnh sửa ghi chú' : 'Thêm ghi chú';
+                const hoverHint = awaitingConfirm
+                  ? 'Bấm để xác nhận điểm danh'
+                  : hasNote ? 'Chỉnh sửa ghi chú' : 'Thêm ghi chú';
                 const teacherHint = sch.teacherName ? `GV: ${sch.teacherName}` : '';
 
                 return (
@@ -242,7 +249,15 @@ export default function StudentWeeklyScheduleGrid({
                     <button
                       type="button"
                       disabled={!clickable}
-                      onClick={() => onOpenSession?.(sch)}
+                      onClick={() => {
+                        if (awaitingConfirm) {
+                          window.dispatchEvent(new CustomEvent('cms:open-student-attendance-confirm', {
+                            detail: { scheduleId: String(sch._id || sch.id) },
+                          }));
+                          return;
+                        }
+                        onOpenSession?.(sch);
+                      }}
                       title={clickable ? [hoverHint, teacherHint].filter(Boolean).join(' · ') : teacherHint || undefined}
                       className={`group relative w-full min-h-[38px] px-1 py-1 rounded-xl border flex flex-col items-center justify-center text-center transition ${tone} ${
                         clickable ? 'hover:brightness-95 cursor-pointer active:scale-95' : 'cursor-default'

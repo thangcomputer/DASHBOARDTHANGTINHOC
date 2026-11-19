@@ -14,8 +14,10 @@ import {
 } from 'lucide-react-native';
 import { Mascot } from './Mascot';
 import { DuoButton } from '../duo/DuoButton';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../ShareAchievementModal';
 import type { GameSound } from './useGameSounds';
 import { formatPracticeScoreQuestions } from '../../../../shared/dailyPractice/finishScoreLine.mjs';
+import { buildPracticeShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 import { practiceFinishXpDisplay, type DpSummary } from '../../services/dailyPracticeApi';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -117,6 +119,7 @@ export function AchievementPopup({
   onReviewResults,
   onReplay,
   onDismiss,
+  onShare,
   onRelatedVideo: _onRelatedVideo,
 }: {
   summary: DpSummary;
@@ -125,9 +128,11 @@ export function AchievementPopup({
   onReviewResults?: () => void;
   onReplay?: () => void;
   onDismiss?: () => void;
+  onShare?: (data: ShareAchievementData) => void;
   onRelatedVideo?: () => void;
 }) {
   const { width } = useWindowDimensions();
+  const [localShareOpen, setLocalShareOpen] = useState(false);
   const cardWidth = Math.min(Math.max(width - 24, 280), 440);
 
   const total = Math.max(1, Number(summary?.total) || 1);
@@ -267,17 +272,38 @@ export function AchievementPopup({
               ) : null}
             </View>
           ) : null}
-          <DuoButton
-            variant="primary"
-            size="md"
-            fullWidth
-            text={continueLabel}
-            icon={<Play size={15} color="#FFFFFF" fill="#FFFFFF" />}
-            onPress={onContinue}
-            style={styles.actionPrimaryBtn}
-          />
+          <View style={styles.actionsPrimaryRow}>
+            <ShareTriggerButton
+              onPress={() => {
+                play?.('tap');
+                const data = buildPracticeShareData(summary) as ShareAchievementData;
+                if (onShare) onShare(data);
+                else setLocalShareOpen(true);
+              }}
+              label="SHARE"
+              style={styles.shareBtnInline}
+            />
+            <View style={styles.actionPrimaryFlex}>
+              <DuoButton
+                variant="primary"
+                size="md"
+                fullWidth
+                text={continueLabel}
+                icon={<Play size={15} color="#FFFFFF" fill="#FFFFFF" />}
+                onPress={onContinue}
+                style={styles.actionPrimaryBtn}
+              />
+            </View>
+          </View>
         </View>
       </View>
+      {!onShare ? (
+        <ShareAchievementModal
+          visible={localShareOpen}
+          onClose={() => setLocalShareOpen(false)}
+          data={buildPracticeShareData(summary) as ShareAchievementData}
+        />
+      ) : null}
     </Animated.View>
   );
 }
@@ -377,5 +403,8 @@ const styles = StyleSheet.create({
   actionHalfSolo: { flex: 1 },
   actionBtnCompact: { paddingHorizontal: 6, minWidth: 0 },
   actionTextCompact: { fontSize: 12, flexShrink: 1 },
+  actionsPrimaryRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, width: '100%' },
+  shareBtnInline: { minHeight: 44, borderRadius: 16, paddingHorizontal: 14 },
+  actionPrimaryFlex: { flex: 1, minWidth: 0 },
   actionPrimaryBtn: { width: '100%' },
 });

@@ -7,6 +7,7 @@ import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { useToast } from '../../../utils/useToast';
 import { PLAN_LABELS, formatExpiryDate } from '../../../utils/subscription';
 import AdminStudentSubscriptionPanel from '../subscription/AdminStudentSubscriptionPanel';
+import { cmsConfirmAction } from '../../../utils/cmsDialog';
 
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const STATUS_META = {
@@ -168,7 +169,7 @@ function XpConfigCard() {
   };
 
   const resetAllNow = async () => {
-    if (!window.confirm('Bạn có chắc muốn đặt lại ví XP của toàn bộ học viên về mức mới ngay bây giờ không?')) return;
+    if (!(await cmsConfirmAction('Bạn có chắc muốn đặt lại ví XP của toàn bộ học viên về mức mới ngay bây giờ không?'))) return;
     setResetting(true);
     try {
       const res = await subscriptionApi.admin.resetAllXp();
@@ -421,7 +422,7 @@ function CodesCard({ reloadKey }) {
   }, [load, reloadKey]);
 
   const revoke = async (row) => {
-    if (!window.confirm(`Thu hồi mã ${row.code}? Mã sẽ không dùng được nữa.`)) return;
+    if (!(await cmsConfirmAction(`Thu hồi mã ${row.code}? Mã sẽ không dùng được nữa.`))) return;
     try {
       await subscriptionApi.admin.revoke(row.id);
       toast.success('Đã thu hồi mã');

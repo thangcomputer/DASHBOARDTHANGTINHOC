@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { formatDateTime, formatDuration, localeLabel } from './certPrepStudentLabels';
 import CertPrepResultStats from './CertPrepResultStats';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
+import { buildExamShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 
 export default function CertPrepResultSummary({ result }) {
+  const [shareOpen, setShareOpen] = useState(false);
   if (!result) return null;
   const passed = result.passed === true;
   const title = [result.course?.name, result.level?.title].filter(Boolean).join(' · ');
@@ -31,6 +35,27 @@ export default function CertPrepResultSummary({ result }) {
         <p>Thời gian làm: {formatDuration(result.durationSeconds)}</p>
         <p>Thời gian giới hạn: {result.timeLimitMinutes} phút</p>
       </div>
+      <div className="pt-2 flex justify-center">
+        <ShareTriggerButton
+          onClick={() => setShareOpen(true)}
+          label="SHARE KẾT QUẢ"
+        />
+      </div>
+      <ShareAchievementModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={buildExamShareData({
+          title: result.test?.name || title || 'Đề luyện thi MOS/IC3',
+          kindLabel: 'LUYỆN THI MOS / IC3',
+          score: result.score ?? 0,
+          scoreMax: result.scoreMax ?? 100,
+          correctCount: result.correctCount ?? result.correct ?? 0,
+          totalQuestions: result.totalQuestions ?? result.total ?? 0,
+          passed,
+          durationSeconds: result.durationSeconds,
+          timeLimitMinutes: result.timeLimitMinutes,
+        })}
+      />
     </section>
   );
 }

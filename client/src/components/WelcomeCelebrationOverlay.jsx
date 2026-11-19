@@ -1,7 +1,9 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Sparkles, X, Star, Video } from 'lucide-react';
 import { formatHoaHong, STAR_BONUS_MIN_STARS, STAR_BONUS_MIN_STUDENTS } from '../utils/teacherCommission';
 import { setLoginOverlay } from '../utils/loginOverlayGate';
+import ShareAchievementModal, { ShareTriggerButton } from './student/ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 
 /**
  * Pháo hoa chào mừng / hoàn thành khóa / thưởng sao GV - canvas trên overlay (pointer-events: none).
@@ -22,6 +24,7 @@ export default function WelcomeCelebrationOverlay({
   const rocketsRef = useRef([]);
   const sparksRef = useRef([]);
   const flashesRef = useRef([]);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     // LMS / layout đều dùng component này - đăng ký gate khi mở
@@ -589,13 +592,39 @@ export default function WelcomeCelebrationOverlay({
           <p className="text-[11px] font-semibold tracking-wide text-slate-400 sm:text-xs">
             Lời chào từ đội ngũ Thắng Tin Học
           </p>
-          <button
-            type="button"
-            onClick={() => onClose?.()}
-            className="w-full min-h-11 rounded-2xl bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition tracking-wide sm:min-h-12"
-          >
-            {isCourseComplete ? 'Tiếp tục hành trình' : 'Tiếp tục vào hệ thống'}
-          </button>
+          {isCourseComplete ? (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <ShareTriggerButton
+                onClick={() => setShareOpen(true)}
+                label="SHARE"
+                className="sm:w-auto w-full !rounded-2xl !py-3"
+              />
+              <button
+                type="button"
+                onClick={() => onClose?.()}
+                className="flex-1 min-h-11 rounded-2xl bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition tracking-wide sm:min-h-12"
+              >
+                Tiếp tục hành trình
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="w-full min-h-11 rounded-2xl bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition tracking-wide sm:min-h-12"
+            >
+              Tiếp tục vào hệ thống
+            </button>
+          )}
+          <ShareAchievementModal
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            data={buildCourseOrCertShareData({
+              title: courseName || 'Khóa học Thắng Tin Học',
+              studentName: name,
+              completionRate: 100,
+            })}
+          />
         </div>
       </div>
 

@@ -12,8 +12,19 @@ const FOCUSABLE =
 export const ModalProvider = ({ children }) => {
   const [modal, setModal] = useState(null);
 
-  const showModal = useCallback(({ title, content, type = 'info', onConfirm, onCancel, confirmText = 'Đóng', cancelText = null, size = 'sm', confirmButtonClass }) => {
-    setModal({ title, content, type, onConfirm, onCancel, confirmText, cancelText, size, confirmButtonClass });
+  const showModal = useCallback(({
+    title,
+    content,
+    type = 'info',
+    onConfirm,
+    onCancel,
+    confirmText = 'Đóng',
+    cancelText = null,
+    size = 'sm',
+    confirmButtonClass,
+    prompt = null,
+  }) => {
+    setModal({ title, content, type, onConfirm, onCancel, confirmText, cancelText, size, confirmButtonClass, prompt });
   }, []);
 
   const closeModal = useCallback(() => {
@@ -39,9 +50,35 @@ export const ModalProvider = ({ children }) => {
     });
   }, [showModal]);
 
+  const promptAsync = useCallback(({
+    title = 'Nhập thông tin',
+    content = '',
+    label = '',
+    placeholder = '',
+    defaultValue = '',
+    confirmText = 'Xác nhận',
+    cancelText = 'Hủy',
+    type = 'question',
+  } = {}) => (
+    new Promise((resolve) => {
+      showModal({
+        title,
+        content: content || label,
+        type,
+        confirmText,
+        cancelText,
+        confirmButtonClass: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
+        prompt: { placeholder, defaultValue: String(defaultValue ?? '') },
+        onConfirm: (value) => resolve(typeof value === 'string' ? value : String(value ?? '')),
+        onCancel: () => resolve(null),
+      });
+    })
+  ), [showModal]);
+
   useEffect(() => {
     window.cmsConfirm = (content) => confirmAsync({ content });
-    window.cmsAlert = (content, type = 'info') => confirmAsync({
+    window.cmsAlert = (content, type = 'info', title = 'Thông báo') => confirmAsync({
+      title,
       content,
       type,
       cancelText: null,
@@ -50,16 +87,22 @@ export const ModalProvider = ({ children }) => {
         ? 'bg-red-600 hover:bg-red-700 text-white shadow-sm'
         : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
     });
+    window.cmsPrompt = (optionsOrContent, defaultValue = '') => promptAsync(
+      typeof optionsOrContent === 'string'
+        ? { content: optionsOrContent, defaultValue }
+        : { defaultValue, ...(optionsOrContent || {}) },
+    );
     window.cmsConfirmAdvanced = confirmAsync;
     return () => {
       delete window.cmsConfirm;
       delete window.cmsAlert;
+      delete window.cmsPrompt;
       delete window.cmsConfirmAdvanced;
     };
-  }, [confirmAsync]);
+  }, [confirmAsync, promptAsync]);
 
-  const handleConfirm = useCallback(() => {
-    if (modal?.onConfirm) modal.onConfirm();
+  const handleConfirm = useCallback((value) => {
+    if (modal?.onConfirm) modal.onConfirm(value);
     setModal(null);
   }, [modal]);
 
@@ -69,23 +112,60 @@ export const ModalProvider = ({ children }) => {
   }, [modal]);
 
   return (
-    <ModalContext.Provider value={{ showModal, closeModal, confirmAsync }}>
+    <ModalContext.Provider value={{ showModal, closeModal, confirmAsync, promptAsync }}>
       {children}
       {modal && <ModalUI modal={modal} onConfirm={handleConfirm} onCancel={handleCancel} />}
     </ModalContext.Provider>
   );
 };
 
+/** Mở popup xác nhận chuẩn DewSkill thay thế hoàn toàn `window.confirm`. */
+export async function appConfirm(optionsOrContent) {
+  if (typeof optionsOrContent === 'string') {
+    if (typeof window !== 'undefined' && typeof window.cmsConfirm === 'function') {
+      return Boolean(await window.cmsConfirm(optionsOrContent));
+    }
+    return false;
+  }
+  if (typeof window !== 'undefined' && typeof window.cmsConfirmAdvanced === 'function') {
+    return Boolean(await window.cmsConfirmAdvanced(optionsOrContent || {}));
+  }
+  return false;
+}
+
+/** Mở popup thông báo chuẩn DewSkill thay thế hoàn toàn `window.alert`. */
+export async function appAlert(content, type = 'info', title = 'Thông báo') {
+  if (typeof window !== 'undefined' && typeof window.cmsAlert === 'function') {
+    await window.cmsAlert(content, type, title);
+    return true;
+  }
+  return false;
+}
+
+/** Mở popup nhập liệu chuẩn DewSkill thay thế hoàn toàn `window.prompt`. */
+export async function appPrompt(optionsOrContent, defaultValue = '') {
+  if (typeof window !== 'undefined' && typeof window.cmsPrompt === 'function') {
+    return window.cmsPrompt(optionsOrContent, defaultValue);
+  }
+  return null;
+}
+
 const ModalUI = ({ modal, onConfirm, onCancel }) => {
   const dialogRef = useRef(null);
+  const promptInputRef = useRef(null);
   const previouslyFocused = useRef(null);
+  const [promptValue, setPromptValue] = useState(() => modal.prompt?.defaultValue ?? '');
+
+  useEffect(() => {
+    setPromptValue(modal.prompt?.defaultValue ?? '');
+  }, [modal]);
 
   const typeConfigs = {
-    info:     { icon: Info,        tone: 'text-sky-600 bg-sky-50' },
-    success:  { icon: CheckCircle, tone: 'text-emerald-600 bg-emerald-50' },
-    warning:  { icon: AlertCircle, tone: 'text-amber-600 bg-amber-50' },
-    error:    { icon: AlertCircle, tone: 'text-red-600 bg-red-50' },
-    question: { icon: HelpCircle,  tone: 'text-sky-600 bg-sky-50' },
+    info: { icon: Info, tone: 'text-sky-600 bg-sky-50' },
+    success: { icon: CheckCircle, tone: 'text-emerald-600 bg-emerald-50' },
+    warning: { icon: AlertCircle, tone: 'text-amber-600 bg-amber-50' },
+    error: { icon: AlertCircle, tone: 'text-red-600 bg-red-50' },
+    question: { icon: HelpCircle, tone: 'text-sky-600 bg-sky-50' },
   };
 
   const config = typeConfigs[modal.type] || typeConfigs.info;
@@ -99,6 +179,9 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
     '3xl': 'cms-sheet--invoice',
   })[modal.size] || '';
   const showFooter = Boolean(modal.cancelText || modal.confirmText);
+  const submitCurrent = () => {
+    onConfirm(modal.prompt ? promptValue : undefined);
+  };
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement;
@@ -108,10 +191,15 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
     const focusables = () => Array.from(node.querySelectorAll(FOCUSABLE))
       .filter((el) => el.offsetParent !== null || el === document.activeElement);
 
-    const list = focusables();
-    const initial = list.find((el) => el.classList.contains('cms-btn-primary')) || list[0];
-    if (initial) initial.focus();
-    else node.focus();
+    if (modal.prompt && promptInputRef.current) {
+      promptInputRef.current.focus();
+      promptInputRef.current.select?.();
+    } else {
+      const list = focusables();
+      const initial = list.find((el) => el.classList.contains('cms-btn-primary')) || list[0];
+      if (initial) initial.focus();
+      else node.focus();
+    }
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -146,7 +234,7 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
         try { prev.focus(); } catch { /* ignore */ }
       }
     };
-  }, [onCancel]);
+  }, [onCancel, modal.prompt]);
 
   return (
     <>
@@ -177,9 +265,29 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
         </div>
 
         <div className={`cms-sheet-body ${modal.size === '3xl' ? 'cms-sheet-body--invoice' : ''}`}>
-          <div className="text-sm text-slate-600 leading-relaxed">
-            {modal.content}
-          </div>
+          {modal.content ? (
+            <div className="text-sm text-slate-600 leading-relaxed">
+              {modal.content}
+            </div>
+          ) : null}
+          {modal.prompt ? (
+            <form
+              className={modal.content ? 'mt-3' : ''}
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitCurrent();
+              }}
+            >
+              <input
+                ref={promptInputRef}
+                type="text"
+                value={promptValue}
+                onChange={(event) => setPromptValue(event.target.value)}
+                placeholder={modal.prompt.placeholder || ''}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              />
+            </form>
+          ) : null}
         </div>
 
         {showFooter ? (
@@ -190,7 +298,11 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
               </button>
             ) : null}
             {modal.confirmText ? (
-              <button type="button" onClick={onConfirm} className={modal.confirmButtonClass ? `cms-btn ${modal.confirmButtonClass}` : "cms-btn cms-btn-primary"}>
+              <button
+                type="button"
+                onClick={submitCurrent}
+                className={modal.confirmButtonClass ? `cms-btn ${modal.confirmButtonClass}` : 'cms-btn cms-btn-primary'}
+              >
                 {modal.confirmText}
               </button>
             ) : null}

@@ -10,6 +10,9 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../app/AuthContext';
+import { getCurrentLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
 import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScreen';
 import { CourseVideosScreen } from './CourseVideosScreen';
@@ -21,7 +24,7 @@ import {
   MessageSquare, Newspaper, Paperclip, Pencil, Play, Radio, Reply, Search, Send, Sparkles, Star, ThumbsUp, Trash2, TrendingUp, WalletCards, X,
   Users, Video, Link2, Plus, Lock,
 } from 'lucide-react-native';
-import { hasFeedPostAccess } from '../services/subscriptionApi';
+import { hasFeedPostAccess, restoreMobileBillingPurchases } from '../services/subscriptionApi';
 import {
   AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton,
   ProgressBar, SearchField, SectionHeading, StatusBadge,
@@ -68,11 +71,11 @@ async function shareQuizWorkbook(base64: string, fileName: string) {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     return;
   }
-  if (!FileSystem.cacheDirectory) throw new Error('Không thể truy cập vùng lưu tệp trên thiết bị.');
+  if (!FileSystem.cacheDirectory) throw new Error(translateText('Không thể truy cập vùng lưu tệp trên thiết bị.', getCurrentLanguage()));
   const uri = `${FileSystem.cacheDirectory}${fileName}`;
   await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-  if (!(await Sharing.isAvailableAsync())) throw new Error('Thiết bị không hỗ trợ chia sẻ hoặc lưu tệp Excel.');
-  await Sharing.shareAsync(uri, { mimeType, dialogTitle: 'Lưu tệp câu hỏi Excel' });
+  if (!(await Sharing.isAvailableAsync())) throw new Error(translateText('Thiết bị không hỗ trợ chia sẻ hoặc lưu tệp Excel.', getCurrentLanguage()));
+  await Sharing.shareAsync(uri, { mimeType, dialogTitle: translateText('Lưu tệp câu hỏi Excel', getCurrentLanguage()) });
 }
 
 async function openExternalUrl(url: string | undefined, label: string) {
@@ -124,6 +127,7 @@ export function MobileMenuScreen() {
         subtitle="Các mục theo tài khoản hiện tại"
         containerStyle={styles.menuHeader}
       />
+      <LanguageSwitcher variant="card" />
       <View style={styles.menuList}>
         {items.map((item) => (
           <Pressable
@@ -3299,7 +3303,22 @@ export function TuitionScreen() {
         </Card>
       }) : null}
       {!profileResource.loading && !profileResource.error && !enrollments.length ? <EmptyState title="Chưa có khóa học" message="Thông tin học phí sẽ xuất hiện theo khóa học." /> : null}
-      <Text style={styles.note}>Để thanh toán hoặc xác nhận giao dịch, vui lòng thực hiện trên website.</Text>
+      <PrimaryButton
+        title="Khôi phục giao dịch mua"
+        variant="secondary"
+        onPress={() => {
+          void restoreMobileBillingPurchases()
+            .then((res) => {
+              Alert.alert('Khôi phục giao dịch', res.message);
+              profileResource.reload();
+              paymentResource.reload();
+            })
+            .catch((err: unknown) => {
+              Alert.alert('Không thể khôi phục', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+            });
+        }}
+      />
+      <Text style={styles.note}>Thông tin học phí và quyền truy cập khóa học được đồng bộ trực tiếp từ hồ sơ tài khoản tại Trung tâm.</Text>
     </AppScreen>
   );
 }

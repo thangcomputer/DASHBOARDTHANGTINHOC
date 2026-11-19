@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Clock, Eye, Lightbulb, Loader2, Maximize2, Minimize2, Move, Play, RotateCcw, Sparkles, Trophy, Volume2, VolumeX } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
+import { buildLessonPracticeShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 import { resolveMediaUrl } from '../../../services/api';
 import { SOUND_MUTE_CHANGED_EVENT, gameSounds, isSoundMuted, playLessonCorrectSound, playLessonTick, playLessonWrongSound, setSoundMuted, unlockAudio } from '../../../utils/sound';
 import { useFocusMode } from '../../../utils/focusMode';
@@ -284,6 +286,8 @@ function AnimatedResultValue({ value, suffix = '', total }) {
 
 function PracticeResult({
   result,
+  unitTitle = '',
+  courseTitle = '',
   celebrate,
   wrongQuestionsCount,
   reviewingWrongAnswers,
@@ -297,6 +301,7 @@ function PracticeResult({
   canContinue,
   onContinue,
 }) {
+  const [shareOpen, setShareOpen] = useState(false);
   const perfect = isPerfectTenPracticeResult(result);
   const particles = Array.from({ length: 28 }, (_, index) => {
     const angle = (index / 28) * Math.PI * 2;
@@ -362,12 +367,22 @@ function PracticeResult({
           <RotateCcw size={18} aria-hidden="true" />
           Làm lại bài
         </button>
+        <ShareTriggerButton
+          onClick={() => setShareOpen(true)}
+          label="SHARE KẾT QUẢ"
+          className="!rounded-xl !px-4 !py-2.5"
+        />
         {canContinue && (
           <button type="button" onClick={onContinue} disabled={resetting} className="quiz-result-card__button quiz-result-card__button--primary">
             Học tiếp <ArrowRight size={18} aria-hidden="true" />
           </button>
         )}
       </div>
+      <ShareAchievementModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={buildLessonPracticeShareData({ result, unitTitle, courseTitle })}
+      />
     </section>
   );
 }
@@ -1368,6 +1383,8 @@ export default function LessonPracticePlayerPage({
                   <>
                     <PracticeResult
                       result={result}
+                      unitTitle={payload?.unit?.title || ''}
+                      courseTitle={payload?.course?.title || ''}
                       celebrate={completionCelebration}
                       wrongQuestionsCount={wrongReviewItems.length}
                       reviewingWrongAnswers={reviewingWrongAnswers}

@@ -118,11 +118,7 @@ router.put('/students/:id', ...requireStudentAdmin, async (req, res) => {
       expiresAt: req.body?.expiresAt || null,
       note: String(req.body?.note || '').slice(0, 200),
       customXp: req.body?.customXp != null ? Number(req.body.customXp) : null,
-    }, actorOf(req));
-    if (mode === 'free') {
-      const io = req.app.get('io');
-      if (io) io.to(String(req.params.id)).emit('free-portal-locked', { studentId: String(req.params.id) });
-    }
+    }, { ...actorOf(req), io: req.app.get('io') });
     return res.json({ success: true, data });
   } catch (err) {
     return sendError(res, err);

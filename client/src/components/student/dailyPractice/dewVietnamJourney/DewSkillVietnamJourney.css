@@ -118,17 +118,17 @@
 
 .dp-path-start-bubble {
   position: relative;
-  z-index: 5;
+  z-index: 6;
   margin-bottom: 0.35rem;
-  border-radius: 12px;
-  border: 1px solid #e8e2d5;
+  border-radius: 11px;
+  border: 1.5px solid #e2e8f0;
   background: #fff;
-  padding: 0.3rem 0.7rem;
-  font-size: 10px;
+  padding: 0.32rem 0.78rem;
+  font-size: 10.5px;
   font-weight: 900;
-  letter-spacing: 0.04em;
-  color: #e5a500;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  letter-spacing: 0.05em;
+  color: #059669;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.09);
   animation: ds-path-label-soft 2.2s ease-in-out infinite;
 }
 
@@ -136,14 +136,14 @@
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -5px;
+  bottom: -6px;
   margin-left: -5px;
   width: 10px;
   height: 10px;
   rotate: 45deg;
   background: #fff;
-  border-right: 1px solid #cbece0;
-  border-bottom: 1px solid #cbece0;
+  border-right: 1.5px solid #e2e8f0;
+  border-bottom: 1.5px solid #e2e8f0;
 }
 
 .ds-journey__hub-scale [data-path-hub] .dp-path-hub-ring {
@@ -167,18 +167,18 @@
 }
 
 .ds-journey--plain .ds-journey__stop {
-  transform: translate(-50%, calc(-1 * clamp(29px, 7.5cqw, 35px)));
+  transform: translate(-50%, calc(-1 * clamp(39px, 10cqw, 46px)));
   min-height: 0;
 }
 
 .ds-journey--plain .ds-journey__hub-scale [data-path-hub].dp-path-hub-root {
-  min-width: 4.75rem;
+  min-width: 5.5rem;
 }
 
 .ds-journey--plain .dp-path-start-bubble {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 4px);
   transform: translateX(-50%);
   margin-bottom: 0;
   white-space: nowrap;
@@ -190,8 +190,8 @@
 }
 
 .ds-journey--plain .ds-journey__hub-scale [data-path-hub] .dp-path-hub-ring {
-  width: clamp(58px, 15cqw, 70px) !important;
-  height: clamp(58px, 15cqw, 70px) !important;
+  width: clamp(78px, 20cqw, 92px) !important;
+  height: clamp(78px, 20cqw, 92px) !important;
 }
 
 

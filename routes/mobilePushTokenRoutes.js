@@ -1,10 +1,47 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const MobilePushToken = require('../models/MobilePushToken');
+const { DEFAULT_NOTIFICATION_PREFERENCES } = require('../models/MobilePushToken');
 const logger = require('../config/logger');
 
 const router = express.Router();
 const EXPO_TOKEN_PATTERN = /^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$/;
+const BOOLEAN_PREFERENCE_KEYS = [
+  'scheduleReminders',
+  'scheduleChanges',
+  'messages',
+  'calls',
+  'adminAnnouncements',
+  'assignmentsAndQuizzes',
+  'financeAndCourses',
+];
+const ALLOWED_REMINDER_OFFSETS = new Set([1440, 60, 15]);
+
+function normalizePreferences(raw = {}) {
+  const base = {
+    scheduleReminders: true,
+    scheduleChanges: true,
+    messages: true,
+    calls: true,
+    adminAnnouncements: true,
+    assignmentsAndQuizzes: true,
+    financeAndCourses: true,
+    reminderOffsetsMinutes: [...DEFAULT_NOTIFICATION_PREFERENCES.reminderOffsetsMinutes],
+  };
+  if (!raw || typeof raw !== 'object') return base;
+  for (const key of BOOLEAN_PREFERENCE_KEYS) {
+    if (typeof raw[key] === 'boolean') base[key] = raw[key];
+  }
+  if (Array.isArray(raw.reminderOffsetsMinutes)) {
+    const clean = [...new Set(
+      raw.reminderOffsetsMinutes
+        .map((n) => Number(n))
+        .filter((n) => ALLOWED_REMINDER_OFFSETS.has(n)),
+    )].sort((a, b) => b - a);
+    base.reminderOffsetsMinutes = clean;
+  }
+  return base;
+}
 
 router.post('/', authMiddleware, async (req, res) => {
   const { id, role } = req.user || {};
@@ -23,6 +60,11 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 
   try {
+    const existingAny = await MobilePushToken.findOne({ userId: String(id), role })
+      .select('preferences')
+      .lean();
+    const inheritedPrefs = normalizePreferences(existingAny?.preferences || {});
+
     await MobilePushToken.findOneAndUpdate(
       { token },
       {
@@ -34,15 +76,85 @@ router.post('/', authMiddleware, async (req, res) => {
           projectId,
           soundEnabled,
           enabled: true,
+          preferences: inheritedPrefs,
           updatedAt: new Date(),
         },
       },
       { upsert: true, runValidators: true, setDefaultsOnInsert: true },
     );
-    return res.json({ success: true });
+    return res.json({ success: true, preferences: inheritedPrefs });
   } catch (error) {
     logger.error({ err: error }, '[MOBILE_PUSH] Token registration failed');
     return res.status(500).json({ success: false, message: 'Không thể đăng ký thiết bị nhận thông báo.' });
+  }
+});
+
+router.get('/preferences', authMiddleware, async (req, res) => {
+  const { id, role } = req.user || {};
+  if (!id || !['student', 'teacher'].includes(role)) {
+    return res.status(403).json({ success: false, message: 'Chỉ học viên và giảng viên mới có cài đặt thông báo mobile.' });
+  }
+  try {
+    const doc = await MobilePushToken.findOne({ userId: String(id), role })
+      .sort({ updatedAt: -1 })
+      .select('preferences')
+      .lean();
+    return res.json({ success: true, data: normalizePreferences(doc?.preferences || {}) });
+  } catch (error) {
+    logger.error({ err: error }, '[MOBILE_PUSH] Preferences load failed');
+    return res.status(500).json({ success: false, message: 'Không thể tải cài đặt thông báo.' });
+  }
+});
+
+router.put('/preferences', authMiddleware, async (req, res) => {
+  const { id, role } = req.user || {};
+  if (!id || !['student', 'teacher'].includes(role)) {
+    return res.status(403).json({ success: false, message: 'Chỉ học viên và giảng viên mới có cài đặt thông báo mobile.' });
+  }
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const updates = {};
+  for (const key of BOOLEAN_PREFERENCE_KEYS) {
+    if (key in body) {
+      if (typeof body[key] !== 'boolean') {
+        return res.status(400).json({ success: false, message: `Trường ${key} phải là boolean.` });
+      }
+      updates[`preferences.${key}`] = body[key];
+    }
+  }
+  if ('reminderOffsetsMinutes' in body) {
+    if (!Array.isArray(body.reminderOffsetsMinutes)) {
+      return res.status(400).json({ success: false, message: 'reminderOffsetsMinutes phải là mảng số.' });
+    }
+    const clean = [...new Set(
+      body.reminderOffsetsMinutes
+        .map((n) => Number(n))
+        .filter((n) => ALLOWED_REMINDER_OFFSETS.has(n)),
+    )].sort((a, b) => b - a);
+    updates['preferences.reminderOffsetsMinutes'] = clean;
+  }
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ success: false, message: 'Không có cài đặt hợp lệ để cập nhật.' });
+  }
+
+  try {
+    await MobilePushToken.updateMany(
+      { userId: String(id), role },
+      { $set: { ...updates, updatedAt: new Date() } },
+    );
+    const updatedDoc = await MobilePushToken.findOne({ userId: String(id), role })
+      .sort({ updatedAt: -1 })
+      .select('preferences')
+      .lean();
+    const data = normalizePreferences(updatedDoc?.preferences || body);
+    const io = req.app?.get?.('io');
+    if (io) {
+      io.to(String(id)).emit('notification:preferences-updated', data);
+    }
+    return res.json({ success: true, data, message: 'Đã lưu cài đặt thông báo.' });
+  } catch (error) {
+    logger.error({ err: error }, '[MOBILE_PUSH] Preferences update failed');
+    return res.status(500).json({ success: false, message: 'Không thể lưu cài đặt thông báo.' });
   }
 });
 
@@ -70,3 +182,4 @@ router.delete('/', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.normalizePreferences = normalizePreferences;

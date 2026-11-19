@@ -8,6 +8,8 @@ import api from '../../services/api';
 import { useToast } from '../../utils/useToast';
 import { useData } from '../../context/DataContext';
 import ExamClickOutsideGuard from '../exam/ExamClickOutsideGuard';
+import ShareAchievementModal, { ShareTriggerButton } from './ShareAchievementModal';
+import { buildExamShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 
 /** Lớp phủ toàn app - che sidebar/header/messenger */
 function ExamOverlay({ children }) {
@@ -67,6 +69,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   const [showExitModal, setShowExitModal] = useState(false);
   const [resultData, setResultData] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [shareOpen, setShareOpen] = useState(false);
 
   const timerRef = useRef(null);
   const resultDataRef = useRef(null);
@@ -265,22 +268,14 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   useEffect(() => {
     const inExam = () => Boolean(quizDataRef.current && !resultDataRef.current && !loading);
 
-    const handleBeforeUnload = (e) => {
-      if (!inExam() || allowUnloadRef.current) return;
-      e.preventDefault();
-      e.returnValue = 'Thoát lúc này sẽ bị tính RỚT. Bạn có chắc không?';
-    };
-
     const markPendingAndBeacon = () => {
       if (!inExam() || allowUnloadRef.current) return;
       try { localStorage.setItem(forfeitKey, '1'); } catch { /* ignore */ }
       api.quizzes.submitForfeitBeacon(quizId, 'Tải lại hoặc đóng trang khi đang làm bài');
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', markPendingAndBeacon);
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', markPendingAndBeacon);
     };
   }, [quizId, forfeitKey, loading]);
@@ -406,7 +401,30 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                   </span>
                 </div>
               </div>
+              {!isForfeit ? (
+                <div className="mt-6 flex justify-center">
+                  <ShareTriggerButton
+                    onClick={() => setShareOpen(true)}
+                    label="SHARE KẾT QUẢ"
+                    variant="dark"
+                  />
+                </div>
+              ) : null}
             </div>
+            <ShareAchievementModal
+              open={shareOpen}
+              onClose={() => setShareOpen(false)}
+              data={buildExamShareData({
+                title: quizData?.title || 'Bài kiểm tra trắc nghiệm',
+                kindLabel: 'TRẮC NGHIỆM BUỔI HỌC',
+                score: resultData.score ?? 0,
+                scoreMax: 100,
+                correctCount: resultData.correctCount ?? 0,
+                totalQuestions: resultData.totalQuestions ?? 0,
+                passed: isPassed,
+                timeLimitMinutes: quizData?.timeLimitMinutes,
+              })}
+            />
             {!isForfeit && Array.isArray(resultData.detailedReview) && resultData.detailedReview.length > 0 && (
               <section className="space-y-4">
                 <h2 className="text-base font-black text-slate-200">Xem lại đáp án</h2>

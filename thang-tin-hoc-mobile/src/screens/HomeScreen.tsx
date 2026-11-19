@@ -203,7 +203,7 @@ export function HomeScreen() {
     return () => clearInterval(t);
   }, []);
 
-  useFocusEffect(useCallback(() => {
+  const reloadStudentHomeData = useCallback(() => {
     if (isTeacher || !user || user.previewMode) return;
     const userKey = String(user.id || user._id || '').trim();
     void readLastStudySession(userKey).then(setLastStudy);
@@ -270,7 +270,28 @@ export function HomeScreen() {
         );
       })
       .catch(() => { });
-  }, [isTeacher, user]));
+  }, [isTeacher, user]);
+
+  useFocusEffect(useCallback(() => {
+    reloadStudentHomeData();
+  }, [reloadStudentHomeData]));
+
+  useEffect(() => {
+    if (isTeacher || !user || user.previewMode) return undefined;
+    const onUnlockOrSubChanged = () => {
+      reloadStudentHomeData();
+      void refreshSubscription();
+    };
+    const subs = [
+      DeviceEventEmitter.addListener('mobile:free-portal-unlocked', onUnlockOrSubChanged),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_UNLOCKED, onUnlockOrSubChanged),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.FREE_PORTAL_LOCKED, onUnlockOrSubChanged),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.SUBSCRIPTION_UPDATED, onUnlockOrSubChanged),
+    ];
+    return () => {
+      subs.forEach((s) => s.remove());
+    };
+  }, [isTeacher, refreshSubscription, reloadStudentHomeData, user]);
   useEffect(() => {
     if (isTeacher || !user || user.previewMode) return undefined;
     const userKey = String(user.id || user._id || '').trim();
@@ -794,6 +815,7 @@ export function HomeScreen() {
   const scheduleAccent = isBrandStudent ? '#059669' : '#059669';
   const portalSub = subscription?.subscription;
   const meetAccess = hasMeetAccessClient(portalSub);
+  const needsUnlockMeetCta = freeMenu && !meetAccess && user?.freeUnlocked !== true;
   const meetEmptyMode: 'default' | 'purchase' | 'renew' = freeMenu
     ? (portalSub?.state === 'expired'
       ? 'renew'
@@ -1176,7 +1198,9 @@ export function HomeScreen() {
                         ? `${nextMeetForEmpty.startTime || ''}–${nextMeetForEmpty.endTime || ''}`
                         : nextLesson[0]
                           ? nextLesson[0].meta
-                          : 'Tự học video & giữ chuỗi XP'}
+                          : meetAccess
+                            ? 'Chưa có lịch Meet hôm nay · Tự học video & giữ chuỗi XP'
+                            : 'Tự học video & giữ chuỗi XP'}
                   </Text>
                   <View style={styles.bMiniActionWrap}>
                     {primaryTodayClass ? (
@@ -1236,9 +1260,9 @@ export function HomeScreen() {
                         variant="secondary"
                         size="sm"
                         fullWidth
-                        label={freeMenu ? 'Mở khóa Meet' : 'Xem lịch học'}
+                        label={needsUnlockMeetCta ? 'Mở khóa Meet' : 'Xem lịch học'}
                         onPress={() => {
-                          if (freeMenu) setMeetPlanOpen(true);
+                          if (needsUnlockMeetCta) setMeetPlanOpen(true);
                           else tabNavigation.navigate('Schedule');
                         }}
                       />

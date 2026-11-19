@@ -317,37 +317,32 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
             </div>
           ) : (
             <>
-              {/* Khối giới thiệu Giảng viên + Lịch học + Quyền lợi cân đối 2 cột */}
+              {/* Khối giới thiệu Lộ trình học + Ca học + Quyền lợi cân đối 2 cột */}
               <div className="grid gap-3 md:grid-cols-[1.2fr_1fr]">
                 <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 sm:p-4">
-                  <div className="flex items-center gap-3.5">
-                    <img
-                      src="/giang-vien-phi-van-thang.png"
-                      alt="Giảng viên Phí Văn Thắng"
-                      className="h-14 w-14 shrink-0 rounded-2xl border-2 border-white object-cover object-top shadow-xs ring-2 ring-emerald-500/20"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center rounded-md bg-emerald-100/85 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-800">
-                          Giảng viên
-                        </span>
-                        <div className="inline-flex items-center gap-1">
-                          {OFFICE_APPS.map((app) => (
-                            <span
-                              key={app.short}
-                              title={app.name}
-                              className={`inline-flex h-4 w-4 items-center justify-center rounded text-[9px] font-black text-white ${app.tone}`}
-                            >
-                              {app.short}
-                            </span>
-                          ))}
-                        </div>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center rounded-md bg-emerald-100/85 px-2 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wider text-emerald-800">
+                        Lộ trình kèm trực tiếp
+                      </span>
+                      <div className="inline-flex items-center gap-1">
+                        {OFFICE_APPS.map((app) => (
+                          <span
+                            key={app.short}
+                            title={app.name}
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black text-white shadow-2xs ${app.tone}`}
+                          >
+                            {app.short}
+                          </span>
+                        ))}
                       </div>
-                      <p className="mt-0.5 text-sm sm:text-[15px] font-extrabold text-slate-900">
-                        Phí Văn Thắng
+                    </div>
+                    <div>
+                      <p className="text-sm sm:text-[15px] font-extrabold text-slate-900 leading-snug">
+                        Thực hành trực tiếp & hỏi đáp ngay trong ca học
                       </p>
-                      <p className="text-xs font-medium text-slate-600 leading-snug">
-                        8 năm kinh nghiệm · Dạy trực tiếp, dễ hiểu cho người mới & mất gốc
+                      <p className="mt-1 text-xs font-medium text-slate-600 leading-relaxed">
+                        Phù hợp cho người mới bắt đầu, người mất gốc hoặc cần học Word · Excel · PowerPoint bài bản.
                       </p>
                     </div>
                   </div>

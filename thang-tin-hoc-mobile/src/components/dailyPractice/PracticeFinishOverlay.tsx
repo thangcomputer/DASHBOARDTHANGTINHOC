@@ -3,6 +3,7 @@ import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Celebration } from './Celebration';
 import { PracticeReviewModal } from './PracticeReviewModal';
+import { ShareAchievementModal, type ShareAchievementData } from '../ShareAchievementModal';
 import type { GameSound } from './useGameSounds';
 import type { DpSummary } from '../../services/dailyPracticeApi';
 
@@ -24,6 +25,7 @@ export function PracticeFinishOverlay({
   onRelatedVideo?: () => void;
 }) {
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [shareData, setShareData] = useState<ShareAchievementData | null>(null);
   const insets = useSafeAreaInsets();
   const reviewItems = (summary.reviewAll?.length ? summary.reviewAll : summary.review) || [];
 
@@ -43,8 +45,15 @@ export function PracticeFinishOverlay({
               onClose={onDismiss}
               onReviewResults={() => setReviewOpen(true)}
               onReplay={onReplay}
+              onShare={(data) => setShareData(data)}
             />
           </ScrollView>
+          <ShareAchievementModal
+            visible={Boolean(shareData)}
+            onClose={() => setShareData(null)}
+            data={shareData}
+            inlineOverlay
+          />
         </View>
       </Modal>
       <PracticeReviewModal review={reviewItems} visible={reviewOpen} onClose={() => setReviewOpen(false)} />

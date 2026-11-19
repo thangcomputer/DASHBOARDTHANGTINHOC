@@ -11,6 +11,7 @@ const { xpPack } = require('./dailyPracticeRules');
 const SystemSettings = require('../models/SystemSettings');
 const { settlePayment } = require('./ledgerService');
 const { unlockFreePortal } = require('./freePortal');
+const { emitSubscriptionRealtime } = require('../config/socketHub');
 const { buildStudentSearchAndConditions } = require('../utils/personSearchQuery');
 
 const PLANS = ['1m', '3m', '6m', '12m', 'lifetime'];
@@ -184,7 +185,11 @@ async function applyRenewal(studentId, plan, { source, code = '', paymentSession
         console.error('[subscription] không cộng được mức 300 XP/ngày:', err.message);
       }
     }
-    return statusOf({ ...updated, freePortal: student.freePortal }, now, await getXpConfig());
+    const status = statusOf({ ...updated, freePortal: student.freePortal }, now, await getXpConfig());
+    emitSubscriptionRealtime(studentId, status, {
+      unlocked: student.freePortal === true || plan !== 'lifetime',
+    });
+    return status;
   }
   throw httpError(409, 'Đang có thao tác gia hạn khác, vui lòng thử lại');
 }
@@ -731,7 +736,16 @@ async function adminSetSubscription(studentId, { mode = 'extend', plan = '', exp
     note: mode === 'free' ? (note ? `Về gói miễn phí · ${note}` : 'Về gói miễn phí') : (note || defaultNote),
   });
   await syncPlanAllowance(studentId);
-  return statusOf(updated, new Date(), await getXpConfig());
+  if (mode === 'set' && nextExpiresAt && nextExpiresAt > new Date()) {
+    await unlockFreePortal(studentId);
+  }
+  const nextStatus = statusOf(updated, new Date(), await getXpConfig());
+  emitSubscriptionRealtime(studentId, nextStatus, {
+    unlocked: mode === 'set' && Boolean(nextExpiresAt && nextExpiresAt > new Date()),
+    locked: mode === 'free',
+    io: actor?.io,
+  });
+  return nextStatus;
 }
 
 /** Admin tìm HV để gia hạn tay (tên / SĐT / mã HV), trong phạm vi chi nhánh được xem. */

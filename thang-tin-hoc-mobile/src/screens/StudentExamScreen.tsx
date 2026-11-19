@@ -18,6 +18,8 @@ import {
 } from '../services/studentQuizApi';
 import { quizService } from '../services/mockService';
 import { getStudentCertExamScores, type CertExamScore } from '../services/studentApi';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../components/ShareAchievementModal';
+import { buildExamShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 
@@ -80,6 +82,7 @@ export function StudentExamScreen() {
   const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [notificationQuizId, setNotificationQuizId] = useState<string | null>(null);
   const [showDetailedReview, setShowDetailedReview] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [scoreTab, setScoreTab] = useState<'quiz' | 'cert'>('quiz');
   const [certScores, setCertScores] = useState<{ loading: boolean; error: string; data: CertExamScore[] }>({ loading: false, error: '', data: [] });
   const isPreview = Boolean(user?.previewMode)
@@ -314,10 +317,33 @@ export function StudentExamScreen() {
                 </View>
               </View>
               {result.exitReason ? <Text style={styles.resultExitReason}>{result.exitReason}</Text> : null}
-              <Pressable onPress={closeQuiz} style={styles.resultBackButton} accessibilityRole="button">
-                <Text style={styles.primaryButtonText}>Quay lại danh sách</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                {!result.forfeit ? (
+                  <ShareTriggerButton
+                    onPress={() => setShareOpen(true)}
+                    label="SHARE KẾT QUẢ"
+                    style={{ borderRadius: 12, minHeight: 40, paddingHorizontal: 14 }}
+                  />
+                ) : null}
+                <Pressable onPress={closeQuiz} style={[styles.resultBackButton, { flex: 1 }]} accessibilityRole="button">
+                  <Text style={styles.primaryButtonText}>Quay lại danh sách</Text>
+                </Pressable>
+              </View>
             </Card>
+            <ShareAchievementModal
+              visible={shareOpen}
+              onClose={() => setShareOpen(false)}
+              data={buildExamShareData({
+                title: quizDetail.title,
+                kindLabel: 'TRẮC NGHIỆM BUỔI HỌC',
+                score: result.score ?? 0,
+                scoreMax: 100,
+                correctCount: result.correctCount ?? 0,
+                totalQuestions: result.totalQuestions ?? 0,
+                passed: isPassed,
+                timeLimitMinutes: quizDetail.timeLimitMinutes,
+              }) as ShareAchievementData}
+            />
             {!result.forfeit && result.detailedReview.length ? (
               <View style={styles.reviewList}>
                 <Pressable

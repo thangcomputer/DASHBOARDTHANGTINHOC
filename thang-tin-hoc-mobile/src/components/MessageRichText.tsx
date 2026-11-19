@@ -7,6 +7,8 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+import { useLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 
 export interface MessageRichTextProps {
   text: string;
@@ -87,9 +89,9 @@ const STEP_ACTION_RE = /^(Vào|Vào menu|Mở|Chọn|Bấm|Nhấn|Click|Tạo|Đ
 
 export function emphasizeStepLine(line: string): string {
   const text = String(line || '');
-  if (/^\s*\*\*Bước\s+\d+/i.test(text)) return text;
-  if (/^\s*Bước\s+\d+\s*:/i.test(text)) {
-    return text.replace(/^(\s*)(Bước\s+\d+\s*:)/i, '$1**$2**');
+  if (/^\s*\*\*(?:Bước|Step)\s+\d+/i.test(text)) return text;
+  if (/^\s*(?:Bước|Step)\s+\d+\s*:/i.test(text)) {
+    return text.replace(/^(\s*)((?:Bước|Step)\s+\d+\s*:)/i, '$1**$2**');
   }
   const match = text.match(/^(\s*)(\d+)\.\s+(.*)$/);
   if (match) {
@@ -357,16 +359,21 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
   mine = false,
   highlight = '',
 }) => {
-  const raw = String(text || '');
+  const { language } = useLanguage();
+  const raw = useMemo(
+    () => (language === 'en' ? translateText(String(text || ''), 'en') : String(text || '')),
+    [language, text],
+  );
 
   // Strip embed tokens like ⟦chat:...⟧, ⟦go:...⟧, ⟦student_detail:...⟧ to clean label
   const cleanedText = useMemo(() => {
     return raw
       .replace(EMBED_RE, (_match, _p1, _p2, p3, _p4, p5, _p6, _p7, _p8, p9) => {
-        return p3 || p5 || p9 || '';
+        const label = p3 || p5 || p9 || '';
+        return language === 'en' && p5 ? translateText(label, 'en') : label;
       })
       .trim();
-  }, [raw]);
+  }, [language, raw]);
 
   const blocks = useMemo(() => {
     if (!cleanedText) return [];
@@ -393,7 +400,8 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
         }
         // If not a valid table, render as normal lines
         tableLines.forEach((tLine, li) => {
-          const emphasized = emphasizeStepLine(tLine);
+          const translatedLine = language === 'en' ? translateText(tLine, 'en') : tLine;
+          const emphasized = emphasizeStepLine(translatedLine);
           out.push(
             <Text key={`line-${start}-${li}`} style={styles.paragraphLine}>
               {renderInlineMarks(emphasized, `m-${start}-${li}`, mine, highlight)}
@@ -404,7 +412,8 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
       }
 
       // 2. Check if standalone formula line (e.g. `=SUMIF(...)`)
-      const curLine = lines[i];
+      const rawLine = lines[i];
+      const curLine = language === 'en' ? translateText(rawLine, 'en') : rawLine;
       if (isFormulaLine(curLine)) {
         out.push(
           <View
@@ -439,7 +448,7 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
     }
 
     return out;
-  }, [cleanedText, mine, highlight]);
+  }, [cleanedText, highlight, language, mine]);
 
   if (!cleanedText) return null;
 

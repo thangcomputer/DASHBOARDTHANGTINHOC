@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { playMessageSound, playNotifySound } from '../utils/sound';
 import { getMessagingRole, isMessageFromSelf } from '../lib/messagingRoles';
 import { API_BASE, SOCKET_BASE, apiFetch } from '../services/api';
+import { appAlert } from '../utils/Modal';
 import { isRetractedStudentScheduleNote } from '../components/teacher/TeacherStudentNoteModal';
 
 const SocketContext = createContext(null);
@@ -394,7 +395,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       }
     };
 
-    const onSystemReset = (data) => {
+    const onSystemReset = async (data) => {
       try {
         localStorage.removeItem('token');
         localStorage.removeItem('admin_user');
@@ -404,7 +405,11 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       } catch (e) {
         console.error('Lỗi khi xóa storage:', e);
       }
-      alert(data?.message || 'Hệ thống đã được thiết lập lại từ Admin. Vui lòng đăng nhập lại!');
+      await appAlert(
+        data?.message || 'Hệ thống đã được thiết lập lại từ Admin. Vui lòng đăng nhập lại!',
+        'warning',
+        'Hệ thống đã được đặt lại',
+      );
       window.location.href = '/login';
     };
 

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { resolveMediaUrl } from '../services/api';
 import { applyAnchorNewTabPolicy } from '../utils/htmlContent';
+import { cmsPromptInput } from '../utils/cmsDialog';
 
 const DEFAULT_IMG_STYLE = 'max-width:100%;width:auto;height:auto;max-height:22rem;border-radius:12px;display:inline-block';
 
@@ -338,10 +339,14 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
     getHtml: () => htmlToStorage(elRef.current?.innerHTML || ''),
   }));
 
-  const addLink = () => {
+  const addLink = async () => {
     if (disabled) return;
     saveRange();
-    const raw = window.prompt('Nhập link (https://…)');
+    const raw = await cmsPromptInput({
+      title: 'Thêm liên kết',
+      label: 'Địa chỉ URL',
+      placeholder: 'https://…',
+    });
     if (!raw) return;
     const href = normalizeHref(raw);
     if (!href) return;

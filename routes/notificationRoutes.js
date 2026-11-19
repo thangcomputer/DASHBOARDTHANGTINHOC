@@ -61,11 +61,50 @@ router.get('/unread', notifGuard('unread'), async (req, res) => {
   }
 });
 
+async function emitReadSync(req, data, unreadHint = null) {
+  const io = req.app?.get?.('io');
+  const userId = String(req.user?.id || req.user?._id || '');
+  if (!io || !userId) return;
+  const unread = unreadHint != null ? unreadHint : await center.countUnread(req.user).catch(() => null);
+  io.to(userId).emit('notification:read-sync', {
+    marked: data?.marked,
+    ...(unread != null ? { unread } : {}),
+  });
+}
+
 // PUT /api/notifications/mark-read
 router.put('/mark-read', notifGuard('mark_read'), async (req, res) => {
   try {
     const data = await center.markRead(req.user, req.body || {});
-    res.json({ success: true, message: 'Da danh dau doc', data });
+    const unread = await center.countUnread(req.user).catch(() => null);
+    await emitReadSync(req, data, unread);
+    res.json({ success: true, message: 'Da danh dau doc', data, ...(unread != null ? { unread } : {}) });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message || 'Loi server' });
+  }
+});
+
+// PUT /api/notifications/read-all
+router.put('/read-all', notifGuard('mark_read'), async (req, res) => {
+  try {
+    const data = await center.markRead(req.user, { markAll: true });
+    const unread = await center.countUnread(req.user).catch(() => 0);
+    await emitReadSync(req, data, unread);
+    res.json({ success: true, message: 'Da danh dau doc tat ca', data, unread });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message || 'Loi server' });
+  }
+});
+
+// PUT /api/notifications/:id/read
+router.put('/:id/read', notifGuard('mark_read'), async (req, res) => {
+  try {
+    const data = await center.markRead(req.user, { notificationId: req.params.id });
+    const unread = await center.countUnread(req.user).catch(() => null);
+    await emitReadSync(req, data, unread);
+    res.json({ success: true, message: 'Da danh dau doc', data, ...(unread != null ? { unread } : {}) });
   } catch (error) {
     const status = error.status || 500;
     res.status(status).json({ success: false, message: error.message || 'Loi server' });

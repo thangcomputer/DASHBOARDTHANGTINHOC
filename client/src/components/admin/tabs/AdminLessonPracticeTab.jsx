@@ -5,6 +5,7 @@ import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import RichTextEditor from '../shared/RichTextEditor';
 import AdminStudentTrainingTab from './AdminStudentTrainingTab';
+import { cmsConfirmAction } from '../../../utils/cmsDialog';
 
 const TYPES = [
   { id: 'multi', label: 'Chọn nhiều đáp án' },
@@ -560,7 +561,7 @@ export default function AdminLessonPracticeTab() {
   async function importBackup(file, course = null) {
     if (!file) return;
     const scope = course ? ` của khóa "${course.name}"` : '';
-    if (!window.confirm(`Nhập dữ liệu${scope} sẽ cập nhật các buổi/câu hỏi/nội dung/video trùng và thêm phần còn thiếu (không xóa dữ liệu hiện có). Tiếp tục?`)) return;
+    if (!(await cmsConfirmAction(`Nhập dữ liệu${scope} sẽ cập nhật các buổi/câu hỏi/nội dung/video trùng và thêm phần còn thiếu (không xóa dữ liệu hiện có). Tiếp tục?`))) return;
     setBackupBusy(true);
     setBackupCourseId(course?.id || '');
     setError('');
@@ -804,8 +805,8 @@ export default function AdminLessonPracticeTab() {
                                 aria-label={`Xóa ${unit.title}`}
                                 title={`Xóa ${unit.title}`}
                                 disabled={saving}
-                                onClick={() => {
-                                  if (!window.confirm(`Xóa ${unit.title}?`)) return;
+                                onClick={async () => {
+                                  if (!(await cmsConfirmAction(`Xóa ${unit.title}?`))) return;
                                   run(async () => {
                                     await lessonPracticeApi.admin.deleteUnit(unit.id);
                                     setUnitId('');
@@ -985,8 +986,8 @@ export default function AdminLessonPracticeTab() {
                                     <div className="flex items-center gap-2">
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          if (groupItems.length > 0 && !window.confirm(`Xóa Phần ${entryIndex + 1} và toàn bộ ${groupItems.length} câu hỏi trong phần này?`)) return;
+                                        onClick={async () => {
+                                          if (groupItems.length > 0 && !(await cmsConfirmAction(`Xóa Phần ${entryIndex + 1} và toàn bộ ${groupItems.length} câu hỏi trong phần này?`))) return;
                                           setItems((rows) => rows.filter((item) => String(item.practiceGroupId || unitId) !== groupId));
                                           setDeletedItemIds((rows) => [
                                             ...rows,
@@ -1361,8 +1362,8 @@ export default function AdminLessonPracticeTab() {
                                 aria-label={`Xóa ${unit.title}`}
                                 title={`Xóa ${unit.title}`}
                                 disabled={saving}
-                                onClick={() => {
-                                  if (!window.confirm(`Xóa ${unit.title}?`)) return;
+                                onClick={async () => {
+                                  if (!(await cmsConfirmAction(`Xóa ${unit.title}?`))) return;
                                   run(async () => {
                                     await lessonPracticeApi.admin.deleteUnit(unit.id);
                                     if (unitId === unit.id) setUnitId('');

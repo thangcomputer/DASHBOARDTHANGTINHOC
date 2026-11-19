@@ -19,11 +19,15 @@ import {
   Trophy,
   KeyRound,
   RefreshCw,
+  UserPlus,
+  ArrowRight,
 } from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
 import { isValidVNPhone, isValidEmail, limitPhoneInput, normalizePhone } from '../utils/validators';
 import { unlockAudio } from '../utils/sound';
+import ForgotPasswordModal from './ForgotPasswordModal';
+import LanguageSwitcher from './LanguageSwitcher';
 
 function GoogleIcon() {
   return (
@@ -128,16 +132,19 @@ export default function FreePortalPage({ onLogin }) {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialMode = searchParams.get('mode') === 'login' || searchParams.get('dangnhap') !== null ? 'login' : 'register';
+  const initialContact = searchParams.get('contact') || '';
   const [mode, setMode] = useState(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [age] = useState('18');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialContact);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notFoundAccount, setNotFoundAccount] = useState(false);
   const [deviceConflict, setDeviceConflict] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const [socialReady, setSocialReady] = useState({ google: false, facebook: false });
   const [pending, setPending] = useState(null);
   const [flyInReady, setFlyInReady] = useState(false);
@@ -146,6 +153,7 @@ export default function FreePortalPage({ onLogin }) {
   const [countdown, setCountdown] = useState(0);
   const [devOtpNotice, setDevOtpNotice] = useState('');
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
+  const [otpDeliveryInfo, setOtpDeliveryInfo] = useState(null);
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -159,11 +167,13 @@ export default function FreePortalPage({ onLogin }) {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const m = params.get('mode');
+    const c = params.get('contact');
     if (m === 'login' || m === 'dangnhap') {
       setMode('login');
     } else if (m === 'register' || m === 'dangky') {
       setMode('register');
     }
+    if (c) setPhone(c);
   }, [location.search]);
 
   useEffect(() => {
@@ -250,7 +260,7 @@ export default function FreePortalPage({ onLogin }) {
     if (!isPhoneOk && !isEmailOk) { setError('Số điện thoại hoặc Gmail không hợp lệ'); return; }
     if (!password) { setError('Hãy nhập mật khẩu'); return; }
     const loginId = isPhoneOk ? normalized : trimmedEmail;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setNotFoundAccount(false);
     try {
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/login/public`, {
@@ -260,7 +270,13 @@ export default function FreePortalPage({ onLogin }) {
       });
       const data = await response.json();
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') { setDeviceConflict(true); return; }
-      if (!data.success) { setError(data.message || 'Số điện thoại/Gmail hoặc mật khẩu không đúng'); return; }
+      if (!data.success) {
+        if (response.status === 404 || data.code === 'ACCOUNT_NOT_FOUND') {
+          setNotFoundAccount(true);
+        }
+        setError(data.message || 'Số điện thoại/Gmail hoặc mật khẩu không đúng');
+        return;
+      }
       acceptSession(data.data);
     } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
   };
@@ -311,58 +327,41 @@ export default function FreePortalPage({ onLogin }) {
     }
     if (password.length < 6) { setError('Mật khẩu cần ít nhất 6 ký tự'); return; }
 
-    setLoading(true); setError(''); setDevOtpNotice(''); setOtpSuccessMsg('');
+    setLoading(true); setError(''); setDevOtpNotice(''); setOtpSuccessMsg(''); setOtpDeliveryInfo(null);
+    const targetIdentifier = isEmailOk ? trimmedEmail : id;
     try {
       const csrf = await ensureCsrfToken();
-
-      if (isEmailOk) {
-        setEmail(trimmedEmail);
-        const response = await fetch(`${API_BASE}/auth/free-portal/send-otp`, {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-          body: JSON.stringify({ name: name.trim(), email: trimmedEmail, password }),
-        });
-        const data = await response.json();
-        if (!data.success) {
-          if (response.status === 409) {
-            setMode('login');
-            setPhone(trimmedEmail);
-            setOtpStep(false);
-          }
-          setError(data.message || 'Chưa gửi được mã xác thực');
-          return;
-        }
-        setOtpStep(true);
-        setCountdown(45);
-        if (data.devOtp) setDevOtpNotice(data.devOtp);
-        setOtpSuccessMsg(data.message || `Mã xác thực đã được gửi tới ${trimmedEmail}`);
-        return;
-      }
-
-      const regRes = await fetch(`${API_BASE}/auth/register-free`, {
+      setEmail(targetIdentifier);
+      const response = await fetch(`${API_BASE}/auth/free-portal/send-otp`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ name: name.trim(), age: 18, phone: id, password }),
+        body: JSON.stringify({
+          name: name.trim(),
+          age: Number(age) || 18,
+          identifier: targetIdentifier,
+          ...(isEmailOk ? { email: trimmedEmail } : { phone: id }),
+          password,
+        }),
       });
-      const regData = await regRes.json();
-      if (!regData.success) {
-        if (regRes.status === 409) {
+      const data = await response.json();
+      if (!data.success) {
+        if (response.status === 409) {
           setMode('login');
-          setPhone(id);
+          setPhone(targetIdentifier);
           setOtpStep(false);
         }
-        setError(regData.message || 'Không thể tạo tài khoản');
+        setError(data.message || 'Chưa gửi được mã xác thực');
         return;
       }
-
-      const loginRes = await fetch(`${API_BASE}/auth/login/public`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ identifier: id, phone: id, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: false }),
+      setOtpStep(true);
+      setOtpCode('');
+      setCountdown(Number(data.resendAfterSec || 45));
+      if (data.devOtp) setDevOtpNotice(data.devOtp);
+      setOtpDeliveryInfo({
+        channel: data.channel || (isEmailOk ? 'email' : 'sms'),
+        channelConfigured: data.channelConfigured !== false,
       });
-      const loginData = await loginRes.json();
-      if (!loginData.success) { setError(loginData.message || 'Đăng ký thành công, vui lòng đăng nhập.'); return; }
-      acceptSession(loginData.data);
+      setOtpSuccessMsg(data.message || `Mã xác thực đã được gửi tới ${targetIdentifier}`);
     } catch {
       setError('Không kết nối được máy chủ');
     } finally {
@@ -372,20 +371,28 @@ export default function FreePortalPage({ onLogin }) {
 
   const handleResendOtp = async () => {
     if (countdown > 0 || loading) return;
-    const trimmedEmail = email.trim().toLowerCase();
+    const targetIdentifier = email.trim();
+    const isEmailTarget = isValidEmail(targetIdentifier.toLowerCase());
     setLoading(true); setError(''); setDevOtpNotice(''); setOtpSuccessMsg('');
     try {
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/free-portal/resend-otp`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-        body: JSON.stringify({ email: trimmedEmail }),
+        body: JSON.stringify({
+          identifier: targetIdentifier,
+          ...(isEmailTarget ? { email: targetIdentifier.toLowerCase() } : { phone: targetIdentifier }),
+        }),
       });
       const data = await response.json();
       if (!data.success) { setError(data.message || 'Chưa gửi lại được mã'); setLoading(false); return; }
-      setCountdown(45);
+      setCountdown(Number(data.resendAfterSec || 45));
       if (data.devOtp) setDevOtpNotice(data.devOtp);
-      setOtpSuccessMsg(data.message || `Đã gửi lại mã mới tới ${trimmedEmail}`);
+      setOtpDeliveryInfo({
+        channel: data.channel || (isEmailTarget ? 'email' : 'sms'),
+        channelConfigured: data.channelConfigured !== false,
+      });
+      setOtpSuccessMsg(data.message || `Đã gửi lại mã mới tới ${targetIdentifier}`);
     } catch {
       setError('Không kết nối được máy chủ');
     } finally {
@@ -395,7 +402,8 @@ export default function FreePortalPage({ onLogin }) {
 
   const handleVerifyOtp = async (event) => {
     if (event) event.preventDefault();
-    const trimmedEmail = email.trim().toLowerCase();
+    const targetIdentifier = email.trim();
+    const isEmailTarget = isValidEmail(targetIdentifier.toLowerCase());
     const cleanOtp = otpCode.trim().replace(/\s+/g, '');
     if (!cleanOtp || cleanOtp.length < 6) {
       setError('Vui lòng nhập đủ 6 chữ số mã xác thực');
@@ -408,9 +416,10 @@ export default function FreePortalPage({ onLogin }) {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
         body: JSON.stringify({
-          email: trimmedEmail,
+          identifier: targetIdentifier,
+          ...(isEmailTarget ? { email: targetIdentifier.toLowerCase() } : { phone: targetIdentifier }),
           otp: cleanOtp,
-          deviceFingerprint: getDeviceFingerprint()
+          deviceFingerprint: getDeviceFingerprint(),
         }),
       });
       const data = await response.json();
@@ -498,6 +507,9 @@ export default function FreePortalPage({ onLogin }) {
 
         {/* Two-panel split layout: 50% / 50% */}
         <div className="relative z-10 flex h-full flex-col lg:flex-row">
+          <div className="absolute top-3.5 right-4 sm:top-5 sm:right-6 z-30">
+            <LanguageSwitcher variant="pill" theme="dark" />
+          </div>
 
           {/* ═══════════════════════════════════════════════════
               LEFT HERO PANEL (Minimal, clean, desktop only)
@@ -645,7 +657,7 @@ export default function FreePortalPage({ onLogin }) {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => { setMode(tab.id); setError(''); }}
+                      onClick={() => { setMode(tab.id); setError(''); setNotFoundAccount(false); }}
                       className={`dewskill-tab rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${mode === tab.id
                         ? 'bg-emerald-600 text-white shadow-sm'
                         : 'text-slate-400 hover:text-white'
@@ -664,16 +676,25 @@ export default function FreePortalPage({ onLogin }) {
                 <form onSubmit={handleVerifyOtp} className="space-y-3">
                   {/* Hộp thông báo email nhận mã */}
                   <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-center">
-                    <div className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
-                      <Mail size={18} />
+                      <div className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                        {otpDeliveryInfo?.channel === 'sms' ? <Phone size={18} /> : <Mail size={18} />}
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-300">
+                        {otpDeliveryInfo?.channel === 'sms'
+                          ? 'Mã xác thực 6 chữ số qua tin nhắn SĐT tới:'
+                          : 'Mã xác thực 6 chữ số đã được gửi tới:'}
+                      </p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-black text-emerald-300 break-all">
+                        {email}
+                      </p>
+                      {otpDeliveryInfo && otpDeliveryInfo.channelConfigured === false ? (
+                        <p className="mt-1.5 text-[11px] font-semibold text-amber-300">
+                          {otpDeliveryInfo.channel === 'sms'
+                            ? 'Máy chủ chưa cấu hình cổng SMS trong .env — dùng mã thử nghiệm (Dev) hoặc xem log server.'
+                            : 'Máy chủ chưa cấu hình SMTP/Gmail trong .env — dùng mã thử nghiệm (Dev) hoặc xem log server.'}
+                        </p>
+                      ) : null}
                     </div>
-                    <p className="text-[11px] font-semibold text-slate-300">
-                      Mã xác thực 6 chữ số đã được gửi tới:
-                    </p>
-                    <p className="mt-0.5 text-xs sm:text-sm font-black text-emerald-300 break-all">
-                      {email}
-                    </p>
-                  </div>
 
                   {/* Banner mã thử nghiệm trong môi trường DEV (Click để điền tự động) */}
                   {devOtpNotice && (
@@ -737,14 +758,14 @@ export default function FreePortalPage({ onLogin }) {
                     <span>{loading ? 'Đang xác thực…' : 'Xác nhận & Vào học ngay'}</span>
                   </button>
 
-                  {/* Thao tác phụ: Gửi lại mã / Đổi email khác */}
+                  {/* Thao tác phụ: Gửi lại mã / Đổi SĐT hoặc Gmail */}
                   <div className="flex items-center justify-between pt-0.5 text-xs">
                     <button
                       type="button"
                       onClick={() => { setOtpStep(false); setError(''); }}
                       className="font-bold text-slate-300 hover:text-white hover:underline transition cursor-pointer"
                     >
-                      ← Đổi email khác
+                      ← Sửa SĐT / Gmail
                     </button>
 
                     <button
@@ -793,7 +814,10 @@ export default function FreePortalPage({ onLogin }) {
                     icon={Phone}
                     inputMode={pending ? 'numeric' : 'email'}
                     value={phone}
-                    onChange={(e) => setPhone(pending ? limitPhoneInput(e.target.value) : e.target.value)}
+                    onChange={(e) => {
+                      setPhone(pending ? limitPhoneInput(e.target.value) : e.target.value);
+                      setNotFoundAccount(false);
+                    }}
                     placeholder={pending ? '0912 345 678' : '0912345678 hoặc vidu@gmail.com'}
                   />
 
@@ -817,11 +841,41 @@ export default function FreePortalPage({ onLogin }) {
                     </CompactField>
                   )}
 
+                  {mode === 'login' && !pending ? (
+                    <div className="flex justify-end -mt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowForgot(true)}
+                        className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <KeyRound size={12} aria-hidden="true" /> Quên mật khẩu?
+                      </button>
+                    </div>
+                  ) : null}
+
                   {/* Error message */}
                   {error && (
-                    <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-rose-300">
-                      <span className="shrink-0 text-rose-400 font-bold">⚠</span>
-                      <span>{error}</span>
+                    <div className="space-y-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-rose-300">
+                      <div className="flex items-start gap-2">
+                        <span className="shrink-0 text-rose-400 font-bold">⚠</span>
+                        <span>{error}</span>
+                      </div>
+                      {notFoundAccount && mode === 'login' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMode('register');
+                            setOtpStep(false);
+                            setError('');
+                            setNotFoundAccount(false);
+                          }}
+                          className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black tracking-wide transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <UserPlus size={14} />
+                          Đăng ký tài khoản ngay
+                          <ArrowRight size={14} />
+                        </button>
+                      ) : null}
                     </div>
                   )}
 
@@ -891,6 +945,24 @@ export default function FreePortalPage({ onLogin }) {
           </div>
         </div>
       </div>
+      <ForgotPasswordModal
+        open={showForgot}
+        initialRole="student"
+        lockRole
+        onClose={() => setShowForgot(false)}
+        onRecovered={(payload) => {
+          setShowForgot(false);
+          acceptSession(payload);
+        }}
+        onSwitchToRegister={(val) => {
+          setShowForgot(false);
+          setMode('register');
+          setOtpStep(false);
+          setError('');
+          setNotFoundAccount(false);
+          if (val) setPhone(val);
+        }}
+      />
     </>
   );
 }

@@ -13,6 +13,7 @@ import {
   Download, Upload, FileSpreadsheet, RefreshCw
 } from 'lucide-react';
 import { useToast } from '../utils/useToast';
+import { cmsConfirmAction } from '../utils/cmsDialog';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { apiFetch, resolveMediaUrl } from '../services/api';
@@ -1190,7 +1191,7 @@ export default function CoursePricingTab() {
         throw new Error('Không đúng mẫu Excel: cần có cột Tên khóa học và Giá gốc');
       }
 
-      if (!window.confirm(`Sẽ thêm khóa mới từ file "${file.name}". Tên khóa trùng với khóa đang có sẽ được bỏ qua; dữ liệu hiện có không bị ghi đè. Tiếp tục?`)) {
+      if (!(await cmsConfirmAction(`Sẽ thêm khóa mới từ file "${file.name}". Tên khóa trùng với khóa đang có sẽ được bỏ qua; dữ liệu hiện có không bị ghi đè. Tiếp tục?`))) {
         return;
       }
 

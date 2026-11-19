@@ -24,7 +24,7 @@ import { buildStudentActivityLogs, isStudentScheduleLog, isStudentScoreLog } fro
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
-import { isFreePortalLocked, useFreePortalLock, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
+import { useFreePortalLock, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
 import FreeFeatureLock from './student/dailyPractice/FreeFeatureLock';
 import {
   StudentLazyEvaluationTab,
@@ -138,7 +138,7 @@ const StudentDashboard = () => {
     session = {};
   }
   const STUDENT_ID = session.id || session._id || null;
-  const freePortalApiLocked = isFreePortalLocked(session);
+  const freePortalApiLocked = useFreePortalLock(session);
   const { students, teachers, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, examSubjectsCatalog } = useData();
   const { setSchedulesLocal } = useScheduleContext();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));

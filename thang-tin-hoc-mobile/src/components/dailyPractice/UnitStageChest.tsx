@@ -14,6 +14,8 @@ import { BlurView } from 'expo-blur';
 import { Check, Gift, Lock, Sparkles, X, Zap } from 'lucide-react-native';
 import type { GameSound } from './useGameSounds';
 import { DpPathUnit, dailyPracticeApi, UNIT_CHEST_REWARD_XP } from '../../services/dailyPracticeApi';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../ShareAchievementModal';
+import { buildChestShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 
 function unitStepProgress(unit: DpPathUnit) {
   const steps = unit.steps || [];
@@ -124,6 +126,7 @@ export function UnitStageChest({ unit, play, onClaimed, variant = 'bar' }: Props
   const [error, setError] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [claimedXp, setClaimedXp] = useState(rewardXp);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const doneStyle = complete && !claimed;
   const claimedStyle = claimed;
@@ -382,17 +385,33 @@ export function UnitStageChest({ unit, play, onClaimed, variant = 'bar' }: Props
               {liveCounter >= claimedXp ? '✨ 50 XP đã được cộng vào ví của bạn!' : 'Đang đồng bộ phần thưởng...'}
             </Text>
 
-            {/* Nút nhận thưởng 3D xanh nổi bật */}
-            <Pressable
-              onPress={handleCloseCelebration}
-              style={styles.actionBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Tuyệt vời, nhận ngay"
-            >
-              <Check size={20} color="#FFFFFF" strokeWidth={3} />
-              <Text style={styles.actionBtnText}>Tuyệt vời · Nhận ngay</Text>
-            </Pressable>
+            {/* Nút hành động 3D xanh + SHARE */}
+            <View style={styles.celebrationActions}>
+              <ShareTriggerButton
+                onPress={() => {
+                  play?.('tap');
+                  setShareOpen(true);
+                }}
+                label="SHARE"
+                style={styles.chestShareBtn}
+              />
+              <Pressable
+                onPress={handleCloseCelebration}
+                style={styles.actionBtnFlex}
+                accessibilityRole="button"
+                accessibilityLabel="Tuyệt vời, nhận ngay"
+              >
+                <Check size={20} color="#FFFFFF" strokeWidth={3} />
+                <Text style={styles.actionBtnText}>Tuyệt vời · Nhận ngay</Text>
+              </Pressable>
+            </View>
           </Animated.View>
+          <ShareAchievementModal
+            visible={shareOpen}
+            onClose={() => setShareOpen(false)}
+            data={buildChestShareData({ unitTitle: unit.title || '', rewardXp: claimedXp }) as ShareAchievementData}
+            inlineOverlay
+          />
         </View>
       </Modal>
     </>
@@ -652,6 +671,39 @@ const styles = StyleSheet.create({
     color: '#059669',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  celebrationActions: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+  chestShareBtn: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+  },
+  actionBtnFlex: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: '#059669',
+    borderBottomWidth: 4,
+    borderBottomColor: '#047857',
+    ...(Platform.OS === 'web' ? {
+      boxShadow: '0 8px 18px rgba(5, 150, 105, 0.35)',
+    } : {
+      shadowColor: '#059669',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.35,
+      shadowRadius: 8,
+      elevation: 6,
+    }),
   },
   actionBtn: {
     width: '100%',

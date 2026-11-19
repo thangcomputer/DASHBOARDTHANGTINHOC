@@ -69,9 +69,9 @@ const STEP_ACTION_RE = /^(Vào|Vào menu|Mở|Chọn|Bấm|Nhấn|Click|Tạo|Đ
 
 export function emphasizeStepLine(line) {
   const text = String(line || '');
-  if (/^\s*\*\*Bước\s+\d+/i.test(text)) return text;
-  if (/^\s*Bước\s+\d+\s*:/i.test(text)) {
-    return text.replace(/^(\s*)(Bước\s+\d+\s*:)/i, '$1**$2**');
+  if (/^\s*\*\*(?:Bước|Step)\s+\d+/i.test(text)) return text;
+  if (/^\s*(?:Bước|Step)\s+\d+\s*:/i.test(text)) {
+    return text.replace(/^(\s*)((?:Bước|Step)\s+\d+\s*:)/i, '$1**$2**');
   }
   const match = text.match(/^(\s*)(\d+)\.\s+(.*)$/);
   if (match && STEP_ACTION_RE.test(match[3].trim())) {

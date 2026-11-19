@@ -263,23 +263,30 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
     assert.equal(refresh.json.success, true);
   });
 
-  await t.test('invalid identifiers, contacts, duplicates and wrong portals fail generically', async () => {
-    const attempts = [
+  await t.test('unregistered accounts return ACCOUNT_NOT_FOUND while internal login and wrong password fail safely', async () => {
+    const notFoundAttempts = [
       () => publicLogin('unknown.phase15@example.test', 'StudentPass!1', 'student'),
       () => publicLogin('0977777777', 'StudentPass!1', 'student'),
       () => publicLogin('0962345678', 'Duplicate!1', 'student'),
-      () => internalLogin('admin', 'phase15-master-password'),
       () => publicLogin('0942345678', 'AdminPass!1', 'student'),
     ];
-    for (const attempt of attempts) {
+    for (const attempt of notFoundAttempts) {
       const result = await attempt();
-      assert.equal(result.response.status, 401);
-      assert.equal(result.json.code, 'INVALID_CREDENTIALS');
-      assert.equal(result.json.message, 'Số điện thoại hoặc mật khẩu không đúng');
+      assert.equal(result.response.status, 404);
+      assert.equal(result.json.code, 'ACCOUNT_NOT_FOUND');
+      assert.equal(result.json.suggestRegister, true);
     }
+
+    const adminDenied = await internalLogin('admin', 'phase15-master-password');
+    assert.equal(adminDenied.response.status, 401);
+    assert.equal(adminDenied.json.code, 'INVALID_CREDENTIALS');
+
+    const wrongPw = await publicLogin('0901234567', 'WrongPassword!9', 'student');
+    assert.equal(wrongPw.response.status, 401);
+    assert.equal(wrongPw.json.code, 'INVALID_CREDENTIALS');
   });
 
-  await t.test('check-role and forgot-password do not enumerate accounts', async () => {
+  await t.test('check-role stays uniform and forgot-password checks account existence', async () => {
     const knownRole = await harness.request('POST', '/api/auth/check-role', {
       body: { phone: '0901234567' },
     });
@@ -296,9 +303,10 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
       body: { phone: '0999999999', role: 'student' },
     });
     assert.equal(knownForgot.response.status, 202);
-    assert.equal(unknownForgot.response.status, 202);
-    assert.equal(knownForgot.json.message, unknownForgot.json.message);
     assert.equal(Object.hasOwn(knownForgot.json, 'data'), false);
+    assert.equal(unknownForgot.response.status, 404);
+    assert.equal(unknownForgot.json.code, 'ACCOUNT_NOT_FOUND');
+    assert.equal(unknownForgot.json.suggestRegister, true);
   });
 
   await t.test('CAPTCHA and MFA remain gates on internal login', async () => {

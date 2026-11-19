@@ -44,15 +44,41 @@ function readStudentSession() {
 
 export function useFreePortalLock(session) {
   const [stored, setStored] = useState(readStudentSession);
+  const [unlockOverride, setUnlockOverride] = useState(null);
   useEffect(() => {
-    const sync = () => setStored(readStudentSession());
-    window.addEventListener('free-portal-unlocked', sync);
-    return () => window.removeEventListener('free-portal-unlocked', sync);
+    const onUnlock = () => {
+      setUnlockOverride(true);
+      setStored(readStudentSession());
+    };
+    const onLock = () => {
+      setUnlockOverride(false);
+      setStored(readStudentSession());
+    };
+    const onSubUpdated = (e) => {
+      if (typeof e?.detail?.freeUnlocked === 'boolean') {
+        setUnlockOverride(e.detail.freeUnlocked);
+      }
+      setStored(readStudentSession());
+    };
+    window.addEventListener('free-portal-unlocked', onUnlock);
+    window.addEventListener('free-portal-locked', onLock);
+    window.addEventListener('cms:subscription-updated', onSubUpdated);
+    return () => {
+      window.removeEventListener('free-portal-unlocked', onUnlock);
+      window.removeEventListener('free-portal-locked', onLock);
+      window.removeEventListener('cms:subscription-updated', onSubUpdated);
+    };
   }, []);
   useEffect(() => {
     setStored(readStudentSession());
+    if (typeof session?.freeUnlocked === 'boolean') {
+      setUnlockOverride(null);
+    }
   }, [session?.freePortal, session?.freeUnlocked]);
   const source = session?.freePortal === true ? session : (stored || session);
+  if (typeof unlockOverride === 'boolean' && source?.role === 'student' && source?.freePortal === true) {
+    return !unlockOverride;
+  }
   return isFreePortalLocked(source);
 }
 

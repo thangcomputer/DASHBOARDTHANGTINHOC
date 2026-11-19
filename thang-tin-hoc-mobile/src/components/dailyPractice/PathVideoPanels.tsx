@@ -33,6 +33,8 @@ import {
   dailyPracticeApi,
   type DpVideoGuide,
 } from '../../services/dailyPracticeApi';
+import { getCurrentLanguage } from '../../i18n/LanguageContext';
+import { translateText } from '../../../../shared/i18n/translate.mjs';
 
 const NOTE_QUICK_TAGS = [
   '📌 Quan trọng',
@@ -172,7 +174,9 @@ async function copyTextCrossPlatform(text: string): Promise<boolean> {
 }
 
 function buildNotesMarkdown(notes: TimelineNote[], unitTitle?: string): string {
-  const heading = unitTitle ? `# Ghi chú bài học: ${unitTitle}\n\n` : '# Ghi chú video bài học\n\n';
+  const lang = getCurrentLanguage();
+  const rawHeading = unitTitle ? `# Ghi chú bài học: ${unitTitle}` : '# Ghi chú video bài học';
+  const heading = `${translateText(rawHeading, lang)}\n\n`;
   const lines = notes.map((note) => {
     const label = note.lessonTitle ? ` (${note.lessonTitle})` : '';
     return `- [${formatVideoTimestamp(note.atSec)}]${label}: ${note.text}`;

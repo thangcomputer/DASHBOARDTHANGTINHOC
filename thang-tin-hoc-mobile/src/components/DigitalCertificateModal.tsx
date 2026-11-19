@@ -15,6 +15,10 @@ import Svg, { Rect } from 'react-native-svg';
 import * as Print from 'expo-print';
 import { Award, Check, Copy, Printer, Share2, ShieldCheck, Sparkles, X } from 'lucide-react-native';
 import { radius, spacing, typography } from '../theme/tokens';
+import { useLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from './ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 
 export type DigitalCertificateModalProps = {
   visible: boolean;
@@ -174,8 +178,10 @@ export function DigitalCertificateModal({
   avgGrade = null,
   issuedDate = '',
 }: DigitalCertificateModalProps) {
+  const { language } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const safeCompletion = Math.min(100, Math.max(0, Math.round(Number(completionRate) || 100)));
 
@@ -216,10 +222,13 @@ export function DigitalCertificateModal({
 
   const handleShareOrCopy = async () => {
     const safeName = studentName || 'Học viên';
-    const message = `Chứng chỉ Thắng Tin Học · Học viên: ${safeName} · Khóa: ${courseTitle} · Mã xác thực: ${certCode} · Link: ${verifyUrl}`;
+    const message = translateText(
+      `Chứng chỉ Thắng Tin Học · Học viên: ${safeName} · Khóa: ${courseTitle} · Mã xác thực: ${certCode} · Link: ${verifyUrl}`,
+      language,
+    );
     if (Platform.OS !== 'web') {
       try {
-        await Share.share({ title: 'Chứng chỉ Thắng Tin Học', message });
+        await Share.share({ title: translateText('Chứng chỉ Thắng Tin Học', language), message });
         return;
       } catch {
         // user dismissed share sheet or share failed silently
@@ -240,9 +249,10 @@ export function DigitalCertificateModal({
     if (printing) return;
     setPrinting(true);
     try {
+      const tx = (value: string) => translateText(value, language);
       const qrSvg = qrMatrixToSvgMarkup(qrMatrix, 92);
       const gradeHtml = avgGrade != null && Number(avgGrade) > 0
-        ? `<span style="color:#B45309">Điểm TB: ${escapeHtml(String(avgGrade))}/10</span>`
+        ? `<span style="color:#B45309">${escapeHtml(tx('Điểm TB:'))} ${escapeHtml(String(avgGrade))}/10</span>`
         : '';
       const html = `<!doctype html>
 <html>
@@ -272,37 +282,37 @@ export function DigitalCertificateModal({
       <div class="inner">
         <div class="head">
           <div>
-            <div class="brand">Thắng Tin Học Academy</div>
-            <div class="sub">Hệ thống Đào tạo &amp; Xác thực Kỹ năng số</div>
+            <div class="brand">${escapeHtml(tx('Thắng Tin Học Academy'))}</div>
+            <div class="sub">${escapeHtml(tx('Hệ thống Đào tạo & Xác thực Kỹ năng số'))}</div>
           </div>
-          <div class="badge">Đã xác thực</div>
+          <div class="badge">${escapeHtml(tx('Đã xác thực'))}</div>
         </div>
         <div class="center">
           <div class="eyebrow">Certificate of Completion</div>
-          <h1>CHỨNG NHẬN HOÀN THÀNH KHÓA HỌC</h1>
-          <div style="font-size:13px;color:#64748B;">Trân trọng trao tặng học viên</div>
-          <div class="name">${escapeHtml(studentName || 'HỌC VIÊN THẮNG TIN HỌC')}</div>
-          <div style="font-size:13px;color:#475569;">Đã hoàn thành xuất sắc chương trình đào tạo &amp; thực hành</div>
+          <h1>${escapeHtml(tx('CHỨNG NHẬN HOÀN THÀNH KHÓA HỌC'))}</h1>
+          <div style="font-size:13px;color:#64748B;">${escapeHtml(tx('Trân trọng trao tặng học viên'))}</div>
+          <div class="name">${escapeHtml(studentName || tx('HỌC VIÊN THẮNG TIN HỌC'))}</div>
+          <div style="font-size:13px;color:#475569;">${escapeHtml(tx('Đã hoàn thành xuất sắc chương trình đào tạo & thực hành'))}</div>
           <div class="courseBox">
-            <div class="courseTitle">${escapeHtml(courseTitle)}</div>
+            <div class="courseTitle">${escapeHtml(tx(courseTitle))}</div>
             <div class="meta">
-              <span style="color:#047857">Tiến độ: ${safeCompletion}%</span>
+              <span style="color:#047857">${escapeHtml(tx('Tiến độ:'))} ${safeCompletion}%</span>
               ${gradeHtml}
-              <span>Ngày cấp: ${escapeHtml(formattedDate)}</span>
+              <span>${escapeHtml(tx('Ngày cấp:'))} ${escapeHtml(formattedDate)}</span>
             </div>
           </div>
         </div>
         <div class="footer">
           <div>
-            <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;color:#94A3B8;text-transform:uppercase;">Giảng viên / Đại diện đào tạo</div>
-            <div style="font-size:14px;font-weight:800;color:#1E293B;margin-top:3px;">${escapeHtml(instructorName || 'Trung tâm Thắng Tin Học')}</div>
-            <div style="font-size:11px;font-family:monospace;font-weight:700;color:#047857;margin-top:4px;">Mã CC: ${escapeHtml(certCode)}</div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;color:#94A3B8;text-transform:uppercase;">${escapeHtml(tx('Giảng viên / Đại diện đào tạo'))}</div>
+            <div style="font-size:14px;font-weight:800;color:#1E293B;margin-top:3px;">${escapeHtml(tx(instructorName || 'Trung tâm Thắng Tin Học'))}</div>
+            <div style="font-size:11px;font-family:monospace;font-weight:700;color:#047857;margin-top:4px;">${escapeHtml(tx('Mã CC:'))} ${escapeHtml(certCode)}</div>
           </div>
           <div class="qrBox">
             ${qrSvg}
             <div style="max-width:150px;">
-              <div style="font-size:10px;font-weight:800;color:#047857;text-transform:uppercase;">Quét QR xác thực</div>
-              <div style="font-size:10px;color:#64748B;margin-top:2px;">Kiểm tra tính hợp lệ trực tuyến theo mã định danh.</div>
+              <div style="font-size:10px;font-weight:800;color:#047857;text-transform:uppercase;">${escapeHtml(tx('Quét QR xác thực'))}</div>
+              <div style="font-size:10px;color:#64748B;margin-top:2px;">${escapeHtml(tx('Kiểm tra tính hợp lệ trực tuyến theo mã định danh.'))}</div>
               <div style="font-size:9px;font-family:monospace;color:#94A3B8;margin-top:4px;">${escapeHtml(certCode)}</div>
             </div>
           </div>
@@ -421,9 +431,15 @@ export function DigitalCertificateModal({
                   <Share2 size={15} color="#334155" />
                 )}
                 <Text style={styles.shareButtonText}>
-                  {Platform.OS === 'web' && copied ? 'Đã sao chép mã' : 'Chia sẻ / Sao chép mã'}
+                  {Platform.OS === 'web' && copied ? 'Đã sao chép mã' : 'Share / Sao chép mã'}
                 </Text>
               </Pressable>
+              <ShareTriggerButton
+                onPress={() => setShareOpen(true)}
+                label="SHARE"
+                size="sm"
+                style={{ borderRadius: 12, minHeight: 38 }}
+              />
             </View>
             <Pressable onPress={onClose} style={styles.closeButton} accessibilityRole="button">
               <X size={15} color="#475569" />
@@ -431,6 +447,19 @@ export function DigitalCertificateModal({
             </Pressable>
           </View>
         </View>
+        <ShareAchievementModal
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={buildCourseOrCertShareData({
+            title: courseTitle,
+            studentName,
+            completionRate: safeCompletion,
+            avgGrade,
+            certCode,
+            verifyUrl,
+          }) as ShareAchievementData}
+          inlineOverlay
+        />
       </View>
     </Modal>
   );

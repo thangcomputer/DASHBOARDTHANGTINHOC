@@ -321,8 +321,8 @@ test('lối vào 1 từ Tổng quan (web + mobile)', () => {
   assert.ok(!read('client/src/components/student/LearningGoalCard.jsx').includes('DailyStreakCta'), 'không lặp ở thẻ Mục tiêu');
 
   const mobile = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
-  assert.ok(mobile.includes('<DuoHeroCard'));
-  assert.ok(mobile.includes("tabNavigation.navigate('DailyPractice')"));
+  assert.ok(mobile.includes('<DuoHeroCard') || mobile.includes('styles.bHeroCard'));
+  assert.ok(mobile.includes("tabNavigation.navigate('DailyPractice'"));
   assert.ok(mobile.includes('<DuoDailyQuestsCard'));
   assert.ok(!read('thang-tin-hoc-mobile/src/components/LearningGoalCard.tsx').includes('DailyStreakCta'));
 });

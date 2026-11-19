@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   DeviceEventEmitter,
@@ -26,6 +26,8 @@ import {
   TrendingUp,
 } from 'lucide-react-native';
 import { useAuth } from '../app/AuthContext';
+import { useLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 import {
   AppHeader,
   AppScreen,
@@ -79,11 +81,14 @@ function createWorkbookBytes(rows: Array<Array<string | number>>) {
     const cells = row.map((value, columnIndex) => {
       const reference = `${spreadsheetColumn(columnIndex)}${rowIndex + 1}`;
       if (typeof value === 'number' && Number.isFinite(value)) {
-        const style = columnIndex === 4 ? (rowIndex > 3 && String(row[0] || '').toLocaleLowerCase().includes('tổng') ? 5 : 1) : 0;
+        const firstLabel = String(row[0] || '').toLocaleLowerCase();
+        const isSummaryRow = firstLabel.includes('tổng') || firstLabel.includes('total');
+        const style = columnIndex === 4 ? (rowIndex > 3 && isSummaryRow ? 5 : 1) : 0;
         return `<c r="${reference}"${style ? ` s="${style}"` : ''}><v>${value}</v></c>`;
       }
       const firstCell = String(row[0] || '').toLocaleLowerCase();
-      const style = rowIndex === 0 ? 3 : rowIndex === 3 ? 2 : firstCell.startsWith('tổng') ? 4 : 0;
+      const isSummaryStart = firstCell.startsWith('tổng') || firstCell.startsWith('total') || firstCell.includes('all students total');
+      const style = rowIndex === 0 ? 3 : rowIndex === 3 ? 2 : isSummaryStart ? 4 : 0;
       return `<c r="${reference}"${style ? ` s="${style}"` : ''} t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
     }).join('');
     return `<row r="${rowIndex + 1}"${rowIndex === 0 ? ' ht="28" customHeight="1"' : ''}>${cells}</row>`;
@@ -111,6 +116,7 @@ function encodeBase64(bytes: Uint8Array) {
 
 export function TeacherFinanceScreen() {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const loader = useCallback(() => teacherFinanceService.overview(user), [user]);
   const resource = useMockResource(loader);
   const overview = resource.data;
@@ -243,11 +249,12 @@ export function TeacherFinanceScreen() {
         studentRows.set(studentKey, student);
       });
 
+      const tx = (value: string) => translateText(value, language);
       const rows: Array<Array<string | number>> = [
-        [`BẢNG KÊ THU NHẬP ${monthTitle.toUpperCase()}`],
-        [`Giảng viên: ${user?.name || '-'}`],
+        [tx(`BẢNG KÊ THU NHẬP ${monthTitle.toUpperCase()}`)],
+        [tx(`Giảng viên: ${user?.name || '-'}`)],
         [],
-        ['Học viên', 'Khóa học', 'Ngày dạy', 'Buổi số', 'Tiền/buổi (VNĐ)'],
+        [tx('Học viên'), tx('Khóa học'), tx('Ngày dạy'), tx('Buổi số'), tx('Tiền/buổi (VNĐ)')],
       ];
       let totalAmount = 0;
       studentRows.forEach((student) => {
@@ -260,16 +267,18 @@ export function TeacherFinanceScreen() {
             session.amount,
           ]);
         });
-        rows.push([student.studentName, '', '', `Tổng ${student.sessions.length} buổi`, student.total]);
+        rows.push([student.studentName, '', '', tx(`Tổng ${student.sessions.length} buổi`), student.total]);
         totalAmount += student.total;
       });
-      if (!completedSessions.length) rows.push(['Không có buổi dạy hoàn thành trong tháng này']);
+      if (!completedSessions.length) rows.push([tx('Không có buổi dạy hoàn thành trong tháng này')]);
       rows.push([]);
-      rows.push(['TỔNG TOÀN BỘ HỌC VIÊN', '', '', `${completedSessions.length} buổi`, totalAmount]);
+      rows.push([tx('TỔNG TOÀN BỘ HỌC VIÊN'), '', '', tx(`${completedSessions.length} buổi`), totalAmount]);
 
       const workbookBytes = createWorkbookBytes(rows);
       const fileMonth = `${String(now.getMonth() + 1).padStart(2, '0')}_${now.getFullYear()}`;
-      const fileName = `Bang_ke_thu_nhap_Thang_${fileMonth}.xlsx`;
+      const fileName = language === 'en'
+        ? `Income_Statement_Month_${fileMonth}.xlsx`
+        : `Bang_ke_thu_nhap_Thang_${fileMonth}.xlsx`;
       if (Platform.OS === 'web') {
         const blob = new Blob([workbookBytes], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -285,14 +294,14 @@ export function TeacherFinanceScreen() {
         anchor.remove();
         setTimeout(() => URL.revokeObjectURL(url), 2000);
       } else {
-        if (!FileSystem.cacheDirectory) throw new Error('Không thể truy cập vùng lưu tệp trên thiết bị.');
+        if (!FileSystem.cacheDirectory) throw new Error(tx('Không thể truy cập vùng lưu tệp trên thiết bị.'));
         const uri = `${FileSystem.cacheDirectory}${fileName}`;
         const base64 = encodeBase64(workbookBytes);
         await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-        if (!(await Sharing.isAvailableAsync())) throw new Error('Thiết bị không hỗ trợ chia sẻ hoặc lưu tệp Excel.');
+        if (!(await Sharing.isAvailableAsync())) throw new Error(tx('Thiết bị không hỗ trợ chia sẻ hoặc lưu tệp Excel.'));
         await Sharing.shareAsync(uri, {
           mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: `Lưu bảng kê ${monthTitle}`,
+          dialogTitle: tx(`Lưu bảng kê ${monthTitle}`),
         });
       }
     } catch (error) {

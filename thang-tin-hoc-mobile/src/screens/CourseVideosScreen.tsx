@@ -15,6 +15,8 @@ import { saveLastStudySession } from '../utils/resumeLearning';
 import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from './VideoPlayerFrame';
 import { VideoLessonTabs } from './VideoLessonTabs';
 import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../components/ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 import { AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { useMockResource } from '../hooks/useMockResource';
@@ -454,6 +456,8 @@ export function CourseVideosScreen() {
   const [registeringCourseId, setRegisteringCourseId] = useState('');
   const [checkout, setCheckout] = useState<CoursePaymentCheckout | null>(null);
   const [certificateCourse, setCertificateCourse] = useState<LessonPracticeCourse | null>(null);
+  const [shareCourseData, setShareCourseData] = useState<ShareAchievementData | null>(null);
+  const [shareListData, setShareListData] = useState<ShareAchievementData | null>(null);
 
   const startCourseCheckout = async (course: LessonPracticeCourse) => {
     setRegisteringCourseId(course.id);
@@ -999,6 +1003,11 @@ export function CourseVideosScreen() {
               onOpen={openCourse}
               onRegister={requestCourseRegistration}
               onOpenCertificate={setCertificateCourse}
+              onShareCourse={(course) => setShareListData(buildCourseOrCertShareData({
+                title: course.name || 'Khóa học Thắng Tin Học',
+                studentName: user?.name || '',
+                completionRate: courseProgress(course),
+              }) as ShareAchievementData)}
               registeringCourseId={registeringCourseId}
             />
           </View>
@@ -1048,6 +1057,11 @@ export function CourseVideosScreen() {
         courseTitle={certificateCourse?.name || ''}
         completionRate={certificateCourse ? courseProgress(certificateCourse) : 100}
       />
+      <ShareAchievementModal
+        visible={Boolean(shareListData)}
+        onClose={() => setShareListData(null)}
+        data={shareListData}
+      />
       <Modal visible={Boolean(selectedCourse)} transparent animationType="slide" onRequestClose={() => { setSelectedCourse(null); setSelectedSubject(null); }}>
         <View style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => { setSelectedCourse(null); setSelectedSubject(null); }} accessibilityRole="button" accessibilityLabel="Đóng nội dung khóa học" />
@@ -1082,15 +1096,26 @@ export function CourseVideosScreen() {
                 </Text>
               </View>
               {selectedCourse?.enrolled && courseProgress(selectedCourse) >= 100 ? (
-                <Pressable
-                  onPress={() => setCertificateCourse(selectedCourse)}
-                  style={styles.headerCertButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Xem chứng nhận số có mã QR"
-                >
-                  <Award size={15} color="#047857" />
-                  <Text style={styles.headerCertButtonText}>Chứng chỉ QR</Text>
-                </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Pressable
+                    onPress={() => setCertificateCourse(selectedCourse)}
+                    style={styles.headerCertButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Xem chứng nhận số có mã QR"
+                  >
+                    <Award size={15} color="#047857" />
+                    <Text style={styles.headerCertButtonText}>Chứng chỉ QR</Text>
+                  </Pressable>
+                  <ShareTriggerButton
+                    onPress={() => setShareCourseData(buildCourseOrCertShareData({
+                      title: selectedCourse.name || 'Khóa học Thắng Tin Học',
+                      studentName: user?.name || '',
+                      completionRate: 100,
+                    }) as ShareAchievementData)}
+                    label="SHARE"
+                    size="sm"
+                  />
+                </View>
               ) : null}
               {selectedSubject && units.length > 0 ? (
                 <View style={styles.headerProgressPill}>
@@ -1156,6 +1181,11 @@ export function CourseVideosScreen() {
                           }}
                           onResetPractice={resetPracticeAttempt}
                           onContinuePractice={() => setSelectedLearningSectionId(null)}
+                          onShareUnit={() => setShareCourseData(buildCourseOrCertShareData({
+                            title: unit.title || selectedSubject?.name || selectedCourse?.name || 'Bài học',
+                            studentName: user?.name || '',
+                            completionRate: 100,
+                          }) as ShareAchievementData)}
                         />
                       );
                     })}
@@ -1352,6 +1382,12 @@ export function CourseVideosScreen() {
               )
             ) : null}
           </View>
+          <ShareAchievementModal
+            visible={Boolean(shareCourseData)}
+            onClose={() => setShareCourseData(null)}
+            data={shareCourseData}
+            inlineOverlay
+          />
         </View>
       </Modal>
     </AppScreen>
@@ -1385,12 +1421,14 @@ function CourseCard({
   onOpen,
   onRegister,
   onOpenCertificate,
+  onShareCourse,
   registering = false,
 }: {
   course: LessonPracticeCourse;
   onOpen: () => void;
   onRegister: () => void;
   onOpenCertificate?: () => void;
+  onShareCourse?: () => void;
   registering?: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -1512,10 +1550,19 @@ function CourseCard({
               <Text style={styles.zaloButtonText}>Zalo tư vấn</Text>
             </Pressable>
           ) : course.enrolled && progress >= 100 && onOpenCertificate ? (
-            <Pressable onPress={onOpenCertificate} style={styles.certButton} accessibilityRole="button" accessibilityLabel={`Xem chứng nhận QR khóa học ${course.name}`}>
-              <Award size={14} color="#047857" />
-              <Text style={styles.certButtonText}>Chứng chỉ QR</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Pressable onPress={onOpenCertificate} style={styles.certButton} accessibilityRole="button" accessibilityLabel={`Xem chứng nhận QR khóa học ${course.name}`}>
+                <Award size={14} color="#047857" />
+                <Text style={styles.certButtonText}>Chứng chỉ QR</Text>
+              </Pressable>
+              {onShareCourse ? (
+                <ShareTriggerButton
+                  onPress={onShareCourse}
+                  label="SHARE"
+                  size="sm"
+                />
+              ) : null}
+            </View>
           ) : (
             <View />
           )}
@@ -1537,12 +1584,14 @@ function CourseList({
   onOpen,
   onRegister,
   onOpenCertificate,
+  onShareCourse,
   registeringCourseId = '',
 }: {
   courses: LessonPracticeCourse[];
   onOpen: (course: LessonPracticeCourse) => void;
   onRegister: (course: LessonPracticeCourse) => void;
   onOpenCertificate?: (course: LessonPracticeCourse) => void;
+  onShareCourse?: (course: LessonPracticeCourse) => void;
   registeringCourseId?: string;
 }) {
   return (
@@ -1554,6 +1603,7 @@ function CourseList({
             onOpen={() => onOpen(course)}
             onRegister={() => onRegister(course)}
             onOpenCertificate={onOpenCertificate ? () => onOpenCertificate(course) : undefined}
+            onShareCourse={onShareCourse ? () => onShareCourse(course) : undefined}
             registering={registeringCourseId === course.id}
           />
         </View>
@@ -1617,6 +1667,7 @@ function UnitDetails({
   onAdvancePractice,
   onResetPractice,
   onContinuePractice,
+  onShareUnit,
 }: {
   unit: LessonPracticeUnit;
   units?: LessonPracticeUnit[];
@@ -1645,6 +1696,7 @@ function UnitDetails({
   onAdvancePractice: (unitId: string) => Promise<void>;
   onResetPractice: (unitId: string, practiceGroupId: string) => Promise<boolean>;
   onContinuePractice: () => void;
+  onShareUnit?: () => void;
 }) {
   const [practiceSoundEnabled, setPracticeSoundEnabled] = useState(true);
   const [startedPracticeKey, setStartedPracticeKey] = useState('');
@@ -1974,6 +2026,7 @@ function UnitDetails({
         onAdvancePractice={() => onAdvancePractice(unit.id)}
         onChoosePraise={choosePracticePraise}
         onPlayPraise={playPracticePraise}
+        onShareUnit={onShareUnit}
         onComplete={() => {
           if (!activeVideo) return Promise.resolve(true);
           return onCompleteSection(unit.id, 'video', activeVideo.id, true).then((saved) => {
@@ -2103,6 +2156,7 @@ function VideoLessonPane({
   onAdvancePractice,
   onChoosePraise,
   onPlayPraise,
+  onShareUnit,
   onComplete,
 }: {
   unit: LessonPracticeUnit;
@@ -2135,6 +2189,7 @@ function VideoLessonPane({
   onAdvancePractice?: () => Promise<void>;
   onChoosePraise?: () => PracticePraise;
   onPlayPraise?: (audio: number) => void;
+  onShareUnit?: () => void;
   onComplete: () => Promise<boolean>;
 }) {
   const [activeTab, setActiveTab] = useState<VideoMainTab>('lesson');
@@ -2615,10 +2670,21 @@ function VideoLessonPane({
               {`Buổi ${Math.max(1, unitIndex + 1)} · ${done ? 'Đã hoàn thành ✓' : `Đã xem ${watchedPct}%`}`}
             </Text>
           </View>
-          <View style={styles.videoStageCheckPill}>
-            <Text numberOfLines={1} style={styles.videoStageCheckPillText}>
-              {`${Math.min(safeQuizIdx + 1, quizItems.length)}/${quizItems.length} mốc câu hỏi`}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {done ? (
+              <ShareTriggerButton
+                onPress={() => onShareUnit?.()}
+                label="SHARE"
+                size="sm"
+                variant="white"
+                style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}
+              />
+            ) : null}
+            <View style={styles.videoStageCheckPill}>
+              <Text numberOfLines={1} style={styles.videoStageCheckPillText}>
+                {`${Math.min(safeQuizIdx + 1, quizItems.length)}/${quizItems.length} mốc câu hỏi`}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -3506,7 +3572,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   discountPctText: { fontSize: 8, fontWeight: '900', color: '#BE123C', backgroundColor: '#FFE4E6', borderRadius: 999, paddingHorizontal: 4, paddingVertical: 1 },
   priceText: { color: '#1E293B', fontSize: 14, fontWeight: '900' },
   priceTextSale: { color: '#BE123C' },
-  courseActions: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', backgroundColor: '#FFFDF5' },
+  courseActions: { minHeight: 54, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', backgroundColor: '#FFFDF5' },
   courseActionsCentered: { justifyContent: 'center' },
   zaloButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#BAE6FD', borderBottomWidth: 3, borderBottomColor: '#38BDF8', backgroundColor: '#E0F2FE' },
   zaloButtonText: { color: '#075985', fontSize: 12, fontWeight: '900' },

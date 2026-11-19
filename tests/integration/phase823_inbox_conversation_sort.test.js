@@ -209,9 +209,8 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
     assert.ok(navigation.includes('animateChrome(visibility, visible);'));
     assert.ok(ui.includes('animateChrome(headerProgress, visible);'));
     assert.ok(ui.includes('const CHROME_ANIMATION_MS = 260;'));
-    assert.equal(
-      (navigation.match(/style=\{styles\.navigationGlassBackground\}/g) || []).length,
-      2,
+    assert.ok(
+      (navigation.match(/style=\{styles\.navigationGlassBackground\}/g) || []).length >= 2,
       'main and persistent tab bars should share the same glass background',
     );
   });

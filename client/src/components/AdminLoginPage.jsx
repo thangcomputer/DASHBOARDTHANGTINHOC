@@ -9,6 +9,7 @@ import { setTokens, clearOtherRoleSessions, API_BASE, SOCKET_BASE, ensureCsrfTok
 import { unlockAudio } from '../utils/sound';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
 import { isValidVNPhone, limitPhoneInput, normalizePhone, PHONE_MAX_DIGITS } from '../utils/validators';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const ADMIN_HIGHLIGHTS = [
   { label: 'Bảo mật 2 lớp', icon: KeyRound },
@@ -271,6 +272,9 @@ const AdminLoginPage = ({ onLogin }) => {
       </div>
 
       <div className="relative z-10 w-full min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row overflow-x-clip md:overflow-hidden">
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-8 z-30">
+          <LanguageSwitcher variant="pill" theme="dark" />
+        </div>
 
         {/* CỘT TRÁI: GIỚI THIỆU TRUNG TÂM ĐIỀU HÀNH */}
         <div className="hidden md:flex md:w-[55%] p-10 lg:p-20 flex-col justify-center relative min-w-0">

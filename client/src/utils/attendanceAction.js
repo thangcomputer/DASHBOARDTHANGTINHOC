@@ -48,6 +48,8 @@ export const ATTENDANCE_UI = {
   UPCOMING: { state: 'UPCOMING', label: 'Sắp tới', tone: 'amber' },
   IN_PROGRESS: { state: 'IN_PROGRESS', label: 'Đang diễn ra', tone: 'blue' },
   PENDING_ATTENDANCE: { state: 'PENDING_ATTENDANCE', label: 'Chưa điểm danh', tone: 'orange' },
+  AWAITING_STUDENT_CONFIRM: { state: 'AWAITING_STUDENT_CONFIRM', label: 'Học viên đang xác nhận', tone: 'blue' },
+  ATTENDANCE_DISPUTED: { state: 'ATTENDANCE_DISPUTED', label: 'Đang giải quyết', tone: 'amber' },
   OVERDUE_ATTENDANCE: { state: 'OVERDUE_ATTENDANCE', label: 'Quá hạn điểm danh', tone: 'red' },
   COMPLETED: { state: 'COMPLETED', label: 'Đã học', tone: 'emerald' },
   CANCELLED: { state: 'CANCELLED', label: 'Đã hủy', tone: 'slate' },
@@ -99,6 +101,53 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
   }
 
   const bounds = scheduleBounds(schedule, now);
+  const confirm = String(schedule?.studentConfirmStatus || '').toLowerCase();
+  if (confirm === 'disputed') {
+    return {
+      ...ATTENDANCE_UI.ATTENDANCE_DISPUTED,
+      action: null,
+      canAttend: false,
+      canLateAttend: false,
+      canAdminMakeup: false,
+      canRequestCorrection: false,
+      reason: 'Học viên không đồng ý - chờ Admin xử lý',
+      remainingGraceMs: 0,
+      ...(bounds ? { endAt: bounds.endAt, graceEndAt: bounds.graceEndAt } : {}),
+    };
+  }
+  if (confirm === 'pending' || confirm === 'confirm_expired') {
+    const requestedAt = schedule?.studentConfirmRequestedAt
+      ? new Date(schedule.studentConfirmRequestedAt).getTime()
+      : 0;
+    const graceEndMs = bounds?.graceEndAt ? bounds.graceEndAt.getTime() : 0;
+    const deadlineMs = Math.max(requestedAt > 0 ? requestedAt + 60 * 60 * 1000 : 0, graceEndMs);
+    const expired = deadlineMs > 0 ? now.getTime() >= deadlineMs : confirm === 'confirm_expired';
+    if (!expired) {
+      return {
+        ...ATTENDANCE_UI.AWAITING_STUDENT_CONFIRM,
+        action: null,
+        canAttend: false,
+        canLateAttend: false,
+        canAdminMakeup: false,
+        canRequestCorrection: false,
+        reason: 'Đã gửi điểm danh - học viên đang xác nhận',
+        remainingGraceMs: Math.max(0, deadlineMs - now.getTime()),
+        ...(bounds ? { endAt: bounds.endAt, graceEndAt: bounds.graceEndAt } : {}),
+      };
+    }
+    return {
+      ...ATTENDANCE_UI.OVERDUE_ATTENDANCE,
+      action: 'ADMIN_MAKEUP',
+      canAttend: false,
+      canLateAttend: false,
+      canAdminMakeup: true,
+      canRequestCorrection: true,
+      reason: 'Quá hạn học viên xác nhận - cần Admin điểm danh bù',
+      remainingGraceMs: 0,
+      ...(bounds ? { endAt: bounds.endAt, graceEndAt: bounds.graceEndAt } : {}),
+    };
+  }
+
   if (!bounds) {
     return {
       ...ATTENDANCE_UI.UPCOMING,

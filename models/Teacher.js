@@ -195,6 +195,7 @@ const TeacherSchema = new mongoose.Schema(
     refreshToken: { type: String, select: false },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login → vô hiệu token cũ
     isFirstLogin: { type: Boolean, default: false },
+    mustChangePassword: { type: Boolean, default: false },
     /** Đã xem pháo hoa chào mừng lần đầu. Tài khoản cũ thiếu field = coi như đã xem. */
     welcomeCelebrationSeen: { type: Boolean, default: false },
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập

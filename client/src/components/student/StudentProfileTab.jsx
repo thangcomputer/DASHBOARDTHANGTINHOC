@@ -8,6 +8,8 @@ import {
   Award, Laptop, QrCode, Smartphone, Users, Lock,
 } from 'lucide-react';
 import DigitalCertificateModal from './DigitalCertificateModal';
+import ShareAchievementModal, { ShareTriggerButton } from './ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 import EditableAvatar from '../EditableAvatar';
 import { openPinLockSettings } from '../../utils/pinLock';
 import { openLearningGoal } from '../../utils/learningGoal';
@@ -21,6 +23,7 @@ import { useStudentSubscription } from './subscription/subscriptionContext';
 import { formatVnd } from '../../utils/subscription';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/useToast';
+import LanguageSwitcher from '../LanguageSwitcher';
 
 function openChangePassword() {
   window.dispatchEvent(new CustomEvent('open-change-password-modal'));
@@ -82,11 +85,13 @@ export default function StudentProfileTab({
 
   const [openSections, setOpenSections] = useState({
     courses: false,
-    freeSubjects: true,
+    freeSubjects: false,
     videoOrders: false,
     devices: false,
+    support: false,
   });
   const [certificateCourse, setCertificateCourse] = useState(null);
+  const [shareAchievementData, setShareAchievementData] = useState(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [videoOrders, setVideoOrders] = useState([]);
   const [lessonProgress, setLessonProgress] = useState({
@@ -616,7 +621,7 @@ export default function StudentProfileTab({
                         </div>
                       ) : null}
                       {isCompleted ? (
-                        <div className="pt-1">
+                        <div className="pt-1 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setCertificateCourse({
@@ -632,6 +637,17 @@ export default function StudentProfileTab({
                           >
                             <QrCode size={13} /> Xem chứng nhận QR
                           </button>
+                          <ShareTriggerButton
+                            onClick={() => setShareAchievementData(buildCourseOrCertShareData({
+                              title,
+                              scope: 'course',
+                              studentName: studentData?.name || '',
+                              completionRate: 100,
+                              avgGrade: examEval.averageExamScore ?? (Number(c.avgGrade) > 0 ? Number(c.avgGrade) : null),
+                            }))}
+                            label="SHARE"
+                            size="sm"
+                          />
                         </div>
                       ) : awaitingExams ? (
                         <div className="pt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[11px] font-semibold text-amber-800">
@@ -708,21 +724,33 @@ export default function StudentProfileTab({
                         {sub.done}/{sub.total} {sub.unitLabel} · Tiến độ {sub.pct}%
                       </span>
                       {sub.completed ? (
-                        <button
-                          type="button"
-                          onClick={() => setCertificateCourse({
-                            courseId: sub.id,
-                            courseTitle: sub.name,
-                            instructorName: 'Trung tâm Thắng Tin Học',
-                            completionRate: 100,
-                            avgGrade: null,
-                            examsPassed: true,
-                            scope: 'subject',
-                          })}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
-                        >
-                          <QrCode size={13} /> Xem &amp; tải chứng nhận
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setCertificateCourse({
+                              courseId: sub.id,
+                              courseTitle: sub.name,
+                              instructorName: 'Trung tâm Thắng Tin Học',
+                              completionRate: 100,
+                              avgGrade: null,
+                              examsPassed: true,
+                              scope: 'subject',
+                            })}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                          >
+                            <QrCode size={13} /> Xem &amp; tải chứng nhận
+                          </button>
+                          <ShareTriggerButton
+                            onClick={() => setShareAchievementData(buildCourseOrCertShareData({
+                              title: sub.name,
+                              scope: 'subject',
+                              studentName: studentData?.name || '',
+                              completionRate: 100,
+                            }))}
+                            label="SHARE"
+                            size="sm"
+                          />
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -953,26 +981,47 @@ export default function StudentProfileTab({
         </div>
       )}
 
-      {/* ── 7. Cài đặt và hỗ trợ (Chuẩn Mobile App) ── */}
-      <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] p-4 sm:p-5">
-        <h4 className="text-[16px] font-bold text-[#0F172A] mb-2">Cài đặt và hỗ trợ</h4>
+      {/* ── 7. Cài đặt và hỗ trợ (mặc định thu gọn, bấm vào mới mở) ── */}
+      <div className="rounded-[20px] bg-white border-[1.5px] border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.06)] overflow-hidden">
         <button
           type="button"
-          onClick={handleEnableNotification}
-          className="w-full min-h-[60px] flex items-center gap-3.5 text-left hover:bg-slate-50/70 py-2 border-b border-[#F1F5F9] transition-colors cursor-pointer !shadow-none"
+          onClick={() => toggleSection('support')}
+          aria-expanded={openSections.support}
+          className={`w-full min-h-[48px] flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-slate-50/60 transition cursor-pointer !shadow-none ${openSections.support ? 'border-b border-[#E9EEF2]' : ''}`}
         >
-          <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] text-[#10B981] flex items-center justify-center shrink-0">
-            <Bell size={18} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-semibold text-[#0F172A]">Bật thông báo trên thiết bị</p>
-            <p className="text-[12px] text-[#64748B] mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <Settings size={16} className="text-emerald-600 shrink-0" />
+            <h4 className="text-[14px] font-extrabold text-[#0F172A] truncate">Cài đặt và hỗ trợ</h4>
           </div>
-          <ChevronRight size={18} className="text-[#64748B] shrink-0" />
+          <ChevronDown
+            size={17}
+            className={`text-[#64748B] shrink-0 transition-transform duration-200 ${openSections.support ? 'rotate-180' : ''}`}
+          />
         </button>
-        <p className="text-[12px] text-[#64748B] italic mt-3">
-          Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
-        </p>
+        {openSections.support && (
+          <div className="p-4 sm:p-5">
+            <div className="mb-3">
+              <LanguageSwitcher variant="card" />
+            </div>
+            <button
+              type="button"
+              onClick={handleEnableNotification}
+              className="w-full min-h-[60px] flex items-center gap-3.5 text-left hover:bg-slate-50/70 py-2 border-b border-[#F1F5F9] transition-colors cursor-pointer !shadow-none"
+            >
+              <span className="w-[38px] h-[38px] rounded-[12px] bg-[#F8FAFC] text-[#10B981] flex items-center justify-center shrink-0">
+                <Bell size={18} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-semibold text-[#0F172A]">Bật thông báo trên thiết bị</p>
+                <p className="text-[12px] text-[#64748B] mt-0.5">Bật quyền thông báo cho trình duyệt này</p>
+              </div>
+              <ChevronRight size={18} className="text-[#64748B] shrink-0" />
+            </button>
+            <p className="text-[12px] text-[#64748B] italic mt-3">
+              Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── 8. Nút Đăng xuất (Chuẩn 3D) ── */}
@@ -1002,6 +1051,11 @@ export default function StudentProfileTab({
         avgGrade={certificateCourse?.avgGrade ?? null}
         examsPassed={certificateCourse?.examsPassed !== false}
         certificateScope={certificateCourse?.scope || 'course'}
+      />
+      <ShareAchievementModal
+        open={Boolean(shareAchievementData)}
+        onClose={() => setShareAchievementData(null)}
+        data={shareAchievementData}
       />
     </div>
   );

@@ -717,25 +717,18 @@ const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
       confirmExit('quay lại trạng thái trước đó');
     };
 
-    const handleBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = 'Bạn đang trong bài thi. Thoát sẽ bị hủy kết quả và đăng xuất?';
-    };
-
     const handleActualUnload = () => {
       localStorage.setItem('punish_teacher_exam', 'true');
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('popstate', handlePopState);
-    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handleActualUnload);
     window.addEventListener('unload', handleActualUnload);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handleActualUnload);
       window.removeEventListener('unload', handleActualUnload);
     };

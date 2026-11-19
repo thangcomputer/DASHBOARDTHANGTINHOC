@@ -164,6 +164,8 @@ function getSafeApiErrorMessage(status: number, payload: Record<string, unknown>
   if (status === 0) return 'Không thể kết nối máy chủ. Hãy kiểm tra Internet và thử lại.';
   const serverMessage = typeof payload.message === 'string' ? payload.message.trim() : '';
   if (payload.publicMessage === true && serverMessage) return serverMessage;
+  if (payload.code === 'DEVICE_CONFLICT' && serverMessage) return serverMessage;
+  if (payload.code === 'DEVICE_NOT_REGISTERED_LIMIT_REACHED' && serverMessage) return serverMessage;
   if (payload.code === 'SUBSCRIPTION_EXPIRED') return 'Tài khoản đã hết hạn. Vui lòng gia hạn để tiếp tục học.';
   if (status === 403) {
     if (payload.code === 'NEEDS_RE_ENROLL') {

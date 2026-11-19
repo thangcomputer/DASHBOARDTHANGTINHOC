@@ -28,7 +28,7 @@ describe('Inbox & Messaging Student Schedule Locking Verification', () => {
 
   it('3. TeacherStudentCard passes only that student to the quick schedule sheet', () => {
     const code = read('client/src/components/teacher/TeacherStudentCard.jsx');
-    assert.ok(code.includes('student={student}'));
-    assert.ok(code.includes('enrollments={[student]}'));
+    assert.ok(code.includes('student={student}') || code.includes('activeEnrollmentsForSheet[0] : student'));
+    assert.ok(code.includes('enrollments={[student]}') || code.includes('activeEnrollmentsForSheet : [student]'));
   });
 });

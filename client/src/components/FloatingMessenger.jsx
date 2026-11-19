@@ -54,6 +54,8 @@ import ScreenCaptureButton from './ScreenCaptureButton';
 import StickerPicker from './StickerPicker';
 import ChatStickerImage from './ChatStickerImage';
 import { isFreePortalLocked } from './student/dailyPractice/FreeFeatureLock';
+import { useLanguage } from '../context/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -487,7 +489,7 @@ function ChatWindow({
   tab, meId, draftStorageKey, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onRecall, onReact, onlineUsers = [], isSuper = false,
   peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
   canShowEscalate = false, feedbackPhase = '', supportOnline = false,
-  onEscalate, onResetAi, onAgree, onDisagree, onMoreYes, onMoreNo,
+  onEscalate, onResetAi, onEndAi, onAgree, onDisagree, onMoreYes, onMoreNo,
   onDisagreeReason, onDisagree2, onFinalExplain, onFinalStaff,
   escalating = false, resettingAi = false,
   onTypingStart, onTypingStop,
@@ -498,6 +500,7 @@ function ChatWindow({
   fullPage = false,
 }) {
   const toast = useToast();
+  const { language } = useLanguage();
   const [text, setText] = useState(() => readChatDraft(draftStorageKey));
   const [uploading, setUploading] = useState(false);
   const [pendingImage, setPendingImage] = useState(null);
@@ -522,6 +525,8 @@ function ChatWindow({
   const awaitingAiReply = isAiPeer
     && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE
     && isAwaitingAiReply(messages, meId);
+  const aiSessionEnded = isAiPeer
+    && (aiStatus === AI_SUPPORT_STATUS.CLOSED || feedbackPhase === 'ended');
 
   useEffect(() => {
     if (!awaitingAiReply) return undefined;
@@ -995,15 +1000,15 @@ function ChatWindow({
                 className={`w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 ${isRealAvatar(tab.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
               />
             )}
-            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${isOnline || isAiPeer ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${aiSessionEnded ? 'bg-slate-300' : (isOnline || isAiPeer ? 'bg-emerald-500' : 'bg-slate-300')}`} />
           </span>
           <div className="min-w-0">
             <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">
               {isAiPeer ? 'Trợ lý AI' : displayName}
             </p>
-            <p className={`text-[10px] font-semibold ${isOnline || isAiPeer ? 'text-emerald-600' : 'text-slate-400'}`}>
+            <p className={`text-[10px] font-semibold ${aiSessionEnded ? 'text-slate-400' : (isOnline || isAiPeer ? 'text-emerald-600' : 'text-slate-400')}`}>
               {isAiPeer
-                ? 'Đang trực tuyến'
+                ? (aiSessionEnded ? 'Phiên hỗ trợ đã kết thúc' : 'Đang trực tuyến')
                 : `${displayRoleLabel} · ${isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}`}
             </p>
           </div>
@@ -1206,7 +1211,7 @@ function ChatWindow({
                       ? welcomeChips
                       : null
                   }
-                  onChip={(chip) => onSend(tab, chip.label)}
+                  onChip={(chip) => onSend(tab, translateText(chip.label, language))}
                   onSchedulePreview={setSchedulePreview}
                 />
                 {!isAiPeer && !m.isRecalled && m.messageType !== 'system' ? (
@@ -1254,7 +1259,7 @@ function ChatWindow({
           ) : null}
 
           {/* Reset AI khi đã escalate/resolved */}
-          {(aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
+          {!aiSessionEnded && (aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
             || aiStatus === AI_SUPPORT_STATUS.CLOSED
             || aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT) ? (
             <button
@@ -1268,8 +1273,37 @@ function ChatWindow({
             </button>
           ) : null}
 
+          {aiSessionEnded ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center space-y-2">
+              <div>
+                <p className="text-[11.5px] font-extrabold text-slate-800">Phiên trả lời với Trợ lý AI đã kết thúc</p>
+                <p className="text-[11px] font-semibold text-slate-500 mt-0.5">Xin chào, hẹn gặp lại bạn.</p>
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  disabled={resettingAi}
+                  onClick={() => onResetAi?.(tab)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                >
+                  {resettingAi ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                  Bắt đầu phiên mới
+                </button>
+                {typeof onClose === 'function' ? (
+                  <button
+                    type="button"
+                    onClick={() => onClose(tab.id)}
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    Đóng
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           {/* Luồng feedback chính */}
-          {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked ? (
+          {!aiSessionEnded && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked ? (
             <div className="space-y-1.5">
 
               {/* Bước 0: Lần 1 - đồng ý / không - chỉ hiện khi có AI reply và canShowEscalate */}
@@ -1284,6 +1318,15 @@ function ChatWindow({
                     <button type="button" onClick={() => onDisagree?.(tab)}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black  tracking-wide hover:bg-slate-50 transition-colors">
                       <X size={14} /> Không
+                    </button>
+                  </div>
+                  <div className="flex justify-center pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => onEndAi?.(tab)}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10.5px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      Đã hỗ trợ xong · Kết thúc phiên
                     </button>
                   </div>
                 </>
@@ -1376,11 +1419,6 @@ function ChatWindow({
                   Mời bạn đặt câu hỏi.
                 </p>
               ) : null}
-              {feedbackPhase === 'ended' ? (
-                <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
-                  Xin chào, hẹn gặp lại bạn.
-                </p>
-              ) : null}
               {feedbackPhase === 'staff' ? (
                 <button type="button" disabled={escalating} onClick={() => onEscalate?.(tab)}
                   className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black  tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
@@ -1393,6 +1431,22 @@ function ChatWindow({
         </div>
       ) : null}
 
+      {aiSessionEnded ? (
+        <div className="cms-fm-window__foot flex items-center justify-between gap-2 bg-slate-50 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-slate-600">
+            <Check size={14} className="shrink-0 text-emerald-600" aria-hidden="true" />
+            <span className="truncate">Phiên hỗ trợ với Trợ lý AI đã kết thúc</span>
+          </div>
+          <button
+            type="button"
+            disabled={resettingAi}
+            onClick={() => onResetAi?.(tab)}
+            className="shrink-0 rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            Phiên mới
+          </button>
+        </div>
+      ) : (
       <form className="cms-fm-window__foot" onSubmit={submit}>
         {pendingImage ? (
           <div className="cms-fm-pending">
@@ -1539,6 +1593,7 @@ function ChatWindow({
           </button>
         </div>
       </form>
+      )}
 
       <ScheduleMessagePreviewModal
         open={!!schedulePreview}
@@ -1549,7 +1604,7 @@ function ChatWindow({
   );
 }
 
-export default function FloatingMessenger({ session, role }) {
+export default function FloatingMessenger({ session, role, hidden = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isInbox = location.pathname.includes('/inbox');
@@ -1628,6 +1683,7 @@ export default function FloatingMessenger({ session, role }) {
   }, [closeAllSupportChats]);
 
   const meId = String(session?.id || session?._id || '');
+  const { language } = useLanguage();
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
   const canUseAiSupport = meRole === 'student' || meRole === 'teacher';
@@ -2003,7 +2059,7 @@ export default function FloatingMessenger({ session, role }) {
       const res = await aiSupportAPI.reset(tab.id);
       if (!res?.success) throw new Error(res?.message || 'Không bật lại được Trợ lý AI');
       setAiStatusMap((prev) => ({ ...prev, [tab.id]: AI_SUPPORT_STATUS.AI_ACTIVE }));
-      setAiFeedback((prev) => ({ ...prev, [tab.id]: { phase: 'idle', replyId: prev[tab.id]?.replyId || '' } }));
+      setAiFeedback((prev) => ({ ...prev, [tab.id]: { phase: 'invite', replyId: prev[tab.id]?.replyId || '' } }));
       toast.success('Trợ lý AI đã sẵn sàng - bạn có thể hỏi tiếp');
     } catch (err) {
       toast.error(err.message || 'Không bật lại được Trợ lý AI');
@@ -2011,6 +2067,17 @@ export default function FloatingMessenger({ session, role }) {
       setResettingAiId(null);
     }
   }, [resettingAiId, toast]);
+
+  const handleEndAi = useCallback(async (tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'ended' } }));
+    setAiStatusMap((prev) => ({ ...prev, [tab.id]: AI_SUPPORT_STATUS.CLOSED }));
+    try {
+      await aiSupportAPI.end(tab.id);
+    } catch {
+      /* giữ trạng thái kết thúc trên giao diện */
+    }
+  }, []);
 
   useEffect(() => {
     const aiTab = tabs.find((t) => isAiSupportPeer(t.user));
@@ -2051,6 +2118,9 @@ export default function FloatingMessenger({ session, role }) {
         ? AI_SUPPORT_STATUS.AI_ACTIVE
         : payload.status;
       setAiStatusMap((prev) => ({ ...prev, [cid]: nextStatus }));
+      if (nextStatus === AI_SUPPORT_STATUS.CLOSED) {
+        setAiFeedback((prev) => ({ ...prev, [cid]: { ...(prev[cid] || {}), phase: 'ended' } }));
+      }
       if (resolvedBySupport) {
         // Support đã đóng yêu cầu: chuyển người dùng về AI ngay, không cần
         // bấm thêm nút "Hỏi Trợ lý AI".
@@ -2249,9 +2319,8 @@ export default function FloatingMessenger({ session, role }) {
   }, []);
 
   const handleMoreNo = useCallback((tab) => {
-    if (!tab?.id) return;
-    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'ended' } }));
-  }, []);
+    void handleEndAi(tab);
+  }, [handleEndAi]);
 
   /** Gửi tin nhắn lên AI từ feedback flow (không cần handleSend) */
   const sendAiMessage = useCallback(async (tab, text) => {
@@ -2295,9 +2364,9 @@ export default function FloatingMessenger({ session, role }) {
       too_short: 'Câu trả lời còn quá ngắn, bạn hãy giải thích đầy đủ và chi tiết hơn.',
     }[reason] || 'Bạn có thể giải thích thêm không?';
     try {
-      await sendAiMessage(tab, reasonText);
+      await sendAiMessage(tab, translateText(reasonText, language));
     } catch { /* ignore */ }
-  }, [sendAiMessage]);
+  }, [sendAiMessage, language]);
 
   /** Người dùng nhấn Không lần 2 → hiện lựa chọn cuối */
   const handleDisagree2 = useCallback((tab) => {
@@ -2310,9 +2379,9 @@ export default function FloatingMessenger({ session, role }) {
     if (!tab?.id) return;
     setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 're_explain' } }));
     try {
-      await sendAiMessage(tab, 'Bạn có thể giải thích thêm một lần nữa với nhiều ví dụ và chi tiết hơn không?');
+      await sendAiMessage(tab, translateText('Bạn có thể giải thích thêm một lần nữa với nhiều ví dụ và chi tiết hơn không?', language));
     } catch { /* ignore */ }
-  }, [sendAiMessage]);
+  }, [sendAiMessage, language]);
 
   /** Gặp nhân viên trực tiếp → chuyển ngay sang cuộc trò chuyện với nhân viên */
   const handleFinalStaff = useCallback(async (tab) => {
@@ -2665,7 +2734,7 @@ export default function FloatingMessenger({ session, role }) {
 
   const fabExpanded = canUseAiSupport ? showHumanSupportPanel : supportOpen;
 
-  if (!meId || isInbox) return null;
+  if (!meId || isInbox || hidden) return null;
 
   return (
     <div className={`cms-fm-root${supportChatPage ? ' is-page-chat' : ''}`} aria-live="polite">
@@ -2700,6 +2769,7 @@ export default function FloatingMessenger({ session, role }) {
               supportOnline={supportOnline}
               onEscalate={handleEscalate}
               onResetAi={handleResetAi}
+              onEndAi={handleEndAi}
               onAgree={handleAgree}
               onDisagree={handleDisagree}
               onMoreYes={handleMoreYes}

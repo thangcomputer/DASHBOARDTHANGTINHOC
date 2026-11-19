@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Award, Eye, Play, RotateCcw, Star, Timer, Trophy, X, Zap,
 } from 'lucide-react';
 import { formatPracticeScoreQuestions } from '../../../../../shared/dailyPractice/finishScoreLine.mjs';
+import { buildPracticeShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 import { practiceFinishXpDisplay } from '../../../utils/dailyPractice';
 import { GameSoundManager } from '../../../utils/sound';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
 import Mascot from './Mascot';
 import GameButton from './GameButton';
 import { DEWSKILL_ANIMATION, useAnimatedNumber, useReducedMotion } from './animationConstants';
@@ -87,6 +89,7 @@ export default function AchievementPopup({
   onRelatedVideo: _onRelatedVideo,
 }) {
   const reducedMotion = useReducedMotion();
+  const [shareOpen, setShareOpen] = useState(false);
   const total = Math.max(1, Number(summary?.total) || 1);
   const correctCount = Math.max(0, Number(summary?.correctCount) || 0);
   const accuracy = typeof summary?.path?.scorePercent === 'number'
@@ -223,12 +226,27 @@ export default function AchievementPopup({
               ) : null}
             </div>
           ) : null}
-          <GameButton variant="primary" onClick={onContinue} className="w-full !py-3 text-sm font-black uppercase">
-            <Play size={15} fill="currentColor" />
-            <span>Tiếp tục học</span>
-          </GameButton>
+          <div className="grid grid-cols-[auto_1fr] items-stretch gap-2">
+            <ShareTriggerButton
+              onClick={() => {
+                GameSoundManager.click();
+                setShareOpen(true);
+              }}
+              label="SHARE"
+              className="!rounded-2xl !px-4 !py-3"
+            />
+            <GameButton variant="primary" onClick={onContinue} className="w-full !py-3 text-sm font-black uppercase">
+              <Play size={15} fill="currentColor" />
+              <span>Tiếp tục học</span>
+            </GameButton>
+          </div>
         </div>
       </div>
+      <ShareAchievementModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={buildPracticeShareData(summary)}
+      />
     </div>
   );
 }

@@ -211,6 +211,73 @@ export async function unregisterMobilePushNotifications() {
   registeredSessionKey = '';
 }
 
+export type MobilePushPreferences = {
+  scheduleReminders: boolean;
+  scheduleChanges: boolean;
+  messages: boolean;
+  calls: boolean;
+  adminAnnouncements: boolean;
+  assignmentsAndQuizzes: boolean;
+  financeAndCourses: boolean;
+  reminderOffsetsMinutes: number[];
+};
+
+export const DEFAULT_MOBILE_PUSH_PREFERENCES: MobilePushPreferences = {
+  scheduleReminders: true,
+  scheduleChanges: true,
+  messages: true,
+  calls: true,
+  adminAnnouncements: true,
+  assignmentsAndQuizzes: true,
+  financeAndCourses: true,
+  reminderOffsetsMinutes: [1440, 60, 15],
+};
+
+export async function getMobilePushPreferences(): Promise<MobilePushPreferences> {
+  const response = await mobileApiRequest<{ data?: MobilePushPreferences }>('/mobile-push-tokens/preferences');
+  return {
+    ...DEFAULT_MOBILE_PUSH_PREFERENCES,
+    ...(response?.data || {}),
+  };
+}
+
+export async function updateMobilePushPreferences(
+  updates: Partial<MobilePushPreferences>,
+): Promise<MobilePushPreferences> {
+  const response = await mobileApiRequest<{ data?: MobilePushPreferences }>('/mobile-push-tokens/preferences', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  return {
+    ...DEFAULT_MOBILE_PUSH_PREFERENCES,
+    ...(response?.data || updates),
+  };
+}
+
+export async function cancelScheduledRemindersForSchedule(scheduleId: string) {
+  if (Platform.OS === 'web' || !nativeNotifications || !scheduleId) return 0;
+  try {
+    const scheduled = await nativeNotifications.getAllScheduledNotificationsAsync();
+    const matches = scheduled.filter(
+      (item) => String(item?.content?.data?.scheduleId || '') === String(scheduleId),
+    );
+    await Promise.all(
+      matches.map((item) => nativeNotifications.cancelScheduledNotificationAsync(item.identifier)),
+    );
+    return matches.length;
+  } catch {
+    return 0;
+  }
+}
+
+export async function setMobileBadgeCount(count: number) {
+  if (Platform.OS === 'web' || !nativeNotifications) return;
+  try {
+    await nativeNotifications.setBadgeCountAsync(Math.max(0, Math.floor(Number(count) || 0)));
+  } catch { /* ignore badge errors on unsupported devices */ }
+}
+
 export async function scheduleCategorizedLocalNotification(options: {
   category: MobilePushCategory;
   title: string;

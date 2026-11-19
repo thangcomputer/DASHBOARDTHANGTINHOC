@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Award, Check, Copy, Lock, Printer, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
 import { classifyCertificateGrade } from '../../utils/examSubjects';
+import ShareAchievementModal, { ShareTriggerButton } from './ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 
 function hashString32(input, seed = 0x811c9dc5) {
   let h = seed >>> 0;
@@ -128,6 +130,7 @@ export default function DigitalCertificateModal({
   blockedReason = '',
 }) {
   const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const safeProgress = Math.min(
     100,
     Math.max(0, Number.isFinite(Number(completionRate)) ? Math.round(Number(completionRate)) : 0),
@@ -392,6 +395,12 @@ export default function DigitalCertificateModal({
                   {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                   {copied ? 'Đã sao chép mã' : 'Sao chép mã xác thực'}
                 </button>
+                <ShareTriggerButton
+                  onClick={() => setShareOpen(true)}
+                  label="SHARE"
+                  size="sm"
+                  className="!py-2"
+                />
               </>
             ) : (
               <button
@@ -412,6 +421,19 @@ export default function DigitalCertificateModal({
             Đóng
           </button>
         </div>
+        <ShareAchievementModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={buildCourseOrCertShareData({
+            title: displayCourseTitle,
+            scope: certificateScope,
+            studentName,
+            completionRate: safeProgress,
+            avgGrade,
+            certCode,
+            verifyUrl,
+          })}
+        />
       </div>
     </div>,
     document.body,

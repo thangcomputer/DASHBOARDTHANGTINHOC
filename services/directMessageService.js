@@ -172,6 +172,24 @@ async function sendCanonicalMessageInner({
     conversationId = buildCanonicalConversationId(sender, rRole, rid);
   }
 
+  if (!isGroupFinal && rid && rid !== 'admin' && rid !== 'ai_support' && mongoose.connection.readyState === 1) {
+    const UserBlock = require('../models/UserBlock');
+    const blockDoc = await UserBlock.findOne({
+      $or: [
+        { blockerId: senderId, blockedId: rid },
+        { blockerId: rid, blockedId: senderId },
+      ],
+    }).select('_id').lean();
+    if (blockDoc) {
+      return {
+        ok: false,
+        status: 403,
+        message: 'Không thể gửi tin nhắn vì hai người dùng đang chặn liên lạc.',
+        code: 'MESSAGING_USER_BLOCKED',
+      };
+    }
+  }
+
   let recipientRejected = false;
   if (!isGroupFinal && ['student', 'teacher'].includes(senderRole) && ['student', 'teacher'].includes(rRole)) {
     const { getCommunicationPreferences, getMessageRejectionPreference } = require('./communicationPreferences');

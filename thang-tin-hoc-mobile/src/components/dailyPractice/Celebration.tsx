@@ -4,6 +4,8 @@ import { Award, Check, Crown, Flame, Gift, Star, Trophy } from 'lucide-react-nat
 import { Mascot } from './Mascot';
 import { DuoButton } from '../duo/DuoButton';
 import { AchievementPopup } from './AchievementPopup';
+import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../ShareAchievementModal';
+import { buildPracticeShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
 import type { GameSound } from './useGameSounds';
 import type { DpSummary } from '../../services/dailyPracticeApi';
 import { spacing } from '../../theme/tokens';
@@ -94,6 +96,7 @@ function DoneStage({
   onClose,
   onReviewResults,
   onReplay,
+  onShare,
 }: {
   summary: DpSummary;
   play: (s: GameSound) => void;
@@ -101,6 +104,7 @@ function DoneStage({
   onClose?: () => void;
   onReviewResults?: () => void;
   onReplay?: () => void;
+  onShare?: (data: ShareAchievementData) => void;
 }) {
   const isPerfect = Boolean(
     summary &&
@@ -122,19 +126,31 @@ function DoneStage({
         onReviewResults={onReviewResults || onNext}
         onReplay={onReplay}
         onDismiss={onClose || onNext}
+        onShare={onShare}
       />
     </View>
   );
 }
 
-function CourseTrophyStage({ summary, play, onNext }: { summary: DpSummary; play: (s: GameSound) => void; onNext: () => void }) {
+function CourseTrophyStage({
+  summary,
+  play,
+  onNext,
+  onShare,
+}: {
+  summary: DpSummary;
+  play: (s: GameSound) => void;
+  onNext: () => void;
+  onShare?: (data: ShareAchievementData) => void;
+}) {
   const pathResult = summary.path;
   const isFullCourse = Boolean(pathResult?.topicCompleted);
+  const [localShareOpen, setLocalShareOpen] = useState(false);
   useEffect(() => {
     play('win');
   }, [play]);
   return (
-    <Shell button="NHẬN CÚP VINH DANH" onNext={onNext}>
+    <View style={styles.shellOuter}>
       <PopIn style={styles.trophyCard}>
         <View style={styles.trophyBadge}>
           <Crown size={14} color="#D97706" fill="#FBBF24" />
@@ -172,7 +188,36 @@ function CourseTrophyStage({ summary, play, onNext }: { summary: DpSummary; play
           <Text style={styles.trophyMetaText}>{`Đạt ${pathResult?.scorePercent || 100}% chính xác · Danh hiệu Học Viên Xuất Sắc`}</Text>
         </View>
       </PopIn>
-    </Shell>
+      <View style={styles.trophyActionRow}>
+        <ShareTriggerButton
+          onPress={() => {
+            play('tap');
+            const data = buildPracticeShareData(summary) as ShareAchievementData;
+            if (onShare) onShare(data);
+            else setLocalShareOpen(true);
+          }}
+          label="SHARE"
+          variant="white"
+          style={styles.trophyShareBtn}
+        />
+        <View style={styles.trophyCtaFlex}>
+          <DuoButton
+            variant="primary"
+            size="lg"
+            fullWidth
+            text="NHẬN CÚP VINH DANH"
+            onPress={onNext}
+          />
+        </View>
+      </View>
+      {!onShare ? (
+        <ShareAchievementModal
+          visible={localShareOpen}
+          onClose={() => setLocalShareOpen(false)}
+          data={buildPracticeShareData(summary) as ShareAchievementData}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -274,6 +319,7 @@ export function Celebration({
   onClose,
   onReviewResults,
   onReplay,
+  onShare,
 }: {
   summary: DpSummary;
   play: (s: GameSound) => void;
@@ -281,6 +327,7 @@ export function Celebration({
   onClose?: () => void;
   onReviewResults?: () => void;
   onReplay?: () => void;
+  onShare?: (data: ShareAchievementData) => void;
 }) {
   const hasTrophyStage = Boolean(summary.path?.passed && (summary.path?.topicCompleted || summary.path?.unitCompleted || summary.path?.testOut));
   const stages = useMemo(() => [
@@ -299,7 +346,7 @@ export function Celebration({
     advance();
   }, [advance, play]);
   const stage = stages[index];
-  if (stage === 'trophy') return <CourseTrophyStage key="trophy" summary={summary} play={play} onNext={nextWithTap} />;
+  if (stage === 'trophy') return <CourseTrophyStage key="trophy" summary={summary} play={play} onNext={nextWithTap} onShare={onShare} />;
   if (stage === 'streak') return <StreakStage key="streak" summary={summary} play={play} onNext={advance} />;
   if (stage === 'quest') return <QuestStage key="quest" play={play} onNext={advance} />;
   return (
@@ -311,6 +358,7 @@ export function Celebration({
       onClose={onClose}
       onReviewResults={onReviewResults}
       onReplay={onReplay}
+      onShare={onShare}
     />
   );
 }
@@ -506,6 +554,12 @@ const styles = StyleSheet.create({
     marginBottom: -4,
   },
   perfectBadgeText: {
-    color: '#92400E', fontSize: 11, fontWeight: '900', letterSpacing: 0.6,
+    color: '#92400E',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
+  trophyActionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, width: '100%' },
+  trophyShareBtn: { borderRadius: 16, paddingHorizontal: 14 },
+  trophyCtaFlex: { flex: 1, minWidth: 0 },
 });

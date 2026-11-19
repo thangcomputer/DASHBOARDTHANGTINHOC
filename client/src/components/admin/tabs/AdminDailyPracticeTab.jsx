@@ -12,6 +12,7 @@ import {
 } from '../../../utils/dailyPractice';
 import AdminMilestoneEditor, { VideoChecksEditor, normalizeLevelConfigs } from './AdminMilestoneEditor';
 import AdminFreePortalMaterialsPanel from './AdminFreePortalMaterialsPanel';
+import { cmsConfirmAction } from '../../../utils/cmsDialog';
 
 const TYPE_IDS = Object.keys(QUESTION_TYPES);
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
@@ -1106,8 +1107,8 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEdi
     setEditingIndex(nextIndex);
   };
 
-  const removeLesson = (index) => {
-    if (!window.confirm(`Xóa mốc "${lessons[index]?.title || `Bài ${index + 1}`}"?`)) return;
+  const removeLesson = async (index) => {
+    if (!(await cmsConfirmAction(`Xóa mốc "${lessons[index]?.title || `Bài ${index + 1}`}"?`))) return;
     setLessons((list) => list.filter((_, i) => i !== index));
     setEditingIndex((current) => (current === index ? null : current > index ? current - 1 : current));
   };
@@ -1634,7 +1635,7 @@ function UnitsManager({
   };
 
   const remove = async (unit) => {
-    if (!window.confirm(`Xóa chặng "${unit.title}"? Câu hỏi trong chặng sẽ chuyển về "Chưa xếp chặng", tiến độ học viên ở chặng này bị xóa.`)) return;
+    if (!(await cmsConfirmAction(`Xóa chặng "${unit.title}"? Câu hỏi trong chặng sẽ chuyển về "Chưa xếp chặng", tiến độ học viên ở chặng này bị xóa.`))) return;
     try {
       await dailyPracticeApi.admin.deleteUnit(unit.id);
       toast.success('Đã xóa chặng');
@@ -1867,7 +1868,7 @@ export default function AdminDailyPracticeTab() {
   };
 
   const removeTopic = async (t) => {
-    if (!window.confirm(`Xóa chủ đề "${t.name}" và toàn bộ câu hỏi trong đó?`)) return;
+    if (!(await cmsConfirmAction(`Xóa chủ đề "${t.name}" và toàn bộ câu hỏi trong đó?`))) return;
     try {
       await dailyPracticeApi.admin.deleteTopic(t.id);
       toast.success('Đã xóa chủ đề');
@@ -1887,7 +1888,7 @@ export default function AdminDailyPracticeTab() {
   };
 
   const removeQuestion = async (q) => {
-    if (!window.confirm('Xóa câu hỏi này?')) return;
+    if (!(await cmsConfirmAction('Xóa câu hỏi này?'))) return;
     try {
       await dailyPracticeApi.admin.deleteQuestion(q.id);
       refreshAll();

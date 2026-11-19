@@ -208,15 +208,12 @@ export default function PathLessonModal({
   }, [unitId]);
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
     };
-  }, [onClose]);
+  }, []);
 
   const pending = checks.filter((check) => !passedKeys.has(`${video?.id}:${check.id}`));
 
@@ -428,12 +425,11 @@ export default function PathLessonModal({
   const canFinish = !done && pending.length === 0 && (!url || watchedEnough || vimeo);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9600] flex items-center justify-center bg-slate-950/55 p-3 sm:p-6" role="presentation" onClick={onClose}>
+    <div className="fixed inset-0 z-[9600] flex items-center justify-center bg-slate-950/55 p-3 sm:p-6" role="presentation">
       <div
         className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center gap-3 px-4 py-3 text-white"

@@ -72,3 +72,31 @@ export function getDeviceFingerprint() {
   }
   return id;
 }
+
+const SECRET_KEY = 'cms_device_secret_v1';
+
+/** Khóa chứng minh thiết bị (không phải hardware ID). Trình duyệt chỉ giữ trong localStorage. */
+export function getStoredDeviceSecret() {
+  try {
+    return localStorage.getItem(SECRET_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function rememberDeviceSecret(secret) {
+  if (!secret) return;
+  try {
+    localStorage.setItem(SECRET_KEY, String(secret));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getDeviceAuthFields() {
+  return {
+    deviceFingerprint: getDeviceFingerprint(),
+    deviceKey: getDeviceFingerprint(),
+    deviceSecret: getStoredDeviceSecret(),
+  };
+}

@@ -30,6 +30,10 @@ export default function AdminDeviceSecurityTab() {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [revokingId, setRevokingId] = useState('');
   const [revokingOthers, setRevokingOthers] = useState(false);
+  const [registryUserId, setRegistryUserId] = useState('');
+  const [registryRole, setRegistryRole] = useState('student');
+  const [registryItems, setRegistryItems] = useState([]);
+  const [registryLoading, setRegistryLoading] = useState(false);
 
   // 2FA OTP Zalo / Email state
   const [otpConfig, setOtpConfig] = useState(null);
@@ -197,8 +201,66 @@ export default function AdminDeviceSecurityTab() {
   const stats = sessionsData.stats || {};
   const items = sessionsData.items || [];
 
+  const loadRegistry = async () => {
+    const userId = registryUserId.trim();
+    if (!userId) {
+      toast.error('Nhập ID tài khoản học viên hoặc giảng viên');
+      return;
+    }
+    setRegistryLoading(true);
+    try {
+      const res = await authAPI.registeredDevices(userId, registryRole);
+      if (res?.success) setRegistryItems(res.data?.items || []);
+      else toast.error(res?.message || 'Không tải được thiết bị cố định');
+    } catch {
+      toast.error('Không tải được thiết bị cố định');
+    } finally {
+      setRegistryLoading(false);
+    }
+  };
+
+  const revokeRegistry = async (row) => {
+    if (!(await window.cmsConfirm(`Gỡ thiết bị cố định slot ${row.slot} sau khi đã xác minh chủ tài khoản? Đăng xuất của học viên không làm việc này.`))) return;
+    try {
+      const res = await authAPI.revokeRegisteredDevice(row.id, 'Admin xác minh và thay thế thiết bị');
+      if (res?.success) {
+        toast.success(res.message || 'Đã gỡ thiết bị');
+        loadRegistry();
+      } else toast.error(res?.message || 'Không gỡ được');
+    } catch {
+      toast.error('Không gỡ được thiết bị');
+    }
+  };
+
   return (
     <div className="space-y-6 pb-8">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-black text-slate-900">Thiết bị cố định (tối đa 2)</h2>
+        <p className="mt-1 text-xs text-slate-500">Đăng xuất không xóa đăng ký. Chỉ Admin gỡ sau khi xác minh chủ tài khoản. Không hiện mã định danh thiết bị.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input value={registryUserId} onChange={(e) => setRegistryUserId(e.target.value)} placeholder="ID học viên / giảng viên" className="min-w-[220px] rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          <select value={registryRole} onChange={(e) => setRegistryRole(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+            <option value="student">Học viên</option>
+            <option value="teacher">Giảng viên</option>
+          </select>
+          <button type="button" onClick={loadRegistry} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">Xem</button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {registryLoading ? <p className="text-xs text-slate-500">Đang tải…</p> : null}
+          {!registryLoading && registryItems.length === 0 ? <p className="text-xs text-slate-400">Chưa có thiết bị cố định, hoặc chưa tra cứu.</p> : null}
+          {registryItems.map((row) => (
+            <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 px-3 py-2 text-xs">
+              <div>
+                <p className="font-black text-slate-800">Slot {row.slot} · {row.status === 'active' ? 'Đang đăng ký' : 'Đã gỡ'} · {row.platform}</p>
+                <p className="text-slate-500">{row.deviceLabel || row.deviceType} · {row.os} · đăng ký {row.registeredAt ? new Date(row.registeredAt).toLocaleString('vi-VN') : '—'} · hoạt động {row.lastActiveAt ? new Date(row.lastActiveAt).toLocaleString('vi-VN') : '—'}</p>
+              </div>
+              {row.status === 'active' ? (
+                <button type="button" onClick={() => revokeRegistry(row)} className="rounded-lg border border-red-200 px-2 py-1 font-bold text-red-600">Gỡ / thay thế</button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </section>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

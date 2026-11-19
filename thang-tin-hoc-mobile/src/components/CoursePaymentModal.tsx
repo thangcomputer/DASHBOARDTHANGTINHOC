@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { RefreshCw, X } from 'lucide-react-native';
 import { PrimaryButton } from './ui';
 import {
@@ -9,6 +9,7 @@ import {
   simulateCoursePurchase,
   type CenterBankAccount,
 } from '../services/courseVideoApi';
+import { restoreMobileBillingPurchases } from '../services/subscriptionApi';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 
 const POLL_MS = 3000;
@@ -39,19 +40,27 @@ export function CoursePaymentModal({
   getSession?: (sessionId: string) => Promise<{ paid: boolean }>;
   simulate?: (sessionId: string) => Promise<unknown>;
 }) {
+  const isNativeStoreApp = Platform.OS === 'ios' || Platform.OS === 'android';
+  const nativeIapReady = process.env.EXPO_PUBLIC_NATIVE_IAP_ENABLED === 'true';
+  const companionReadOnly = isNativeStoreApp && !nativeIapReady;
+
   const getSessionRef = useRef(getSession);
   getSessionRef.current = getSession;
   const [bank, setBank] = useState<CenterBankAccount | null>(null);
   const [loadingBank, setLoadingBank] = useState(true);
   const [seconds, setSeconds] = useState(0);
   const [simulating, setSimulating] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const firedRef = useRef(false);
   const onPaidRef = useRef(onPaid);
   onPaidRef.current = onPaid;
   const sessionId = checkout?.sessionId || '';
 
   useEffect(() => {
-    if (!sessionId) return undefined;
+    if (!sessionId || companionReadOnly) {
+      setLoadingBank(false);
+      return undefined;
+    }
     let cancelled = false;
     setLoadingBank(true);
     getCenterBankAccount()
@@ -59,10 +68,10 @@ export function CoursePaymentModal({
       .catch(() => { if (!cancelled) setBank(null); })
       .finally(() => { if (!cancelled) setLoadingBank(false); });
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [sessionId, companionReadOnly]);
 
   useEffect(() => {
-    if (!sessionId) return undefined;
+    if (!sessionId || companionReadOnly) return undefined;
     firedRef.current = false;
     setSeconds(0);
     const markPaid = () => {
@@ -83,7 +92,7 @@ export function CoursePaymentModal({
       clearInterval(poll);
       clearInterval(timer);
     };
-  }, [sessionId]);
+  }, [sessionId, companionReadOnly]);
 
   const handleSimulate = async () => {
     if (!sessionId) return;
@@ -99,20 +108,50 @@ export function CoursePaymentModal({
     }
   };
 
-  const qrUrl = bank && checkout ? buildVietQrUrl(bank, checkout.amount, checkout.ref) : null;
+  const handleRestorePurchases = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      const res = await restoreMobileBillingPurchases();
+      Alert.alert('Khôi phục giao dịch mua', res.message);
+      if (res.data.reconciledCount > 0 || res.data.restoredCourseIds.length > 0) {
+        onPaidRef.current();
+      }
+    } catch (error) {
+      Alert.alert('Không thể khôi phục', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const qrUrl = bank && checkout && !companionReadOnly ? buildVietQrUrl(bank, checkout.amount, checkout.ref) : null;
 
   return (
     <Modal visible={Boolean(checkout)} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.title}>{companionReadOnly ? 'Đồng bộ quyền truy cập' : title}</Text>
             <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Đóng thanh toán">
               <X size={20} color={colors.muted} />
             </Pressable>
           </View>
           {checkout ? <Text style={styles.course} numberOfLines={2}>{checkout.courseTitle}</Text> : null}
-          {loadingBank ? (
+          {companionReadOnly ? (
+            <View style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+              <Text style={{ fontSize: 13, lineHeight: 20, color: colors.ink }}>
+                Để tuân thủ chính sách thanh toán nội dung số của App Store và Google Play, giao dịch mua trực tiếp trong ứng dụng chỉ mở khi sản phẩm cửa hàng (Apple IAP / Google Play Billing) đã được kích hoạt.
+              </Text>
+              <Text style={styles.muted}>
+                Nếu bạn đã có quyền truy cập hợp lệ trên tài khoản học viên, bấm nút bên dưới để đồng bộ lại khóa học và gói của bạn.
+              </Text>
+              <PrimaryButton
+                title={restoring ? 'Đang khôi phục…' : 'Khôi phục giao dịch mua'}
+                onPress={() => { void handleRestorePurchases(); }}
+                loading={restoring}
+              />
+            </View>
+          ) : loadingBank ? (
             <View style={styles.center}>
               <ActivityIndicator color={colors.brand} />
               <Text style={styles.muted}>Đang tải thông tin thanh toán…</Text>

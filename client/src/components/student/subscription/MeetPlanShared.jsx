@@ -130,15 +130,16 @@ export function MeetPlanGrid({
       <div
         role="radiogroup"
         aria-label={heading}
-        className="flex gap-2.5 overflow-x-auto pb-1.5 pt-3 snap-x snap-mandatory sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:overflow-visible sm:pb-0 sm:pt-3"
+        className="grid grid-cols-2 gap-2.5 pt-3 sm:grid-cols-3 lg:grid-cols-5"
       >
-        {plans.map((plan) => {
+        {plans.map((plan, idx) => {
           const meta = PLAN_META[plan.id] || {};
           const selected = plan.id === selectedId;
           const price = Number(plan.price) || 0;
           const sellable = price > 0;
           const planXp = xpSummary?.getPlanXp ? xpSummary.getPlanXp(plan) : null;
           const cycleText = xpSummary?.cycleText || formatCycleText(plan.resetCycle);
+          const spanLastOnMobile = plans.length % 2 === 1 && idx === plans.length - 1 ? 'col-span-2 sm:col-span-1' : '';
           return (
             <button
               key={plan.id}
@@ -146,7 +147,7 @@ export function MeetPlanGrid({
               role="radio"
               aria-checked={selected}
               onClick={() => onSelect(plan.id)}
-              className={`group relative flex min-w-[144px] sm:min-w-0 shrink-0 snap-start flex-col justify-between rounded-2xl border p-3 text-left transition-all duration-150 cursor-pointer !shadow-none ${
+              className={`group relative flex flex-col justify-between rounded-2xl border p-3 text-left transition-all duration-150 cursor-pointer !shadow-none ${spanLastOnMobile} ${
                 selected
                   ? 'border-emerald-500 bg-emerald-50/45 ring-2 ring-emerald-500/20 shadow-sm'
                   : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50/50'

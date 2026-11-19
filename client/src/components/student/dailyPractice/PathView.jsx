@@ -9,8 +9,7 @@ import {
 import { pathNodeMapLabel, pathNodeStartBubbleLabel } from '../../../../../shared/dailyPractice/pathNodeNudge.mjs';
 import {
   PATH_HUB_PROGRESS_RING,
-  pathHubNodeProgress,
-  pathHubProgressColor,
+  pathHubLevelStates,
 } from '../../../../../shared/dailyPractice/pathHubProgressRing.mjs';
 import { pathNodeColor } from '../../../../../shared/dailyPractice/pathNodeColors.mjs';
 import { pathPlainStageMinHeightPx } from '../../../../../shared/dailyPractice/pathPlainJourney.mjs';
@@ -55,31 +54,62 @@ function buildUnitPathItems(unit) {
 
 const NODE_ICONS = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
 
-function ProgressRing({ size, progress, progressColor, dimmed = false }) {
+function ProgressRing({ size, progress = 0, progressColor, segments, dimmed = false }) {
   const stroke = PATH_HUB_PROGRESS_RING.stroke;
+  const half = size / 2;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
+
+  if (Array.isArray(segments) && segments.length > 0) {
+    const angles = PATH_HUB_PROGRESS_RING.segmentAngles;
+    const arcLen = circumference * (PATH_HUB_PROGRESS_RING.segmentSweepDeg / 360);
+    return (
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className={`dp-path-progress-ring pointer-events-none absolute inset-0 h-full w-full ${dimmed ? 'opacity-55' : ''}`}
+        aria-hidden="true"
+      >
+        {angles.map((startDeg, idx) => {
+          const done = Boolean(segments[idx]);
+          return (
+            <circle
+              key={idx}
+              cx={half}
+              cy={half}
+              r={radius}
+              fill="none"
+              stroke={done ? progressColor : PATH_HUB_PROGRESS_RING.track}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={`${arcLen} ${circumference}`}
+              className="transition-[stroke] duration-500"
+              transform={`rotate(${startDeg} ${half} ${half})`}
+            />
+          );
+        })}
+      </svg>
+    );
+  }
+
   const clamped = Math.max(0, Math.min(1, progress));
   const visibleArc = clamped > 0 && clamped < 1 ? Math.max(clamped, 0.06) : clamped;
   return (
     <svg
-      width={size}
-      height={size}
       viewBox={`0 0 ${size} ${size}`}
-      className={`dp-path-progress-ring pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${dimmed ? 'opacity-55' : ''}`}
+      className={`dp-path-progress-ring pointer-events-none absolute inset-0 h-full w-full ${dimmed ? 'opacity-55' : ''}`}
       aria-hidden="true"
     >
       <circle
-        cx={size / 2}
-        cy={size / 2}
+        cx={half}
+        cy={half}
         r={radius}
         fill="none"
         stroke={PATH_HUB_PROGRESS_RING.track}
         strokeWidth={stroke}
       />
       <circle
-        cx={size / 2}
-        cy={size / 2}
+        cx={half}
+        cy={half}
         r={radius}
         fill="none"
         stroke={progressColor}
@@ -88,47 +118,28 @@ function ProgressRing({ size, progress, progressColor, dimmed = false }) {
         strokeDasharray={circumference}
         strokeDashoffset={circumference * (1 - visibleArc)}
         className="transition-[stroke-dashoffset] duration-700"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        transform={`rotate(-90 ${half} ${half})`}
       />
     </svg>
   );
 }
 
-/** Một nút trên lộ trình - nút tròn 3D vàng kim + icon trắng + 3 chấm + sao viền theo mẫu thiết kế. */
-function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selected, onClick, nodeIndex = 0, completedSections = [] }) {
+/** Một nút trên lộ trình - nút tròn 3D vàng kim + đường vòng 3 nấc + bubble Bắt đầu / Tiếp tục. */
+function PracticeHubNode({ node, color: _color, isNext, isNewlyUnlocked = false, selected, onClick, nodeIndex = 0, completedSections = [] }) {
   const locked = node.state === 'locked';
   const size = PATH_HUB_DUO.buttonSize.web;
-  const levels = node.levels || [];
-  const completedSet = new Set(completedSections || []);
-  const LEVEL_DOTS = [
-    { diff: 'easy', color: '#22C55E', label: 'Dễ' },
-    { diff: 'medium', color: '#F97316', label: 'Vừa' },
-    { diff: 'hard', color: '#EF4444', label: 'Khó' },
-  ];
-  const isDotDone = (i) => {
-    if (node.state === 'completed') return true;
-    const isStudy = node.kind === 'study' || node.icon === 'book';
-    if (isStudy) {
-      const diff = LEVEL_DOTS[i].diff;
-      const cfg = node.levelConfigs?.[diff];
-      const hidden = new Set(cfg?.hiddenSections || []);
-      const order = (Array.isArray(cfg?.sectionOrder) && cfg.sectionOrder.length
-        ? cfg.sectionOrder
-        : ['content', 'file', 'video', 'practice']).filter((k) => !hidden.has(k));
-      return order.length > 0 && order.every((secKey) => completedSet.has(`${node.key}:${diff}:${secKey}`));
-    }
-    return levels[i]?.state === 'completed';
-  };
-  const progress = pathHubNodeProgress(node);
-  const progressColor = pathHubProgressColor(node, progress, color);
+  const levelStates = pathHubLevelStates(node, completedSections);
+  const doneLevels = levelStates.filter(Boolean).length;
+  const ringColor = doneLevels >= 3 ? PATH_HUB_PROGRESS_RING.progressDone : PATH_HUB_PROGRESS_RING.progressActive;
   const HubIcon = NODE_ICONS[node.icon] || Dumbbell;
   const face = locked
     ? 'linear-gradient(180deg, #E8EDF2 0%, #D8DEE6 100%)'
     : 'linear-gradient(180deg, #FFDE59 0%, #FBBF24 50%, #F59E0B 100%)';
   const base = locked ? '#C4C9D1' : '#D97706';
-  const showRing =
-    PATH_HUB_DUO.showProgressRing && !locked && isNext && progress > 0 && progress < 1;
-  const ring = showRing ? size + PATH_HUB_PROGRESS_RING.pad : size;
+  const showRing = PATH_HUB_DUO.showProgressRing && !locked && (isNext || doneLevels > 0);
+  const ring = size + PATH_HUB_PROGRESS_RING.pad;
+  const startBubble = pathNodeStartBubbleLabel(node, completedSections);
+  const isContinueBubble = startBubble === 'TIẾP TỤC';
   const badgeCorner = nodeIndex % 2 === 0 ? 'top-right' : 'top-left';
   return (
     <div
@@ -142,14 +153,14 @@ function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selecte
           disabled={locked}
           onClick={onClick}
           className="dp-path-start-bubble cursor-pointer border-0"
-          style={{ color: '#D97706' }}
+          style={{ color: isContinueBubble ? '#D97706' : '#059669' }}
         >
-          {pathNodeStartBubbleLabel(node)}
+          {startBubble}
         </button>
       ) : null}
       <div className="dp-path-hub-ring relative" style={{ width: ring, height: ring }}>
         {showRing ? (
-          <ProgressRing size={ring} progress={progress} progressColor={progressColor} />
+          <ProgressRing size={ring} segments={levelStates} progressColor={ringColor} />
         ) : null}
         <button
           type="button"
@@ -168,22 +179,7 @@ function PracticeHubNode({ node, color, isNext, isNewlyUnlocked = false, selecte
             color: locked ? '#9CA3AF' : '#FFFFFF',
           }}
         >
-          <HubIcon size={26} strokeWidth={PATH_HUB_DUO.iconStroke} aria-hidden="true" className="drop-shadow-sm text-white" />
-          {!locked ? (
-            <span className="mt-1 flex items-center justify-center gap-1" aria-hidden="true">
-              {LEVEL_DOTS.map((dot, i) => {
-                const done = isDotDone(i);
-                return (
-                  <span
-                    key={dot.diff}
-                    title={`${dot.label}: ${done ? 'Đã hoàn thành' : 'Chưa hoàn thành'}`}
-                    className="h-2 w-2 rounded-full ring-1 ring-white/95 shadow-xs"
-                    style={{ background: done ? dot.color : '#94A3B8' }}
-                  />
-                );
-              })}
-            </span>
-          ) : null}
+          <HubIcon size={28} strokeWidth={PATH_HUB_DUO.iconStroke} aria-hidden="true" className="drop-shadow-sm text-white" />
           {/* Ngôi sao vàng nhỏ đính góc trên phải nút */}
           {!locked && (
             <span

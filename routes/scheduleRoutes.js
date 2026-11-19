@@ -55,7 +55,11 @@ async function notifyScheduleConversationSafe({ io, notifyUser, user }, schedule
 
 async function notifyScheduleConversation(req, schedule, action, previous = {}) {
   return notifyScheduleConversationSafe(
-    { io: req.app.get('io'), notifyUser: req.app.notifyUser, user: req.user },
+    {
+      io: req?.app?.get?.('io'),
+      notifyUser: req?.app?.notifyUser,
+      user: req?.user ? { ...req.user } : {},
+    },
     schedule,
     action,
     previous,
@@ -738,10 +742,28 @@ async function attachFallbackScheduleLinks(schedules) {
 }
 
 async function scanAttendanceFollowUps(io, schedules) {
-  if (!io || !Array.isArray(schedules) || schedules.length === 0) return;
+  if (!Array.isArray(schedules) || schedules.length === 0) return;
   const { maybeNotifyOverdueAttendance, maybeEscalateUnconfirmedAttendance } = require('../services/attendanceService');
   const { resolveAttendanceState } = require('../services/attendanceWindow');
-  const due = schedules.filter((row) => String(row.status) === 'scheduled').filter((row) => {
+  const scheduledRows = schedules.filter((row) => String(row.status) === 'scheduled');
+  const toHeal = scheduledRows.filter((row) => (
+    String(row.studentConfirmStatus || '') === 'confirm_expired'
+    && resolveAttendanceState(row).state === 'AWAITING_STUDENT_CONFIRM'
+  ));
+  if (toHeal.length > 0) {
+    await Promise.all(toHeal.map((row) => {
+      row.studentConfirmStatus = 'pending';
+      row.studentConfirmExpiredAt = null;
+      const id = row._id || row.id;
+      if (!id) return null;
+      return Schedule.updateOne(
+        { _id: id, status: 'scheduled', studentConfirmStatus: 'confirm_expired' },
+        { $set: { studentConfirmStatus: 'pending', studentConfirmExpiredAt: null } },
+      ).catch(() => null);
+    }));
+  }
+  if (!io) return;
+  const due = scheduledRows.filter((row) => {
     const state = resolveAttendanceState(row).state;
     if (state === 'STUDENT_CONFIRM_EXPIRED') return true;
     return state === 'OVERDUE_ATTENDANCE' && !row.reminderSent;
@@ -872,7 +894,7 @@ router.get('/pending-confirm', [authMiddleware], async (req, res) => {
     const list = await Schedule.find({
       studentId: uid,
       status: 'scheduled',
-      studentConfirmStatus: { $in: ['pending', 'disputed'] },
+      studentConfirmStatus: { $in: ['pending', 'confirm_expired', 'disputed'] },
     }).sort({ studentConfirmRequestedAt: -1 }).limit(10).lean();
     await scanAttendanceFollowUps(req.app.get('io'), list);
     const { refreshScheduleSessionPreview } = require('../services/attendanceService');
@@ -1307,11 +1329,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       });
 
       if (schedule.status === 'scheduled') {
-        notifyScheduleConversationSafe(
-          { io, notifyUser: notifyUserRef, user: actorSnapshot },
-          responseData,
-          'created',
-        ).catch(() => {});
+        notifyScheduleConversation(req, schedule, 'created').catch(() => {});
       }
 
       if (io && studentId) {
@@ -1762,20 +1780,25 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
 
     const runPostUpdateSideEffects = async () => {
       if (updated && schedule.studentId) {
+        if (isCancelling || isRescheduling) {
+          try {
+            const { revokeScheduleReminders } = require('../services/mobilePushService');
+            revokeScheduleReminders(io, {
+              scheduleId: updated._id || schedule._id,
+              userIds: [schedule.studentId, schedule.teacherId, updated.teacherId].filter(Boolean),
+            });
+          } catch { /* ignore reminder revocation hook errors */ }
+        }
         if (isCancelling && !isRejectMakeup) {
-          await notifyScheduleConversationSafe(
-            { io, notifyUser: notifyUserRef, user: actorSnapshot },
-            plainUpdated,
-            'cancelled',
-            { startTime: schedule.startTime, endTime: schedule.endTime },
-          );
+          await notifyScheduleConversation(req, updated, 'cancelled', {
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+          });
         } else if (isRescheduling) {
-          await notifyScheduleConversationSafe(
-            { io, notifyUser: notifyUserRef, user: actorSnapshot },
-            plainUpdated,
-            'changed',
-            { startTime: schedule.startTime, endTime: schedule.endTime },
-          );
+          await notifyScheduleConversation(req, updated, 'changed', {
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+          });
         }
       }
 
@@ -2378,12 +2401,18 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
         course: schedule.course,
       }).catch((e) => logger.warn('[ScheduleHistory] PATCH CANCELLED err:', e?.message || e));
 
-      notifyScheduleConversationSafe(
-        { io, notifyUser: notifyUserRef, user: actorSnapshot },
-        plain,
-        'cancelled',
-        { startTime: schedule.startTime, endTime: schedule.endTime },
-      ).catch(() => {});
+      try {
+        const { revokeScheduleReminders } = require('../services/mobilePushService');
+        revokeScheduleReminders(io, {
+          scheduleId: schedule._id,
+          userIds: [schedule.studentId, schedule.teacherId].filter(Boolean),
+        });
+      } catch { /* ignore reminder revocation hook errors */ }
+
+      notifyScheduleConversation(req, schedule, 'cancelled', {
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+      }).catch(() => {});
 
       if (io && schedule.studentId) {
         try {

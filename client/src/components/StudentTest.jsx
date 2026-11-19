@@ -656,11 +656,6 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
       confirmExit('quay lại trạng thái trước đó');
     };
 
-    const handleBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = 'Rời khỏi lúc này sẽ mất toàn bộ bài làm. Bạn có chắc không?';
-    };
-
     // Rời trang thật sự (F5 / đóng tab): chốt RỚT ngay trên server, không cho thi tiếp
     const handleActualUnload = () => {
       if (!STUDENT_ID) return;
@@ -675,14 +670,12 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('popstate', handlePopState);
-    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handleActualUnload);
     window.addEventListener('unload', handleActualUnload);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handleActualUnload);
       window.removeEventListener('unload', handleActualUnload);
     };

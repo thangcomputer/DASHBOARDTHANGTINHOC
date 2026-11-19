@@ -14,7 +14,7 @@ import { isUserOnline } from '../../utils/presence';
 import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
-import { formatLocalDateKey, normalizeScheduleDate } from '../../utils/scheduleTime';
+import { formatLocalDateKey, isStudentConfirmExpired, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
 import { expandStudentsForTeacher } from '../../utils/enrollments';
@@ -405,23 +405,28 @@ export const StudentCard = ({
     });
   }, [allSchedules, student._id, student.id, student.course, attendanceTick]);
 
-  /** Chờ HV xác nhận / tranh chấp (chưa completed) */
+  /** Chờ HV xác nhận / tranh chấp / hết hạn xác nhận (chưa completed) */
   const studentConfirmPhase = useMemo(() => {
     const sid = String(student._id || student.id || '');
     const course = String(student.course || '').trim();
     const todayKey = formatLocalDateKey(new Date());
     const hit = (allSchedules || []).find((sch) => {
       if (String(sch.status || '') !== 'scheduled') return false;
-      const conf = String(sch.studentConfirmStatus || 'none');
-      if (conf !== 'pending' && conf !== 'disputed') return false;
+      const conf = String(sch.studentConfirmStatus || 'none').toLowerCase();
+      if (!['pending', 'confirm_expired', 'disputed'].includes(conf)) return false;
       const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
       if (schSid !== sid) return false;
       if (course && sch.course && String(sch.course) !== course) return false;
       return normalizeScheduleDate(sch.date) === todayKey
-        || conf === 'disputed'; // tranh chấp có thể qua ngày
+        || conf === 'disputed'
+        || conf === 'confirm_expired';
     });
     if (!hit) return null;
-    return String(hit.studentConfirmStatus);
+    const conf = String(hit.studentConfirmStatus || '').toLowerCase();
+    if (conf === 'pending' || conf === 'confirm_expired') {
+      return isStudentConfirmExpired(hit) ? 'confirm_expired' : 'pending';
+    }
+    return conf;
   }, [allSchedules, student._id, student.id, student.course, attendanceTick]);
 
   const awaitingStudentConfirm = studentConfirmPhase === 'pending';
@@ -505,7 +510,7 @@ export const StudentCard = ({
     }
   }, [alreadyAttendedToday, makeupKey, attendanceGate?.status, attendanceGate?.schedule, allSchedules]);
 
-  const isOverdueMakeup = attendanceGate?.status === 'overdue'
+  const isOverdueMakeup = (attendanceGate?.status === 'overdue' || studentConfirmPhase === 'confirm_expired')
     && !alreadyAttendedToday
     && !isPendingConfirm
     && !isCompleted
@@ -1332,7 +1337,7 @@ export const StudentCard = ({
                                 : attendanceDisputed
                                   ? 'Đang giải quyết'
                                   : awaitingStudentConfirm
-                                    ? 'Chờ HV xác nhận'
+                                    ? 'Học viên đang xác nhận'
                                     : alreadyAttendedToday
                                       ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
                                       : 'Điểm danh'}

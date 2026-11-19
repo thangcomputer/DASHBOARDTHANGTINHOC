@@ -163,6 +163,23 @@ export async function csrfFetch(url, options = {}) {
   return fetchWithNetworkRetry(url, { ...options, credentials: 'include', headers });
 }
 
+/** Best-effort POST khi tải lại / đóng tab (keepalive, kèm Bearer + CSRF). */
+export function keepalivePost(path, body = {}, roleHint = 'student') {
+  try {
+    const token = getAccessToken(roleHint) || getAccessToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (_csrfToken) headers['X-CSRF-Token'] = _csrfToken;
+    fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      keepalive: true,
+      headers,
+      body: JSON.stringify(body || {}),
+    }).catch(() => { });
+  } catch { /* ignore */ }
+}
+
 /** POST FormData (upload) với CSRF + Bearer */
 export async function uploadWithAuth(path, formData, roleHint = null) {
   const token = roleHint ? getAccessToken(roleHint) : getAccessToken();
@@ -824,6 +841,21 @@ export const authAPI = {
     return res.json();
   },
 
+  registeredDevices: async (userId, role = '') => {
+    const params = new URLSearchParams({ userId: String(userId || '') });
+    if (role) params.set('role', role);
+    const res = await apiFetch(`/auth/registered-devices?${params.toString()}`);
+    return res.json();
+  },
+
+  revokeRegisteredDevice: async (id, reason = '') => {
+    const res = await apiFetch(`/auth/registered-devices/${encodeURIComponent(id)}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    return res.json();
+  },
+
   deviceSessions: async ({ scope = 'all', role = '', status = 'active', search = '' } = {}) => {
     const params = new URLSearchParams();
     if (scope) params.set('scope', scope);
@@ -1348,8 +1380,22 @@ export const aiSupportAPI = {
     });
     return res.json();
   },
+  end: async (conversationId) => {
+    const res = await apiFetch('/ai-support/end', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId }),
+    });
+    return res.json();
+  },
   clearHistory: async () => {
     const res = await apiFetch('/ai-support/clear-history', { method: 'POST', body: '{}' });
+    return res.json();
+  },
+  quickAsk: async ({ question, history = [], preferredLang = 'vi' }) => {
+    const res = await apiFetch('/ai-support/quick-ask', {
+      method: 'POST',
+      body: JSON.stringify({ question, history, preferredLang }),
+    });
     return res.json();
   },
   queue: async () => {

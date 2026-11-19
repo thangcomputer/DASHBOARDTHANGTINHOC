@@ -33,12 +33,18 @@ function resolveTodayAttendanceGate(todaySchedules) {
     schedule,
     meta: getAttendanceAction(schedule, null, now),
   }));
-  // Ưu tiên: đã điểm danh > còn điểm danh được > quá hạn (bù) > chưa tới giờ
+  // Ưu tiên: đã điểm danh > chờ HV xác nhận/tranh chấp > còn điểm danh được > quá hạn (bù) > chưa tới giờ
   const done = ranked.find(
     (x) => x.meta.state === 'COMPLETED' || String(x.schedule?.status || '') === 'completed',
   );
   if (done) {
     return { status: 'done', schedule: done.schedule, meta: done.meta };
+  }
+  const awaiting = ranked.find(
+    (x) => x.meta.state === 'AWAITING_STUDENT_CONFIRM' || x.meta.state === 'ATTENDANCE_DISPUTED',
+  );
+  if (awaiting) {
+    return { status: 'awaiting_confirm', schedule: awaiting.schedule, meta: awaiting.meta };
   }
   const attendable = ranked.find((x) => x.meta.canAttend);
   if (attendable) {

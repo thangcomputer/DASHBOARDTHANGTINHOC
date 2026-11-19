@@ -78,6 +78,14 @@ function scheduleBounds(schedule, now = new Date()) {
   return { startAt, endAt, graceEndAt, now: now instanceof Date ? now : new Date(now) };
 }
 
+function getStudentConfirmDeadlineMs(schedule, bounds) {
+  const requestedAt = schedule?.studentConfirmRequestedAt
+    ? new Date(schedule.studentConfirmRequestedAt).getTime()
+    : 0;
+  const graceEndMs = bounds?.graceEndAt instanceof Date ? bounds.graceEndAt.getTime() : 0;
+  return Math.max(requestedAt > 0 ? requestedAt + STUDENT_CONFIRM_MS : 0, graceEndMs);
+}
+
 /**
  * Derived attendance state machine (does not write DB).
  * @returns {{ state, kind, code, canTeacherAttend, canAdminMakeup, remainingGraceMs, startAt?, endAt?, graceEndAt?, attendanceType? }}
@@ -113,13 +121,16 @@ function resolveAttendanceState(schedule, now = new Date()) {
     };
   }
 
-  // Chờ HV xác nhận. Quá 1 giờ kể từ lúc GV gửi thì chuyển điểm danh bù cho Admin.
+  const bounds = scheduleBounds(schedule, now);
+
+  // Chờ HV xác nhận: giữ ít nhất tới hết hạn grace của buổi học (endAt + 60m) hoặc 1 giờ sau khi GV gửi.
   if (confirm === 'pending' || confirm === 'confirm_expired') {
     const requestedAt = schedule?.studentConfirmRequestedAt
       ? new Date(schedule.studentConfirmRequestedAt).getTime()
       : 0;
-    const elapsed = requestedAt > 0 ? (now instanceof Date ? now : new Date(now)).getTime() - requestedAt : 0;
-    const expired = confirm === 'confirm_expired' || (requestedAt > 0 && elapsed >= STUDENT_CONFIRM_MS);
+    const nowMs = (now instanceof Date ? now : new Date(now)).getTime();
+    const deadlineMs = getStudentConfirmDeadlineMs(schedule, bounds);
+    const expired = deadlineMs > 0 ? nowMs >= deadlineMs : confirm === 'confirm_expired';
     if (!expired) {
       return {
         state: 'AWAITING_STUDENT_CONFIRM',
@@ -130,8 +141,8 @@ function resolveAttendanceState(schedule, now = new Date()) {
         canAttend: false,
         canLateAttend: false,
         canRequestCorrection: false,
-        remainingGraceMs: Math.max(0, STUDENT_CONFIRM_MS - elapsed),
-        studentConfirmRequestedAt: new Date(requestedAt),
+        remainingGraceMs: Math.max(0, deadlineMs - nowMs),
+        ...(requestedAt > 0 ? { studentConfirmRequestedAt: new Date(requestedAt) } : {}),
       };
     }
     return {
@@ -160,7 +171,6 @@ function resolveAttendanceState(schedule, now = new Date()) {
     };
   }
 
-  const bounds = scheduleBounds(schedule, now);
   if (!bounds) {
     return {
       state: 'UPCOMING',

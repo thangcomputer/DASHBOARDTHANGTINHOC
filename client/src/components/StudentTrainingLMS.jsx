@@ -16,6 +16,8 @@ import {
 import StudentExamRoom from './StudentExamRoom';
 import VideoCoursePayModal from './VideoCoursePayModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
+import ShareAchievementModal, { ShareTriggerButton } from './student/ShareAchievementModal';
+import { buildCourseOrCertShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 import api, { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, csrfFetch } from '../services/api';
 import { useToast } from '../utils/useToast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
@@ -354,6 +356,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const [purchasesLoaded, setPurchasesLoaded] = useState(false);
   const [videoPurchaseCelebration, setVideoPurchaseCelebration] = useState(null);
   const [certificateModalOpen, setCertificateModalOpen] = useState(false);
+  const [shareCourseOpen, setShareCourseOpen] = useState(false);
   const resumePayCourseIdRef = useRef(null);
   const [courseFilterStatus, setCourseFilterStatus] = useState('all'); // all | done | learning | new
   const [courseFilterPrice, setCourseFilterPrice] = useState('all'); // all | paid | free
@@ -2759,13 +2762,22 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 <Award size={26} className="text-emerald-400 mx-auto mb-2" />
                 <p className="font-black text-emerald-400 text-sm">Hoàn thành 100%</p>
                 <p className="text-emerald-600/70 text-[11px] mt-1 font-medium">Chúc mừng bạn đã hoàn tất lộ trình</p>
-                <button
-                  type="button"
-                  onClick={() => setCertificateModalOpen(true)}
-                  className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition-colors cursor-pointer"
-                >
-                  <Award size={14} /> Xem Chứng nhận số
-                </button>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCertificateModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition-colors cursor-pointer"
+                  >
+                    <Award size={14} /> Xem Chứng nhận số
+                  </button>
+                  <ShareTriggerButton
+                    onClick={() => setShareCourseOpen(true)}
+                    label="SHARE"
+                    size="sm"
+                    variant="dark"
+                    className="!py-2"
+                  />
+                </div>
               </div>
             )}
             <div className="h-6" />
@@ -2787,6 +2799,16 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         instructorName={selectedCourse?.instructorName || 'Trung tâm Thắng Tin Học'}
         certificateScope={isFreeStudent ? 'subject' : 'course'}
         completionRate={overallProgress}
+      />
+      <ShareAchievementModal
+        open={shareCourseOpen}
+        onClose={() => setShareCourseOpen(false)}
+        data={buildCourseOrCertShareData({
+          title: selectedCourse?.title || 'Khóa học Thắng Tin Học',
+          scope: isFreeStudent ? 'subject' : 'course',
+          studentName: student?.name || session?.name || 'Học viên',
+          completionRate: overallProgress,
+        })}
       />
 
       <style dangerouslySetInnerHTML={{

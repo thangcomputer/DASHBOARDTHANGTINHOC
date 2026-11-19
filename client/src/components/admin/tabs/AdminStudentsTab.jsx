@@ -108,7 +108,7 @@ async function confirmAdminAction({ title, content, confirmText, confirmButtonCl
       type: 'warning',
     });
   }
-  return window.confirm(content);
+  return false;
 }
 
 /** Nút ⋯ + menu portal (fixed) - tránh bị che bởi overflow bảng/card. */

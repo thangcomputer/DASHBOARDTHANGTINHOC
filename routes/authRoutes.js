@@ -37,7 +37,9 @@ const freePortalOtp = require('../services/freePortalOtp');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 const deviceSessionService = require('../services/deviceSessionService');
+const registeredDeviceService = require('../services/registeredDeviceService');
 const adminOtp2faService = require('../services/adminOtp2faService');
+const forgotPasswordOtpService = require('../services/forgotPasswordOtpService');
 const {
   normalizeVNPhone,
   phoneLookupVariants,
@@ -54,6 +56,32 @@ const INVALID_CREDENTIALS = {
   code: 'INVALID_CREDENTIALS',
   message: 'Số điện thoại hoặc mật khẩu không đúng',
 };
+const WRONG_PASSWORD_CREDENTIALS = {
+  success: false,
+  code: 'INVALID_CREDENTIALS',
+  publicMessage: true,
+  message: 'Mật khẩu không đúng. Vui lòng kiểm tra lại hoặc bấm Quên mật khẩu.',
+};
+function accountNotFoundPayload(role, flow = 'login') {
+  if (role === 'teacher') {
+    return {
+      success: false,
+      code: 'ACCOUNT_NOT_FOUND',
+      suggestRegister: true,
+      message: flow === 'forgot'
+        ? 'Tài khoản giảng viên không tồn tại. Vui lòng đăng ký hoặc liên hệ Học vụ.'
+        : 'Tài khoản giảng viên không tồn tại. Vui lòng đăng ký hoặc liên hệ Học vụ để được cấp tài khoản.',
+    };
+  }
+  return {
+    success: false,
+    code: 'ACCOUNT_NOT_FOUND',
+    suggestRegister: true,
+    message: flow === 'forgot'
+      ? 'Tài khoản không tồn tại. Vui lòng đăng ký tài khoản mới.'
+      : 'Tài khoản không tồn tại. Vui lòng đăng ký tài khoản mới để bắt đầu học.',
+  };
+}
 const TEACHER_LOGIN_LOCK_THRESHOLD = 5;
 
 async function findPhoneMatches(value) {
@@ -241,6 +269,70 @@ async function checkDeviceConflict(Model, userId, fp, force, req) {
     code: 'DEVICE_CONFLICT',
     message: 'Tài khoản đang đăng nhập trên máy tính khác. Đăng nhập sẽ đăng xuất phiên đó. Bạn có muốn tiếp tục không?',
   };
+}
+
+/** HV/GV: 2 thiết bị cố định. Không xóa đăng ký khi logout. Không khóa tài khoản khi máy thứ 3. */
+async function gateFixedRegisteredDevice(req, res, user, userRole) {
+  if (!['student', 'teacher'].includes(userRole)) return true;
+  const deviceKey = String(req.body?.deviceKey || req.body?.deviceFingerprint || '').trim();
+  if (!deviceKey) return true;
+  try {
+    const claim = await registeredDeviceService.claimLoginDevice({
+      userId: user._id,
+      role: userRole,
+      deviceKey,
+      deviceSecret: req.body?.deviceSecret,
+      platform: req.body?.platform || 'web',
+      req,
+    });
+    req.fixedDeviceClaim = claim;
+    return true;
+  } catch (err) {
+    if (sendFixedDeviceError(res, err)) return false;
+    throw err;
+  }
+}
+
+function sendFixedDeviceError(res, err) {
+  if (err.code === 'DEVICE_NOT_REGISTERED_LIMIT_REACHED') {
+    res.status(403).json({
+      success: false,
+      code: err.code,
+      title: 'Đã đạt giới hạn thiết bị',
+      message: registeredDeviceService.LIMIT_MESSAGE,
+    });
+    return true;
+  }
+  if (err.code === 'DEVICE_KEY_REQUIRED' || err.code === 'DEVICE_PROOF_INVALID') {
+    res.status(err.status || 403).json({
+      success: false,
+      code: err.code,
+      title: err.code === 'DEVICE_PROOF_INVALID' ? 'Không xác minh được thiết bị' : 'Thiếu thiết bị',
+      message: err.message,
+    });
+    return true;
+  }
+  return false;
+}
+
+/** Máy đã được phép, nhưng tài khoản đang online ở máy khác → hỏi trước khi đá phiên. Không gỡ đăng ký. */
+async function confirmOrKickActiveSession(req, res, user, userRole, fingerprint) {
+  const Model = userRole === 'student' ? Student : Teacher;
+  const conflict = await checkDeviceConflict(Model, user._id, fingerprint, false, req);
+  if (!conflict) return true;
+  if (req.body?.force !== true) {
+    res.status(409).json(conflict);
+    return false;
+  }
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  user.markModified('tokenVersion');
+  await revokePreviousMobileSessions({
+    userId: user._id,
+    role: userRole,
+    io: req.app.get('io'),
+  });
+  disconnectUserSockets(req.app.get('io'), user._id);
+  return true;
 }
 
 /** HV: ghi nhận thiết bị & vị trí mạng lịch sử (không thay DEVICE_CONFLICT 1 phiên). GV không gọi. */
@@ -902,6 +994,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
           specialty: user.specialty,
           subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
           isFirstLogin: !!user.isFirstLogin,
+          mustChangePassword: !!user.mustChangePassword,
           showWelcomeCelebration: user.welcomeCelebrationSeen === false,
         }
         : {
@@ -909,6 +1002,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
           remainingSessions: user.remainingSessions,
           grade: user.grade,
           isFirstLogin: !!user.isFirstLogin,
+          mustChangePassword: !!user.mustChangePassword,
           showWelcomeCelebration: user.welcomeCelebrationSeen === false,
           subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
           ...freePortalFlags(user),
@@ -1003,11 +1097,13 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
       found = await lookupUserByEmail(trimmedRawId, role);
     } else {
       const phone = normalizeVNPhone(trimmedRawId);
-      if (!phone) return res.status(401).json(INVALID_CREDENTIALS);
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'Số điện thoại hoặc Gmail không hợp lệ' });
+      }
       found = await lookupUser(phone, role);
     }
     if (!found || ['admin', 'staff'].includes(found.role)) {
-      return res.status(401).json(INVALID_CREDENTIALS);
+      return res.status(404).json(accountNotFoundPayload(role, 'login'));
     }
 
     const { user, role: userRole } = found;
@@ -1016,7 +1112,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
-      return res.status(401).json(INVALID_CREDENTIALS);
+      return res.status(401).json(WRONG_PASSWORD_CREDENTIALS);
     }
 
     const sStatus = String(user.status || '').toLowerCase();
@@ -1044,23 +1140,28 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
       });
     }
 
-    // Lần đăng nhập mới thay thế phiên cũ trên web và mobile.
-    const { deviceFingerprint: fp2, force } = req.body;
+    // Máy thứ 3: từ chối. Hai máy đã đăng ký: nếu máy kia đang online thì hỏi xác nhận trước khi đá phiên.
+    const { deviceFingerprint: fp2 } = req.body;
     const knownDevice2 = trackStudentKnownDevice(user, userRole, fp2, req);
-    if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDevice2)) return;
-    const conflict = await checkDeviceConflict(userRole === 'student' ? Student : Teacher, user._id, fp2, force === true, req);
-    if (conflict) return res.status(409).json(conflict);
-    await revokePreviousMobileSessions({
-      userId: user._id,
-      role: userRole,
-      io: req.app.get('io'),
-    });
-    disconnectUserSockets(req.app.get('io'), user._id);
+    const previewKey2 = String(req.body?.deviceKey || fp2 || '').trim();
+    if (previewKey2) {
+      try {
+        await registeredDeviceService.previewLoginDevice({
+          userId: user._id,
+          role: userRole,
+          deviceKey: previewKey2,
+          deviceSecret: req.body?.deviceSecret,
+        });
+      } catch (previewErr) {
+        if (sendFixedDeviceError(res, previewErr)) return;
+        throw previewErr;
+      }
+    }
+    if (!(await confirmOrKickActiveSession(req, res, user, userRole, fp2))) return;
+    if (!(await gateFixedRegisteredDevice(req, res, user, userRole))) return;
     if (fp2) user.deviceFingerprint = fp2;
 
-    // ⭐ Fix 1: tokenVersion
-    const newTokenVersion = (user.tokenVersion || 0) + 1;
-    user.tokenVersion = newTokenVersion;
+    const newTokenVersion = user.tokenVersion || 0;
     const dsid = deviceSessionService.createDeviceSessionId();
 
     const tokenPayload = {
@@ -1101,6 +1202,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
           course: user.course,
           remainingSessions: user.remainingSessions,
           isFirstLogin: !!user.isFirstLogin,
+          mustChangePassword: !!user.mustChangePassword,
           // HV + GV: hiện pháo hoa ngay lúc login (trước đây chỉ student → GV phải chờ /me)
           showWelcomeCelebration:
             (userRole === 'student' || userRole === 'teacher')
@@ -1121,6 +1223,8 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
         accessToken,
         refreshToken,
         deviceSessionId: dsid,
+        ...(req.fixedDeviceClaim?.deviceSecret ? { deviceSecret: req.fixedDeviceClaim.deviceSecret } : {}),
+        registeredDeviceSlot: req.fixedDeviceClaim?.slot || null,
       },
     });
   } catch (err) {
@@ -1159,18 +1263,20 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
       found = await lookupUserByEmail(trimmedRawId, role);
     } else {
       const phone = normalizeVNPhone(trimmedRawId);
-      if (!phone) return res.status(401).json(INVALID_CREDENTIALS);
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'Số điện thoại hoặc Gmail không hợp lệ' });
+      }
       found = await lookupUser(phone, role);
     }
     if (!found || !['student', 'teacher'].includes(found.role)) {
-      return res.status(401).json(INVALID_CREDENTIALS);
+      return res.status(404).json(accountNotFoundPayload(role, 'login'));
     }
 
     const { user, role: userRole } = found;
     const passwordMatches = await user.comparePassword(password);
     if (!passwordMatches) {
       await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
-      return res.status(401).json(INVALID_CREDENTIALS);
+      return res.status(401).json(WRONG_PASSWORD_CREDENTIALS);
     }
 
     const status = String(user.status || '').toLowerCase();
@@ -1196,21 +1302,26 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
       });
     }
 
-    const mobileFp = String(req.body?.deviceFingerprint || '').trim();
+    const mobileFp = String(req.body?.deviceKey || req.body?.deviceFingerprint || '').trim();
     const knownDeviceMobile = mobileFp
       ? trackStudentKnownDevice(user, userRole, mobileFp, req, platform)
       : null;
-    if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDeviceMobile)) return;
+    if (mobileFp) {
+      try {
+        await registeredDeviceService.previewLoginDevice({
+          userId: user._id,
+          role: userRole,
+          deviceKey: mobileFp,
+          deviceSecret: req.body?.deviceSecret,
+        });
+      } catch (previewErr) {
+        if (sendFixedDeviceError(res, previewErr)) return;
+        throw previewErr;
+      }
+    }
+    if (!(await confirmOrKickActiveSession(req, res, user, userRole, mobileFp))) return;
+    if (!(await gateFixedRegisteredDevice(req, res, user, userRole))) return;
 
-    await revokePreviousMobileSessions({
-      userId: user._id,
-      role: userRole,
-      io: req.app.get('io'),
-    });
-    disconnectUserSockets(req.app.get('io'), user._id);
-
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
-    user.refreshToken = undefined;
     user.lastLogin = new Date();
     user.loginAttempts = 0;
     user.markModified('tokenVersion');
@@ -1269,6 +1380,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
           course: user.course,
           remainingSessions: user.remainingSessions,
           isFirstLogin: !!user.isFirstLogin,
+          mustChangePassword: !!user.mustChangePassword,
           showWelcomeCelebration:
             (userRole === 'student' || userRole === 'teacher')
             && user.welcomeCelebrationSeen === false,
@@ -1288,6 +1400,8 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         sessionId,
+        ...(req.fixedDeviceClaim?.deviceSecret ? { deviceSecret: req.fixedDeviceClaim.deviceSecret } : {}),
+        registeredDeviceSlot: req.fixedDeviceClaim?.slot || null,
       },
     });
   } catch (err) {
@@ -2076,6 +2190,66 @@ function canManageAllDeviceSessions(user) {
   return user.role === 'staff' && perms.includes('settings');
 }
 
+router.get('/registered-devices', authMiddleware, async (req, res) => {
+  try {
+    if (!canViewAllDeviceSessions(req.user)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem thiết bị đã đăng ký' });
+    }
+    const userId = String(req.query.userId || '').trim();
+    const role = String(req.query.role || '').trim();
+    if (!userId) return res.status(400).json({ success: false, message: 'Thiếu userId' });
+    const items = await registeredDeviceService.listForAccount(userId, role);
+    return res.json({
+      success: true,
+      data: {
+        items: items.map((row) => ({
+          id: row._id,
+          slot: row.slot,
+          status: row.status,
+          platform: row.platform,
+          deviceLabel: row.deviceLabel,
+          deviceType: row.deviceType,
+          os: row.os,
+          browser: row.browser,
+          registeredAt: row.registeredAt,
+          lastActiveAt: row.lastActiveAt,
+          revokedAt: row.revokedAt,
+          revokedBy: row.revokedBy,
+          revokeReason: row.revokeReason,
+        })),
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] registered-devices list error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.post('/registered-devices/:id/revoke', authMiddleware, async (req, res) => {
+  try {
+    if (!canManageAllDeviceSessions(req.user)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền gỡ thiết bị cố định' });
+    }
+    const doc = await registeredDeviceService.revokeByAdmin({
+      id: req.params.id,
+      actorId: req.user.id,
+      reason: req.body?.reason,
+    });
+    logger.info('[AUTH] registered device revoked by %s slot=%s user=%s', req.user.id, doc.slot, doc.userId);
+    return res.json({
+      success: true,
+      message: 'Đã gỡ thiết bị khỏi danh sách cố định. Lượt đăng ký trống có thể dùng cho thiết bị mới sau khi xác minh chủ tài khoản.',
+      data: { id: doc._id, slot: doc.slot, status: doc.status },
+    });
+  } catch (err) {
+    if (err.code === 'DEVICE_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    logger.error('[AUTH] registered-devices revoke error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
 router.get('/device-sessions', authMiddleware, async (req, res) => {
   try {
     const requestedScope = req.query.scope === 'mine' ? 'mine' : 'all';
@@ -2307,7 +2481,7 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
 
     if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
 
-    if (!user.isFirstLogin) {
+    if (!user.isFirstLogin && !user.mustChangePassword) {
       if (!oldPassword) {
         return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu cũ' });
       }
@@ -2318,6 +2492,9 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
     user.password = newPassword;
     if (user.isFirstLogin) {
       user.isFirstLogin = false;
+    }
+    if (user.mustChangePassword) {
+      user.mustChangePassword = false;
     }
     await user.save({ validateModifiedOnly: true });
     try {
@@ -2337,11 +2514,123 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
       });
     }
 
-    return res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công' });
+    return res.status(200).json({
+      success: true,
+      message: 'Đổi mật khẩu thành công',
+      data: { mustChangePassword: false, isFirstLogin: false },
+    });
 
   } catch (error) {
     logger.error('[AUTH] Change password error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/auth/delete-account ───────────────────────────────────────────
+/**
+ * @route   POST /api/auth/delete-account
+ * @desc    Học viên hoặc giảng viên tự xóa vĩnh viễn tài khoản cá nhân (Apple 5.1.1(v) / Google Play)
+ * @access  Protected (student / teacher only; re-authenticated)
+ */
+router.post('/delete-account', authMiddleware, sensitiveFlowLimiter, async (req, res) => {
+  try {
+    const userId = String(req.user?.id || req.user?._id || '');
+    const role = String(req.user?.role || '').toLowerCase();
+    const adminRole = String(req.user?.adminRole || '').toUpperCase();
+
+    if (!userId || userId === 'admin' || !['student', 'teacher'].includes(role) || adminRole) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ tài khoản học viên hoặc giảng viên mới có thể tự xóa tại đây.',
+      });
+    }
+
+    const Model = role === 'student' ? Student : Teacher;
+    const user = await Model.findById(userId).select('+password +refreshToken');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản.' });
+    }
+    if (role === 'teacher' && (user.role !== 'teacher' || user.adminRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản quản trị/nhân viên phải do Super Admin xử lý.',
+      });
+    }
+
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const confirmText = String(req.body?.confirmText || '').trim().toUpperCase();
+    const reason = String(req.body?.reason || '').trim().slice(0, 300);
+
+    if (user.password) {
+      if (!password) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu để xác nhận xóa tài khoản.' });
+      }
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu xác nhận không đúng.' });
+      }
+    } else if (confirmText !== 'XOA TAI KHOAN' && !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập mật khẩu hoặc cụm xác nhận XOA TAI KHOAN để xóa tài khoản.',
+      });
+    }
+
+    const io = req.app?.get?.('io');
+    await revokeMobileSessionsForUser({
+      userId,
+      role,
+      reason: 'account_self_deleted',
+      io,
+    }).catch((err) => logger.warn('[AUTH] delete-account mobile revocation warn:', err.message));
+
+    const UserDeviceSession = require('../models/UserDeviceSession');
+    const MobilePushToken = require('../models/MobilePushToken');
+    await Promise.all([
+      UserDeviceSession.deleteMany({ userId, role }).catch(() => {}),
+      MobilePushToken.deleteMany({ userId, role }).catch(() => {}),
+    ]);
+
+    const authHeader = req.get('authorization');
+    const bearer = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (bearer) {
+      await blacklist.add(bearer, 28800).catch(() => {});
+    }
+    if (user.refreshToken) {
+      await blacklist.add(user.refreshToken, 86400).catch(() => {});
+    }
+
+    const { purgeStudentSideEffects, purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
+    const purgeResult = role === 'student'
+      ? await purgeStudentSideEffects(userId, { studentName: user.name })
+      : await purgeTeacherSideEffects(userId, { teacherName: user.name });
+
+    const { writeAudit } = require('../services/auditLogService');
+    await writeAudit({
+      action: 'ACCOUNT_SELF_DELETED',
+      actorUserId: userId,
+      actorRole: role,
+      branchId: user.branchId || null,
+      entityType: role === 'student' ? 'Student' : 'Teacher',
+      entityId: userId,
+      studentId: role === 'student' ? user._id : null,
+      teacherId: role === 'teacher' ? user._id : null,
+      oldValue: { name: user.name, status: user.status, freePortal: Boolean(user.freePortal) },
+      newValue: { deleted: true, reason: reason || 'self_service', purgeResult },
+      ip: req.ip || '',
+      userAgent: String(req.headers['user-agent'] || ''),
+    });
+
+    await Model.findByIdAndDelete(userId);
+    disconnectUserSockets(io, userId);
+
+    return res.json({
+      success: true,
+      message: 'Tài khoản đã được xóa vĩnh viễn. Hóa đơn và chứng từ kế toán bắt buộc được lưu giữ tách biệt theo quy định.',
+    });
+  } catch (error) {
+    logger.error('[AUTH] Delete account error:', error);
+    return res.status(500).json({ success: false, message: 'Không thể xóa tài khoản lúc này.' });
   }
 });
 
@@ -2509,6 +2798,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
         avatar: user.avatar || '',
         gender: user.gender || '',
         isFirstLogin: !!user.isFirstLogin,
+        mustChangePassword: !!user.mustChangePassword,
         showWelcomeCelebration:
           (decoded.role === 'student' || decoded.role === 'teacher')
           && user.welcomeCelebrationSeen === false,
@@ -2590,7 +2880,7 @@ const otpStore = new Map(); // "phone:role" → { otp, expiresAt, userId, userNa
 // ─── POST /api/auth/forgot-password/request ───────────────────────────────────
 /**
  * @route   POST /api/auth/forgot-password/request
- * @desc    Bước 1: Gửi OTP về Zalo để cấp lại mật khẩu
+ * @desc    Bước 1: Gửi mã OTP 6 số về Gmail hoặc tin nhắn điện thoại (SMS) để khôi phục mật khẩu
  * @access  Public
  */
 router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('forgot_password_request'), async (req, res) => {
@@ -2605,39 +2895,48 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('
     if (!isEmail && !canonicalPhone) {
       return res.status(400).json({ success: false, message: 'Số điện thoại hoặc Gmail không hợp lệ' });
     }
+
     const found = isEmail
       ? await lookupUserByEmail(rawContact, role)
       : await lookupUser(canonicalPhone, role);
-    const user = found?.user || null;
-    const contactDisplay = isEmail ? rawContact.toLowerCase() : maskPhone(canonicalPhone);
+    const user = found?.user && found.role === role ? found.user : null;
 
-    // Tạo thông báo cho Admin
-    if (user) try {
-      const Notification = require('../models/Notification');
-      await Notification.create({
-        type: 'SYSTEM',
-        title: 'Yêu cầu cấp lại mật khẩu',
-        content: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${contactDisplay}) đang yêu cầu cấp lại mật khẩu. Vui lòng xử lý qua quy trình OTP.`,
-        receivers: ['ALL_ADMIN'], // Chỉ admin nhận được
-        payload: { userId: user._id, role: role, action: 'RESET_PASSWORD', userName: user.name }
-      });
-      if (global.io) {
-        global.io.to('ALL_ADMIN').emit('RECEIVE_NOTIFICATION', {
-          type: 'system',
-          title: 'Yêu cầu cấp lại mật khẩu',
-          message: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${contactDisplay}) đang yêu cầu cấp lại mật khẩu.`,
-          time: new Date(),
-          read: false,
-        });
-        global.io.to('ALL_ADMIN').emit('new-notification');
-      }
-    } catch (err) {
-      logger.warn('[AUTH] Cannot create notification:', err.message);
+    if (!user) {
+      return res.status(404).json(accountNotFoundPayload(role, 'forgot'));
     }
+
+    const sStatus = String(user.status || '').toLowerCase();
+    if (
+      (role === 'student' && isStudentAccountLocked(user))
+      || (role === 'teacher' && (user.isLocked || ['inactive', 'suspended'].includes(sStatus)))
+      || (role === 'student' && ['inactive', 'suspended'].includes(sStatus))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản đang bị khóa hoặc tạm ngừng. Vui lòng liên hệ quản trị.',
+      });
+    }
+
+    await forgotPasswordOtpService.createAndSendForgotPasswordOtp({
+      user,
+      role,
+      contactType: isEmail ? 'email' : 'sms',
+      contactValue: isEmail ? rawContact.toLowerCase() : canonicalPhone,
+    });
+
+    const { emailConfigured, smsConfigured } = forgotPasswordOtpService.getChannelReadiness();
+    const channel = isEmail ? 'email' : 'sms';
+    const channelConfigured = isEmail ? emailConfigured : smsConfigured;
 
     return res.status(202).json({
       success: true,
-      message: 'Nếu thông tin hợp lệ và đã đăng ký, yêu cầu sẽ được chuyển đến quản trị viên.',
+      channel,
+      channelConfigured,
+      emailConfigured,
+      smsConfigured,
+      expiresIn: 300,
+      resendAfterSec: 45,
+      message: 'Mã xác nhận 6 chữ số đã được gửi tới kênh liên hệ của bạn.',
     });
   } catch (error) {
     logger.error('[AUTH] forgot-password/request error:', error);
@@ -2648,67 +2947,289 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('
 // ─── POST /api/auth/forgot-password/verify ────────────────────────────────────
 /**
  * @route   POST /api/auth/forgot-password/verify
- * @desc    Bước 2: Xác minh OTP và cấp mật khẩu mới
+ * @desc    Bước 2: Xác minh mã OTP 6 số, tạo phiên đăng nhập tạm (mustChangePassword=true) vào App/Web để đổi mật khẩu mới
  * @access  Public
  */
 router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('forgot_password_verify'), async (req, res) => {
   try {
-    const { phone, otp, role } = req.body;
-    const canonicalPhone = normalizeVNPhone(phone);
-    if (!canonicalPhone || !otp || !['student', 'teacher'].includes(role)) {
-      return res.status(400).json({ success: false, message: 'Thông tin xác minh không hợp lệ' });
+    const {
+      identifier,
+      phone,
+      email,
+      role,
+      otp,
+      code,
+      clientType,
+      platform,
+      deviceFingerprint,
+      deviceLabel,
+      appVersion,
+    } = req.body || {};
+    const rawContact = String(identifier ?? phone ?? email ?? '').trim();
+    const rawOtp = String(otp ?? code ?? '').replace(/\D/g, '');
+    if (!['student', 'teacher'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Vai trò không hợp lệ' });
+    }
+    const isEmail = LOGIN_EMAIL_RE.test(rawContact);
+    const canonicalPhone = isEmail ? '' : normalizeVNPhone(rawContact);
+    if ((!isEmail && !canonicalPhone) || rawOtp.length !== 6) {
+      return res.status(400).json({ success: false, message: 'Thông tin hoặc mã xác nhận không hợp lệ' });
     }
 
-    const key = `${canonicalPhone}:${role}`;
-    const record = otpStore.get(key);
+    let verifiedUserId = '';
+    const check = await forgotPasswordOtpService.verifyForgotPasswordOtp({
+      role,
+      contactType: isEmail ? 'email' : 'sms',
+      contactValue: isEmail ? rawContact.toLowerCase() : canonicalPhone,
+      code: rawOtp,
+    });
+    if (check.ok) {
+      verifiedUserId = check.userId;
+    } else if (!isEmail) {
+      // Backward compat cho OTP 120s do Admin tao bang /admin/generate-otp
+      const key = `${canonicalPhone}:${role}`;
+      const record = otpStore.get(key);
+      if (record && Date.now() <= record.expiresAt) {
+        const a = Buffer.from(String(record.otp || ''), 'utf8');
+        const b = Buffer.from(rawOtp, 'utf8');
+        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+          otpStore.delete(key);
+          verifiedUserId = String(record.userId);
+        }
+      } else if (record) {
+        otpStore.delete(key);
+      }
+    }
 
-    if (!record) {
-      return res.status(400).json({ success: false, message: 'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu lại.' });
+    if (!verifiedUserId) {
+      return res.status(check.status || 400).json({
+        success: false,
+        message: check.message || 'Mã xác nhận không đúng hoặc đã hết hạn. Vui lòng yêu cầu lại.',
+      });
     }
-    if (Date.now() > record.expiresAt) {
-      otpStore.delete(key);
-      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn (60 giây). Vui lòng yêu cầu lại.' });
-    }
-    if (record.otp !== otp.trim()) {
-      return res.status(400).json({ success: false, message: 'Mã OTP không đúng. Vui lòng kiểm tra lại.' });
-    }
-
-    // OTP đúng → đặt lại mật khẩu = SĐT/Zalo (mặc định hệ thống)
-    otpStore.delete(key);
 
     let user = null;
-    if (record.role === 'teacher') {
-      user = await Teacher.findById(record.userId).select('+password name phone zalo email');
+    if (role === 'teacher') {
+      user = await Teacher.findById(verifiedUserId).select('+password +refreshToken +mfaSecret');
     } else {
-      user = await Student.findById(record.userId).select('+password name phone zalo email');
+      user = await Student.findById(verifiedUserId).select('+password +knownDevices');
     }
-    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    }
+    const userRole = role === 'teacher' ? user.role : 'student';
+    if (!['student', 'teacher'].includes(userRole) || userRole !== role) {
+      return res.status(403).json({ success: false, message: 'Tài khoản không hỗ trợ luồng khôi phục này' });
+    }
 
-    const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
-    const newPassword = resolveDefaultAccountPassword({
-      phone: user.phone,
-      zalo: user.zalo || canonicalPhone,
+    const sStatus = String(user.status || '').toLowerCase();
+    if (userRole === 'student' && isStudentAccountLocked(user)) {
+      return res.status(403).json(buildStudentLockedResponse(user));
+    }
+    if (
+      (userRole === 'teacher' && (user.isLocked || ['inactive', 'suspended'].includes(sStatus)))
+      || (userRole === 'student' && ['inactive', 'suspended'].includes(sStatus))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.',
+      });
+    }
+    if (userRole === 'student' && user.freePortal !== true && !studentHasLearningAccess(user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'NEEDS_RE_ENROLL',
+        redirect: '/dangkykhoahoc',
+        phone: normalizeVNPhone(user.phone) || user.phone || '',
+        message: 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.',
+      });
+    }
+
+    const isMobileClient = clientType === 'mobile' || ['android', 'ios'].includes(String(platform || '').toLowerCase());
+    if (isMobileClient && !isMobileMultiSessionAuthEnabled()) {
+      return res.status(404).json({
+        success: false,
+        code: 'MOBILE_SESSION_AUTH_DISABLED',
+        message: 'Đăng nhập mobile chưa được bật.',
+      });
+    }
+
+    await revokePreviousMobileSessions({
+      userId: user._id,
+      role: userRole,
+      io: req.app.get('io'),
     });
+    disconnectUserSockets(req.app.get('io'), user._id);
 
-    user.password = newPassword;
-    user.isFirstLogin = false;
+    const newTokenVersion = (user.tokenVersion || 0) + 1;
+    user.tokenVersion = newTokenVersion;
+    user.mustChangePassword = true;
+    user.loginAttempts = 0;
+    user.lastLogin = new Date();
+    user.markModified('tokenVersion');
+
+    if (isMobileClient) {
+      const mobilePlatform = ['android', 'ios', 'web'].includes(String(platform || '').toLowerCase())
+        ? String(platform).toLowerCase()
+        : 'web';
+      const mobileFp = String(deviceFingerprint || '').trim();
+      const knownDeviceMobile = mobileFp
+        ? trackStudentKnownDevice(user, userRole, mobileFp, req, mobilePlatform)
+        : null;
+      if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDeviceMobile)) return;
+
+      user.refreshToken = undefined;
+      await user.save({ validateModifiedOnly: true });
+      fireStudentDeviceAlert(req, user, userRole, knownDeviceMobile);
+
+      const sessionId = crypto.randomUUID();
+      const refreshJti = crypto.randomUUID();
+      const tokens = generateTokens({
+        id: String(user._id),
+        role: userRole,
+        name: user.name,
+        adminRole: null,
+        permissions: [],
+        branchId: null,
+        branchCode: '',
+        tokenVersion: newTokenVersion,
+        sid: sessionId,
+        jti: refreshJti,
+        pwdReset: true,
+      }, 'mobile');
+      const refreshClaims = jwt.decode(tokens.refreshToken);
+      if (!refreshClaims?.exp) throw new Error('Unable to determine refresh token expiry');
+
+      const now = new Date();
+      const sessionService = require('../services/mobileAuthSessionService');
+      await sessionService.createSession({
+        sessionId,
+        userId: user._id,
+        role: userRole,
+        clientType: 'mobile',
+        platform: mobilePlatform,
+        deviceLabel: String(deviceLabel || '').trim().slice(0, 100),
+        appVersion: String(appVersion || '').trim().slice(0, 50),
+        userAgent: String(req.get('user-agent') || '').slice(0, 300),
+        createdAt: now,
+        lastUsedAt: now,
+        absoluteExpiresAt: new Date(refreshClaims.exp * 1000),
+        revokedAt: null,
+        revocationReason: '',
+        refreshFamilyId: crypto.randomUUID(),
+        currentRefreshJtiHash: sessionService.hashRefreshJti(refreshJti),
+      });
+
+      return res.json({
+        success: true,
+        message: 'Xác thực thành công! Vui lòng đặt mật khẩu mới.',
+        data: {
+          user: {
+            _id: user._id,
+            name: user.name,
+            role: userRole,
+            phone: normalizeVNPhone(user.phone) || user.phone || '',
+            email: user.email || '',
+            status: user.status,
+            course: user.course,
+            remainingSessions: user.remainingSessions,
+            isFirstLogin: !!user.isFirstLogin,
+            mustChangePassword: true,
+            showWelcomeCelebration:
+              (userRole === 'student' || userRole === 'teacher')
+              && user.welcomeCelebrationSeen === false,
+            avatar: user.avatar || '',
+            gender: user.gender || '',
+            ...(userRole === 'teacher' ? {
+              testScore: user.testScore,
+              testStatus: user.testStatus,
+              practicalStatus: user.practicalStatus,
+              specialty: user.specialty,
+              subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
+            } : {
+              subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
+              ...freePortalFlags(user),
+            }),
+          },
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          sessionId,
+        },
+      });
+    }
+
+    const webFp = String(deviceFingerprint || '').trim();
+    const knownDeviceWeb = webFp ? trackStudentKnownDevice(user, userRole, webFp, req) : null;
+    if (await enforceStudentDeviceLockIfNeeded(req, res, user, userRole, knownDeviceWeb)) return;
+    if (webFp) user.deviceFingerprint = webFp;
+
+    const dsid = deviceSessionService.createDeviceSessionId();
+    const { accessToken, refreshToken } = generateTokens({
+      id: user._id,
+      role: userRole,
+      name: user.name,
+      adminRole: null,
+      permissions: [],
+      branchId: null,
+      branchCode: '',
+      tokenVersion: newTokenVersion,
+      dsid,
+      pwdReset: true,
+    }, 'public');
+
+    user.refreshToken = refreshToken;
     await user.save({ validateModifiedOnly: true });
-
-    // Gửi mật khẩu mới qua queue (Zalo OA / email) - không trả password về client
-    const destPhone = (user.zalo || user.phone || canonicalPhone || '').trim();
-    await enqueuePassword({
-      phone: destPhone || undefined,
-      email: user.email || undefined,
-      password: newPassword,
+    await deviceSessionService.recordWebDeviceSession({
+      sessionId: dsid,
+      userId: String(user._id),
       userName: user.name,
-    }).catch((err) => logger.warn('[AUTH] enqueuePassword:', err.message));
+      role: userRole,
+      adminRole: '',
+      req,
+      fingerprint: webFp,
+      loginChannel: 'forgot_password_otp',
+    });
+    fireStudentDeviceAlert(req, user, userRole, knownDeviceWeb);
 
     return res.json({
       success: true,
-      message: 'Mật khẩu mới đã được gửi qua kênh liên hệ đã đăng ký.',
+      message: 'Xác thực thành công! Vui lòng đặt mật khẩu mới.',
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          role: userRole,
+          phone: normalizeVNPhone(user.phone) || user.phone || '',
+          email: user.email || '',
+          status: user.status,
+          course: user.course,
+          remainingSessions: user.remainingSessions,
+          isFirstLogin: !!user.isFirstLogin,
+          mustChangePassword: true,
+          showWelcomeCelebration:
+            (userRole === 'student' || userRole === 'teacher')
+            && user.welcomeCelebrationSeen === false,
+          avatar: user.avatar || '',
+          gender: user.gender || '',
+          ...(userRole === 'teacher' ? {
+            testScore: user.testScore,
+            testStatus: user.testStatus,
+            practicalStatus: user.practicalStatus,
+            specialty: user.specialty,
+            subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
+          } : {
+            subscription: subscriptionStatusOf(user, new Date(), await getSubscriptionXpConfig()),
+            ...freePortalFlags(user),
+          }),
+        },
+        accessToken,
+        refreshToken,
+        deviceSessionId: dsid,
+      },
     });
   } catch (error) {
     logger.error('[AUTH] forgot-password/verify error:', error);
+    if (error.code === 'MOBILE_SESSION_REVOCATION_FAILED') return mobileSessionRevocationFailure(res);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
@@ -3028,18 +3549,38 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
       const existing = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
       if (existing) {
         if (existing.freePortal === true) {
-          return res.status(409).json({ success: false, message: 'Số điện thoại đã có tài khoản miễn phí. Hãy đăng nhập.' });
+          return res.status(409).json({
+            success: false,
+            code: 'ACCOUNT_ALREADY_EXISTS',
+            suggestLogin: true,
+            message: 'Số điện thoại đã có tài khoản miễn phí. Hãy đăng nhập.',
+          });
         }
-        return res.status(409).json({ success: false, message: 'Số này đã thuộc học viên trung tâm. Hãy đăng nhập ở trang trung tâm.' });
+        return res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_ALREADY_EXISTS',
+          suggestLogin: true,
+          message: 'Số này đã thuộc học viên trung tâm. Hãy đăng nhập ở trang trung tâm.',
+        });
       }
     }
     if (rawEmail) {
       const existingByEmail = await Student.findOne({ email: rawEmail });
       if (existingByEmail) {
         if (existingByEmail.freePortal === true) {
-          return res.status(409).json({ success: false, message: 'Email đã có tài khoản miễn phí. Hãy đăng nhập.' });
+          return res.status(409).json({
+            success: false,
+            code: 'ACCOUNT_ALREADY_EXISTS',
+            suggestLogin: true,
+            message: 'Email đã có tài khoản miễn phí. Hãy đăng nhập.',
+          });
         }
-        return res.status(409).json({ success: false, message: 'Email này đã thuộc học viên trung tâm. Hãy đăng nhập.' });
+        return res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_ALREADY_EXISTS',
+          suggestLogin: true,
+          message: 'Email này đã thuộc học viên trung tâm. Hãy đăng nhập.',
+        });
       }
     }
     try {
@@ -3050,7 +3591,12 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
       });
     } catch (dupErr) {
       if (dupErr.status === 409) {
-        return res.status(409).json({ success: false, message: dupErr.message });
+        return res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_ALREADY_EXISTS',
+          suggestLogin: true,
+          message: dupErr.message,
+        });
       }
       throw dupErr;
     }
@@ -3089,22 +3635,27 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
   }
 });
 
-// ─── Cổng OTP Gmail đăng ký miễn phí DewSkill ─────────────────────────────────
+// ─── Cổng OTP Gmail / SMS đăng ký miễn phí ────────────────────────────────────
 router.post('/free-portal/send-otp', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body || {};
-    const result = await freePortalOtp.sendRegisterOtp({ name, email, phone, password });
+    const { name, age, identifier, email, phone, password } = req.body || {};
+    const result = await freePortalOtp.sendRegisterOtp({ name, age, identifier, email, phone, password });
     return res.json(result);
   } catch (err) {
     logger.error('[AUTH] free-portal send-otp error:', err);
-    return res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi server' });
+    return res.status(err.status || 500).json({
+      success: false,
+      ...(err.code ? { code: err.code } : {}),
+      ...(err.status === 409 ? { suggestLogin: true } : {}),
+      message: err.message || 'Lỗi server',
+    });
   }
 });
 
 router.post('/free-portal/resend-otp', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
   try {
-    const { email } = req.body || {};
-    const result = await freePortalOtp.resendRegisterOtp({ email });
+    const { identifier, email, phone } = req.body || {};
+    const result = await freePortalOtp.resendRegisterOtp({ identifier, email, phone });
     return res.json(result);
   } catch (err) {
     logger.error('[AUTH] free-portal resend-otp error:', err);
@@ -3114,8 +3665,8 @@ router.post('/free-portal/resend-otp', sensitiveFlowLimiter, policyShadowAuth('r
 
 router.post('/free-portal/verify-otp', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
   try {
-    const { email, otp, deviceFingerprint } = req.body || {};
-    const result = await freePortalOtp.verifyOtpAndRegister({ email, otp, deviceFingerprint });
+    const { identifier, email, phone, otp, deviceFingerprint } = req.body || {};
+    const result = await freePortalOtp.verifyOtpAndRegister({ identifier, email, phone, otp, deviceFingerprint });
     return res.json(result);
   } catch (err) {
     logger.error('[AUTH] free-portal verify-otp error:', err);

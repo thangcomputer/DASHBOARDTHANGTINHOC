@@ -1,12 +1,14 @@
-/** Mốc đã có tiến độ → Tiếp tục, chưa → Bắt đầu. */
-export function pathNodeNudgeLabel(node) {
+/** Mốc đã có ít nhất 1 phần/nấc hoàn thành → Tiếp tục, chưa học gì → Bắt đầu. */
+export function pathNodeNudgeLabel(node, completedSections = []) {
   if (!node) return 'BẮT ĐẦU';
   const levels = node.levels || [];
   const lessons = node.lessons || [];
-  const touched =
-    levels.some((l) => l.state === 'completed' || l.state === 'active')
-    || lessons.some((l) => l.state === 'completed' || l.state === 'active');
-  return touched ? 'TIẾP TỤC' : 'BẮT ĐẦU';
+  const prefix = `${node.key}:`;
+  const hasSectionDone = Array.isArray(completedSections)
+    && completedSections.some((key) => String(key || '').startsWith(prefix));
+  const hasLevelDone = levels.some((l) => l.state === 'completed')
+    || lessons.some((l) => l.state === 'completed');
+  return (hasSectionDone || hasLevelDone) ? 'TIẾP TỤC' : 'BẮT ĐẦU';
 }
 
 /** Nhãn dưới nút — chỉ tên mốc (giống mẫu Duolingo). */
@@ -15,6 +17,6 @@ export function pathNodeMapLabel(node) {
 }
 
 /** Bubble phía trên mốc đang học. */
-export function pathNodeStartBubbleLabel(node) {
-  return pathNodeNudgeLabel(node);
+export function pathNodeStartBubbleLabel(node, completedSections = []) {
+  return pathNodeNudgeLabel(node, completedSections);
 }

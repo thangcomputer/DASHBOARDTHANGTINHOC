@@ -30,7 +30,7 @@ export function messageTimestamp(m) {
 
 export function isAiEscalationMessage(m) {
   return String(m?.senderId || '') === AI_SUPPORT_PEER.id
-    && String(m?.content || '').includes(AI_ESCALATE_MARKER);
+    && /Đã chuyển yêu cầu tới nhân viên hỗ trợ|transferred to a support agent/i.test(String(m?.content || ''));
 }
 
 export const AI_REPLY_WAIT_MS = 90 * 1000;
@@ -52,7 +52,7 @@ export function isAwaitingAiReply(messages, meId, now = Date.now()) {
 export function isAiBusyReply(m) {
   return String(m?.senderId || '') === AI_SUPPORT_PEER.id
     && !m?.isRecalled
-    && String(m?.content || '').includes(AI_BUSY_MARKER);
+    && /Trợ lý AI đang bận|AI Assistant is currently busy/i.test(String(m?.content || ''));
 }
 
 /** User gõ ý muốn chuyển thẳng sang nhân viên - không gọi AI. */
@@ -95,8 +95,10 @@ export function isSimpleGreeting(text) {
 
 export function isAiWelcomeReply(content) {
   const t = String(content || '');
-  return /Trợ lý AI Tin Học của Thắng Tin Học/.test(t)
-    && /hỗ trợ Word, Excel, PowerPoint, MOS, LMS/i.test(t);
+  return (/Trợ lý AI Tin Học của Thắng Tin Học/.test(t)
+    && /hỗ trợ Word, Excel, PowerPoint, MOS, LMS/i.test(t))
+    || (/Office IT AI Assistant at Thang Tin Hoc/i.test(t)
+      && /Word, Excel, PowerPoint, MOS, LMS/i.test(t));
 }
 
 /** Nút câu hỏi sẵn dưới lời chào AI. Gửi đúng `label` để backend FAQ không gọi Gemini. */
@@ -115,7 +117,7 @@ export const STUDENT_WELCOME_CHIPS = Object.freeze([
 ]);
 
 export function isAiQuestionLimitReply(content) {
-  return /lượt hỏi Trợ lý AI hôm nay/i.test(String(content || ''));
+  return /lượt hỏi Trợ lý AI hôm nay|AI Assistant questions for today/i.test(String(content || ''));
 }
 
 export function isAiFaqChipLabel(text, role) {
@@ -126,15 +128,15 @@ export function isAiFaqChipLabel(text, role) {
 }
 
 export function isAiIdlePing(content) {
-  return String(content || '').includes('Bạn có còn đó không');
+  return /Bạn có còn đó không|Are you still there/i.test(String(content || ''));
 }
 
 export function isAiIdleEnd(content) {
-  return String(content || '').includes(AI_IDLE_END);
+  return /Phiên hỗ trợ đã kết thúc|Support session has ended/i.test(String(content || ''));
 }
 
 export function isAiIdleStill(content) {
-  return String(content || '').includes(AI_IDLE_STILL);
+  return /Mình vẫn ở đây|I am still here/i.test(String(content || ''));
 }
 
 /** Có ít nhất một câu trả lời AI thực sự (không phải tin chuyển nhân viên / chào tự động). */

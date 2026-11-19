@@ -318,17 +318,6 @@ export default function useCertPrepSession(sessionId) {
   }, [flushSave]);
 
   useEffect(() => {
-    const onBeforeUnload = (e) => {
-      if (!dirtyRef.current) return;
-      if (sessionRef.current?.status !== 'in_progress') return;
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, []);
-
-  useEffect(() => {
     clearInterval(tickRef.current);
     const active = session?.status === 'in_progress' && uiStatus === 'active';
     if (!active || remainingAtSyncRef.current == null || !syncAtRef.current) return undefined;

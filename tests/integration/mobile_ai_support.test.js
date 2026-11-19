@@ -67,5 +67,8 @@ test('mobile AI conversation presents the same role-based business FAQs and AI f
   assert.ok(webMessenger.includes('welcomeChips'));
   assert.ok(screen.includes('getAiSupportReplyPresentation(message.text)'));
   assert.ok(screen.includes('aiReplyPresentation.suggestions'));
-  assert.ok(screen.includes('void send(prompt.label)'));
+  assert.ok(
+    screen.includes('void send(prompt.label)')
+    || screen.includes('void send(translateText(prompt.label'),
+  );
 });

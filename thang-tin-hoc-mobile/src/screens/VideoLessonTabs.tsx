@@ -15,6 +15,8 @@ import {
 import { SOCKET_EVENTS } from '../services/socketService';
 import { resolveMobilePublicUrl } from '../services/apiClient';
 import { colors, radius, spacing, typography, theme } from '../theme/tokens';
+import { getCurrentLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 
 const NOTE_QUICK_TAGS = ['📌 Quan trọng', '💡 Mẹo hay', '❓ Cần ôn lại', '⌨️ Phím tắt'] as const;
 
@@ -210,7 +212,8 @@ export function VideoLessonTabs({
 
   const handleExportOrShareNotes = async () => {
     if (!visibleNotes.length) return;
-    const heading = `# Sổ tay ghi chú: ${courseTitle || lessonTitle || 'Khóa học Thắng Tin Học'}\n\n`;
+    const lang = getCurrentLanguage();
+    const heading = `${translateText(`# Sổ tay ghi chú: ${courseTitle || lessonTitle || 'Khóa học Thắng Tin Học'}`, lang)}\n\n`;
     const body = visibleNotes.map((n) => (
       `- [${formatTime(n.atSec)}]${n.lessonTitle ? ` **${n.lessonTitle}**:` : ''} ${n.text}`
     )).join('\n');

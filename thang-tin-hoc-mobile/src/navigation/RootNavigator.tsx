@@ -12,31 +12,37 @@ import { BlurView } from 'expo-blur';
 import {
   addMobileNotificationReceivedListener,
   addMobileNotificationResponseReceivedListener,
+  cancelScheduledRemindersForSchedule,
   clearMobileLastNotificationResponseAsync,
   getMobileLastNotificationResponseAsync,
   MOBILE_NOTIFICATION_ACTIONS,
+  setMobileBadgeCount,
   type MobileNotificationResponse,
 } from '../services/mobilePushNotifications';
 import { openDeepLinkInApp } from './linking';
 import {
   BookOpen, Building2, CalendarDays, CheckSquare, FileBox, FileText, Gamepad2, GraduationCap,
-  DollarSign, Headphones, House, LayoutDashboard, Lock, LogOut, Maximize2, Menu, MessageCircle, Minimize2, Newspaper, Phone, PhoneOff, Radio, Search, Sparkles, Star, Target, UserRound, Users, Volume2, VolumeX, WalletCards, X,
+  DollarSign, Headphones, House, LayoutDashboard, Lock, LogOut, Menu, MessageCircle, Minimize2, Newspaper, Phone, PhoneOff, Radio, Sparkles, Star, Target, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../app/AuthContext';
+import { useLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { QuickAiPopupModal } from '../components/QuickAiPopupModal';
 import { emit, SOCKET_EVENTS } from '../services/socketService';
 import { colors, droplet, radius, spacing, typography } from '../theme/tokens';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
-import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import { useMobileFocusMode, setMobileFocusMode } from '../utils/focusMode';
+import { useMobilePracticeSessionActive, setMobilePracticeSessionActive } from '../utils/practiceSessionMode';
 import { triggerMobileHaptic } from '../components/dailyPractice/useGameSounds';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { messageService, notificationService, scheduleService, teacherFinanceService } from '../services/mockService';
 import { LoginScreen } from '../screens/LoginScreen';
 import { EditableMobileAvatar } from '../components/EditableMobileAvatar';
 import { SubscriptionExpiredScreen, SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
-import { hasFeedPostAccess } from '../services/subscriptionApi';
+import { hasFeedPostAccess, hasMeetAccessClient } from '../services/subscriptionApi';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CallScreen } from '../screens/CallScreen';
 import { CallHistoryScreen } from '../screens/CallHistoryScreen';
@@ -58,6 +64,7 @@ import {
 } from '../screens/CertPrepScreens';
 import { DailyPracticeScreen } from '../screens/DailyPracticeScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { ForcePasswordResetModal } from '../components/ForcePasswordResetModal';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
 import { MeetStartAlert } from '../components/MeetStartAlert';
 import { PinLockGate } from '../components/pinLock/PinLockGate';
@@ -131,8 +138,9 @@ const NAV_TAB_LABELS: Record<'student' | 'teacher', Record<string, string>> = {
   },
 };
 
-function navTabLabel(name: string, isTeacher: boolean) {
-  return NAV_TAB_LABELS[isTeacher ? 'teacher' : 'student'][name] || name;
+function navTabLabel(name: string, isTeacher: boolean, lang: 'vi' | 'en' = 'vi') {
+  const raw = NAV_TAB_LABELS[isTeacher ? 'teacher' : 'student'][name] || name;
+  return translateText(raw, lang);
 }
 
 type IncomingCallPrompt = {
@@ -144,9 +152,10 @@ type IncomingCallPrompt = {
 };
 
 export function RootNavigator() {
-  const { user, isRestoringSession, signOut, subscription, refreshUser, refreshSubscription } = useAuth();
+  const { user, isRestoringSession, signOut, subscription, refreshUser, refreshSubscription, markPasswordChanged } = useAuth();
   const insets = useSafeAreaInsets();
   const { focusMode } = useMobileFocusMode();
+  const practiceSessionActive = useMobilePracticeSessionActive();
   const [notificationOverlayVisible, setNotificationOverlayVisible] = useState(false);
   const [freeLockModalVisible, setFreeLockModalVisible] = useState(false);
   const [surveyDismissed, setSurveyDismissed] = useState(false);
@@ -172,6 +181,7 @@ export function RootNavigator() {
     );
     if (!isStudyDestination) {
       setMobileFocusMode(false);
+      setMobilePracticeSessionActive(false);
     }
   }, [stackRouteName, activeTab]);
   useEffect(() => {
@@ -186,11 +196,35 @@ export function RootNavigator() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [user]);
   useEffect(() => {
+    if (!isFreePortalLocked(user) || hasMeetAccessClient(subscription?.subscription)) {
+      setFreeLockModalVisible(false);
+    }
+  }, [user, subscription?.subscription]);
+  useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:open-notifications', () => setNotificationOverlayVisible(true));
     const lockSub = DeviceEventEmitter.addListener(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT, () => setFreeLockModalVisible(true));
+    const revokedSub = DeviceEventEmitter.addListener(
+      SOCKET_EVENTS.SCHEDULE_REMINDER_REVOKED,
+      (payload: { scheduleId?: string } | undefined) => {
+        if (payload?.scheduleId) {
+          void cancelScheduledRemindersForSchedule(String(payload.scheduleId));
+        }
+      },
+    );
+    const readSyncSub = DeviceEventEmitter.addListener(
+      SOCKET_EVENTS.NOTIFICATION_READ_SYNC,
+      (payload: { unread?: number } | undefined) => {
+        if (typeof payload?.unread === 'number') {
+          unreadNotificationCountRef.current = payload.unread;
+          void setMobileBadgeCount(payload.unread);
+        }
+      },
+    );
     return () => {
       subscription.remove();
       lockSub.remove();
+      revokedSub.remove();
+      readSyncSub.remove();
     };
   }, []);
   useEffect(() => {
@@ -532,37 +566,51 @@ export function RootNavigator() {
       <OfflineBanner />
       <MobileSoundEffects incomingCall={Boolean(incomingCall)} />
       {(user.role === 'student' || user.role === 'teacher') ? <MeetStartAlert user={user} /> : null}
-      <PinLockGate
-        userKey={pinUserKey(user)}
+      <ForcePasswordResetModal
+        visible={Boolean(user.mustChangePassword)}
         userName={user.name}
+        onCompleted={markPasswordChanged}
         onSignOut={() => {
           void signOut().catch((error: unknown) => {
             Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
           });
         }}
       />
-      <TeacherPaymentNoticeModal
-        user={user}
-        onViewFinance={() => {
-          if (navigationRef.isReady()) navigationRef.navigate('MainTabs', { screen: 'Finance' });
-        }}
-      />
-      <LearningGoalHost user={user} />
-      <FreeFeatureLockModal
-        visible={freeLockModalVisible}
-        onClose={() => setFreeLockModalVisible(false)}
-        onUnlocked={() => {
-          void refreshUser();
-          void refreshSubscription();
-        }}
-      />
-      <FreeSurveyModal
-        visible={Boolean(user.role === 'student' && user.needsFreeSurvey && !surveyDismissed)}
-        onDone={() => {
-          setSurveyDismissed(true);
-          void refreshUser();
-        }}
-      />
+      {!user.mustChangePassword ? (
+        <>
+          <PinLockGate
+            userKey={pinUserKey(user)}
+            userName={user.name}
+            onSignOut={() => {
+              void signOut().catch((error: unknown) => {
+                Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
+              });
+            }}
+          />
+          <TeacherPaymentNoticeModal
+            user={user}
+            onViewFinance={() => {
+              if (navigationRef.isReady()) navigationRef.navigate('MainTabs', { screen: 'Finance' });
+            }}
+          />
+          <LearningGoalHost user={user} />
+          <FreeFeatureLockModal
+            visible={freeLockModalVisible}
+            onClose={() => setFreeLockModalVisible(false)}
+            onUnlocked={() => {
+              void refreshUser();
+              void refreshSubscription();
+            }}
+          />
+          <FreeSurveyModal
+            visible={Boolean(user.role === 'student' && user.needsFreeSurvey && !surveyDismissed)}
+            onDone={() => {
+              setSurveyDismissed(true);
+              void refreshUser();
+            }}
+          />
+        </>
+      ) : null}
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
@@ -606,7 +654,7 @@ export function RootNavigator() {
           ) : null}
         </>
       </Stack.Navigator>
-      {!examRoomActive ? (
+      {!examRoomActive && !practiceSessionActive ? (
         <FloatingNavigationMenu
           onSignOut={() => {
             void signOut().catch((error: unknown) => {
@@ -616,6 +664,7 @@ export function RootNavigator() {
         />
       ) : null}
       {!examRoomActive
+        && !practiceSessionActive
         && !focusMode
         && stackRouteName !== 'Conversation'
         && stackRouteName !== 'Call'
@@ -623,7 +672,7 @@ export function RootNavigator() {
         && user.role === 'teacher' ? (
         <FloatingSupportButton />
       ) : null}
-      {!examRoomActive && !focusMode && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? (
+      {!examRoomActive && !practiceSessionActive && !focusMode && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' && stackRouteName !== 'CertPrepPlayer' ? (
         <PersistentTabBar
           role={user.role}
           activeTab={activeTab}
@@ -633,7 +682,7 @@ export function RootNavigator() {
           freeLocked={isFreePortalLocked(user)}
         />
       ) : null}
-      {focusMode && stackRouteName !== 'DailyPractice' && activeTab !== 'DailyPractice' ? (
+      {focusMode && !practiceSessionActive && stackRouteName !== 'DailyPractice' && activeTab !== 'DailyPractice' ? (
         <Pressable
           onPress={() => {
             triggerMobileHaptic('light');
@@ -658,7 +707,7 @@ export function RootNavigator() {
         />
       ) : null}
       {searchOverlayVisible ? (
-        <GlobalSearchOverlay
+        <QuickAiPopupModal
           role={user.role}
           freeMenu={isFreePortalMenu(user)}
           onClose={() => setSearchOverlayVisible(false)}
@@ -707,259 +756,6 @@ export function RootNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
       <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'fade' }} />
     </Stack.Navigator>
-  );
-}
-
-function normalizeSearchQuery(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-}
-
-type CommandEntry = {
-  id: string;
-  label: string;
-  subtitle: string;
-  keywords: string;
-  icon: LucideIcon;
-  active?: boolean;
-  locked?: boolean;
-  onSelect: () => void;
-};
-
-function GlobalSearchOverlay({
-  onClose,
-  role,
-  freeMenu,
-}: {
-  onClose: () => void;
-  role: 'student' | 'teacher';
-  freeMenu: boolean;
-}) {
-  const { user } = useAuth();
-  const { focusMode } = useMobileFocusMode();
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [query, setQuery] = useState('');
-  const freeLocked = role === 'student' && isFreePortalLocked(user);
-
-  useEffect(() => {
-    let active = true;
-    getMobileSoundEnabled()
-      .then((enabled) => { if (active) setSoundEnabled(enabled); })
-      .catch(() => { });
-    const unsub = subscribeToMobileSoundPreference((enabled) => setSoundEnabled(enabled));
-    return () => {
-      active = false;
-      unsub();
-    };
-  }, []);
-
-  const quickActions: CommandEntry[] = [
-    {
-      id: 'act-sound',
-      label: soundEnabled ? 'Tắt âm thanh hiệu ứng' : 'Bật âm thanh hiệu ứng',
-      subtitle: soundEnabled ? 'Đang bật âm thanh & rung phản hồi' : 'Đang tắt âm thanh & rung',
-      keywords: 'am thanh sound mute loa rung haptic',
-      icon: soundEnabled ? Volume2 : VolumeX,
-      active: soundEnabled,
-      onSelect: () => {
-        const next = !soundEnabled;
-        if (next) triggerMobileHaptic('light');
-        void setMobileSoundEnabled(next).then(() => setSoundEnabled(next)).catch(() => { });
-      },
-    },
-    {
-      id: 'act-focus',
-      label: focusMode ? 'Thoát chế độ tập trung' : 'Bật chế độ tập trung',
-      subtitle: focusMode ? 'Hiện lại thanh điều hướng & hỗ trợ' : 'Ẩn thanh điều hướng & nút nổi khi học',
-      keywords: 'che do tap trung focus mode an thanh dieu huong',
-      icon: focusMode ? Minimize2 : Maximize2,
-      active: focusMode,
-      onSelect: () => {
-        triggerMobileHaptic('light');
-        setMobileFocusMode(!focusMode);
-        onClose();
-      },
-    },
-    ...(role === 'student' ? [{
-      id: 'act-goal',
-      label: 'Đặt mục tiêu học tập',
-      subtitle: 'Cài đặt số giờ học mỗi ngày',
-      keywords: 'muc tieu hoc tap goal streak gio hoc',
-      icon: Target,
-      onSelect: () => {
-        triggerMobileHaptic('light');
-        onClose();
-        DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT);
-      },
-    }] : []),
-  ];
-
-  const navigateTab = (screen: keyof MainTabsParamList, locked = false) => {
-    triggerMobileHaptic('light');
-    onClose();
-    if (locked) {
-      DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
-      return;
-    }
-    navigationRef.navigate('MainTabs', { screen });
-  };
-
-  const destinations: CommandEntry[] = role === 'teacher'
-    ? [
-      { id: 'nav-home', label: 'Tổng quan', subtitle: 'Bảng điều khiển giảng viên', keywords: 'tong quan home dashboard', icon: House, onSelect: () => navigateTab('Home') },
-      { id: 'nav-schedule', label: 'Lịch dạy & điểm danh', subtitle: 'Xem ca dạy hôm nay', keywords: 'lich day diem danh schedule', icon: CalendarDays, onSelect: () => navigateTab('Schedule') },
-      { id: 'nav-messages', label: 'Hộp thư', subtitle: 'Nhắn tin với học viên', keywords: 'hop thu tin nhan chat messages', icon: MessageCircle, onSelect: () => navigateTab('Messages') },
-      { id: 'nav-feed', label: 'Bảng tin', subtitle: 'Thông báo & bài đăng trung tâm', keywords: 'bang tin feed', icon: Radio, onSelect: () => navigateTab('Feed') },
-      { id: 'nav-finance', label: 'Tài chính', subtitle: 'Thu nhập & đối soát', keywords: 'tai chinh luong finance', icon: DollarSign, onSelect: () => navigateTab('Finance') },
-      {
-        id: 'nav-students',
-        label: 'Quản lý học viên',
-        subtitle: 'Danh sách lớp & học viên',
-        keywords: 'hoc vien lop students',
-        icon: Users,
-        onSelect: () => {
-          triggerMobileHaptic('light');
-          onClose();
-          navigationRef.navigate('Students');
-        },
-      },
-      { id: 'nav-support', label: 'Hỗ trợ', subtitle: 'Trợ giúp & tài liệu giảng viên', keywords: 'ho tro support', icon: Headphones, onSelect: () => navigateTab('Support') },
-      { id: 'nav-profile', label: 'Hồ sơ cá nhân', subtitle: 'Thông tin & cài đặt', keywords: 'ho so profile cai dat', icon: UserRound, onSelect: () => navigateTab('Profile') },
-    ]
-    : [
-      { id: 'nav-home', label: 'Tổng quan', subtitle: 'Tiến độ & lịch học hôm nay', keywords: 'tong quan home dashboard', icon: House, onSelect: () => navigateTab('Home') },
-      { id: 'nav-dp', label: 'Luyện tập hằng ngày', subtitle: 'Lộ trình XP & câu hỏi ngắn', keywords: 'luyen tap daily practice xp lo trinh', icon: Gamepad2, onSelect: () => navigateTab('DailyPractice') },
-      ...(!freeMenu ? [
-        { id: 'nav-videos', label: 'Bài giảng', subtitle: 'Video & thực hành bài học', keywords: 'bai giang video thuc hanh course', icon: BookOpen, onSelect: () => navigateTab('CourseVideos') },
-        { id: 'nav-schedule', label: 'Lịch học', subtitle: 'Lịch học trực tuyến qua Meet', keywords: 'lich hoc meet schedule', icon: CalendarDays, onSelect: () => navigateTab('Schedule') },
-      ] : []),
-      { id: 'nav-messages', label: 'Hộp thư', subtitle: 'Trao đổi với giảng viên', keywords: 'hop thu tin nhan chat messages', icon: MessageCircle, locked: freeLocked, onSelect: () => navigateTab('Messages', freeLocked) },
-      { id: 'nav-feed', label: 'Bảng tin', subtitle: 'Cộng đồng & thông báo mới', keywords: 'bang tin feed', icon: Radio, locked: freeLocked, onSelect: () => navigateTab('Feed', freeLocked) },
-      {
-        id: 'nav-support',
-        label: 'Hỗ trợ',
-        subtitle: 'Liên hệ & giải đáp thắc mắc',
-        keywords: 'ho tro support',
-        icon: Headphones,
-        locked: freeLocked,
-        onSelect: () => {
-          triggerMobileHaptic('light');
-          onClose();
-          if (freeLocked) {
-            DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
-            return;
-          }
-          navigationRef.navigate('Support');
-        },
-      },
-      { id: 'nav-profile', label: 'Hồ sơ cá nhân', subtitle: 'Tài khoản & khóa thiết bị', keywords: 'ho so profile cai dat', icon: UserRound, onSelect: () => navigateTab('Profile') },
-    ];
-
-  const normalizedQuery = normalizeSearchQuery(query);
-  const matches = (entry: CommandEntry) => {
-    if (!normalizedQuery) return true;
-    const hay = normalizeSearchQuery(`${entry.label} ${entry.subtitle} ${entry.keywords}`);
-    return hay.includes(normalizedQuery);
-  };
-  const filteredActions = quickActions.filter(matches);
-  const filteredDestinations = destinations.filter(matches);
-  const firstMatch = filteredDestinations[0] || filteredActions[0] || null;
-
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.searchOverlay}>
-        <Pressable style={styles.searchOverlayBackdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm" />
-        <View style={styles.searchOverlayCard}>
-          <View style={styles.searchOverlayHeader}>
-            <View style={styles.searchOverlayTitleRow}>
-              <Sparkles size={17} color={colors.brand} />
-              <Text style={styles.searchOverlayTitle}>Tìm kiếm & tác vụ nhanh</Text>
-            </View>
-            <Pressable onPress={onClose} style={styles.searchOverlayClose} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
-              <X size={20} color={colors.muted} />
-            </Pressable>
-          </View>
-          <View style={styles.searchOverlayInput}>
-            <Search size={18} color={colors.muted} />
-            <TextInput
-              autoFocus
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Tìm màn hình, bật âm thanh, chế độ tập trung…"
-              placeholderTextColor={colors.muted}
-              style={styles.searchOverlayTextInput}
-              accessibilityLabel="Tìm màn hình hoặc tác vụ nhanh"
-              returnKeyType="go"
-              onSubmitEditing={() => {
-                if (normalizedQuery && firstMatch) {
-                  firstMatch.onSelect();
-                } else {
-                  onClose();
-                }
-              }}
-            />
-            {query ? (
-              <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Xóa nội dung tìm kiếm">
-                <X size={17} color={colors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
-          <ScrollView style={styles.commandListScroll} contentContainerStyle={styles.commandListContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {filteredActions.length > 0 ? (
-              <View style={styles.commandSection}>
-                <Text style={styles.commandSectionLabel}>TÁC VỤ NHANH</Text>
-                {filteredActions.map((entry) => {
-                  const Icon = entry.icon;
-                  return (
-                    <Pressable
-                      key={entry.id}
-                      onPress={entry.onSelect}
-                      style={({ pressed }) => [styles.commandRow, entry.active && styles.commandRowActive, pressed && styles.commandRowPressed]}
-                      accessibilityRole="button"
-                    >
-                      <View style={[styles.commandIconBox, entry.active && styles.commandIconBoxActive]}>
-                        <Icon size={16} color={entry.active ? '#FFFFFF' : colors.brand} />
-                      </View>
-                      <View style={styles.commandTextCol}>
-                        <Text style={styles.commandLabel} numberOfLines={1}>{entry.label}</Text>
-                        <Text style={styles.commandSubtitle} numberOfLines={1}>{entry.subtitle}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-            {filteredDestinations.length > 0 ? (
-              <View style={styles.commandSection}>
-                <Text style={styles.commandSectionLabel}>ĐI TỚI NHANH</Text>
-                {filteredDestinations.map((entry) => {
-                  const Icon = entry.icon;
-                  return (
-                    <Pressable
-                      key={entry.id}
-                      onPress={entry.onSelect}
-                      style={({ pressed }) => [styles.commandRow, pressed && styles.commandRowPressed]}
-                      accessibilityRole="button"
-                    >
-                      <View style={styles.commandIconBox}>
-                        <Icon size={16} color={colors.brand} />
-                      </View>
-                      <View style={styles.commandTextCol}>
-                        <Text style={styles.commandLabel} numberOfLines={1}>{entry.label}</Text>
-                        <Text style={styles.commandSubtitle} numberOfLines={1}>{entry.subtitle}</Text>
-                      </View>
-                      {entry.locked ? <Lock size={14} color="#D97706" /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-            {filteredActions.length === 0 && filteredDestinations.length === 0 ? (
-              <Text style={styles.commandEmptyText}>Không tìm thấy màn hình hay tác vụ phù hợp.</Text>
-            ) : null}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -1226,7 +1022,7 @@ function PersistentTabBar({
       />
     );
   }
-  const items = [
+  const items = isTeacher ? [
     { name: 'Schedule' as const, label: 'Lịch dạy', shortLabel: 'Lịch', icon: CalendarDays },
     { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
     { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
@@ -1234,7 +1030,7 @@ function PersistentTabBar({
     { name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: DollarSign },
     { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
     { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
-  ];
+  ] : [];
   const orderedItems = items;
   const barHeight = 96 + insets.bottom;
   return (
@@ -1319,7 +1115,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
   const isBrandStudent = !isTeacher && !freeMenu;
-  const freeLocked = isFreePortalLocked(user);
+  const freeLocked = isFreePortalLocked(user) && !hasMeetAccessClient(subscription?.subscription);
   const feedPostLocked = !isTeacher && !hasFeedPostAccess({
     role: user?.role,
     user,
@@ -1573,6 +1369,10 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
               ))}
             </ScrollView>
             <View style={styles.drawerFooter}>
+              <View style={[styles.drawerItem, { justifyContent: 'space-between' }]}>
+                <Text style={styles.drawerItemText}>Ngôn ngữ</Text>
+                <LanguageSwitcher variant="pill" theme="dark" />
+              </View>
               <Pressable
                 onPress={() => openDestination('Profile')}
                 style={[styles.drawerItem, activeDestination === 'Profile' && (isBrandStudent ? styles.drawerItemActiveBrand : styles.drawerItemActive)]}
@@ -1606,11 +1406,11 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
 }
 
 function FloatingSupportButton() {
-  const { user } = useAuth();
+  const { user, subscription } = useAuth();
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
   const isGreenTone = isTeacher || freeMenu;
-  const freeLocked = isFreePortalLocked(user);
+  const freeLocked = isFreePortalLocked(user) && !hasMeetAccessClient(subscription?.subscription);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [hovered, setHovered] = useState(false);
@@ -1670,12 +1470,16 @@ function FloatingSupportButton() {
 
 function MainTabs() {
   const { user, subscription } = useAuth();
+  const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const { focusMode } = useMobileFocusMode();
+  const practiceSessionActive = useMobilePracticeSessionActive();
+  const hideTabBar = practiceSessionActive || focusMode;
   const isTeacher = user?.role === 'teacher';
   const freeMenu = isFreePortalMenu(user);
   const isBrandStudent = !isTeacher && !freeMenu;
-  const freeLocked = isFreePortalLocked(user);
+  const freeLocked = isFreePortalLocked(user) && !hasMeetAccessClient(subscription?.subscription);
   const feedPostLocked = !isTeacher && !hasFeedPostAccess({
     role: user?.role,
     user,
@@ -1807,6 +1611,10 @@ function MainTabs() {
       SOCKET_EVENTS.NOTIFICATION,
       SOCKET_EVENTS.CONTACT_UPDATED,
       SOCKET_EVENTS.DATA_REFRESH,
+      SOCKET_EVENTS.FREE_PORTAL_UNLOCKED,
+      SOCKET_EVENTS.FREE_PORTAL_LOCKED,
+      SOCKET_EVENTS.SUBSCRIPTION_UPDATED,
+      'mobile:free-portal-unlocked',
     ];
     const subscriptions = refreshEvents.map((eventName) => DeviceEventEmitter.addListener(eventName, refresh));
     const financeViewedSubscription = DeviceEventEmitter.addListener('mobile:finance-viewed', () => {
@@ -1821,6 +1629,7 @@ function MainTabs() {
   }, [markFinanceTransactionsViewed, refreshTabBadges]);
 
   const renderStudentTabBar = useCallback((tabProps: BottomTabBarProps) => {
+    if (hideTabBar) return null;
     const currentRoute = tabProps.state.routes[tabProps.state.index]?.name || 'Home';
     return (
       <StudentFiveTabBar
@@ -1833,7 +1642,7 @@ function MainTabs() {
         onSelect={(screen) => tabProps.navigation.navigate(screen)}
       />
     );
-  }, [unreadConversationCount, todayScheduleCount, freeMenu, freeLocked, isBrandStudent]);
+  }, [hideTabBar, unreadConversationCount, todayScheduleCount, freeMenu, freeLocked, isBrandStudent]);
 
   return (
     <Tab.Navigator
@@ -1853,40 +1662,42 @@ function MainTabs() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: {
-          ...(centeredWebBar ? {
-            width: tabBarWidth,
-            maxWidth: '100%',
-            alignSelf: 'center' as const,
-          } : {}),
-          position: 'absolute' as const,
-          left: centeredWebBar ? (windowWidth - tabBarWidth) / 2 : 10,
-          right: centeredWebBar ? (windowWidth - tabBarWidth) / 2 : 10,
-          bottom: centeredWebBar ? 12 : Math.max(insets.bottom, 8),
-          backgroundColor: 'transparent',
-          borderTopColor: 'rgba(255,255,255,0.96)',
-          borderTopWidth: 1,
-          borderLeftWidth: 1,
-          borderRightWidth: 1,
-          borderColor: 'rgba(255,255,255,0.8)',
-          borderRadius: 24,
-          height: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 96 + insets.bottom] }),
-          paddingTop: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
-          paddingBottom: navigationBarVisibility.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, spacing.sm],
-          }),
-          boxShadow: droplet.navBar,
-          opacity: navigationBarVisibility,
-          transform: [{
-            translateY: navigationBarVisibility.interpolate({
+        tabBarStyle: hideTabBar
+          ? { display: 'none' as const }
+          : {
+            ...(centeredWebBar ? {
+              width: tabBarWidth,
+              maxWidth: '100%',
+              alignSelf: 'center' as const,
+            } : {}),
+            position: 'absolute' as const,
+            left: centeredWebBar ? (windowWidth - tabBarWidth) / 2 : 10,
+            right: centeredWebBar ? (windowWidth - tabBarWidth) / 2 : 10,
+            bottom: centeredWebBar ? 12 : Math.max(insets.bottom, 8),
+            backgroundColor: 'transparent',
+            borderTopColor: 'rgba(255,255,255,0.96)',
+            borderTopWidth: 1,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderColor: 'rgba(255,255,255,0.8)',
+            borderRadius: 24,
+            height: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 96 + insets.bottom] }),
+            paddingTop: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
+            paddingBottom: navigationBarVisibility.interpolate({
               inputRange: [0, 1],
-              outputRange: [96 + insets.bottom, 0],
+              outputRange: [0, spacing.sm],
             }),
-          }],
-        },
+            boxShadow: droplet.navBar,
+            opacity: navigationBarVisibility,
+            transform: [{
+              translateY: navigationBarVisibility.interpolate({
+                inputRange: [0, 1],
+                outputRange: [96 + insets.bottom, 0],
+              }),
+            }],
+          },
         tabBarIconStyle: { width: '100%', height: 64 },
-        tabBarAccessibilityLabel: navTabLabel(route.name, isTeacher),
+        tabBarAccessibilityLabel: navTabLabel(route.name, isTeacher, language),
         tabBarButton: (props) => {
           const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(route.name);
           return (
@@ -1930,7 +1741,7 @@ function MainTabs() {
           return (
             <NavTabContent
               name={route.name}
-              label={navTabLabel(route.name, isTeacher)}
+              label={navTabLabel(route.name, isTeacher, language)}
               Icon={TAB_ICONS[route.name] || FileText}
               selected={focused}
               isHome={route.name === 'Home'}
@@ -1949,41 +1760,41 @@ function MainTabs() {
               name="Schedule"
               component={ScheduleScreen}
               options={{
-                title: 'Lịch dạy',
+                title: translateText('Lịch dạy', language),
               }}
             />
             <Tab.Screen
               name="Feed"
               component={FeedScreen}
-              options={{ title: 'Bảng tin' }}
+              options={{ title: translateText('Bảng tin', language) }}
             />
-            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Tổng quan' }} />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: translateText('Tổng quan', language) }} />
             <Tab.Screen
               name="Finance"
               component={TeacherFinanceScreen}
               options={{
-                title: 'Tài chính',
+                title: translateText('Tài chính', language),
               }}
             />
             <Tab.Screen
               name="Messages"
               component={MessagesScreen}
               options={{
-                title: 'Tin nhắn',
+                title: translateText('Tin nhắn', language),
               }}
             />
-            <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
-            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
+            <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: translateText('Hỗ trợ', language) }} />
+            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: translateText('Hồ sơ', language) }} />
           </>
         ) : (
           <>
-            <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Lịch học' }} />
-            <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Trao đổi' }} />
-            <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
-            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-            <Tab.Screen name="DailyPractice" component={DailyPracticeScreen} options={{ title: 'Luyện tập' }} />
-            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Học tập' }} />
-            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
+            <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: translateText('Lịch học', language) }} />
+            <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: translateText('Trao đổi', language) }} />
+            <Tab.Screen name="Feed" component={FeedScreen} options={{ title: translateText('Bảng tin', language) }} />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: translateText('Trang chủ', language) }} />
+            <Tab.Screen name="DailyPractice" component={DailyPracticeScreen} options={{ title: translateText('Luyện tập', language) }} />
+            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: translateText('Học tập', language) }} />
+            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: translateText('Hồ sơ', language) }} />
           </>
         )}
     </Tab.Navigator >
@@ -2013,28 +1824,6 @@ function useNavigationBarVisibility() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
-  searchOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.48)' },
-  searchOverlayBackdrop: { ...StyleSheet.absoluteFill },
-  searchOverlayCard: { width: '100%', maxWidth: 460, maxHeight: '84%', padding: spacing.lg, borderWidth: 1, borderColor: colors.line, borderRadius: 22, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
-  searchOverlayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  searchOverlayTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  searchOverlayTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' },
-  searchOverlayClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  searchOverlayInput: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1.5, borderColor: colors.line, borderRadius: 16, backgroundColor: colors.canvas },
-  searchOverlayTextInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.body, paddingVertical: spacing.sm },
-  commandListScroll: { marginTop: spacing.md, maxHeight: 380 },
-  commandListContent: { gap: spacing.md, paddingBottom: spacing.xs },
-  commandSection: { gap: 6 },
-  commandSectionLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, paddingHorizontal: 4 },
-  commandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-  commandRowActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
-  commandRowPressed: { opacity: 0.82 },
-  commandIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' },
-  commandIconBoxActive: { backgroundColor: '#059669' },
-  commandTextCol: { flex: 1, minWidth: 0 },
-  commandLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  commandSubtitle: { color: colors.muted, fontSize: 11, fontWeight: '500', marginTop: 1 },
-  commandEmptyText: { color: colors.muted, fontSize: 13, fontWeight: '600', textAlign: 'center', paddingVertical: spacing.lg },
   focusExitPill: { position: 'absolute', right: 14, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: '#A7F3D0', backgroundColor: 'rgba(255,255,255,0.96)', shadowColor: '#047857', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   focusExitText: { color: '#047857', fontSize: 12, fontWeight: '800' },
   incomingCallBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.62)' },

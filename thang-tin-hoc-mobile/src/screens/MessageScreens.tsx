@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  Bot, CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle, MessageSquare,
+  Ban, Bot, CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Flag, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle, MessageSquare,
   MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, Sparkles, ThumbsUp, Trash2, UserPlus, UserRound, Video, X,
 } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, ChromeScrollView, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
@@ -33,6 +33,7 @@ import {
   AI_SUPPORT_WELCOME_CHIPS,
   AI_SUPPORT_STATUS,
   canOfferHumanEscalation,
+  endAiSupportConversation,
   escalateAiSupportConversation,
   getAiSupportReplyPresentation,
   isAiSupportWelcome,
@@ -44,12 +45,17 @@ import { MessageRichText } from '../components/MessageRichText';
 import { TypingDots } from '../components/TypingDots';
 import { downloadChatAttachment, openChatAttachment } from '../services/chatFileAccess';
 import {
+  blockChatUser,
   buildDirectConversationId,
+  getBlockedChatUsers,
   getChatReactionEmoji,
   getChatReactionType,
   mapLiveChatMessage,
   mapLiveReaction,
   MESSAGE_PAGE_SIZE,
+  reportChatViolation,
+  unblockChatUser,
+  type ChatReportReason,
 } from '../services/messageApi';
 import {
   emitTypingStart,
@@ -66,6 +72,8 @@ import { CommunicationPreferencesCard } from '../components/CommunicationPrefere
 import { getTeacherPublicCard } from '../services/teacherApi';
 import { getStudentChatCard, getStudentDetail } from '../services/studentApi';
 import { getContactAvatarSource, getRoleBadgeConfig } from '../utils/contactAvatars';
+import { getCurrentLanguage } from '../i18n/LanguageContext';
+import { translateText } from '../../../shared/i18n/translate.mjs';
 import { useMockResource } from '../hooks/useMockResource';
 import { colors, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
@@ -791,8 +799,107 @@ export function ConversationScreen() {
   const [teacherAttendanceSavedScheduleId, setTeacherAttendanceSavedScheduleId] = useState('');
   const teacherAttendanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const groupDeleteRequested = useRef(false);
+  const [isPeerBlocked, setIsPeerBlocked] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    messageId?: string;
+    reportedUserId?: string;
+    reportedUserRole?: string;
+    label?: string;
+  } | null>(null);
+  const [reportReason, setReportReason] = useState<ChatReportReason>('inappropriate');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+
+  const canBlockOrReportPeer = !isPreview
+    && !isGroupConversation
+    && !isAiSupportConversation
+    && Boolean(chatPeerId)
+    && chatPeerId !== 'admin'
+    && chatPeerId !== 'ai_support';
+
   useEffect(() => {
-    setAiSupportStatus(resolveAiSupportStatus(route.params.supportStatus));
+    if (!canBlockOrReportPeer || !chatPeerId) {
+      setIsPeerBlocked(false);
+      return;
+    }
+    let alive = true;
+    getBlockedChatUsers()
+      .then((ids) => {
+        if (alive) setIsPeerBlocked(ids.includes(String(chatPeerId)));
+      })
+      .catch(() => { });
+    return () => { alive = false; };
+  }, [canBlockOrReportPeer, chatPeerId]);
+
+  const handleToggleBlockPeer = () => {
+    if (!canBlockOrReportPeer || !chatPeerId || blockBusy) return;
+    if (isPeerBlocked) {
+      setBlockBusy(true);
+      void unblockChatUser(chatPeerId)
+        .then(() => {
+          setIsPeerBlocked(false);
+          Alert.alert('Đã bỏ chặn', 'Bạn có thể tiếp tục trao đổi với người dùng này.');
+        })
+        .catch((err: unknown) => {
+          Alert.alert('Không thể bỏ chặn', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+        })
+        .finally(() => setBlockBusy(false));
+      return;
+    }
+    Alert.alert(
+      'Chặn người dùng',
+      'Sau khi chặn, hai bên sẽ không thể gửi tin nhắn 1-1 cho nhau cho đến khi bạn bỏ chặn.',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Chặn',
+          style: 'destructive',
+          onPress: () => {
+            setBlockBusy(true);
+            void blockChatUser(chatPeerId, String(route.params.participantRole || ''), 'Blocked by user from mobile chat')
+              .then(() => {
+                setIsPeerBlocked(true);
+                setShowInfo(false);
+                Alert.alert('Đã chặn', 'Đã chặn liên lạc với người dùng này.');
+              })
+              .catch((err: unknown) => {
+                Alert.alert('Không thể chặn', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+              })
+              .finally(() => setBlockBusy(false));
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSubmitChatReport = async () => {
+    if (!reportTarget || reportBusy) return;
+    setReportBusy(true);
+    try {
+      await reportChatViolation({
+        conversationId: route.params.conversationId,
+        messageId: reportTarget.messageId,
+        reportedUserId: reportTarget.reportedUserId || chatPeerId,
+        reportedUserRole: reportTarget.reportedUserRole || route.params.participantRole,
+        reason: reportReason,
+        details: reportDetails.trim(),
+      });
+      setReportTarget(null);
+      setReportDetails('');
+      Alert.alert('Đã gửi báo cáo', 'Quản trị viên đã nhận được báo cáo nội dung vi phạm của bạn.');
+    } catch (err) {
+      Alert.alert('Không thể gửi báo cáo', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setReportBusy(false);
+    }
+  };
+  useEffect(() => {
+    const nextStatus = resolveAiSupportStatus(route.params.supportStatus);
+    setAiSupportStatus(nextStatus);
+    if (nextStatus === AI_SUPPORT_STATUS.CLOSED) {
+      setAiFeedbackPhase('ended');
+    }
   }, [route.params.supportStatus]);
   useEffect(() => {
     if (!isAiSupportConversation || isPreview) return undefined;
@@ -802,7 +909,13 @@ export function ConversationScreen() {
         if (!payload || typeof payload !== 'object') return;
         const event = payload as { conversationId?: string; status?: string };
         if (event.conversationId !== route.params.conversationId || !event.status) return;
-        setAiSupportStatus(resolveAiSupportStatus(event.status));
+        const resolved = resolveAiSupportStatus(event.status);
+        setAiSupportStatus(resolved);
+        if (resolved === AI_SUPPORT_STATUS.CLOSED) {
+          setAiFeedbackPhase('ended');
+        } else if (resolved === AI_SUPPORT_STATUS.AI_ACTIVE) {
+          setAiFeedbackPhase((prev) => (prev === 'ended' ? 'invite' : prev));
+        }
       },
     );
     return () => subscription.remove();
@@ -1339,10 +1452,14 @@ export function ConversationScreen() {
   const lastAiReplyIdRef = useRef('');
   useEffect(() => {
     if (!latestAiReplyId) return;
+    if (aiSupportStatus === AI_SUPPORT_STATUS.CLOSED) {
+      lastAiReplyIdRef.current = latestAiReplyId;
+      return;
+    }
     if (lastAiReplyIdRef.current === latestAiReplyId) return;
     lastAiReplyIdRef.current = latestAiReplyId;
     setAiFeedbackPhase((prev) => (prev === 're_explain' ? 'disagree2' : 'agree'));
-  }, [latestAiReplyId]);
+  }, [latestAiReplyId, aiSupportStatus]);
   const conversationName = isAiSupportConversation
     ? 'Trợ lý AI'
     : route.params.conversationName || 'Cuộc trò chuyện';
@@ -1575,8 +1692,6 @@ export function ConversationScreen() {
       .filter((schedule) => (
         schedule.teacherId === String(route.params.participantId)
         && schedule.attendanceConfirmPending
-        && schedule.attendanceConfirmStatus === 'pending'
-        && (getAttendanceConfirmUnlockAt(schedule) || Infinity) <= scheduleNow.getTime()
         && !handledAttendancePromptIds.includes(schedule.id)
       ))
       .sort((left, right) => (
@@ -1585,7 +1700,6 @@ export function ConversationScreen() {
   }, [
     route.params.participantId,
     route.params.participantRole,
-    scheduleNow,
     pendingAttendanceResource.data,
     handledAttendancePromptIds,
     user?.role,
@@ -1795,11 +1909,13 @@ export function ConversationScreen() {
     .filter((contact) => matchesContactSearch(groupMemberSearch, contact));
   const groupMemberCount = groupDetails?.groupParticipants?.length;
   const peerId = String(route.params.participantId || '');
+  const aiSessionEnded = isAiSupportConversation
+    && (aiSupportStatus === AI_SUPPORT_STATUS.CLOSED || aiFeedbackPhase === 'ended');
   const isPeerOnline = isAiSupportConversation
-    ? true
+    ? !aiSessionEnded
     : Boolean(peerId && getPresenceUserIds(presenceOnlineUsers).includes(peerId));
   const contactStatus = isAiSupportConversation
-    ? 'Đang trực tuyến'
+    ? (aiSessionEnded ? 'Phiên hỗ trợ đã kết thúc' : 'Đang trực tuyến')
     : isGroupConversation
       ? (groupMemberCount == null ? '' : `${groupMemberCount} thành viên`)
       : isPeerOnline
@@ -2170,19 +2286,51 @@ export function ConversationScreen() {
     setAiFeedbackPhase('invite');
   };
 
-  const handleAiMoreNo = () => {
+  const handleEndAiSession = async () => {
     setAiFeedbackPhase('ended');
+    setAiSupportStatus(AI_SUPPORT_STATUS.CLOSED);
+    if (!isPreview && isAiSupportConversation) {
+      try {
+        await endAiSupportConversation(route.params.conversationId);
+      } catch {
+        /* giữ trạng thái kết thúc trên UI */
+      }
+    }
+  };
+
+  const handleStartNewAiSession = async () => {
+    if (aiSupportBusy) return;
+    setAiSupportBusy(true);
+    try {
+      if (!isPreview && isAiSupportConversation) {
+        const nextStatus = await resetAiSupportConversation(route.params.conversationId);
+        setAiSupportStatus(resolveAiSupportStatus(nextStatus));
+      } else {
+        setAiSupportStatus(AI_SUPPORT_STATUS.AI_ACTIVE);
+      }
+      setAiFeedbackPhase('invite');
+    } catch {
+      setAiSupportStatus(AI_SUPPORT_STATUS.AI_ACTIVE);
+      setAiFeedbackPhase('invite');
+    } finally {
+      setAiSupportBusy(false);
+    }
+  };
+
+  const handleAiMoreNo = () => {
+    void handleEndAiSession();
   };
 
   const handleAiDisagreeReason = async (reason: string) => {
     setAiFeedbackPhase('re_explain');
-    const reasonText = {
+    const lang = getCurrentLanguage();
+    const rawReasonText = {
       unclear: 'Tôi không hiểu câu trả lời vừa rồi, bạn có thể giải thích rõ hơn không?',
       offtopic: 'Câu trả lời chưa đúng trọng tâm câu hỏi của tôi, bạn hãy trả lời lại đúng vào câu hỏi hơn.',
       too_short: 'Câu trả lời còn quá ngắn, bạn hãy giải thích đầy đủ và chi tiết hơn.',
     }[reason] || 'Bạn có thể giải thích thêm không?';
     try {
-      await send(reasonText);
+      await send(translateText(rawReasonText, lang));
     } catch { }
   };
 
@@ -2192,8 +2340,9 @@ export function ConversationScreen() {
 
   const handleAiFinalExplain = async () => {
     setAiFeedbackPhase('re_explain');
+    const lang = getCurrentLanguage();
     try {
-      await send('Bạn có thể giải thích thêm một lần nữa với nhiều ví dụ và chi tiết hơn không?');
+      await send(translateText('Bạn có thể giải thích thêm một lần nữa với nhiều ví dụ và chi tiết hơn không?', lang));
     } catch { }
   };
 
@@ -3139,6 +3288,30 @@ export function ConversationScreen() {
                         <Trash2 size={15} color="#DC2626" />
                         <Text style={[styles.optionsMenuItemText, styles.optionsMenuItemRed]}>Xóa chỉ ở phía tôi</Text>
                       </Pressable>
+                      {!isMine && !message.recalled && !isAiSupportConversation && !isPreview ? (
+                        <Pressable
+                          onPress={() => {
+                            setOptionsMenuMsgId(null);
+                            setReportReason('inappropriate');
+                            setReportDetails('');
+                            setReportTarget({
+                              messageId: message.id,
+                              reportedUserId: message.senderId || chatPeerId,
+                              reportedUserRole: message.senderRole || route.params.participantRole,
+                              label: message.senderName || 'tin nhắn này',
+                            });
+                          }}
+                          style={({ pressed, hovered }: any) => [
+                            styles.optionsMenuItem,
+                            styles.optionsMenuItemBorderTop,
+                            (pressed || hovered) && styles.optionsMenuItemPressed,
+                          ]}
+                          accessibilityRole="button"
+                        >
+                          <Flag size={15} color="#DC2626" />
+                          <Text style={[styles.optionsMenuItemText, styles.optionsMenuItemRed]}>Báo cáo vi phạm</Text>
+                        </Pressable>
+                      ) : null}
                     </View>
                   ) : null}
                 </View>
@@ -3210,7 +3383,7 @@ export function ConversationScreen() {
                         {promptChips.map((prompt) => (
                           <Pressable
                             key={prompt.id}
-                            onPress={() => { void send(prompt.label); }}
+                            onPress={() => { void send(translateText(prompt.label, getCurrentLanguage())); }}
                             disabled={sending}
                             style={[styles.aiSupportPromptButton, sending && styles.aiSupportPromptButtonDisabled]}
                             accessibilityRole="button"
@@ -3237,9 +3410,9 @@ export function ConversationScreen() {
                 ) : null}
               </View>
             ) : null}
-            {canShowEscalate && !peerTyping && !aiAwaitingReply ? (
+            {((canShowEscalate && !peerTyping && !aiAwaitingReply) || aiSessionEnded) ? (
               <View style={styles.aiFeedbackContainer}>
-                {(!aiFeedbackPhase || aiFeedbackPhase === 'agree') ? (
+                {!aiSessionEnded && (!aiFeedbackPhase || aiFeedbackPhase === 'agree') ? (
                   <View style={styles.aiFeedbackSection}>
                     <Text style={styles.aiFeedbackTitle}>Bạn đồng ý câu trả lời này không?</Text>
                     <View style={styles.aiFeedbackRow}>
@@ -3262,6 +3435,14 @@ export function ConversationScreen() {
                         <Text style={styles.aiFeedbackBtnDisagreeText}>Không</Text>
                       </Pressable>
                     </View>
+                    <Pressable
+                      onPress={() => { void handleEndAiSession(); }}
+                      style={({ pressed }) => [styles.aiEndSessionChip, pressed && { opacity: 0.8 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Kết thúc phiên hỗ trợ"
+                    >
+                      <Text style={styles.aiEndSessionChipText}>Đã hỗ trợ xong · Kết thúc phiên</Text>
+                    </Pressable>
                   </View>
                 ) : null}
 
@@ -3368,9 +3549,32 @@ export function ConversationScreen() {
                   </View>
                 ) : null}
 
-                {aiFeedbackPhase === 'ended' ? (
+                {aiSessionEnded ? (
                   <View style={styles.aiEndedNotice}>
+                    <Text style={styles.aiEndedTitle}>Phiên trả lời với Trợ lý AI đã kết thúc</Text>
                     <Text style={styles.aiEndedText}>Xin chào, hẹn gặp lại bạn.</Text>
+                    <View style={styles.aiEndedActionsRow}>
+                      <Pressable
+                        onPress={() => { void handleStartNewAiSession(); }}
+                        disabled={aiSupportBusy}
+                        style={({ pressed }) => [styles.aiRestartSessionBtn, pressed && { opacity: 0.85 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Bắt đầu phiên mới"
+                      >
+                        <RotateCcw size={13} color="#047857" />
+                        <Text style={styles.aiRestartSessionBtnText}>Bắt đầu phiên mới</Text>
+                      </Pressable>
+                      {navigation.canGoBack() ? (
+                        <Pressable
+                          onPress={() => navigation.goBack()}
+                          style={({ pressed }) => [styles.aiCloseSessionBtn, pressed && { opacity: 0.85 }]}
+                          accessibilityRole="button"
+                          accessibilityLabel="Đóng phiên hỗ trợ"
+                        >
+                          <Text style={styles.aiCloseSessionBtnText}>Đóng</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
                 ) : null}
               </View>
@@ -3398,6 +3602,20 @@ export function ConversationScreen() {
             <View style={[styles.composerBar, styles.composerLocked]} accessibilityRole="text">
               <Lock size={16} color="#94A3B8" />
               <Text style={styles.composerLockedText}>Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này.</Text>
+            </View>
+          ) : aiSessionEnded ? (
+            <View style={[styles.composerBar, styles.composerLocked]} accessibilityRole="text">
+              <Check size={16} color="#059669" />
+              <Text style={styles.composerLockedText}>Phiên hỗ trợ với Trợ lý AI đã kết thúc.</Text>
+              <Pressable
+                onPress={() => { void handleStartNewAiSession(); }}
+                disabled={aiSupportBusy}
+                style={({ pressed }) => [styles.aiRestartFooterBtn, pressed && { opacity: 0.85 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Hỏi phiên mới"
+              >
+                <Text style={styles.aiRestartFooterBtnText}>Phiên mới</Text>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.composerBar}>
@@ -4129,9 +4347,101 @@ export function ConversationScreen() {
                   <CommunicationPreferencesCard role={user.role} />
                 </View>
               ) : null}
+              {!isPreview && !isAiSupportConversation ? (
+                <View style={{ width: '100%', gap: spacing.xs, marginTop: spacing.sm }}>
+                  <Pressable
+                    onPress={() => {
+                      setShowInfo(false);
+                      setReportReason('inappropriate');
+                      setReportDetails('');
+                      setReportTarget({
+                        reportedUserId: chatPeerId,
+                        reportedUserRole: route.params.participantRole,
+                        label: conversationName || 'cuộc trò chuyện này',
+                      });
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Báo cáo vi phạm"
+                  >
+                    <Flag size={15} color="#DC2626" />
+                    <Text style={{ fontSize: typography.caption, fontWeight: '800', color: '#DC2626' }}>Báo cáo vi phạm</Text>
+                  </Pressable>
+                  {canBlockOrReportPeer ? (
+                    <Pressable
+                      onPress={handleToggleBlockPeer}
+                      disabled={blockBusy}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: isPeerBlocked ? '#A7F3D0' : '#E2E8F0', backgroundColor: isPeerBlocked ? '#ECFDF5' : '#F8FAFC' }}
+                      accessibilityRole="button"
+                      accessibilityLabel={isPeerBlocked ? 'Bỏ chặn người dùng' : 'Chặn người dùng'}
+                    >
+                      <Ban size={15} color={isPeerBlocked ? '#047857' : '#475569'} />
+                      <Text style={{ fontSize: typography.caption, fontWeight: '800', color: isPeerBlocked ? '#047857' : '#334155' }}>
+                        {blockBusy ? 'Đang cập nhật…' : isPeerBlocked ? 'Bỏ chặn người dùng này' : 'Chặn người dùng này'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
               <Pressable onPress={() => setShowInfo(false)} style={styles.infoClose} accessibilityRole="button">
                 <Text style={styles.infoCloseText}>Đóng</Text>
               </Pressable>
+            </View>
+          </View>
+        </Modal>
+        <Modal visible={Boolean(reportTarget)} transparent animationType="fade" onRequestClose={() => { if (!reportBusy) setReportTarget(null); }}>
+          <View style={styles.infoBackdrop}>
+            <View style={[styles.infoCard, { alignItems: 'stretch' }]}>
+              <Text style={styles.infoName}>Báo cáo vi phạm</Text>
+              <Text style={styles.infoStatus}>Gửi báo cáo {reportTarget?.label || 'nội dung'} đến quản trị viên kiểm duyệt</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.xs }}>
+                {([
+                  ['inappropriate', 'Nội dung không phù hợp'],
+                  ['harassment', 'Quấy rối'],
+                  ['spam', 'Spam / Quảng cáo'],
+                  ['scam', 'Lừa đảo'],
+                  ['other', 'Khác'],
+                ] as const).map(([key, label]) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => setReportReason(key)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: radius.pill,
+                      borderWidth: 1,
+                      borderColor: reportReason === key ? '#DC2626' : colors.line,
+                      backgroundColor: reportReason === key ? '#FEF2F2' : colors.surface,
+                    }}
+                  >
+                    <Text style={{ fontSize: typography.caption, fontWeight: '700', color: reportReason === key ? '#DC2626' : colors.muted }}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                placeholder="Mô tả thêm chi tiết vi phạm (tùy chọn)..."
+                placeholderTextColor="#94A3B8"
+                multiline
+                style={{ borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.sm, minHeight: 74, textAlignVertical: 'top', color: colors.ink, backgroundColor: colors.canvas }}
+              />
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                <Pressable
+                  onPress={() => setReportTarget(null)}
+                  disabled={reportBusy}
+                  style={[styles.infoClose, { flex: 1, backgroundColor: '#F1F5F9' }]}
+                >
+                  <Text style={styles.infoCloseText}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void handleSubmitChatReport(); }}
+                  disabled={reportBusy}
+                  style={[styles.infoClose, { flex: 1.4, backgroundColor: '#DC2626' }]}
+                >
+                  <Text style={[styles.infoCloseText, { color: '#FFFFFF' }]}>{reportBusy ? 'Đang gửi…' : 'Gửi báo cáo'}</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </Modal>
@@ -4719,8 +5029,18 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   aiFinalStaffText: { fontSize: 12, fontWeight: '800', color: '#92400E' },
   aiInviteNotice: { alignSelf: 'stretch', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE', backgroundColor: '#F5F3FF', alignItems: 'center' },
   aiInviteText: { fontSize: 12, fontWeight: '700', color: '#6D28D9', textAlign: 'center' },
-  aiEndedNotice: { alignSelf: 'stretch', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center' },
-  aiEndedText: { fontSize: 12, fontWeight: '700', color: '#64748B', textAlign: 'center' },
+  aiEndedNotice: { alignSelf: 'stretch', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center', gap: 6 },
+  aiEndedTitle: { fontSize: 12.5, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
+  aiEndedText: { fontSize: 12, fontWeight: '600', color: '#64748B', textAlign: 'center' },
+  aiEndedActionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
+  aiRestartSessionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  aiRestartSessionBtnText: { fontSize: 12, fontWeight: '800', color: '#047857' },
+  aiCloseSessionBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
+  aiCloseSessionBtnText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  aiEndSessionChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+  aiEndSessionChipText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
+  aiRestartFooterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#059669' },
+  aiRestartFooterBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   sticker: { fontSize: 38, lineHeight: 46 },
   composerBar: { alignSelf: 'stretch', marginHorizontal: -spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
   composerLocked: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 14, backgroundColor: '#F1F5F9' },

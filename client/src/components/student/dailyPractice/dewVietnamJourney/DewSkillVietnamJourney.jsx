@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import Mascot from '../Mascot';
 import {
   dewSkillAnchorsForCount,
@@ -34,6 +35,7 @@ export default function DewSkillVietnamJourney({
   renderHub,
   renderChest,
 }) {
+  const uid = useId().replace(/:/g, '');
   const positions = plainJourney
     ? dewSkillPlainAnchorsForCount(pathItems.length)
     : dewSkillAnchorsForCount(pathItems.length);
@@ -57,35 +59,46 @@ export default function DewSkillVietnamJourney({
           <div className="ds-journey__drops" aria-hidden="true">
             {droplets.map((drop, idx) => {
               const done = pathDropletDone(drop.segmentIndex, pathItems);
-              if (drop.kind === 'star') {
-                return (
-                  <span
-                    key={`drop-star-${idx}`}
-                    className="ds-journey__star"
-                    style={{ left: `${drop.xPct}%`, top: `${drop.yPct}%` }}
-                    aria-hidden="true"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#F59E0B" stroke="#D97706" strokeWidth="1.5">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  </span>
-                );
-              }
+              const gradId = `ds-drop-${uid}-${idx}`;
+              const stopTop = done ? PATH_DROPLET.fillDoneTop : PATH_DROPLET.fillTodoTop;
+              const stopMid = done ? PATH_DROPLET.fillDoneMid : PATH_DROPLET.fillTodoMid;
+              const stopBot = done ? PATH_DROPLET.fillDoneBot : PATH_DROPLET.fillTodoBot;
+              const glowColor = done ? '#A7F3D0' : '#E0F2FE';
+              const shadowColor = done ? 'rgba(4, 120, 87, 0.20)' : 'rgba(56, 189, 248, 0.22)';
               return (
                 <svg
-                  key={`drop-${idx}`}
+                  key={gradId}
                   className="ds-journey__droplet"
                   style={{ left: `${drop.xPct}%`, top: `${drop.yPct}%` }}
-                  viewBox="-6 -10 12 16"
-                  width="13"
-                  height="15"
+                  viewBox="0 0 28 34"
+                  width="18"
+                  height="22"
                 >
+                  <defs>
+                    <linearGradient id={gradId} x1="20%" y1="5%" x2="85%" y2="98%">
+                      <stop offset="0%" stopColor={stopTop} />
+                      <stop offset="48%" stopColor={stopMid} />
+                      <stop offset="100%" stopColor={stopBot} />
+                    </linearGradient>
+                  </defs>
+                  <ellipse cx="14" cy="31.5" rx="6.5" ry="2" fill={shadowColor} />
                   <path
-                    d={PATH_DROPLET.path}
-                    fill={done ? PATH_DROPLET.fillDone : PATH_DROPLET.fillTodo}
-                    stroke={PATH_DROPLET.stroke}
-                    strokeWidth="1"
+                    d={PATH_DROPLET.glossyPath}
+                    fill={`url(#${gradId})`}
+                    stroke="rgba(255,255,255,0.95)"
+                    strokeWidth="1.3"
                   />
+                  <ellipse cx="15" cy="24.5" rx="4.5" ry="2.2" fill={glowColor} opacity="0.45" />
+                  <ellipse
+                    cx="10.8"
+                    cy="17.2"
+                    rx="2.3"
+                    ry="4.8"
+                    fill="#FFFFFF"
+                    opacity="0.85"
+                    transform="rotate(-18 10.8 17.2)"
+                  />
+                  <circle cx="13.2" cy="11.5" r="1.25" fill="#FFFFFF" opacity="0.95" />
                 </svg>
               );
             })}

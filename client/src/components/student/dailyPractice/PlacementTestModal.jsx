@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, CheckCircle2, Clock, Compass, FileText, Loader2, RotateCcw, Sparkles, Target } from 'lucide-react';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
+import { buildPlacementShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 
 const STORAGE_PREFIX = 'dewskill_placement_v1';
 
@@ -174,6 +176,7 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [showIntro, setShowIntro] = useState(Boolean(intro));
+  const [shareOpen, setShareOpen] = useState(false);
 
   const effectiveSurveyLevel = surveyLevel || (() => {
     try { return localStorage.getItem('dewskill_survey_level') || ''; } catch { return ''; }
@@ -470,14 +473,21 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-2">
-                <button
-                  type="button"
-                  disabled={aiLoading}
-                  onClick={resetTest}
-                  className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RotateCcw size={14} /> Làm lại bài 10 câu
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={aiLoading}
+                    onClick={resetTest}
+                    className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw size={14} /> Làm lại bài 10 câu
+                  </button>
+                  <ShareTriggerButton
+                    onClick={() => setShareOpen(true)}
+                    label="SHARE"
+                    className="!rounded-xl !py-2.5"
+                  />
+                </div>
                 <button
                   type="button"
                   disabled={aiLoading}
@@ -490,6 +500,11 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
                   <Target size={15} /> {aiLoading ? 'Đang phân tích...' : 'Áp dụng lộ trình gợi ý'}
                 </button>
               </div>
+              <ShareAchievementModal
+                open={shareOpen}
+                onClose={() => setShareOpen(false)}
+                data={buildPlacementShareData(activeResult)}
+              />
             </div>
           ) : (
             <div className="space-y-4">

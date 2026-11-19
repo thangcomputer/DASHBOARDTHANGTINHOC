@@ -7,6 +7,8 @@ import {
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { useFocusMode } from '../../../utils/focusMode';
+import { setPracticeSessionActive } from '../../../utils/practiceSessionMode';
+import { readReloadAbandonNotice, writeReloadAbandonNotice } from '../../../utils/dailyPracticeReloadNotice';
 import { LEARNING_GOAL_CHANGED_EVENT, lessonResumeUrl } from '../../../utils/learningGoal';
 import {
   DIFFICULTIES, QUESTION_TYPES, QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, difficultyMeta, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage,
@@ -24,6 +26,8 @@ import { reviewItemFollowUpLine } from '../../../../../shared/dailyPractice/revi
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import PathVideoModal from './PathVideoModal';
 import PracticeFinishOverlay from './PracticeFinishOverlay';
+import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
+import { buildPracticeShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 import ComboCelebrationOverlay from './ComboCelebrationOverlay';
 import { shouldShowComboCelebration } from './quizFeedbackOrchestration';
 import BuyXpModal from './BuyXpModal';
@@ -474,10 +478,11 @@ function HomeScreen({
 }
 
 // ── Màn chơi ─────────────────────────────────────────────────────────────────
-function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, quitting, onStay, onQuit }) {
+function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, quitting, mode = 'quit', onStay, onQuit }) {
   const left = Math.max(0, total - answered);
   const lossOnQuit = Math.max(stakeXp, quitLossXp);
   const loseXp = lossOnQuit > 0;
+  const isReload = mode === 'reload';
 
   useEffect(() => { gameSounds.sad(); }, []);
 
@@ -487,19 +492,27 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
         <div className={`px-6 pb-5 pt-6 ${loseXp ? 'bg-gradient-to-br from-red-50 via-white to-amber-50' : 'bg-gradient-to-br from-sky-50 via-white to-slate-100'}`}>
           <Mascot mood="quit" size={96} className="mx-auto" />
           <h2 id="dp-quit-title" className="mt-2 text-xl font-black text-slate-900">
-            {loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?'}
+            {isReload
+              ? (loseXp ? 'Tải lại trang sẽ mất XP!' : 'Tải lại trang lúc này?')
+              : (loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?')}
           </h2>
           <p className="mt-1.5 text-sm text-slate-600">
-            {loseXp
-              ? mandatory
-                ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
-                : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`
-              : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.'}
+            {isReload
+              ? (loseXp
+                ? (mandatory
+                  ? `Đây là lượt bắt buộc. Tải lại trang lúc này sẽ hủy lượt luyện tập và mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
+                  : `Tải lại trang lúc này sẽ hủy lượt luyện tập và mất thêm XP (tối đa −${lossOnQuit} XP).`)
+                : 'Tải lại trang lúc này sẽ hủy tiến độ lượt luyện tập hiện tại. Lượt phục hồi này không mất XP nhưng bạn nên hoàn thành để nhận XP.')
+              : (loseXp
+                ? (mandatory
+                  ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
+                  : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`)
+                : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.')}
           </p>
           {loseXp && (
             <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 ring-1 ring-red-200">
               <Zap size={13} className="fill-amber-300 text-amber-500" aria-hidden="true" />
-              Mất tối đa −{lossOnQuit} XP nếu thoát
+              {isReload ? `Mất tối đa −${lossOnQuit} XP nếu tải lại` : `Mất tối đa −${lossOnQuit} XP nếu thoát`}
             </p>
           )}
           {left > 0 && (
@@ -514,7 +527,42 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
           </button>
           <button type="button" onClick={onQuit} disabled={quitting} className="cms-btn cms-btn-outline w-full !py-2.5 !text-emerald-600">
             {quitting ? <Loader2 size={16} className="animate-spin" /> : null}
-            {loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát'}
+            {isReload
+              ? (loseXp ? `Tải lại trang và mất tối đa ${lossOnQuit} XP` : 'Vẫn tải lại trang')
+              : (loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ReloadAbandonNoticeModal({ lostXp, onClose }) {
+  useEffect(() => { gameSounds.sad(); }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9800] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
+      <div
+        className="cms-goal-in w-full max-w-sm overflow-hidden rounded-[28px] bg-white text-center shadow-2xl"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dp-reload-notice-title"
+      >
+        <div className="bg-gradient-to-br from-amber-50 via-white to-orange-50 px-6 pb-5 pt-6">
+          <Mascot mood="thinking" size={92} className="mx-auto" />
+          <h2 id="dp-reload-notice-title" className="mt-2 text-xl font-black text-slate-900">
+            Lượt luyện tập trước đã hủy
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            {lostXp > 0
+              ? `Bạn vừa tải lại hoặc rời trang khi đang luyện. Lượt đó đã bị hủy (có thể mất tối đa −${lostXp} XP). Lần sau bấm Thoát hoặc F5 để xác nhận trước khi rời.`
+              : 'Bạn vừa tải lại hoặc rời trang khi đang luyện. Lượt trước đã bị hủy — hãy bắt đầu lượt mới khi sẵn sàng.'}
+          </p>
+        </div>
+        <div className="p-5">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-primary w-full !py-3">
+            Đã hiểu
           </button>
         </div>
       </div>
@@ -525,7 +573,9 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
 
 function PlayScreen({ session, stats, onQuit, onFinished }) {
   const [quitOpen, setQuitOpen] = useState(false);
+  const [quitMode, setQuitMode] = useState('quit');
   const [quitting, setQuitting] = useState(false);
+  const allowUnloadRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [pending, setPending] = useState(null);
   const [chosen, setChosen] = useState(null);
@@ -658,9 +708,11 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       return;
     }
     setBusy(true);
+    allowUnloadRef.current = true;
     try {
       onFinished(await dailyPracticeApi.student.finish(session.id));
     } catch (err) {
+      allowUnloadRef.current = false;
       setError(err.message || 'Không lưu được kết quả');
       setBusy(false);
     }
@@ -671,8 +723,22 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     setQuitting(true);
     try {
       const data = await dailyPracticeApi.student.abandon(session.id);
+      allowUnloadRef.current = true;
+      if (quitMode === 'reload') {
+        writeReloadAbandonNotice(quitLossXp);
+        setQuitOpen(false);
+        window.location.reload();
+        return;
+      }
       onQuit(data);
     } catch {
+      allowUnloadRef.current = true;
+      if (quitMode === 'reload') {
+        writeReloadAbandonNotice(quitLossXp);
+        setQuitOpen(false);
+        window.location.reload();
+        return;
+      }
       onQuit(null);
     } finally {
       setQuitting(false);
@@ -687,6 +753,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const contextLabel = headerChips[0]?.text || level.label;
   const answeredCount = index + (stepDone ? 1 : 0);
   const quitLossXp = isPerQuestion ? Math.max(0, total - answeredCount) * perQuestionStake : stakeXp;
+  const lossOnQuit = Math.max(stakeXp, quitLossXp);
   const confirmedQuestionXp = result?.correct
     ? (typeof result.xpDelta === 'number' && result.xpDelta > 0
       ? result.xpDelta
@@ -695,8 +762,56 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         : (isPerQuestion ? perQuestionStake : 0)))
     : 0;
 
+  const leaveGuardRef = useRef({ sessionId: session.id, lossOnQuit: 0 });
+  leaveGuardRef.current = { sessionId: session.id, lossOnQuit };
+
   const { setFocusMode } = useFocusMode();
   useEffect(() => () => setFocusMode(false), [setFocusMode]);
+  useEffect(() => {
+    setPracticeSessionActive(true);
+    return () => setPracticeSessionActive(false);
+  }, []);
+
+  useEffect(() => {
+    const handleReloadShortcut = (event) => {
+      if (allowUnloadRef.current) return;
+      const key = String(event.key || '');
+      const isReloadKey = key === 'F5' || ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 'r');
+      if (!isReloadKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setQuitMode('reload');
+      setQuitOpen(true);
+    };
+
+    const handlePageHide = () => {
+      if (allowUnloadRef.current) return;
+      allowUnloadRef.current = true;
+      const { sessionId, lossOnQuit: loss } = leaveGuardRef.current;
+      if (sessionId) {
+        dailyPracticeApi.student.abandonBeacon(sessionId);
+      }
+      writeReloadAbandonNotice(loss);
+    };
+
+    const handleNavigate = (event) => {
+      if (allowUnloadRef.current) return;
+      if (event?.navigationType !== 'reload') return;
+      if (typeof event.preventDefault === 'function') event.preventDefault();
+      setQuitMode('reload');
+      setQuitOpen(true);
+    };
+
+    window.addEventListener('keydown', handleReloadShortcut, true);
+    window.addEventListener('pagehide', handlePageHide);
+    const nav = window.navigation;
+    if (nav?.addEventListener) nav.addEventListener('navigate', handleNavigate);
+    return () => {
+      window.removeEventListener('keydown', handleReloadShortcut, true);
+      window.removeEventListener('pagehide', handlePageHide);
+      if (nav?.removeEventListener) nav.removeEventListener('navigate', handleNavigate);
+    };
+  }, []);
 
   const keyActionsRef = useRef({});
   keyActionsRef.current = {
@@ -792,7 +907,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       <div className="flex items-center justify-start">
         <button
           type="button"
-          onClick={() => setQuitOpen(true)}
+          onClick={() => { setQuitMode('quit'); setQuitOpen(true); }}
           aria-label="Thoát"
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
         >
@@ -1038,6 +1153,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           quitLossXp={quitLossXp}
           mandatory={mandatory}
           quitting={quitting}
+          mode={quitMode}
           onStay={() => setQuitOpen(false)}
           onQuit={confirmQuit}
         />
@@ -1287,6 +1403,7 @@ function clientStakeMeta(pick) {
 function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOpenBuyXp, starting }) {
   const [rematchOpen, setRematchOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const pathResult = summary.path;
   const message = resultMessage(summary.stars);
   const good = summary.stars >= 2;
@@ -1378,10 +1495,15 @@ function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOp
         </section>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_auto_1fr]">
         <button type="button" onClick={onHome} className="cms-btn cms-btn-outline !py-3">
           <ArrowLeft size={17} /> {pathResult ? 'Về lộ trình' : 'Chủ đề khác'}
         </button>
+        <ShareTriggerButton
+          onClick={() => setShareOpen(true)}
+          label="SHARE THÀNH TÍCH"
+          className="col-span-2 sm:col-span-1 !rounded-xl !px-4 !py-3 order-first sm:order-none"
+        />
         {pathResult?.passed && pathResult.next ? (
           <button type="button" disabled={starting} onClick={() => onNextStep(pathResult.next)} className="cms-btn cms-btn-primary !py-3">
             {starting ? <Loader2 size={17} className="animate-spin" /> : <Play size={17} />} Tiếp: {pathResult.next.stepLabel}
@@ -1408,6 +1530,11 @@ function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOp
           </button>
         )}
       </div>
+      <ShareAchievementModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={buildPracticeShareData(summary)}
+      />
       {rematchOpen && (
         <StakeSessionConfirm
           stakeXp={rematchStakeXp}
@@ -1454,6 +1581,15 @@ export default function DailyPracticePage() {
   const [requestedLesson, setRequestedLesson] = useState(null);
   const [welcomeTarget, setWelcomeTarget] = useState(null);
   const [stakeConfirm, setStakeConfirm] = useState(null);
+  const [reloadNotice, setReloadNotice] = useState(null);
+  const [reloadNoticeOpen, setReloadNoticeOpen] = useState(false);
+
+  useEffect(() => {
+    const notice = readReloadAbandonNotice();
+    if (!notice) return;
+    setReloadNotice(notice);
+    setReloadNoticeOpen(true);
+  }, []);
   const practiceLockRef = useRef(false);
 
   useEffect(() => {
@@ -1563,11 +1699,21 @@ export default function DailyPracticePage() {
       loadOverview(true);
       loadPath(true);
     };
+    const onSubOrUnlock = () => {
+      loadOverview(true);
+      loadPath(true);
+    };
     window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
+    window.addEventListener('free-portal-unlocked', onSubOrUnlock);
+    window.addEventListener('free-portal-locked', onSubOrUnlock);
+    window.addEventListener('cms:subscription-updated', onSubOrUnlock);
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
+      window.removeEventListener('free-portal-unlocked', onSubOrUnlock);
+      window.removeEventListener('free-portal-locked', onSubOrUnlock);
+      window.removeEventListener('cms:subscription-updated', onSubOrUnlock);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
@@ -2013,6 +2159,15 @@ export default function DailyPracticePage() {
             setCelebrating(false);
             setSummary(null);
             if (lastPick) queueBegin(lastPick);
+          }}
+        />
+      ) : null}
+      {reloadNoticeOpen && reloadNotice ? (
+        <ReloadAbandonNoticeModal
+          lostXp={reloadNotice.lostXp}
+          onClose={() => {
+            setReloadNoticeOpen(false);
+            setReloadNotice(null);
           }}
         />
       ) : null}

@@ -52,6 +52,11 @@ export const SOCKET_EVENTS = {
   STUDENT_CHANGED: 'socket:student:changed',
   AI_SUPPORT_STATUS: 'socket:ai-support:status',
   CLASS_REMINDER: 'socket:class:reminder',
+  NOTIFICATION_READ_SYNC: 'socket:notification:read-sync',
+  SCHEDULE_REMINDER_REVOKED: 'socket:schedule:reminder-revoked',
+  FREE_PORTAL_UNLOCKED: 'socket:free-portal:unlocked',
+  FREE_PORTAL_LOCKED: 'socket:free-portal:locked',
+  SUBSCRIPTION_UPDATED: 'socket:subscription:updated',
 } as const;
 
 let socket: Socket | null = null;
@@ -146,6 +151,14 @@ function bindSocketEvents(instance: Socket, token: string) {
   instance.on('schedule:new', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_NEW, data));
   instance.on('schedule:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_UPDATED, data));
   instance.on('schedule:cancelled', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_CANCELLED, data));
+  instance.on('schedule:reminder-revoked', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_REMINDER_REVOKED, data));
+  instance.on('free-portal-unlocked', (data) => emitDeviceEvent(SOCKET_EVENTS.FREE_PORTAL_UNLOCKED, data));
+  instance.on('free-portal-locked', (data) => emitDeviceEvent(SOCKET_EVENTS.FREE_PORTAL_LOCKED, data));
+  instance.on('subscription:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.SUBSCRIPTION_UPDATED, data));
+  instance.on('notification:read-sync', (data) => {
+    emitDeviceEvent(SOCKET_EVENTS.NOTIFICATION_READ_SYNC, data);
+    queueNotificationSignal(data);
+  });
   instance.on('attendance:awaiting-confirm', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_AWAITING_CONFIRM, data));
   instance.on('attendance:disputed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_DISPUTED, data));
   instance.on('attendance:confirmed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_CONFIRMED, data));

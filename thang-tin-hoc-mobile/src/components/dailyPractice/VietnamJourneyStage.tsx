@@ -1,16 +1,15 @@
-import React from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import React, { useId } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
 import { dewSkillDropletPoints } from '../../../../shared/dailyPractice/dewSkillJourneyAnchors.mjs';
 import { PATH_DROPLET, pathDropletDone } from '../../../../shared/dailyPractice/pathDropletDecor.mjs';
 import {
   dewSkillPlainAnchorsForCount,
   pathPlainHubHalfPx,
-  pathPlainMascotTopPct,
   pathPlainStageMinHeightPx,
 } from '../../../../shared/dailyPractice/pathPlainJourney.mjs';
 import { PATH_HUB_DUO } from '../../../../shared/dailyPractice/pathHubDuoVisual.mjs';
-import { Mascot, type MascotMood } from './Mascot';
+import { Mascot } from './Mascot';
 
 type PathItem = {
   key: string;
@@ -43,15 +42,16 @@ export function VietnamJourneyStage({
   renderNode,
 }: VietnamJourneyStageProps) {
   const { width: winW } = useWindowDimensions();
+  const uid = useId().replace(/:/g, '');
   const positions = dewSkillPlainAnchorsForCount(pathItems.length);
   const stageW = Math.min(winW - 16, 420);
   const stageH = pathPlainStageMinHeightPx(pathItems.length, stageW);
   const droplets = dewSkillDropletPoints(positions);
-  const uid = 'dsvn';
   if (!positions.length) return null;
 
-  const hubHalf = pathPlainHubHalfPx(PATH_HUB_DUO.buttonSize.mobile);
-  const hubColW = 104;
+  const hubBox = PATH_HUB_DUO.buttonSize.mobile + PATH_HUB_DUO.ringPad;
+  const hubHalf = pathPlainHubHalfPx(hubBox);
+  const hubColW = 112;
 
   return (
     <View style={[styles.stage, { width: stageW, height: stageH, alignSelf: 'center' }]}>
@@ -60,38 +60,51 @@ export function VietnamJourneyStage({
         const done = pathDropletDone(drop.segmentIndex, pathItems);
         const left = (drop.xPct / 100) * stageW;
         const top = (drop.yPct / 100) * stageH;
-        if (drop.kind === 'star') {
-          return (
-            <View
-              key={`${uid}-star-${idx}`}
-              style={{ position: 'absolute', left: left - 7, top: top - 7, zIndex: 1 }}
-              pointerEvents="none"
-            >
-              <Svg width={14} height={14} viewBox="0 0 24 24">
-                <Path
-                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                  fill="#F59E0B"
-                  stroke="#D97706"
-                  strokeWidth={1.5}
-                />
-              </Svg>
-            </View>
-          );
-        }
+        const gradId = `drop-${uid}-${idx}`;
+        const stopTop = done ? PATH_DROPLET.fillDoneTop : PATH_DROPLET.fillTodoTop;
+        const stopMid = done ? PATH_DROPLET.fillDoneMid : PATH_DROPLET.fillTodoMid;
+        const stopBot = done ? PATH_DROPLET.fillDoneBot : PATH_DROPLET.fillTodoBot;
+        const glowColor = done ? '#A7F3D0' : '#E0F2FE';
+        const shadowColor = done ? 'rgba(4, 120, 87, 0.20)' : 'rgba(56, 189, 248, 0.22)';
+
         return (
           <Svg
-            key={`${uid}-drop-${idx}`}
-            width={13}
-            height={15}
-            viewBox="-6 -10 12 16"
-            style={{ position: 'absolute', left: left - 6.5, top: top - 7.5, zIndex: 1 }}
+            key={gradId}
+            width={18}
+            height={22}
+            viewBox="0 0 28 34"
+            style={{ position: 'absolute', left: left - 9, top: top - 11, zIndex: 1 }}
+            pointerEvents="none"
           >
+            <Defs>
+              <LinearGradient id={gradId} x1="0.2" y1="0.05" x2="0.85" y2="0.98">
+                <Stop offset="0" stopColor={stopTop} />
+                <Stop offset="0.48" stopColor={stopMid} />
+                <Stop offset="1" stopColor={stopBot} />
+              </LinearGradient>
+            </Defs>
+            {/* Bóng mềm phía dưới giọt nước */}
+            <Ellipse cx="14" cy="31.5" rx="6.5" ry="2" fill={shadowColor} />
+            {/* Thân giọt nước chuyển sắc 3D */}
             <Path
-              d={PATH_DROPLET.path}
-              fill={done ? PATH_DROPLET.fillDone : PATH_DROPLET.fillTodo}
-              stroke={PATH_DROPLET.stroke}
-              strokeWidth={1}
+              d={PATH_DROPLET.glossyPath}
+              fill={`url(#${gradId})`}
+              stroke="rgba(255,255,255,0.95)"
+              strokeWidth={1.3}
             />
+            {/* Ánh phản quang đáy giọt */}
+            <Ellipse cx="15" cy="24.5" rx="4.5" ry="2.2" fill={glowColor} opacity={0.45} />
+            {/* Vệt bóng sáng lấp lánh góc trên trái */}
+            <Ellipse
+              cx="10.8"
+              cy="17.2"
+              rx="2.3"
+              ry="4.8"
+              fill="#FFFFFF"
+              opacity={0.85}
+              transform="rotate(-18 10.8 17.2)"
+            />
+            <Circle cx="13.2" cy="11.5" r="1.25" fill="#FFFFFF" opacity={0.95} />
           </Svg>
         );
       })}
