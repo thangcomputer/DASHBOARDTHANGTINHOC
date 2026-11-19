@@ -17,7 +17,6 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
   ArrowUp,
   BookOpen,
@@ -201,25 +200,11 @@ const STARTER_PROMPTS: Record<'student' | 'teacher', string[]> = {
 
 function DewSkillAiOrb({ size = 54 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 64 64" fill="none">
-      <Defs>
-        <LinearGradient id="mobileDewOrbGrad" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
-          <Stop offset="0%" stopColor="#10B981" />
-          <Stop offset="50%" stopColor="#06B6D4" />
-          <Stop offset="100%" stopColor="#6366F1" />
-        </LinearGradient>
-      </Defs>
-      <Circle
-        cx="32"
-        cy="32"
-        r="24"
-        stroke="url(#mobileDewOrbGrad)"
-        strokeWidth="8.5"
-        strokeLinecap="round"
-        strokeDasharray="116 14"
-      />
-      <Circle cx="32" cy="32" r="14" stroke="#34D399" strokeWidth="2.5" strokeOpacity="0.4" />
-    </Svg>
+    <Image
+      source={require('../../assets/dewskill-ai-icon.webp')}
+      style={{ width: size, height: size }}
+      resizeMode="contain"
+    />
   );
 }
 

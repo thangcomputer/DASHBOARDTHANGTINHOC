@@ -88,12 +88,16 @@ test('services/aiSupportService quickAskAssistant hits memory for FAQs & simple 
 test('Web and Mobile headers merge AI + Search into a single AI button wired to unified popups', () => {
   const webHeader = read('client/src/components/DashboardLayout.jsx');
   assert.match(webHeader, /aria-label="DewSkill AI & Tìm nhanh"/);
+  assert.match(webHeader, /dewskill-ai-icon\.webp/);
+  assert.match(webHeader, /<span>DewSkill AI<\/span>/);
   assert.match(webHeader, /conic-gradient\(/);
   assert.match(webHeader, /animate-\[spin_2\.4s_linear_infinite\]/);
   assert.doesNotMatch(webHeader, /aria-label="Tìm kiếm nhanh \(Ctrl\+K\)"/);
 
   const mobileHeader = read('thang-tin-hoc-mobile/src/components/ui.tsx');
   assert.match(mobileHeader, /accessibilityLabel="DewSkill AI và tìm kiếm nhanh"/);
+  assert.match(mobileHeader, /dewskill-ai-icon\.webp/);
+  assert.match(mobileHeader, />DewSkill AI</);
   assert.match(mobileHeader, /topBarAiBorderSpinner/);
   assert.match(mobileHeader, /Animated\.loop/);
   assert.doesNotMatch(mobileHeader, /accessibilityLabel="Tìm kiếm và tác vụ nhanh"/);
@@ -102,11 +106,13 @@ test('Web and Mobile headers merge AI + Search into a single AI button wired to 
   const webPopup = read('client/src/components/ui/CommandPalette.jsx');
   assert.match(webPopup, /aiSupportAPI\.quickAsk/);
   assert.match(webPopup, /matchLocalOfficeMemory/);
+  assert.match(webPopup, /dewskill-ai-icon\.webp/);
   assert.match(webPopup, /DewSkill AI, trợ lý cá nhân/);
 
   const mobilePopup = read('thang-tin-hoc-mobile/src/components/QuickAiPopupModal.tsx');
   assert.match(mobilePopup, /quickAskAi/);
   assert.match(mobilePopup, /matchLocalOfficeMemory/);
+  assert.match(mobilePopup, /dewskill-ai-icon\.webp/);
   assert.match(mobilePopup, /DewSkill AI/);
 
   const rootNav = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');

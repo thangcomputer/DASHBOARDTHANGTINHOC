@@ -22,7 +22,7 @@ import api, { setTokens, csrfFetch } from '../services/api';
 import {
   Bell, MessageCircle, CheckCircle2, Clock, X, Lock, Eye, EyeOff, ShieldCheck, LogOut,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
-  Sparkles, Sun, Moon, Minimize2,
+  Sun, Moon, Minimize2,
 } from 'lucide-react';
 import { useTheme } from '../utils/theme';
 import { useFocusMode } from '../utils/focusMode';
@@ -2029,15 +2029,20 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                     className="pointer-events-none absolute inset-0 flex items-center justify-center"
                   >
                     <span
-                      className="h-24 w-24 shrink-0 animate-[spin_2.4s_linear_infinite]"
+                      className="h-44 w-44 shrink-0 animate-[spin_2.4s_linear_infinite]"
                       style={{
                         background: 'conic-gradient(from 0deg, #059669 0deg, #10b981 60deg, #34d399 115deg, #6ee7b7 155deg, rgba(16,185,129,0.18) 215deg, rgba(16,185,129,0.18) 305deg, #059669 360deg)',
                       }}
                     />
                   </span>
                   <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-emerald-50/95 px-2.5 sm:px-3 text-xs font-black tracking-tight text-emerald-700 group-hover:bg-emerald-100/95 dark:bg-slate-900 dark:text-emerald-300 dark:group-hover:bg-emerald-950/90 transition">
-                    <Sparkles size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-                    <span>AI</span>
+                    <img
+                      src="/dewskill-ai-icon.webp"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-5 w-5 shrink-0 object-contain"
+                    />
+                    <span>DewSkill AI</span>
                   </span>
                 </button>
 

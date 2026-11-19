@@ -120,20 +120,16 @@ const STARTER_PROMPTS = {
 };
 
 function DewSkillAiOrb({ size = 44 }) {
-  const idRef = useRef(`ds-orb-${Math.random().toString(36).slice(2, 8)}`);
-  const gradId = idRef.current;
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" className="shrink-0">
-      <defs>
-        <linearGradient id={gradId} x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#10B981" />
-          <stop offset="50%" stopColor="#06B6D4" />
-          <stop offset="100%" stopColor="#6366F1" />
-        </linearGradient>
-      </defs>
-      <circle cx="32" cy="32" r="24" stroke={`url(#${gradId})`} strokeWidth="8.5" strokeLinecap="round" strokeDasharray="116 14" />
-      <circle cx="32" cy="32" r="14" stroke="#34D399" strokeWidth="2.5" strokeOpacity="0.4" />
-    </svg>
+    <img
+      src="/dewskill-ai-icon.webp"
+      alt=""
+      aria-hidden="true"
+      width={size}
+      height={size}
+      style={{ width: size, height: size }}
+      className="shrink-0 object-contain"
+    />
   );
 }
 
