@@ -205,6 +205,26 @@ function BrandingTopBar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const headerProgress = useRef(new Animated.Value(1)).current;
   const headerVisible = useRef(true);
+  const aiBorderSpin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    aiBorderSpin.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(aiBorderSpin, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.linear,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [aiBorderSpin]);
+
+  const aiBorderRotate = aiBorderSpin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   const setHeaderVisible = useCallback((visible: boolean) => {
     if (headerVisible.current === visible) return;
@@ -325,8 +345,20 @@ function BrandingTopBar() {
             accessibilityRole="button"
             accessibilityLabel="DewSkill AI và tìm kiếm nhanh"
           >
-            <Sparkles size={14} color="#059669" />
-            <Text style={styles.topBarAiText}>AI</Text>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.topBarAiBorderSpinner,
+                { transform: [{ rotate: aiBorderRotate }] },
+              ]}
+            >
+              <View style={styles.topBarAiBorderArcPrimary} />
+              <View style={styles.topBarAiBorderArcSecondary} />
+            </Animated.View>
+            <View style={styles.topBarAiChipInner}>
+              <Sparkles size={14} color="#059669" />
+              <Text style={styles.topBarAiText}>AI</Text>
+            </View>
           </Pressable>
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
@@ -737,8 +769,12 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
   topBarActionsRow: { zIndex: 1, flexShrink: 0, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
   topBarActionsRowStudent: { gap: 5 },
-  topBarAiChip: { zIndex: 1, height: 38, paddingHorizontal: 9, borderRadius: 12, borderWidth: 1.5, borderColor: '#6EE7B7', borderBottomWidth: 3, borderBottomColor: '#10B981', backgroundColor: '#ECFDF5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  topBarAiChipPressed: { transform: [{ translateY: 1 }], borderBottomWidth: 1.5 },
+  topBarAiChip: { position: 'relative', zIndex: 1, height: 38, borderRadius: 12, padding: 2, overflow: 'hidden', backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  topBarAiBorderSpinner: { position: 'absolute', width: 100, height: 100, alignItems: 'center', justifyContent: 'center' },
+  topBarAiBorderArcPrimary: { position: 'absolute', top: 0, left: 0, width: 52, height: 52, backgroundColor: '#059669', borderBottomRightRadius: 24 },
+  topBarAiBorderArcSecondary: { position: 'absolute', bottom: 0, right: 0, width: 52, height: 52, backgroundColor: '#34D399', borderTopLeftRadius: 24 },
+  topBarAiChipInner: { height: '100%', paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#ECFDF5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  topBarAiChipPressed: { transform: [{ translateY: 1 }], opacity: 0.9 },
   topBarAiText: { color: '#047857', fontSize: 12, fontWeight: '900' },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarActionCompact: { width: 38, height: 38 },

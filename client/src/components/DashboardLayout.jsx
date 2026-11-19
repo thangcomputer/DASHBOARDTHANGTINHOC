@@ -2020,12 +2020,25 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
-                  className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3 rounded-xl border-[1.5px] border-emerald-300 border-b-[3px] border-b-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:translate-y-[1px] active:border-b-[1.5px] dark:bg-emerald-950/60 dark:border-emerald-700 dark:border-b-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition text-xs font-black tracking-tight shrink-0 cursor-pointer"
+                  className="group relative inline-flex h-8 sm:h-9 shrink-0 items-center justify-center overflow-hidden rounded-xl p-[2px] shadow-[0_2px_10px_rgba(16,185,129,0.22)] active:translate-y-[1px] transition cursor-pointer"
                   title="DewSkill AI & Tìm nhanh (Ctrl+K)"
                   aria-label="DewSkill AI & Tìm nhanh"
                 >
-                  <Sparkles size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-                  <span>AI</span>
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                  >
+                    <span
+                      className="h-24 w-24 shrink-0 animate-[spin_2.4s_linear_infinite]"
+                      style={{
+                        background: 'conic-gradient(from 0deg, #059669 0deg, #10b981 60deg, #34d399 115deg, #6ee7b7 155deg, rgba(16,185,129,0.18) 215deg, rgba(16,185,129,0.18) 305deg, #059669 360deg)',
+                      }}
+                    />
+                  </span>
+                  <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-emerald-50/95 px-2.5 sm:px-3 text-xs font-black tracking-tight text-emerald-700 group-hover:bg-emerald-100/95 dark:bg-slate-900 dark:text-emerald-300 dark:group-hover:bg-emerald-950/90 transition">
+                    <Sparkles size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                    <span>AI</span>
+                  </span>
                 </button>
 
                 <button
