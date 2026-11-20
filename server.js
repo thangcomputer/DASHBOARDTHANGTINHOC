@@ -499,6 +499,11 @@ io.on('connection', (socket) => {
 
     console.log(`👤 Online (Verified): ${name} (${messagingRole}) - ${key}`);
 
+    if (messagingRole === 'student' && mongoose.Types.ObjectId.isValid(userId)) {
+      const Student = require('./models/Student');
+      Student.updateOne({ _id: userId }, { $set: { lastAccessAt: new Date() } }).catch(() => {});
+    }
+
     // Join rooms for Centralized Notification Service
     socket.join(userId);           // Unique user room
     socket.join('feed_room');       // Bang tin (realtime) - không join GLOBAL data bus

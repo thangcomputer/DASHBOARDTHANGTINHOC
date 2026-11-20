@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, AlertTriangle, Award, Bell, Check, Copy, ChevronRight,
   DollarSign, GraduationCap, Laptop, ShieldCheck, TrendingUp, Users,
@@ -6,21 +6,21 @@ import {
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../shared/StatCard';
 import Avatar from '../shared/Avatar';
-import { getClientEnrollments } from '../../../utils/enrollments';
+import { getClientEnrollments, sumClientPaidTuition } from '../../../utils/enrollments';
 import { useAdminTab } from '../AdminTabContext';
 import useSWR from 'swr';
 import api from '../../../services/api';
 import { useBranch } from '../../../context/BranchContext';
-import { sumClientPaidTuition } from '../../../utils/enrollments';
+import { useSocket } from '../../../context/SocketContext';
 import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
+import { isTeacherActive, isTeacherPending } from '../../../constants/teacherStatus';
 import { summarizeExamProgress } from '../../../utils/examProgressStats';
 import { computeAtRiskStudents } from '../../../utils/atRiskStudents';
 
-function vnDayKeyFrom(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(d);
+function formatCompactVnd(amount) {
+  const n = Number(amount) || 0;
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  return `${Math.round(n / 1000)}K`;
 }
 
 function readBrowserSummary() {
@@ -41,110 +41,84 @@ function readBrowserSummary() {
 export default function AdminOverviewTab({ session }) {
   const { filteredStudents = [], safeTeachers = [] } = useAdminTab() || {};
   const { selectedBranchId } = useBranch();
-  
+  const { onlineUsers = [] } = useSocket() || {};
+
   const statsFetcher = async ([, branch_id]) => {
     const params = branch_id ? { branch_id } : {};
     const res = await api.students.getStats(params);
     return res?.success ? res.data : null;
   };
-  
-  const { data: branchStats } = useSWR(
+
+  const { data: branchStats, isValidating, mutate: mutateBranchStats } = useSWR(
     ['admin_stats', selectedBranchId],
     statsFetcher,
-    { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 15_000 }
+    { refreshInterval: 30_000, revalidateOnFocus: true, dedupingInterval: 5_000 },
   );
-  
+
+  // Khi Socket báo số user online thay đổi, làm mới thống kê tổng quan từ server (debounce nhẹ).
+  const initialPresenceRef = useRef(true);
+  useEffect(() => {
+    if (initialPresenceRef.current) {
+      initialPresenceRef.current = false;
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      void mutateBranchStats();
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [onlineUsers.length, mutateBranchStats]);
+
   const statTotalStudents = branchStats?.total ?? filteredStudents.length;
-  const statPaidStudents = branchStats?.paid ?? filteredStudents.filter((s) => s.paid).length;
-  const statActiveTeachers = branchStats?.activeTeachers ?? safeTeachers.filter((t) => t.status === 'Active' || t.status === 'active').length;
+  const statPaidStudents = branchStats?.paid ?? filteredStudents.filter((s) => s.paid && !s.freePortal).length;
+  const statActiveTeachers = branchStats?.activeTeachers ?? safeTeachers.filter((t) => isTeacherActive(t.status)).length;
   const statTotalTeachers = branchStats?.totalTeachers ?? safeTeachers.length;
   const statTotalRevenue = branchStats?.totalRevenue ?? filteredStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
-  const statPendingTeachers = branchStats?.pendingTeachers ?? safeTeachers.filter((t) => t.status === 'Pending').length;
-  const certificationStats = summarizeExamProgress(filteredStudents);
-  const atRiskStudents = useMemo(() => computeAtRiskStudents(filteredStudents), [filteredStudents]);
-  const [snapshotMs, setSnapshotMs] = useState(() => Date.now());
+  const statPendingTeachers = branchStats?.pendingTeachers ?? safeTeachers.filter((t) => isTeacherPending(t.status)).length;
+
+  const certificationStats = useMemo(
+    () => branchStats?.certificationStats ?? summarizeExamProgress(filteredStudents),
+    [branchStats?.certificationStats, filteredStudents],
+  );
+  const fallbackAtRisk = useMemo(() => computeAtRiskStudents(filteredStudents), [filteredStudents]);
+  const atRiskTotal = branchStats?.atRisk?.total ?? fallbackAtRisk.length;
+  const atRiskStudents = branchStats?.atRisk?.items ?? fallbackAtRisk;
+
   const [copiedAutoId, setCopiedAutoId] = useState('');
   const [securityVerifiedAt, setSecurityVerifiedAt] = useState('');
+  const [lastRefreshedAt, setLastRefreshedAt] = useState('');
 
   const realtime = useMemo(() => {
-    const todayKey = vnDayKeyFrom(snapshotMs);
-    const thisMonth = todayKey.slice(5, 7);
-    const onlineStudents = (filteredStudents || []).filter((s) => {
-      const t = s?.lastAccessAt ? new Date(s.lastAccessAt).getTime() : NaN;
-      return Number.isFinite(t) && snapshotMs - t <= 15 * 60_000;
-    }).length;
-    const onlineTeachers = (safeTeachers || []).filter((t) => {
-      const ts = t?.lastAccessAt ? new Date(t.lastAccessAt).getTime() : NaN;
-      return Number.isFinite(ts) && snapshotMs - ts <= 15 * 60_000;
-    }).length;
-    const activeToday = (filteredStudents || []).filter(
-      (s) => vnDayKeyFrom(s?.lastAccessAt) === todayKey,
-    ).length;
-    const todayRevenue = (filteredStudents || [])
-      .filter((s) => s?.paid && (vnDayKeyFrom(s?.createdAt) === todayKey || vnDayKeyFrom(s?.updatedAt) === todayKey))
-      .reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
+    const onlineFallback = new Set(
+      (onlineUsers || []).map((u) => String(u?.userId || '')).filter(Boolean),
+    ).size;
+    const onlineTotal = branchStats?.realtime?.onlineTotal ?? onlineFallback;
+    const activeToday = branchStats?.realtime?.activeToday ?? 0;
+    // Doanh thu hôm nay lấy trực tiếp từ Sổ cái kế toán (Ledger: payment - refund ngày VN), không tự cộng từ Student.updatedAt.
+    const todayRevenue = branchStats?.todayRevenue ?? 0;
 
-    const registeredCount = filteredStudents.length;
-    const engagedCount = (filteredStudents || []).filter(
-      (s) => Boolean(s?.lastAccessAt) || (Number(s?.completedSessions) || 0) > 0 || s?.freePortal,
-    ).length;
-    const paidCount = (filteredStudents || []).filter(
-      (s) => s?.paid || sumClientPaidTuition(s) > 0,
-    ).length;
-    const funnel = [
-      { key: 'reg', label: '1. Đăng ký tài khoản', count: registeredCount, pct: registeredCount ? 100 : 0, bar: 'bg-sky-500' },
-      { key: 'use', label: '2. Dùng thử / Tham gia học', count: engagedCount, pct: registeredCount ? Math.round((engagedCount / registeredCount) * 100) : 0, bar: 'bg-amber-500' },
-      { key: 'pay', label: '3. Hoàn tất học phí / Mua gói', count: paidCount, pct: registeredCount ? Math.round((paidCount / registeredCount) * 100) : 0, bar: 'bg-emerald-500' },
-    ];
+    const funnel = Array.isArray(branchStats?.funnel) && branchStats.funnel.length > 0
+      ? branchStats.funnel
+      : [
+        { key: 'reg', label: '1. Đăng ký tài khoản', count: statTotalStudents, pct: statTotalStudents ? 100 : 0, bar: 'bg-sky-500' },
+        { key: 'use', label: '2. Dùng thử / Tham gia học', count: 0, pct: 0, bar: 'bg-amber-500' },
+        { key: 'pay', label: '3. Hoàn tất học phí / Mua gói', count: statPaidStudents, pct: statTotalStudents ? Math.round((statPaidStudents / statTotalStudents) * 100) : 0, bar: 'bg-emerald-500' },
+      ];
 
-    const automations = [];
-    for (const s of filteredStudents || []) {
-      const sid = String(s?._id || s?.id || '');
-      const dobRaw = s?.dob || s?.birthDate || s?.dateOfBirth || '';
-      const dobKey = vnDayKeyFrom(dobRaw);
-      if (dobKey && dobKey.slice(5, 7) === thisMonth) {
-        automations.push({
-          id: `bday-${sid}`,
-          kind: 'birthday',
-          badge: dobKey.slice(5) === todayKey.slice(5) ? '🎂 Sinh nhật hôm nay' : '🎂 Sinh nhật tháng này',
-          tone: 'bg-pink-50 text-pink-700 border-pink-200/70',
-          studentName: s.name || 'Học viên',
-          message: `Chúc mừng sinh nhật bạn ${s.name || ''}! Trung tâm Thắng Tin Học gửi tặng bạn +50 XP & chúc bạn học tập thật vui!`,
-        });
-      }
-      const rem = Number(s?.remainingSessions) || 0;
-      if (rem > 0 && rem <= 2) {
-        automations.push({
-          id: `renew-${sid}`,
-          kind: 'renewal',
-          badge: `⏰ Còn ${rem} buổi`,
-          tone: 'bg-amber-50 text-amber-800 border-amber-200/70',
-          studentName: s.name || 'Học viên',
-          message: `Chào ${s.name || 'bạn'}, khóa ${s.course || 'Tin học'} của bạn chỉ còn ${rem} buổi. Hãy gia hạn sớm để giữ lịch học cố định nhé!`,
-        });
-      }
-    }
-    for (const r of atRiskStudents) {
-      if (r.daysInactive >= 5) {
-        automations.push({
-          id: `nudge-${r.id}`,
-          kind: 'nudge',
-          badge: `📩 Vắng ${r.daysInactive} ngày`,
-          tone: 'bg-sky-50 text-sky-700 border-sky-200/70',
-          studentName: r.name,
-          message: `Chào ${r.name}, đã ${r.daysInactive} ngày chưa thấy bạn vào luyện DewSkill! Hôm nay dành 10 phút hoàn thành mục tiêu nhé!`,
-        });
-      }
-    }
+    const autoRaw = branchStats?.automations;
+    const automationsList = Array.isArray(autoRaw?.items)
+      ? autoRaw.items
+      : (Array.isArray(autoRaw) ? autoRaw : []);
+    const automationsTotal = typeof autoRaw?.total === 'number' ? autoRaw.total : automationsList.length;
 
     return {
-      onlineTotal: Math.max(1, onlineStudents + onlineTeachers),
+      onlineTotal,
       activeToday,
       todayRevenue,
       funnel,
-      automations: automations.slice(0, 8),
+      automations: automationsList,
+      automationsTotal,
     };
-  }, [filteredStudents, safeTeachers, atRiskStudents, snapshotMs]);
+  }, [branchStats, onlineUsers, statTotalStudents, statPaidStudents]);
 
   const navigate = useNavigate();
 
@@ -224,10 +198,14 @@ export default function AdminOverviewTab({ session }) {
           </div>
           <button
             type="button"
-            onClick={() => setSnapshotMs(Date.now())}
-            className="cms-dash-link"
+            disabled={isValidating}
+            onClick={async () => {
+              await mutateBranchStats();
+              setLastRefreshedAt(new Date().toLocaleTimeString('vi-VN'));
+            }}
+            className="cms-dash-link disabled:opacity-60"
           >
-            Cập nhật trực tiếp
+            {isValidating ? 'Đang cập nhật…' : (lastRefreshedAt ? `Cập nhật trực tiếp (${lastRefreshedAt})` : 'Cập nhật trực tiếp')}
           </button>
         </div>
 
@@ -246,12 +224,13 @@ export default function AdminOverviewTab({ session }) {
               <p className="mt-1 text-xl font-black text-slate-900 tabular-nums">{realtime.activeToday}</p>
               <p className="text-[10px] text-slate-500">học viên hoạt động</p>
             </div>
-            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3">
+            <div
+              className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3"
+              title={`${(realtime.todayRevenue || 0).toLocaleString('vi-VN')}đ`}
+            >
               <p className="text-[11px] font-bold text-amber-800">Doanh thu hôm nay</p>
               <p className="mt-1 text-xl font-black text-amber-700 tabular-nums">
-                {realtime.todayRevenue >= 1_000_000
-                  ? `${(realtime.todayRevenue / 1_000_000).toFixed(1)}M`
-                  : `${Math.round(realtime.todayRevenue / 1000)}K`}
+                {formatCompactVnd(realtime.todayRevenue)}
               </p>
               <p className="text-[10px] text-slate-500">VNĐ ghi nhận mới</p>
             </div>
@@ -266,7 +245,10 @@ export default function AdminOverviewTab({ session }) {
                   <span className="tabular-nums font-bold">{step.count} HV ({step.pct}%)</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                  <div className={`h-full rounded-full ${step.bar} transition-all`} style={{ width: `${Math.max(4, step.pct)}%` }} />
+                  <div
+                    className={`h-full rounded-full ${step.bar} transition-all`}
+                    style={{ width: `${step.count > 0 ? Math.max(4, step.pct) : 0}%` }}
+                  />
                 </div>
               </div>
             ))}
@@ -420,7 +402,7 @@ export default function AdminOverviewTab({ session }) {
             onClick={() => navigate('/admin#students')}
             className="cms-dash-link"
           >
-            {atRiskStudents.length} cần chú ý <ChevronRight size={14} aria-hidden="true" />
+            {atRiskTotal} cần chú ý <ChevronRight size={14} aria-hidden="true" />
           </button>
         </div>
 
@@ -472,7 +454,7 @@ export default function AdminOverviewTab({ session }) {
                 </p>
               </div>
             </div>
-            <span className="cms-pill bg-emerald-50 text-emerald-700">{realtime.automations.length} gợi ý</span>
+            <span className="cms-pill bg-emerald-50 text-emerald-700">{realtime.automationsTotal} gợi ý</span>
           </div>
 
           {realtime.automations.length > 0 ? (

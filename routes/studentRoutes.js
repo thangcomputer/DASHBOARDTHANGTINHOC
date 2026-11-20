@@ -453,73 +453,23 @@ router.get('/stats', [authMiddleware, branchFilter, policyShadowStudentRead('sta
       bf.branchId = branch_id;
     }
 
-    const total = await Student.countDocuments(bf);
-    const paid = await Student.countDocuments({ ...bf, paid: true });
-    const unpaid = await Student.countDocuments({ ...bf, paid: false });
-    const unlocked = await Student.countDocuments({ ...bf, studentExamUnlocked: true });
+    const isFailClosed = Boolean(bf._id && !bf.branchId);
+    const teacherBranchFilter = isFailClosed
+      ? { _id: { $in: [] } }
+      : (req.userBranchId
+        ? { branchId: req.userBranchId }
+        : (bf.branchId ? { branchId: bf.branchId } : {}));
 
-    const { sumFinancialRevenue } = require('../services/ledgerService');
-    const branchId = bf.branchId || null;
+    const { computeAdminOverviewStats } = require('../services/adminOverviewStatsService');
+    const data = await computeAdminOverviewStats({
+      branchFilter: bf,
+      teacherBranchFilter,
+      req,
+    });
 
-    // Doanh thu SoT = Ledger (PAYMENT − REFUND), không dùng enrollment.paid
-    const [revenueAll, pendingResult, todayRevenueRow] = await Promise.all([
-      sumFinancialRevenue({ branchId }),
-      Student.aggregate([
-        { $match: { ...bf } },
-        {
-          $project: {
-            pending: {
-              $cond: [
-                { $gt: [{ $size: { $ifNull: ['$enrollments', []] } }, 0] },
-                {
-                  $sum: {
-                    $map: {
-                      input: {
-                        $filter: {
-                          input: '$enrollments',
-                          as: 'e',
-                          cond: {
-                            $and: [
-                              { $ne: ['$$e.paid', true] },
-                              { $ne: ['$$e.status', 'cancelled'] },
-                            ],
-                          },
-                        },
-                      },
-                      as: 'e',
-                      in: { $ifNull: ['$$e.price', 0] },
-                    },
-                  },
-                },
-                {
-                  $cond: [{ $eq: ['$paid', true] }, 0, { $ifNull: ['$price', 0] }],
-                },
-              ],
-            },
-          },
-        },
-        { $group: { _id: null, total: { $sum: '$pending' } } },
-      ]),
-      (async () => {
-        const nowVN = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
-        const startOfTodayVN = new Date(Date.UTC(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()) - 7 * 60 * 60 * 1000);
-        return sumFinancialRevenue({ branchId, from: startOfTodayVN, to: new Date() });
-      })(),
-    ]);
-    const totalRevenue = revenueAll.net || 0;
-    const pendingRevenue = pendingResult[0]?.total || 0;
-    const todayRevenue = todayRevenueRow.net || 0;
-
-    // Số giảng viên active (branch-aware)
-    const Teacher = require('../models/Teacher');
-    const teacherBranchFilter = req.userBranchId ? { branchId: req.userBranchId } : {};
-    if (branch_id && branch_id !== 'all' && !req.userBranchId) teacherBranchFilter.branchId = branch_id;
-    const activeTeachers = await Teacher.countDocuments({ ...teacherBranchFilter, status: { $in: ['Active', 'active'] }, role: 'teacher' });
-    const pendingTeachers = await Teacher.countDocuments({ role: 'teacher', status: 'Pending' });
-    const totalTeachers = await Teacher.countDocuments({ ...teacherBranchFilter, role: 'teacher' });
     res.json({
       success: true,
-      data: { total, paid, unpaid, unlocked, totalRevenue, pendingRevenue, todayRevenue, activeTeachers, pendingTeachers, totalTeachers },
+      data,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

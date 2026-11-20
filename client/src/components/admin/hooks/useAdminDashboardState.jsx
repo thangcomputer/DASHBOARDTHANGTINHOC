@@ -12,6 +12,7 @@ import { useAdminTeachers } from './useAdminTeachers';
 import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from './adminConstants';
 import { sumClientPaidTuition } from '../../../utils/enrollments';
 import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
+import { isTeacherActive, isTeacherPending } from '../../../constants/teacherStatus';
 
 export { EXAM_RESULTS_STUDENTS_FETCH_CAP };
 
@@ -552,13 +553,13 @@ export function useAdminDashboardState() {
   const statTotalStudents = branchStats?.total ?? filteredStudents.length;
   const statPaidStudents = branchStats?.paid ?? filteredStudents.filter((s) => s.paid).length;
   const statActiveTeachers = branchStats?.activeTeachers
-    ?? safeTeachers.filter((t) => t.status === 'Active' || t.status === 'active').length;
+    ?? safeTeachers.filter((t) => isTeacherActive(t.status)).length;
   const statTotalTeachers = branchStats?.totalTeachers
     ?? safeTeachers.length;
   const statTotalRevenue = branchStats?.totalRevenue
     ?? filteredStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
   const statPendingTeachers = branchStats?.pendingTeachers
-    ?? safeTeachers.filter((t) => t.status === 'Pending').length;
+    ?? safeTeachers.filter((t) => isTeacherPending(t.status)).length;
 
   const adminTabValue = useMemo(() => ({
     search, setSearch, filterCourse, setFilterCourse, filterPaid, setFilterPaid,

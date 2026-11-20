@@ -1005,6 +1005,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     // Lưu refresh token + tokenVersion vào DB
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
+    if (userRole === 'student') user.lastAccessAt = new Date();
     user.loginAttempts = 0;
     if (user.lockUntil) user.lockUntil = undefined;
     user.markModified('tokenVersion');  // Force Mongoose to persist new field
@@ -1233,6 +1234,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     const { accessToken, refreshToken } = generateTokens(tokenPayload, 'public');
 
     user.refreshToken = refreshToken; user.lastLogin = new Date();
+    if (userRole === 'student') user.lastAccessAt = new Date();
     user.loginAttempts = 0;
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
@@ -1387,6 +1389,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
     if (!(await confirmOrKickActiveSession(req, res, user, userRole, mobileFp))) return;
 
     user.lastLogin = new Date();
+    if (userRole === 'student') user.lastAccessAt = new Date();
     user.loginAttempts = 0;
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
@@ -2204,7 +2207,7 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
           actor: { id: userId, role },
           reason: 'user_logout',
           io: req.app.get('io'),
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
 
@@ -2651,17 +2654,17 @@ router.post('/delete-account', authMiddleware, sensitiveFlowLimiter, async (req,
     const UserDeviceSession = require('../models/UserDeviceSession');
     const MobilePushToken = require('../models/MobilePushToken');
     await Promise.all([
-      UserDeviceSession.deleteMany({ userId, role }).catch(() => {}),
-      MobilePushToken.deleteMany({ userId, role }).catch(() => {}),
+      UserDeviceSession.deleteMany({ userId, role }).catch(() => { }),
+      MobilePushToken.deleteMany({ userId, role }).catch(() => { }),
     ]);
 
     const authHeader = req.get('authorization');
     const bearer = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
     if (bearer) {
-      await blacklist.add(bearer, 28800).catch(() => {});
+      await blacklist.add(bearer, 28800).catch(() => { });
     }
     if (user.refreshToken) {
-      await blacklist.add(user.refreshToken, 86400).catch(() => {});
+      await blacklist.add(user.refreshToken, 86400).catch(() => { });
     }
 
     const { purgeStudentSideEffects, purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
@@ -3129,6 +3132,7 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
     user.mustChangePassword = true;
     user.loginAttempts = 0;
     user.lastLogin = new Date();
+    if (userRole === 'student') user.lastAccessAt = new Date();
     user.markModified('tokenVersion');
 
     if (isMobileClient) {

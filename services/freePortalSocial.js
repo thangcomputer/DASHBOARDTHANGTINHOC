@@ -262,6 +262,7 @@ async function issueSession(student, fingerprint, req = null) {
   fresh.tokenVersion = tokenVersion;
   fresh.refreshToken = refreshToken;
   fresh.lastLogin = new Date();
+  fresh.lastAccessAt = new Date();
   fresh.loginAttempts = 0;
   if (fingerprint) fresh.deviceFingerprint = String(fingerprint).slice(0, 200);
   fresh.markModified('tokenVersion');

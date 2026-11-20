@@ -676,7 +676,7 @@ router.get('/stats/summary', [authMiddleware, branchFilter, ...teacherRouteGuard
 
     const total = await Teacher.countDocuments({ ...bf, role: 'teacher' });
     const active = await Teacher.countDocuments({ ...bf, role: 'teacher', status: { $in: ['active', 'Active'] } });
-    const pending = await Teacher.countDocuments({ ...bf, role: 'teacher', status: 'pending' });
+    const pending = await Teacher.countDocuments({ ...bf, role: 'teacher', status: { $in: ['pending', 'Pending'] } });
     const suspended = await Teacher.countDocuments({ ...bf, role: 'teacher', status: 'suspended' });
 
     return res.json({
