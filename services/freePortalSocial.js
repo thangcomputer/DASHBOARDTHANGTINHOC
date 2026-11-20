@@ -264,6 +264,7 @@ async function issueSession(student, fingerprint, req = null) {
   fresh.lastLogin = new Date();
   fresh.lastAccessAt = new Date();
   fresh.loginAttempts = 0;
+  fresh.loginLockUntil = null;
   if (fingerprint) fresh.deviceFingerprint = String(fingerprint).slice(0, 200);
   fresh.markModified('tokenVersion');
   await fresh.save({ validateModifiedOnly: true });

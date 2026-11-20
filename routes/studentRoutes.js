@@ -4137,6 +4137,8 @@ router.post('/:id/unlock-account', [
         $set: {
           accountLocked: false,
           accountLockReason: '',
+          loginAttempts: 0,
+          loginLockUntil: null,
           knownDevices: [],
           knownDeviceCount: 0,
           knownDeviceSummary: '',

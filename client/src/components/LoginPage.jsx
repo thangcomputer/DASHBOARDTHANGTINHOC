@@ -12,6 +12,9 @@ import { getDeviceAuthFields, rememberDeviceSecret } from '../utils/deviceFinger
 import { isValidEmail, isValidVNPhone, normalizePhone } from '../utils/validators';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
+import { formatLoginErrorText, formatRetryButtonText, useLoginLockCountdown } from '../hooks/useLoginLockCountdown';
+import { LoginLockStatusBanner } from './ui/LoginLockNotice';
 
 const LOGIN_HIGHLIGHTS = [
   { label: 'Học mọi lúc', desc: 'Lộ trình 1-1 & Video', icon: BookOpen },
@@ -20,6 +23,7 @@ const LOGIN_HIGHLIGHTS = [
 ];
 
 const LoginPage = ({ onLogin }) => {
+  const { language, tr } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [role, setRole] = useState('student');
@@ -33,6 +37,14 @@ const LoginPage = ({ onLogin }) => {
   const [deviceConflict, setDeviceConflict] = useState(false); // cảnh báo máy khác
   const pendingLoginRef = useRef(null); // lưu payload để force login
   const [dynamicLogo, setDynamicLogo] = useState('');
+  const {
+    lockSecondsLeft,
+    lockDurationSeconds,
+    remainingAttempts,
+    maxAttempts,
+    applyLoginFailure,
+    resetLockHint,
+  } = useLoginLockCountdown();
 
   // Hiển thị thông báo nếu bị đăng xuất do không hoạt động hoặc do nơi khác đăng nhập
   const urlMsg = new URLSearchParams(location.search).get('msg');
@@ -94,6 +106,7 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
       if (data.success) {
+        resetLockHint();
         rememberDeviceSecret(data.data?.deviceSecret, deviceScope);
         setDeviceConflict(false);
         const user = data.data.user ? { ...data.data.user } : { ...data.data };
@@ -127,9 +140,11 @@ const LoginPage = ({ onLogin }) => {
         // Cho HV bấm ngay sang form đăng ký
         setTimeout(() => navigate(`/dangkykhoahoc?${q.toString()}`), 600);
       } else if (response.status === 404 || data.code === 'ACCOUNT_NOT_FOUND') {
+        resetLockHint();
         setNotFoundError(true);
         setError(data.message || 'Tài khoản không tồn tại. Vui lòng đăng ký tài khoản mới.');
       } else {
+        applyLoginFailure(response.status, data);
         setError(data.message || 'Số điện thoại/Gmail hoặc mật khẩu không đúng');
       }
     } catch { setError('Không thể kết nối đến máy chủ'); }
@@ -255,7 +270,7 @@ const LoginPage = ({ onLogin }) => {
                     type="button"
                     role="tab"
                     aria-selected={role === item.value}
-                    onClick={() => setRole(item.value)}
+                    onClick={() => { setRole(item.value); resetLockHint(); setError(null); setNotFoundError(false); setReEnrollError(false); }}
                     className={`relative z-10 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs sm:text-sm font-extrabold transition-colors duration-200 cursor-pointer ${
                       role === item.value
                         ? 'text-white'
@@ -282,10 +297,17 @@ const LoginPage = ({ onLogin }) => {
                 )}
                 {error && (
                   <div role="alert" className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex flex-col gap-1.5 text-red-400 text-xs font-bold">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle size={16} aria-hidden="true" className="shrink-0" />
-                      <span>{error}</span>
+                    <div className="flex items-start gap-2">
+                      <AlertCircle size={16} aria-hidden="true" className="shrink-0 mt-0.5" />
+                      <span>{formatLoginErrorText(error, language, tr)}</span>
                     </div>
+                    <LoginLockStatusBanner
+                      compact
+                      lockSecondsLeft={lockSecondsLeft}
+                      lockDurationSeconds={lockDurationSeconds}
+                      remainingAttempts={remainingAttempts}
+                      maxAttempts={maxAttempts}
+                    />
                     {notFoundError && role === 'student' ? (
                       <button
                         type="button"
@@ -320,7 +342,7 @@ const LoginPage = ({ onLogin }) => {
                     <label htmlFor="login-identifier" className="text-[11px] font-bold text-slate-400 block ml-1">Số điện thoại hoặc Gmail</label>
                     <div className="cms-login-field !min-h-[44px] sm:!min-h-[46px] !px-3.5 !rounded-xl group">
                       <User size={16} className="shrink-0 text-slate-400 group-focus-within:text-emerald-400 transition-colors" aria-hidden="true" />
-                      <input id="login-identifier" type="text" inputMode="email" required value={phone} onChange={(e) => { setPhone(e.target.value); setNotFoundError(false); }} autoComplete="username"
+                      <input id="login-identifier" type="text" inputMode="email" required value={phone} onChange={(e) => { setPhone(e.target.value); setNotFoundError(false); resetLockHint(); }} autoComplete="username"
                         className="cms-login-input !py-2 text-sm"
                         placeholder="0912345678 hoặc ten@gmail.com" />
                     </div>
@@ -346,12 +368,14 @@ const LoginPage = ({ onLogin }) => {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || lockSecondsLeft > 0}
                   className="cms-login-btn-sheen relative overflow-hidden mx-auto min-w-[200px] px-8 min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-600 text-white text-sm font-black shadow-[0_5px_0_#065f46,0_12px_26px_rgba(16,185,129,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.45)] hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_7px_0_#065f46,0_16px_32px_rgba(16,185,129,0.5),inset_0_1.5px_1px_rgba(255,255,255,0.5)] active:translate-y-[4px] active:shadow-[0_1px_0_#065f46,0_4px_12px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.35)] transition-all duration-150 disabled:opacity-60 cursor-pointer"
                 >
                   {loading
                     ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
-                    : <><LogIn size={16} aria-hidden="true" /> Đăng nhập ngay</>}
+                    : lockSecondsLeft > 0
+                      ? <><Clock size={16} aria-hidden="true" /><span>{formatRetryButtonText(lockSecondsLeft, language)}</span></>
+                      : <><LogIn size={16} aria-hidden="true" /> Đăng nhập ngay</>}
                 </button>
               </form>
             </div>

@@ -1,11 +1,10 @@
 import { translateText } from '../../../shared/i18n/translate.mjs';
 
-const SKIP_TAGS = new Set([
+const HARD_SKIP_TAGS = new Set([
   'SCRIPT',
   'STYLE',
   'NOSCRIPT',
   'TEMPLATE',
-  'TEXTAREA',
   'CODE',
   'PRE',
 ]);
@@ -22,16 +21,23 @@ const groupedElements = new WeakSet();
 let originalDocTitle = null;
 let lastWrittenDocTitle = null;
 
-function isSkippedElement(el) {
+function isHardSkippedElement(el) {
   if (!el || el.nodeType !== 1) return false;
-  if (SKIP_TAGS.has(el.tagName)) return true;
+  if (HARD_SKIP_TAGS.has(el.tagName)) return true;
   if (typeof el.closest === 'function') {
     const blocked = el.closest(
-      'script, style, noscript, template, textarea, code, pre, [contenteditable="true"], [contenteditable=""], [data-no-translate="true"], [data-no-translate=""], .notranslate'
+      'script, style, noscript, template, code, pre, [contenteditable="true"], [contenteditable=""], [data-no-translate="true"], [data-no-translate=""], .notranslate'
     );
     if (blocked) return true;
   }
   return false;
+}
+
+function isSkippedTextElement(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (isHardSkippedElement(el)) return true;
+  if (el.tagName === 'TEXTAREA') return true;
+  return typeof el.closest === 'function' ? Boolean(el.closest('textarea')) : false;
 }
 
 function getElementForTextNode(node) {
@@ -50,7 +56,7 @@ function getDirectTextNodes(el) {
 }
 
 function syncTextGroupElement(el, lang) {
-  if (!el || el.nodeType !== 1 || isSkippedElement(el)) return false;
+  if (!el || el.nodeType !== 1 || isSkippedTextElement(el)) return false;
   const textNodes = getDirectTextNodes(el);
   if (!textNodes || textNodes.length < 2) return false;
 
@@ -110,7 +116,7 @@ function restoreElementIfCollapsed(el, lang) {
 function syncTextNode(node, lang) {
   if (!node || node.nodeType !== 3) return;
   const parent = getElementForTextNode(node);
-  if (!parent || isSkippedElement(parent)) return;
+  if (!parent || isSkippedTextElement(parent)) return;
 
   const current = node.nodeValue ?? '';
   if (!current.trim()) return;
@@ -131,7 +137,7 @@ function syncTextNode(node, lang) {
 }
 
 function syncElementAttributes(el, lang) {
-  if (!el || el.nodeType !== 1 || isSkippedElement(el)) return;
+  if (!el || el.nodeType !== 1 || isHardSkippedElement(el)) return;
 
   let origAttrs = originalAttrMap.get(el);
   let lastAttrs = lastWrittenAttrMap.get(el);
@@ -201,7 +207,7 @@ export function translateSubtree(root, lang) {
   const handledGroups = new Set();
 
   if (root.nodeType === 1) {
-    if (isSkippedElement(root)) return;
+    if (isHardSkippedElement(root)) return;
     syncElementAttributes(root, lang);
     if (syncTextGroupElement(root, lang)) {
       handledGroups.add(root);
@@ -213,7 +219,7 @@ export function translateSubtree(root, lang) {
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
     {
       acceptNode(node) {
-        if (node.nodeType === 1 && isSkippedElement(node)) {
+        if (node.nodeType === 1 && isHardSkippedElement(node)) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -277,7 +283,7 @@ export function startDomAutoTranslation(getLanguage) {
         }
       } else if (m.type === 'childList') {
         const parent = m.target;
-        if (parent && parent.nodeType === 1 && !isSkippedElement(parent)) {
+        if (parent && parent.nodeType === 1 && !isSkippedTextElement(parent)) {
           if (m.removedNodes && m.removedNodes.length > 0) {
             restoreElementIfCollapsed(parent, lang);
           }

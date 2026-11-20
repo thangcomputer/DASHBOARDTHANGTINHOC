@@ -316,6 +316,8 @@ const StudentSchema = new mongoose.Schema(
     /** Pháo hoa hoàn thành khóa (legacy 1 khóa, không enrollment). false = chờ xem. */
     courseCelebrationSeen: { type: Boolean },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login
+    loginAttempts: { type: Number, default: 0 },
+    loginLockUntil: { type: Date, default: null },
     lastAccessAt: { type: Date, default: null },
     refreshToken: { type: String, select: false }, // Refresh token rotation (server-side)
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
@@ -413,9 +415,20 @@ StudentSchema.post('save', async function (doc) {
   }
 });
 
+// ── Virtual: Tài khoản có đang bị tạm khóa đăng nhập không ──────
+StudentSchema.virtual('isLoginLocked').get(function () {
+  return !!(this.loginLockUntil && new Date(this.loginLockUntil).getTime() > Date.now());
+});
+
 // ── Method: Kiểm tra password ────────────────────────────────────
 StudentSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
+};
+
+// ── Method: Xử lý đăng nhập sai mật khẩu ─────────────────────────
+StudentSchema.methods.incLoginAttempts = async function () {
+  const { incrementAccountLoginAttempts } = require('../services/loginAttemptService');
+  return incrementAccountLoginAttempts({ doc: this, lockField: 'loginLockUntil' });
 };
 
 // ── Indexes ──────────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck, Lock, User, Eye, EyeOff, AlertTriangle, ChevronRight, Fingerprint, Activity, MonitorX,
-  RefreshCw, KeyRound, Users, ScrollText, LayoutDashboard, BarChart3,
+  RefreshCw, KeyRound, Users, ScrollText, LayoutDashboard, BarChart3, Clock,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { setTokens, clearOtherRoleSessions, API_BASE, SOCKET_BASE, ensureCsrfToken } from '../services/api';
@@ -10,6 +10,9 @@ import { unlockAudio } from '../utils/sound';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
 import { isValidVNPhone, limitPhoneInput, normalizePhone, PHONE_MAX_DIGITS } from '../utils/validators';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
+import { formatLoginErrorText, formatRetryButtonText, useLoginLockCountdown } from '../hooks/useLoginLockCountdown';
+import { LoginLockStatusBanner } from './ui/LoginLockNotice';
 
 const ADMIN_HIGHLIGHTS = [
   { label: 'Bảo mật 2 lớp', icon: KeyRound },
@@ -18,6 +21,7 @@ const ADMIN_HIGHLIGHTS = [
 ];
 
 const AdminLoginPage = ({ onLogin }) => {
+  const { language, tr } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const sessionReplacedMsg = new URLSearchParams(location.search).get('msg') === 'session_replaced';
@@ -32,6 +36,14 @@ const AdminLoginPage = ({ onLogin }) => {
   const [mfaMeta, setMfaMeta] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
   const [otpResendWait, setOtpResendWait] = useState(0);
+  const {
+    lockSecondsLeft,
+    lockDurationSeconds,
+    remainingAttempts,
+    maxAttempts,
+    applyLoginFailure,
+    resetLockHint,
+  } = useLoginLockCountdown();
 
   /** Base gốc API (domain backend hoặc '' để dùng proxy Vite /api) */
   const API = SOCKET_BASE;
@@ -185,8 +197,10 @@ const AdminLoginPage = ({ onLogin }) => {
       }
 
       if (data.success) {
+        resetLockHint();
         finishLogin(data);
       } else {
+        applyLoginFailure(response.status, data);
         setError(data.message || 'Tài khoản hoặc mật khẩu không đúng');
         toast.error('Truy cập bị từ chối!');
         setPassword('');
@@ -346,9 +360,17 @@ const AdminLoginPage = ({ onLogin }) => {
                   </div>
                 )}
                 {error && (
-                  <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm font-bold">
-                    <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />
-                    <span className="break-anywhere">{error}</span>
+                  <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex flex-col gap-2 text-red-400 text-sm font-bold">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={18} className="shrink-0 mt-0.5" aria-hidden="true" />
+                      <span className="break-anywhere">{formatLoginErrorText(error, language, tr)}</span>
+                    </div>
+                    <LoginLockStatusBanner
+                      lockSecondsLeft={lockSecondsLeft}
+                      lockDurationSeconds={lockDurationSeconds}
+                      remainingAttempts={remainingAttempts}
+                      maxAttempts={maxAttempts}
+                    />
                   </div>
                 )}
 
@@ -401,7 +423,7 @@ const AdminLoginPage = ({ onLogin }) => {
                           inputMode="tel"
                           required
                           value={phone}
-                          onChange={(e) => setPhone(limitPhoneInput(e.target.value))}
+                          onChange={(e) => { setPhone(limitPhoneInput(e.target.value)); resetLockHint(); }}
                           maxLength={PHONE_MAX_DIGITS + 1}
                           autoComplete="tel"
                           className="cms-login-input"
@@ -470,10 +492,15 @@ const AdminLoginPage = ({ onLogin }) => {
                   </>
                 )}
 
-                <button type="submit" disabled={loading} className="cms-login-submit group">
+                <button type="submit" disabled={loading || (!mfaToken && lockSecondsLeft > 0)} className="cms-login-submit group">
                   <span className="cms-login-shine" aria-hidden="true" />
                   {loading ? (
                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                  ) : !mfaToken && lockSecondsLeft > 0 ? (
+                    <>
+                      <Clock size={18} aria-hidden="true" />
+                      <span>{formatRetryButtonText(lockSecondsLeft, language)}</span>
+                    </>
                   ) : (
                     <>
                       {mfaToken ? 'Xác thực OTP' : 'Khởi tạo truy cập'}

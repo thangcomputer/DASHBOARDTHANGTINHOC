@@ -13,6 +13,26 @@ function parseMax(envKey, defaultVal) {
 
 const jsonMessage = (message) => ({ success: false, code: 'RATE_LIMITED', message });
 
+function rateLimitHandler(baseMessage) {
+  return (req, res, _next, options) => {
+    const windowMs = Number(options?.windowMs) || 60_000;
+    const resetMs = req.rateLimit?.resetTime instanceof Date
+      ? req.rateLimit.resetTime.getTime()
+      : Date.now() + windowMs;
+    const retryAfterSeconds = Math.max(1, Math.ceil((resetMs - Date.now()) / 1000));
+    const lockDurationSeconds = Math.max(1, Math.ceil(windowMs / 1000));
+    res.set('Retry-After', String(retryAfterSeconds));
+    res.status(options?.statusCode || 429).json({
+      success: false,
+      publicMessage: true,
+      code: 'RATE_LIMITED',
+      retryAfterSeconds,
+      lockDurationSeconds,
+      message: baseMessage,
+    });
+  };
+}
+
 const skipInDev = () => process.env.NODE_ENV === 'development';
 
 function clientIpKey(req) {
@@ -34,6 +54,7 @@ function buildLoginLimiter({ windowMs, max, keyGenerator, skipSuccessfulRequests
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipInDev,
+    handler: rateLimitHandler(message),
     message: jsonMessage(message),
   });
 }

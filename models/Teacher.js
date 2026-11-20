@@ -239,19 +239,8 @@ TeacherSchema.methods.comparePassword = async function (candidatePassword) {
 
 // ── Method: Xử lý đăng nhập sai ─────────────────────────────────
 TeacherSchema.methods.incLoginAttempts = async function () {
-  const MAX_ATTEMPTS = 5;
-  const LOCK_TIME = 15 * 60 * 1000; // 15 phút
-
-  // Reset nếu hết thời gian khóa
-  if (this.lockUntil && this.lockUntil < Date.now()) {
-    return this.updateOne({ $set: { loginAttempts: 1 }, $unset: { lockUntil: 1 } });
-  }
-
-  const updates = { $inc: { loginAttempts: 1 } };
-  if (this.loginAttempts + 1 >= MAX_ATTEMPTS && !this.isLocked) {
-    updates.$set = { lockUntil: Date.now() + LOCK_TIME };
-  }
-  return this.updateOne(updates);
+  const { incrementAccountLoginAttempts } = require('../services/loginAttemptService');
+  return incrementAccountLoginAttempts({ doc: this, lockField: 'lockUntil' });
 };
 
 // ── Indexes ──────────────────────────────────────────────────────

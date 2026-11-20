@@ -18,12 +18,23 @@ export class MobileApiError extends Error {
   code?: string;
   currentXp?: number;
   needXp?: number;
+  remainingAttempts?: number;
+  maxAttempts?: number;
+  retryAfterSeconds?: number;
+  lockDurationSeconds?: number;
 
   constructor(
     message: string,
     status: number,
     code?: string,
-    extra?: { currentXp?: number; needXp?: number },
+    extra?: {
+      currentXp?: number;
+      needXp?: number;
+      remainingAttempts?: number;
+      maxAttempts?: number;
+      retryAfterSeconds?: number;
+      lockDurationSeconds?: number;
+    },
   ) {
     super(message);
     this.name = 'MobileApiError';
@@ -31,6 +42,10 @@ export class MobileApiError extends Error {
     this.code = code;
     if (typeof extra?.currentXp === 'number') this.currentXp = extra.currentXp;
     if (typeof extra?.needXp === 'number') this.needXp = extra.needXp;
+    if (typeof extra?.remainingAttempts === 'number') this.remainingAttempts = extra.remainingAttempts;
+    if (typeof extra?.maxAttempts === 'number') this.maxAttempts = extra.maxAttempts;
+    if (typeof extra?.retryAfterSeconds === 'number') this.retryAfterSeconds = extra.retryAfterSeconds;
+    if (typeof extra?.lockDurationSeconds === 'number') this.lockDurationSeconds = extra.lockDurationSeconds;
   }
 }
 
@@ -216,6 +231,10 @@ async function parseResponse(response: Response) {
       {
         currentXp: typeof payload.currentXp === 'number' ? payload.currentXp : undefined,
         needXp: typeof payload.needXp === 'number' ? payload.needXp : undefined,
+        remainingAttempts: typeof payload.remainingAttempts === 'number' ? payload.remainingAttempts : undefined,
+        maxAttempts: typeof payload.maxAttempts === 'number' ? payload.maxAttempts : undefined,
+        retryAfterSeconds: typeof payload.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : undefined,
+        lockDurationSeconds: typeof payload.lockDurationSeconds === 'number' ? payload.lockDurationSeconds : undefined,
       },
     );
   }

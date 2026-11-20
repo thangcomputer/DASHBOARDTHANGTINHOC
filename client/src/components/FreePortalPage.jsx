@@ -22,6 +22,7 @@ import {
   UserPlus,
   ArrowRight,
   MonitorX,
+  Clock,
 } from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
 import { getDeviceFingerprint, getDeviceAuthFields, rememberDeviceSecret } from '../utils/deviceFingerprint';
@@ -29,6 +30,9 @@ import { isValidVNPhone, isValidEmail, limitPhoneInput, normalizePhone } from '.
 import { unlockAudio } from '../utils/sound';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
+import { formatLoginErrorText, formatRetryButtonText, useLoginLockCountdown } from '../hooks/useLoginLockCountdown';
+import { LoginLockStatusBanner } from './ui/LoginLockNotice';
 
 function GoogleIcon() {
   return (
@@ -130,6 +134,7 @@ function CompactField({ label, icon: Icon, type = 'text', value, onChange, place
 }
 
 export default function FreePortalPage({ onLogin }) {
+  const { language, tr } = useLanguage();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const sessionReplacedMsg = searchParams.get('msg') === 'session_replaced';
@@ -157,6 +162,14 @@ export default function FreePortalPage({ onLogin }) {
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
   const [otpDeliveryInfo, setOtpDeliveryInfo] = useState(null);
   const formRef = useRef(null);
+  const {
+    lockSecondsLeft,
+    lockDurationSeconds,
+    remainingAttempts,
+    maxAttempts,
+    applyLoginFailure,
+    resetLockHint,
+  } = useLoginLockCountdown();
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -277,11 +290,15 @@ export default function FreePortalPage({ onLogin }) {
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') { setDeviceConflict(true); return; }
       if (!data.success) {
         if (response.status === 404 || data.code === 'ACCOUNT_NOT_FOUND') {
+          resetLockHint();
           setNotFoundAccount(true);
+        } else {
+          applyLoginFailure(response.status, data);
         }
         setError(data.message || 'Số điện thoại/Gmail hoặc mật khẩu không đúng');
         return;
       }
+      resetLockHint();
       acceptSession(data.data, deviceScope);
     } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
   };
@@ -662,7 +679,7 @@ export default function FreePortalPage({ onLogin }) {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => { setMode(tab.id); setError(''); setNotFoundAccount(false); }}
+                      onClick={() => { setMode(tab.id); setError(''); setNotFoundAccount(false); resetLockHint(); }}
                       className={`dewskill-tab rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${mode === tab.id
                         ? 'bg-emerald-600 text-white shadow-sm'
                         : 'text-slate-400 hover:text-white'
@@ -681,25 +698,25 @@ export default function FreePortalPage({ onLogin }) {
                 <form onSubmit={handleVerifyOtp} className="space-y-3">
                   {/* Hộp thông báo email nhận mã */}
                   <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-center">
-                      <div className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
-                        {otpDeliveryInfo?.channel === 'sms' ? <Phone size={18} /> : <Mail size={18} />}
-                      </div>
-                      <p className="text-[11px] font-semibold text-slate-300">
-                        {otpDeliveryInfo?.channel === 'sms'
-                          ? 'Mã xác thực 6 chữ số qua tin nhắn SĐT tới:'
-                          : 'Mã xác thực 6 chữ số đã được gửi tới:'}
-                      </p>
-                      <p className="mt-0.5 text-xs sm:text-sm font-black text-emerald-300 break-all">
-                        {email}
-                      </p>
-                      {otpDeliveryInfo && otpDeliveryInfo.channelConfigured === false ? (
-                        <p className="mt-1.5 text-[11px] font-semibold text-amber-300">
-                          {otpDeliveryInfo.channel === 'sms'
-                            ? 'Máy chủ chưa cấu hình cổng SMS trong .env — dùng mã thử nghiệm (Dev) hoặc xem log server.'
-                            : 'Máy chủ chưa cấu hình SMTP/Gmail trong .env — dùng mã thử nghiệm (Dev) hoặc xem log server.'}
-                        </p>
-                      ) : null}
+                    <div className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                      {otpDeliveryInfo?.channel === 'sms' ? <Phone size={18} /> : <Mail size={18} />}
                     </div>
+                    <p className="text-[11px] font-semibold text-slate-300">
+                      {otpDeliveryInfo?.channel === 'sms'
+                        ? 'Mã xác thực 6 chữ số qua tin nhắn SĐT tới:'
+                        : 'Mã xác thực 6 chữ số đã được gửi tới:'}
+                    </p>
+                    <p className="mt-0.5 text-xs sm:text-sm font-black text-emerald-300 break-all">
+                      {email}
+                    </p>
+                    {otpDeliveryInfo && otpDeliveryInfo.channelConfigured === false ? (
+                      <p className="mt-1.5 text-[11px] font-semibold text-amber-300">
+                        {otpDeliveryInfo.channel === 'sms'
+                          ? 'Máy chủ chưa cấu hình cổng SMS trong .env — dùng mã thử nghiệm (Dev) hoặc xem log server.'
+                          : 'Máy chủ chưa cấu hình SMTP/Gmail trong .env — dùng mã thử nghiệm (Dev) hoặc xem log server.'}
+                      </p>
+                    ) : null}
+                  </div>
 
                   {/* Banner mã thử nghiệm trong môi trường DEV (Click để điền tự động) */}
                   {devOtpNotice && (
@@ -822,6 +839,7 @@ export default function FreePortalPage({ onLogin }) {
                     onChange={(e) => {
                       setPhone(pending ? limitPhoneInput(e.target.value) : e.target.value);
                       setNotFoundAccount(false);
+                      resetLockHint();
                     }}
                     placeholder={pending ? '0912 345 678' : '0912345678 hoặc vidu@gmail.com'}
                   />
@@ -871,8 +889,17 @@ export default function FreePortalPage({ onLogin }) {
                     <div className="space-y-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-rose-300">
                       <div className="flex items-start gap-2">
                         <span className="shrink-0 text-rose-400 font-bold">⚠</span>
-                        <span>{error}</span>
+                        <span>{formatLoginErrorText(error, language, tr)}</span>
                       </div>
+                      {mode === 'login' && (
+                        <LoginLockStatusBanner
+                          compact
+                          lockSecondsLeft={lockSecondsLeft}
+                          lockDurationSeconds={lockDurationSeconds}
+                          remainingAttempts={remainingAttempts}
+                          maxAttempts={maxAttempts}
+                        />
+                      )}
                       {notFoundAccount && mode === 'login' ? (
                         <button
                           type="button"
@@ -906,7 +933,7 @@ export default function FreePortalPage({ onLogin }) {
                   {/* Submit button */}
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || (mode === 'login' && !pending && lockSecondsLeft > 0)}
                     className="btn-shimmer relative mt-1 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-2.5 text-xs sm:text-sm font-black text-white shadow-md transition-all duration-200 disabled:opacity-60 cursor-pointer active:scale-[0.98]"
                     style={{
                       background: loading ? '#6ee7b7' : 'linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%)',
@@ -921,7 +948,7 @@ export default function FreePortalPage({ onLogin }) {
                       }}
                       aria-hidden="true"
                     />
-                    <Lock size={14} />
+                    {mode === 'login' && !pending && lockSecondsLeft > 0 ? <Clock size={14} /> : <Lock size={14} />}
                     <span>
                       {loading
                         ? 'Đang gửi mã…'
@@ -929,7 +956,9 @@ export default function FreePortalPage({ onLogin }) {
                           ? 'Hoàn tất hồ sơ'
                           : isRegister
                             ? 'Tạo tài khoản miễn phí'
-                            : 'Đăng nhập ngay'}
+                            : lockSecondsLeft > 0
+                              ? formatRetryButtonText(lockSecondsLeft, language)
+                              : 'Đăng nhập ngay'}
                     </span>
                   </button>
                 </form>

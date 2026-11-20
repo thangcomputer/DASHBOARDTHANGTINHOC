@@ -41,6 +41,15 @@ const registeredDeviceService = require('../services/registeredDeviceService');
 const adminOtp2faService = require('../services/adminOtp2faService');
 const forgotPasswordOtpService = require('../services/forgotPasswordOtpService');
 const {
+  LOGIN_MAX_ATTEMPTS,
+  getAccountLockSeconds,
+  getMasterAdminLockState,
+  recordMasterAdminFailure,
+  resetMasterAdminFailures,
+  buildTemporarilyLockedPayload,
+  buildWrongPasswordPayload,
+} = require('../services/loginAttemptService');
+const {
   normalizeVNPhone,
   phoneLookupVariants,
   maskPhone,
@@ -60,7 +69,7 @@ const WRONG_PASSWORD_CREDENTIALS = {
   success: false,
   code: 'INVALID_CREDENTIALS',
   publicMessage: true,
-  message: 'Mật khẩu không đúng. Vui lòng kiểm tra lại hoặc bấm Quên mật khẩu.',
+  message: 'Mật khẩu không đúng.',
 };
 function accountNotFoundPayload(role, flow = 'login') {
   if (role === 'teacher') {
@@ -82,7 +91,40 @@ function accountNotFoundPayload(role, flow = 'login') {
       : 'Tài khoản không tồn tại. Vui lòng đăng ký tài khoản mới để bắt đầu học.',
   };
 }
-const TEACHER_LOGIN_LOCK_THRESHOLD = 5;
+const TEACHER_LOGIN_LOCK_THRESHOLD = LOGIN_MAX_ATTEMPTS;
+
+function clearUserLoginFailures(user) {
+  if (!user) return;
+  user.loginAttempts = 0;
+  if (user.lockUntil) user.lockUntil = undefined;
+  if (user.loginLockUntil) user.loginLockUntil = null;
+}
+
+function rejectIfTemporarilyLocked(res, user, userRole) {
+  const lockField = userRole === 'student' ? 'loginLockUntil' : 'lockUntil';
+  const lockSeconds = getAccountLockSeconds(user, lockField);
+  if (lockSeconds <= 0) return false;
+  res.set('Retry-After', String(lockSeconds));
+  res.status(403).json(buildTemporarilyLockedPayload({
+    maxAttempts: LOGIN_MAX_ATTEMPTS,
+    lockSeconds,
+    lockUntil: user?.[lockField] || null,
+  }));
+  return true;
+}
+
+function sendFailedPasswordResponse(res, basePayload, attemptInfo) {
+  if (attemptInfo?.isLocked && attemptInfo.lockSeconds > 0) {
+    res.set('Retry-After', String(attemptInfo.lockSeconds));
+    return res.status(403).json(buildTemporarilyLockedPayload({
+      maxAttempts: attemptInfo.maxAttempts,
+      lockSeconds: attemptInfo.lockSeconds,
+      lockUntil: attemptInfo.lockUntil,
+      lockDurationSeconds: attemptInfo.lockDurationSeconds,
+    }));
+  }
+  return res.status(401).json(buildWrongPasswordPayload({ basePayload, attemptInfo }));
+}
 
 async function findPhoneMatches(value) {
   const phone = normalizeVNPhone(value);
@@ -123,16 +165,19 @@ async function lookupUserByPhone(value, requestedRole = null) {
 }
 
 async function recordFailedLoginAttempt(user, role, io) {
-  if (typeof user.incLoginAttempts !== 'function') return;
+  if (typeof user?.incLoginAttempts !== 'function') return null;
 
-  const lockExpired = user.lockUntil && new Date(user.lockUntil).getTime() < Date.now();
+  const lockField = role === 'student' ? 'loginLockUntil' : 'lockUntil';
+  const rawLock = user[lockField];
+  const lockExpired = rawLock && new Date(rawLock).getTime() <= Date.now();
+  const isAlreadyLocked = !lockExpired && getAccountLockSeconds(user, lockField) > 0;
+  const nextCount = lockExpired ? 1 : Number(user.loginAttempts || 0) + 1;
   const willLockTeacher = role === 'teacher'
-    && !user.isLocked
-    && !lockExpired
-    && Number(user.loginAttempts || 0) + 1 >= TEACHER_LOGIN_LOCK_THRESHOLD;
+    && !isAlreadyLocked
+    && nextCount >= TEACHER_LOGIN_LOCK_THRESHOLD;
 
-  await user.incLoginAttempts();
-  if (!willLockTeacher) return;
+  const attemptInfo = await user.incLoginAttempts();
+  if (!willLockTeacher) return attemptInfo;
 
   try {
     await revokeMobileSessionsForUser({
@@ -146,6 +191,7 @@ async function recordFailedLoginAttempt(user, role, io) {
     error.code = 'MOBILE_SESSION_REVOCATION_FAILED';
     throw error;
   }
+  return attemptInfo;
 }
 
 function mobileSessionRevocationFailure(res) {
@@ -579,8 +625,7 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io, req 
 
   user.refreshToken = refreshToken;
   user.lastLogin = new Date();
-  user.loginAttempts = 0;
-  if (user.lockUntil) user.lockUntil = undefined;
+  clearUserLoginFailures(user);
   user.markModified('tokenVersion');
   await user.save({ validateModifiedOnly: true });
 
@@ -953,13 +998,14 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     }
     const { user, role: userRole } = found;
     if (!user.password) return res.status(401).json(INVALID_CREDENTIALS);
+    if (rejectIfTemporarilyLocked(res, user, userRole)) return;
 
     // ── Kiểm tra mật khẩu ─────────────────────────────────────────
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
-      await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
-      return res.status(401).json(INVALID_CREDENTIALS);
+      const attemptInfo = await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
+      return sendFailedPasswordResponse(res, INVALID_CREDENTIALS, attemptInfo);
     }
     if (userRole === 'teacher') {
       if (user.isLocked) return res.status(403).json({ success: false, message: 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.' });
@@ -1006,8 +1052,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
     if (userRole === 'student') user.lastAccessAt = new Date();
-    user.loginAttempts = 0;
-    if (user.lockUntil) user.lockUntil = undefined;
+    clearUserLoginFailures(user);
     user.markModified('tokenVersion');  // Force Mongoose to persist new field
     await user.save({ validateModifiedOnly: true });
     await deviceSessionService.recordWebDeviceSession({
@@ -1166,12 +1211,13 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     }
 
     const { user, role: userRole } = found;
+    if (rejectIfTemporarilyLocked(res, user, userRole)) return;
 
     // Xác thực mật khẩu
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
-      return res.status(401).json(WRONG_PASSWORD_CREDENTIALS);
+      const attemptInfo = await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
+      return sendFailedPasswordResponse(res, WRONG_PASSWORD_CREDENTIALS, attemptInfo);
     }
 
     const sStatus = String(user.status || '').toLowerCase();
@@ -1235,7 +1281,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
 
     user.refreshToken = refreshToken; user.lastLogin = new Date();
     if (userRole === 'student') user.lastAccessAt = new Date();
-    user.loginAttempts = 0;
+    clearUserLoginFailures(user);
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
     await deviceSessionService.recordWebDeviceSession({
@@ -1337,10 +1383,12 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
     }
 
     const { user, role: userRole } = found;
+    if (rejectIfTemporarilyLocked(res, user, userRole)) return;
+
     const passwordMatches = await user.comparePassword(password);
     if (!passwordMatches) {
-      await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
-      return res.status(401).json(WRONG_PASSWORD_CREDENTIALS);
+      const attemptInfo = await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
+      return sendFailedPasswordResponse(res, WRONG_PASSWORD_CREDENTIALS, attemptInfo);
     }
 
     const status = String(user.status || '').toLowerCase();
@@ -1390,7 +1438,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
 
     user.lastLogin = new Date();
     if (userRole === 'student') user.lastAccessAt = new Date();
-    user.loginAttempts = 0;
+    clearUserLoginFailures(user);
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
     fireStudentDeviceAlert(req, user, userRole, knownDeviceMobile);
@@ -1514,12 +1562,20 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     // Bước 2: Super Admin configured phone (JWT id remains "admin" for compatibility).
     const masterPhone = normalizeVNPhone(process.env.MASTER_ADMIN_PHONE);
     if (masterPhone && phone === masterPhone) {
+      const masterIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+      const masterLock = getMasterAdminLockState(masterIp, phone);
+      if (masterLock.isLocked) {
+        res.set('Retry-After', String(masterLock.lockSeconds));
+        return res.status(403).json(buildTemporarilyLockedPayload(masterLock));
+      }
       const sysSettings = await SystemSettings.findOne({ _key: 'main' })
         .select('+adminMfaSecret adminPasswordHash adminName adminMfaEnabled adminOtp2faEnabled adminOtp2faChannel adminOtp2faPhone adminOtp2faEmail');
       const adminPasswordMatch = await verifyAdminPassword(password, sysSettings);
       if (!adminPasswordMatch) {
-        return res.status(401).json(INVALID_CREDENTIALS);
+        const attemptInfo = recordMasterAdminFailure(masterIp, phone);
+        return sendFailedPasswordResponse(res, INVALID_CREDENTIALS, attemptInfo);
       }
+      resetMasterAdminFailures(masterIp, phone);
       // Trùng SĐT với HV/GV: cảnh báo nhưng vẫn cho Super Admin vào nếu mật khẩu master đúng
       const collisions = await findPhoneMatches(phone);
       if (collisions.length) {
@@ -1560,10 +1616,11 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     }
 
     // Bước 4: Xác thực mật khẩu
+    if (rejectIfTemporarilyLocked(res, user, userRole)) return;
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      if (user.incLoginAttempts) await user.incLoginAttempts();
-      return res.status(401).json(INVALID_CREDENTIALS);
+      const attemptInfo = await recordFailedLoginAttempt(user, userRole, req.app.get('io'));
+      return sendFailedPasswordResponse(res, INVALID_CREDENTIALS, attemptInfo);
     }
     const sStatus = String(user.status || '').toLowerCase();
     if (user.isLocked || ['inactive', 'suspended'].includes(sStatus)) {
@@ -1648,9 +1705,14 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
       if (!['admin', 'staff'].includes(user.role)) {
         return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập khu vực quản trị.' });
       }
+      if (rejectIfTemporarilyLocked(res, user, user.role)) return;
       if (!verifyTotp(user.mfaSecret, code)) {
-        if (user.incLoginAttempts) await user.incLoginAttempts();
-        return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+        const attemptInfo = await recordFailedLoginAttempt(user, user.role, req.app.get('io'));
+        return sendFailedPasswordResponse(
+          res,
+          { success: false, publicMessage: true, code: 'INVALID_MFA_CODE', message: 'Mã OTP không đúng' },
+          attemptInfo,
+        );
       }
       return res.json(await completeInternalLogin(user, user.role, decoded.fp || null, req.app.get('io'), req));
     }
@@ -3130,7 +3192,7 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
     const newTokenVersion = (user.tokenVersion || 0) + 1;
     user.tokenVersion = newTokenVersion;
     user.mustChangePassword = true;
-    user.loginAttempts = 0;
+    clearUserLoginFailures(user);
     user.lastLogin = new Date();
     if (userRole === 'student') user.lastAccessAt = new Date();
     user.markModified('tokenVersion');

@@ -24,6 +24,7 @@ import {
   ArrowRight,
   Award,
   CheckCircle2,
+  Clock,
   Eye,
   EyeOff,
   GraduationCap,
@@ -128,6 +129,10 @@ export function LoginScreen() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState<'ACCOUNT_NOT_FOUND' | 'ACCOUNT_ALREADY_EXISTS' | ''>('');
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+  const [lockDurationSeconds, setLockDurationSeconds] = useState(900);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [maxAttempts, setMaxAttempts] = useState(5);
   const [focused, setFocused] = useState<'name' | 'age' | 'phone' | 'password' | null>(null);
   const [logoUrl, setLogoUrl] = useState('');
   const [logoFailed, setLogoFailed] = useState(false);
@@ -193,16 +198,55 @@ export function LoginScreen() {
     return () => clearTimeout(timer);
   }, [registerCooldown]);
 
+  useEffect(() => {
+    if (lockSecondsLeft <= 0) return undefined;
+    const timer = setInterval(() => {
+      setLockSecondsLeft((sec) => (sec > 1 ? sec - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockSecondsLeft]);
+
+  const resetLoginLockHint = () => {
+    setLockSecondsLeft(0);
+    setRemainingAttempts(null);
+  };
+
+  const applyLoginFailureMeta = (reason: unknown) => {
+    if (!(reason instanceof MobileApiError)) {
+      resetLoginLockHint();
+      return;
+    }
+    if (typeof reason.lockDurationSeconds === 'number' && reason.lockDurationSeconds > 0) {
+      setLockDurationSeconds(Math.ceil(reason.lockDurationSeconds));
+    }
+    if (typeof reason.maxAttempts === 'number' && reason.maxAttempts > 0) {
+      setMaxAttempts(reason.maxAttempts);
+    }
+    if ((reason.status === 403 || reason.status === 429) && typeof reason.retryAfterSeconds === 'number' && reason.retryAfterSeconds > 0) {
+      setLockSecondsLeft(Math.ceil(reason.retryAfterSeconds));
+      setRemainingAttempts(0);
+      return;
+    }
+    if (typeof reason.remainingAttempts === 'number' && reason.remainingAttempts >= 0) {
+      setRemainingAttempts(reason.remainingAttempts);
+      setLockSecondsLeft(0);
+      return;
+    }
+    resetLoginLockHint();
+  };
+
   const chooseRole = (nextRole: UserRole) => {
     setRole(nextRole);
     setError('');
     setErrorCode('');
+    resetLoginLockHint();
   };
 
   const switchMode = (nextMode: 'login' | 'register') => {
     setMode(nextMode);
     setError('');
     setErrorCode('');
+    resetLoginLockHint();
     setRegisterOtpStep(false);
     setRegisterOtpCode('');
     setRegisterCooldown(0);
@@ -366,6 +410,7 @@ export function LoginScreen() {
       await signIn(role, contact.value, password, {
         saveBiometric: Boolean(biometricInfo?.enrolled && saveBiometric),
       });
+      resetLoginLockHint();
     } catch (reason) {
       if (reason instanceof MobileApiError && reason.code === 'DEVICE_CONFLICT') {
         Alert.alert(
@@ -381,6 +426,7 @@ export function LoginScreen() {
                   saveBiometric: Boolean(biometricInfo?.enrolled && saveBiometric),
                   force: true,
                 }).catch((retryErr) => {
+                  applyLoginFailureMeta(retryErr);
                   setError(retryErr instanceof Error ? retryErr.message : 'Không thể đăng nhập.');
                 });
               },
@@ -392,6 +438,7 @@ export function LoginScreen() {
       if (reason instanceof MobileApiError && (reason.code === 'ACCOUNT_NOT_FOUND' || reason.status === 404)) {
         setErrorCode('ACCOUNT_NOT_FOUND');
       }
+      applyLoginFailureMeta(reason);
       setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập.');
     }
   };
@@ -400,7 +447,9 @@ export function LoginScreen() {
     setError('');
     try {
       await signInWithBiometrics();
+      resetLoginLockHint();
     } catch (reason) {
+      applyLoginFailureMeta(reason);
       setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập bằng sinh trắc học.');
     }
   };
@@ -517,6 +566,20 @@ export function LoginScreen() {
                       <AlertCircle size={18} color={loginPalette.errorText} />
                       <Text style={styles.errorText}>{message}</Text>
                     </View>
+                    {mode === 'login' && lockSecondsLeft > 0 ? (
+                      <View style={styles.lockWarnBanner}>
+                        <Clock size={14} color="#92400E" />
+                        <Text style={styles.lockWarnText}>
+                          {`Tạm khóa ${lockDurationSeconds} giây — thử lại sau ${lockSecondsLeft}s.`}
+                        </Text>
+                      </View>
+                    ) : mode === 'login' && remainingAttempts !== null && remainingAttempts > 0 ? (
+                      <View style={styles.lockWarnBanner}>
+                        <Text style={styles.lockWarnText}>
+                          {`Còn ${remainingAttempts}/${maxAttempts} lần thử (khóa ${lockDurationSeconds} giây).`}
+                        </Text>
+                      </View>
+                    ) : null}
                     {errorCode === 'ACCOUNT_NOT_FOUND' && mode === 'login' && role === 'student' ? (
                       <Pressable
                         onPress={() => switchMode('register')}
@@ -697,7 +760,7 @@ export function LoginScreen() {
                         <UserRound size={17} color={focused === 'phone' ? loginPalette.brand : loginPalette.subtle} />
                         <TextInput
                           value={phone}
-                          onChangeText={(value) => { setPhone(value); setErrorCode(''); }}
+                          onChangeText={(value) => { setPhone(value); setErrorCode(''); resetLoginLockHint(); }}
                           placeholder="0912345678 hoặc ten@gmail.com"
                           placeholderTextColor={loginPalette.subtle}
                           keyboardType="email-address"
@@ -776,10 +839,10 @@ export function LoginScreen() {
 
                     <Pressable
                       onPress={() => { void submit(); }}
-                      disabled={busy}
+                      disabled={busy || (mode === 'login' && lockSecondsLeft > 0)}
                       style={({ pressed }) => [
                         styles.submitBtn,
-                        (pressed || busy) && styles.submitBtnPressed,
+                        (pressed || busy || (mode === 'login' && lockSecondsLeft > 0)) && styles.submitBtnPressed,
                       ]}
                       accessibilityRole="button"
                       accessibilityLabel={mode === 'register' ? 'Tạo tài khoản ngay' : 'Đăng nhập ngay'}
@@ -789,6 +852,11 @@ export function LoginScreen() {
                           <UserPlus size={18} color={loginPalette.white} />
                           <Text style={styles.submitText}>Tạo tài khoản ngay</Text>
                           <ArrowRight size={16} color={loginPalette.white} />
+                        </>
+                      ) : lockSecondsLeft > 0 ? (
+                        <>
+                          <Clock size={18} color={loginPalette.white} />
+                          <Text style={styles.submitText}>{`Thử lại sau ${lockSecondsLeft}s`}</Text>
                         </>
                       ) : (
                         <>
@@ -1482,6 +1550,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  lockWarnBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  lockWarnText: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   errorActionBtn: {
     minHeight: 42,
