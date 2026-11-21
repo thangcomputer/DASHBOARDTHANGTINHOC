@@ -26,8 +26,8 @@ test('mobile UI & navigator optimizations remove known bottlenecks cleanly', () 
   assert.ok(drawerSrc.includes('useCallback('), 'Drawer menu handlers should be memoized');
   assert.ok(drawerSrc.includes('DrawerMenuRow'), 'Drawer menu rows should be memoized individually');
 
-  // BrandingTopBar AI border spinner should pause when unfocused/inactive and Android headers skip BlurView
-  assert.ok(ui.includes('if (!isFocused || !appIsActive)'), 'TopBar spinner loop must pause when unfocused or backgrounded');
+  // Nút AI không còn vòng xoay liên tục; Android vẫn bỏ BlurView nặng
+  assert.ok(!ui.includes('aiBorderSpin'), 'Top bar should not run a continuous border spinner');
   assert.ok(ui.includes("Platform.OS === 'android' ? View : BlurView"), 'Android top/app bars should avoid heavy BlurView passes');
 
   // TranslatedText uses single O(1) LanguageCodeContext + Vietnamese fast path
