@@ -23,7 +23,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, Sparkles, type LucideIcon } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
@@ -379,7 +379,7 @@ const BrandingTopBar = React.memo(function BrandingTopBar() {
             onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
             style={({ pressed }) => [styles.topBarAiChip, pressed && styles.topBarAiChipPressed]}
             accessibilityRole="button"
-            accessibilityLabel="DewSkill AI và tìm kiếm nhanh"
+            accessibilityLabel="Tìm kiếm AI"
           >
             <Animated.View
               pointerEvents="none"
@@ -393,12 +393,9 @@ const BrandingTopBar = React.memo(function BrandingTopBar() {
               <View style={styles.topBarAiBorderArcTertiary} />
             </Animated.View>
             <View style={[styles.topBarAiChipInner, compactLogoWithAi && styles.topBarAiChipInnerCompact]}>
-              <Image
-                source={require('../../assets/dewskill-ai-icon.webp')}
-                style={styles.topBarAiLogo}
-                resizeMode="contain"
-              />
-              <Sparkles size={12} color="#0D9488" />
+              <View style={styles.topBarAiSearch}>
+                <Search size={14} color="#FFFFFF" strokeWidth={2.75} />
+              </View>
               <Text style={styles.topBarAiText} numberOfLines={1}>AI</Text>
             </View>
           </Pressable>
@@ -828,7 +825,7 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarAiBorderArcTertiary: { position: 'absolute', bottom: 0, right: 0, width: 68, height: 68, backgroundColor: '#6366F1', borderTopLeftRadius: 28 },
   topBarAiChipInner: { height: '100%', paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   topBarAiChipInnerCompact: { paddingHorizontal: 8, gap: 3 },
-  topBarAiLogo: { width: 19, height: 19 },
+  topBarAiSearch: { width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0D9488' },
   topBarAiChipPressed: { transform: [{ translateY: 1 }], opacity: 0.9 },
   topBarAiText: { color: '#0F766E', fontSize: 12.5, fontWeight: '900', letterSpacing: 0.3 },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },

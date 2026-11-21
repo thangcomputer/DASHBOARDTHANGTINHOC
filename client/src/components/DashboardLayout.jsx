@@ -22,7 +22,7 @@ import api, { setTokens, csrfFetch } from '../services/api';
 import {
   Bell, MessageCircle, CheckCircle2, Clock, X, Lock, Eye, EyeOff, ShieldCheck, LogOut,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
-  Sparkles, Sun, Moon, Minimize2,
+  Search, Sun, Moon, Minimize2,
 } from 'lucide-react';
 import { useTheme } from '../utils/theme';
 import { useFocusMode } from '../utils/focusMode';
@@ -2021,8 +2021,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
                   className="group relative inline-flex h-8 sm:h-9 shrink-0 items-center justify-center overflow-hidden rounded-xl p-[2px] shadow-[0_2px_12px_rgba(6,182,212,0.28)] active:translate-y-[1px] transition cursor-pointer"
-                  title="DewSkill AI & Tìm nhanh (Ctrl+K)"
-                  aria-label="DewSkill AI & Tìm nhanh"
+                  title="Tìm kiếm AI (Ctrl+K)"
+                  aria-label="Tìm kiếm AI"
                 >
                   <span
                     aria-hidden="true"
@@ -2035,14 +2035,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                       }}
                     />
                   </span>
-                  <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-white/95 px-2.5 sm:px-3 group-hover:bg-emerald-50/95 dark:bg-slate-900 dark:group-hover:bg-slate-800/95 transition">
-                    <img
-                      src="/dewskill-ai-icon.webp"
-                      alt=""
-                      aria-hidden="true"
-                      className="h-5 w-5 shrink-0 object-contain"
-                    />
-                    <Sparkles size={13} className="shrink-0 text-teal-500 dark:text-teal-300 animate-pulse" aria-hidden="true" />
+                  <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-white/95 pl-1 pr-2.5 sm:pr-3 group-hover:bg-emerald-50/95 dark:bg-slate-900 dark:group-hover:bg-slate-800/95 transition">
+                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white shadow-[0_2px_6px_rgba(13,148,136,0.35)]">
+                      <Search size={14} strokeWidth={2.75} aria-hidden="true" />
+                    </span>
                     <span className="bg-gradient-to-r from-emerald-700 via-teal-600 to-indigo-600 dark:from-emerald-300 dark:via-teal-200 dark:to-indigo-300 bg-clip-text text-xs font-black tracking-wide text-transparent">
                       AI
                     </span>

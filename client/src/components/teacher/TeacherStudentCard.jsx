@@ -1738,7 +1738,7 @@ export const StudentCard = ({
             onClick={() => !sendingMakeup && setShowMakeupModal(false)}
           >
             <div
-              className="bg-white rounded-[26px] w-full max-w-[22rem] max-h-[calc(100dvh-1.5rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
+              className="bg-white rounded-3xl size-[min(92vw,88dvh,30rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
               role="dialog"
               aria-modal="true"
               onClick={(e) => e.stopPropagation()}
@@ -1757,18 +1757,20 @@ export const StudentCard = ({
                   <X size={20} />
                 </button>
               </div>
-              <div className="p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-1">
-                  <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
-                  <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
-                  {makeupSummary.course ? (
-                    <p className="text-slate-600">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
-                  ) : null}
-                  {makeupSummary.total > 0 ? (
-                    <p className="text-slate-600">Buổi: <span className="font-black">{makeupSummary.sessionNo}/{makeupSummary.total}</span></p>
-                  ) : null}
-                  <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
-                  <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
+              <div className="flex-1 p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3">
+                  <p className="text-[10px] font-black tracking-widest text-amber-700 mb-2">Thông tin buổi học</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    <p className="font-bold text-slate-800 col-span-2">HV: {makeupSummary.name}</p>
+                    {makeupSummary.course ? (
+                      <p className="text-slate-600 col-span-2">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
+                    ) : null}
+                    {makeupSummary.total > 0 ? (
+                      <p className="text-slate-600">Buổi: <span className="font-black">{makeupSummary.sessionNo}/{makeupSummary.total}</span></p>
+                    ) : null}
+                    <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
+                    <p className="text-slate-600 col-span-2">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-slate-700 leading-relaxed">
                   <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
@@ -2091,7 +2093,7 @@ export const StudentCard = ({
           onClick={() => !sendingMakeup && setShowMakeupModal(false)}
         >
           <div
-            className="bg-white rounded-[26px] w-full max-w-[22rem] max-h-[calc(100dvh-1.5rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
+            className="bg-white rounded-3xl size-[min(92vw,88dvh,30rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -2109,18 +2111,20 @@ export const StudentCard = ({
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-1">
-                <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
-                <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
-                {makeupSummary.course ? (
-                  <p className="text-slate-600">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
-                ) : null}
-                {makeupSummary.total > 0 ? (
-                  <p className="text-slate-600">Buổi: <span className="font-black">{makeupSummary.sessionNo}/{makeupSummary.total}</span></p>
-                ) : null}
-                <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
-                <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
+            <div className="flex-1 p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3">
+                <p className="text-[10px] font-black tracking-widest text-amber-700 mb-2">Thông tin buổi học</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  <p className="font-bold text-slate-800 col-span-2">HV: {makeupSummary.name}</p>
+                  {makeupSummary.course ? (
+                    <p className="text-slate-600 col-span-2">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
+                  ) : null}
+                  {makeupSummary.total > 0 ? (
+                    <p className="text-slate-600">Buổi: <span className="font-black">{makeupSummary.sessionNo}/{makeupSummary.total}</span></p>
+                  ) : null}
+                  <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
+                  <p className="text-slate-600 col-span-2">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
+                </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-slate-700 leading-relaxed">
                 <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
