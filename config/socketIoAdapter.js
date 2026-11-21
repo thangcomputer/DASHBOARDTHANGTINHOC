@@ -3,16 +3,17 @@
  * Falls back to in-memory adapter if Redis is missing or connect fails.
  */
 const logger = require('./logger');
+const { resolveRedisUrl, resolveRedisNamespace } = require('./redis');
 
 /**
  * @param {import('socket.io').Server} io
  * @returns {Promise<{ mode: 'redis'|'memory', error?: string }>}
  */
 async function attachSocketIoAdapter(io) {
-  const url = (process.env.REDIS_URL || '').trim();
+  const url = resolveRedisUrl();
   if (!url) {
     process.env.__SOCKET_ADAPTER_MODE = 'memory';
-    logger.info('Socket.IO adapter: memory (REDIS_URL unset)');
+    logger.info('Socket.IO adapter: memory (Redis disabled or REDIS_URL unset)');
     return { mode: 'memory' };
   }
 
@@ -28,7 +29,8 @@ async function attachSocketIoAdapter(io) {
     const subClient = pubClient.duplicate();
 
     await Promise.all([pubClient.connect(), subClient.connect()]);
-    io.adapter(createAdapter(pubClient, subClient));
+    const adapterKey = `${resolveRedisNamespace()}socket.io`;
+    io.adapter(createAdapter(pubClient, subClient, { key: adapterKey }));
     process.env.__SOCKET_ADAPTER_MODE = 'redis';
 
     const onErr = (label) => (err) => {

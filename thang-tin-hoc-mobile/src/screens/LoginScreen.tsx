@@ -391,7 +391,7 @@ export function LoginScreen() {
         setRegisterCooldown(Number(res.resendAfterSec || 45));
         setRegisterOtpCode('');
         setRegisterOtpStep(true);
-      } catch (reason) {
+    } catch (reason) {
         if (reason instanceof MobileApiError && (reason.code === 'ACCOUNT_ALREADY_EXISTS' || reason.status === 409)) {
           setErrorCode('ACCOUNT_ALREADY_EXISTS');
         }
@@ -504,7 +504,7 @@ export function LoginScreen() {
                     accessibilityLabel="Linh vật Bé Đậu Tin Học"
                   />
                 </Animated.View>
-              </View>
+            </View>
 
               <View style={styles.heroBadge}>
                 <ShieldCheck size={13} color="#D1FAE5" />
@@ -759,7 +759,7 @@ export function LoginScreen() {
                       >
                         <UserRound size={17} color={focused === 'phone' ? loginPalette.brand : loginPalette.subtle} />
                         <TextInput
-                          value={phone}
+              value={phone}
                           onChangeText={(value) => { setPhone(value); setErrorCode(''); resetLoginLockHint(); }}
                           placeholder="0912345678 hoặc ten@gmail.com"
                           placeholderTextColor={loginPalette.subtle}
@@ -796,35 +796,35 @@ export function LoginScreen() {
                       >
                         <Lock size={17} color={focused === 'password' ? loginPalette.brand : loginPalette.subtle} />
                         <TextInput
-                          value={password}
-                          onChangeText={setPassword}
-                          placeholder="Nhập mật khẩu"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Nhập mật khẩu"
                           placeholderTextColor={loginPalette.subtle}
-                          secureTextEntry={!showPassword}
-                          autoComplete="password"
-                          textContentType="password"
+                secureTextEntry={!showPassword}
+                autoComplete="password"
+                textContentType="password"
                           onFocus={() => setFocused('password')}
                           onBlur={() => setFocused(null)}
                           onSubmitEditing={() => { void submit(); }}
                           returnKeyType="go"
                           style={styles.input}
-                          accessibilityLabel="Mật khẩu"
-                        />
-                        <Pressable
-                          onPress={() => setShowPassword((shown) => !shown)}
+                accessibilityLabel="Mật khẩu"
+              />
+              <Pressable
+                onPress={() => setShowPassword((shown) => !shown)}
                           hitSlop={10}
                           style={({ pressed }) => [styles.eyeBtn, pressed && styles.eyeBtnPressed]}
-                          accessibilityRole="button"
-                          accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                        >
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
                           {showPassword ? <EyeOff size={15} color={loginPalette.muted} /> : <Eye size={15} color={loginPalette.muted} />}
                           <Text style={styles.eyeBtnText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
-                        </Pressable>
-                      </View>
+              </Pressable>
+            </View>
                     </View>
 
                     {mode === 'login' && biometricInfo?.enrolled ? (
-                      <Pressable
+            <Pressable
                         onPress={() => setSaveBiometric((prev) => !prev)}
                         style={styles.biometricRememberRow}
                         accessibilityRole="checkbox"
@@ -844,7 +844,7 @@ export function LoginScreen() {
                         styles.submitBtn,
                         (pressed || busy || (mode === 'login' && lockSecondsLeft > 0)) && styles.submitBtnPressed,
                       ]}
-                      accessibilityRole="button"
+              accessibilityRole="button"
                       accessibilityLabel={mode === 'register' ? 'Tạo tài khoản ngay' : 'Đăng nhập ngay'}
                     >
                       {busy ? <ActivityIndicator color={loginPalette.white} /> : mode === 'register' ? (
@@ -865,7 +865,7 @@ export function LoginScreen() {
                           <ArrowRight size={16} color={loginPalette.white} />
                         </>
                       )}
-                    </Pressable>
+            </Pressable>
 
                     {mode === 'login' && biometricInfo?.hasSavedCredential && biometricInfo.enrolled ? (
                       <Pressable
@@ -887,7 +887,7 @@ export function LoginScreen() {
                     ) : null}
                   </>
                 )}
-              </View>
+          </View>
 
               {/* Thẻ phân luồng Dùng thử / Quay lại đăng nhập / Cấp TK Giảng viên */}
               <View style={styles.branchCard}>
@@ -1128,16 +1128,16 @@ function ForgotPasswordModal({
                   <View style={styles.modalRoleRow}>
                     {(['student', 'teacher'] as const).map((value) => {
                       const active = role === value;
-                      return (
-                        <Pressable
+  return (
+    <Pressable
                           key={value}
                           onPress={() => { setRole(value); setError(''); setNotFoundAccount(false); }}
                           style={[styles.modalRole, active && styles.modalRoleActive]}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: active }}
-                        >
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
+    >
                           <Text style={[styles.modalRoleText, active && styles.modalRoleTextActive]}>{roleLabel(value)}</Text>
-                        </Pressable>
+    </Pressable>
                       );
                     })}
                   </View>

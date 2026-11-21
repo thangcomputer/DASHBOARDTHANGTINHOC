@@ -59,6 +59,40 @@ const mobileMakeupRequestsSent = new Set<string>();
 const STUDENT_WEEK_CELL_WIDTH = 72;
 const TEACHER_WEEK_NAME_CELL_WIDTH = 116;
 
+function parseClockTimeMinutes(raw: string): number | null {
+  const match = String(raw || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const min = Number(match[2]);
+  if (h === 24 && min === 0) return 24 * 60;
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+function normalizeClockTimeInput(raw: string): string | null {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return '';
+  const mins = parseClockTimeMinutes(trimmed);
+  if (mins == null) return null;
+  if (mins >= 24 * 60) return '24:00';
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+}
+
+function parseScheduleTimeRangeMinutes(timeStr?: string): { startMins: number; endMins: number } | null {
+  const matches = String(timeStr || '').match(/\d{1,2}:\d{2}/g);
+  if (!matches?.length) return null;
+  const startMins = parseClockTimeMinutes(matches[0]);
+  if (startMins == null) return null;
+  const parsedEnd = matches[1] ? parseClockTimeMinutes(matches[1]) : null;
+  const endMins = parsedEnd != null && parsedEnd > startMins ? parsedEnd : Math.min(startMins + 90, 24 * 60);
+  return { startMins, endMins };
+}
+
+function formatClockFromMinutes(totalMins: number): string {
+  if (totalMins >= 24 * 60) return '24:00';
+  return `${String(Math.floor(totalMins / 60)).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}`;
+}
+
 function getAttendanceBounds(item: ScheduleItem) {
   if (!item.date || item.status === 'cancelled') return null;
   const times = item.time?.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);
@@ -249,6 +283,10 @@ export function ScheduleScreen() {
   const [sendingMakeupRequest, setSendingMakeupRequest] = useState(false);
   const [, setMakeupRequestsRevision] = useState(0);
   const [classTime, setClassTime] = useState('');
+  const [classEndTime, setClassEndTime] = useState('');
+  const [customTimeExpanded, setCustomTimeExpanded] = useState(false);
+  const [customStartInput, setCustomStartInput] = useState('');
+  const [customEndInput, setCustomEndInput] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState('');
   const [classDate, setClassDate] = useState('');
@@ -489,8 +527,8 @@ export function ScheduleScreen() {
     const end = endMinutes === 24 * 60
       ? '24:00'
       : `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
-    return { start, label: `${start} - ${end}` };
-  }).filter((option): option is { start: string; label: string } => option !== null);
+    return { start, end, label: `${start} - ${end}` };
+  }).filter((option): option is { start: string; end: string; label: string } => option !== null);
   const diaryItems = allScheduleItems.filter((item) => {
     const date = item.date ? new Date(`${item.date}T00:00:00`) : null;
     if (diaryFilter === 'Ngày' && (!date || date.toDateString() !== new Date().toDateString())) return false;
@@ -553,12 +591,15 @@ export function ScheduleScreen() {
       setSavingStudentNote(false);
     }
   };
-  const selectSlot = async (startTime: string | null) => {
+  const selectSlot = async (startTime: string | null, customEndTime?: string | null) => {
     if (!selectedStudentId || !selectedStudent || !classDate) return;
     const current = itemsOverride || resource.data || [];
     const currentSlot = current.find((item) => item.id === selectedId);
     if (!startTime) {
-      if (!currentSlot) return;
+      if (!currentSlot) {
+        setShowCreate(false);
+        return;
+      }
       if (isLocalSchedulePreview) {
         setItemsOverride(current.map((item) => item.id === currentSlot.id ? { ...item, status: 'cancelled' } : item));
         setShowCreate(false);
@@ -577,17 +618,26 @@ export function ScheduleScreen() {
       Alert.alert('Không thể đổi ca', 'Buổi đã điểm danh - không đổi giờ từ bảng này.');
       return;
     }
-    const startMinutes = Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3, 5));
-    const endMinutes = startMinutes + 90;
+    const startMinutes = parseClockTimeMinutes(startTime);
+    if (startMinutes == null || startMinutes >= 24 * 60) {
+      Alert.alert('Giờ không hợp lệ', 'Giờ bắt đầu không hợp lệ.');
+      return;
+    }
+    const endMinutes = customEndTime
+      ? parseClockTimeMinutes(customEndTime)
+      : Math.min(startMinutes + 90, 24 * 60);
+    if (endMinutes == null || endMinutes <= startMinutes) {
+      Alert.alert('Giờ không hợp lệ', 'Giờ kết thúc phải lớn hơn giờ bắt đầu.');
+      return;
+    }
     if (classDate === todayKey && endMinutes <= now.getHours() * 60 + now.getMinutes()) {
       Alert.alert('Không thể xếp lịch', 'Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
       return;
     }
     const conflicts = current.filter((item) => item.id !== selectedId && item.date === classDate && item.status === 'upcoming').some((item) => {
-      const match = item.time.match(/(\d{2}):(\d{2})/);
-      if (!match) return false;
-      const otherStart = Number(match[1]) * 60 + Number(match[2]);
-      return startMinutes < otherStart + 90 && otherStart < endMinutes;
+      const range = parseScheduleTimeRangeMinutes(item.time);
+      if (!range) return false;
+      return startMinutes < range.endMins && range.startMins < endMinutes;
     });
     if (conflicts) {
       Alert.alert('Khung giờ đã có lịch', 'Giảng viên đã có lịch trùng thời gian này. Vui lòng chọn khung giờ khác.');
@@ -603,9 +653,9 @@ export function ScheduleScreen() {
       Alert.alert('Học viên đã có lịch', `Học viên đã có ca ${studentConflict.subject || 'khác'} trong ngày.`);
       return;
     }
-    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
-    const displayEnd = endMinutes === 24 * 60 ? '24:00' : endTime;
-    const time = `${startTime} – ${displayEnd}`;
+    const normalizedStart = formatClockFromMinutes(startMinutes);
+    const displayEnd = formatClockFromMinutes(endMinutes);
+    const time = `${normalizedStart} – ${displayEnd}`;
     const dateLabel = new Date(`${classDate}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
     if (isLocalSchedulePreview) {
       if (currentSlot) {
@@ -637,15 +687,15 @@ export function ScheduleScreen() {
     }
     setSavingSlot(true);
     try {
-      const apiEndTime = endMinutes >= 24 * 60 ? '23:59' : endTime;
+      const apiEndTime = endMinutes >= 24 * 60 ? '23:59' : displayEnd;
       if (currentSlot) {
-        await scheduleService.update(currentSlot.id, { date: classDate, startTime, endTime: apiEndTime }, user);
+        await scheduleService.update(currentSlot.id, { date: classDate, startTime: normalizedStart, endTime: apiEndTime }, user);
       } else {
         await scheduleService.create({
           teacherId: user.id,
           studentId: selectedStudent.id,
           date: classDate,
-          startTime,
+          startTime: normalizedStart,
           endTime: apiEndTime,
           course: selectedScheduleEnrollment?.courseName || selectedStudent.course,
           ...(selectedScheduleEnrollment?.id ? { enrollmentId: selectedScheduleEnrollment.id } : {}),
@@ -659,6 +709,32 @@ export function ScheduleScreen() {
     } finally {
       setSavingSlot(false);
     }
+  };
+
+  const applyCustomMobileSlot = () => {
+    const startRaw = customStartInput.trim();
+    const endRaw = customEndInput.trim();
+    if (!startRaw && !endRaw) {
+      void selectSlot(null);
+      return;
+    }
+    if (!startRaw || !endRaw) {
+      Alert.alert('Thiếu khung giờ', 'Vui lòng chọn đủ giờ bắt đầu và giờ kết thúc, hoặc để trống cả hai nếu không có lịch.');
+      return;
+    }
+    const normStart = normalizeClockTimeInput(startRaw);
+    const normEnd = normalizeClockTimeInput(endRaw);
+    if (!normStart || !normEnd) {
+      Alert.alert('Giờ không hợp lệ', 'Vui lòng nhập giờ theo định dạng HH:mm (ví dụ 19:00).');
+      return;
+    }
+    const sMins = parseClockTimeMinutes(normStart);
+    const eMins = parseClockTimeMinutes(normEnd);
+    if (sMins == null || eMins == null || eMins <= sMins) {
+      Alert.alert('Giờ không hợp lệ', 'Giờ kết thúc phải lớn hơn giờ bắt đầu.');
+      return;
+    }
+    void selectSlot(normStart, normEnd);
   };
 
   const confirmCancelSchedule = async () => {
@@ -790,11 +866,20 @@ export function ScheduleScreen() {
       enrollment.id === item.enrollmentId
       || (item.courseName && normalizeScheduleCourseName(enrollment.courseName) === normalizeScheduleCourseName(item.courseName))
     ));
+    const parsedRange = parseScheduleTimeRangeMinutes(item.time);
+    const parsedStart = parsedRange
+      ? formatClockFromMinutes(parsedRange.startMins)
+      : (item.time.match(/\d{1,2}:\d{2}/)?.[0] || '');
+    const parsedEnd = parsedRange ? formatClockFromMinutes(parsedRange.endMins) : '';
     setSelectedId(item.id);
     setSelectedStudentId(student.id);
     setSelectedEnrollmentId(matchingEnrollment?.id || student.enrollments?.find((enrollment) => enrollment.status === 'Đang học')?.id || '');
     setClassDate(item.date);
-    setClassTime(item.time.match(/\d{1,2}:\d{2}/)?.[0] || '');
+    setClassTime(parsedStart);
+    setClassEndTime(parsedEnd);
+    setCustomStartInput(parsedStart);
+    setCustomEndInput(parsedEnd);
+    setCustomTimeExpanded(false);
     setShowCreate(true);
   };
 
@@ -1394,9 +1479,16 @@ export function ScheduleScreen() {
                                         enrollment.id === scheduled?.enrollmentId
                                         || (scheduled?.courseName && normalizeScheduleCourseName(enrollment.courseName) === normalizeScheduleCourseName(scheduled.courseName))
                                       ));
+                                      const parsedRange = parseScheduleTimeRangeMinutes(scheduled?.time);
+                                      const parsedStart = parsedRange ? formatClockFromMinutes(parsedRange.startMins) : (start || '');
+                                      const parsedEnd = parsedRange ? formatClockFromMinutes(parsedRange.endMins) : '';
                                       setSelectedEnrollmentId(matchingEnrollment?.id || student.enrollments?.find((enrollment) => enrollment.status === 'Đang học')?.id || '');
                                       setClassDate(day.dateKey);
-                                      setClassTime(start || '');
+                                      setClassTime(parsedStart);
+                                      setClassEndTime(parsedEnd);
+                                      setCustomStartInput(parsedStart);
+                                      setCustomEndInput(parsedEnd);
+                                      setCustomTimeExpanded(false);
                                       setShowCreate(true);
                                     }}
                                     style={[
@@ -2138,7 +2230,7 @@ export function ScheduleScreen() {
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>Chọn khung giờ</Text>
                 <Text style={styles.metaText}>{selectedStudent?.name || 'Học viên'} · {selectedScheduleEnrollment?.courseName || selectedStudent?.course || '-'} · {classDate}</Text>
-                <Text style={styles.metaText}>Ca 90 phút · lịch sẽ được lưu và đồng bộ với hệ thống.</Text>
+                <Text style={styles.metaText}>Chọn khung giờ có sẵn hoặc tự chọn giờ học · bỏ trống giờ coi như không có lịch.</Text>
               </View>
               <Pressable onPress={() => setShowCreate(false)} accessibilityRole="button" accessibilityLabel="Đóng chọn khung giờ">
                 <Text style={styles.closeText}>Đóng</Text>
@@ -2165,27 +2257,104 @@ export function ScheduleScreen() {
               </View>
             ) : null}
             <ScrollView style={styles.slotOptionsList} contentContainerStyle={styles.slotOptions}>
+              {(() => {
+                const hasCustomCurrent = Boolean(
+                  classTime
+                  && classEndTime
+                  && !slotOptions.some((o) => o.start === classTime && o.end === classEndTime),
+                );
+                const customLabel = hasCustomCurrent
+                  ? `Tự chọn giờ: ${classTime} - ${classEndTime}`
+                  : 'Tự chọn giờ...';
+                const customDisabled = savingSlot || blockedByEnrollment;
+                return (
+                  <View style={styles.customSlotWrap}>
+                    <Pressable
+                      disabled={customDisabled}
+                      onPress={() => setCustomTimeExpanded((prev) => !prev)}
+                      style={[
+                        styles.slotOption,
+                        (customTimeExpanded || hasCustomCurrent) && styles.slotOptionSelected,
+                        customDisabled && styles.slotOptionDisabled,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: customTimeExpanded, selected: hasCustomCurrent, disabled: customDisabled }}
+                    >
+                      <Text
+                        style={[
+                          styles.slotOptionText,
+                          (customTimeExpanded || hasCustomCurrent) && styles.slotOptionTextSelected,
+                          customDisabled && styles.slotOptionTextDisabled,
+                        ]}
+                      >
+                        {customLabel}
+                      </Text>
+                    </Pressable>
+                    {customTimeExpanded ? (
+                      <View style={styles.customSlotPanel}>
+                        <View style={styles.customSlotInputsRow}>
+                          <View style={styles.customSlotField}>
+                            <Text style={styles.fieldLabel}>Từ giờ</Text>
+                            <TextInput
+                              value={customStartInput}
+                              onChangeText={setCustomStartInput}
+                              placeholder="08:00"
+                              placeholderTextColor={colors.muted}
+                              style={styles.customSlotInput}
+                              keyboardType="numbers-and-punctuation"
+                              autoCapitalize="none"
+                              editable={!customDisabled}
+                            />
+                          </View>
+                          <View style={styles.customSlotField}>
+                            <Text style={styles.fieldLabel}>Đến giờ</Text>
+                            <TextInput
+                              value={customEndInput}
+                              onChangeText={setCustomEndInput}
+                              placeholder="10:00"
+                              placeholderTextColor={colors.muted}
+                              style={styles.customSlotInput}
+                              keyboardType="numbers-and-punctuation"
+                              autoCapitalize="none"
+                              editable={!customDisabled}
+                            />
+                          </View>
+                        </View>
+                        <Text style={styles.metaText}>Không chọn giờ (để trống cả hai ô) coi như không có lịch.</Text>
+                        <Pressable
+                          disabled={customDisabled}
+                          onPress={applyCustomMobileSlot}
+                          style={[styles.customSlotApplyBtn, customDisabled && styles.slotOptionDisabled]}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.customSlotApplyBtnText}>{savingSlot ? 'Đang lưu…' : 'Xác nhận'}</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })()}
               {slotOptions.map((option) => {
-                const slotStart = Number(option.start.slice(0, 2)) * 60 + Number(option.start.slice(3, 5));
+                const slotStart = parseClockTimeMinutes(option.start) ?? 0;
                 const slotEnd = slotStart + 90;
                 const unavailableReason = (classDate === todayKey && slotEnd <= now.getHours() * 60 + now.getMinutes())
                   ? 'Đã qua'
                   : (itemsOverride || resource.data || []).some((item) => {
                     if (item.id === selectedId || item.date !== classDate || item.status !== 'upcoming') return false;
                     if (item.studentId === selectedStudentId) return true;
-                    const conflictStart = item.time.match(/(\d{2}):(\d{2})/);
-                    if (!conflictStart) return false;
-                    const otherStart = Number(conflictStart[1]) * 60 + Number(conflictStart[2]);
-                    return slotStart < otherStart + 90 && otherStart < slotEnd;
+                    const range = parseScheduleTimeRangeMinutes(item.time);
+                    if (!range) return false;
+                    return slotStart < range.endMins && range.startMins < slotEnd;
                   }) ? 'Đã có lịch' : '';
                 const unavailable = Boolean(unavailableReason);
+                const selectedSlot = classTime === option.start && (!classEndTime || classEndTime === option.end);
                 return (
-                  <Pressable key={option.start} disabled={unavailable || savingSlot || blockedByEnrollment} onPress={() => { void selectSlot(option.start); }} style={[styles.slotOption, classTime === option.start && styles.slotOptionSelected, (unavailable || savingSlot || blockedByEnrollment) && styles.slotOptionDisabled]} accessibilityRole="button" accessibilityState={{ selected: classTime === option.start, disabled: unavailable || savingSlot || blockedByEnrollment }}>
-                    <Text style={[styles.slotOptionText, classTime === option.start && styles.slotOptionTextSelected, (unavailable || savingSlot || blockedByEnrollment) && styles.slotOptionTextDisabled]}>{savingSlot ? 'Đang lưu… ' : ''}{option.label}{unavailable ? ` · ${unavailableReason}` : ''}</Text>
+                  <Pressable key={option.start} disabled={unavailable || savingSlot || blockedByEnrollment} onPress={() => { void selectSlot(option.start, option.end); }} style={[styles.slotOption, selectedSlot && styles.slotOptionSelected, (unavailable || savingSlot || blockedByEnrollment) && styles.slotOptionDisabled]} accessibilityRole="button" accessibilityState={{ selected: selectedSlot, disabled: unavailable || savingSlot || blockedByEnrollment }}>
+                    <Text style={[styles.slotOptionText, selectedSlot && styles.slotOptionTextSelected, (unavailable || savingSlot || blockedByEnrollment) && styles.slotOptionTextDisabled]}>{savingSlot ? 'Đang lưu… ' : ''}{option.label}{unavailable ? ` · ${unavailableReason}` : ''}</Text>
                   </Pressable>
                 );
               })}
-              {selectedId ? <Pressable disabled={savingSlot} onPress={() => { void selectSlot(null); }} style={styles.clearSlotAction} accessibilityRole="button"><Text style={styles.clearSlotActionText}>{savingSlot ? 'Đang cập nhật…' : 'Bỏ ca khỏi lịch'}</Text></Pressable> : null}
+              {selectedId ? <Pressable disabled={savingSlot} onPress={() => { void selectSlot(null); }} style={styles.clearSlotAction} accessibilityRole="button"><Text style={styles.clearSlotActionText}>{savingSlot ? 'Đang cập nhật…' : 'Không có lịch (bỏ ca)'}</Text></Pressable> : null}
             </ScrollView>
             <PrimaryButton title="Đóng" variant="quiet" disabled={savingSlot} onPress={() => setShowCreate(false)} />
           </View>
@@ -6449,6 +6618,13 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   slotOptionText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
   slotOptionTextSelected: { color: colors.brandDark },
   slotOptionTextDisabled: { color: colors.muted },
+  customSlotWrap: { gap: spacing.xs },
+  customSlotPanel: { gap: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas },
+  customSlotInputsRow: { flexDirection: 'row', gap: spacing.sm },
+  customSlotField: { flex: 1, gap: 4 },
+  customSlotInput: { minHeight: 40, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  customSlotApplyBtn: { minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.brand },
+  customSlotApplyBtnText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   sortMenuCard: { width: '100%', maxWidth: 420, gap: spacing.xs, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   centeredPickerCard: { maxHeight: '80%' },
   sortMenuHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },

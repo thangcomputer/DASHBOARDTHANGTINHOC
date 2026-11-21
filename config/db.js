@@ -7,6 +7,10 @@ function resolveDatabaseUri(env = process.env) {
     const { assertTestDatabaseEnvironment } = require('../tests/setup/testDatabaseGuard');
     return assertTestDatabaseEnvironment(env).uri;
   }
+  if (env.NODE_ENV === 'staging' && ['1', 'true'].includes(String(env.ENFORCE_STAGING_DB_ISOLATION || '').toLowerCase())) {
+    const { assertStagingDatabaseEnvironment } = require('./stagingDatabaseGuard');
+    return assertStagingDatabaseEnvironment(env).uri;
+  }
   const uri = String(env.MONGODB_URI || '').trim();
   if (!uri) throw new Error('MONGODB_URI is required');
   return uri;

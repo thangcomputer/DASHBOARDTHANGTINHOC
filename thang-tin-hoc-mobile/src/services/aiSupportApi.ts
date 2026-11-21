@@ -188,7 +188,7 @@ export async function quickAskAi({
     : null;
   const payload = await mobileApiRequest<{ data?: QuickAiReply }>('/ai-support/quick-ask', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Client-Platform': 'mobile' },
     body: JSON.stringify({
       question,
       history,
@@ -203,4 +203,44 @@ export async function quickAskAi({
     actions: Array.isArray(payload?.data?.actions) ? payload.data.actions : [],
     model: payload?.data?.model,
   };
+}
+
+export async function submitQuickAskFeedback({
+  rating,
+  comment = '',
+  question = '',
+  answer = '',
+  source = 'ai',
+  model = '',
+  responseId = '',
+}: {
+  rating: 'helpful' | 'inaccurate';
+  comment?: string;
+  question?: string;
+  answer?: string;
+  source?: string;
+  model?: string;
+  responseId?: string;
+}): Promise<{ id: string; rating: string; reviewStatus: string; autoPromotedToKnowledge: boolean; deduplicated?: boolean; updated?: boolean }> {
+  const payload = await mobileApiRequest<{ data?: { id: string; rating: string; reviewStatus: string; autoPromotedToKnowledge: boolean; deduplicated?: boolean; updated?: boolean } }>(
+    '/ai-support/quick-ask/feedback',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Client-Platform': 'mobile' },
+      body: JSON.stringify({ rating, comment, question, answer, source, model, responseId, platform: 'mobile' }),
+    }
+  );
+  return payload?.data || { id: '', rating, reviewStatus: 'pending_admin_review', autoPromotedToKnowledge: false };
+}
+
+export async function reportQuickAskClientError(errorType: 'timeout' | 'network' | 'other' = 'network'): Promise<void> {
+  try {
+    await mobileApiRequest('/ai-support/quick-ask/client-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Client-Platform': 'mobile' },
+      body: JSON.stringify({ platform: 'mobile', errorType }),
+    });
+  } catch {
+    /* non-blocking */
+  }
 }

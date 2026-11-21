@@ -54,6 +54,46 @@ function parseTimeToMinutes(raw) {
   return h * 60 + min;
 }
 
+function normalizeTimeInput(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  if (s === '24:00') return '23:59';
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return s;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h > 23 || min > 59) return s;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+function addMinutesToTimeHHmm(time, addMins) {
+  const mins = parseTimeToMinutes(time);
+  if (mins == null) return '';
+  const total = Math.min(mins + addMins, 23 * 60 + 59);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function endTimeFromStartOrDefault(startTime, endTime) {
+  const explicitEnd = normalizeTimeInput(endTime);
+  if (explicitEnd) return explicitEnd;
+  const fromStart = addMinutesToTimeHHmm(startTime, SESSION_DURATION_MINS);
+  if (!fromStart) return '';
+  return fromStart;
+}
+
+function assertEndAfterStart(startTime, endTime) {
+  const s = parseTimeToMinutes(startTime);
+  if (s == null) return 'Giờ bắt đầu hoặc kết thúc không hợp lệ';
+  const end = String(endTime ?? '').trim();
+  if (!end) return null;
+  const e = parseTimeToMinutes(end);
+  if (e == null) return 'Giờ bắt đầu hoặc kết thúc không hợp lệ';
+  if (e <= s) return 'Giờ kết thúc phải lớn hơn giờ bắt đầu';
+  return null;
+}
+
 function timeRangesOverlap(start1, end1, start2, end2) {
   const s1 = parseTimeToMinutes(start1);
   const s2 = parseTimeToMinutes(start2);
@@ -415,6 +455,10 @@ module.exports = {
   ERROR_CODES,
   schedulingError,
   dayRange,
+  normalizeTimeInput,
+  addMinutesToTimeHHmm,
+  endTimeFromStartOrDefault,
+  assertEndAfterStart,
   timeRangesOverlap,
   getEnrollmentSessionUsage,
   countStudentSessionsOnDate,

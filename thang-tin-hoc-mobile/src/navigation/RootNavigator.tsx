@@ -223,7 +223,7 @@ const QuickAiOverlayHost = React.memo(function QuickAiOverlayHost({
   }, []);
 
   if (!visible) return null;
-  return (
+    return (
     <QuickAiPopupModal
       role={user.role}
       freeMenu={isFreePortalMenu(user)}
@@ -234,49 +234,49 @@ const QuickAiOverlayHost = React.memo(function QuickAiOverlayHost({
 
 const MainStackScreens = React.memo(function MainStackScreens({ isStudent }: { isStudent: boolean }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
-      <>
-        <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="Assignments" component={isStudent ? StudentResourcesScreen : AssignmentsScreen} />
-        <Stack.Screen name="NotificationCenter" component={NotificationsScreen} />
-        <Stack.Screen name="Conversation" component={ConversationScreen} />
+          <Stack.Screen name="NotificationCenter" component={NotificationsScreen} />
+          <Stack.Screen name="Conversation" component={ConversationScreen} />
         <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
         <Stack.Screen name="Call" component={CallScreen} options={{ gestureEnabled: false }} />
-        <Stack.Screen name="MobileMenu" component={MobileMenuScreen} />
-        <Stack.Screen name="Feed" component={FeedScreen} />
-        <Stack.Screen name="News" component={NewsScreen} />
-        <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
-        <Stack.Screen name="CenterInfo" component={CenterInfoScreen} />
-        <Stack.Screen name="SoftwareLinks" component={SoftwareLinksScreen} />
+          <Stack.Screen name="MobileMenu" component={MobileMenuScreen} />
+          <Stack.Screen name="Feed" component={FeedScreen} />
+          <Stack.Screen name="News" component={NewsScreen} />
+          <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+          <Stack.Screen name="CenterInfo" component={CenterInfoScreen} />
+          <Stack.Screen name="SoftwareLinks" component={SoftwareLinksScreen} />
         {isStudent ? (
-          <>
+            <>
             <Stack.Screen name="CourseVideos" component={CourseVideosScreen} />
-            <Stack.Screen name="Materials" component={MaterialsScreen} />
-            <Stack.Screen name="Grades" component={GradesScreen} />
-            <Stack.Screen name="StudentLearning" component={StudentLearningScreen} />
-            <Stack.Screen name="StudentExam" component={StudentExamScreen} />
-            <Stack.Screen name="LearningLesson" component={LearningLessonScreen} />
-            <Stack.Screen name="Evaluations" component={EvaluationsScreen} />
-            <Stack.Screen name="Tuition" component={TuitionScreen} />
+              <Stack.Screen name="Materials" component={MaterialsScreen} />
+              <Stack.Screen name="Grades" component={GradesScreen} />
+              <Stack.Screen name="StudentLearning" component={StudentLearningScreen} />
+              <Stack.Screen name="StudentExam" component={StudentExamScreen} />
+              <Stack.Screen name="LearningLesson" component={LearningLessonScreen} />
+              <Stack.Screen name="Evaluations" component={EvaluationsScreen} />
+              <Stack.Screen name="Tuition" component={TuitionScreen} />
             <Stack.Screen name="CertPrepCatalog" component={CertPrepCatalogScreen} />
             <Stack.Screen name="CertPrepLevel" component={CertPrepLevelScreen} />
             <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
             <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
             <Stack.Screen name="DailyPractice" component={DailyPracticeScreen} />
             <Stack.Screen name="Support" component={SupportEntryScreen} />
-          </>
-        ) : null}
+            </>
+          ) : null}
         {!isStudent ? (
-          <>
-            <Stack.Screen name="Students" component={StudentsScreen} />
-            <Stack.Screen name="Attendance" component={AttendanceScreen} />
-            <Stack.Screen name="TeacherQuizzes" component={TeacherQuizzesScreen} />
-            <Stack.Screen name="TeacherTraining" component={TeacherTrainingScreen} />
-            <Stack.Screen name="TeacherFinance" component={TeacherFinanceScreen} />
-          </>
-        ) : null}
-      </>
-    </Stack.Navigator>
+            <>
+              <Stack.Screen name="Students" component={StudentsScreen} />
+              <Stack.Screen name="Attendance" component={AttendanceScreen} />
+              <Stack.Screen name="TeacherQuizzes" component={TeacherQuizzesScreen} />
+              <Stack.Screen name="TeacherTraining" component={TeacherTrainingScreen} />
+              <Stack.Screen name="TeacherFinance" component={TeacherFinanceScreen} />
+            </>
+          ) : null}
+        </>
+      </Stack.Navigator>
   );
 });
 
@@ -657,9 +657,9 @@ export function RootNavigator() {
     return () => subscriptions.forEach((subscription) => subscription.remove());
   }, []);
   const handleSignOut = useCallback(() => {
-    void signOut().catch((error: unknown) => {
-      Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
-    });
+          void signOut().catch((error: unknown) => {
+            Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
+          });
   }, [signOut]);
   const handleUnlocked = useCallback(() => {
     void refreshUser();
@@ -859,8 +859,8 @@ function NavTabContent({
           <Text style={[styles.persistentTabBadge, isBrandStudent && styles.persistentTabBadgeBrand]}>
             {badgeCount > 99 ? '99+' : badgeCount}
           </Text>
-        ) : null}
-      </View>
+            ) : null}
+          </View>
       {isHome ? null : (
         <Text
           numberOfLines={1}
@@ -875,7 +875,7 @@ function NavTabContent({
           {label}
         </Text>
       )}
-    </View>
+        </View>
   );
 }
 
@@ -1225,40 +1225,40 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
           label: 'KHÔNG GIAN LÀM VIỆC',
           items: [
             { label: 'Tổng quan', destination: 'Home', icon: LayoutDashboard },
-            { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+      { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
             { label: 'Quản lý học viên', destination: 'Students', icon: Users },
-            { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
+      { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
           ],
         },
         {
           label: 'QUẢN LÝ ĐÀO TẠO',
           items: [
             { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
-            { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
+      { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
             { label: 'Tài chính', destination: 'TeacherFinance', icon: DollarSign },
           ],
         },
         {
           label: 'THÔNG TIN',
           items: [
-            { label: 'Bảng tin', destination: 'Feed', icon: Radio },
-            { label: 'Tin tức', destination: 'News', icon: Newspaper },
+      { label: 'Bảng tin', destination: 'Feed', icon: Radio },
+      { label: 'Tin tức', destination: 'News', icon: Newspaper },
             { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
-            { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
+      { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
           ],
         },
-      ]
-      : [
+    ]
+    : [
         {
           label: 'KHÔNG GIAN HỌC TẬP',
           items: [
-            { label: 'Tổng quan', destination: 'Home', icon: House },
+      { label: 'Tổng quan', destination: 'Home', icon: House },
             { label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 },
             ...(!freeMenu ? [{ label: 'Bài giảng', destination: 'CourseVideos' as const, icon: BookOpen }] : []),
-            { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+      { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
             ...(!freeMenu ? [{ label: 'Lịch học', destination: 'Schedule' as const, icon: CalendarDays }] : []),
             { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
-            { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
+      { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
           ],
         },
         {
@@ -1448,7 +1448,7 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
       importantForAccessibility={menuMounted ? 'yes' : 'no-hide-descendants'}
       style={[styles.drawerOverlayRoot, !menuMounted && styles.drawerOverlayHidden]}
     >
-      <View style={styles.drawerOverlay}>
+        <View style={styles.drawerOverlay}>
         <Animated.View style={[styles.drawerBackdrop, { opacity: backdropOpacity }]}>
           <Pressable style={styles.drawerDismiss} onPress={closeMenu} accessibilityLabel="Đóng danh mục" />
         </Animated.View>
@@ -1464,18 +1464,18 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
             },
           ]}
         >
-          <View style={styles.drawerHeader}>
+            <View style={styles.drawerHeader}>
             <View style={styles.drawerProfileCard}>
               <View style={styles.drawerProfileTop}>
                 <EditableMobileAvatar size={46} name={user?.name} showBadge />
-                <View style={styles.drawerIdentity}>
-                  <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
+              <View style={styles.drawerIdentity}>
+                <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
                   <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
                     <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
                       {isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}
                     </Text>
-                  </View>
-                </View>
+              </View>
+            </View>
               </View>
               {!isTeacher ? <SubscriptionStatusCard compact variant="drawer" /> : null}
             </View>
@@ -1490,7 +1490,7 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
                     const itemLocked = (!isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(destination)) || (destination === 'Feed' && feedPostLocked);
                     return (
                       <DrawerMenuRow
-                        key={destination}
+                  key={destination}
                         label={label}
                         destination={destination}
                         icon={icon}
@@ -1503,9 +1503,9 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
                   })}
                 </View>
               </View>
-            ))}
-          </ScrollView>
-          <View style={styles.drawerFooter}>
+              ))}
+            </ScrollView>
+            <View style={styles.drawerFooter}>
             <View style={[styles.drawerItem, { justifyContent: 'space-between' }]}>
               <Text style={styles.drawerItemText}>Ngôn ngữ</Text>
               <LanguageSwitcher variant="pill" theme="dark" />
@@ -1523,20 +1523,20 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
               {activeDestination === 'Profile' ? (
                 <View style={[styles.drawerItemSelectedMark, isBrandStudent && styles.drawerItemSelectedMarkBrand]} />
               ) : null}
-            </Pressable>
+              </Pressable>
             <Pressable onPress={() => { closeMenuImmediate(); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
               <View style={styles.drawerItemIcon}><LogOut size={18} color="#34D399" /></View>
               <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Đăng xuất</Text>
-            </Pressable>
+              </Pressable>
             <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'} accessibilityState={{ checked: soundEnabled }}>
               <View style={styles.drawerItemIcon}>
                 {soundEnabled ? <Volume2 size={18} color="#A8B6CC" /> : <VolumeX size={18} color="#A8B6CC" />}
-              </View>
+            </View>
               <Text style={styles.drawerItemText}>{soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}</Text>
             </Pressable>
           </View>
         </Animated.View>
-      </View>
+        </View>
     </View>
   );
 });
@@ -1859,7 +1859,7 @@ const MainTabs = React.memo(function MainTabs() {
         tabBarAccessibilityLabel: navTabLabel(route.name, isTeacher, language),
         tabBarButton: (props) => {
           const locked = !isTeacher && freeLocked && FREE_LOCKED_DESTINATIONS.has(route.name);
-          return (
+            return (
             <PlatformPressable
               {...props}
               onPress={(e) => {
@@ -1936,9 +1936,9 @@ const MainTabs = React.memo(function MainTabs() {
             />
             <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: translateText('Hỗ trợ', language) }} />
             <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: translateText('Hồ sơ', language) }} />
-          </>
-        ) : (
-          <>
+        </>
+      ) : (
+        <>
             <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: translateText('Lịch học', language) }} />
             <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: translateText('Trao đổi', language) }} />
             <Tab.Screen name="Feed" component={FeedScreen} options={{ title: translateText('Bảng tin', language) }} />
@@ -1946,8 +1946,8 @@ const MainTabs = React.memo(function MainTabs() {
             <Tab.Screen name="DailyPractice" component={DailyPracticeScreen} options={{ title: translateText('Luyện tập', language) }} />
             <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: translateText('Học tập', language) }} />
             <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: translateText('Hồ sơ', language) }} />
-          </>
-        )}
+        </>
+      )}
     </Tab.Navigator >
   );
 });

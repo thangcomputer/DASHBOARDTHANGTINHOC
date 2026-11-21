@@ -2,13 +2,53 @@
  * Cache-aside: Redis khi co REDIS_URL, khong thi in-memory Map (TTL).
  * Khong throw - loi Redis luon fallback memory / miss.
  */
-const { getRedis, isRedisReady } = require('../config/redis');
+const {
+  getRedis,
+  isRedisEnabled,
+  isRedisReady,
+  resolveRedisNamespace,
+  getCachedRedisServerInfo,
+} = require('../config/redis');
+const logger = require('../config/logger');
+
+let lastFallbackWarnAt = 0;
+
+function warnIfSilentFallback() {
+  if (!isRedisEnabled() || isRedisReady()) return;
+  const now = Date.now();
+  if (now - lastFallbackWarnAt > 30_000) {
+    lastFallbackWarnAt = now;
+    logger.warn('[Cache] Redis is enabled but not ready — falling back to in-memory RAM cache');
+  }
+}
 
 /** Chỉ gọi Redis khi client ready - tránh treo khi REDIS_URL set nhưng Redis down. */
 function readyRedis() {
   const redis = getRedis();
-  if (!redis || !isRedisReady()) return null;
+  if (!redis || !isRedisReady()) {
+    warnIfSilentFallback();
+    return null;
+  }
   return redis;
+}
+
+function getCachePrefix() {
+  return resolveRedisNamespace();
+}
+
+function getCacheBackendStatus() {
+  const configured = isRedisEnabled();
+  const redisReady = isRedisReady();
+  const serverInfo = typeof getCachedRedisServerInfo === 'function' ? getCachedRedisServerInfo() : null;
+  return {
+    configured,
+    redisReady,
+    activeBackend: redisReady ? 'redis' : (configured ? 'memory_fallback' : 'memory_explicit'),
+    silentFallbackToRam: Boolean(configured && !redisReady),
+    namespace: getCachePrefix(),
+    redisVersion: serverInfo?.version || null,
+    bullMqCompatible: serverInfo ? serverInfo.bullMqCompatible : null,
+  };
 }
 
 const PREFIX = 'cms:';
@@ -28,7 +68,8 @@ function ensureMemoryCleaner() {
 }
 
 function fullKey(key) {
-  return key.startsWith(PREFIX) ? key : PREFIX + key;
+  const ns = getCachePrefix();
+  return key.startsWith(ns) ? key : ns + key;
 }
 
 function memoryGet(key) {
@@ -143,10 +184,13 @@ function _resetMemoryForTests() {
 
 module.exports = {
   PREFIX,
+  getCachePrefix,
+  fullKey,
   get,
   set,
   del,
   delByPrefix,
   wrap,
+  getCacheBackendStatus,
   _resetMemoryForTests,
 };

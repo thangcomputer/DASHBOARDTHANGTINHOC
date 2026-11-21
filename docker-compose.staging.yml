@@ -1,0 +1,116 @@
+# Hạ tầng Staging cô lập cho Pilot AI DewSkill (MongoDB 7 độc lập + Redis 7.4 AOF + API Staging)
+# Không dùng chung dữ liệu hoặc namespace Redis với Production.
+#
+# Cách chạy:
+#   cp .env.staging.example .env.staging
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+#   docker compose -f docker-compose.staging.yml exec api-staging node scripts/setup-staging-db.cjs --seed
+
+services:
+  mongo-staging:
+    image: mongo:7
+    container_name: dewskill-mongo-staging
+    restart: unless-stopped
+    command: ["--auth", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${STAGING_MONGO_ROOT_USER:-staging_root_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${STAGING_MONGO_ROOT_PASSWORD:-StagingRootAuth_2026_Secure}
+      MONGO_INITDB_DATABASE: dashboardthangtinhoc_staging
+      STAGING_MONGO_APP_USER: dewskill_staging_app
+      STAGING_MONGO_APP_PASSWORD: ${STAGING_MONGO_APP_PASSWORD:-StagingAppAuth_2026_Secure}
+    networks:
+      - dewskill_staging_net
+    volumes:
+      - mongo_staging_data:/data/db
+      - ./scripts/mongo-staging-init.js:/docker-entrypoint-initdb.d/01-create-staging-user.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "-u", "${STAGING_MONGO_ROOT_USER:-staging_root_admin}", "-p", "${STAGING_MONGO_ROOT_PASSWORD:-StagingRootAuth_2026_Secure}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping').ok ? quit(0) : quit(1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-staging:
+    image: redis:7.4-alpine
+    container_name: dewskill-redis-staging
+    restart: unless-stopped
+    command:
+      - "redis-server"
+      - "--requirepass"
+      - "${STAGING_REDIS_PASSWORD:-StagingRedisAuth_2026_Secure}"
+      - "--appendonly"
+      - "yes"
+      - "--appendfsync"
+      - "everysec"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "noeviction"
+    ports:
+      - "127.0.0.1:6380:6379"
+    networks:
+      - dewskill_staging_net
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${STAGING_REDIS_PASSWORD:-StagingRedisAuth_2026_Secure}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api-staging:
+    build: .
+    container_name: dewskill-api-staging
+    restart: unless-stopped
+    ports:
+      - "5055:5055"
+    networks:
+      - dewskill_staging_net
+    volumes:
+      - ./ai-knowledge/index:/app/ai-knowledge/index:ro
+      - ./ai-knowledge/manifests:/app/ai-knowledge/manifests:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5055/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    environment:
+      NODE_ENV: staging
+      PORT: 5055
+      ENFORCE_STAGING_DB_ISOLATION: "1"
+      MONGODB_URI: ${STAGING_MONGODB_CONTAINER_URI:-mongodb://dewskill_staging_app:StagingAppAuth_2026_Secure@mongo-staging:27017/dashboardthangtinhoc_staging?authSource=dashboardthangtinhoc_staging}
+      STAGING_MONGODB_URI: ${STAGING_MONGODB_CONTAINER_URI:-mongodb://dewskill_staging_app:StagingAppAuth_2026_Secure@mongo-staging:27017/dashboardthangtinhoc_staging?authSource=dashboardthangtinhoc_staging}
+      ENABLE_REDIS: "true"
+      REDIS_URL: redis://:${STAGING_REDIS_PASSWORD:-StagingRedisAuth_2026_Secure}@redis-staging:6379/1
+      REDIS_KEY_PREFIX: "cms:staging:"
+      AI_SUPPORT_ENABLED: "1"
+      MOBILE_MULTI_SESSION_AUTH: "true"
+      AI_KNOWLEDGE_RAG_ENABLED: "1"
+      AI_KNOWLEDGE_VECTOR_ENABLED: "0"
+      AI_KNOWLEDGE_RAG_CANARY_USER_IDS: ${AI_KNOWLEDGE_RAG_CANARY_USER_IDS:-690000000000000000000101,690000000000000000000102,690000000000000000000103,690000000000000000000104}
+      AI_KNOWLEDGE_RAG_ALLOW_ROLE_EXPANSION: "0"
+      AI_KNOWLEDGE_RAG_ALLOW_ALL_PRODUCTION: "0"
+      AI_QUICK_ASK_TELEMETRY_LOG: "1"
+      JWT_SECRET: ${STAGING_JWT_SECRET}
+      JWT_REFRESH_SECRET: ${STAGING_JWT_REFRESH_SECRET}
+      SESSION_SECRET: ${STAGING_SESSION_SECRET:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_API_KEYS: ${GEMINI_API_KEYS:-}
+      CLIENT_URL: ${STAGING_CLIENT_URL:-http://localhost:5174}
+      ALLOWED_ORIGINS: ${STAGING_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174}
+    depends_on:
+      mongo-staging:
+        condition: service_healthy
+      redis-staging:
+        condition: service_healthy
+
+networks:
+  dewskill_staging_net:
+    driver: bridge
+    internal: false
+
+volumes:
+  mongo_staging_data:
+  redis_staging_data:

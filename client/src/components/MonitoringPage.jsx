@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, AlertTriangle, Bug, CheckCircle2, ChevronDown, ChevronRight,
   Database, Gauge, HardDrive, Loader2, RefreshCw, RotateCcw, Server,
-  ShieldCheck, Timer, Zap,
+  ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, Timer, Zap,
 } from 'lucide-react';
-import { monitoringAPI } from '../services/api';
+import { aiSupportAPI, monitoringAPI } from '../services/api';
 import { captureClientError } from '../utils/telemetry';
 import { useToast } from '../utils/useToast';
 
@@ -67,6 +67,9 @@ export default function MonitoringPage({ session }) {
   const toast = useToast();
   const [data, setData] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
+  const [ragMetrics, setRagMetrics] = useState(null);
+  const [ragFeedbacks, setRagFeedbacks] = useState([]);
+  const [reviewingFbId, setReviewingFbId] = useState('');
   const [windowHours, setWindowHours] = useState(24);
   const [issueStatus, setIssueStatus] = useState('all');
   const [expandedIssue, setExpandedIssue] = useState(null);
@@ -76,18 +79,39 @@ export default function MonitoringPage({ session }) {
 
   const load = useCallback(async () => {
     try {
-      const [overviewRes, telRes] = await Promise.all([
+      const [overviewRes, telRes, ragRes, fbRes] = await Promise.all([
         monitoringAPI.overview(),
         monitoringAPI.telemetry({ windowHours, issueStatus }),
+        aiSupportAPI.getRagMetrics().catch(() => null),
+        aiSupportAPI.listRagFeedback({ limit: 15 }).catch(() => null),
       ]);
       if (overviewRes?.success) setData(overviewRes.data);
       if (telRes?.success) setTelemetry(telRes.data);
+      if (ragRes?.success) setRagMetrics(ragRes.data);
+      if (fbRes?.success) setRagFeedbacks(Array.isArray(fbRes.data?.items) ? fbRes.data.items : []);
     } catch {
       toast.error('Không tải được dữ liệu monitoring');
     } finally {
       setLoading(false);
     }
   }, [toast, windowHours, issueStatus]);
+
+  const onReviewRagFeedback = async (id, reviewStatus) => {
+    setReviewingFbId(id);
+    try {
+      const res = await aiSupportAPI.reviewRagFeedback(id, { reviewStatus });
+      if (res?.success) {
+        toast.success(reviewStatus === 'reviewed_approved' ? 'Đã đánh dấu đã xem góp ý' : 'Đã bỏ qua góp ý');
+        load();
+      } else {
+        toast.error(res?.message || 'Không cập nhật được phản hồi AI');
+      }
+    } catch {
+      toast.error('Lỗi kết nối');
+    } finally {
+      setReviewingFbId('');
+    }
+  };
 
   useEffect(() => {
     load();
@@ -428,6 +452,181 @@ export default function MonitoringPage({ session }) {
               </ul>
             )}
           </section>
+
+          {/* AI DewSkill RAG Pilot Monitoring & Feedback Review (Giai đoạn 6) */}
+          {ragMetrics && (
+            <section className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                    <Sparkles className="text-emerald-600" size={18} />
+                    Giám sát Pilot AI DewSkill (RAG Canary &amp; Phản hồi 7–14 ngày)
+                  </h2>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Kho tri thức v{ragMetrics.ragConfig?.knowledgeVersion || 'n/a'} · Canary {ragMetrics.ragConfig?.canaryUserIdsCount ?? 0} User ID ·
+                    Production All: {ragMetrics.ragConfig?.allowAllProduction ? 'BẬT' : 'KHÓA AN TOÀN (0)'} ·
+                    Cache: <strong>{ragMetrics.cacheBackend?.activeBackend}</strong> ({ragMetrics.cacheBackend?.namespace || 'cms:'})
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusPill status={ragMetrics.healthStatus || 'healthy'} />
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                    Rollback: {ragMetrics.rollbackCommand || 'AI_KNOWLEDGE_RAG_ENABLED=0'}
+                  </span>
+                </div>
+              </div>
+
+              {Array.isArray(ragMetrics.alerts) && ragMetrics.alerts.length > 0 && (
+                <div className="space-y-1.5">
+                  {ragMetrics.alerts.map((al) => (
+                    <div
+                      key={al.code}
+                      className={`rounded-xl border px-3 py-2 text-xs font-bold ${
+                        al.severity === 'critical'
+                          ? 'bg-red-50 border-red-200 text-red-800'
+                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                      }`}
+                    >
+                      <div>[{al.code}] {al.message}</div>
+                      {al.action && <div className="text-[11px] font-medium mt-0.5 opacity-90">Khuyến nghị: {al.action}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="rounded-xl border border-gray-100 bg-slate-50/70 p-3">
+                  <div className="text-[10px] font-black text-gray-400 uppercase">Người dùng / Lượt thật</div>
+                  <div className="text-lg font-black text-gray-900 mt-1">
+                    {ragMetrics.promotionGate?.uniqueRealUsersCount ?? ragMetrics.uniqueRealUsersCount ?? 0} HV · {ragMetrics.promotionGate?.observedRequests ?? ragMetrics.pilotRequests ?? 0} câu
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    Ngày: {ragMetrics.promotionGate?.observedDays ?? 0}/{ragMetrics.promotionGate?.requiredDays || '7-14'} · Mục tiêu ≥ {ragMetrics.promotionGate?.requiredMinRequests ?? 200}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-slate-50/70 p-3">
+                  <div className="text-[10px] font-black text-gray-400 uppercase">Cache Hit Rate</div>
+                  <div className="text-lg font-black text-emerald-700 mt-1">{ragMetrics.cacheHitRatePct ?? 0}%</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    Hit {ragMetrics.cacheHits ?? 0} · Coalesced {ragMetrics.coalescedHits ?? 0} · Redis {ragMetrics.cacheBackend?.redisVersion || 'n/a'}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-slate-50/70 p-3">
+                  <div className="text-[10px] font-black text-gray-400 uppercase">Chi phí &amp; Token</div>
+                  <div className="text-lg font-black text-gray-900 mt-1">${Number(ragMetrics.estimatedCostUsd || 0).toFixed(5)}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    {ragMetrics.tokens?.totalTokens ?? 0} tok · {ragMetrics.geminiCallsCount ?? 0} gọi Gemini
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-slate-50/70 p-3">
+                  <div className="text-[10px] font-black text-gray-400 uppercase">Phản hồi thực tế</div>
+                  <div className="text-lg font-black text-gray-900 mt-1 flex items-center gap-2">
+                    <span className="text-emerald-700 inline-flex items-center gap-1"><ThumbsUp size={13} /> {ragMetrics.storedFeedback?.helpful ?? ragMetrics.feedback?.helpful ?? 0}</span>
+                    <span className="text-rose-600 inline-flex items-center gap-1"><ThumbsDown size={13} /> {ragMetrics.storedFeedback?.inaccurate ?? ragMetrics.feedback?.inaccurate ?? 0}</span>
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">Chờ Admin duyệt: {ragMetrics.storedFeedback?.pendingReview ?? 0}</div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-slate-50/70 p-3">
+                  <div className="text-[10px] font-black text-gray-400 uppercase">Lỗi &amp; Không nguồn</div>
+                  <div className="text-lg font-black text-gray-900 mt-1">
+                    {Object.values(ragMetrics.errorsByType || {}).reduce((a, b) => a + Number(b || 0), 0)} API · {ragMetrics.noSourceFoundCount ?? 0} thiếu nguồn
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    Client Web/Mob: {ragMetrics.clientErrors?.web ?? 0}/{ragMetrics.clientErrors?.mobile ?? 0} · Guard: {ragMetrics.outOfScopeRejected ?? 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Separated latency streams table */}
+              <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] font-black text-gray-500 uppercase">
+                    <tr>
+                      <th className="px-3 py-2">Luồng AI (tách riêng)</th>
+                      <th className="px-3 py-2 text-right">Số mẫu</th>
+                      <th className="px-3 py-2 text-right">TB</th>
+                      <th className="px-3 py-2 text-right">P50</th>
+                      <th className="px-3 py-2 text-right">P95</th>
+                      <th className="px-3 py-2 text-right">P99</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[
+                      { key: 'ragCold', label: 'RAG Cold (Gemini + Giáo trình)' },
+                      { key: 'ragWarmCache', label: 'RAG Warm (Redis Cache)' },
+                      { key: 'legacy', label: 'Legacy (AI cũ ngoài Canary)' },
+                      { key: 'guardMemory', label: 'Guard / Memory (chặn ngoài phạm vi & FAQ)' },
+                    ].map(({ key, label }) => {
+                      const s = ragMetrics.latencyByStream?.[key] || {};
+                      return (
+                        <tr key={key} className="hover:bg-slate-50/70">
+                          <td className="px-3 py-2 font-bold text-gray-800">{label}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-600">{s.count ?? 0}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-700">{s.avg ?? 0} ms</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-700">{s.p50 ?? 0} ms</td>
+                          <td className="px-3 py-2 text-right font-mono font-bold text-gray-900">{s.p95 ?? 0} ms</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-700">{s.p99 ?? 0} ms</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Recent feedback queue for manual Admin review (NEVER auto-promoted to knowledge) */}
+              {ragFeedbacks.length > 0 && (
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-slate-50 border-b border-gray-100 flex items-center justify-between">
+                    <span className="text-[11px] font-black text-gray-700">
+                      Phản hồi người dùng gần đây (Chỉ Admin duyệt thủ công · Không tự nạp vào RAG)
+                    </span>
+                    <span className="text-[10px] font-bold text-gray-400">{ragFeedbacks.length} mục</span>
+                  </div>
+                  <ul className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                    {ragFeedbacks.map((fb) => (
+                      <li key={fb._id} className="px-3 py-2.5 flex flex-wrap items-start justify-between gap-2 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                              fb.rating === 'helpful'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              {fb.rating === 'helpful' ? 'Hữu ích' : 'Chưa chính xác'}
+                            </span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">{fb.platform} · {fb.userRole}</span>
+                            <span className="text-[10px] font-mono text-gray-400">{fb.reviewStatus}</span>
+                          </div>
+                          {fb.questionPreview && <p className="text-gray-800 font-semibold mt-1 truncate">Hỏi: {fb.questionPreview}</p>}
+                          {fb.comment && <p className="text-rose-700 text-[11px] mt-0.5">Góp ý: {fb.comment}</p>}
+                        </div>
+                        {fb.reviewStatus === 'pending_admin_review' && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              disabled={reviewingFbId === fb._id}
+                              onClick={() => onReviewRagFeedback(fb._id, 'reviewed_approved')}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100"
+                            >
+                              Đã duyệt xem
+                            </button>
+                            <button
+                              type="button"
+                              disabled={reviewingFbId === fb._id}
+                              onClick={() => onReviewRagFeedback(fb._id, 'reviewed_dismissed')}
+                              className="px-2 py-1 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-[10px] font-bold hover:bg-gray-200"
+                            >
+                              Bỏ qua
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Top API endpoints & Recent RAM 500s */}
           <div className="grid lg:grid-cols-2 gap-4 min-h-[220px]">

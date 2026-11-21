@@ -14,7 +14,23 @@ try {
 
 /** key -> cooldown until (ms epoch) */
 const geminiKeyCooldownUntil = new Map();
+const geminiClientCache = new Map();
 let geminiRrIndex = 0;
+
+function getCachedGoogleGenAI(apiKey, timeoutMs) {
+  if (!GoogleGenAI) return null;
+  const cacheKey = `${apiKey}:${timeoutMs}`;
+  let client = geminiClientCache.get(cacheKey);
+  if (!client) {
+    if (geminiClientCache.size > 32) geminiClientCache.clear();
+    client = new GoogleGenAI({
+      apiKey,
+      httpOptions: { timeout: timeoutMs },
+    });
+    geminiClientCache.set(cacheKey, client);
+  }
+  return client;
+}
 
 const KEY_COOLDOWN_MS = Math.max(10_000, Number(process.env.GEMINI_KEY_COOLDOWN_MS) || 60_000);
 
@@ -202,31 +218,39 @@ function normalizeGeminiContents(rawMessages, rawImages = []) {
   return contents;
 }
 
+  const effectiveTimeoutMs = Math.max(4000, Number(opts.timeoutMs) || cfg.timeoutMs);
+
   if (GoogleGenAI) {
-    const ai = new GoogleGenAI({
-      apiKey: cfg.apiKey,
-      httpOptions: { timeout: cfg.timeoutMs },
-    });
+    const ai = getCachedGoogleGenAI(cfg.apiKey, effectiveTimeoutMs);
     const config = {
       temperature: opts.temperature ?? 0.4,
       maxOutputTokens: opts.maxTokens ?? 1200,
     };
     if (opts.responseFormat === 'json') config.responseMimeType = 'application/json';
     if (system) config.systemInstruction = system;
+    // Only apply thinkingConfig to non-lite thinking-capable Gemini models (lite returns 400 INVALID_ARGUMENT)
+    if (typeof opts.thinkingBudget === 'number' && !/lite/i.test(model)) {
+      config.thinkingConfig = { thinkingBudget: Math.max(0, Math.floor(opts.thinkingBudget)) };
+    }
 
     const contents = normalizeGeminiContents(opts.messages, opts.images);
 
-    const res = await Promise.race([
-      ai.models.generateContent({ model, contents, config }),
-      new Promise((_, reject) => {
-        setTimeout(() => {
-          const err = new Error('Không gọi được AI. Hãy gửi lại ảnh.');
-          err.status = 504;
-          reject(err);
-        }, cfg.timeoutMs);
-      }),
-    ]);
-    return { content: res.text || '', model, usage: res.usageMetadata || null };
+    let timeoutHandle = null;
+    try {
+      const res = await Promise.race([
+        ai.models.generateContent({ model, contents, config }),
+        new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            const err = new Error('Không gọi được AI. Hãy gửi lại ảnh.');
+            err.status = 504;
+            reject(err);
+          }, effectiveTimeoutMs);
+        }),
+      ]);
+      return { content: res.text || '', model, usage: res.usageMetadata || null };
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -238,12 +262,15 @@ function normalizeGeminiContents(rawMessages, rawImages = []) {
       maxOutputTokens: opts.maxTokens ?? 1200,
     },
   };
+  if (typeof opts.thinkingBudget === 'number' && !/lite/i.test(model)) {
+    body.generationConfig.thinkingConfig = { thinkingBudget: Math.max(0, Math.floor(opts.thinkingBudget)) };
+  }
   if (system) body.systemInstruction = { parts: [{ text: system }] };
   if (opts.responseFormat === 'json') {
     body.generationConfig.responseMimeType = 'application/json';
   }
   const res = await axios.post(url, body, {
-    timeout: cfg.timeoutMs,
+    timeout: effectiveTimeoutMs,
     headers: buildGeminiHeaders(cfg.apiKey),
   });
   const text = res.data?.candidates?.[0]?.content?.parts

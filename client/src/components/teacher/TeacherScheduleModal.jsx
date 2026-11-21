@@ -37,6 +37,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
     ? normalizeTimeHHmm(schedule?.endTime, endTimeFromStart(initStart))
     : endTimeFromStart(initStart);
   const [formError, setFormError] = useState('');
+  const [endTimeTouched, setEndTimeTouched] = useState(() => Boolean(isEdit && schedule?.endTime));
   const [form, setForm] = useState(() => {
     const initStudentId = String(schedule?.studentId?._id || schedule?.studentId || '');
     const initCourse = schedule?.course || '';
@@ -70,12 +71,21 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
   const lockedPast = dateIsPast || originalIsPast;
 
   const applyStartTime = (raw) => {
-    const start = normalizeTimeHHmm(raw, getCurrentTimeHHmm());
+    const rawTrim = String(raw || '').trim();
     setFormError('');
+    if (!rawTrim) {
+      setForm((prev) => ({
+        ...prev,
+        startTime: '',
+        endTime: endTimeTouched ? prev.endTime : '',
+      }));
+      return;
+    }
+    const start = normalizeTimeHHmm(rawTrim, rawTrim);
     setForm((prev) => ({
       ...prev,
       startTime: start,
-      endTime: endTimeFromStart(start),
+      endTime: endTimeTouched && prev.endTime ? prev.endTime : endTimeFromStart(start),
     }));
   };
 
@@ -94,6 +104,9 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
       setForm((prev) => ({ ...prev, date: value, dayOfWeek: getDayOfWeek(value) }));
     } else if (name === 'startTime') {
       applyStartTime(value);
+    } else if (name === 'endTime') {
+      setEndTimeTouched(Boolean(String(value || '').trim()));
+      setForm((prev) => ({ ...prev, endTime: value }));
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
     }
@@ -126,9 +139,13 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
       setFormError('Vui lòng chọn giờ bắt đầu');
       return;
     }
-    const startTime = normalizeTimeHHmm(form.startTime);
-    const endTime = endTimeFromStart(startTime);
-    if (!isEndTimeAfterStart(startTime, endTime)) {
+    if (!form.endTime?.trim()) {
+      setFormError('Vui lòng chọn giờ kết thúc');
+      return;
+    }
+    const startTime = normalizeTimeHHmm(form.startTime, '');
+    const endTime = normalizeTimeHHmm(form.endTime, '');
+    if (!startTime || !endTime || !isEndTimeAfterStart(startTime, endTime)) {
       setFormError('Giờ kết thúc phải lớn hơn giờ bắt đầu');
       return;
     }
@@ -298,16 +315,15 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
                 type="time"
                 name="endTime"
                 value={form.endTime}
-                readOnly
-                tabIndex={-1}
-                aria-readonly="true"
-                title="Tự động = giờ bắt đầu + 1 giờ 30 phút"
-                className="w-full bg-slate-100 border-2 border-gray-100 rounded-xl p-3 text-sm text-slate-600 outline-none cursor-default"
+                onChange={handleChange}
+                onInput={handleChange}
+                disabled={lockedPast || (!gate.canSchedule && !isEdit)}
+                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-50"
               />
             </div>
           </div>
           <p className="text-[11px] text-slate-500 font-medium -mt-2">
-            Mỗi buổi học cố định <span className="font-bold text-slate-700">1 giờ 30 phút</span> - giờ kết thúc tự cập nhật khi đổi giờ bắt đầu.
+            Mặc định gợi ý <span className="font-bold text-slate-700">1 giờ 30 phút</span> khi chọn giờ bắt đầu — giảng viên có thể tự chỉnh giờ kết thúc.
           </p>
           <div>
             <label className="text-xs font-bold text-gray-400  block mb-1">Chủ đề buổi học</label>

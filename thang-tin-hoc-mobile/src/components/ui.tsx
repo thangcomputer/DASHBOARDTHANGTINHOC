@@ -218,8 +218,6 @@ const BrandingTopBar = React.memo(function BrandingTopBar() {
   const [unreadCount, setUnreadCount] = useState(() => latestUnreadNotificationCount);
   const headerProgress = useRef(new Animated.Value(1)).current;
   const headerVisible = useRef(true);
-    return () => appSub.remove();
-  });
 
   const setHeaderVisible = useCallback((visible: boolean) => {
     if (headerVisible.current === visible) return;
@@ -768,6 +766,8 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarMenuCompact: { width: 40, height: 40, minWidth: 40, paddingHorizontal: 0 },
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  topBarActionsRow: { zIndex: 1, flexShrink: 0, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  topBarActionsRowStudent: { gap: 5 },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarActionCompact: { width: 38, height: 38 },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },

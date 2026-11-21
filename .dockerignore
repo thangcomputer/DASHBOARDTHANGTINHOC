@@ -16,5 +16,15 @@ coverage
 .vscode
 .cursor
 agent-transcripts
+ai-knowledge
 **/*.md
 !README.md
+**/node_modules
+thang-tin-hoc-mobile
+landingpage-dewskill
+client
+artifacts
+dashboardthangtinhoc
+backups
+*.zip
+*.gz

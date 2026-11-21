@@ -23,12 +23,16 @@ import {
   Moon,
   Newspaper,
   Plus,
+  RefreshCw,
   RotateCcw,
   Search,
+  Send,
   Settings,
   Sparkles,
   Sun,
   Target,
+  ThumbsDown,
+  ThumbsUp,
   Ticket,
   Users,
   Video,
@@ -175,13 +179,120 @@ function renderInlineMarkdown(text) {
   });
 }
 
+function isTableSeparatorLine(line) {
+  return /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(String(line || '').trim());
+}
+
+function parseTableRowCells(line) {
+  return String(line || '')
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+function parseMarkdownBlocks(rawText) {
+  const lines = String(rawText || '').split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Fenced code block (``` ... ```)
+    if (trimmed.startsWith('```')) {
+      const lang = trimmed.slice(3).trim();
+      const codeLines = [];
+      i += 1;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      if (i < lines.length) i += 1;
+      blocks.push({ type: 'code', lang, content: codeLines.join('\n') });
+      continue;
+    }
+
+    // Markdown table (header row + separator row + 1+ body rows)
+    if (trimmed.includes('|') && i + 1 < lines.length && isTableSeparatorLine(lines[i + 1])) {
+      const headers = parseTableRowCells(trimmed);
+      const rows = [];
+      i += 2;
+      while (i < lines.length) {
+        const rowTrim = lines[i].trim();
+        if (!rowTrim || !rowTrim.includes('|')) break;
+        rows.push(parseTableRowCells(rowTrim));
+        i += 1;
+      }
+      blocks.push({ type: 'table', headers, rows });
+      continue;
+    }
+
+    blocks.push({ type: 'line', text: line });
+    i += 1;
+  }
+
+  return blocks;
+}
+
 function AiMarkdownMessage({ text }) {
-  const lines = String(text || '').split('\n');
+  const blocks = useMemo(() => parseMarkdownBlocks(text), [text]);
   return (
     <div className="space-y-1.5 text-[13.5px] leading-relaxed text-slate-800 dark:text-slate-100">
-      {lines.map((rawLine, idx) => {
-        const trimmed = rawLine.trim();
+      {blocks.map((block, idx) => {
+        if (block.type === 'code') {
+          return (
+            <div key={`code-${idx}`} className="my-1.5 overflow-x-auto rounded-xl border border-emerald-200/80 dark:border-emerald-900/70 bg-slate-900 dark:bg-slate-950 px-3 py-2.5">
+              <pre className="font-mono text-[12px] leading-relaxed text-emerald-200 whitespace-pre">
+                <code>{block.content}</code>
+              </pre>
+            </div>
+          );
+        }
+        if (block.type === 'table') {
+          return (
+            <div key={`tbl-${idx}`} className="my-2 overflow-x-auto rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900/80">
+              <table className="min-w-full border-collapse text-left text-[12.5px]">
+                <thead>
+                  <tr className="bg-emerald-50/90 dark:bg-emerald-950/60 border-b border-slate-200 dark:border-slate-700">
+                    {block.headers.map((h, hIdx) => (
+                      <th key={hIdx} className="px-2.5 py-1.5 font-bold text-emerald-900 dark:text-emerald-200 whitespace-nowrap">
+                        {renderInlineMarkdown(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rIdx) => (
+                    <tr
+                      key={rIdx}
+                      className={rIdx % 2 === 1 ? 'bg-slate-50/70 dark:bg-slate-800/40' : ''}
+                    >
+                      {block.headers.map((_, cIdx) => (
+                        <td key={cIdx} className="border-t border-slate-100 dark:border-slate-800 px-2.5 py-1.5 text-slate-700 dark:text-slate-200 align-top">
+                          {renderInlineMarkdown(row[cIdx] || '')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const trimmed = String(block.text || '').trim();
         if (!trimmed) return <div key={idx} className="h-1" />;
+        const headingMatch = /^#{1,4}\s+(.+)$/.exec(trimmed);
+        if (headingMatch) {
+          return (
+            <div key={idx} className="pt-1 font-extrabold text-[13.5px] text-slate-900 dark:text-white">
+              {renderInlineMarkdown(headingMatch[1])}
+            </div>
+          );
+        }
         const bulletMatch = /^[-•*]\s+(.+)$/.exec(trimmed);
         if (bulletMatch) {
           return (
@@ -204,6 +315,167 @@ function AiMarkdownMessage({ text }) {
         }
         return <p key={idx}>{renderInlineMarkdown(trimmed)}</p>;
       })}
+    </div>
+  );
+}
+
+function QuickAiFeedbackBar({ msg, language = 'vi' }) {
+  const [submittedRating, setSubmittedRating] = useState(null);
+  const [showReasonBox, setShowReasonBox] = useState(false);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [statusText, setStatusText] = useState('');
+  const [errorText, setErrorText] = useState('');
+  const [lastAttempt, setLastAttempt] = useState(null);
+  const reasonFormRef = useRef(null);
+
+  useEffect(() => {
+    if (showReasonBox && reasonFormRef.current) {
+      window.setTimeout(() => {
+        reasonFormRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      }, 20);
+    }
+  }, [showReasonBox]);
+
+  const isEn = language === 'en';
+
+  const sendFeedback = useCallback(async (rating, commentText = '') => {
+    if (submitting) return;
+    if (submittedRating === rating && rating === 'helpful' && !errorText) return;
+    setSubmitting(true);
+    setErrorText('');
+    setLastAttempt({ rating, comment: commentText });
+    try {
+      const resp = await aiSupportAPI.submitQuickAskFeedback({
+        responseId: msg.id,
+        rating,
+        comment: commentText,
+        question: msg.question || '',
+        answer: msg.text || '',
+        source: msg.source || 'ai',
+        model: msg.model || '',
+      });
+      setSubmittedRating(rating);
+      setShowReasonBox(false);
+      if (resp?.data?.deduplicated && !resp?.data?.updated) {
+        setStatusText(isEn ? 'Feedback already recorded.' : 'Bạn đã đánh giá câu trả lời này rồi.');
+      } else if (rating === 'inaccurate') {
+        setStatusText(isEn ? 'Sent for Admin review. Thank you!' : 'Đã gửi góp ý để Admin kiểm tra. Cảm ơn bạn!');
+      } else {
+        setStatusText(isEn ? 'Thanks for your feedback!' : 'Cảm ơn bạn đã đánh giá hữu ích!');
+      }
+    } catch (err) {
+      setErrorText(err?.message || (isEn ? 'Could not submit feedback. Please retry.' : 'Chưa gửi được phản hồi. Vui lòng thử lại.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [errorText, isEn, msg.id, msg.model, msg.question, msg.source, msg.text, submittedRating, submitting]);
+
+  return (
+    <div className="mt-2.5 border-t border-slate-200/75 dark:border-slate-700/75 pt-2" data-testid="ai-feedback-bar">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          disabled={submitting || (submittedRating === 'helpful' && !errorText)}
+          onClick={() => {
+            setShowReasonBox(false);
+            void sendFeedback('helpful', '');
+          }}
+          aria-pressed={submittedRating === 'helpful'}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+            submittedRating === 'helpful'
+              ? 'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 cursor-default'
+              : 'border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-emerald-300 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer'
+          } disabled:opacity-70`}
+        >
+          <ThumbsUp size={11} />
+          <span>{isEn ? 'Helpful' : 'Hữu ích'}</span>
+        </button>
+
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => {
+            setErrorText('');
+            setShowReasonBox((prev) => !prev);
+          }}
+          aria-pressed={submittedRating === 'inaccurate' || showReasonBox}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+            submittedRating === 'inaccurate' || showReasonBox
+              ? 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+              : 'border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-rose-300 hover:text-rose-700 dark:hover:text-rose-300'
+          } cursor-pointer disabled:opacity-70`}
+        >
+          <ThumbsDown size={11} />
+          <span>{isEn ? 'Inaccurate' : 'Chưa chính xác'}</span>
+        </button>
+
+        {submitting ? (
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            {isEn ? 'Sending…' : 'Đang gửi…'}
+          </span>
+        ) : null}
+
+        {!submitting && statusText && !errorText ? (
+          <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300" role="status">
+            {statusText}
+          </span>
+        ) : null}
+      </div>
+
+      {showReasonBox ? (
+        <form
+          ref={reasonFormRef}
+          className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-center"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void sendFeedback('inaccurate', reason.trim());
+          }}
+        >
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={300}
+            placeholder={isEn ? 'Short reason (optional, e.g. wrong Office version)…' : 'Lý do ngắn (tùy chọn, VD: sai phiên bản Office, thiếu bước)…'}
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-[12px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-rose-400"
+          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-1 rounded-xl bg-rose-600 px-2.5 py-1.5 text-[11.5px] font-bold text-white hover:bg-rose-700 transition cursor-pointer disabled:opacity-60"
+            >
+              <Send size={11} />
+              <span>{isEn ? 'Send' : 'Gửi'}</span>
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => setShowReasonBox(false)}
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              {isEn ? 'Cancel' : 'Hủy'}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {errorText ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-rose-600 dark:text-rose-300" role="alert">
+          <span>{errorText}</span>
+          {lastAttempt ? (
+            <button
+              type="button"
+              onClick={() => void sendFeedback(lastAttempt.rating, lastAttempt.comment)}
+              className="inline-flex items-center gap-1 underline hover:text-rose-800 cursor-pointer"
+            >
+              <RefreshCw size={10} />
+              <span>{isEn ? 'Retry' : 'Thử gửi lại'}</span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -377,6 +649,14 @@ export default function CommandPalette({ role = 'student' }) {
         if (isPracticeSessionActive()) return;
         e.preventDefault();
         setOpen((prev) => !prev);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setOpen((prev) => {
+          if (!prev) return prev;
+          e.preventDefault();
+          return false;
+        });
       }
     };
     const onOpenEvent = () => {
@@ -645,7 +925,7 @@ export default function CommandPalette({ role = 'student' }) {
     setAttachError('');
     setAsking(true);
 
-    // Local office memory first when instant hit is available & not an explicit follow-up conversation
+    let failedErrorType = null;
     try {
       const res = await aiSupportAPI.quickAsk({
         question,
@@ -653,23 +933,31 @@ export default function CommandPalette({ role = 'student' }) {
         preferredLang: language,
         attachment: activeAttachment,
       });
-      const payload = res?.data || res;
-      const answerText = String(payload?.answer || '').trim();
-      if (answerText) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `a_${Date.now()}`,
-            role: 'assistant',
-            text: answerText,
-            source: payload?.source || 'ai',
-            actions: Array.isArray(payload?.actions) ? payload.actions : [],
-          },
-        ]);
-        return;
+      if (res?.success === false) {
+        failedErrorType = 'other';
+      } else {
+        const payload = res?.data || res;
+        const answerText = String(payload?.answer || '').trim();
+        if (answerText) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              role: 'assistant',
+              text: answerText,
+              question,
+              source: payload?.source || 'ai',
+              model: payload?.model || '',
+              actions: Array.isArray(payload?.actions) ? payload.actions : [],
+            },
+          ]);
+          return;
+        }
       }
-    } catch {
-      // Fallback to offline local office memory below
+    } catch (err) {
+      const msgStr = String(err?.message || err?.name || '').toLowerCase();
+      failedErrorType = /timeout|abort/.test(msgStr) ? 'timeout' : 'network';
+      void aiSupportAPI.reportQuickAskClientError({ errorType: failedErrorType });
     } finally {
       setAsking(false);
     }
@@ -679,19 +967,28 @@ export default function CommandPalette({ role = 'student' }) {
       ...prev,
       localFallback
         ? {
-          id: `a_${Date.now()}`,
+          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           role: 'assistant',
           text: localFallback.answer,
+          question,
           source: 'memory',
+          model: '',
           actions: localFallback.actions || [],
         }
         : {
-          id: `a_${Date.now()}`,
+          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           role: 'assistant',
-          text: language === 'en'
-            ? 'Unable to connect to DewSkill AI right now. Please try again shortly.'
-            : 'Chưa kết nối được DewSkill AI lúc này. Bạn vui lòng thử lại sau ít giây nhé.',
+          text: failedErrorType === 'timeout'
+            ? (language === 'en'
+              ? 'Request to DewSkill AI timed out. Please try again.'
+              : 'Yêu cầu tới DewSkill AI bị quá thời gian chờ. Bạn bấm thử lại nhé.')
+            : (language === 'en'
+              ? 'Unable to connect to DewSkill AI right now. Please try again shortly.'
+              : 'Chưa kết nối được DewSkill AI lúc này. Bạn vui lòng thử lại sau ít giây nhé.'),
+          question,
           source: 'fallback',
+          retryQuestion: question,
+          retryAttachment: activeAttachment,
           actions: [],
         },
     ]);
@@ -949,7 +1246,7 @@ export default function CommandPalette({ role = 'student' }) {
                   </div>
                 ) : (
                   <div key={msg.id} className="flex justify-start">
-                    <div className="max-w-[90%] rounded-[20px] bg-slate-100/90 dark:bg-slate-800/90 px-4 py-3.5">
+                    <div className="min-w-0 max-w-[90%] rounded-[20px] bg-slate-100/90 dark:bg-slate-800/90 px-4 py-3.5">
                       <div className="mb-1.5 flex items-center gap-1.5">
                         {msg.source === 'memory' ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-300">
@@ -980,6 +1277,22 @@ export default function CommandPalette({ role = 'student' }) {
                             </button>
                           ))}
                         </div>
+                      ) : null}
+                      {msg.source === 'fallback' && (msg.retryQuestion || msg.retryAttachment) ? (
+                        <div className="mt-2.5">
+                          <button
+                            type="button"
+                            disabled={asking}
+                            onClick={() => void askAiQuestion(msg.retryQuestion || '', msg.retryAttachment || null)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition cursor-pointer disabled:opacity-60"
+                          >
+                            <RefreshCw size={12} />
+                            <span>{language === 'en' ? 'Retry' : 'Thử lại'}</span>
+                          </button>
+                        </div>
+                      ) : null}
+                      {msg.source !== 'fallback' ? (
+                        <QuickAiFeedbackBar msg={msg} language={language} />
                       ) : null}
                     </div>
                   </div>

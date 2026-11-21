@@ -4415,7 +4415,7 @@ export function ConversationScreen() {
                     }}
                   >
                     <Text style={{ fontSize: typography.caption, fontWeight: '700', color: reportReason === key ? '#DC2626' : colors.muted }}>{label}</Text>
-                  </Pressable>
+          </Pressable>
                 ))}
               </View>
               <TextInput

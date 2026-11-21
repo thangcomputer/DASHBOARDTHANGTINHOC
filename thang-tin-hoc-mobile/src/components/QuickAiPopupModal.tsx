@@ -33,9 +33,12 @@ import {
   Minimize2,
   Plus,
   Radio,
+  RefreshCw,
   RotateCcw,
   Sparkles,
   Target,
+  ThumbsDown,
+  ThumbsUp,
   UserRound,
   Users,
   Volume2,
@@ -48,7 +51,13 @@ import { useAuth } from '../app/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { navigationRef } from '../navigation/navigationRef';
-import { quickAskAi, type QuickAiAction, type QuickAiAttachment } from '../services/aiSupportApi';
+import {
+  quickAskAi,
+  reportQuickAskClientError,
+  submitQuickAskFeedback,
+  type QuickAiAction,
+  type QuickAiAttachment,
+} from '../services/aiSupportApi';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import {
   getMobileSoundEnabled,
@@ -83,9 +92,13 @@ type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  question?: string;
+  model?: string;
   attachment?: QuickAiAttachment;
   source?: 'memory' | 'ai' | 'fallback';
   actions?: QuickAiAction[];
+  retryQuestion?: string;
+  retryAttachment?: QuickAiAttachment | null;
 };
 
 const MOBILE_TEXT_EXT_RE = /\.(txt|csv|tsv|json|md|markdown|xml|html|htm|css|js|jsx|ts|tsx|py|sql|log|yml|yaml|ini|conf)$/i;
@@ -253,14 +266,121 @@ function renderInlineSegments(line: string, baseKey: string): React.ReactNode[] 
   });
 }
 
+type MobileMdBlock =
+  | { type: 'code'; content: string }
+  | { type: 'table'; headers: string[]; rows: string[][] }
+  | { type: 'line'; text: string };
+
+function isMobileTableSeparator(line: string): boolean {
+  return /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(String(line || '').trim());
+}
+
+function parseMobileTableRow(line: string): string[] {
+  return String(line || '')
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
+}
+
+function parseMobileMarkdownBlocks(rawText: string): MobileMdBlock[] {
+  const lines = String(rawText || '').split('\n');
+  const blocks: MobileMdBlock[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed.startsWith('```')) {
+      const codeLines: string[] = [];
+      i += 1;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      if (i < lines.length) i += 1;
+      blocks.push({ type: 'code', content: codeLines.join('\n') });
+      continue;
+    }
+    if (trimmed.includes('|') && i + 1 < lines.length && isMobileTableSeparator(lines[i + 1])) {
+      const headers = parseMobileTableRow(trimmed);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length) {
+        const rowTrim = lines[i].trim();
+        if (!rowTrim || !rowTrim.includes('|')) break;
+        rows.push(parseMobileTableRow(rowTrim));
+        i += 1;
+      }
+      blocks.push({ type: 'table', headers, rows });
+      continue;
+    }
+    blocks.push({ type: 'line', text: line });
+    i += 1;
+  }
+  return blocks;
+}
+
 function AiMarkdownBlock({ text }: { text: string }) {
-  const lines = String(text || '').split('\n');
+  const blocks = useMemo(() => parseMobileMarkdownBlocks(text), [text]);
   return (
     <View style={styles.mdWrap}>
-      {lines.map((rawLine, idx) => {
-        const trimmed = rawLine.trim();
+      {blocks.map((block, idx) => {
+        if (block.type === 'code') {
+          return (
+            <ScrollView
+              key={`code-${idx}`}
+              horizontal
+              showsHorizontalScrollIndicator
+              style={styles.mdCodeBlock}
+            >
+              <Text style={styles.mdCodeBlockText}>{block.content}</Text>
+            </ScrollView>
+          );
+        }
+        if (block.type === 'table') {
+          return (
+            <ScrollView
+              key={`tbl-${idx}`}
+              horizontal
+              showsHorizontalScrollIndicator
+              style={styles.mdTableScroll}
+            >
+              <View style={styles.mdTable}>
+                <View style={styles.mdTableHeaderRow}>
+                  {block.headers.map((h, hIdx) => (
+                    <View key={`th-${hIdx}`} style={styles.mdTableCell}>
+                      <Text style={styles.mdTableHeaderText}>{renderInlineSegments(h, `th-${idx}-${hIdx}`)}</Text>
+                    </View>
+                  ))}
+                </View>
+                {block.rows.map((row, rIdx) => (
+                  <View key={`tr-${rIdx}`} style={[styles.mdTableRow, rIdx % 2 === 1 && styles.mdTableRowAlt]}>
+                    {block.headers.map((_, cIdx) => (
+                      <View key={`td-${cIdx}`} style={styles.mdTableCell}>
+                        <Text style={styles.mdTableCellText}>
+                          {renderInlineSegments(row[cIdx] || '', `td-${idx}-${rIdx}-${cIdx}`)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          );
+        }
+
+        const trimmed = block.text.trim();
         if (!trimmed) {
           return <View key={`sp-${idx}`} style={styles.mdSpacer} />;
+        }
+        const headingMatch = /^#{1,4}\s+(.+)$/.exec(trimmed);
+        if (headingMatch) {
+          return (
+            <Text key={`hd-${idx}`} style={styles.mdHeading}>
+              {renderInlineSegments(headingMatch[1], `hd-${idx}`)}
+            </Text>
+          );
         }
         const bulletMatch = /^[-•*]\s+(.+)$/.exec(trimmed);
         if (bulletMatch) {
@@ -288,6 +408,163 @@ function AiMarkdownBlock({ text }: { text: string }) {
           </Text>
         );
       })}
+    </View>
+  );
+}
+
+function MobileQuickAiFeedbackBar({
+  msg,
+  language,
+  onExpandReasonBox,
+}: {
+  msg: ChatMessage;
+  language: string;
+  onExpandReasonBox?: () => void;
+}) {
+  const [submittedRating, setSubmittedRating] = useState<'helpful' | 'inaccurate' | null>(null);
+  const [showReasonBox, setShowReasonBox] = useState(false);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [statusText, setStatusText] = useState('');
+  const [errorText, setErrorText] = useState('');
+  const [lastAttempt, setLastAttempt] = useState<{ rating: 'helpful' | 'inaccurate'; comment: string } | null>(null);
+  const isEn = language === 'en';
+
+  const sendFeedback = useCallback(async (rating: 'helpful' | 'inaccurate', commentText = '') => {
+    if (submitting) return;
+    if (submittedRating === rating && rating === 'helpful' && !errorText) return;
+    triggerMobileHaptic('light');
+    setSubmitting(true);
+    setErrorText('');
+    setLastAttempt({ rating, comment: commentText });
+    try {
+      const resp = await submitQuickAskFeedback({
+        responseId: msg.id,
+        rating,
+        comment: commentText,
+        question: msg.question || '',
+        answer: msg.text || '',
+        source: msg.source || 'ai',
+        model: msg.model || '',
+      });
+      setSubmittedRating(rating);
+      setShowReasonBox(false);
+      if (resp?.deduplicated && !resp?.updated) {
+        setStatusText(isEn ? 'Feedback already recorded.' : 'Bạn đã đánh giá câu trả lời này rồi.');
+      } else if (rating === 'inaccurate') {
+        setStatusText(isEn ? 'Sent for Admin review. Thank you!' : 'Đã gửi góp ý để Admin kiểm tra!');
+      } else {
+        setStatusText(isEn ? 'Thanks for your feedback!' : 'Cảm ơn bạn đã đánh giá hữu ích!');
+      }
+    } catch (err) {
+      setErrorText(err instanceof Error ? err.message : (isEn ? 'Failed to submit feedback.' : 'Chưa gửi được phản hồi.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [errorText, isEn, msg.id, msg.model, msg.question, msg.source, msg.text, submittedRating, submitting]);
+
+  return (
+    <View style={styles.fbWrap}>
+      <View style={styles.fbBtnRow}>
+        <Pressable
+          disabled={submitting || (submittedRating === 'helpful' && !errorText)}
+          onPress={() => {
+            setShowReasonBox(false);
+            void sendFeedback('helpful', '');
+          }}
+          style={({ pressed }) => [
+            styles.fbPillBtn,
+            submittedRating === 'helpful' && styles.fbPillBtnHelpfulActive,
+            pressed && styles.rowPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={isEn ? 'Helpful' : 'Hữu ích'}
+        >
+          <ThumbsUp size={11} color={submittedRating === 'helpful' ? '#047857' : '#475569'} />
+          <Text style={[styles.fbPillText, submittedRating === 'helpful' && styles.fbPillTextHelpfulActive]}>
+            {isEn ? 'Helpful' : 'Hữu ích'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          disabled={submitting}
+          onPress={() => {
+            setErrorText('');
+            setShowReasonBox((prev) => {
+              const next = !prev;
+              if (next) onExpandReasonBox?.();
+              return next;
+            });
+          }}
+          style={({ pressed }) => [
+            styles.fbPillBtn,
+            (submittedRating === 'inaccurate' || showReasonBox) && styles.fbPillBtnInaccurateActive,
+            pressed && styles.rowPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={isEn ? 'Inaccurate' : 'Chưa chính xác'}
+        >
+          <ThumbsDown size={11} color={(submittedRating === 'inaccurate' || showReasonBox) ? '#BE123C' : '#475569'} />
+          <Text style={[styles.fbPillText, (submittedRating === 'inaccurate' || showReasonBox) && styles.fbPillTextInaccurateActive]}>
+            {isEn ? 'Inaccurate' : 'Chưa chính xác'}
+          </Text>
+        </Pressable>
+
+        {submitting ? <ActivityIndicator size="small" color="#059669" /> : null}
+      </View>
+
+      {!submitting && statusText && !errorText ? (
+        <Text style={styles.fbStatusSuccess}>{statusText}</Text>
+      ) : null}
+
+      {showReasonBox ? (
+        <View style={styles.fbReasonBox}>
+          <TextInput
+            value={reason}
+            onChangeText={setReason}
+            maxLength={300}
+            placeholder={isEn ? 'Short reason (optional)…' : 'Lý do ngắn (tùy chọn, VD: sai phiên bản Office)…'}
+            placeholderTextColor="#94A3B8"
+            style={styles.fbReasonInput}
+            returnKeyType="send"
+            onSubmitEditing={() => void sendFeedback('inaccurate', reason.trim())}
+          />
+          <View style={styles.fbReasonActions}>
+            <Pressable
+              disabled={submitting}
+              onPress={() => void sendFeedback('inaccurate', reason.trim())}
+              style={({ pressed }) => [styles.fbSendBtn, pressed && styles.rowPressed]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.fbSendBtnText}>{isEn ? 'Send' : 'Gửi'}</Text>
+            </Pressable>
+            <Pressable
+              disabled={submitting}
+              onPress={() => setShowReasonBox(false)}
+              style={({ pressed }) => [styles.fbCancelBtn, pressed && styles.rowPressed]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.fbCancelBtnText}>{isEn ? 'Cancel' : 'Hủy'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {errorText ? (
+        <View style={styles.fbErrorRow}>
+          <Text style={styles.fbErrorText}>{errorText}</Text>
+          {lastAttempt ? (
+            <Pressable
+              onPress={() => void sendFeedback(lastAttempt.rating, lastAttempt.comment)}
+              style={({ pressed }) => [styles.fbRetryLink, pressed && styles.rowPressed]}
+              accessibilityRole="button"
+            >
+              <RefreshCw size={10} color="#BE123C" />
+              <Text style={styles.fbRetryText}>{isEn ? 'Retry' : 'Thử gửi lại'}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -638,6 +915,7 @@ export function QuickAiPopupModal({
     setAttachError('');
     setAsking(true);
 
+    let failedErrorType: 'timeout' | 'network' | 'other' | null = null;
     try {
       const result = await quickAskAi({
         question,
@@ -649,17 +927,21 @@ export function QuickAiPopupModal({
         setMessages((prev) => [
           ...prev,
           {
-            id: `a_${Date.now()}`,
+            id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
             role: 'assistant',
             text: result.answer,
+            question,
+            model: result.model || '',
             source: result.source,
             actions: result.actions,
           },
         ]);
         return;
       }
-    } catch {
-      // Fallback to local built-in office IT memory if offline / server unavailable
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message.toLowerCase() : '';
+      failedErrorType = /timeout|abort/.test(errMsg) ? 'timeout' : 'network';
+      void reportQuickAskClientError(failedErrorType);
     } finally {
       setAsking(false);
     }
@@ -669,19 +951,28 @@ export function QuickAiPopupModal({
       ...prev,
       localHit
         ? {
-          id: `a_${Date.now()}`,
+          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           role: 'assistant',
           text: localHit.answer,
+          question,
+          model: '',
           source: 'memory',
           actions: [],
         }
         : {
-          id: `a_${Date.now()}`,
+          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           role: 'assistant',
-          text: language === 'en'
-            ? 'Unable to connect to DewSkill AI right now. Please check your connection and try again.'
-            : 'Chưa kết nối được DewSkill AI lúc này. Bạn kiểm tra mạng rồi thử lại nhé.',
+          text: failedErrorType === 'timeout'
+            ? (language === 'en'
+              ? 'Request to DewSkill AI timed out. Please try again.'
+              : 'Yêu cầu tới DewSkill AI quá thời gian chờ. Bạn bấm thử lại nhé.')
+            : (language === 'en'
+              ? 'Unable to connect to DewSkill AI right now. Please check your connection and try again.'
+              : 'Chưa kết nối được DewSkill AI lúc này. Bạn kiểm tra mạng rồi thử lại nhé.'),
+          question,
           source: 'fallback',
+          retryQuestion: question,
+          retryAttachment: activeAttachment,
           actions: [],
         },
     ]);
@@ -712,7 +1003,7 @@ export function QuickAiPopupModal({
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.modalRoot}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable
           style={styles.backdrop}
@@ -821,6 +1112,25 @@ export function QuickAiPopupModal({
                             </Pressable>
                           ))}
                         </View>
+                      ) : null}
+                      {msg.source === 'fallback' && (msg.retryQuestion || msg.retryAttachment) ? (
+                        <Pressable
+                          disabled={asking}
+                          onPress={() => void askAiQuestion(msg.retryQuestion || '', msg.retryAttachment || null)}
+                          style={({ pressed }) => [styles.retryBtn, pressed && styles.rowPressed]}
+                          accessibilityRole="button"
+                          accessibilityLabel={language === 'en' ? 'Retry' : 'Thử lại'}
+                        >
+                          <RefreshCw size={12} color="#047857" />
+                          <Text style={styles.retryBtnText}>{language === 'en' ? 'Retry' : 'Thử lại'}</Text>
+                        </Pressable>
+                      ) : null}
+                      {msg.source !== 'fallback' ? (
+                        <MobileQuickAiFeedbackBar
+                          msg={msg}
+                          language={language}
+                          onExpandReasonBox={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 90)}
+                        />
                       ) : null}
                     </View>
                   </View>
@@ -1514,5 +1824,195 @@ const styles = StyleSheet.create({
   },
   composerSendBtnIdle: {
     backgroundColor: '#D1FAE5',
+  },
+  mdHeading: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  mdCodeBlock: {
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginVertical: 4,
+  },
+  mdCodeBlockText: {
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#A7F3D0',
+  },
+  mdTableScroll: {
+    marginVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  mdTable: {
+    minWidth: 260,
+  },
+  mdTableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#ECFDF5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#CBD5E1',
+  },
+  mdTableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  mdTableRowAlt: {
+    backgroundColor: '#F8FAFC',
+  },
+  mdTableCell: {
+    minWidth: 96,
+    maxWidth: 180,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  mdTableHeaderText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  mdTableCellText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#334155',
+  },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#FFFFFF',
+  },
+  retryBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  fbWrap: {
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 6,
+  },
+  fbBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  fbPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  fbPillBtnHelpfulActive: {
+    borderColor: '#6EE7B7',
+    backgroundColor: '#D1FAE5',
+  },
+  fbPillBtnInaccurateActive: {
+    borderColor: '#FDA4AF',
+    backgroundColor: '#FFE4E6',
+  },
+  fbPillText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  fbPillTextHelpfulActive: {
+    color: '#047857',
+  },
+  fbPillTextInaccurateActive: {
+    color: '#BE123C',
+  },
+  fbStatusSuccess: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  fbReasonBox: {
+    gap: 6,
+    marginTop: 2,
+  },
+  fbReasonInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12.5,
+    color: '#0F172A',
+  },
+  fbReasonActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fbSendBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#E11D48',
+  },
+  fbSendBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  fbCancelBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  fbCancelBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  fbErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  fbErrorText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#BE123C',
+  },
+  fbRetryLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  fbRetryText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#BE123C',
+    textDecorationLine: 'underline',
   },
 });

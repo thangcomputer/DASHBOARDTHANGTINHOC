@@ -4,7 +4,9 @@ node_modules/
 # Environment variables
 .env
 .env.deploy
+.env.staging
 .env.local
+thang-tin-hoc-mobile/.env
 .env.development.local
 .env.test.local
 .env.production.local
@@ -78,4 +80,8 @@ backups/
 
 # Separate standalone project
 landingpage-dewskill/
+
+# Internal AI Knowledge Base (never commit)
+ai-knowledge/
+
 

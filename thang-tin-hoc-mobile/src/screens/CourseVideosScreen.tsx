@@ -727,7 +727,7 @@ export function CourseVideosScreen() {
       const result = await confirmCoursePracticeItem(itemId, answer);
       const confirmedItem = result.data?.item;
       if (!keepSection) {
-        setSelectedLearningSectionId(`practice:${practiceGroupId || confirmedItem?.practiceGroupId || unitId}`);
+      setSelectedLearningSectionId(`practice:${practiceGroupId || confirmedItem?.practiceGroupId || unitId}`);
       }
       if (result.data?.retry) return confirmedItem || null;
       if (!keepSection && !(confirmedItem?.correct === true && confirmedItem.confirmed === true)) {
@@ -873,9 +873,9 @@ export function CourseVideosScreen() {
         previousUnit={displayedUnitIndex > 0 ? units[displayedUnitIndex - 1] : null}
         nextUnit={displayedUnitIndex >= 0 ? units[displayedUnitIndex + 1] || null : null}
         onNavigateUnit={(target) => void startUnit(target)}
-      />
-    )
-    : null;
+        />
+      )
+      : null;
 
   return (
     <AppScreen safeAreaStyle={{ backgroundColor: '#FFFBF2' }} contentStyle={styles.screenContent}>
@@ -886,22 +886,22 @@ export function CourseVideosScreen() {
       </View>
       <View style={styles.filtersOuter}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">
-          {filterOptions.map((option) => {
-            const Icon = option.icon;
-            const count = option.id === 'all' ? counts.all
-              : option.id === 'registered' ? counts.registered
-                : option.id === 'video' ? counts.video
-                  : option.id === 'instructor' ? counts.instructor : undefined;
-            const active = filter === option.id;
-            return (
-              <Pressable
-                key={option.id}
-                onPress={() => setFilter(option.id)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={option.label}
-              >
+        {filterOptions.map((option) => {
+          const Icon = option.icon;
+          const count = option.id === 'all' ? counts.all
+            : option.id === 'registered' ? counts.registered
+              : option.id === 'video' ? counts.video
+                : option.id === 'instructor' ? counts.instructor : undefined;
+          const active = filter === option.id;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => setFilter(option.id)}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={option.label}
+            >
                 <Icon size={15} color={active ? '#FFFFFF' : '#92400E'} />
                 <Text numberOfLines={1} style={[styles.filterText, active && styles.filterTextActive]}>
                   {option.displayLabel}
@@ -909,9 +909,9 @@ export function CourseVideosScreen() {
                 {count !== undefined ? (
                   <Text style={[styles.filterCount, active && styles.filterCountActive]}>{count}</Text>
                 ) : null}
-              </Pressable>
-            );
-          })}
+            </Pressable>
+          );
+        })}
         </ScrollView>
       </View>
       {!resource.loading && Platform.OS !== 'web' && offlineVideos.length > 0 ? (
@@ -975,17 +975,17 @@ export function CourseVideosScreen() {
         section.courses.length ? (
           <View key={section.id} style={styles.courseSection}>
             <View style={styles.sectionHeaderWrap}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, section.id.startsWith('registered') ? styles.registeredIcon : section.id.startsWith('video') ? styles.videoIcon : styles.instructorIcon]}>
-                  {section.id.startsWith('registered') ? <CheckCircle2 size={21} color="#059669" /> : section.id.startsWith('video') ? <Clapperboard size={21} color="#B45309" /> : <GraduationCap size={21} color="#0369A1" />}
-                </View>
-                <View style={styles.sectionCopy}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, section.id.startsWith('registered') ? styles.registeredIcon : section.id.startsWith('video') ? styles.videoIcon : styles.instructorIcon]}>
+                {section.id.startsWith('registered') ? <CheckCircle2 size={21} color="#059669" /> : section.id.startsWith('video') ? <Clapperboard size={21} color="#B45309" /> : <GraduationCap size={21} color="#0369A1" />}
+              </View>
+              <View style={styles.sectionCopy}>
                   <Text style={styles.eyebrow}>{section.id.startsWith('registered') ? 'LỘ TRÌNH CỦA BẠN' : section.id.startsWith('video') ? 'CHỦ ĐỘNG HỌC TẬP' : 'HỌC CÙNG GIẢNG VIÊN'}</Text>
-                  <View style={styles.sectionTitleRow}>
-                    <Text style={styles.sectionTitle}>{section.title}</Text>
-                    <Text style={[styles.sectionCount, section.id.startsWith('registered') ? styles.registeredCount : section.id.startsWith('video') ? styles.videoCount : styles.instructorCount]}>{section.courses.length}</Text>
-                  </View>
+                <View style={styles.sectionTitleRow}>
+                  <Text style={styles.sectionTitle}>{section.title}</Text>
+                  <Text style={[styles.sectionCount, section.id.startsWith('registered') ? styles.registeredCount : section.id.startsWith('video') ? styles.videoCount : styles.instructorCount]}>{section.courses.length}</Text>
                 </View>
+              </View>
               </View>
               <View
                 style={[
@@ -1073,11 +1073,11 @@ export function CourseVideosScreen() {
                   if (closeDirectly) {
                     setSelectedCourse(null);
                   }
-                  setSelectedSubject(null);
-                  setSelectedUnit(null);
-                  setUnits([]);
-                  setActiveUnitDetails([]);
-                  setUnitNavOpen(false);
+                    setSelectedSubject(null);
+                    setSelectedUnit(null);
+                    setUnits([]);
+                    setActiveUnitDetails([]);
+                    setUnitNavOpen(false);
                 }}
                 style={styles.modalBack}
                 accessibilityRole="button"
@@ -1097,15 +1097,15 @@ export function CourseVideosScreen() {
               </View>
               {selectedCourse?.enrolled && courseProgress(selectedCourse) >= 100 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Pressable
+                <Pressable
                     onPress={() => setCertificateCourse(selectedCourse)}
                     style={styles.headerCertButton}
-                    accessibilityRole="button"
+                  accessibilityRole="button"
                     accessibilityLabel="Xem chứng nhận số có mã QR"
-                  >
+                >
                     <Award size={15} color="#047857" />
                     <Text style={styles.headerCertButtonText}>Chứng chỉ QR</Text>
-                  </Pressable>
+                </Pressable>
                   <ShareTriggerButton
                     onPress={() => setShareCourseData(buildCourseOrCertShareData({
                       title: selectedCourse.name || 'Khóa học Thắng Tin Học',
@@ -1567,10 +1567,10 @@ function CourseCard({
             <View />
           )}
           {!blockUnregisteredInstructorPreview ? (
-            <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
-              <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
+          <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
+            <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
               <ChevronRight size={16} color="#FFFFFF" />
-            </Pressable>
+          </Pressable>
           ) : null}
         </View>
       </Card>
@@ -1995,37 +1995,37 @@ function UnitDetails({
           />
         ))}
       </View>
-      <VideoLessonPane
+        <VideoLessonPane
         key={`${unit.id}-${activeVideo?.id || 'lesson'}`}
-        unit={unit}
+          unit={unit}
         units={units}
         unitIndex={unitIndex}
         subjectId={subjectId}
-        subjectName={subjectName}
+          subjectName={subjectName}
         sectionId={videoSectionId}
         sectionLabel={videoSectionLabel}
         video={activeVideo}
         initialAtSec={resumeVideoAt && (!resumeVideoAt.sectionId || resumeVideoAt.sectionId === videoSectionId) ? resumeVideoAt.atSec : 0}
         done={Boolean(activeVideoDone)}
         antiSeekEnabled={activeVideo?.antiSeek ?? unit.antiSeek !== false}
-        courseId={courseId}
-        courseTitle={courseTitle}
+          courseId={courseId}
+          courseTitle={courseTitle}
         progressPct={progressPct}
-        userId={userId}
-        enabled={enabled}
-        resources={resources}
+          userId={userId}
+          enabled={enabled}
+          resources={resources}
         contentWidth={contentWidth}
         soundEnabled={practiceSoundEnabled}
         onSelectUnit={onSelectUnit}
-        onOpenVideo={onOpenVideo}
+          onOpenVideo={onOpenVideo}
         onCompleteSection={(secKind, itemId) => onCompleteSection(unit.id, secKind, itemId, true).then((saved) => {
-          if (saved) celebrateSectionCompletion();
-          return saved;
+              if (saved) celebrateSectionCompletion();
+              return saved;
         })}
         onSubmitQuizItem={(itemId, grpId, answer) => onSubmitPractice(unit.id, itemId, grpId, answer, true)}
         onAdvancePractice={() => onAdvancePractice(unit.id)}
-        onChoosePraise={choosePracticePraise}
-        onPlayPraise={playPracticePraise}
+                  onChoosePraise={choosePracticePraise}
+                  onPlayPraise={playPracticePraise}
         onShareUnit={onShareUnit}
         onComplete={() => {
           if (!activeVideo) return Promise.resolve(true);
@@ -2669,9 +2669,9 @@ function VideoLessonPane({
             <Text numberOfLines={1} style={styles.videoStageUnitPillText}>
               {`Buổi ${Math.max(1, unitIndex + 1)} · ${done ? 'Đã hoàn thành ✓' : `Đã xem ${watchedPct}%`}`}
             </Text>
-          </View>
+        </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {done ? (
+        {done ? (
               <ShareTriggerButton
                 onPress={() => onShareUnit?.()}
                 label="SHARE"
@@ -2679,40 +2679,40 @@ function VideoLessonPane({
                 variant="white"
                 style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}
               />
-            ) : null}
+        ) : null}
             <View style={styles.videoStageCheckPill}>
               <Text numberOfLines={1} style={styles.videoStageCheckPillText}>
                 {`${Math.min(safeQuizIdx + 1, quizItems.length)}/${quizItems.length} mốc câu hỏi`}
               </Text>
-            </View>
+      </View>
           </View>
         </View>
 
         <View style={[styles.videoFrame, styles.videoStageFrame]}>
           {started && (usingOfflineUri ? Boolean(offlineUri) : (embeddedUrl || directVideo)) ? (
-            <VideoPlayerFrame
+          <VideoPlayerFrame
               videoUrl={usingOfflineUri && offlineUri ? offlineUri : resolveMobilePublicUrl(url)}
               embeddedUrl={usingOfflineUri ? '' : embeddedUrl}
-              title={video?.title || unit.title}
-              lessonId={`${userId || 'anon'}-${unit.id}-${video?.id || 'video'}`}
-              antiSeekEnabled={antiSeekEnabled}
-              done={done}
+            title={video?.title || unit.title}
+            lessonId={`${userId || 'anon'}-${unit.id}-${video?.id || 'video'}`}
+            antiSeekEnabled={antiSeekEnabled}
+            done={done}
               initialAtSec={initialAtSec}
-              playerApiRef={playerApiRef}
+            playerApiRef={playerApiRef}
               onProgress={handleVideoProgress}
-              onWatched={onComplete}
-            />
-          ) : (
-            <View style={styles.videoStartOverlay}>
-              <Pressable
-                onPress={startVideo}
-                disabled={!url}
-                style={[styles.videoStartButton, !url && styles.actionDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Bắt đầu phát video"
-              >
+            onWatched={onComplete}
+          />
+        ) : (
+          <View style={styles.videoStartOverlay}>
+            <Pressable
+              onPress={startVideo}
+              disabled={!url}
+              style={[styles.videoStartButton, !url && styles.actionDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Bắt đầu phát video"
+            >
                 <Play size={22} color="#FFFFFF" fill="#FFFFFF" />
-              </Pressable>
+            </Pressable>
               <Text numberOfLines={2} style={styles.videoStageTitle}>{video?.title || unit.title}</Text>
               <Text numberOfLines={2} style={styles.videoStartLabel}>
                 {url
@@ -2721,9 +2721,9 @@ function VideoLessonPane({
                     ? 'Liên kết video chưa đúng - trung tâm sẽ cập nhật sớm'
                     : 'Video chưa có liên kết · Đọc lý thuyết ở tab Tài liệu'}
               </Text>
-            </View>
-          )}
-        </View>
+          </View>
+        )}
+      </View>
       </View>
 
       {!url && unitContents.length ? (
@@ -3005,7 +3005,7 @@ function VideoLessonPane({
                           </Text>
                         )}
                   </View>
-                  <View style={styles.flex}>
+              <View style={styles.flex}>
                     <Text numberOfLines={2} style={[styles.unitTitle, locked && styles.unitTitleLocked]}>
                       {item.title}
                     </Text>
@@ -3014,7 +3014,7 @@ function VideoLessonPane({
                         <Text style={[styles.curriculumCompText, item.videoDone && styles.curriculumCompTextDone]}>
                           {`🎬 Video`}
                         </Text>
-                      </View>
+              </View>
                       <View style={[styles.curriculumCompChip, item.noteDone && styles.curriculumCompChipDone]}>
                         <Text style={[styles.curriculumCompText, item.noteDone && styles.curriculumCompTextDone]}>
                           {`📝 Lý thuyết`}
@@ -3025,9 +3025,9 @@ function VideoLessonPane({
                           <Text style={[styles.curriculumCompText, item.practiceDone && styles.curriculumCompTextDone]}>
                             {`🎯 Bài tập`}
                           </Text>
-                        </View>
-                      ) : null}
-                    </View>
+                </View>
+              ) : null}
+            </View>
                   </View>
                   <View style={[
                     styles.unitAction,
@@ -3040,7 +3040,7 @@ function VideoLessonPane({
                       completed && !active && styles.unitActionTextCompleted,
                     ]}>
                       {locked ? 'Khóa' : active ? 'Đang học' : completed ? 'Xem lại' : 'Học ngay'}
-                    </Text>
+            </Text>
                   </View>
                 </Pressable>
               );
@@ -3104,21 +3104,21 @@ function VideoLessonPane({
           ) : null}
 
           <View style={styles.resourcesTabsCard}>
-            <VideoLessonTabs
+          <VideoLessonTabs
               activeTab={resourceSubTab}
-              courseId={courseId}
-              courseTitle={subjectName || courseTitle}
-              lessonId={`${unit.id}-${video?.id || 'video'}`}
-              lessonTitle={video?.title || unit.title}
-              userId={userId}
-              enabled={enabled}
-              videoUrl={url}
-              resources={resources}
-              currentTime={videoProgress.currentTime || playerApiRef.current?.getCurrentTime() || 0}
-              videoDuration={videoProgress.duration || playerApiRef.current?.getDuration() || 0}
+            courseId={courseId}
+            courseTitle={subjectName || courseTitle}
+            lessonId={`${unit.id}-${video?.id || 'video'}`}
+            lessonTitle={video?.title || unit.title}
+            userId={userId}
+            enabled={enabled}
+            videoUrl={url}
+            resources={resources}
+            currentTime={videoProgress.currentTime || playerApiRef.current?.getCurrentTime() || 0}
+            videoDuration={videoProgress.duration || playerApiRef.current?.getDuration() || 0}
               onSeekTo={handleSeekTo}
-            />
-          </View>
+          />
+      </View>
         </View>
       )}
     </View>

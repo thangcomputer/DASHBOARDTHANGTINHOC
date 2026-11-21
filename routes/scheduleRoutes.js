@@ -12,6 +12,11 @@ const { emitScheduleEvent, emitDataRefresh } = require('../utils/realtimeEmit');
 const { policyShadowSchedule } = require('../middleware/policyShadowSchedule');
 const { schedulesCutoverGate } = require('../middleware/schedulesCutoverGate');
 const { buildActivityEntry } = require('../utils/studentActivityLog');
+const {
+  normalizeTimeInput,
+  endTimeFromStartOrDefault,
+  assertEndAfterStart,
+} = require('../services/schedulingValidation');
 
 /** Phase 7.21: policyShadowSchedule → schedulesCutoverGate */
 function schedulesGuard(action) {
@@ -78,22 +83,6 @@ function parseTimeToMinutes(raw) {
 
 const SESSION_DURATION_MINS = 90;
 
-function addMinutesToTimeHHmm(time, addMins) {
-  const mins = parseTimeToMinutes(time);
-  if (mins == null) return '';
-  const total = Math.min(mins + addMins, 23 * 60 + 59);
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-/** Buổi học cố định 1h30 - luôn suy ra end từ start */
-function endTimeFromStartOrDefault(startTime, endTime) {
-  const fromStart = addMinutesToTimeHHmm(startTime, SESSION_DURATION_MINS);
-  if (!fromStart) return String(endTime || '').trim();
-  return fromStart;
-}
-
 function timeRangesOverlap(start1, end1, start2, end2) {
   const s1 = parseTimeToMinutes(start1);
   const s2 = parseTimeToMinutes(start2);
@@ -132,16 +121,6 @@ function formatStudentClashMessage(clash) {
   const course = clash.course ? ` (${clash.course})` : '';
   const end = clash.endTime ? ` - ${clash.endTime}` : '';
   return `TRÙNG LỊCH: Học viên đã có buổi học${course} từ ${clash.startTime}${end} trong ngày này.`;
-}
-
-function assertEndAfterStart(startTime, endTime) {
-  const end = String(endTime || '').trim();
-  if (!end) return null;
-  const s = parseTimeToMinutes(startTime);
-  const e = parseTimeToMinutes(end);
-  if (s == null || e == null) return 'Giờ bắt đầu hoặc kết thúc không hợp lệ';
-  if (e <= s) return 'Giờ kết thúc phải lớn hơn giờ bắt đầu';
-  return null;
 }
 
 /** Thông báo điểm danh: HV + Admin (GV nào · HV nào · buổi thứ mấy). */
@@ -1120,10 +1099,11 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     const scheduleEnrollmentId = selectedEnrollment?._id || null;
     const scheduleCourseId = selectedEnrollment?.courseId || courseIdInput || null;
 
-    // Mỗi buổi cố định 1h30 - nếu thiếu/lệch endTime thì chuẩn hóa theo startTime
-    const resolvedEndTime = endTimeFromStartOrDefault(startTime, endTime);
+    const normalizedStartTime = normalizeTimeInput(startTime);
+    // Tôn trọng endTime tùy chọn của giảng viên; chỉ mặc định 1h30 khi không truyền endTime
+    const resolvedEndTime = endTimeFromStartOrDefault(normalizedStartTime, endTime);
 
-    const timeErr = assertEndAfterStart(startTime, resolvedEndTime);
+    const timeErr = assertEndAfterStart(normalizedStartTime, resolvedEndTime);
     if (timeErr) {
       return res.status(400).json({ success: false, message: timeErr });
     }
@@ -1140,7 +1120,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
           teacherId,
           courseName: courseFinal,
           date,
-          startTime,
+          startTime: normalizedStartTime,
           endTime: resolvedEndTime,
           enrollmentId: scheduleEnrollmentId,
           studentDoc: student,
@@ -1161,7 +1141,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
           assertAttendanceAllowed(
             {
               date,
-              startTime,
+              startTime: normalizedStartTime,
               endTime: resolvedEndTime,
               status: 'scheduled',
             },
@@ -1224,7 +1204,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       enrollmentId: scheduleEnrollmentId,
       courseId: scheduleCourseId,
       date: new Date(date),
-      startTime, endTime: resolvedEndTime,
+      startTime: normalizedStartTime, endTime: resolvedEndTime,
       course: courseFinal,
       linkHoc: resolvedScheduleLinkHoc,
       note: (() => {
@@ -1605,11 +1585,15 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       });
     }
 
-    const effectiveStart = startTime || schedule.startTime;
-    // Khi đổi giờ bắt đầu (hoặc gửi endTime), luôn khóa kết thúc = start + 1h30
-    const effectiveEnd = (startTime || endTime !== undefined)
-      ? endTimeFromStartOrDefault(effectiveStart, endTime)
-      : (schedule.endTime || endTimeFromStartOrDefault(effectiveStart));
+    const normalizedStartInput = startTime ? normalizeTimeInput(startTime) : '';
+    const effectiveStart = normalizedStartInput || schedule.startTime;
+    const hasExplicitEnd = endTime !== undefined && String(endTime).trim() !== '';
+    // Tôn trọng endTime tùy chọn; chỉ tự suy start + 1h30 khi đổi startTime mà không truyền endTime
+    const effectiveEnd = hasExplicitEnd
+      ? normalizeTimeInput(endTime)
+      : (normalizedStartInput
+        ? endTimeFromStartOrDefault(effectiveStart)
+        : (schedule.endTime || endTimeFromStartOrDefault(effectiveStart)));
     const effectiveDate = date || schedule.date;
     const timeErr = assertEndAfterStart(effectiveStart, effectiveEnd);
     if (timeErr) {
@@ -1674,11 +1658,11 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     if (status) updates.status = status;
     if (isRejectMakeup) updates.studentConfirmStatus = 'admin_rejected';
     if (linkHoc) updates.linkHoc = linkHoc;
-    if (startTime) {
-      updates.startTime = startTime;
-      updates.endTime = endTimeFromStartOrDefault(startTime);
+    if (normalizedStartInput) {
+      updates.startTime = normalizedStartInput;
+      updates.endTime = effectiveEnd;
     } else if (endTime !== undefined) {
-      updates.endTime = endTimeFromStartOrDefault(schedule.startTime, endTime);
+      updates.endTime = effectiveEnd;
     }
     if (date) updates.date = new Date(date);
     const noteVal = note !== undefined ? note : topic;
@@ -1725,9 +1709,9 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     const isCancelling = Boolean(updated && status === 'cancelled' && schedule.status !== 'cancelled');
     const isRescheduling = Boolean(
       updated
-      && ((startTime && startTime !== schedule.startTime)
+      && ((normalizedStartInput && normalizedStartInput !== schedule.startTime)
         || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
-        || (endTime !== undefined && String(endTime) !== String(schedule.endTime || ''))),
+        || (effectiveEnd && String(effectiveEnd) !== String(schedule.endTime || ''))),
     );
     const scheduleScope = updated ? {
       branchId: updated.branchId || schedule.branchId,

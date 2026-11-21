@@ -1419,12 +1419,52 @@ export const aiSupportAPI = {
       : null;
     const res = await apiFetch('/ai-support/quick-ask', {
       method: 'POST',
+      headers: { 'X-Client-Platform': 'web' },
       body: JSON.stringify({
         question,
         history,
         preferredLang,
         ...(cleanAttachment ? { attachment: cleanAttachment } : {}),
       }),
+    });
+    return res.json();
+  },
+  submitQuickAskFeedback: async ({ rating, comment = '', question = '', answer = '', source = 'ai', model = '', responseId = '' } = {}) => {
+    const res = await apiFetch('/ai-support/quick-ask/feedback', {
+      method: 'POST',
+      headers: { 'X-Client-Platform': 'web' },
+      body: JSON.stringify({ rating, comment, question, answer, source, model, responseId, platform: 'web' }),
+    });
+    const payload = await res.json();
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không gửi được phản hồi lúc này');
+    }
+    return payload;
+  },
+  reportQuickAskClientError: async ({ errorType = 'network' } = {}) => {
+    try {
+      await apiFetch('/ai-support/quick-ask/client-event', {
+        method: 'POST',
+        headers: { 'X-Client-Platform': 'web' },
+        body: JSON.stringify({ platform: 'web', errorType }),
+      });
+    } catch {
+      /* non-blocking */
+    }
+  },
+  getRagMetrics: async () => {
+    const res = await apiFetch('/ai-support/admin/rag-metrics');
+    return res.json();
+  },
+  listRagFeedback: async (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    const res = await apiFetch(`/ai-support/admin/rag-feedback${qs ? `?${qs}` : ''}`);
+    return res.json();
+  },
+  reviewRagFeedback: async (id, { reviewStatus, adminNote = '' } = {}) => {
+    const res = await apiFetch(`/ai-support/admin/rag-feedback/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reviewStatus, adminNote }),
     });
     return res.json();
   },

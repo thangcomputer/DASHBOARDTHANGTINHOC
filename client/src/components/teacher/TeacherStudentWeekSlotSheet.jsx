@@ -2,8 +2,8 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useToast } from '../../utils/useToast';
+import CustomScheduleTimeModal from './CustomScheduleTimeModal';
 import {
-  endTimeFromStart,
   findTeacherScheduleConflict,
   formatTeacherConflictMessage,
   formatLocalDateKey,
@@ -13,16 +13,23 @@ import { getStudentScheduleGate, resolveEnrollmentProgress } from '../../utils/s
 import {
   WEEKDAY_LABELS,
   WEEK_SLOT_OPTIONS,
+  CUSTOM_SLOT_SENTINEL,
+  CUSTOM_SLOT_OPTION_LABEL,
   startOfWeekMonday,
   addDays,
   weekDateKeys,
   formatWeekRangeLabel,
+  formatSlotRangeLabel,
+  encodeSlotValue,
+  parseSlotValue,
   findStudentDayOccupying,
   occupyingMatchesCourse,
   isWeekSlotElapsed,
   weekSlotSelectMeta,
   slotValueFromSchedule,
   extraSlotOption,
+  extraSlotOptionFromValue,
+  slotEndForStart,
 } from '../../utils/weeklySlotGrid';
 
 const LOCKED_STATUSES = new Set(['completed', 'no_show']);
@@ -38,12 +45,6 @@ function scheduleIdOf(sch) {
 
 function enrollmentKey(student) {
   return String(student?._enrollmentKey || student?._id || student?.id || '');
-}
-
-function slotEnd(start) {
-  if (!start) return '';
-  const known = WEEK_SLOT_OPTIONS.find((o) => o.value === start);
-  return known?.end || endTimeFromStart(start);
 }
 
 export default function TeacherStudentWeekSlotSheet({
@@ -64,6 +65,7 @@ export default function TeacherStudentWeekSlotSheet({
   const [saving, setSaving] = useState(false);
   const [enrollmentKeyState, setEnrollmentKeyState] = useState(() => enrollmentKey(student));
   const [drafts, setDrafts] = useState({});
+  const [customSlotModal, setCustomSlotModal] = useState(null);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -98,11 +100,15 @@ export default function TeacherStudentWeekSlotSheet({
       const own = occupyingMatchesCourse(dayOccupying, activeStudent?.course) ? dayOccupying : null;
       const otherCourse = Boolean(dayOccupying && !own);
       const locked = Boolean(own && LOCKED_STATUSES.has(String(own.status)));
+      const value = slotValueFromSchedule(own);
+      const { start, end } = parseSlotValue(value, own);
       map[dateKey] = {
         own,
         otherCourse,
         locked,
-        start: slotValueFromSchedule(own),
+        value,
+        start,
+        end,
         id: own ? scheduleIdOf(own) : '',
         status: own ? String(own.status) : '',
       };
@@ -113,7 +119,7 @@ export default function TeacherStudentWeekSlotSheet({
   const valueOf = useCallback((dateKey) => (
     Object.prototype.hasOwnProperty.call(drafts, dateKey)
       ? drafts[dateKey]
-      : (savedByDay[dateKey]?.start || '')
+      : (savedByDay[dateKey]?.value || '')
   ), [drafts, savedByDay]);
 
   const dirtyKeys = useMemo(() => {
@@ -122,12 +128,12 @@ export default function TeacherStudentWeekSlotSheet({
       const saved = savedByDay[dateKey];
       if (saved?.locked || saved?.otherCourse || isScheduleDateBeforeToday(dateKey)) return false;
       const next = valueOf(dateKey);
-      const prev = saved?.start || '';
+      const prev = saved?.value || '';
       return String(next) !== String(prev);
     });
   }, [drafts, dateKeys, savedByDay, valueOf]);
 
-  const handleSlotChange = useCallback((dateKey, nextStart) => {
+  const handleSlotChange = useCallback((dateKey, nextRawValue) => {
     const saved = savedByDay[dateKey];
     if (isScheduleDateBeforeToday(dateKey)) {
       toast.error('Không thể sửa lịch đã qua ngày.');
@@ -141,8 +147,28 @@ export default function TeacherStudentWeekSlotSheet({
       toast.info(`Học viên đã có ca khóa khác trong ngày (${saved.own?.course || 'khác'}).`);
       return;
     }
+    if (nextRawValue === CUSTOM_SLOT_SENTINEL) {
+      const currentVal = valueOf(dateKey);
+      const gate = getStudentScheduleGate(activeStudent, schedulesRef.current || [], dateKey, saved?.id || null);
+      if (!currentVal && !(saved?.id && saved.status === 'scheduled') && !gate.canSchedule) {
+        toast.info(gate.reason || 'Không xếp thêm được ca');
+        return;
+      }
+      const { start: curStart, end: curEnd } = parseSlotValue(currentVal, saved?.own);
+      setCustomSlotModal({
+        dateKey,
+        dayIndex: dateKeys.indexOf(dateKey),
+        initialStart: currentVal ? curStart : '',
+        initialEnd: currentVal ? curEnd : '',
+        hasExistingSlot: Boolean(currentVal || (saved?.id && saved.status === 'scheduled')),
+        saved,
+      });
+      return;
+    }
+
+    const { start: nextStart, end: endTime } = parseSlotValue(nextRawValue, saved?.own);
     if (nextStart) {
-      if (isWeekSlotElapsed(dateKey, nextStart, slotEnd(nextStart))) {
+      if (isWeekSlotElapsed(dateKey, nextStart, endTime)) {
         toast.error('Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
         return;
       }
@@ -151,7 +177,7 @@ export default function TeacherStudentWeekSlotSheet({
         teacherId: effectiveTeacherId,
         date: dateKey,
         startTime: nextStart,
-        endTime: slotEnd(nextStart),
+        endTime,
         excludeScheduleId: saved?.id || null,
       });
       if (conflict) {
@@ -166,8 +192,9 @@ export default function TeacherStudentWeekSlotSheet({
       });
       return;
     }
-    setDrafts((prev) => ({ ...prev, [dateKey]: nextStart }));
-  }, [savedByDay, effectiveTeacherId, toast]);
+    const encoded = nextStart ? encodeSlotValue(nextStart, endTime) : '';
+    setDrafts((prev) => ({ ...prev, [dateKey]: encoded }));
+  }, [savedByDay, valueOf, activeStudent, dateKeys, effectiveTeacherId, toast]);
 
   const handleCommit = useCallback(async () => {
     if (!activeStudent || saving || dirtyKeys.length === 0) return;
@@ -194,7 +221,7 @@ export default function TeacherStudentWeekSlotSheet({
       for (const dateKey of dirtyKeys) {
         const saved = savedByDay[dateKey];
         const next = valueOf(dateKey);
-        const prev = saved?.start || '';
+        const prev = saved?.value || '';
         if (String(next) === String(prev)) continue;
 
         if (!next) {
@@ -205,9 +232,9 @@ export default function TeacherStudentWeekSlotSheet({
           continue;
         }
 
-        const extra = extraSlotOption(saved?.own);
-        const endTime = WEEK_SLOT_OPTIONS.find((o) => o.value === next)?.end || extra?.end || endTimeFromStart(next);
-        if (isWeekSlotElapsed(dateKey, next, endTime)) {
+        const { start: nextStart, end: endTime } = parseSlotValue(next, saved?.own);
+        if (!nextStart) continue;
+        if (isWeekSlotElapsed(dateKey, nextStart, endTime)) {
           throw new Error('Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
         }
 
@@ -215,7 +242,7 @@ export default function TeacherStudentWeekSlotSheet({
           schedules: simulatedLive,
           teacherId: effectiveTeacherId,
           date: dateKey,
-          startTime: next,
+          startTime: nextStart,
           endTime,
           excludeScheduleId: saved?.id || null,
         });
@@ -225,9 +252,9 @@ export default function TeacherStudentWeekSlotSheet({
 
         if (saved?.id && saved.status === 'scheduled') {
           simulatedLive = simulatedLive.map((s) => (
-            scheduleIdOf(s) === String(saved.id) ? { ...s, date: dateKey, startTime: next, endTime } : s
+            scheduleIdOf(s) === String(saved.id) ? { ...s, date: dateKey, startTime: nextStart, endTime } : s
           ));
-          ops.push({ kind: 'update', dateKey, saved, prev, next, endTime });
+          ops.push({ kind: 'update', dateKey, saved, prev, nextStart, endTime });
           continue;
         }
 
@@ -244,11 +271,11 @@ export default function TeacherStudentWeekSlotSheet({
           enrollmentId: realEnrollmentId || null,
           course: activeStudent.course || '',
           date: dateKey,
-          startTime: next,
+          startTime: nextStart,
           endTime,
           status: 'scheduled',
         }];
-        ops.push({ kind: 'create', dateKey, next, endTime });
+        ops.push({ kind: 'create', dateKey, nextStart, endTime });
       }
     } catch (validationErr) {
       toast.error(validationErr?.message || 'Dữ liệu lịch không hợp lệ');
@@ -273,7 +300,7 @@ export default function TeacherStudentWeekSlotSheet({
           if (op.kind === 'update') {
             const res = await updateSchedule(op.saved.id, {
               date: op.dateKey,
-              startTime: op.next,
+              startTime: op.nextStart,
               endTime: op.endTime,
             });
             if (res?.success === false) throw new Error(res.message || 'Không cập nhật được lịch');
@@ -284,7 +311,7 @@ export default function TeacherStudentWeekSlotSheet({
             teacherId: effectiveTeacherId,
             ...(realEnrollmentId ? { enrollmentId: realEnrollmentId } : {}),
             date: op.dateKey,
-            startTime: op.next,
+            startTime: op.nextStart,
             endTime: op.endTime,
             course: activeStudent.course || '',
             topic: '',
@@ -307,10 +334,11 @@ export default function TeacherStudentWeekSlotSheet({
         if (op.kind === 'cancel') {
           cancelled += 1;
           if (typeof onCancelled === 'function') {
+            const prevParsed = parseSlotValue(op.prev, op.saved.own);
             postCallbacks.push(onCancelled({
               date: op.dateKey,
-              startTime: op.saved.start || op.prev || '',
-              endTime: op.saved.end || slotEnd(op.saved.start || op.prev) || '',
+              startTime: op.saved.start || prevParsed.start || '',
+              endTime: op.saved.end || slotEndForStart(op.prev, op.saved.own) || '',
               course: activeStudent.course || '',
               studentName: activeStudent.displayName || activeStudent.name || '',
               studentId: sid,
@@ -320,12 +348,13 @@ export default function TeacherStudentWeekSlotSheet({
         } else if (op.kind === 'update') {
           updated += 1;
           if (typeof onUpdated === 'function') {
-            const prevEnd = op.saved.end || slotEnd(op.prev) || '';
+            const prevParsed = parseSlotValue(op.prev, op.saved.own);
+            const prevEnd = op.saved.end || slotEndForStart(op.prev, op.saved.own) || '';
             postCallbacks.push(onUpdated({
               date: op.dateKey,
-              startTime: op.next,
+              startTime: op.nextStart,
               endTime: op.endTime,
-              prevStartTime: op.prev || op.saved.start || '',
+              prevStartTime: prevParsed.start || op.saved.start || '',
               prevEndTime: prevEnd,
               course: activeStudent.course || '',
               studentName: activeStudent.displayName || activeStudent.name || '',
@@ -338,7 +367,7 @@ export default function TeacherStudentWeekSlotSheet({
           if (typeof onCreated === 'function') {
             postCallbacks.push(onCreated({
               date: op.dateKey,
-              startTime: op.next,
+              startTime: op.nextStart,
               endTime: op.endTime,
               course: activeStudent.course || '',
               studentName: activeStudent.displayName || activeStudent.name || '',
@@ -472,6 +501,39 @@ export default function TeacherStudentWeekSlotSheet({
           </div>
         </div>
       </div>
+      <CustomScheduleTimeModal
+        open={Boolean(customSlotModal)}
+        studentName={name}
+        courseName={activeStudent?.course || ''}
+        weekdayLabel={customSlotModal && customSlotModal.dayIndex >= 0 ? WEEKDAY_LABELS[customSlotModal.dayIndex] : ''}
+        dateKey={customSlotModal?.dateKey || ''}
+        initialStart={customSlotModal?.initialStart || ''}
+        initialEnd={customSlotModal?.initialEnd || ''}
+        hasExistingSlot={Boolean(customSlotModal?.hasExistingSlot)}
+        validateRange={(startTime, endTime) => {
+          if (!customSlotModal) return '';
+          if (isWeekSlotElapsed(customSlotModal.dateKey, startTime, endTime)) {
+            return 'Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.';
+          }
+          const conflict = findTeacherScheduleConflict({
+            schedules: schedulesRef.current || [],
+            teacherId: effectiveTeacherId,
+            date: customSlotModal.dateKey,
+            startTime,
+            endTime,
+            excludeScheduleId: customSlotModal.saved?.id || null,
+          });
+          return conflict ? formatTeacherConflictMessage(conflict) : '';
+        }}
+        onConfirm={({ startTime, endTime }) => {
+          const target = customSlotModal;
+          setCustomSlotModal(null);
+          if (!target) return;
+          const nextValue = startTime && endTime ? encodeSlotValue(startTime, endTime) : '';
+          handleSlotChange(target.dateKey, nextValue);
+        }}
+        onClose={() => setCustomSlotModal(null)}
+      />
     </div>,
     document.body,
   );
@@ -483,9 +545,13 @@ function DaySlotRow({ label, dateKey, student, schedules, teacherId, saved, valu
   const otherCourse = Boolean(saved?.otherCourse);
   const existingId = saved?.id || '';
   const lockedDone = Boolean(saved?.locked);
-  const extra = extraSlotOption(own);
+  const extraFromValue = extraSlotOptionFromValue(value, own);
+  const extraFromSaved = extraSlotOption(own);
+  const extraList = [extraFromValue, extraFromSaved].filter((item, idx, arr) => (
+    item && arr.findIndex((candidate) => candidate && candidate.value === item.value) === idx
+  ));
   const gate = getStudentScheduleGate(student, schedules, dateKey, existingId || null);
-  const options = extra ? [extra, ...WEEK_SLOT_OPTIONS] : WEEK_SLOT_OPTIONS;
+  const options = [...extraList, ...WEEK_SLOT_OPTIONS];
   const dateLabel = `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
 
   let control = null;
@@ -497,12 +563,16 @@ function DaySlotRow({ label, dateKey, student, schedules, teacherId, saved, valu
     );
   } else if (past || lockedDone) {
     const labelText = own
-      ? (extra?.label || WEEK_SLOT_OPTIONS.find((o) => o.value === value)?.label || value || '-')
+      ? (formatSlotRangeLabel(own.startTime, own.endTime)
+        || extraFromSaved?.label
+        || WEEK_SLOT_OPTIONS.find((o) => o.value === value)?.label
+        || value
+        || '-')
       : '-';
     control = (
       <div className={`flex-1 min-h-11 px-3 rounded-xl border text-xs font-bold flex items-center ${String(own?.status) === 'completed'
-          ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-          : 'bg-slate-50 border-slate-100 text-slate-500'
+        ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+        : 'bg-slate-50 border-slate-100 text-slate-500'
         }`}>
         {labelText}
       </div>
@@ -514,15 +584,22 @@ function DaySlotRow({ label, dateKey, student, schedules, teacherId, saved, valu
         value={value}
         disabled={!canCreate}
         title={!value && !gate.canSchedule ? (gate.reason || 'Không xếp thêm được') : undefined}
-        onChange={(e) => onChange(dateKey, e.target.value)}
+        onChange={(e) => {
+          const picked = e.target.value;
+          if (picked === CUSTOM_SLOT_SENTINEL) {
+            e.target.value = value;
+          }
+          onChange(dateKey, picked);
+        }}
         className={`flex-1 min-h-11 px-2 rounded-xl border text-sm font-semibold outline-none cursor-pointer ${dirty
-            ? 'bg-amber-50 border-amber-300 text-amber-900'
-            : value
-              ? 'bg-amber-50/70 border-amber-200 text-amber-800'
-              : 'bg-white border-slate-200 text-slate-700'
+          ? 'bg-amber-50 border-amber-300 text-amber-900'
+          : value
+            ? 'bg-amber-50/70 border-amber-200 text-amber-800'
+            : 'bg-white border-slate-200 text-slate-700'
           }`}
       >
-        <option value="">- Chọn giờ -</option>
+        <option value={CUSTOM_SLOT_SENTINEL}>{CUSTOM_SLOT_OPTION_LABEL}</option>
+        <option value="">- Không có lịch -</option>
         {options.map((opt) => {
           const meta = weekSlotSelectMeta(opt, dateKey, {
             schedules,

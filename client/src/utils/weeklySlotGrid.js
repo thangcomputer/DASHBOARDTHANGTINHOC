@@ -12,10 +12,13 @@ import {
   formatLocalDateKey,
   parseTimeToMinutes,
   timeRangesOverlap,
-} from './scheduleTime';
+} from './scheduleTime.js';
 
 export const TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT = true;
 export const SHOW_TEACHER_MONTHLY_CALENDAR = false;
+
+export const CUSTOM_SLOT_SENTINEL = '__custom__';
+export const CUSTOM_SLOT_OPTION_LABEL = 'Tự chọn giờ...';
 
 export const WEEKDAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
 
@@ -144,6 +147,49 @@ export function isWeekSlotElapsed(dateKey, startTime, endTime, now = new Date(),
   return nowMins >= endMins;
 }
 
+export function normalizeSlotEnd(rawEnd) {
+  const raw = String(rawEnd ?? '').trim();
+  if (!raw) return '';
+  if (raw === '24:00') return '23:59';
+  return normalizeTimeHHmm(raw, '');
+}
+
+export function formatSlotRangeLabel(start, end) {
+  const s = normalizeTimeHHmm(start, '');
+  const e = normalizeSlotEnd(end);
+  if (!s) return '';
+  if (!e) return s;
+  const displayEnd = s === '22:30' && e === '23:59' ? '24:00' : e;
+  return `${s} - ${displayEnd}`;
+}
+
+export function encodeSlotValue(start, end) {
+  const s = normalizeTimeHHmm(start, '');
+  if (!s) return '';
+  const e = normalizeSlotEnd(end) || endTimeFromStart(s);
+  const matchedPreset = WEEK_SLOT_OPTIONS.find((o) => o.start === s && o.end === e);
+  if (matchedPreset) return matchedPreset.value;
+  return `${s}|${e}`;
+}
+
+export function parseSlotValue(value, sch = null) {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw === CUSTOM_SLOT_SENTINEL) return { start: '', end: '' };
+  if (raw.includes('|')) {
+    const [rawStart, rawEnd] = raw.split('|');
+    const start = normalizeTimeHHmm(rawStart, '');
+    if (!start) return { start: '', end: '' };
+    const end = normalizeSlotEnd(rawEnd) || normalizeSlotEnd(sch?.endTime) || endTimeFromStart(start);
+    return { start, end };
+  }
+  const start = normalizeTimeHHmm(raw, '');
+  if (!start) return { start: '', end: '' };
+  const known = WEEK_SLOT_OPTIONS.find((o) => o.value === start);
+  if (known) return { start: known.start, end: known.end };
+  const end = normalizeSlotEnd(sch?.endTime) || endTimeFromStart(start);
+  return { start, end };
+}
+
 export function weekSlotSelectMeta(opt, dateKey, {
   schedules,
   conflictSchedules,
@@ -153,9 +199,10 @@ export function weekSlotSelectMeta(opt, dateKey, {
   currentValue,
   extraTakenRanges,
 } = {}) {
-  const start = opt.start || opt.value;
-  const elapsed = isWeekSlotElapsed(dateKey, start, opt.end, now);
-  const optEnd = opt.end || endTimeFromStart(start);
+  const parsed = parseSlotValue(opt?.value);
+  const start = opt.start || parsed.start;
+  const optEnd = opt.end || parsed.end || endTimeFromStart(start);
+  const elapsed = isWeekSlotElapsed(dateKey, start, optEnd, now);
   const isCurrent = String(currentValue || '') === String(opt.value);
   let holdMatch = null;
   if (!elapsed) {
@@ -206,32 +253,34 @@ export function slotValueFromSchedule(sch) {
   if (!sch) return '';
   const start = normalizeTimeHHmm(sch.startTime, '');
   if (!start) return '';
-  const known = WEEK_SLOT_OPTIONS.some((o) => o.value === start);
-  return known ? start : start;
+  const end = normalizeSlotEnd(sch.endTime) || endTimeFromStart(start);
+  return encodeSlotValue(start, end);
+}
+
+export function extraSlotOptionFromValue(value, sch = null) {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw === CUSTOM_SLOT_SENTINEL) return null;
+  if (WEEK_SLOT_OPTIONS.some((o) => o.value === raw)) return null;
+  const { start, end } = parseSlotValue(raw, sch);
+  if (!start) return null;
+  const encoded = encodeSlotValue(start, end);
+  if (WEEK_SLOT_OPTIONS.some((o) => o.value === encoded)) return null;
+  return {
+    start,
+    end,
+    value: encoded,
+    label: formatSlotRangeLabel(start, end),
+  };
 }
 
 export function extraSlotOption(sch) {
   if (!sch) return null;
-  const start = normalizeTimeHHmm(sch.startTime, '');
-  if (!start) return null;
-  if (WEEK_SLOT_OPTIONS.some((o) => o.value === start)) return null;
-  const end = sch.endTime ? normalizeTimeHHmm(sch.endTime, '') : '';
-  return {
-    start,
-    end,
-    value: start,
-    label: end ? `${start} - ${end}` : start,
-  };
+  return extraSlotOptionFromValue(slotValueFromSchedule(sch), sch);
 }
 
-export function slotEndForStart(start, sch) {
-  if (!start) return '';
-  const known = WEEK_SLOT_OPTIONS.find((o) => o.value === start);
-  if (known?.end) return known.end;
-  const extra = extraSlotOption(sch);
-  if (extra?.end) return extra.end;
-  if (sch?.endTime) return normalizeTimeHHmm(sch.endTime, '') || endTimeFromStart(start);
-  return endTimeFromStart(start);
+export function slotEndForStart(slotVal, sch) {
+  if (!slotVal || slotVal === CUSTOM_SLOT_SENTINEL) return '';
+  return parseSlotValue(slotVal, sch).end;
 }
 
 function rowKeyOf(student) {
@@ -261,9 +310,12 @@ export function otherTeacherRowRanges({
     if (rk && rk === excludeRowKey) continue;
     const hold = holds?.[`${rk}|${dateKey}`];
     if (hold?.start) {
+      const parsedHold = parseSlotValue(hold.start);
+      const start = parsedHold.start || normalizeTimeHHmm(hold.start, '');
+      const end = normalizeSlotEnd(hold.end) || parsedHold.end || endTimeFromStart(start);
       ranges.push({
-        start: hold.start,
-        end: hold.end || slotEndForStart(hold.start),
+        start,
+        end,
         studentName: hold.studentName || studentLabel(student),
       });
       continue;
@@ -271,11 +323,13 @@ export function otherTeacherRowRanges({
     const sid = String(student?._id || student?.id || '');
     const dayOccupying = findStudentDayOccupying(schedules, sid, dateKey);
     const own = occupyingMatchesCourse(dayOccupying, student.course) ? dayOccupying : null;
-    const start = slotValueFromSchedule(own);
+    const slotVal = slotValueFromSchedule(own);
+    if (!slotVal) continue;
+    const { start, end } = parseSlotValue(slotVal, own);
     if (!start) continue;
     ranges.push({
       start,
-      end: slotEndForStart(start, own),
+      end,
       studentName: studentLabel(student, own),
     });
   }

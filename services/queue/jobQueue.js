@@ -3,6 +3,7 @@
  * Queues: notify (OTP/email/Zalo), pdf (hoa don).
  */
 const logger = require('../../config/logger');
+const { resolveRedisUrl, resolveBullMqPrefix, ensureRedisReady, inspectRedisServerInfo } = require('../../config/redis');
 const { processNotifyJob, processPdfJob } = require('./processors');
 
 const QUEUE_NOTIFY = 'cms-notify';
@@ -71,21 +72,37 @@ async function initJobQueue(opts = {}) {
     opts.workers === true ||
     (opts.workers !== false && process.env.QUEUE_PRODUCER_ONLY !== '1' && process.env.RUN_QUEUE_WORKERS !== '0');
 
-  if (!process.env.REDIS_URL) {
+  const redisUrl = resolveRedisUrl();
+  if (!redisUrl) {
     mode = 'inline';
-    logger.info('Job queue: inline mode (no REDIS_URL)');
+    logger.info('Job queue: inline mode (Redis disabled or no REDIS_URL)');
     return { mode };
+  }
+
+  // BullMQ yêu cầu Redis >= 5.0.0; kiểm tra phiên bản trước khi khởi tạo để tránh lặp lỗi khi dev dùng Redis Windows 3.0.x
+  const readyState = await ensureRedisReady(1500);
+  if (readyState.ready) {
+    const serverInfo = await inspectRedisServerInfo();
+    if (serverInfo.available && !serverInfo.bullMqCompatible) {
+      mode = 'inline';
+      logger.warn(
+        { redisVersion: serverInfo.version, required: '>=5.0.0', recommended: '7.x' },
+        'Job queue: Redis version < 5.0.0 — BullMQ disabled cleanly (inline mode); upgrade to Redis 7.x for BullMQ',
+      );
+      return { mode, reason: 'redis_version_below_5', redisVersion: serverInfo.version };
+    }
   }
 
   try {
     const { Queue, Worker } = require('bullmq');
-    const base = parseRedisUrl(process.env.REDIS_URL);
+    const base = parseRedisUrl(redisUrl);
+    const bullPrefix = resolveBullMqPrefix();
 
     const qConn = { ...base };
     connections.push(qConn);
 
-    notifyQueue = new Queue(QUEUE_NOTIFY, { connection: qConn });
-    pdfQueue = new Queue(QUEUE_PDF, { connection: { ...base } });
+    notifyQueue = new Queue(QUEUE_NOTIFY, { connection: qConn, prefix: bullPrefix });
+    pdfQueue = new Queue(QUEUE_PDF, { connection: { ...base }, prefix: bullPrefix });
 
     if (wantWorkers) {
       const wNotifyConn = { ...base };
@@ -95,12 +112,12 @@ async function initJobQueue(opts = {}) {
       const notifyWorker = new Worker(
         QUEUE_NOTIFY,
         async (job) => processNotifyJob(job.name, job.data),
-        { connection: wNotifyConn, concurrency: 3 },
+        { connection: wNotifyConn, prefix: bullPrefix, concurrency: 3 },
       );
       const pdfWorker = new Worker(
         QUEUE_PDF,
         async (job) => processPdfJob(job.name, job.data),
-        { connection: wPdfConn, concurrency: 2 },
+        { connection: wPdfConn, prefix: bullPrefix, concurrency: 2 },
       );
 
       for (const w of [notifyWorker, pdfWorker]) {
