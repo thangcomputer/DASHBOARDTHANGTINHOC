@@ -22,7 +22,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, Sparkles, type LucideIcon } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, type LucideIcon } from 'lucide-react-native';
+import { AiSearchHeaderButton } from './ai/AiSearchHeaderButton';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
@@ -345,21 +346,11 @@ const BrandingTopBar = React.memo(function BrandingTopBar() {
           </Pressable>
         </View>
         <View style={[styles.topBarActionsRow, styles.topBarActionsRowStudent]}>
-          <Pressable
+          <AiSearchHeaderButton
             onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
-            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-            style={({ pressed }) => [
-              styles.topBarAiChip,
-              compactTopBar && styles.topBarAiChipIconOnly,
-              pressed && styles.topBarAiChipPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Tìm kiếm bằng AI"
-          >
-            <Search size={16} color="#10B981" strokeWidth={2.4} />
-            {compactTopBar ? null : <Sparkles size={11} color="#10B981" strokeWidth={2.4} />}
-            {compactTopBar ? null : <Text style={styles.topBarAiText}>AI</Text>}
-          </Pressable>
+            compact={compactTopBar || compactLogoWithAi}
+            iconOnly={compactTopBar}
+          />
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
             style={({ pressed }) => [
@@ -777,10 +768,6 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarMenuCompact: { width: 40, height: 40, minWidth: 40, paddingHorizontal: 0 },
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  topBarAiChip: { zIndex: 1, height: 36, minWidth: 36, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: '#10B981', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, shadowColor: '#10B981', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  topBarAiChipIconOnly: { width: 36, paddingHorizontal: 0 },
-  topBarAiChipPressed: { transform: [{ scale: 0.96 }] },
-  topBarAiText: { color: '#10B981', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarActionCompact: { width: 38, height: 38 },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },

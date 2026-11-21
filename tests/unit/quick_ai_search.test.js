@@ -87,21 +87,24 @@ test('services/aiSupportService quickAskAssistant hits memory for FAQs & simple 
 
 test('Web and Mobile headers merge AI + Search into a single AI button wired to unified popups', () => {
   const webHeader = read('client/src/components/DashboardLayout.jsx');
-  assert.match(webHeader, /aria-label="Tìm kiếm bằng AI"/);
-  assert.match(webHeader, /<SearchCheck\b/);
-  assert.match(webHeader, /Tìm kiếm/);
-  assert.doesNotMatch(webHeader, /dewskill-ai-icon\.webp/);
-  assert.match(webHeader, />\s*AI\s*<\/span>/);
-  assert.match(webHeader, /rounded-full/);
+  const webButton = read('client/src/components/ui/AiSearchPillButton.jsx');
+  assert.match(webButton, /ariaLabel = 'Tìm kiếm bằng AI'/);
+  assert.match(webButton, /aria-label=\{ariaLabel\}/);
+  assert.match(webButton, /search-ai-icon\.svg/);
+  assert.match(webButton, /ai-sparkles\.svg/);
+  assert.match(webButton, /mint-wave\.svg/);
+  assert.match(webButton, /Tìm kiếm/);
+  assert.match(webButton, />\s*AI\s*</);
+  assert.doesNotMatch(webButton, /dewskill-ai-icon\.webp/);
+  assert.match(webHeader, /<AiSearchPillButton\b/);
   assert.doesNotMatch(webHeader, /conic-gradient\(/);
-  assert.doesNotMatch(webHeader, /aria-label="Tìm kiếm nhanh \(Ctrl\+K\)"/);
 
+  const mobileButton = read('thang-tin-hoc-mobile/src/components/ai/AiSearchHeaderButton.tsx');
   const mobileHeader = read('thang-tin-hoc-mobile/src/components/ui.tsx');
-  assert.match(mobileHeader, /accessibilityLabel="Tìm kiếm bằng AI"/);
-  assert.match(mobileHeader, /<Search\b/);
-  assert.match(mobileHeader, /<Sparkles\b/);
-  assert.match(mobileHeader, />AI</);
-  assert.doesNotMatch(mobileHeader, /topBarAiLabel/);
+  assert.match(mobileButton, /accessibilityLabel="Tìm kiếm bằng AI"/);
+  assert.match(mobileButton, /<SearchAiIcon\b/);
+  assert.match(mobileButton, />AI</);
+  assert.match(mobileHeader, /<AiSearchHeaderButton\b/);
   assert.doesNotMatch(mobileHeader, /dewskill-ai-icon\.webp/);
   assert.doesNotMatch(mobileHeader, /topBarAiBorderSpinner/);
   assert.doesNotMatch(mobileHeader, /accessibilityLabel="Tìm kiếm và tác vụ nhanh"/);
