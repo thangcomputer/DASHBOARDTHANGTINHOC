@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../utils/useToast';
+import {
+  attendanceConfirmKey,
+  confirmAndQueueAttendance,
+  getAttendanceConfirm,
+  removeAttendanceConfirm,
+  subscribeAttendanceConfirm,
+} from '../../utils/attendanceConfirmStore';
 import { BookText, CalendarDays, CheckCircle, Clock3, Users, Video, UserCheck } from 'lucide-react';
 import {
   formatLocalDateKey,
@@ -154,6 +162,13 @@ export default function TeacherTeachingLog({
 }) {
   const copy = COPY[variant] || COPY.teacher;
   const navigate = useNavigate();
+  const toast = useToast();
+  const [confirmTick, setConfirmTick] = useState(0);
+  useEffect(() => subscribeAttendanceConfirm(() => setConfirmTick((n) => n + 1)), []);
+  useEffect(() => {
+    const id = setInterval(() => setConfirmTick((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, []);
   const [tab, setTab] = useState('all');
   const [makeupTarget, setMakeupTarget] = useState(null);
   const [, refreshMakeupPending] = useReducer((revision) => revision + 1, 0);
@@ -219,7 +234,63 @@ export default function TeacherTeachingLog({
 
   const emptyText = copy.empty[tab];
 
-  const openAttendanceFor = (sch) => {
+  const matchStudent = (sch) => {
+    const sid = resolveStudentId(sch);
+    const schCourse = String(sch.course || sch.courseName || '').trim().toLowerCase();
+    return (students || []).find(
+      (s) => String(s._id || s.id) === sid && (!schCourse || String(s.course || '').trim().toLowerCase() === schCourse),
+    ) || studentById.get(sid) || null;
+  };
+
+  const pendingForSchedule = (sch) => {
+    void confirmTick;
+    const student = matchStudent(sch);
+    const key = attendanceConfirmKey(student || { _id: resolveStudentId(sch), id: resolveStudentId(sch) });
+    const item = key ? getAttendanceConfirm(key) : null;
+    if (!item) return null;
+    const schId = String(sch?._id || sch?.id || '');
+    if (item.scheduleId && schId && String(item.scheduleId) !== schId) return null;
+    const remain = Math.max(0, Math.ceil((Number(item.endsAt) - Date.now()) / 1000));
+    return { key, item, remain };
+  };
+
+  const openAttendanceFor = async (sch) => {
+    const kindNow = getScheduleDisplayKind(sch, now);
+    const overdue = kindNow === 'overdue_attendance' || kindNow === 'makeup_attendance';
+    if (overdue) {
+      if (typeof onOpenAttendance === 'function') {
+        onOpenAttendance(sch);
+        return;
+      }
+    } else if (variant === 'teacher') {
+      const pending = pendingForSchedule(sch);
+      if (pending?.item?.committing) return;
+      if (pending) {
+        removeAttendanceConfirm(pending.key);
+        toast.success('Đã hủy điểm danh - buổi chưa được tính.');
+        return;
+      }
+      const sid = resolveStudentId(sch);
+      const found = matchStudent(sch);
+      const course = String(sch.course || sch.courseName || found?.course || '').trim();
+      const student = found
+        ? { ...found, course: course || found.course || '' }
+        : {
+          _id: sid,
+          id: sid,
+          name: sch.studentName || 'Học viên',
+          course,
+        };
+      const queued = await confirmAndQueueAttendance({
+        student,
+        schedule: sch,
+        teacherId: String(teacherSession.id || teacherSession._id || ''),
+        note: 'Đã điểm danh hoàn thành buổi học',
+        grade: 0,
+      });
+      if (queued) toast.info('Đã ghi nhận. Còn 10 giây để hủy trên nút Điểm danh.');
+      return;
+    }
     if (typeof onOpenAttendance === 'function') {
       onOpenAttendance(sch);
       return;
@@ -378,7 +449,10 @@ export default function TeacherTeachingLog({
                       && !makeupRequestSent
                       && PENDING_KINDS.has(kind)
                       && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
-                    const actionLabel = isOverdueKind ? 'Điểm danh bù' : 'Điểm danh';
+                    const undo = !isOverdueKind ? pendingForSchedule(sch) : null;
+                    const actionLabel = undo
+                      ? (undo.item?.committing ? 'Đang ghi nhận' : `Hủy điểm danh (${undo.remain}s)`)
+                      : (isOverdueKind ? 'Điểm danh bù' : 'Điểm danh');
 
                     return (
                       <tr
@@ -450,11 +524,13 @@ export default function TeacherTeachingLog({
                             <button
                               type="button"
                               onClick={() => openAttendanceFor(sch)}
-                              className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-extrabold transition-colors cursor-pointer ${isOverdueKind
+                              className={`inline-flex min-h-8 items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-extrabold transition-colors cursor-pointer ${undo
+                                  ? 'border-red-700 bg-red-600 text-white hover:bg-red-700'
+                                  : isOverdueKind
                                   ? 'border-amber-600 bg-amber-500 text-white hover:bg-amber-600'
                                   : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'
                                 }`}
-                              title={isOverdueKind ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
+                              title={undo ? 'Hủy điểm danh trong 10 giây, buổi chưa được tính' : isOverdueKind ? 'Mở yêu cầu điểm danh bù' : 'Đồng ý điểm danh hoặc hủy bỏ'}
                             >
                               {!isOverdueKind
                                 ? <CheckCircle size={12} />

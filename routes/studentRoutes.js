@@ -38,6 +38,7 @@ const {
   studentMatchesTeacher,
   resolveEnrollmentExamSubjects,
   syncStudentFromPrimaryEnrollment,
+  syncEnrollmentLifecycle,
   sanitizeTeacherAlert,
 } = require('../services/enrollmentService');
 
@@ -1505,6 +1506,10 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
             enr.totalSessions = ts;
             enr.completedSessions = completed;
             enr.remainingSessions = remaining;
+            syncEnrollmentLifecycle(enr);
+            if (enr.status === 'active' && ['hoàn thành', 'hoan thanh', 'completed'].includes(String(student.status || '').trim().toLowerCase())) {
+              student.status = 'Đang học';
+            }
             student.totalSessions = ts;
             student.completedSessions = completed;
             student.remainingSessions = remaining;
@@ -3039,6 +3044,10 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
       enr.totalSessions = ts;
       enr.completedSessions = completed;
       enr.remainingSessions = remaining;
+      syncEnrollmentLifecycle(enr);
+      if (enr.status === 'active' && ['hoàn thành', 'hoan thanh', 'completed'].includes(String(student.status || '').trim().toLowerCase())) {
+        student.status = 'Đang học';
+      }
 
       // Khóa chính → đồng bộ root student (list / legacy)
       if (enr.isPrimary || student.enrollments.length === 1) {

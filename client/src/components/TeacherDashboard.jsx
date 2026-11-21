@@ -383,11 +383,11 @@ const TeacherDashboard = () => {
     });
   }, [students, hashQuery]);
 
-  const markAttendance = async (id, noteParam, gradeParam, courseName) => {
+  const markAttendance = async (id, noteParam, gradeParam, courseName, scheduleId, lateReason, enrollmentId) => {
     const note = noteParam || noteInputs[id] || 'Đã điểm danh';
     const grade = gradeParam !== undefined ? gradeParam : (gradeInputs[id] || 0);
     try {
-      await ctxMarkAttendance(id, note, Number(grade), courseName);
+      await ctxMarkAttendance(id, note, Number(grade), courseName, scheduleId, lateReason, enrollmentId);
       toast.success('Đã điểm danh thành công!');
     } catch (err) {
       if (err.cooldown) {

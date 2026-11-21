@@ -171,8 +171,10 @@ async function payTeacherForStudent({
   }
 
   const salaryPerSession = Number(teacher.baseSalaryPerSession) || 0;
+  // Chỉ buổi do đúng giảng viên này dạy. Buổi của GV cũ giữ lại để trả ở sổ lương GV đó.
   const pendingSessions = await Schedule.find({
     studentId,
+    teacherId: teacher._id,
     status: 'completed',
     is_paid_to_teacher: { $ne: true },
   }).sort({ date: 1, createdAt: 1 }).select('_id').lean();
@@ -182,7 +184,15 @@ async function payTeacherForStudent({
   const amount = paidCount * salaryPerSession;
 
   if (paidCount <= 0 && action !== 'PAID_IN_ADVANCE') {
-    const err = new Error('Không có buổi hoàn thành chưa thanh toán');
+    const otherTeacherCount = await Schedule.countDocuments({
+      studentId,
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true },
+      teacherId: { $ne: teacher._id },
+    });
+    const err = new Error(otherTeacherCount > 0
+      ? 'Các buổi chưa trả lương thuộc giảng viên đã dạy trước. Thanh toán tại sổ lương của giảng viên đó.'
+      : 'Không có buổi hoàn thành chưa thanh toán');
     err.status = 409;
     throw err;
   }

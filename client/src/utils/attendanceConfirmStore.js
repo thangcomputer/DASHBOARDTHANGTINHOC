@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { useToast } from './useToast';
+import { cmsConfirmAction } from './cmsDialog';
 
 export const ATTENDANCE_CONFIRM_MS = 10_000;
 const STORAGE_KEY = 'cms_attendance_confirm_pending';
@@ -76,6 +77,43 @@ export function takeAttendanceConfirm(key) {
   delete next[key];
   writeMap(next);
   return item;
+}
+
+/** Hỏi đồng ý / hủy bỏ, rồi mở cửa sổ 10 giây để hủy trên chính nút điểm danh. */
+export async function confirmAndQueueAttendance({
+  student,
+  schedule,
+  teacherId,
+  note,
+  grade = 0,
+} = {}) {
+  const name = student?.name || schedule?.studentName || 'học viên';
+  const course = String(student?.course || schedule?.course || schedule?.courseName || '').trim();
+  const ok = await cmsConfirmAction(
+    `Điểm danh buổi học cho ${name}${course ? ` · ${course}` : ''}?`,
+    {
+      title: 'Điểm danh',
+      confirmText: 'Đồng ý',
+      cancelText: 'Hủy bỏ',
+      type: 'warning',
+    },
+  );
+  if (!ok) return null;
+  const key = attendanceConfirmKey(student);
+  if (!key) return null;
+  const scheduleId = schedule?._id || schedule?.id || '';
+  const payload = {
+    studentId: String(student?._id || student?.id || ''),
+    courseName: course,
+    scheduleId: scheduleId ? String(scheduleId) : '',
+    enrollmentId: String(student?._enrollmentId || schedule?.enrollmentId || '') || '',
+    note: note || 'Đã điểm danh hoàn thành buổi học',
+    grade: Number(grade) || 0,
+    endsAt: Date.now() + ATTENDANCE_CONFIRM_MS,
+    teacherId: String(teacherId || ''),
+  };
+  upsertAttendanceConfirm(key, payload);
+  return { key, ...payload };
 }
 
 export function subscribeAttendanceConfirm(fn) {
@@ -187,6 +225,8 @@ export function useAttendanceConfirmFlush({ enabled, teacherId }) {
           Number(entry.grade),
           entry.courseName,
           entry.scheduleId || undefined,
+          undefined,
+          entry.enrollmentId || undefined,
         );
         toastRef.current.success('Đã gửi điểm danh - đang chờ học viên xác nhận.');
       } catch (err) {

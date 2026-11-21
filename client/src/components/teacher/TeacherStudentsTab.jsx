@@ -328,7 +328,7 @@ export default function TeacherStudentsTab({
                 </button>
                 <TeacherStudentCard
                   key={student._enrollmentKey || student._id || student.id} student={student}
-                  onAttendance={(id, note, grade) => markAttendance(id, note, grade, courseName)} onUpdateLink={updateLink}
+                  onAttendance={(id, note, grade) => markAttendance(id, note, grade, courseName, undefined, undefined, student._enrollmentId)} onUpdateLink={updateLink}
                   onSaveGrade={saveGrade} onUpdateNotes={updateNotes}
                   onLockExam={lockStudentExam}
                   isDetailed={true}

@@ -166,6 +166,48 @@ function toClientCourse(enrollment, index) {
   };
 }
 
+/**
+ * Khóa completed tự mở lại khi Admin tăng tổng buổi (đã học < tổng).
+ * Không đụng khóa hủy, hoàn phí, tạm dừng, chờ thanh toán.
+ */
+function completedCountFromSchedules({
+  enrollmentKey,
+  courseKey,
+  idx,
+  sessionByEnrollment,
+  allByCourse,
+  unlinkedByCourse,
+  sameCourseCounts,
+  firstIdxByCourse,
+}) {
+  if (enrollmentKey && sessionByEnrollment[enrollmentKey] != null) {
+    return sessionByEnrollment[enrollmentKey];
+  }
+  if (courseKey && sameCourseCounts[courseKey] === 1) {
+    return allByCourse[courseKey];
+  }
+  if (!enrollmentKey && courseKey && firstIdxByCourse[courseKey] === idx) {
+    return unlinkedByCourse[courseKey];
+  }
+  // Nhiều khóa cùng tên (hoàn phí rồi đăng ký lại): không cộng lịch không gắn id
+  // của khóa cũ vào khóa mới. Chỉ tính lịch có đúng enrollmentId.
+  return undefined;
+}
+
+function syncEnrollmentLifecycle(enrollment) {
+  if (!enrollment) return enrollment;
+  const st = String(enrollment.status || 'active').toLowerCase();
+  if (['cancelled', 'refunded', 'paused', 'pending_payment'].includes(st)) return enrollment;
+  const total = Number(enrollment.totalSessions) > 0 ? Number(enrollment.totalSessions) : 12;
+  const hasCounter = enrollment.completedSessions != null || enrollment.remainingSessions != null;
+  if (!hasCounter) return enrollment;
+  const done = enrollment.completedSessions != null
+    ? Math.max(0, Number(enrollment.completedSessions) || 0)
+    : Math.max(0, total - (Number(enrollment.remainingSessions) || 0));
+  enrollment.status = done >= total ? 'completed' : 'active';
+  return enrollment;
+}
+
 function normCourseName(name) {
   return String(name || '').trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -389,16 +431,16 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     // → Điểm danh vẫn tăng tiến độ; Admin nhập tay "đã học" (migration / bù) không bị tụt về 0 khi chưa có lịch.
     const courseKey = normCourseName(courseName);
     const enrollmentKey = e._id ? String(e._id) : '';
-    let fromSchedule;
-    if (enrollmentKey && sessionByEnrollment[enrollmentKey] != null) {
-      fromSchedule = sessionByEnrollment[enrollmentKey];
-    } else if (!enrollmentKey && courseKey && sameCourseCounts[courseKey] === 1) {
-      fromSchedule = allByCourse[courseKey];
-    } else if (courseKey && firstIdxByCourse[courseKey] === idx) {
-      fromSchedule = unlinkedByCourse[courseKey];
-    } else {
-      fromSchedule = undefined;
-    }
+    const fromSchedule = completedCountFromSchedules({
+      enrollmentKey,
+      courseKey,
+      idx,
+      sessionByEnrollment,
+      allByCourse,
+      unlinkedByCourse,
+      sameCourseCounts,
+      firstIdxByCourse,
+    });
     const fromStored = Number(e.completedSessions) || 0;
     const completed = fromSchedule != null
       ? Math.max(Number(fromSchedule) || 0, fromStored)
@@ -421,9 +463,9 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
         || '',
       completedSessions: completed,
       remainingSessions: Math.max(0, total - completed),
-      status: (e.status === 'cancelled' || e.status === 'refunded')
+      status: (e.status === 'cancelled' || e.status === 'refunded' || e.status === 'paused' || e.status === 'pending_payment')
         ? e.status
-        : (completed >= total ? 'completed' : (e.status || 'active')),
+        : (completed >= total ? 'completed' : 'active'),
       grades: enrGrades,
       requireWebcam: e.requireWebcam === true || inheritWebcamOn,
       examUnlocked: e.examUnlocked === true || inheritUnlock,
@@ -521,7 +563,7 @@ function expandStudentsForTeacher(students, teacherId) {
         const locked = st === 'cancelled' || st === 'refunded';
         const resolvedStatus = locked
           ? 'Thôi học'
-          : (st === 'completed' ? 'Hoàn thành' : (rootIsDropped || !rawRootSt ? 'Đang học' : rawRootSt));
+          : (st === 'completed' ? 'Hoàn thành' : (st === 'active' ? 'Đang học' : (rootIsDropped || !rawRootSt ? 'Đang học' : rawRootSt)));
         result.push({
           ...student,
           id: student.id || student._id,
@@ -709,5 +751,7 @@ module.exports = {
   resolveEnrollmentExamSubjects,
   recordAttendanceGrade,
   normCourseName,
+  syncEnrollmentLifecycle,
+  completedCountFromSchedules,
   syncStudentFromPrimaryEnrollment,
 };

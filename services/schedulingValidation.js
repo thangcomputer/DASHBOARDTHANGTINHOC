@@ -214,7 +214,12 @@ async function assertEnrollmentCanSchedule({
   const totalSessions = Number(enr.totalSessions) > 0 ? Number(enr.totalSessions) : 12;
   const courseKey = enr.courseName || courseName || student.course || '';
 
-  if (status === 'completed') {
+  const storedDoneEarly = enr.completedSessions != null
+    ? Math.max(0, Number(enr.completedSessions) || 0)
+    : Math.max(0, totalSessions - (Number(enr.remainingSessions) || 0));
+  const reopened = status === 'completed' && storedDoneEarly < totalSessions;
+
+  if (status === 'completed' && !reopened) {
     throw schedulingError(
       ERROR_CODES.ENROLLMENT_COMPLETED,
       `Khóa học đã hoàn thành đủ ${totalSessions}/${totalSessions} buổi, không thể xếp thêm lịch.`,
@@ -222,7 +227,7 @@ async function assertEnrollmentCanSchedule({
     );
   }
 
-  if (status !== 'active') {
+  if (status !== 'active' && !reopened) {
     throw schedulingError(
       ERROR_CODES.ENROLLMENT_NOT_ACTIVE,
       `Khóa học đang ở trạng thái "${status}", không thể xếp lịch.`,

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import { CalendarDays, CalendarPlus, Check, CheckCircle, Clock, Ban, Copy, Download, ExternalLink, QrCode, Table2, Video, X } from 'lucide-react';
 import TeacherMonthlyCalendar from './TeacherMonthlyCalendar';
 import TeacherWeeklySlotGrid from './TeacherWeeklySlotGrid';
@@ -19,6 +18,7 @@ import {
 import { isDateInCalendarMonth } from '../../utils/teacherFinance';
 import { TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT, SHOW_TEACHER_MONTHLY_CALENDAR } from '../../utils/weeklySlotGrid';
 import { useToast } from '../../utils/useToast';
+import { confirmAndQueueAttendance } from '../../utils/attendanceConfirmStore';
 
 function resolveStudentId(sch) {
   return String(
@@ -101,7 +101,6 @@ export default function TeacherScheduleTab({
   updateSchedule,
   allSchedules,
 }) {
-  const navigate = useNavigate();
   const toast = useToast();
   const today = useMemo(() => new Date(), []);
   const [makeupTarget, setMakeupTarget] = useState(null);
@@ -321,24 +320,35 @@ export default function TeacherScheduleTab({
     return (mySchedules || []).filter(s => s.status === 'cancelled' && isCurrentMonth(s)).length;
   }, [mySchedules, isCurrentMonth]);
 
-  const openStudentProfile = useCallback((sch) => {
-    const sid = resolveStudentId(sch);
-    if (!sid) {
-      toast.error('Không tìm thấy học viên của ca này.');
-      return;
-    }
-    const course = String(sch.course || sch.courseName || '').trim();
-    const q = new URLSearchParams();
-    q.set('studentId', sid);
-    if (course) q.set('course', course);
-    navigate(`/teacher#students?${q.toString()}`);
-  }, [navigate, toast]);
-
-  /** Nhật ký: quá hạn / hết hạn xác nhận → popup điểm danh bù tại chỗ; còn lại → hồ sơ HV. */
-  const handleOpenAttendance = useCallback((sch) => {
+  /** Quá hạn → điểm danh bù. Buổi trong hạn → hỏi đồng ý, rồi hủy được trên nút trong 10 giây. */
+  const handleOpenAttendance = useCallback(async (sch) => {
     const kind = getScheduleDisplayKind(sch);
     if (kind !== 'overdue_attendance' && kind !== 'makeup_attendance') {
-      openStudentProfile(sch);
+      const sid = resolveStudentId(sch);
+      if (!sid) {
+        toast.error('Không tìm thấy học viên của ca này.');
+        return;
+      }
+      const schCourse = String(sch.course || sch.courseName || '').trim().toLowerCase();
+      const found = (students || []).find(
+        (s) => String(s._id || s.id) === sid && (!schCourse || String(s.course || '').trim().toLowerCase() === schCourse),
+      ) || (students || []).find((s) => String(s._id || s.id) === sid);
+      const student = found
+        ? { ...found, course: sch.course || sch.courseName || found.course || '' }
+        : {
+          _id: sid,
+          id: sid,
+          name: sch.studentName || 'Học viên',
+          course: sch.course || sch.courseName || '',
+        };
+      const queued = await confirmAndQueueAttendance({
+        student,
+        schedule: sch,
+        teacherId: String(teacherId || teacherSession.id || teacherSession._id || ''),
+        note: 'Đã điểm danh hoàn thành buổi học',
+        grade: 0,
+      });
+      if (queued) toast.info('Đã ghi nhận. Còn 10 giây để hủy trên nút Điểm danh.');
       return;
     }
     const sid = resolveStudentId(sch);
@@ -362,7 +372,7 @@ export default function TeacherScheduleTab({
           totalSessions: sch.totalSessions,
         };
     setMakeupTarget({ schedule: sch, student });
-  }, [openStudentProfile, students, toast]);
+  }, [students, toast, teacherId, teacherSession]);
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full min-w-0 bg-[#F5F8FC] py-3 sm:py-6 animate-in fade-in duration-500">

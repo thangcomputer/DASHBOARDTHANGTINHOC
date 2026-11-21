@@ -31,6 +31,41 @@ function scheduleStudentId(schedule) {
   return raw;
 }
 
+function enrollmentIsClosed(enrollment) {
+  const status = String(enrollment?.status || '').toLowerCase();
+  if (['cancelled', 'refunded', 'paused', 'pending_payment'].includes(status)) return true;
+  const total = Number(enrollment?.totalSessions) > 0 ? Number(enrollment.totalSessions) : 12;
+  const hasCounter = enrollment?.completedSessions != null || enrollment?.remainingSessions != null;
+  if (status === 'completed' && !hasCounter) return true;
+  const done = enrollment?.completedSessions != null
+    ? Math.max(0, Number(enrollment.completedSessions) || 0)
+    : (hasCounter ? Math.max(0, total - (Number(enrollment.remainingSessions) || 0)) : 0);
+  if (status === 'completed') return done >= total;
+  return done >= total && hasCounter;
+}
+
+/**
+ * Khóa dùng để điểm danh: ưu tiên enrollment đang học.
+ * Không lấy bản ghi cũ cùng tên khóa (đã hoàn thành / hủy / hoàn phí) khi còn khóa active.
+ */
+function pickAttendanceEnrollment(enrollments, schedule) {
+  const enrs = Array.isArray(enrollments) ? enrollments : [];
+  const courseKey = normCourseName(schedule?.course);
+  const byId = schedule?.enrollmentId
+    ? enrs.find((e) => String(e._id) === String(schedule.enrollmentId))
+    : null;
+  if (byId && !enrollmentIsClosed(byId)) return byId;
+
+  const sameCourse = courseKey
+    ? enrs.filter((e) => normCourseName(e.courseName || e.course) === courseKey)
+    : enrs;
+  return sameCourse.find((e) => String(e.status || '').toLowerCase() === 'active')
+    || sameCourse.find((e) => !enrollmentIsClosed(e))
+    || (byId && enrollmentIsClosed(byId) ? byId : null)
+    || sameCourse.find((e) => enrollmentIsClosed(e))
+    || null;
+}
+
 function attendanceError(message, code, status = 409) {
   const err = new Error(message);
   err.code = code;
@@ -427,15 +462,10 @@ async function completeScheduleAttendance({
       .select('enrollments course status totalSessions completedSessions')
       .lean();
     if (studentForEnr) {
-      const courseKey = normCourseName(schedule.course);
       const enrs = Array.isArray(studentForEnr.enrollments) ? studentForEnr.enrollments : [];
-      const enr = schedule.enrollmentId
-        ? enrs.find((e) => String(e._id) === String(schedule.enrollmentId))
-        : courseKey
-          ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
-          : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
-      const enrStatus = String(enr?.status || '').toLowerCase();
-      if (enr && ['cancelled', 'refunded', 'completed'].includes(enrStatus)) {
+      const enr = pickAttendanceEnrollment(enrs, schedule);
+      if (enr?._id) schedule.enrollmentId = enr._id;
+      if (enr && enrollmentIsClosed(enr)) {
         throw attendanceError(
           'Enrollment không còn active - không thể điểm danh buổi mới.',
           ATTENDANCE_CODES.ENROLLMENT_COMPLETED,
@@ -492,6 +522,7 @@ async function completeScheduleAttendance({
     note: nextNote,
     studentConfirmStatus: confirmFinal,
     studentConfirmedAt: new Date(),
+    ...(schedule.enrollmentId ? { enrollmentId: schedule.enrollmentId } : {}),
   };
   if (forceFinalizeConfirm && confirmOutcome === 'admin_approved') {
     setDoc.attendanceDisputeResolvedAt = new Date();
@@ -652,13 +683,10 @@ async function requestStudentAttendanceConfirm({
       .select('enrollments course status totalSessions completedSessions')
       .lean();
     if (studentForEnr) {
-      const courseKey = normCourseName(schedule.course);
       const enrs = Array.isArray(studentForEnr.enrollments) ? studentForEnr.enrollments : [];
-      const enr = courseKey
-        ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
-        : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
-      const enrStatus = String(enr?.status || '').toLowerCase();
-      if (enr && ['cancelled', 'refunded', 'completed'].includes(enrStatus)) {
+      const enr = pickAttendanceEnrollment(enrs, schedule);
+      if (enr?._id) schedule.enrollmentId = enr._id;
+      if (enr && enrollmentIsClosed(enr)) {
         throw attendanceError(
           'Enrollment không còn active - không thể điểm danh buổi mới.',
           ATTENDANCE_CODES.ENROLLMENT_COMPLETED,
@@ -708,6 +736,7 @@ async function requestStudentAttendanceConfirm({
         attendancePendingGrade: grade != null && Number.isFinite(Number(grade)) ? Number(grade) : null,
         sessionOrdinalPreview: sessionOrdinal,
         sessionTotalPreview: sessionTotal,
+        ...(schedule.enrollmentId ? { enrollmentId: schedule.enrollmentId } : {}),
       },
     },
     { new: true, runValidators: true },
@@ -854,6 +883,8 @@ async function resolveAttendanceDispute({ schedule, actor, decision }) {
 }
 
 module.exports = {
+  pickAttendanceEnrollment,
+  enrollmentIsClosed,
   syncEnrollmentProgressAfterAttendance,
   maybeNotifyOverdueAttendance,
   maybeEscalateUnconfirmedAttendance,

@@ -61,7 +61,7 @@ export function useDataSchedule({
 }) {
 
   // Điểm danh (GV)
-  const markAttendance = useCallback(async (studentId, note, grade, courseName, scheduleId, lateReason) => {
+  const markAttendance = useCallback(async (studentId, note, grade, courseName, scheduleId, lateReason, enrollmentId) => {
     const root = students.find(s => String(s._id || s.id) === String(studentId));
     if (!root) throw new Error('Không tìm thấy học viên');
 
@@ -230,6 +230,7 @@ export function useDataSchedule({
           startTime: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           endTime: new Date(now.getTime() + 90 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           course: courseName || targetStudentSync.course || '',
+          enrollmentId: enrollmentId || targetStudentSync._enrollmentId || undefined,
           status: 'scheduled',
           paymentStatus: 'pending',
         };
