@@ -93,7 +93,15 @@ test('Web and Mobile headers merge AI + Search into a single AI button wired to 
   assert.match(webButton, /search-ai-icon\.svg/);
   assert.match(webButton, /ai-sparkles\.svg/);
   assert.match(webButton, /mint-wave\.svg/);
-  assert.match(webButton, /Tìm kiếm/);
+  assert.match(webButton, /Tìm kiếm bằng AI\.\.\./);
+  assert.match(webButton, /AiSearchPillButton\.css/);
+  const webButtonCss = read('client/src/components/ui/AiSearchPillButton.css');
+  assert.match(webButtonCss, /width:\s*max-content/);
+  assert.match(webButtonCss, /#94a3b8/i);
+  assert.match(webButtonCss, /#00ddb3/i);
+  assert.match(webButtonCss, /#42d80a/i);
+  assert.match(webButtonCss, /padding-box/);
+  assert.match(webButtonCss, /border-box/);
   assert.match(webButton, />\s*AI\s*</);
   assert.doesNotMatch(webButton, /dewskill-ai-icon\.webp/);
   assert.match(webHeader, /<AiSearchPillButton\b/);
@@ -101,7 +109,7 @@ test('Web and Mobile headers merge AI + Search into a single AI button wired to 
 
   const mobileButton = read('thang-tin-hoc-mobile/src/components/ai/AiSearchHeaderButton.tsx');
   const mobileHeader = read('thang-tin-hoc-mobile/src/components/ui.tsx');
-  assert.match(mobileButton, /accessibilityLabel="Tìm kiếm bằng AI"/);
+  assert.match(mobileButton, /accessibilityLabel="Tìm & hỏi đáp bằng AI"/);
   assert.match(mobileButton, /<SearchAiIcon\b/);
   assert.match(mobileButton, />AI</);
   assert.match(mobileHeader, /<AiSearchHeaderButton\b/);

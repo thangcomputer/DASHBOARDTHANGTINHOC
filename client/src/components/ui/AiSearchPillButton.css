@@ -1,0 +1,174 @@
+.ai-search-pill-btn {
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 100%;
+  height: 42px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4fffb 65%, #e9fff5 100%) padding-box,
+    linear-gradient(115deg, #00ddb3 0%, #00bfa6 40%, #00a98d 70%, #42d80a 100%) border-box;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.12);
+  transition:
+    box-shadow 200ms ease,
+    background 200ms ease,
+    transform 120ms ease;
+}
+
+.ai-search-pill-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 4px 10px rgba(0, 180, 140, 0.1),
+    0 8px 20px rgba(52, 211, 153, 0.08),
+    0 0 0 2px #ffffff,
+    0 0 0 4px rgba(0, 191, 166, 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ai-search-pill-btn:hover {
+    background:
+      linear-gradient(180deg, #ffffff 0%, #f7fffd 55%, #f0fff8 100%) padding-box,
+      linear-gradient(115deg, #2aefc8 0%, #14d0b6 35%, #12b399 65%, #5be61a 100%) border-box;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.18);
+  }
+
+  .ai-search-pill-btn:hover .ai-search-pill-btn__icon {
+    transform: scale(1.04);
+  }
+
+  .ai-search-pill-btn:hover .ai-search-pill-btn__sparkles {
+    animation: ai-search-sparkle-twinkle 520ms ease-out 1;
+  }
+}
+
+.ai-search-pill-btn:active {
+  transform: scale(0.98);
+}
+
+.ai-search-pill-btn__icon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  transition: transform 200ms ease;
+}
+
+.ai-search-pill-btn__divider {
+  width: 1px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: #cfe7e0;
+}
+
+.ai-search-pill-btn__placeholder {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0;
+  color: #94a3b8;
+  text-align: left;
+}
+
+.ai-search-pill-btn__badge-wrap {
+  position: relative;
+  flex-shrink: 0;
+  min-width: 38px;
+  height: 28px;
+}
+
+.ai-search-pill-btn__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #00ddaa 0%, #078f69 100%);
+  color: #ffffff;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 145, 110, 0.2);
+}
+
+.ai-search-pill-btn__sparkles {
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: 14px;
+  height: 10px;
+}
+
+.ai-search-pill-btn__wave {
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 62%;
+  height: 72%;
+  object-fit: cover;
+  object-position: right bottom;
+  opacity: 0.25;
+  user-select: none;
+}
+
+.ai-search-pill-btn__fg {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 639px) {
+  .ai-search-pill-btn {
+    width: auto;
+    min-width: 0;
+    padding-right: 8px;
+  }
+
+  .ai-search-pill-btn__divider,
+  .ai-search-pill-btn__placeholder {
+    display: none;
+  }
+}
+
+@keyframes ai-search-sparkle-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  45% {
+    opacity: 0.55;
+    transform: scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-search-pill-btn,
+  .ai-search-pill-btn__icon {
+    transition: none;
+  }
+
+  .ai-search-pill-btn:hover .ai-search-pill-btn__sparkles {
+    animation: none;
+  }
+}
