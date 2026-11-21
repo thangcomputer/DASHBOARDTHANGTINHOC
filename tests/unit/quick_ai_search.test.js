@@ -87,23 +87,23 @@ test('services/aiSupportService quickAskAssistant hits memory for FAQs & simple 
 
 test('Web and Mobile headers merge AI + Search into a single AI button wired to unified popups', () => {
   const webHeader = read('client/src/components/DashboardLayout.jsx');
-  assert.match(webHeader, /aria-label="Tìm kiếm AI"/);
-  assert.match(webHeader, /<Search\b/);
+  assert.match(webHeader, /aria-label="Tìm kiếm bằng AI"/);
+  assert.match(webHeader, /<SearchCheck\b/);
+  assert.match(webHeader, /Tìm kiếm/);
   assert.doesNotMatch(webHeader, /dewskill-ai-icon\.webp/);
   assert.match(webHeader, />\s*AI\s*<\/span>/);
-  assert.match(webHeader, /conic-gradient\(/);
-  assert.match(webHeader, /animate-\[spin_2\.6s_linear_infinite\]/);
+  assert.match(webHeader, /rounded-full/);
+  assert.doesNotMatch(webHeader, /conic-gradient\(/);
   assert.doesNotMatch(webHeader, /aria-label="Tìm kiếm nhanh \(Ctrl\+K\)"/);
 
   const mobileHeader = read('thang-tin-hoc-mobile/src/components/ui.tsx');
-  assert.match(mobileHeader, /accessibilityLabel="Tìm kiếm AI"/);
-  assert.match(mobileHeader, /topBarAiSearch/);
+  assert.match(mobileHeader, /accessibilityLabel="Tìm kiếm bằng AI"/);
   assert.match(mobileHeader, /<Search\b/);
-  assert.doesNotMatch(mobileHeader, /dewskill-ai-icon\.webp/);
+  assert.match(mobileHeader, /<Sparkles\b/);
   assert.match(mobileHeader, />AI</);
-  assert.match(mobileHeader, /topBarAiBorderSpinner/);
-  assert.match(mobileHeader, /topBarAiBorderArcTertiary/);
-  assert.match(mobileHeader, /Animated\.loop/);
+  assert.doesNotMatch(mobileHeader, /topBarAiLabel/);
+  assert.doesNotMatch(mobileHeader, /dewskill-ai-icon\.webp/);
+  assert.doesNotMatch(mobileHeader, /topBarAiBorderSpinner/);
   assert.doesNotMatch(mobileHeader, /accessibilityLabel="Tìm kiếm và tác vụ nhanh"/);
   assert.doesNotMatch(mobileHeader, /accessibilityLabel="Mở Trợ lý AI và Hỗ trợ"/);
 

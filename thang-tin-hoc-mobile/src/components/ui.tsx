@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   ActivityIndicator,
-  AppState,
   DeviceEventEmitter,
   Easing,
   Image,
@@ -23,7 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, type LucideIcon } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Menu, Search, Sparkles, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, droplet, radius, spacing, typography, theme, createThemedStyles } from '../theme/tokens';
@@ -216,38 +215,9 @@ const BrandingTopBar = React.memo(function BrandingTopBar() {
   const [logoUrl, setLogoUrl] = useState(() => peekCachedWebLogoUrl());
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(() => latestUnreadNotificationCount);
-  const [appIsActive, setAppIsActive] = useState(() => AppState.currentState === 'active');
   const headerProgress = useRef(new Animated.Value(1)).current;
   const headerVisible = useRef(true);
-  const aiBorderSpin = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const appSub = AppState.addEventListener('change', (state) => {
-      setAppIsActive(state === 'active');
-    });
     return () => appSub.remove();
-  }, []);
-
-  useEffect(() => {
-    if (!isFocused || !appIsActive) {
-      return undefined;
-    }
-    aiBorderSpin.setValue(0);
-    const loop = Animated.loop(
-      Animated.timing(aiBorderSpin, {
-        toValue: 1,
-        duration: 2400,
-        easing: Easing.linear,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [aiBorderSpin, appIsActive, isFocused]);
-
-  const aiBorderRotate = aiBorderSpin.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
   });
 
   const setHeaderVisible = useCallback((visible: boolean) => {
@@ -377,27 +347,18 @@ const BrandingTopBar = React.memo(function BrandingTopBar() {
         <View style={[styles.topBarActionsRow, styles.topBarActionsRowStudent]}>
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
-            style={({ pressed }) => [styles.topBarAiChip, pressed && styles.topBarAiChipPressed]}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            style={({ pressed }) => [
+              styles.topBarAiChip,
+              compactTopBar && styles.topBarAiChipIconOnly,
+              pressed && styles.topBarAiChipPressed,
+            ]}
             accessibilityRole="button"
-            accessibilityLabel="Tìm kiếm AI"
+            accessibilityLabel="Tìm kiếm bằng AI"
           >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.topBarAiBorderSpinner,
-                { transform: [{ rotate: aiBorderRotate }] },
-              ]}
-            >
-              <View style={styles.topBarAiBorderArcPrimary} />
-              <View style={styles.topBarAiBorderArcSecondary} />
-              <View style={styles.topBarAiBorderArcTertiary} />
-            </Animated.View>
-            <View style={[styles.topBarAiChipInner, compactLogoWithAi && styles.topBarAiChipInnerCompact]}>
-              <View style={styles.topBarAiSearch}>
-                <Search size={14} color="#FFFFFF" strokeWidth={2.75} />
-              </View>
-              <Text style={styles.topBarAiText} numberOfLines={1}>AI</Text>
-            </View>
+            <Search size={16} color="#10B981" strokeWidth={2.4} />
+            {compactTopBar ? null : <Sparkles size={11} color="#10B981" strokeWidth={2.4} />}
+            {compactTopBar ? null : <Text style={styles.topBarAiText}>AI</Text>}
           </Pressable>
           <Pressable
             onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
@@ -816,18 +777,10 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   topBarMenu: { zIndex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 44, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarMenuCompact: { width: 40, height: 40, minWidth: 40, paddingHorizontal: 0 },
   topBarMenuLabel: { color: '#475569', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  topBarActionsRow: { zIndex: 1, flexShrink: 0, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
-  topBarActionsRowStudent: { gap: 5 },
-  topBarAiChip: { position: 'relative', zIndex: 1, height: 38, borderRadius: 12, padding: 2, overflow: 'hidden', backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', shadowColor: '#06B6D4', shadowOpacity: 0.28, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  topBarAiBorderSpinner: { position: 'absolute', width: 132, height: 132, alignItems: 'center', justifyContent: 'center' },
-  topBarAiBorderArcPrimary: { position: 'absolute', top: 0, left: 0, width: 68, height: 68, backgroundColor: '#10B981', borderBottomRightRadius: 28 },
-  topBarAiBorderArcSecondary: { position: 'absolute', top: 0, right: 0, width: 68, height: 68, backgroundColor: '#06B6D4', borderBottomLeftRadius: 28 },
-  topBarAiBorderArcTertiary: { position: 'absolute', bottom: 0, right: 0, width: 68, height: 68, backgroundColor: '#6366F1', borderTopLeftRadius: 28 },
-  topBarAiChipInner: { height: '100%', paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  topBarAiChipInnerCompact: { paddingHorizontal: 8, gap: 3 },
-  topBarAiSearch: { width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0D9488' },
-  topBarAiChipPressed: { transform: [{ translateY: 1 }], opacity: 0.9 },
-  topBarAiText: { color: '#0F766E', fontSize: 12.5, fontWeight: '900', letterSpacing: 0.3 },
+  topBarAiChip: { zIndex: 1, height: 36, minWidth: 36, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: '#10B981', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, shadowColor: '#10B981', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  topBarAiChipIconOnly: { width: 36, paddingHorizontal: 0 },
+  topBarAiChipPressed: { transform: [{ scale: 0.96 }] },
+  topBarAiText: { color: '#10B981', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
   topBarAction: { zIndex: 1, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 12, backgroundColor: '#F3F6FB', boxShadow: droplet.button },
   topBarActionCompact: { width: 38, height: 38 },
   topBarNeoPressed: { boxShadow: droplet.buttonPressed },

@@ -22,7 +22,7 @@ import api, { setTokens, csrfFetch } from '../services/api';
 import {
   Bell, MessageCircle, CheckCircle2, Clock, X, Lock, Eye, EyeOff, ShieldCheck, LogOut,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
-  Search, Sun, Moon, Minimize2,
+  SearchCheck, Sparkles, Sun, Moon, Minimize2,
 } from 'lucide-react';
 import { useTheme } from '../utils/theme';
 import { useFocusMode } from '../utils/focusMode';
@@ -2020,27 +2020,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
-                  className="group relative inline-flex h-8 sm:h-9 shrink-0 items-center justify-center overflow-hidden rounded-xl p-[2px] shadow-[0_2px_12px_rgba(6,182,212,0.28)] active:translate-y-[1px] transition cursor-pointer"
+                  className="group inline-flex h-8 sm:h-9 shrink-0 items-center rounded-full bg-gradient-to-r from-[#34D399] via-[#10B981] to-[#06B6D4] p-px shadow-[0_3px_10px_rgba(16,185,129,0.16)] transition duration-200 hover:shadow-[0_5px_14px_rgba(16,185,129,0.26)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none cursor-pointer"
                   title="Tìm kiếm AI (Ctrl+K)"
-                  aria-label="Tìm kiếm AI"
+                  aria-label="Tìm kiếm bằng AI"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                  >
-                    <span
-                      className="h-32 w-32 shrink-0 animate-[spin_2.6s_linear_infinite]"
-                      style={{
-                        background: 'conic-gradient(from 0deg, #10b981 0deg, #06b6d4 90deg, #6366f1 180deg, #ec4899 240deg, #10b981 360deg)',
-                      }}
-                    />
-                  </span>
-                  <span className="relative z-10 inline-flex h-full items-center gap-1.5 rounded-[10px] bg-white/95 pl-1 pr-2.5 sm:pr-3 group-hover:bg-emerald-50/95 dark:bg-slate-900 dark:group-hover:bg-slate-800/95 transition">
-                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white shadow-[0_2px_6px_rgba(13,148,136,0.35)]">
-                      <Search size={14} strokeWidth={2.75} aria-hidden="true" />
+                  <span className="inline-flex h-full items-center gap-1.5 rounded-full bg-[#F0FDF4] pl-1 pr-1 dark:bg-slate-900 sm:gap-2 sm:pr-1.5">
+                    <span className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 text-white">
+                      <SearchCheck size={14} strokeWidth={2.4} aria-hidden="true" />
+                      <Sparkles size={8} className="absolute -right-0.5 -top-0.5 text-white group-hover:animate-pulse motion-reduce:animate-none" aria-hidden="true" />
                     </span>
-                    <span className="bg-gradient-to-r from-emerald-700 via-teal-600 to-indigo-600 dark:from-emerald-300 dark:via-teal-200 dark:to-indigo-300 bg-clip-text text-xs font-black tracking-wide text-transparent">
-                      AI
+                    <span className="hidden h-3.5 w-px bg-emerald-200 dark:bg-emerald-800 sm:block" aria-hidden="true" />
+                    <span className="hidden text-[13px] font-extrabold leading-none text-[#1F2937] dark:text-slate-100 sm:inline">
+                      Tìm kiếm
+                    </span>
+                    <span className="relative inline-flex items-center pr-1">
+                      <span className="rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-wide text-white">
+                        AI
+                      </span>
+                      <Sparkles size={9} className="absolute -right-1 -top-1.5 text-emerald-400 group-hover:animate-pulse motion-reduce:animate-none" aria-hidden="true" />
                     </span>
                   </span>
                 </button>
