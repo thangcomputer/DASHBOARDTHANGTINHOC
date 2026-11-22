@@ -9,7 +9,7 @@ export function normalizeQuickQuery(text) {
     .trim();
 }
 
-const QUESTION_INTENT_RE = /(?:^|\s)(?:la gi|cach|tai sao|vi sao|nhu the nao|lam sao|lam the nao|huong dan|giai thich|so sanh|phan biet|khac nhau|loi|ham|cong thuc|phim tat|o dau|khi nao|bao nhieu|co the|nen dung|tai ve|sua loi|what|how|why|when|where|which|explain|compare|difference|fix|error|formula|function|shortcut|help|tell me|tutorial|guide)(?:\s|$|[?!.,])/i;
+const QUESTION_INTENT_RE = /(?:^|\s)(?:la gi|phan mem|ung dung|cong cu|website|thiet bi|lap trinh|co so du lieu|mang may tinh|he dieu hanh|cach|tai sao|vi sao|nhu the nao|lam sao|lam the nao|huong dan|giai thich|so sanh|phan biet|khac nhau|loi|ham|cong thuc|phim tat|o dau|khi nao|bao nhieu|co the|nen dung|tai ve|cai dat|sua loi|what|how|why|when|where|which|software|explain|compare|difference|fix|error|formula|function|shortcut|help|tell me|tutorial|guide)(?:\s|$|[?!.,])/i;
 
 export function isLikelyQuestion(text) {
   const raw = String(text || '').trim();

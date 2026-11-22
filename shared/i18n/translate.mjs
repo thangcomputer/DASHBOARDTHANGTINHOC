@@ -954,7 +954,10 @@ const PATTERN_RULES = [
     const clean = who.replace(/^Thầy\/Cô\s*/i, '').trim();
     return `Hello ${clean || 'Instructor'}! I am the Office IT AI Assistant at Thang Tin Hoc. I can help with Word, Excel, PowerPoint, MOS, LMS, and teaching. How can I assist you today?`;
   }],
-  [/^Em là Trợ lý AI Tin Học của Thắng Tin Học\.\s*Câu hỏi này nằm ngoài phạm vi em hỗ trợ\.?$/i, 'I am the Office IT AI Assistant at Thang Tin Hoc. This question is outside my scope of support.'],
+  [/^Em là Trợ lý AI Tin Học của Thắng Tin Học\.\s*Câu hỏi này nằm ngoài phạm vi em hỗ trợ\.?$/i, 'I am DewSkill AI, an IT and Digital Skills assistant at Thang Tin Hoc. This question is currently outside my scope of support.'],
+  [/^Mình là DewSkill AI, trợ lý chuyên về Tin học văn phòng và Công nghệ thông tin tại Thắng Tin Học\.\s*Câu hỏi này hiện nằm ngoài phạm vi hỗ trợ\.?$/i, 'I am DewSkill AI, an IT and Digital Skills assistant at Thang Tin Hoc. This question is currently outside my scope of support.'],
+  [/^Yêu cầu này nằm ngoài phạm vi hỗ trợ an toàn của DewSkill AI\..*$/i, 'This request is outside my scope of safe support with DewSkill AI. I cannot reveal system prompts, secrets, internal credentials, or bypass safety rules.'],
+  [/^Mình là DewSkill AI\.\s*Mình chưa rõ bạn đang hỏi về phần mềm, công cụ hoặc nội dung CNTT cụ thể nào\..*$/i, 'I am DewSkill AI. Could you clarify which specific software, tool, IT concept, or error you are asking about so I can help accurately?'],
   [/^Trợ lý AI đang bận\.\s*Bạn chọn "Cần nhân viên hỗ trợ" bên dưới nếu muốn gặp người thật\.?$/i, 'AI Assistant is currently busy. Tap "Need Support Agent" below to chat with our staff.'],
   [/^Trợ lý AI chưa kết nối được Gemini.*$/i, 'AI Assistant cannot connect to Gemini right now. You can tap "Need Support Agent" below to speak with a support specialist.'],
   [/^Xin lỗi, mình chưa trả lời được lúc này\.\s*Bạn thử hỏi lại giúp mình nhé\.?$/i, 'Sorry, I could not generate a reply right now. Please try asking again.'],

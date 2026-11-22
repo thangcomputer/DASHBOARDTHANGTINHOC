@@ -70,37 +70,82 @@ const SYNONYM_SHORTCUT_HINTS = [
   { re: /\b(chen ngay hien tai|ngay hien tai)\b/, token: 'sc_ctrl_semicolon' },
 ];
 
-// --- Scope Classifier Dictionaries ---
+// --- Scope Classifier & Security Gate Dictionaries ---
+const SCOPE_LOGIC_VERSION = 'it_semantic_v2';
+
 const PROMPT_INJECTION_PATTERNS = [
   /ignore\s+(all\s+)?(previous|prior|above|system)\s+(instructions?|prompts?|rules?)/i,
   /disregard\s+(all\s+)?(previous|prior|above|system|your)\s+(instructions?|prompts?|rules?)/i,
   /reveal\s+(your\s+)?(system\s+prompt|hidden\s+instructions?|api\s*key)/i,
-  /\b(jailbreak|dan\s+mode|developer\s+mode)\b/i,
+  /\b(jailbreak|dan\s+mode)\b/i,
+  /(ignore|bypass|unrestricted|override|jailbreak|system\s*prompt|pretend|enable|activate).{0,35}\bdeveloper\s+mode\b(?!.*\b(android|ios|iphone|usb|chrome|browser|debug|adb)\b)/i,
+  /\bdeveloper\s+mode\b.{0,30}(bypass|override|unrestricted|prompt|jailbreak)/i,
   /(bo\s*qua|quen\s*het|phat\s*lo|bat\s*chap)\s+(tat\s*ca\s+|moi\s+|toan\s*bo\s+)?(huong\s*dan|quy\s*tac|chi\s*dan|gioi\s*han|luat|system\s*prompt)/i,
-  /(in\s*ra|tiet\s*lo|xem|hien\s*thi|cho\s*xem)\s+(noi\s*dung\s+)?(system\s*prompt|prompt\s*he\s*thong|cau\s*hinh\s*bi\s*mat|api\s*key|gemini_api_key)/i,
+  /(in\s*ra|tiet\s*lo|xem|hien\s*thi|cho\s*xem|xuat\s*ra)\s+(noi\s*dung\s+)?(system\s*prompt|prompt\s*he\s*thong|cau\s*hinh\s*bi\s*mat|api\s*key|gemini_api_key|jwt_secret|mongodb_uri)/i,
+  /(print|dump|export|show\s+me)\s+(out\s+)?(your\s+)?(system\s+prompt|gemini_api_key|jwt_secret|mongodb_uri|\.env)/i,
   /(mat\s*khau\s*(root|admin|may\s*chu|server)|ma\s*khoa\s*quan\s*tri|dap\s*an\s*(bo\s*)?de\s*thi\s*(noi\s*bo|mat|bi\s*mat))/i,
   /tu\s*nay\s*tro\s*di\s*(ban|em|may)\s*la\b/i,
   /\bdong\s*vai\s+(nguoi\s*yeu|ban\s*gai|thay\s*boi|chuyen\s*gia\s*xe|bac\s*si|ai\s*khong\s*gioi\s*han)/i,
   /<\/?(system|knowledge_context|user_attachment)>/i,
 ];
 
-const OFFICE_IT_POSITIVE_RE = new RegExp([
-  '\\b(word|excel|powerpoint|pptx?|docx?|xlsx?|csv|pdf|access|outlook|onenote|publisher)\\b',
-  '\\b(office|microsoft\\s*365|m365|mos|ic3|gs6|mo-100|mo-200|mo-300|mo-400|mo-210|mo-110)\\b',
-  '\\b(google\\s*(sheets?|docs?|slides?|drive|forms?|meet|classroom|workspace)|gmail|zalo|unikey|evkey|telex|vni)\\b',
-  '\\b(windows|win\\s*10|win\\s*11|macos|macbook|finder|safari|explorer|task\\s*manager|control\\s*panel|cmd|powershell)\\b',
-  '\\b(lms|dewskill|thang\\s*tin\\s*hoc|e-learning|khoa\\s*hoc\\s*tin|giao\\s*trinh|chung\\s*chi\\s*tin)\\b',
-  '\\b(bang\\s*tinh|cong\\s*thuc(?!\\s*nau)|ham|vlookup|xlookup|hlookup|sumifs?|countifs?|iferror|pivot\\s*table|slicer|macro|vba)\\b',
-  '\\b(mail\\s*merge|tron\\s*thu|muc\\s*luc|header|footer|hyperlink|bookmark|citation|watermark|track\\s*changes)\\b',
-  '\\b(slide\\s*master|animation|transition|hieu\\s*ung|trinh\\s*chieu|smartart|sparkline|conditional\\s*formatting|data\\s*validation|freeze\\s*panes?)\\b',
-  '\\b(phim\\s*tat|ctrl\\s*\\+|alt\\s*\\+|shift\\s*\\+|cmd\\s*\\+|command\\s*\\+|option\\s*\\+|shortcut|go\\s*tieng\\s*viet|go\\s*dau|bo\\s*go|bang\\s*ma|unicode|tcvn3|loi\\s*font)\\b',
-  '\\b(may\\s*tinh|may\\s*vi\\s*tinh|laptop|pc|ban\\s*phim|chuot|man\\s*hinh|may\\s*in|in\\s*an|kho\\s*giay|can\\s*le|ngat\\s*trang|page\\s*break)\\b',
-  '\\b(thu\\s*muc|folder|tep\\s*tin|tap\\s*tin|file|nen\\s*file|giai\\s*nen|zip|rar|usb|o\\s*cung|ssd|ram|cpu|wifi|wi-fi|mang\\s*lan|ip|internet|trinh\\s*duyet|chrome|edge|email|tai\\s*khoan)\\b',
-  '\\b(tao\\s*bang|ke\\s*bang|lap\\s*bang|quan\\s*ly\\s+bang\\s*(excel|tinh|google\\s*sheet)|tin\\s*hoc\\s*van\\s*phong|ky\\s*nang\\s*so|soan\\s*thao|van\\s*ban|tai\\s*lieu|dinh\\s*dang)\\b',
-  '\\b(danh\\s*so\\s*trang|so\\s*la\\s*ma|ngat\\s*section|in\\s*vung\\s*chon|chuyen\\s*pdf|nen\\s*pdf|loi\\s*#n\\/a|loi\\s*#value|loi\\s*#ref|freeze\\s*panes?|smartart|sparklines?)\\b',
-].join('|'), 'i');
+// Fast-path IT domain groups (representative anchors only — NOT a closed whitelist)
+const IT_DOMAIN_GROUPS = [
+  {
+    category: 'office',
+    reason: 'office_it_domain',
+    re: new RegExp([
+      '\\b(word|excel|powerpoint|pptx?|docx?|xlsx?|csv|pdf|access|outlook|onenote|publisher|libreoffice|wps\\s*office)\\b',
+      '\\b(office|microsoft\\s*365|m365|bang\\s*tinh|cong\\s*thuc(?!\\s*nau)|ham\\s+[a-z0-9_]+|vlookup|xlookup|hlookup|sumifs?|countifs?|averageifs?|iferror|index|match|pivot\\s*table|pivottable|slicer|macro|vba|power\\s*query|dax)\\b',
+      '\\b(mail\\s*merge|tron\\s*thu|muc\\s*luc|header|footer|hyperlink|bookmark|citation|watermark|track\\s*changes|restrict\\s*editing)\\b',
+      '\\b(slide\\s*master|animation|transition|hieu\\s*ung|trinh\\s*chieu|smartart|sparklines?|conditional\\s*formatting|data\\s*validation|freeze\\s*panes?)\\b',
+      '\\b(tao\\s*bang|ke\\s*bang|lap\\s*bang|quan\\s*ly\\s+bang\\s*(excel|tinh|google\\s*sheet)|tin\\s*hoc\\s*van\\s*phong|soan\\s*thao|van\\s*ban|dinh\\s*dang|danh\\s*so\\s*trang|so\\s*la\\s*ma|ngat\\s*(trang|section)|in\\s*vung\\s*chon|chuyen\\s*pdf|nen\\s*pdf|tach\\s*pdf|gop\\s*pdf|loi\\s*#(n\\/a|value|ref|div|name))\\b',
+    ].join('|'), 'i'),
+  },
+  {
+    category: 'cert_exam',
+    reason: 'it_domain_fast',
+    re: /\b(mos|ic3|icdl|gs6|mo-100|mo-200|mo-300|mo-400|mo-500|mo-210|mo-110|77-725|77-727|77-728|77-729|77-730|gmetrix|certiport|iig|compass|jasperactive|testout|chung\s*chi\s*tin|on\s*thi\s*(tin|mos|ic3|icdl)|luyen\s*thi\s*(tin|mos|ic3|icdl)|thi\s*thu\s*(tin|mos|ic3|icdl)|phan\s*mem\s*luyen\s*thi)\b/i,
+  },
+  {
+    category: 'google_collab',
+    reason: 'it_domain_fast',
+    re: /\b(google\s*(sheets?|docs?|slides?|drive|forms?|meet|classroom|workspace|calendar)|gmail|zoom|microsoft\s*teams|ms\s*teams|slack|discord|skype|zalo|telegram|canva|capcut|photoshop|illustrator|premiere|figma|obs(\s*studio)?|camtasia|foxit|adobe\s*acrobat|smallpdf|ilovepdf|ultraviewer|anydesk|teamviewer|unikey|evkey|telex|vni|winrar|7-?zip|dropbox|onedrive|icloud)\b/i,
+  },
+  {
+    category: 'os_hardware_network',
+    reason: 'it_domain_fast',
+    re: new RegExp([
+      '\\b(windows|win\\s*(7|8|10|11)|macos|macbook|imac|linux|ubuntu|android|ios|iphone|ipad|finder|safari|chrome|edge|firefox|trinh\\s*duyet|explorer|task\\s*manager|control\\s*panel|cmd|powershell|terminal|bios|uefi|boot|driver)\\b',
+      '\\b(phim\\s*tat|ctrl\\s*\\+|alt\\s*\\+|shift\\s*\\+|cmd\\s*\\+|command\\s*\\+|option\\s*\\+|shortcut|go\\s*tieng\\s*viet|go\\s*dau|bo\\s*go|bang\\s*ma|unicode|tcvn3|loi\\s*font)\\b',
+      '\\b(may\\s*tinh|may\\s*vi\\s*tinh|laptop|pc|ban\\s*phim|chuot|man\\s*hinh|may\\s*in|may\\s*scan|may\\s*chieu|in\\s*an|kho\\s*giay|can\\s*le|page\\s*break)\\b',
+      '\\b(thu\\s*muc|folder|tep\\s*tin|tap\\s*tin|file|nen\\s*file|giai\\s*nen|zip|rar|usb|o\\s*cung|ssd|hdd|nvme|ram|rom|cpu|gpu|card\\s*(?:man\\s*hinh|do\\s*hoa)|hdmi|type-?c|bluetooth)\\b',
+      '\\b(wifi|wi-?fi|mang\\s*(?:lan|may\\s*tinh)|ethernet|ipv4|ipv6|tcp\\/ip|ip|dns|dhcp|vpn|proxy|router|modem|firewall|tuong\\s*lua|ping|internet|email|tai\\s*khoan|sao\\s*luu|backup|khoi\\s*phuc\\s*du\\s*lieu|virus|malware|ransomware|phishing|bao\\s*mat|mat\\s*khau\\s*(?:file|wi-?fi|windows|tai\\s*khoan))\\b',
+    ].join('|'), 'i'),
+  },
+  {
+    category: 'dev_db_web_cloud_ai',
+    reason: 'it_domain_fast',
+    re: new RegExp([
+      '\\b(lap\\s*trinh|code|coding|source\\s*code|thuat\\s*toan|cau\\s*truc\\s*du\\s*lieu|html|css|javascript|typescript|python|java|c\\+\\+|c#|php|golang|rust|kotlin|swift|dart|react(\\s*native)?|vue|angular|next\\.?js|node\\.?js|express|flutter)\\b',
+      '\\b(sql|mysql|postgresql|sqlite|mongodb|nosql|redis|firebase|supabase|co\\s*so\\s*du\\s*lieu|database|truy\\s*van|query)\\b',
+      '\\b(api|rest\\s*api|graphql|json|xml|yaml|http|https|ssl|tls|webhook|git|github|gitlab|docker|kubernetes|cloud|aws|azure|gcp|vercel|netlify|hosting|domain|ten\\s*mien|website|trang\\s*web|lam\\s*web|tao\\s*web|web\\s*app|ung\\s*dung\\s*web|thiet\\s*ke\\s*web|wordpress)\\b',
+      '\\b(chatgpt|openai|gemini|claude|copilot|notebooklm|prompt|tri\\s*tue\\s*nhan\\s*tao|machine\\s*learning|deep\\s*learning|llm|rag|chatbot|ai\\s*(?:tro\\s*ly|tao|viet|phan\\s*tich|trong\\s*(?:hoc\\s*tap|cong\\s*viec)))\\b',
+      '\\b(kiotviet|misa|sapo|erp|crm|pos|chuyen\\s*doi\\s*so|phan\\s*mem\\s*quan\\s*ly)\\b',
+    ].join('|'), 'i'),
+  },
+  {
+    category: 'lms_education',
+    reason: 'it_domain_fast',
+    re: /\b(lms|dewskill|thang\s*tin\s*hoc|e-?learning|khoa\s*hoc\s*tin|giao\s*trinh|tin\s*hoc|cong\s*nghe\s*thong\s*tin|cntt|ky\s*nang\s*so|lich\s*hoc|lich\s*day|diem\s*danh|hoc\s*phi|hoc\s*video|hop\s*thu)\b/i,
+  },
+];
 
-const OFFICE_IT_TASK_FRAMING_RE = /\b(excel|word|powerpoint|google\s*sheets?|access|outlook|bang\s*tinh|cong\s*thuc|ham|file\s*quan\s*ly|tao\s*bang|lap\s*bang|bieu\s*mau|bao\s*cao|slide|thuyet\s*trinh|mail\s*merge|co\s*so\s*du\s*lieu|database|truy\s*van|lms)\b/i;
+const IT_TASK_FRAMING_RE = /\b(excel|word|powerpoint|google\s*sheets?|access|outlook|canva|photoshop|capcut|python|sql|mongodb|html|css|javascript|react|flutter|bang\s*tinh|cong\s*thuc(?!\s*nau)|ham|file\s*quan\s*ly|phan\s*mem\s*quan\s*ly|thiet\s*ke\s*web|trang\s*web|website|app\s*quan\s*ly|tao\s*bang|lap\s*bang|bieu\s*mau|bao\s*cao|slide|thuyet\s*trinh|mail\s*merge|co\s*so\s*du\s*lieu|database|truy\s*van|lap\s*trinh|chatbot|prompt|lms)\b/i;
+
+const GENERAL_SOFTWARE_FRAMING_RE = /\b(phan\s*mem|ung\s*dung|app|tien\s*ich|trinh\s*duyet|website|cong\s*cu\s*(?:so|ai|hoc\s*tap|van\s*phong)|he\s*thong\s*quan\s*ly)\s+[a-z0-9]{2,}/i;
+
+const PLACEHOLDER_AMBIGUOUS_RE = /(?:^|\s)(?:phan\s*mem|ung\s*dung|app|cong\s*cu|tool|he\s*thong|thiet\s*bi|ham)\s+(?:[xyzabc]|nay|kia|do|ay|nao\s*do)(?:\s|[?!.,]|$)|^(?:cai\s*nay|cai\s*do|cai\s*kia|no|loi\s*nay|loi\s*roi|bi\s*loi|khong\s*chay|bi\s*do|giup\s*minh|huong\s*dan\s*giup)(?:\s+(?:lam\s*sao|lam\s*the\s*nao|nhu\s*the\s*nao|dung\s*sao|sua\s*sao|fix\s*sao|la\s*gi|duoc\s*khong|vay|a|nhe|giup|voi))*\s*[?!.]*$/i;
 
 const OFF_TOPIC_RE = new RegExp([
   // Love / dating / romance
@@ -108,14 +153,15 @@ const OFF_TOPIC_RE = new RegExp([
   // Astrology / fortune telling / gambling
   '\\b(tu\\s*vi|boi\\s*toan|xem\\s*boi|xem\\s*tuoi|phong\\s*thuy|cung\\s*hoang\\s*dao|chiem\\s*tinh|than\\s*so\\s*hoc|giai\\s*mong|nam\\s*mo|van\\s*han|hop\\s*tuoi|xung\\s*khac|lo\\s*de|so\\s*de|xo\\s*so|vietlott|ca\\s*do|ca\\s*cuoc|tai\\s*xiu)\\b',
   // Motorbikes / cars / transport repair & pricing
-  '\\b(xe\\s*may|xe\\s*tay\\s*ga|xe\\s*so|o\\s*to|xe\\s*hoi|honda|yamaha|suzuki|vinfast|vision|winner|exciter|sh\\s*mode|thay\\s*nhot|sua\\s*xe|bugi|lop\\s*xe|xang\\s*xe|bằng\\s*lai\\s*xe)\\b',
-  // Cooking / medical / sports / politics / crypto / weather / literary writing unrelated to IT
-  '\\b(nau\\s*an|mon\\s*an|cong\\s*thuc\\s*nau|lam\\s*banh|nuong\\s*thit|kho\\s*ca|benh\\s*ly|chua\\s*benh|trieu\\s*chung|don\\s*thuoc|kham\\s*benh|uong\\s*thuoc|giam\\s*can|tap\\s*gym)\\b',
+  '\\b(xe\\s*may|xe\\s*tay\\s*ga|xe\\s*so|o\\s*to|xe\\s*hoi|honda|yamaha|suzuki|vinfast|vision|winner|exciter|sh\\s*mode|thay\\s*nhot|sua\\s*xe|bugi|lop\\s*xe|xang\\s*xe|bang\\s*lai\\s*xe)\\b',
+  // Cooking / medical / sports / politics / crypto / weather / pure trivia / literature unrelated to IT
+  '\\b(nau\\s*an|mon\\s*an|cong\\s*thuc\\s*nau|lam\\s*banh|nuong\\s*thit|kho\\s*ca|pho\\s*bo|benh\\s*ly|chua\\s*benh|trieu\\s*chung|don\\s*thuoc|kham\\s*benh|uong\\s*thuoc|giam\\s*can|tap\\s*gym)\\b',
   '\\b(bong\\s*da|soi\\s*keo|ty\\s*so\\s*tran|world\\s*cup|ngoai\\s*hang\\s*anh|chung\\s*khoan|tien\\s*ao|bitcoin|crypto|forex|thoi\\s*tiet\\s*hom\\s*nay|mua\\s*nang|gia\\s*vang)\\b',
   '\\b(viet\\s*tho|lam\\s*tho|ke\\s*chuyen\\s*cuoi|viet\\s*rap|giai\\s*toan\\s*tich\\s*phan|hoa\\s*hoc\\s*huu\\s*co|phan\\s*tich\\s*tac\\s*pham\\s*van\\s*hoc)\\b',
+  '\\b(thu\\s*do\\s*cua|dan\\s*so\\s*(?:bao\\s*nhieu|cua|nuoc)|ai\\s*la\\s*tong\\s*thong|giai\\s*nobel|chieu\\s*cao\\s*nui|song\\s*(?:nao|dai\\s*nhat)|chien\\s*tranh\\s*the\\s*gioi)\\b',
 ].join('|'), 'i');
 
-const SHORT_FOLLOWUP_RE = /\b(cach\s*nao|lam\s*sao|buoc\s*tiep|cu\s*the\s*hon|vi\\s*du|tren\s*mac|tren\s*win|sao\s*nua|the\s*con|giai\s*thich\s*them|loi\s*nay|fix\s*sao|khac\s*gi)\b/i;
+const SHORT_FOLLOWUP_RE = /\b(cach\s*nao|lam\s*sao|buoc\s*tiep|cu\s*the\s*hon|vi\s*du|tren\s*mac|tren\s*win|sao\s*nua|the\s*con|giai\s*thich\s*them|loi\s*nay|fix\s*sao|khac\s*gi|cai\s*nay|the\s*thi)\b/i;
 
 // --- Module Cache & Overrides ---
 let ragOverrideForTests = null;
@@ -351,10 +397,21 @@ function extractRareQueryIdentifiers(rawText) {
   const SAFE_DOMAIN_CAPS = new Set([
     ...KNOWN_EXCEL_FUNCTIONS,
     'WORD', 'EXCEL', 'POWERPOINT', 'OUTLOOK', 'ACCESS', 'OFFICE', 'MICROSOFT',
-    'WINDOWS', 'MACOS', 'MACBOOK', 'ZALO', 'GMAIL', 'GOOGLE', 'DRIVE', 'SHEETS', 'DOCS',
-    'TELEX', 'VNI', 'UNIKEY', 'UNICODE', 'TCVN3', 'MO-100', 'MO-200', 'MO-300', 'MO-400', 'MO-500',
-    'MOS', 'IC3', 'GS6', 'LMS', 'PDF', 'CSV', 'DOCX', 'XLSX', 'PPTX', 'CTRL', 'SHIFT', 'ALT', 'CMD',
-    'TOC', 'URL', 'RAM', 'CPU', 'SSD', 'USB', 'WIFI', 'LAN', 'HTML', 'RGB', 'A4', 'QR',
+    'WINDOWS', 'MACOS', 'MACBOOK', 'LINUX', 'UBUNTU', 'ANDROID', 'IPHONE',
+    'ZALO', 'GMAIL', 'GOOGLE', 'DRIVE', 'SHEETS', 'DOCS', 'SLIDES', 'ZOOM', 'TEAMS',
+    'CANVA', 'CAPCUT', 'PHOTOSHOP', 'ILLUSTRATOR', 'PREMIERE', 'FIGMA', 'NOTION',
+    'ULTRAVIEWER', 'ANYDESK', 'TEAMVIEWER', 'WINRAR', 'KIOTVIET',
+    'TELEX', 'VNI', 'UNIKEY', 'EVKEY', 'UNICODE', 'TCVN3',
+    'MO-100', 'MO-200', 'MO-300', 'MO-400', 'MO-500', 'MO-110', 'MO-210', 'MO-310',
+    'MOS', 'IC3', 'ICDL', 'GS6', 'GMETRIX', 'CERTIPORT', 'JASPERACTIVE', 'LMS', 'DEWSKILL',
+    'PDF', 'CSV', 'DOCX', 'XLSX', 'PPTX', 'CTRL', 'SHIFT', 'ALT', 'CMD',
+    'TOC', 'URL', 'RAM', 'ROM', 'CPU', 'GPU', 'SSD', 'HDD', 'NVME', 'BIOS', 'UEFI',
+    'USB', 'HDMI', 'WIFI', 'LAN', 'DNS', 'DHCP', 'VPN', 'HTTP', 'HTTPS',
+    'API', 'REST', 'JSON', 'XML', 'YAML', 'SQL', 'MYSQL', 'POSTGRESQL', 'MONGODB', 'REDIS',
+    'HTML', 'CSS', 'JAVASCRIPT', 'TYPESCRIPT', 'PYTHON', 'REACT', 'FLUTTER', 'NODEJS',
+    'GIT', 'GITHUB', 'GITLAB', 'DOCKER', 'CLOUD', 'AWS', 'AZURE', 'GCP',
+    'CHATGPT', 'OPENAI', 'GEMINI', 'CLAUDE', 'COPILOT', 'NOTEBOOKLM', 'LLM', 'RAG',
+    'CRM', 'ERP', 'POS', 'RGB', 'A4', 'QR',
   ]);
   const tokens = String(rawText || '').match(/\b[A-Za-z][A-Za-z0-9_-]{2,}\b/g) || [];
   const rare = [];
@@ -427,11 +484,18 @@ function detectSoftwareIntent(text, detectedFunctions = []) {
   if (/\b(access|accdb|query\s*access|primary\s*key|relationship)\b/.test(folded)) {
     return 'access';
   }
-  if (/\b(zalo)\b/.test(folded)) return 'zalo';
-  if (/\b(ic3|gs6)\b/.test(folded)) return 'ic3';
+  if (/\b(gmetrix|certiport|iig|jasperactive)\b/.test(folded)) return 'gmetrix';
+  if (/\b(canva|capcut|photoshop|illustrator|figma|premiere)\b/.test(folded)) return 'canva';
+  if (/\b(google\s*(workspace|sheets?|docs?|slides?|drive|forms?|meet|classroom)|gmail)\b/.test(folded)) return 'google_workspace';
+  if (/\b(zalo|zoom|microsoft\s*teams|ultraviewer|anydesk|teamviewer)\b/.test(folded)) return 'zalo';
+  if (/\b(ic3|icdl|gs6)\b/.test(folded)) return 'ic3';
   if (/\b(mos)\b/.test(folded)) return 'mos';
   if (/\b(phim\s*tat|shortcut|ctrl\+|cmd\+|alt\+)\b/.test(folded)) return 'shortcuts';
-  if (/\b(windows|macos|macbook|finder|safari|may\s*tinh|cai\s*win|telex|vni|unikey)\b/.test(folded)) return 'windows';
+  if (/\b(windows|macos|macbook|linux|ubuntu|android|ios|finder|safari|may\s*tinh|cai\s*win|telex|vni|unikey)\b/.test(folded)) return 'windows';
+  if (/\b(wifi|wi-?fi|mang\s*lan|dns|dhcp|vpn|ip|router|modem|firewall|ram|rom|cpu|gpu|ssd|hdd|usb|bios|uefi)\b/.test(folded)) return 'networking';
+  if (/\b(sql|mysql|postgresql|mongodb|redis|database|co\s*so\s*du\s*lieu)\b/.test(folded)) return 'database';
+  if (/\b(lap\s*trinh|python|javascript|typescript|html|css|java|c\+\+|c#|php|react|flutter|node\.?js|api|git|github|docker|website|phan\s*mem)\b/.test(folded)) return 'programming';
+  if (/\b(chatgpt|openai|gemini|claude|copilot|notebooklm|tri\s*tue\s*nhan\s*tao|machine\s*learning|prompt)\b/.test(folded)) return 'ai_tools';
   return null;
 }
 
@@ -441,79 +505,188 @@ function detectMacIntent(text) {
 }
 
 /**
- * Consistent domain & security gate used across memory, cache, and Gemini paths.
+ * Security gate separated from semantic domain scope classification.
+ * Detects prompt injections, rule overrides, secret/credential exfiltration, and markup spoofing.
  */
-function classifyOfficeItScope(question, history = [], attachment = null) {
+function classifySecurityRisk(question, attachment = null) {
   const qRaw = String(question || '').trim();
   const attText = String(attachment?.textContent || '').trim();
   const qFolded = stripVietnameseMarks(qRaw).toLowerCase();
   const attFolded = stripVietnameseMarks(attText).toLowerCase();
 
-  // 1. Prompt injection / security bypass detection across question AND attachment
   for (const re of PROMPT_INJECTION_PATTERNS) {
     if (re.test(qFolded) || re.test(qRaw) || re.test(attFolded) || re.test(attText)) {
       return {
-        inScope: false,
+        blocked: true,
         reason: 'prompt_injection',
-        hasOfficeItContext: false,
+        category: 'security',
       };
     }
   }
+  return {
+    blocked: false,
+    reason: null,
+    category: null,
+  };
+}
 
-  // Image/PDF attachment without off-topic text is treated as IT/LMS support when question is empty or IT-related
+function matchItFastGroup(text) {
+  for (const group of IT_DOMAIN_GROUPS) {
+    if (group.re.test(text)) {
+      return group;
+    }
+  }
+  return null;
+}
+
+/**
+ * 3-state semantic IT & CS domain classifier (+ separate SECURITY_BLOCKED gate).
+ * States: IN_SCOPE | OUT_OF_SCOPE | AMBIGUOUS | SECURITY_BLOCKED.
+ * Preserves legacy `.inScope` & `.hasOfficeItContext` fields for backward compatibility.
+ */
+function classifyItDomainScope(question, history = [], attachment = null) {
+  const security = classifySecurityRisk(question, attachment);
+  if (security.blocked) {
+    return {
+      inScope: false,
+      decision: 'SECURITY_BLOCKED',
+      reason: 'prompt_injection',
+      category: 'security',
+      confidence: 1,
+      hasOfficeItContext: false,
+      needsSemanticClassifier: false,
+      askClarification: false,
+    };
+  }
+
+  const qRaw = String(question || '').trim();
+  const attText = String(attachment?.textContent || '').trim();
+  const qFolded = stripVietnameseMarks(qRaw).toLowerCase();
+  const attFolded = stripVietnameseMarks(attText).toLowerCase();
   const combined = `${qFolded} ${attFolded}`.trim();
   const hasAttachment = Boolean(attachment && (attachment.dataBase64 || attachment.textContent || attachment.fileName));
 
-  const hasPositiveIt = OFFICE_IT_POSITIVE_RE.test(combined);
-  const hasOfficeFraming = OFFICE_IT_TASK_FRAMING_RE.test(combined);
-  const hasOffTopic = OFF_TOPIC_RE.test(qFolded);
-
-  // Example: "Lam bang Excel quan ly xe may" -> hasOfficeFraming is true -> allow!
-  // Contrast: "Xe may Vision gia bao nhieu" -> hasOffTopic is true, hasOfficeFraming is false -> refuse!
-  if (hasOffTopic && !hasOfficeFraming) {
+  // Literal underspecified placeholders (e.g. "Phần mềm X có học ở trung tâm không?") -> AMBIGUOUS (clarify)
+  const isLiteralPlaceholder = /\b(phan\s*mem|ung\s*dung|app|cong\s*cu|tool|he\s*thong|thiet\s*bi|ham)\s+(?:[xyzabc]|nay|kia|do|ay|nao\s*do)\b/i.test(qFolded);
+  if (isLiteralPlaceholder && !matchItFastGroup(qFolded)) {
     return {
       inScope: false,
-      reason: 'out_of_scope_topic',
+      decision: 'AMBIGUOUS',
+      reason: 'ambiguous_placeholder',
+      category: 'unknown',
+      confidence: 0.3,
       hasOfficeItContext: false,
+      needsSemanticClassifier: false,
+      askClarification: true,
     };
   }
 
-  if (hasPositiveIt) {
+  const itGroupHit = matchItFastGroup(combined);
+  const hasItFraming = IT_TASK_FRAMING_RE.test(combined);
+  const hasOffTopic = OFF_TOPIC_RE.test(qFolded);
+
+  // Example: "Làm bảng Excel quản lý xe máy" or "Phần mềm quản lý cửa hàng xe máy" -> IN_SCOPE
+  // Contrast: "Xe máy Honda Vision sửa tốn bao nhiêu tiền" -> OUT_OF_SCOPE
+  if (hasOffTopic && !hasItFraming && !itGroupHit) {
+    return {
+      inScope: false,
+      decision: 'OUT_OF_SCOPE',
+      reason: 'out_of_scope_topic',
+      category: 'non_it',
+      confidence: 0.95,
+      hasOfficeItContext: false,
+      needsSemanticClassifier: false,
+      askClarification: false,
+    };
+  }
+
+  if (itGroupHit) {
     return {
       inScope: true,
-      reason: 'office_it_domain',
+      decision: 'IN_SCOPE',
+      reason: itGroupHit.reason,
+      category: itGroupHit.category,
+      confidence: 0.96,
       hasOfficeItContext: true,
+      needsSemanticClassifier: false,
+      askClarification: false,
     };
   }
 
-  // Follow-up conversation turn inheriting IT/LMS history
+  if (GENERAL_SOFTWARE_FRAMING_RE.test(qFolded) && !hasOffTopic) {
+    return {
+      inScope: true,
+      decision: 'IN_SCOPE',
+      reason: 'software_framing_it_domain',
+      category: 'software_general',
+      confidence: 0.85,
+      hasOfficeItContext: true,
+      needsSemanticClassifier: false,
+      askClarification: false,
+    };
+  }
+
+  // Follow-up conversation turn inheriting recent IT/LMS history
   const recentHistoryText = (Array.isArray(history) ? history : [])
     .slice(-4)
     .map((m) => stripVietnameseMarks(String(m?.content || m?.text || '')).toLowerCase())
     .join(' ');
-  if (SHORT_FOLLOWUP_RE.test(qFolded) && OFFICE_IT_POSITIVE_RE.test(recentHistoryText)) {
+  const historyHasIt = Boolean(matchItFastGroup(recentHistoryText) || GENERAL_SOFTWARE_FRAMING_RE.test(recentHistoryText));
+  if (SHORT_FOLLOWUP_RE.test(qFolded) && historyHasIt) {
     return {
       inScope: true,
+      decision: 'IN_SCOPE',
       reason: 'contextual_followup',
+      category: 'contextual_followup',
+      confidence: 0.9,
       hasOfficeItContext: true,
+      needsSemanticClassifier: false,
+      askClarification: false,
     };
   }
 
-  // General IT / digital literacy phrasing (e.g., short shortcut or tech phrasing with attachment)
   if (hasAttachment && !hasOffTopic) {
     return {
       inScope: true,
+      decision: 'IN_SCOPE',
       reason: 'attachment_support',
+      category: 'attachment',
+      confidence: 0.85,
       hasOfficeItContext: true,
+      needsSemanticClassifier: false,
+      askClarification: false,
     };
   }
 
-  // Ambiguous short queries without any IT keyword -> let caller distinguish greeting/LMS or non-IT
+  // Contextless super-short deictic queries ("cái này làm sao", "lỗi rồi") without IT history -> clarify
+  if (PLACEHOLDER_AMBIGUOUS_RE.test(qFolded)) {
+    return {
+      inScope: false,
+      decision: 'AMBIGUOUS',
+      reason: 'ambiguous_context',
+      category: 'unknown',
+      confidence: 0.35,
+      hasOfficeItContext: false,
+      needsSemanticClassifier: false,
+      askClarification: true,
+    };
+  }
+
+  // Unlisted tool/concept or unclear query -> AMBIGUOUS, trigger lightweight semantic LLM classifier
   return {
     inScope: false,
-    reason: 'non_office_topic',
+    decision: 'AMBIGUOUS',
+    reason: 'needs_semantic_classification',
+    category: 'unknown',
+    confidence: 0.45,
     hasOfficeItContext: false,
+    needsSemanticClassifier: true,
+    askClarification: false,
   };
+}
+
+function classifyOfficeItScope(question, history = [], attachment = null) {
+  return classifyItDomainScope(question, history, attachment);
 }
 
 function buildEngine(indexPath = DEFAULT_INDEX_PATH, vectorsPath = DEFAULT_VECTORS_PATH) {
@@ -1158,6 +1331,7 @@ function buildRagPromptContext(hits = [], lang = 'vi', options = {}) {
 module.exports = {
   EMBEDDING_MODEL,
   MIN_RELEVANCE_SCORE,
+  SCOPE_LOGIC_VERSION,
   isKnowledgeRagEnabled,
   evaluateKnowledgeRagAccess,
   isKnowledgeRagEnabledForUser,
@@ -1174,8 +1348,11 @@ module.exports = {
   stripVietnameseMarks,
   extractExcelFunctions,
   extractShortcutTokens,
+  extractRareQueryIdentifiers,
   detectOfficeVersionIntent,
   detectSoftwareIntent,
+  classifySecurityRisk,
+  classifyItDomainScope,
   classifyOfficeItScope,
   embedQueryWithGemini,
   searchKnowledge,

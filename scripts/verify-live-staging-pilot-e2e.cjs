@@ -413,7 +413,7 @@ async function main() {
       const txt = String(r.data?.data?.answer || '');
       return /(nguồn|giáo trình|mos|excel|word|powerpoint|references|slide master|77-725|77-727|365)/i.test(txt);
     };
-    const isRejectedText = (r) => /chỉ hỗ trợ|tin học văn phòng|office it|ngoài phạm vi|chưa hỗ trợ/i.test(String(r.data?.data?.answer || ''));
+    const isRejectedText = (r) => /chỉ hỗ trợ|tin học văn phòng|office it|ngoài phạm vi|outside my scope|safe support|chưa hỗ trợ/i.test(String(r.data?.data?.answer || ''));
     const preview = (r) => String(r.data?.data?.answer || '').replace(/\s+/g, ' ').slice(0, 220);
 
     const corsAllowOrigin = String(webStatusCors.headers?.['access-control-allow-origin'] || '');
