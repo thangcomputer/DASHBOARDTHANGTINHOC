@@ -3693,6 +3693,7 @@ async function classifyAmbiguousWithLlm(question, { history = [], lang = 'vi' } 
     'AMBIGUOUS: Underspecified question missing critical software/context (e.g. literal placeholders like "software X", vague pronouns like "how to fix this?" with no topic).',
     'Important: Never reject a real software, programming term, digital platform, or IT tool simply because its name is specialized or uncommon.',
     'Reply with STRICT single-line JSON ONLY: {"decision":"IN_SCOPE|OUT_OF_SCOPE|AMBIGUOUS","category":"office|cert_exam|software|hardware|network|programming|ai|lms|non_it|unknown","reason":"brief reason","clarification":"optional short question in user language if AMBIGUOUS"}',
+    'If the user writes in Vietnamese, any clarification MUST use full Vietnamese diacritics (tiếng Việt có dấu), never unaccented ASCII Vietnamese.',
   ].join('\n');
 
   const userMsg = recentCtx
@@ -3942,8 +3943,10 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
         }, 'rejected');
       }
       if (semanticVerdict.decision === 'AMBIGUOUS') {
-        const clarifyText = semanticVerdict.clarification
-          || (lang === 'en' ? AMBIGUOUS_CLARIFY_REPLY_EN : AMBIGUOUS_CLARIFY_REPLY);
+        // Vietnamese UX: never show Gemini classifier clarification (often unaccented); use branded template.
+        const clarifyText = lang === 'vi'
+          ? AMBIGUOUS_CLARIFY_REPLY
+          : (semanticVerdict.clarification || AMBIGUOUS_CLARIFY_REPLY_EN);
         return finishTelemetry({
           answer: clarifyText,
           source: 'memory',
