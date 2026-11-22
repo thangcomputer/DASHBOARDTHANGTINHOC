@@ -299,7 +299,7 @@ async function sendCanonicalMessageInner({
           ok: false,
           status: 403,
           code: 'AI_IMAGE_QUOTA',
-          message: 'Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.',
+          message: 'Bạn đã gửi đủ ảnh cho Trợ lý AI hôm nay. Ngày mai gửi tiếp nhé. Bạn vẫn có thể hỏi bằng chữ nếu còn lượt AI.',
           remaining: 0,
           limit: quota.limit,
         };

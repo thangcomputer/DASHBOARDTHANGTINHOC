@@ -107,21 +107,67 @@ const ROLE_COMMANDS = {
 
 const STARTER_PROMPTS = {
   student: [
-    'Hàm VLOOKUP dùng thế nào?',
-    'Cách tạo mục lục tự động Word',
-    'Bộ phím tắt Excel hay dùng nhất',
+    'Excel: SUMIFS nhiều điều kiện thế nào?',
+    'Word: tạo mục lục tự động từng bước',
+    'LMS: xem lịch học và nộp bài trắc nghiệm',
   ],
   teacher: [
-    'Hướng dẫn tạo lịch dạy cho học viên',
-    'Hàm SUMIFS khác gì SUMIF?',
-    'Cách dùng Slide Master nhanh',
+    'Excel: SUMIFS khác SUMIF như thế nào?',
+    'PowerPoint: chỉnh Slide Master nhanh',
+    'LMS: xem lịch dạy và điểm danh',
   ],
   admin: [
-    'Hàm VLOOKUP dùng thế nào?',
-    'PivotTable tạo như thế nào?',
-    'Chỉnh lề chuẩn Nghị định 30 Word',
+    'Excel: tạo PivotTable từ bảng dữ liệu',
+    'Word: chỉnh lề theo Nghị định 30',
+    'Excel: VLOOKUP báo #N/A — sửa sao?',
   ],
 };
+
+const AI_COMPOSER_HINTS = {
+  student: {
+    vi: {
+      initial: 'VD: Excel—SUMIFS; Word—mục lục; LMS—lịch học. Ghi phần mềm + việc cần làm…',
+      continue: 'Hỏi tiếp: nêu phần mềm (Word/Excel/PPT) và bước bạn đang kẹt…',
+      attach: 'Mô tả lỗi hoặc đề trên ảnh (VD: Excel #N/A, Word lệch lề)…',
+    },
+    en: {
+      initial: 'E.g. Excel—SUMIFS; Word—TOC; LMS—schedule. Name the app + what you need…',
+      continue: 'Follow up: name the app (Word/Excel/PPT) and the step you’re stuck on…',
+      attach: 'Describe the error or task in the image (e.g. Excel #N/A)…',
+    },
+  },
+  teacher: {
+    vi: {
+      initial: 'VD: Excel—chấm điểm; PPT—Slide Master; LMS—lịch dạy. Ghi phần mềm + mục tiêu…',
+      continue: 'Hỏi tiếp: nêu phần mềm và bối cảnh lớp/bài bạn đang soạn…',
+      attach: 'Mô tả màn hình cần xử lý (bảng điểm, slide, lỗi Office)…',
+    },
+    en: {
+      initial: 'E.g. Excel—grading; PPT—masters; LMS—schedule. App + goal in one line…',
+      continue: 'Follow up: app name + class/material context…',
+      attach: 'Describe the screen to fix (grade sheet, slide, Office error)…',
+    },
+  },
+  admin: {
+    vi: {
+      initial: 'VD: Word—mẫu văn bản; Excel—báo cáo; hệ thống LMS. Ghi phần mềm + việc cần làm…',
+      continue: 'Hỏi tiếp: nêu công cụ và thao tác cụ thể…',
+      attach: 'Mô tả nội dung ảnh/tệp cần kiểm tra…',
+    },
+    en: {
+      initial: 'E.g. Word—templates; Excel—reports; LMS. App + task…',
+      continue: 'Follow up: tool name + exact action…',
+      attach: 'Describe what to check in the attachment…',
+    },
+  },
+};
+
+function getAiComposerPlaceholder(roleKey, lang, mode = 'initial') {
+  const key = ['student', 'teacher', 'admin'].includes(roleKey) ? roleKey : 'student';
+  const pack = AI_COMPOSER_HINTS[key] || AI_COMPOSER_HINTS.student;
+  const loc = String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'vi';
+  return pack[loc]?.[mode] || pack.vi.initial;
+}
 
 function DewSkillAiOrb({ size = 44 }) {
   return (
@@ -627,6 +673,7 @@ export default function CommandPalette({ role = 'student' }) {
   const [asking, setAsking] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const [attachError, setAttachError] = useState('');
+  const [aiDailyQuota, setAiDailyQuota] = useState(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -635,6 +682,22 @@ export default function CommandPalette({ role = 'student' }) {
   useEffect(() => {
     if (practiceSessionActive) setOpen(false);
   }, [practiceSessionActive]);
+
+  useEffect(() => {
+    if (!open || (role !== 'student' && role !== 'teacher')) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await aiSupportAPI.status();
+        if (!cancelled && res?.success && res?.data?.dailyQuota) {
+          setAiDailyQuota(res.data.dailyQuota);
+        }
+      } catch {
+        /* quota display optional */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, role]);
 
   useEffect(() => {
     const syncSound = () => setSoundMutedState(isSoundMuted());
@@ -935,9 +998,42 @@ export default function CommandPalette({ role = 'student' }) {
       });
       if (res?.success === false) {
         failedErrorType = 'other';
+        const quotaCode = res?.code;
+        if (quotaCode === 'AI_QUESTION_QUOTA' || quotaCode === 'AI_IMAGE_QUOTA') {
+          setAttachError(res?.message || 'Bạn đã hết lượt AI hôm nay.');
+          setAiDailyQuota((prev) => {
+            const base = prev || { questionQuota: {}, imageQuota: {} };
+            if (quotaCode === 'AI_QUESTION_QUOTA') {
+              return {
+                ...base,
+                questionQuota: {
+                  ...(base.questionQuota || {}),
+                  applies: true,
+                  remaining: 0,
+                  used: base.questionQuota?.limit || 5,
+                },
+              };
+            }
+            return {
+              ...base,
+              imageQuota: {
+                ...(base.imageQuota || {}),
+                remaining: 0,
+                used: base.imageQuota?.limit || 3,
+              },
+            };
+          });
+          return;
+        }
       } else {
         const payload = res?.data || res;
         const answerText = String(payload?.answer || '').trim();
+        if (payload?.questionQuota || payload?.imageQuota) {
+          setAiDailyQuota({
+            questionQuota: payload.questionQuota,
+            imageQuota: payload.imageQuota,
+          });
+        }
         if (answerText) {
           setMessages((prev) => [
             ...prev,
@@ -998,8 +1094,22 @@ export default function CommandPalette({ role = 'student' }) {
 
   const isChatMode = messages.length > 0 || asking;
   const trimmedQuery = query.trim();
-  const canSend = Boolean(trimmedQuery || attachment) && !asking;
+  const questionQuotaApplies = Boolean(aiDailyQuota?.questionQuota?.applies);
+  const questionQuotaLeft = Number(aiDailyQuota?.questionQuota?.remaining);
+  const questionQuotaLimit = Number(aiDailyQuota?.questionQuota?.limit) || (role === 'teacher' ? 10 : 5);
+  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
+  const imageQuotaLeft = Number(aiDailyQuota?.imageQuota?.remaining);
+  const imageQuotaLimit = Number(aiDailyQuota?.imageQuota?.limit) || (role === 'teacher' ? 5 : 3);
+  const imageQuotaBlocked = Boolean(
+    attachment?.isImage
+    && aiDailyQuota?.imageQuota
+    && !(imageQuotaLeft > 0),
+  );
+  const canSend = Boolean(trimmedQuery || attachment) && !asking && !questionQuotaBlocked && !imageQuotaBlocked;
   const starterPrompts = STARTER_PROMPTS[roleKey] || STARTER_PROMPTS.student;
+  const composerPlaceholder = getAiComposerPlaceholder(roleKey, language, 'initial');
+  const composerContinuePlaceholder = getAiComposerPlaceholder(roleKey, language, 'continue');
+  const composerAttachPlaceholder = getAiComposerPlaceholder(roleKey, language, 'attach');
 
   const executeItem = (item) => {
     if (!item) return;
@@ -1120,6 +1230,21 @@ export default function CommandPalette({ role = 'student' }) {
           {attachError}
         </div>
       ) : null}
+      {(role === 'student' || role === 'teacher') && aiDailyQuota?.questionQuota?.applies ? (
+        <div className="mb-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          {questionQuotaBlocked
+            ? t(`Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00, hoặc mở Trợ lý AI trong tin nhắn.`)
+            : t(`Hôm nay: ${Math.max(0, questionQuotaLimit - Math.max(0, questionQuotaLeft))}/${questionQuotaLimit} lượt AI`)}
+          {attachment?.isImage && aiDailyQuota?.imageQuota
+            ? ` · ${t('ảnh')}: ${imageQuotaLimit - Math.max(0, imageQuotaLeft)}/${imageQuotaLimit}`
+            : ''}
+        </div>
+      ) : null}
+      {attachment?.isImage && !attachError ? (
+        <p className="mb-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+          {t('Mẹo: chụp rõ màn hình + một câu mô tả — mỗi lần gửi có ảnh tính 1 lượt AI và 1 lần gửi ảnh.')}
+        </p>
+      ) : null}
       <div className="flex items-center gap-2.5">
         <Search size={17} className="shrink-0 text-slate-400" aria-hidden="true" />
         <input
@@ -1128,7 +1253,7 @@ export default function CommandPalette({ role = 'student' }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder={attachment ? t('Nhập câu hỏi về ảnh/tệp này (hoặc nhấn Gửi ngay)…') : placeholderText}
+          placeholder={attachment ? composerAttachPlaceholder : placeholderText}
           className="w-full min-w-0 bg-transparent text-[14px] font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none"
         />
       </div>
@@ -1310,7 +1435,7 @@ export default function CommandPalette({ role = 'student' }) {
             </div>
 
             <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/50 dark:bg-slate-950/40">
-              {renderComposerPill('Hỏi tiếp DewSkill AI bất kỳ điều gì…')}
+              {renderComposerPill(composerContinuePlaceholder)}
             </div>
           </>
         ) : (
@@ -1330,19 +1455,24 @@ export default function CommandPalette({ role = 'student' }) {
                 <h2 className="mt-3 text-[22px] sm:text-[25px] font-extrabold tracking-tight text-slate-900 dark:text-white leading-snug">
                   DewSkill AI, trợ lý cá nhân
                 </h2>
-                <p className="text-[19px] sm:text-[22px] font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-indigo-500 bg-clip-text text-transparent leading-snug">
-                  tìm nhanh &amp; giải đáp mọi chủ đề
+                <p className="text-[17px] sm:text-[20px] font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-indigo-500 bg-clip-text text-transparent leading-snug">
+                  Word · Excel · PowerPoint · CNTT · LMS
+                </p>
+                <p className="mt-1 max-w-md text-[12px] font-semibold text-slate-500 dark:text-slate-400">
+                  {language === 'en'
+                    ? 'One topic per question — name the app and what you need.'
+                    : 'Mỗi lần hỏi một chủ đề — ghi rõ phần mềm và việc cần làm.'}
                 </p>
               </div>
 
               <div className="mx-auto mt-5 max-w-xl">
-                {renderComposerPill('Hỏi DewSkill AI hoặc tìm nhanh bất kỳ điều gì…')}
+                {renderComposerPill(composerPlaceholder)}
               </div>
 
               {!trimmedQuery ? (
                 <div className="mx-auto mt-4 max-w-xl">
                   <div className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Gợi ý hỏi AI
+                    {language === 'en' ? 'Example prompts' : 'Gợi ý câu hỏi mẫu'}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {starterPrompts.map((promptText) => (

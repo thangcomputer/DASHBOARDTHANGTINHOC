@@ -93,7 +93,7 @@ test('Web and Mobile headers merge AI + Search into a single AI button wired to 
   assert.match(webButton, /search-ai-icon\.svg/);
   assert.match(webButton, /ai-sparkles\.svg/);
   assert.match(webButton, /mint-wave\.svg/);
-  assert.match(webButton, /Tìm kiếm bằng AI\.\.\./);
+  assert.match(webButton, /Hỏi Word, Excel, LMS/);
   assert.match(webButton, /AiSearchPillButton\.css/);
   const webButtonCss = read('client/src/components/ui/AiSearchPillButton.css');
   assert.match(webButtonCss, /width:\s*max-content/);

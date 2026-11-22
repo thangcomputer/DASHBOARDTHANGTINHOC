@@ -494,8 +494,8 @@ function ChatWindow({
   escalating = false, resettingAi = false,
   onTypingStart, onTypingStop,
   sending = false,
-  imageQuota = { remaining: 5, limit: 5, used: 0 },
-  questionQuota = { applies: false, remaining: null, limit: 15, used: 0 },
+  imageQuota = { remaining: 3, limit: 3, used: 0 },
+  questionQuota = { applies: false, remaining: null, limit: 5, used: 0 },
   viewerRole = 'student',
   fullPage = false,
 }) {
@@ -744,12 +744,12 @@ function ChatWindow({
   );
   const aiImageLimited = Boolean(isAiPeer && !talkingToHuman);
   const aiImageLeft = Number(imageQuota?.remaining);
-  const imageLimit = Number(imageQuota?.limit) || (viewerRole === 'teacher' ? 10 : 5);
+  const imageLimit = Number(imageQuota?.limit) || (viewerRole === 'teacher' ? 5 : 3);
   const imageBlocked = aiImageLimited && !(aiImageLeft > 0);
   const canAttachImage = !isAiPeer || talkingToHuman || (aiImageLimited && !imageBlocked);
   const questionLimited = Boolean(isAiPeer && !talkingToHuman && questionQuota?.applies);
   const questionLeft = Number(questionQuota?.remaining);
-  const questionLimit = Number(questionQuota?.limit) || (viewerRole === 'teacher' ? 25 : 15);
+  const questionLimit = Number(questionQuota?.limit) || (viewerRole === 'teacher' ? 10 : 5);
   const questionBlocked = questionLimited && !(questionLeft > 0);
 
   const applyWinSize = useCallback((next) => {
@@ -1238,12 +1238,12 @@ function ChatWindow({
             <div className="space-y-2">
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-[11px] font-semibold leading-snug text-amber-900">
                 {questionBlocked && imageBlocked
-                  ? `Bạn đã hết ${questionLimit} lượt hỏi và ${imageLimit} lượt gửi ảnh hôm nay.`
+                  ? `Bạn đã dùng hết ${questionLimit} lượt AI và ${imageLimit} lần gửi ảnh hôm nay.`
                   : questionBlocked
-                    ? `Bạn đã hết ${questionLimit} lượt hỏi AI hôm nay.`
-                    : `Bạn đã hết ${imageLimit} lượt gửi ảnh hôm nay.`}
+                    ? `Bạn đã dùng hết ${questionLimit} lượt AI hôm nay.`
+                    : `Bạn đã gửi đủ ${imageLimit} ảnh hôm nay — vẫn có thể hỏi bằng chữ nếu còn lượt AI.`}
                 <span className="block mt-0.5 font-medium text-amber-800">
-                  Bạn có thể chuyển sang nhân viên hỗ trợ trực tiếp.
+                  Reset 0:00 (giờ Việt Nam). Cần gấp → chuyển nhân viên hỗ trợ.
                 </span>
               </div>
               <button
@@ -1514,7 +1514,7 @@ function ChatWindow({
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 !shadow-none"
                   >
                     <ImagePlus size={15} className="shrink-0 text-emerald-600" />
-                    <span>{imageBlocked ? `Hết ${imageLimit} ảnh hôm nay` : 'Gửi hình ảnh'}</span>
+                    <span>{imageBlocked ? `Hết ${imageLimit} ảnh hôm nay` : `Gửi hình ảnh${Number.isFinite(aiImageLeft) ? ` (còn ${aiImageLeft})` : ''}`}</span>
                   </button>
                   <button
                     type="button"
@@ -1535,7 +1535,7 @@ function ChatWindow({
                       buttonClassName="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 !shadow-none"
                       className="w-full"
                       label="Chụp màn hình"
-                      title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay - ngày mai gửi tiếp` : 'Chụp màn hình'}
+                      title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay — ngày mai gửi tiếp hoặc hỏi bằng chữ` : 'Chụp màn hình Word/Excel/PPT để AI xem'}
                       onCaptured={(file) => {
                         setAttachMenuOpen(false);
                         stageImage(file);
@@ -1630,9 +1630,9 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
   const [aiFeedback, setAiFeedback] = useState({});
   const [peerTypingMap, setPeerTypingMap] = useState({});
   const [sendingMap, setSendingMap] = useState({});
-  const [aiImageQuota, setAiImageQuota] = useState({ remaining: 5, limit: 5, used: 0 });
+  const [aiImageQuota, setAiImageQuota] = useState({ remaining: 3, limit: 3, used: 0 });
   const [aiQuestionQuota, setAiQuestionQuota] = useState({
-    applies: false, remaining: 15, limit: 15, used: 0,
+    applies: false, remaining: 5, limit: 5, used: 0,
   });
   const [supportDirectoryMode, setSupportDirectoryMode] = useState('all');
   const [supportChatPage, setSupportChatPage] = useState(false);
@@ -1939,8 +1939,8 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
         const q = res.data?.session?.imageQuota;
         if (q) {
           setAiImageQuota({
-            remaining: Number(q.remaining ?? 5),
-            limit: Number(q.limit ?? 5),
+            remaining: Number(q.remaining ?? 3),
+            limit: Number(q.limit ?? 3),
             used: Number(q.used ?? 0),
           });
         }
@@ -1949,7 +1949,7 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
           setAiQuestionQuota({
             applies: Boolean(qq.applies),
             remaining: qq.remaining == null ? null : Number(qq.remaining),
-            limit: Number(qq.limit ?? 15),
+            limit: Number(qq.limit ?? 5),
             used: Number(qq.used ?? 0),
           });
         }
@@ -2090,8 +2090,8 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
         const q = res.data?.session?.imageQuota;
         if (q) {
           setAiImageQuota({
-            remaining: Number(q.remaining ?? 5),
-            limit: Number(q.limit ?? 5),
+            remaining: Number(q.remaining ?? 3),
+            limit: Number(q.limit ?? 3),
             used: Number(q.used ?? 0),
           });
         }
@@ -2100,7 +2100,7 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
           setAiQuestionQuota({
             applies: Boolean(qq.applies),
             remaining: qq.remaining == null ? null : Number(qq.remaining),
-            limit: Number(qq.limit ?? 15),
+            limit: Number(qq.limit ?? 5),
             used: Number(qq.used ?? 0),
           });
         }
@@ -2142,8 +2142,8 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
       }
       if (payload.imageQuota) {
         setAiImageQuota({
-          remaining: Number(payload.imageQuota.remaining ?? 5),
-          limit: Number(payload.imageQuota.limit ?? 5),
+          remaining: Number(payload.imageQuota.remaining ?? 3),
+          limit: Number(payload.imageQuota.limit ?? 3),
           used: Number(payload.imageQuota.used ?? 0),
         });
       }
@@ -2151,7 +2151,7 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
         setAiQuestionQuota({
           applies: Boolean(payload.questionQuota.applies),
           remaining: payload.questionQuota.remaining == null ? null : Number(payload.questionQuota.remaining),
-          limit: Number(payload.questionQuota.limit ?? 15),
+          limit: Number(payload.questionQuota.limit ?? 5),
           used: Number(payload.questionQuota.used ?? 0),
         });
       }
@@ -2539,7 +2539,7 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
       return false;
     }
     if (isImage && quotaApplies && Number(aiImageQuota.remaining) <= 0) {
-      toast.error('Bạn đã hết lượt gửi ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.');
+      toast.error('Bạn đã gửi đủ ảnh cho Trợ lý AI hôm nay. Ngày mai gửi tiếp, hoặc hỏi bằng chữ nếu còn lượt AI.');
       return false;
     }
     const content = String(caption || '').trim() || (isImage ? '[Hình ảnh]' : file.name);

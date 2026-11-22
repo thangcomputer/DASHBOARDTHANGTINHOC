@@ -1327,12 +1327,20 @@ export function QuickAiPopupModal({
                 ref={inputRef}
                 value={query}
                 onChangeText={setQuery}
-                placeholder={attachment ? 'Hỏi về ảnh/tệp này hoặc nhấn gửi…' : 'Hỏi bất kỳ điều gì…'}
+                placeholder={
+                  attachment
+                    ? (isEn
+                      ? 'Describe the error or task in the image…'
+                      : 'Mô tả lỗi/đề trên ảnh (VD: Excel #N/A)…')
+                    : (isEn
+                      ? 'E.g. Excel—SUMIFS; Word—TOC; LMS—schedule…'
+                      : 'VD: Excel—SUMIFS; Word—mục lục; LMS—lịch học…')
+                }
                 placeholderTextColor="#94A3B8"
                 style={styles.composerInput}
                 returnKeyType="send"
                 onSubmitEditing={handleSubmit}
-                accessibilityLabel="Hỏi bất kỳ điều gì…"
+                accessibilityLabel={isEn ? 'Ask DewSkill AI about Office or LMS' : 'Hỏi DewSkill AI về Office hoặc LMS'}
               />
               <Pressable
                 disabled={!canSend}

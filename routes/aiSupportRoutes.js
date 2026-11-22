@@ -38,6 +38,8 @@ const {
   recordQuickAskSecurityEvent,
   redactPiiText,
   sessionToClient,
+  peekQuestionQuota,
+  peekImageQuota,
   AI_PEER_ID,
   AI_PEER_NAME,
 } = require('../services/aiSupportService');
@@ -69,14 +71,27 @@ function denyUnlessSupport(req, res) {
   return false;
 }
 
-router.get('/status', authMiddleware, (req, res) => {
+router.get('/status', authMiddleware, async (req, res) => {
   const allowed = isAiChatUser(req.user);
+  let dailyQuota = null;
+  if (allowed) {
+    const role = getMessagingRole(req.user);
+    const userId = String(req.user.id);
+    const conversationId = buildConversationId(role, userId, 'system', AI_PEER_ID);
+    const session = await getSession(conversationId);
+    const roleKey = session?.userRole || role;
+    dailyQuota = {
+      questionQuota: peekQuestionQuota(session || { userRole: roleKey }),
+      imageQuota: peekImageQuota(session || { userRole: roleKey }),
+    };
+  }
   res.json({
     success: true,
     data: {
       enabled: isAiSupportEnabled() && allowed,
       configured: aiSupportConfigured(),
       peer: { id: AI_PEER_ID, name: AI_PEER_NAME, role: 'system' },
+      ...(dailyQuota ? { dailyQuota } : {}),
     },
   });
 });
@@ -445,7 +460,11 @@ router.post('/quick-ask', authMiddleware, quickAskLimiter, async (req, res) => {
     return res.json({ success: true, data });
   } catch (err) {
     const status = err.status || 500;
-    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+    return res.status(status).json({
+      success: false,
+      message: err.message || 'Lỗi server',
+      ...(err.code ? { code: err.code } : {}),
+    });
   }
 });
 

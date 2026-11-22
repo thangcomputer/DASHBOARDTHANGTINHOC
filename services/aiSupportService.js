@@ -43,10 +43,10 @@ const logger = require('../config/logger');
 const AI_PEER_ID = 'ai_support';
 const AI_PEER_NAME = 'Trợ lý Thắng Tin Học';
 const TYPING_MS = 900;
-const AI_IMAGE_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT) || 5);
-const AI_IMAGE_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_TEACHER) || 10);
-const AI_QUESTION_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT) || 15);
-const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER) || 30);
+const AI_IMAGE_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT) || 3);
+const AI_IMAGE_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_TEACHER) || 5);
+const AI_QUESTION_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT) || 5);
+const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER) || 10);
 const IDLE_PING_MS = Math.max(30_000, Number(process.env.AI_SUPPORT_IDLE_PING_MS) || 5 * 60 * 1000);
 const IDLE_END_MS = Math.max(15_000, Number(process.env.AI_SUPPORT_IDLE_END_MS) || 5 * 60 * 1000);
 const IDLE_SWEEP_MS = Math.max(10_000, Number(process.env.AI_SUPPORT_IDLE_SWEEP_MS) || 30_000);
@@ -68,9 +68,24 @@ const QUESTION_LIMIT_MARKER = 'lượt hỏi Trợ lý AI hôm nay';
 function questionLimitReply(limit, lang = 'vi') {
   const n = Number(limit) || 0;
   if (lang === 'en') {
-    return `You have used all ${n} AI Assistant questions for today. Tap **Need Support Agent** below for live help, or ask AI again tomorrow.`;
+    return `You have used all ${n} AI turns for today. Tap **Need Support Agent** for live help, or ask AI again tomorrow.`;
   }
-  return `Bạn đã hết ${n} ${QUESTION_LIMIT_MARKER}. Cần hỗ trợ tiếp thì bấm **Cần nhân viên hỗ trợ** bên dưới, hoặc ngày mai hỏi AI tiếp.`;
+  return `Bạn đã dùng hết ${n} lượt AI hôm nay. Cần hỗ trợ tiếp thì bấm **Cần nhân viên hỗ trợ** bên dưới, hoặc ngày mai hỏi AI tiếp.`;
+}
+
+function imageLimitReply(limit, lang = 'vi') {
+  const n = Number(limit) || 0;
+  if (lang === 'en') {
+    return `You have used all ${n} image uploads for the AI Assistant today. Try again tomorrow, or ask with text if you still have AI turns left.`;
+  }
+  return `Bạn đã gửi đủ ${n} ảnh cho Trợ lý AI hôm nay. Ngày mai gửi tiếp nhé. Bạn vẫn có thể hỏi bằng chữ nếu còn lượt AI.`;
+}
+
+function buildAiSupportConversationId(myRole, myId) {
+  const sr = String(myRole || 'student');
+  const sid = String(myId || '');
+  const parts = [`${sr}_${sid}`, `system_${AI_PEER_ID}`].sort();
+  return parts.join('__');
 }
 const IMAGE_GEN_REFUSE = 'Em không tạo hình ảnh. Bạn gửi ảnh màn hình Word, Excel hoặc PowerPoint nếu cần em xem giúp.';
 const IMAGE_GEN_REFUSE_EN = 'I do not generate images. You can send a screenshot of Word, Excel, or PowerPoint if you need help troubleshooting.';
@@ -228,6 +243,10 @@ function vietnamDateKey(d = new Date()) {
   }).format(d);
 }
 
+function isAiSessionStoreReady() {
+  return Boolean(mongoose.connection && mongoose.connection.readyState === 1);
+}
+
 function imageDailyLimit(role) {
   if (role === 'teacher') return AI_IMAGE_DAILY_LIMIT_TEACHER;
   if (role === 'student') return AI_IMAGE_DAILY_LIMIT_STUDENT;
@@ -296,6 +315,16 @@ async function refundAiQuestionQuota(sessionDoc) {
   const used = Number(sessionDoc.questionCount || 0);
   if (used <= 0) return;
   sessionDoc.questionCount = used - 1;
+  await sessionDoc.save();
+}
+
+async function refundAiImageQuota(sessionDoc) {
+  if (!sessionDoc) return;
+  const today = vietnamDateKey();
+  if (String(sessionDoc.imageUploadDate || '') !== today) return;
+  const used = Number(sessionDoc.imageUploadCount || 0);
+  if (used <= 0) return;
+  sessionDoc.imageUploadCount = used - 1;
   await sessionDoc.save();
 }
 
@@ -4064,6 +4093,59 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     }, 'fallback');
   }
 
+  const uid = String(user?.id || user?._id || '');
+  const branchId = String(user?.branchId || '');
+  let sessionDoc = null;
+  let consumedQuestionQuota = false;
+  let consumedImageQuota = false;
+  let quotaPayload = {};
+
+  if (questionDailyLimit(userRole) > 0 && uid && isAiSessionStoreReady()) {
+    const conversationId = buildAiSupportConversationId(userRole, uid);
+    sessionDoc = await ensureSession({
+      conversationId,
+      userId: uid,
+      userRole,
+      branchId,
+    });
+
+    const hasVisionAttachment = images.length > 0;
+    if (hasVisionAttachment && imageDailyLimit(userRole) > 0) {
+      const imgQ = await consumeAiImageQuota(sessionDoc);
+      if (imgQ.blocked) {
+        if (cacheKey && rejectInFlight) {
+          inFlightQuickAsk.delete(cacheKey);
+          rejectInFlight(new Error('AI_IMAGE_QUOTA'));
+        }
+        const err = new Error(imageLimitReply(imgQ.limit, lang));
+        err.status = 403;
+        err.code = 'AI_IMAGE_QUOTA';
+        throw err;
+      }
+      consumedImageQuota = imgQ.applies && !imgQ.blocked;
+    }
+
+    const q = await consumeAiQuestionQuota(sessionDoc);
+    if (q.blocked) {
+      if (consumedImageQuota) {
+        await refundAiImageQuota(sessionDoc);
+      }
+      if (cacheKey && rejectInFlight) {
+        inFlightQuickAsk.delete(cacheKey);
+        rejectInFlight(new Error('AI_QUESTION_QUOTA'));
+      }
+      const err = new Error(questionLimitReply(q.limit, lang));
+      err.status = 403;
+      err.code = 'AI_QUESTION_QUOTA';
+      throw err;
+    }
+    consumedQuestionQuota = q.applies && !q.blocked;
+    quotaPayload = {
+      questionQuota: peekQuestionQuota(sessionDoc),
+      imageQuota: peekImageQuota(sessionDoc),
+    };
+  }
+
   const messages = [
     {
       role: 'system',
@@ -4110,6 +4192,8 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       lang,
       actions,
       ...(result?.model ? { model: result.model } : {}),
+      ...(quotaPayload.questionQuota ? { questionQuota: quotaPayload.questionQuota } : {}),
+      ...(quotaPayload.imageQuota ? { imageQuota: quotaPayload.imageQuota } : {}),
     };
 
     // Cache approved RAG-matched replies AND confident general IT replies (without bogus/rare unknown codes like SUPERMAGIC999)
@@ -4144,6 +4228,17 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     if (cacheKey && rejectInFlight) {
       inFlightQuickAsk.delete(cacheKey);
       rejectInFlight(err);
+    }
+    if (consumedQuestionQuota && sessionDoc) {
+      try {
+        await refundAiQuestionQuota(sessionDoc);
+        if (consumedImageQuota) await refundAiImageQuota(sessionDoc);
+      } catch (refundErr) {
+        logger.warn({ err: refundErr?.message }, '[Quick Ask AI] refund quota failed');
+      }
+    }
+    if (err?.code === 'AI_QUESTION_QUOTA' || err?.code === 'AI_IMAGE_QUOTA') {
+      throw err;
     }
     logger.warn({ err: err?.message }, '[Quick Ask AI] fallback error');
     return finishTelemetry({

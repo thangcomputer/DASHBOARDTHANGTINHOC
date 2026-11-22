@@ -5,14 +5,14 @@ const ICON = '/brand/ai-search/search-ai-icon.svg';
 const SPARKLES = '/brand/ai-search/ai-sparkles.svg';
 const WAVE = '/brand/ai-search/mint-wave.svg';
 
-const PLACEHOLDER = 'Tìm kiếm bằng AI...';
+const PLACEHOLDER = 'Hỏi Word, Excel, LMS…';
 
 /**
  * Nút mở tìm kiếm AI — kích thước 280×44px desktop, bám mock pixel-perfect.
  */
 export default function AiSearchPillButton({
   onClick,
-  title = 'Tìm kiếm AI (Ctrl+K)',
+  title = 'Hỏi DewSkill AI: Office, CNTT, LMS (Ctrl+K)',
   ariaLabel = 'Tìm kiếm bằng AI',
   showSearchLabel = true,
   className = '',
