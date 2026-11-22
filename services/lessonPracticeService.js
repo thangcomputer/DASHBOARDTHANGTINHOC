@@ -1007,7 +1007,8 @@ async function explainWritten(item, text) {
       feedback: 'Trợ lý AI chưa kết nối được. Vui lòng thử lại sau.',
     };
   }
-  const { getSupportModelFallbacks } = require('./aiSupportService');
+  const { getModelProfile } = require('./ai/modelRouter');
+  const gradeModels = getModelProfile('grade_text').models;
   const messages = [
     {
       role: 'system',
@@ -1019,13 +1020,14 @@ async function explainWritten(item, text) {
     },
   ];
   let lastErr = null;
-  for (const model of getSupportModelFallbacks()) {
+  for (const model of gradeModels) {
     try {
       const result = await chatCompletion({
         messages,
         model,
         temperature: 0.2,
-        maxTokens: 400,
+        maxTokens: 320,
+        thinkingBudget: 0,
         responseFormat: 'json',
       });
       const parsed = parseJsonLoose(result?.content);

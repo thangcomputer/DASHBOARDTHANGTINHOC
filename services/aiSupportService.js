@@ -13,6 +13,7 @@ const Student = require('../models/Student');
 const AiSupportSession = require('../models/AiSupportSession');
 const AiQuickAskDailyStat = require('../models/AiQuickAskDailyStat');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
+const { getModelProfile, isComplexQuery, getSupportFallbackChain } = require('./ai/modelRouter');
 const cache = require('../utils/cache');
 const {
   evaluateKnowledgeRagAccess,
@@ -187,16 +188,6 @@ function detectQueryLanguage(text, history = [], preferredLang = '') {
   if (isStrongEnglishQuery(t, folded)) return 'en';
   return String(preferredLang || '').toLowerCase().startsWith('en') ? 'en' : 'vi';
 }
-
-const SUPPORT_MODEL_FALLBACKS = [
-  process.env.AI_SUPPORT_MODEL,
-  process.env.AI_MODEL,
-  'gemini-3.6-flash',
-  'gemini-flash-latest',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-lite-latest',
-  'gemini-3.5-flash',
-].filter(Boolean);
 
 function isSimpleGreeting(text) {
   const t = String(text || '').trim().toLowerCase().replace(/[.!?…,-]+$/g, '').trim();
@@ -657,20 +648,8 @@ async function fetchInlineImageFromUrl(fileUrl) {
   }
 }
 
-function uniqueModels() {
-  const seen = new Set();
-  const out = [];
-  for (const m of SUPPORT_MODEL_FALLBACKS) {
-    const k = String(m).trim();
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(k);
-  }
-  return out;
-}
-
 function getSupportModelFallbacks() {
-  return uniqueModels();
+  return getSupportFallbackChain();
 }
 
 function isAiSupportEnabled() {
@@ -1699,10 +1678,10 @@ function buildSupportMessages(history, userRole, userName, currentPrompt = '', l
       }
       return true;
     })
-    .slice(-12);
+    .slice(-8);
 
   for (const m of rows) {
-    let text = String(m.content).trim().slice(0, 1500);
+    let text = String(m.content).trim().slice(0, 900);
     // Nếu tin nhắn là ảnh và caption chỉ là placeholder - thay bằng mô tả rõ hơn
     if (m.messageType === 'image') {
       if (!text || text === '[Hình ảnh]' || text === '[Image]') {
@@ -1771,32 +1750,36 @@ function sanitizeSupportReply(raw, { stripGreeting = false } = {}) {
   return t;
 }
 
-async function callSupportLlm(messages, { images } = {}) {
-  const models = uniqueModels();
+async function callSupportLlm(messages, { images = [], question = '' } = {}) {
+  const hasImages = Array.isArray(images) && images.length > 0;
+  const complex = !hasImages && isComplexQuery(question, { hasImages });
+  const task = hasImages ? 'support_vision' : complex ? 'support_complex' : 'support_simple';
+  const profile = getModelProfile(task);
   let lastErr = null;
-  for (const model of models) {
+  for (let i = 0; i < profile.models.length; i += 1) {
+    const model = profile.models[i];
     try {
       return await chatCompletion({
         messages,
         model,
-        temperature: 0.35,
-        maxTokens: 8000,
+        temperature: profile.temperature,
+        maxTokens: profile.maxTokens,
+        thinkingBudget: profile.thinkingBudget,
+        timeoutMs: i === 0 ? profile.timeoutMs : Math.min(28000, profile.timeoutMs + 4000),
         images: images || [],
       });
     } catch (err) {
       lastErr = err;
-      logger.warn({ model, err: err?.message }, '[AI Support] model try failed');
+      logger.warn({ model, task, err: err?.message }, '[AI Support] model try failed');
     }
   }
   throw lastErr || new Error('AI support unavailable');
 }
 
-function getQuickAskModelFallbacks({ hasImages = false } = {}) {
-  const configured = String(process.env.AI_QUICK_ASK_MODEL || '').trim();
-  const list = hasImages
-    ? [configured, 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest']
-    : [configured, 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
-  return [...new Set(list.filter(Boolean))];
+function getQuickAskModelFallbacks({ hasImages = false, complex = false } = {}) {
+  if (hasImages) return getModelProfile('qa_vision').models;
+  if (complex) return getModelProfile('qa_complex').models;
+  return getModelProfile('qa_simple').models;
 }
 
 function classifyLlmErrorType(err) {
@@ -1821,46 +1804,33 @@ function redactPiiText(input, maxLen = 300) {
   return s;
 }
 
-async function callQuickAskLlm(messages, { images = [], ragEnabled = false, multiPart = false } = {}) {
+async function callQuickAskLlm(messages, {
+  images = [],
+  ragEnabled = false,
+  multiPart = false,
+  question = '',
+  hasAttachmentText = false,
+} = {}) {
   const trackAttemptErr = (model, err) => {
     const errType = classifyLlmErrorType(err);
     quickAskMetrics.errorsByType[errType] = (quickAskMetrics.errorsByType[errType] || 0) + 1;
     logger.warn({ model, errType, status: err?.status || err?.response?.status || null }, '[Quick Ask AI] model try failed');
   };
 
-  if (!ragEnabled) {
-    const models = uniqueModels();
-    let lastErr = null;
-    let fallbackAttempts = 0;
-    for (const model of models) {
-      try {
-        const res = await chatCompletion({
-          messages,
-          model,
-          temperature: 0.35,
-          maxTokens: 8000,
-          timeoutMs: Math.max(8000, Number(process.env.AI_LEGACY_TIMEOUT_MS) || 20000),
-          images: images || [],
-        });
-        return { ...res, fallbackAttempts };
-      } catch (err) {
-        lastErr = err;
-        fallbackAttempts += 1;
-        trackAttemptErr(model, err);
-      }
-    }
-    throw lastErr || new Error('AI support unavailable');
-  }
   const hasImages = Array.isArray(images) && images.length > 0;
-  const models = getQuickAskModelFallbacks({ hasImages });
-  const thinkingBudget = process.env.AI_QUICK_ASK_THINKING_BUDGET !== undefined
+  const complex = !hasImages && isComplexQuery(question, { multiPart, hasImages, hasAttachmentText });
+  const models = getQuickAskModelFallbacks({ hasImages, complex });
+  const rawThinking = process.env.AI_QUICK_ASK_THINKING_BUDGET !== undefined
     ? Number(process.env.AI_QUICK_ASK_THINKING_BUDGET)
     : 0;
+  const thinkingBudget = Number.isFinite(rawThinking) ? Math.max(0, Math.floor(rawThinking)) : 0;
   const configuredMaxTokens = Number(process.env.AI_QUICK_ASK_MAX_TOKENS);
   const maxTokens = Number.isFinite(configuredMaxTokens) && configuredMaxTokens >= 300
     ? configuredMaxTokens
-    : (multiPart ? 1500 : 1150);
-  const primaryTimeoutMs = Math.max(5000, Number(process.env.AI_QUICK_ASK_TIMEOUT_MS) || 12000);
+    : ((multiPart || complex || hasImages) ? 1500 : 1150);
+  const primaryTimeoutMs = ragEnabled
+    ? Math.max(5000, Number(process.env.AI_QUICK_ASK_TIMEOUT_MS) || 12000)
+    : Math.max(8000, Number(process.env.AI_LEGACY_TIMEOUT_MS) || 16000);
   let lastErr = null;
   let fallbackAttempts = 0;
   for (let i = 0; i < models.length; i += 1) {
@@ -1872,7 +1842,7 @@ async function callQuickAskLlm(messages, { images = [], ragEnabled = false, mult
         temperature: 0.3,
         maxTokens,
         timeoutMs: i === 0 ? primaryTimeoutMs : Math.min(20000, primaryTimeoutMs + 4000),
-        thinkingBudget: Number.isFinite(thinkingBudget) ? thinkingBudget : 0,
+        thinkingBudget,
         images,
       });
       return { ...res, fallbackAttempts };
@@ -1882,7 +1852,7 @@ async function callQuickAskLlm(messages, { images = [], ragEnabled = false, mult
       trackAttemptErr(model, err);
     }
   }
-  throw lastErr || new Error('Quick Ask AI unavailable');
+  throw lastErr || new Error(ragEnabled ? 'Quick Ask AI unavailable' : 'AI support unavailable');
 }
 
 async function persistBotReply({
@@ -2200,7 +2170,7 @@ async function replyToUserMessage({
         logger.warn({ imageFileUrl }, '[AI Support] Cannot load image inline, AI will respond without image');
       }
     }
-    const result = await callSupportLlm(messages, { images });
+    const result = await callSupportLlm(messages, { images, question: userText });
     const text = sanitizeSupportReply(result?.content, { stripGreeting: ongoing })
       || (lang === 'en' ? EMPTY_REPLY_EN : EMPTY_REPLY);
     if (isHumanHandoffButtonHallucination(text)) {
@@ -3859,11 +3829,10 @@ async function classifyAmbiguousWithLlm(question, { history = [], lang = 'vi' } 
     ? `Recent context:\n${recentCtx}\n\nQuestion (${lang}): ${q}`
     : `Question (${lang}): ${q}`;
 
-  const model = String(process.env.AI_SCOPE_CLASSIFIER_MODEL || '').trim() || 'gemini-3.5-flash-lite';
-  const fallbackModel = 'gemini-flash-lite-latest';
+  const classifierModels = getModelProfile('classify').models;
   quickAskMetrics.scopeClassifier.invoked += 1;
 
-  for (const m of [...new Set([model, fallbackModel])]) {
+  for (const m of classifierModels) {
     try {
       const res = await chatCompletion({
         messages: [
@@ -4259,10 +4228,16 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     }
   }
 
-  // 5. Access-scoped, language-scoped, Office-version-scoped & knowledge-version-scoped cache lookup + single-flight dedup
-  const canUseCache = ragEnabled && !hasAttachment && historyMessages.length === 0 && rawQuestion.length >= 3;
+  // 5. Access-scoped, language-scoped, Office-version-scoped & knowledge-version-scoped cache lookup + single-flight dedup (works for BOTH RAG & Legacy)
+  const canUseCache = !hasAttachment && historyMessages.length === 0 && rawQuestion.length >= 3;
   cacheKey = canUseCache
-    ? buildQuickAskCacheKey({ ragVersion, accessTier, lang, officeVersion: detectedOfficeVer, question: rawQuestion })
+    ? buildQuickAskCacheKey({
+      ragVersion: ragEnabled ? ragVersion : 'legacy_v2',
+      accessTier,
+      lang,
+      officeVersion: detectedOfficeVer,
+      question: rawQuestion,
+    })
     : null;
 
   if (cacheKey) {
@@ -4433,7 +4408,13 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
 
   try {
     const tLlm0 = Date.now();
-    const result = await callQuickAskLlm(messages, { images, ragEnabled, multiPart });
+    const result = await callQuickAskLlm(messages, {
+      images,
+      ragEnabled,
+      multiPart,
+      question: rawQuestion,
+      hasAttachmentText: Boolean(att?.textContent),
+    });
     telemetryLlmMs = Date.now() - tLlm0;
     telemetryFallbackAttempts = Number(result?.fallbackAttempts || 0);
     const sanitized = sanitizeSupportReply(result?.content, { stripGreeting: historyMessages.length > 0 });

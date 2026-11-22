@@ -606,7 +606,13 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
-  const [videoDoneIds, setVideoDoneIds] = useState({});
+  const [videoDoneIds, setVideoDoneIds] = useState(() => {
+    const init = {};
+    for (const q of session?.questions || []) {
+      if (q?.type === 'video' && q.watched) init[q.id] = true;
+    }
+    return init;
+  });
   const question = session.questions[index];
   const total = session.questions.length;
   const meta = QUESTION_TYPES[question.type] || QUESTION_TYPES.mcq;
@@ -1025,7 +1031,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
               <div className="min-w-0 flex-1">
                 {videoCompleted ? (
                   <p className="dp-play-video-status-text font-semibold text-emerald-800">
-                    Đã xem video và trả lời đúng hết câu hỏi tương tác — bạn có thể chuyển sang câu tiếp theo.
+                    {question.watched
+                      ? 'Video này bạn đã hoàn thành trước đó — đáp án đã được ghi nhớ ở trên, bạn có thể bấm tiếp tục ngay.'
+                      : 'Đã xem video và trả lời đúng hết câu hỏi tương tác — bạn có thể chuyển sang câu tiếp theo.'}
                   </p>
                 ) : (
                   <p className="dp-play-video-status-text font-medium text-slate-600">

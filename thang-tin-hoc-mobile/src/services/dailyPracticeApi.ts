@@ -222,6 +222,7 @@ export type DpVideoCheck = {
   hint?: string;
   reviewHint?: string;
   reviewAnswer?: string;
+  reviewChoiceIndex?: number;
 };
 
 export type DpPathStep = {
@@ -597,11 +598,15 @@ export const dailyPracticeApi = {
     extra: { text?: string; checkId?: string; imageDataUrl?: string } = {},
   ) => call<{
     correct: boolean;
+    alreadyPassed?: boolean;
     passed?: boolean;
     allChecksPassed?: boolean;
     xpDelta?: number;
     profileXp?: number;
     hint?: string;
+    reviewAnswer?: string;
+    reviewHint?: string;
+    reviewChoiceIndex?: number;
     needsReview?: boolean;
   }>('/path/videos/check', { unitId, videoId, checkIndex, choiceIndex: optionIndex, optionIndex, ...extra }).then((data) => {
     invalidateCache('daily-practice:');
@@ -624,6 +629,9 @@ export const dailyPracticeApi = {
     skipped: boolean;
     passed: boolean;
     review?: boolean;
+    reviewAnswer?: string;
+    reviewHint?: string;
+    reviewChoiceIndex?: number;
     cost?: number;
     charged?: number;
     xpDelta?: number;

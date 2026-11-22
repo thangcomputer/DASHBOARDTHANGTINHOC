@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle, BookOpen, CheckCircle2, Download, ExternalLink, FastForward, FileText, Gamepad2, Loader2, Paperclip, Play, X,
+  AlertTriangle, BookOpen, CheckCircle2, Clock, Download, ExternalLink, FastForward, FileText, Gamepad2, Loader2, Paperclip, Play, X,
 } from 'lucide-react';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
@@ -164,6 +164,8 @@ export default function PathLessonModal({
   const [done, setDone] = useState(lesson?.state === 'completed');
   const [watchedEnough, setWatchedEnough] = useState(lesson?.state === 'completed');
   const [passedKeys, setPassedKeys] = useState(() => new Set());
+  const [syncedChecks, setSyncedChecks] = useState(null);
+  const [rememberedAnswers, setRememberedAnswers] = useState({});
   const [gate, setGate] = useState(null);
   const [picked, setPicked] = useState(null);
   const [answerText, setAnswerText] = useState('');
@@ -193,8 +195,9 @@ export default function PathLessonModal({
   const body = useMemo(() => content.split(/\n+/).filter(Boolean), [content]);
   const yt = extractYouTubeId(url);
   const vimeo = vimeoId(url);
-  const checks = video?.checks || [];
+  const checks = useMemo(() => syncedChecks || video?.checks || [], [syncedChecks, video?.checks]);
 
+  useEffect(() => { setSyncedChecks(null); }, [video?.id]);
   useEffect(() => { passedRef.current = passedKeys; }, [passedKeys]);
   useEffect(() => { gateRef.current = gate; }, [gate]);
 
@@ -202,10 +205,44 @@ export default function PathLessonModal({
     if (!unitId) return undefined;
     let alive = true;
     dailyPracticeApi.student.unitVideos(unitId)
-      .then((res) => { if (alive) setPassedKeys(new Set(res.passedCheckIds || [])); })
+      .then((res) => {
+        if (!alive) return;
+        const nextPassed = new Set(res.passedCheckIds || []);
+        const allVideos = [
+          ...(res.videos || []),
+          ...(res.lesson?.videos || []),
+        ];
+        const matched = video?.id ? allVideos.find((v) => v.id === video.id) : null;
+        if (matched && Array.isArray(matched.checks)) {
+          setSyncedChecks(matched.checks);
+          const nextRemembered = {};
+          for (const c of matched.checks) {
+            const cid = String(c.id || c._id || '');
+            const fullKey = `${video.id}:${cid}`;
+            if (matched.state === 'completed' || c.passed || nextPassed.has(fullKey) || nextPassed.has(cid)) {
+              nextPassed.add(fullKey);
+              nextPassed.add(cid);
+              if (c.reviewAnswer || c.reviewHint) {
+                nextRemembered[fullKey] = {
+                  reviewAnswer: c.reviewAnswer || '',
+                  reviewHint: c.reviewHint || '',
+                };
+              }
+            }
+          }
+          if (Object.keys(nextRemembered).length > 0) {
+            setRememberedAnswers((prev) => ({ ...nextRemembered, ...prev }));
+          }
+          if (matched.state === 'completed') {
+            setDone(true);
+            setWatchedEnough(true);
+          }
+        }
+        setPassedKeys(nextPassed);
+      })
       .catch(() => {});
     return () => { alive = false; };
-  }, [unitId]);
+  }, [unitId, video?.id]);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -215,7 +252,7 @@ export default function PathLessonModal({
     };
   }, []);
 
-  const pending = checks.filter((check) => !passedKeys.has(`${video?.id}:${check.id}`));
+  const pending = checks.filter((check) => !passedKeys.has(`${video?.id}:${check.id}`) && !passedKeys.has(check.id));
 
   const openGate = (check, media) => {
     if (!check || gateRef.current) return;
@@ -317,6 +354,15 @@ export default function PathLessonModal({
         imageDataUrl: imageDataUrl || '',
       });
       if (res.correct) {
+        if (res.reviewAnswer || res.reviewHint) {
+          setRememberedAnswers((prev) => ({
+            ...prev,
+            [`${video.id}:${gate.id}`]: {
+              reviewAnswer: res.reviewAnswer || '',
+              reviewHint: res.reviewHint || '',
+            },
+          }));
+        }
         setMissed(false);
         gameSounds.win();
         setCheer(true);
@@ -398,7 +444,16 @@ export default function PathLessonModal({
     setCheckBusy(true);
     setCheckError('');
     try {
-      await dailyPracticeApi.student.skipVideoCheck(unitId, video.id, gate.id);
+      const res = await dailyPracticeApi.student.skipVideoCheck(unitId, video.id, gate.id);
+      if (res?.reviewAnswer || res?.reviewHint) {
+        setRememberedAnswers((prev) => ({
+          ...prev,
+          [`${video.id}:${gate.id}`]: {
+            reviewAnswer: res.reviewAnswer || '',
+            reviewHint: res.reviewHint || '',
+          },
+        }));
+      }
       gameSounds.tap();
       finishCheck(gate.id);
     } catch (err) {
@@ -560,6 +615,56 @@ export default function PathLessonModal({
                   onQuit={onClose}
                 />
               </div>
+              {(() => {
+                const passedList = checks.filter((c) => {
+                  const cid = String(c.id || c._id || '');
+                  return done || c.passed || passedKeys.has(`${video?.id}:${cid}`) || passedKeys.has(cid);
+                });
+                if (!passedList.length) return null;
+                return (
+                  <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
+                        <CheckCircle2 size={14} className="text-emerald-600" />
+                        Câu hỏi đã qua · Đáp án đã ghi nhớ ({passedList.length}/{checks.length})
+                      </p>
+                      {pending.length === 0 && (
+                        <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
+                          Đã đạt điều kiện
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {passedList.map((c, idx) => {
+                        const cid = String(c.id || c._id || idx);
+                        const mem = rememberedAnswers[`${video?.id}:${cid}`] || {};
+                        const ans = mem.reviewAnswer || c.reviewAnswer || '';
+                        const hint = mem.reviewHint || c.reviewHint || '';
+                        return (
+                          <div key={cid} className="rounded-xl border border-emerald-200/80 bg-white p-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">
+                                <Clock size={10} /> Giây {Math.max(0, Math.floor(Number(c.atSec) || 0))}
+                              </span>
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                                Đã qua
+                              </span>
+                            </div>
+                            <p className="mt-1.5 text-xs font-bold text-slate-800">{c.prompt}</p>
+                            <p className="mt-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900">
+                              <span className="font-black">Đáp án: </span>
+                              {ans || 'Đã hoàn thành'}
+                            </p>
+                            {hint ? (
+                              <p className="mt-1 text-[11px] font-medium text-slate-500">Ghi chú: {hint}</p>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ) : null}
 

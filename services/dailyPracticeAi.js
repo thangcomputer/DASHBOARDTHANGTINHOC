@@ -1,16 +1,50 @@
 'use strict';
 
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const DailyPracticeTopic = require('../models/DailyPracticeTopic');
 const DailyPracticeQuestion = require('../models/DailyPracticeQuestion');
 const rules = require('./dailyPracticeRules');
 const { resolveQuestionUnit } = require('./dailyPracticePathService');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
+const { getModelProfile, isComplexQuery } = require('./ai/modelRouter');
+const { classifySecurityRisk, classifyItDomainScope } = require('./ai/knowledgeSearchService');
+const cache = require('../utils/cache');
 const logger = require('../config/logger');
 
 const { httpError } = rules;
 const MAX_COUNT = 10;
 const DIFFICULTY_LABEL = { easy: 'dễ (người mới bắt đầu)', medium: 'trung bình', hard: 'khó (nâng cao)' };
+
+const LESSON_AI_CACHE_TTL_SEC = Math.max(300, Number(process.env.AI_LESSON_CACHE_TTL_SEC) || 6 * 3600);
+const PLACEMENT_AI_CACHE_TTL_SEC = Math.max(600, Number(process.env.AI_PLACEMENT_CACHE_TTL_SEC) || 24 * 3600);
+
+const GUARD_REPLIES = {
+  security: {
+    vi: 'Yêu cầu này nằm ngoài phạm vi hỗ trợ an toàn của DewSkill AI. Mình không thể tiết lộ cấu hình hệ thống, thông tin bảo mật, tài khoản nội bộ hoặc bỏ qua quy tắc vận hành.',
+    en: 'This request is outside my scope of safe support with DewSkill AI. I cannot reveal system prompts, secrets, internal credentials, or bypass safety rules.',
+  },
+  platformMeta: {
+    vi: 'Mình hỗ trợ học Tin học, Office và cách dùng LMS trong bài học. Mình không trả lời về mã nguồn, đường dẫn kỹ thuật, công nghệ nền hay bảo mật nội bộ của web DewSkill / Thắng Tin Học.',
+    en: 'I help with digital skills, Office, and learning within the LMS. I cannot discuss source code, internal URLs, underlying tech stack, or internal security of DewSkill / Thang Tin Hoc.',
+  },
+  outOfScope: {
+    vi: 'Mình là DewSkill AI, trợ lý chuyên về Tin học văn phòng và Công nghệ thông tin tại Thắng Tin Học. Câu hỏi này hiện nằm ngoài phạm vi hỗ trợ của bài học.',
+    en: 'I am DewSkill AI, an IT and Digital Skills assistant at Thang Tin Hoc. This question is currently outside the scope of this lesson.',
+  },
+};
+
+let quickMemoryPromise = null;
+async function getQuickMemoryMatcher() {
+  if (!quickMemoryPromise) {
+    quickMemoryPromise = import('../shared/ai/quickSearchMemory.mjs')
+      .then((mod) => mod?.matchLocalOfficeMemory || null)
+      .catch(() => null);
+  }
+  return quickMemoryPromise;
+}
+
+const LESSON_DEICTIC_CONTEXT_RE = /(?:video\s*này|bài\s*này|bước\s*này|mục\s*này|đang\s*xem|phút\s*thứ|giây\s*thứ|trong\s*bài|mốc\s*này|this\s*video|this\s*lesson)/i;
 
 const TYPE_SCHEMA = {
   mcq: '{"type":"mcq","prompt":"...","options":["A","B","C","D"],"correctIndex":0,"hint":"...","explanation":"..."}',
@@ -69,15 +103,19 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId, forTe
   const testOutFlag = Boolean(targetUnitId && forTestOut === true);
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình');
 
-  const { getSupportModelFallbacks } = require('./aiSupportService');
+  const profile = getModelProfile('admin_quiz', {
+    maxTokens: Math.min(3600, 500 + total * 320),
+  });
   let lastErr = null;
-  for (const model of getSupportModelFallbacks()) {
+  for (const model of profile.models) {
     try {
       const result = await chatCompletion({
         messages: buildMessages(topic, difficulty, useTypes, total, testOutFlag),
         model,
-        temperature: 0.7,
-        maxTokens: 4000,
+        temperature: profile.temperature,
+        maxTokens: profile.maxTokens,
+        thinkingBudget: profile.thinkingBudget,
+        timeoutMs: profile.timeoutMs,
         responseFormat: 'json',
       });
       const parsed = parseJsonLoose(result?.content);
@@ -120,7 +158,25 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId, forTe
   throw httpError(502, 'AI chưa tạo được câu hỏi hợp lệ, vui lòng thử lại');
 }
 
-/** Trợ lý AI hỏi đáp trong bài học / video (dùng Gemini/LLM đã cấu hình trên server). */
+function detectLessonQuestionLang(cleanQuestion, safeHistory = []) {
+  try {
+    const { detectQueryLanguage } = require('./aiSupportService');
+    if (typeof detectQueryLanguage === 'function') {
+      return detectQueryLanguage(cleanQuestion, safeHistory);
+    }
+  } catch { /* fallback below */ }
+  const VI_DIACRITIC_RE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+  if (!cleanQuestion || VI_DIACRITIC_RE.test(cleanQuestion)) return 'vi';
+  if (/\b(xin chao|chao ban|la gi|nhu the nao|cach dung|huong dan|bai tap|trac nghiem|hoc vien|phan mem)\b/i.test(cleanQuestion)) return 'vi';
+  return /\b(hello|hi|hey|what|how|why|where|when|who|which|can|could|would|should|do|does|did|is|are|was|were|please|help|explain|tell|show|guide|use|using|formula|function|difference|between|example|error|fix|schedule|class|course|lesson|video|exam|quiz|score|in|of|for|to|with|from|about|the|and|or)\b/i.test(cleanQuestion)
+    ? 'en'
+    : 'vi';
+}
+
+/**
+ * Trợ lý AI hỏi đáp trong bài học / video (dùng Gemini phân tầng theo độ phức tạp + cache + guard;
+ * không áp hạn mức lượt hỏi/ngày vì câu trả lời sai trong video đã tính phí XP cao).
+ */
 async function askLessonAssistant({
   question = '',
   lessonTitle = '',
@@ -130,14 +186,81 @@ async function askLessonAssistant({
 } = {}) {
   const cleanQuestion = String(question || '').trim().slice(0, 1000);
   if (!cleanQuestion) throw httpError(400, 'Vui lòng nhập câu hỏi');
-  if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
 
-  const VI_DIACRITIC_RE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
-  const isEn = (() => {
-    if (!cleanQuestion || VI_DIACRITIC_RE.test(cleanQuestion)) return false;
-    if (/\b(xin chao|chao ban|la gi|nhu the nao|cach dung|huong dan|bai tap|trac nghiem|hoc vien)\b/i.test(cleanQuestion)) return false;
-    return /\b(hello|hi|hey|what|how|why|where|when|who|which|can|could|would|should|do|does|did|is|are|was|were|please|help|explain|tell|show|guide|use|using|formula|function|difference|between|example|error|fix|schedule|class|course|lesson|video|exam|quiz|score|in|of|for|to|with|from|about|the|and|or)\b/i.test(cleanQuestion);
-  })();
+  const safeHistory = (Array.isArray(history) ? history : [])
+    .slice(-4)
+    .map((m) => ({
+      role: m?.role === 'user' ? 'user' : 'assistant',
+      content: String(m?.body || m?.content || '').trim().slice(0, 700),
+    }))
+    .filter((m) => m.content);
+
+  const lang = detectLessonQuestionLang(cleanQuestion, safeHistory);
+  const isEn = lang === 'en';
+
+  // 1. Security gate (0 token)
+  const securityGate = classifySecurityRisk(cleanQuestion);
+  if (securityGate.blocked) {
+    return {
+      answer: isEn ? GUARD_REPLIES.security.en : GUARD_REPLIES.security.vi,
+      model: 'policy-guard',
+      source: 'security_guard',
+    };
+  }
+
+  // 2. 3-state Domain Scope filter (0 token for clear out-of-scope / platform-meta)
+  const scopeCheck = classifyItDomainScope(cleanQuestion, safeHistory);
+  if (scopeCheck.decision === 'OUT_OF_SCOPE') {
+    if (scopeCheck.reason === 'platform_meta') {
+      return {
+        answer: isEn ? GUARD_REPLIES.platformMeta.en : GUARD_REPLIES.platformMeta.vi,
+        model: 'scope-guard',
+        source: 'scope_guard',
+      };
+    }
+    return {
+      answer: isEn ? GUARD_REPLIES.outOfScope.en : GUARD_REPLIES.outOfScope.vi,
+      model: 'scope-guard',
+      source: 'scope_guard',
+    };
+  }
+
+  // 3. Zero-token Office quick memory for standalone short formula/shortcut queries
+  const wordCount = cleanQuestion.split(/\s+/).filter(Boolean).length;
+  if (safeHistory.length === 0 && wordCount <= 5 && !LESSON_DEICTIC_CONTEXT_RE.test(cleanQuestion)) {
+    const matchLocalOfficeMemory = await getQuickMemoryMatcher();
+    const memoryHit = typeof matchLocalOfficeMemory === 'function'
+      ? matchLocalOfficeMemory(cleanQuestion, lang)
+      : null;
+    if (memoryHit?.answer) {
+      return {
+        answer: memoryHit.answer,
+        model: 'quick-memory',
+        source: 'memory',
+      };
+    }
+  }
+
+  // 4. Shared cache lookup (keyed by lessonTitle, unitTitle, lang, normalized question) when single-turn
+  const normalizedQ = cleanQuestion.toLowerCase().replace(/\s+/g, ' ').trim();
+  const canUseCache = safeHistory.length === 0 && normalizedQ.length >= 3;
+  const cacheKey = canUseCache
+    ? `lesson_ai:v1:${crypto.createHash('sha256').update(`${lang}|${String(lessonTitle || '').trim()}|${String(unitTitle || '').trim()}|${normalizedQ}`).digest('hex').slice(0, 32)}`
+    : '';
+  if (cacheKey) {
+    try {
+      const cached = await cache.get(cacheKey);
+      if (cached && cached.answer) {
+        return {
+          answer: cached.answer,
+          model: cached.model || 'cache',
+          source: 'cache',
+        };
+      }
+    } catch { /* fallback to LLM */ }
+  }
+
+  if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
 
   const contextParts = isEn
     ? [
@@ -153,8 +276,8 @@ async function askLessonAssistant({
 
   const systemPrompt = isEn
     ? [
-      'You are the Office IT AI Assistant at Thang Tin Hoc.',
-      'Task: help the student understand the current lesson and Office IT concepts (Windows 10/11, Microsoft Word, Excel, PowerPoint, IC3, shortcuts, and hands-on workflows).',
+      'You are DewSkill AI, the Office IT & Digital Skills Assistant at Thang Tin Hoc.',
+      'Task: help the student understand the current lesson and IT concepts (Windows 10/11, Microsoft Word, Excel, PowerPoint, MOS/IC3/GMetrix, shortcuts, and hands-on workflows).',
       'CRITICAL LANGUAGE RULE: The student is asking in English. Write your ENTIRE response 100% in clear, natural English.',
       'Markdown formatting rules for readability on dark backgrounds:',
       '- Open with 1–2 concise sentences directly answering the core question.',
@@ -167,9 +290,9 @@ async function askLessonAssistant({
       contextParts.length ? `Current lesson context:\n${contextParts.join('\n')}` : '',
     ].filter(Boolean).join('\n')
     : [
-      'Bạn là Trợ lý AI Tin Học của trung tâm Thắng Tin Học.',
-      'Nhiệm vụ: giải đáp thắc mắc của học viên về bài học đang xem và kiến thức Tin học văn phòng (Windows 10/11, Microsoft Word, Excel, PowerPoint, IC3, phím tắt, thao tác thực hành).',
-      'NGÔN NGỮ: Nếu người dùng hỏi bằng tiếng Anh, hãy trả lời 100% bằng tiếng Anh. Nếu người dùng hỏi bằng tiếng Việt, hãy trả lời bằng tiếng Việt.',
+      'Bạn là DewSkill AI — Trợ giảng AI chuyên về Tin học và Công nghệ thông tin của Trung tâm Thắng Tin Học.',
+      'Nhiệm vụ: giải đáp thắc mắc của học viên về bài học đang xem và kiến thức Tin học văn phòng / CNTT (Windows 10/11, Microsoft Word, Excel, PowerPoint, MOS/IC3/GMetrix, phím tắt, thao tác thực hành).',
+      'NGÔN NGỮ: Mặc định trả lời hoàn toàn bằng tiếng Việt có dấu (kể cả khi câu hỏi không dấu hoặc chứa thuật ngữ tiếng Anh). Chỉ trả lời tiếng Anh khi người dùng hỏi hoàn toàn bằng tiếng Anh hoặc chủ động yêu cầu.',
       'Quy tắc trình bày Markdown để hiển thị đẹp, dễ đọc trên giao diện tối:',
       '- Mở đầu ngắn gọn 1–2 câu đi thẳng vào vấn đề.',
       '- Dùng tiêu đề `###` kèm 1 icon phù hợp (ví dụ: `### 🔍 Nguyên nhân chính`, `### 🛠️ Cách khắc phục từng bước`, `### 📊 Bảng tra nhanh`).',
@@ -183,32 +306,35 @@ async function askLessonAssistant({
       contextParts.length ? `Ngữ cảnh bài học hiện tại:\n${contextParts.join('\n')}` : '',
     ].filter(Boolean).join('\n');
 
-  const safeHistory = (Array.isArray(history) ? history : [])
-    .slice(-6)
-    .map((m) => ({
-      role: m?.role === 'user' ? 'user' : 'assistant',
-      content: String(m?.body || m?.content || '').trim().slice(0, 1000),
-    }))
-    .filter((m) => m.content);
-
   const messages = [
     { role: 'system', content: systemPrompt },
     ...safeHistory,
     { role: 'user', content: cleanQuestion },
   ];
 
-  const { getSupportModelFallbacks } = require('./aiSupportService');
+  const profile = isComplexQuery(cleanQuestion)
+    ? getModelProfile('qa_complex', { maxTokens: 1500 })
+    : getModelProfile('lesson_assistant', { maxTokens: 1200 });
+
   let lastErr = null;
-  for (const model of getSupportModelFallbacks()) {
+  for (let i = 0; i < profile.models.length; i += 1) {
+    const model = profile.models[i];
     try {
       const result = await chatCompletion({
         messages,
         model,
-        temperature: 0.4,
-        maxTokens: 4096,
+        temperature: 0.35,
+        maxTokens: profile.maxTokens,
+        thinkingBudget: profile.thinkingBudget,
+        timeoutMs: i === 0 ? profile.timeoutMs : Math.min(24000, profile.timeoutMs + 4000),
       });
       const answer = String(result?.content || '').trim();
-      if (answer) return { answer, model };
+      if (answer) {
+        if (cacheKey && answer.length >= 25 && !/(nằm ngoài phạm vi|outside the scope|outside my scope)/i.test(answer)) {
+          cache.set(cacheKey, { answer, model }, LESSON_AI_CACHE_TTL_SEC).catch(() => { });
+        }
+        return { answer, model, source: 'ai' };
+      }
     } catch (err) {
       lastErr = err;
       logger.warn({ model, err: err.message }, '[DAILY_PRACTICE] lesson AI assistant failed');
@@ -230,8 +356,6 @@ async function placementAdvice({
   surveyLevel = '',
   topics = [],
 } = {}) {
-  if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
-
   const safeTotal = Math.min(50, Math.max(1, Math.floor(Number(total) || 10)));
   const safeScore = Math.min(safeTotal, Math.max(0, Math.floor(Number(score) || 0)));
   const skills = (Array.isArray(bySkill) ? bySkill : []).slice(0, 8).map((row) => ({
@@ -249,8 +373,24 @@ async function placementAdvice({
     .filter(Boolean);
   const level = PLACEMENT_LEVELS.has(String(surveyLevel)) ? String(surveyLevel) : '';
 
+  const placementCacheKey = `placement_ai:v1:${crypto.createHash('sha256').update(JSON.stringify({
+    score: safeScore,
+    total: safeTotal,
+    skills,
+    wrong,
+    level,
+    topicNames,
+  })).digest('hex').slice(0, 32)}`;
+
+  try {
+    const cached = await cache.get(placementCacheKey);
+    if (cached && cached.summary) return cached;
+  } catch { /* fallback to LLM */ }
+
+  if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
+
   const systemPrompt = [
-    'Bạn là cố vấn học tập AI của DewSkill Academy (trung tâm Thắng Tin Học).',
+    'Bạn là cố vấn học tập DewSkill AI (trung tâm Thắng Tin Học).',
     'Nhiệm vụ: phân tích kết quả bài kiểm tra đầu vào Tin học văn phòng và gợi ý lộ trình cá nhân hóa.',
     'Chỉ trả về JSON đúng dạng:',
     '{"levelLabel":"Cơ bản|Trung cấp|Nâng cao","summary":"1-2 câu nhận xét động viên","strengths":["..."],"focus":["..."],"plan":[{"title":"Tuần 1: ...","detail":"..."}],"recommendedTopic":"tên chủ đề nên học trước, ưu tiên chọn đúng 1 tên trong danh sách chủ đề có sẵn"}',
@@ -267,9 +407,10 @@ async function placementAdvice({
     topicNames.length ? `Danh sách chủ đề có sẵn: ${topicNames.join(', ')}` : '',
   ].filter(Boolean).join('\n');
 
-  const { getSupportModelFallbacks } = require('./aiSupportService');
+  const profile = getModelProfile('placement_advice');
   let lastErr = null;
-  for (const model of getSupportModelFallbacks()) {
+  for (let i = 0; i < profile.models.length; i += 1) {
+    const model = profile.models[i];
     try {
       const result = await chatCompletion({
         messages: [
@@ -277,8 +418,10 @@ async function placementAdvice({
           { role: 'user', content: userContent },
         ],
         model,
-        temperature: 0.5,
-        maxTokens: 1500,
+        temperature: profile.temperature,
+        maxTokens: profile.maxTokens,
+        thinkingBudget: profile.thinkingBudget,
+        timeoutMs: i === 0 ? profile.timeoutMs : Math.min(22000, profile.timeoutMs + 4000),
         responseFormat: 'json',
       });
       const parsed = parseJsonLoose(result?.content);
@@ -290,7 +433,7 @@ async function placementAdvice({
         .map((v) => String(v || '').trim().slice(0, 200))
         .filter(Boolean)
         .slice(0, max);
-      return {
+      const out = {
         levelLabel: String(parsed.levelLabel || '').trim().slice(0, 40),
         summary: String(parsed.summary || '').trim().slice(0, 500),
         strengths: list(parsed.strengths, 3),
@@ -302,6 +445,8 @@ async function placementAdvice({
         recommendedTopic: String(parsed.recommendedTopic || '').trim().slice(0, 80),
         model,
       };
+      cache.set(placementCacheKey, out, PLACEMENT_AI_CACHE_TTL_SEC).catch(() => { });
+      return out;
     } catch (err) {
       lastErr = err;
       logger.warn({ model, err: err.message }, '[DAILY_PRACTICE] placement AI failed');

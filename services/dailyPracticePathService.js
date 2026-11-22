@@ -1339,9 +1339,11 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
       const passedCheckIds = (studyProg?.passedVideoChecks || []).filter((id) => String(id).startsWith(prefix));
       const rawNode = normalizePathNodes(unit).find((n) => String(n.key) === String(nk));
       const rawVideoCfg = rawNode?.levelConfigs?.[studyDiff]?.practice?.video || {};
-      const checks = practiceVideoWatched
-        ? enrichCompletedVideoChecks(studyPracticeCfg?.video?.checks || [], rawVideoCfg?.checks || [])
-        : (studyPracticeCfg?.video?.checks || []);
+      const checks = enrichCompletedVideoChecks(studyPracticeCfg?.video?.checks || [], rawVideoCfg?.checks || [], {
+        videoId: practiceVideoId,
+        passedSet: new Set(passedCheckIds),
+        videoCompleted: practiceVideoWatched,
+      });
       practiceVideo = {
         id: practiceVideoId,
         insertIndex: Math.max(0, Math.min(videoInsertIndex >= 0 ? videoInsertIndex : 0, questions.length)),
@@ -1400,25 +1402,53 @@ async function markSteps(studentId, topicId, unitId, steps, { complete = false, 
   }
 }
 
-function enrichCompletedVideoChecks(checks = [], rawChecks = []) {
+function buildVideoCheckReviewMeta(raw = {}) {
+  const reviewHint = String(raw.paidHint || raw.shortHint || '').trim();
+  let reviewAnswer = '';
+  let reviewChoiceIndex = null;
+  if (raw.kind === 'choice') {
+    const ansIdx = Number(raw.answer);
+    if (Number.isInteger(ansIdx) && ansIdx >= 0) {
+      reviewChoiceIndex = ansIdx;
+      reviewAnswer = String(raw.choices?.[ansIdx] || '').trim();
+    }
+  } else if (raw.kind === 'text') {
+    reviewAnswer = String(raw.answer || '').trim();
+  } else if (raw.kind === 'screen') {
+    reviewAnswer = String(raw.criteria || '').trim();
+  }
+  return { reviewHint, reviewAnswer, reviewChoiceIndex };
+}
+
+function enrichCompletedVideoChecks(checks = [], rawChecks = [], opts = null) {
+  const videoCompleted = opts == null ? true : Boolean(opts.videoCompleted);
+  const passedSet = opts?.passedSet instanceof Set ? opts.passedSet : null;
+  const videoId = String(opts?.videoId || '');
   return (checks || []).map((check, idx) => {
-    const raw = (rawChecks || []).find((r) => String(r?._id || r?.id || '') === String(check?.id || ''))
+    const cid = String(check?.id || check?._id || '');
+    const fullKey = videoId && cid ? `${videoId}:${cid}` : '';
+    const isPassed = Boolean(
+      videoCompleted
+      || check?.passed === true
+      || (passedSet && ((fullKey && passedSet.has(fullKey)) || (cid && passedSet.has(cid)))),
+    );
+    if (!isPassed) {
+      const clean = { ...check, passed: false };
+      delete clean.reviewHint;
+      delete clean.reviewAnswer;
+      delete clean.reviewChoiceIndex;
+      return clean;
+    }
+    const raw = (rawChecks || []).find((r) => String(r?._id || r?.id || '') === cid)
       || (rawChecks || [])[idx]
       || {};
-    const reviewHint = String(raw.paidHint || raw.shortHint || '').trim();
-    let reviewAnswer = '';
-    if (raw.kind === 'choice') {
-      const ansIdx = Number(raw.answer);
-      reviewAnswer = Number.isInteger(ansIdx) ? String(raw.choices?.[ansIdx] || '').trim() : '';
-    } else if (raw.kind === 'text') {
-      reviewAnswer = String(raw.answer || '').trim();
-    } else if (raw.kind === 'screen') {
-      reviewAnswer = String(raw.criteria || '').trim();
-    }
+    const { reviewHint, reviewAnswer, reviewChoiceIndex } = buildVideoCheckReviewMeta(raw);
     return {
       ...check,
+      passed: true,
       reviewHint,
       reviewAnswer,
+      ...(reviewChoiceIndex !== null ? { reviewChoiceIndex } : {}),
     };
   });
 }
@@ -1462,6 +1492,7 @@ async function unitVideos(studentId, unitId) {
     .lean();
   const watchedSet = new Set(progress?.watchedVideoIds || []);
   const completedSet = new Set(progress?.completedSections || []);
+  const passedSet = new Set(progress?.passedVideoChecks || []);
   const isDiffUnlockedInNode = (node, diff) => {
     if (view.testedOut || diff === 'easy') return true;
     const easyDone = isLevelConfigComplete(node, 'easy', completedSet);
@@ -1491,7 +1522,7 @@ async function unitVideos(studentId, unitId) {
         const unlocked = nodeUnlocked && isDiffUnlockedInNode(node, diff) && isVideoSectionUnlockedInNode(node, diff);
         const isCompleted = unlocked && (watchedSet.has(vidId) || completedSet.has(`${node.key}:${diff}:video`) || view.state === 'completed');
         const checks = unlocked
-          ? (isCompleted ? enrichCompletedVideoChecks(vid.checks || [], rawCfg?.video?.checks || []) : (vid.checks || []))
+          ? enrichCompletedVideoChecks(vid.checks || [], rawCfg?.video?.checks || [], { videoId: vidId, passedSet, videoCompleted: isCompleted })
           : [];
         entries.push({
           rawUrl: String(vid.url || '').trim(),
@@ -1518,7 +1549,7 @@ async function unitVideos(studentId, unitId) {
           && isSectionUnlockedForStudent(cfg, 'practice', completedSet, node.key, diff, view.testedOut);
         const isCompleted = pUnlocked && (watchedSet.has(pVidId) || completedSet.has(`${node.key}:${diff}:practice`) || view.state === 'completed');
         const checks = pUnlocked
-          ? (isCompleted ? enrichCompletedVideoChecks(pVid.checks || [], rawCfg?.practice?.video?.checks || []) : (pVid.checks || []))
+          ? enrichCompletedVideoChecks(pVid.checks || [], rawCfg?.practice?.video?.checks || [], { videoId: pVidId, passedSet, videoCompleted: isCompleted })
           : [];
         entries.push({
           rawUrl: String(pVid.url || '').trim(),
@@ -1553,7 +1584,7 @@ async function unitVideos(studentId, unitId) {
         const isCompleted = stepUnlocked && (video.state === 'completed' || watchedSet.has(video.id) || view.state === 'completed');
         const rawVid = (rawNode?.stepVideos?.[level.key] || []).find((rv) => stepVideoId(node.key, level.key, String(rv._id)) === String(video.id));
         const checks = stepUnlocked
-          ? (isCompleted ? enrichCompletedVideoChecks(video.checks || [], rawVid?.checks || []) : (video.checks || []))
+          ? enrichCompletedVideoChecks(video.checks || [], rawVid?.checks || [], { videoId: video.id, passedSet, videoCompleted: isCompleted })
           : [];
         return {
           ...video,
@@ -1581,9 +1612,7 @@ async function unitVideos(studentId, unitId) {
       ...(view.videos || []).map((video) => {
         const isCompleted = video.state === 'completed' || watchedSet.has(video.id) || view.state === 'completed';
         const rawVid = (unit.videos || []).find((rv) => String(rv._id) === String(video.id));
-        const checks = isCompleted
-          ? enrichCompletedVideoChecks(video.checks || [], rawVid?.checks || [])
-          : (video.checks || []);
+        const checks = enrichCompletedVideoChecks(video.checks || [], rawVid?.checks || [], { videoId: video.id, passedSet, videoCompleted: isCompleted });
         return {
           ...video,
           checks,
@@ -1701,11 +1730,13 @@ async function gradeScreen(check, imageDataUrl) {
   const match = String(imageDataUrl || '').match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!match) throw httpError(400, 'Ảnh chụp màn hình không hợp lệ');
   if (match[2].length > 900_000) throw httpError(400, 'Ảnh quá nặng. Hãy chụp vùng bài làm, không chụp cả màn hình lớn.');
-  const { chatCompletion, isAiConfigured } = require('./ai/llmClient');
+  const { isAiConfigured } = require('./ai/llmClient');
+  const { chatWithProfile } = require('./ai/modelRouter');
   if (!isAiConfigured()) throw httpError(503, 'Chưa chấm được lúc này. Hãy gửi lại ảnh sau.');
-  const result = await chatCompletion({
+  const result = await chatWithProfile('grade_vision', {
     temperature: 0.1,
-    maxTokens: 300,
+    maxTokens: 200,
+    thinkingBudget: 0,
     responseFormat: 'json',
     images: [{ mimeType: match[1], data: match[2] }],
     messages: [
@@ -1781,17 +1812,54 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
     checkId ? String(item._id || item.id) === String(checkId) : idx === Number(checkIndex)
   ));
   if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
+
+  const resolvedCheckId = String(check._id || check.id || '');
+  const key = `${located.storageId}:${resolvedCheckId}`;
+  const existingProg = await DailyPracticePathProgress.findOne({ studentId: sid, unitId: unit._id })
+    .select('passedVideoChecks watchedVideoIds testedOut')
+    .lean();
+  const passedList = Array.isArray(existingProg?.passedVideoChecks) ? existingProg.passedVideoChecks : [];
+  const watchedList = Array.isArray(existingProg?.watchedVideoIds) ? existingProg.watchedVideoIds : [];
+  const fastAlreadyPassed = Boolean(
+    existingProg?.testedOut
+    || passedList.includes(key)
+    || watchedList.includes(located.storageId),
+  );
+  const reviewMode = fastAlreadyPassed ? true : await isVideoReviewCompleted(sid, unit, located);
+  const alreadyPassed = Boolean(fastAlreadyPassed || reviewMode);
+  const { adjustProfileXp, getProfile } = require('./dailyPracticeService');
+  const reviewMeta = buildVideoCheckReviewMeta(check);
+
+  if (alreadyPassed) {
+    if (!passedList.includes(key)) await rememberPassedCheck(sid, unit, key);
+    const profile = await getProfile(sid);
+    return {
+      correct: true,
+      alreadyPassed: true,
+      needsReview: false,
+      review: true,
+      hint: '',
+      reviewHint: reviewMeta.reviewHint,
+      reviewAnswer: reviewMeta.reviewAnswer,
+      ...(reviewMeta.reviewChoiceIndex !== null ? { reviewChoiceIndex: reviewMeta.reviewChoiceIndex } : {}),
+      cost: 0,
+      xpDelta: 0,
+      gainedXp: 0,
+      profileXp: rules.clampXp(profile?.xpTotal),
+      purchasedXp: rules.clampXp(profile?.purchasedXp),
+      dailyXp: rules.clampXp(profile?.dailyXp),
+    };
+  }
+
   if (check.kind === 'text' && !normAnswer(text)) throw httpError(400, 'Hãy nhập đáp án');
   if (check.kind === 'choice' && !Number.isInteger(Number(choiceIndex))) throw httpError(400, 'Hãy chọn đáp án');
   if (check.kind === 'screen' && !imageDataUrl) throw httpError(400, 'Hãy gửi ảnh bài làm');
-  const reviewMode = await isVideoReviewCompleted(sid, unit, located);
-  const { adjustProfileXp, getProfile } = require('./dailyPracticeService');
+
   let status = 'INCORRECT';
   if (check.kind === 'choice') status = Number(choiceIndex) === Number(check.answer) ? 'CORRECT' : 'INCORRECT';
   else if (check.kind === 'text') status = await gradeText(check, text);
   else status = (await gradeScreen(check, imageDataUrl)) ? 'CORRECT' : 'INCORRECT';
-  const resolvedCheckId = String(check._id || check.id || '');
-  const key = `${located.storageId}:${resolvedCheckId}`;
+
   if (status === 'CORRECT') {
     const firstPass = await rememberPassedCheck(sid, unit, key);
     // Đúng lần đầu khi chưa hoàn thành video/bài: +XP; đang ôn lại hoặc mốc đã qua thì không cộng lại.
@@ -1804,6 +1872,9 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkInde
       needsReview: false,
       review: reviewMode,
       hint: '',
+      reviewHint: reviewMeta.reviewHint,
+      reviewAnswer: reviewMeta.reviewAnswer,
+      ...(reviewMeta.reviewChoiceIndex !== null ? { reviewChoiceIndex: reviewMeta.reviewChoiceIndex } : {}),
       cost: 0,
       xpDelta: reward,
       gainedXp: reward,
@@ -1930,11 +2001,15 @@ async function skipVideoCheck(studentId, { unitId, videoId, checkId, checkIndex 
   const resolvedCheckId = String(check._id || check.id || '');
   const key = `${located.storageId}:${resolvedCheckId}`;
   await rememberPassedCheck(sid, unit, key);
+  const reviewMeta = buildVideoCheckReviewMeta(check);
 
   return {
     skipped: true,
     passed: true,
     review: reviewMode,
+    reviewHint: reviewMeta.reviewHint,
+    reviewAnswer: reviewMeta.reviewAnswer,
+    ...(reviewMeta.reviewChoiceIndex !== null ? { reviewChoiceIndex: reviewMeta.reviewChoiceIndex } : {}),
     cost,
     charged: cost,
     xpDelta: cost > 0 ? -cost : 0,
@@ -2373,4 +2448,6 @@ module.exports = {
   skipVideoCheck,
   unitVideos,
   claimUnitChest,
+  enrichCompletedVideoChecks,
+  buildVideoCheckReviewMeta,
 };

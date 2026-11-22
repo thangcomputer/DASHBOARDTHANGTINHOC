@@ -1,6 +1,7 @@
 'use strict';
 
-const { chatCompletion, isAiConfigured } = require('./llmClient');
+const { isAiConfigured } = require('./llmClient');
+const { chatWithProfile } = require('./modelRouter');
 
 const STATUSES = new Set(['CORRECT', 'INCORRECT', 'NEEDS_REVIEW']);
 
@@ -43,9 +44,10 @@ async function gradeInstructorAnswer({ prompt, officialAnswer, rubric, studentAn
     throw err;
   }
   const given = String(studentAnswer || '').trim().slice(0, 400);
-  const result = await chatCompletion({
+  const result = await chatWithProfile('grade_text', {
     temperature: 0,
-    maxTokens: 200,
+    maxTokens: 120,
+    thinkingBudget: 0,
     responseFormat: 'json',
     messages: [
       { role: 'system', content: SYSTEM },
@@ -56,7 +58,7 @@ async function gradeInstructorAnswer({ prompt, officialAnswer, rubric, studentAn
     ],
   });
   const status = parseStatus(result?.content);
-  return { status: status || 'NEEDS_REVIEW' };
+  return { status: status || 'NEEDS_REVIEW', model: result?.model || '' };
 }
 
 module.exports = { gradeInstructorAnswer, parseStatus };

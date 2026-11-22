@@ -145,6 +145,7 @@ export default function PathVideoModal({
   const [currentId, setCurrentId] = useState(initialVideoId);
   const [watchedIds, setWatchedIds] = useState(() => new Set());
   const [passedKeys, setPassedKeys] = useState(() => new Set());
+  const [rememberedAnswers, setRememberedAnswers] = useState({});
   const [gate, setGate] = useState(null);
   const [answerText, setAnswerText] = useState('');
   const [picked, setPicked] = useState(null);
@@ -166,8 +167,6 @@ export default function PathVideoModal({
   const playerApiRef = useRef(null);
   const mediaElRef = useRef(null);
   const passedRef = useRef(passedKeys);
-  const initializedVideoIdsRef = useRef(new Set());
-  const replayRequiredIdsRef = useRef(new Set());
   const localPassedInRunRef = useRef(new Set());
   const gateRef = useRef(null);
   const currentRef = useRef(null);
@@ -260,28 +259,33 @@ export default function PathVideoModal({
           if (!alive) return;
           const videos = res.videos || [];
           const nextWatched = new Set(videos.filter((video) => video.state === 'completed').map((video) => video.id));
+          const nextPassed = new Set(res.passedCheckIds || []);
+          const nextRemembered = {};
           videos.forEach((video) => {
-            if (!initializedVideoIdsRef.current.has(video.id)) {
-              initializedVideoIdsRef.current.add(video.id);
-              if (frameless || video.state === 'completed') {
-                replayRequiredIdsRef.current.add(video.id);
+            const vidDone = video.state === 'completed';
+            (video.checks || []).forEach((check) => {
+              const cid = String(check.id || check._id || '');
+              if (!cid) return;
+              const fullKey = `${video.id}:${cid}`;
+              if (vidDone || check.passed || nextPassed.has(fullKey) || nextPassed.has(cid)) {
+                nextPassed.add(fullKey);
+                if (check.reviewAnswer || check.reviewHint) {
+                  nextRemembered[fullKey] = {
+                    reviewAnswer: check.reviewAnswer || '',
+                    reviewHint: check.reviewHint || '',
+                  };
+                }
               }
-            }
+            });
           });
-          const nextPassed = new Set(
-            (res.passedCheckIds || []).filter((id) => {
-              const sId = String(id);
-              for (const reqVidId of replayRequiredIdsRef.current) {
-                if (sId.startsWith(`${reqVidId}:`)) return false;
-              }
-              return true;
-            }),
-          );
           localPassedInRunRef.current.forEach((key) => nextPassed.add(key));
           passedRef.current = nextPassed;
           setData(res);
           setWatchedIds(nextWatched);
           setPassedKeys(nextPassed);
+          if (Object.keys(nextRemembered).length > 0) {
+            setRememberedAnswers((prev) => ({ ...nextRemembered, ...prev }));
+          }
         })
         .catch((err) => { if (alive) setError(err.message || 'Không tải được video của chặng'); });
     };
@@ -297,7 +301,7 @@ export default function PathVideoModal({
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [unit.id, frameless]);
+  }, [unit.id]);
 
   useEffect(() => {
     if (embedded) return undefined;
@@ -329,7 +333,11 @@ export default function PathVideoModal({
   const lesson = data?.lesson || null;
   currentRef.current = current;
 
-  const pendingOf = (video) => (video?.checks || []).filter((check) => !passedRef.current.has(`${video.id}:${check.id}`));
+  const pendingOf = (video) => (video?.checks || []).filter((check) => {
+    const cid = String(check.id || check._id || '');
+    const key = `${video.id}:${cid}`;
+    return !check.passed && !passedRef.current.has(key) && !passedKeys.has(key);
+  });
 
   const openGate = (check, media) => {
     if (!check || gateRef.current) return;
@@ -402,15 +410,15 @@ export default function PathVideoModal({
     };
   }, [unit?.id, unit?.index, unit?.title, current?.id, current?.title]);
 
-  // Nếu video đã được đánh dấu watched từ trước, chỉ mở khóa tiếp sau khi hoàn thành lại hết mốc câu hỏi của lượt này
+  // Video đã hoàn thành trước đó (hoặc hết câu hỏi mốc): mở khóa qua bước tiếp theo ngay, không bắt trả lời lại.
   useEffect(() => {
     if (!current || !watchedIds.has(current.id)) return;
     if (current.source !== 'unit' && current.source !== 'step') return;
+    if (!frameless) return;
     if (syncedSectionRef.current.has(current.id)) return;
     if (pendingOf(current).length > 0) return;
     syncedSectionRef.current.add(current.id);
-    const hadChecks = Boolean(current.checks?.length);
-    Promise.resolve(onWatched(current.id, { initialSync: !hadChecks, completedJustNow: frameless && hadChecks })).catch(() => { });
+    Promise.resolve(onWatched(current.id, { initialSync: true, completedJustNow: false })).catch(() => { });
   }, [current, watchedIds, passedKeys, frameless, onWatched]);
 
   useEffect(() => {
@@ -515,7 +523,17 @@ export default function PathVideoModal({
       const fallbackPenalty = effectiveReview ? 0 : VIDEO_CHECK_ANSWER_XP;
       syncXpStats(res, !res.correct && !res.needsReview ? Number(res.cost ?? fallbackPenalty) : 0);
       if (res.correct) {
-        localPassedInRunRef.current.add(`${current.id}:${gate.id}`);
+        const passedKey = `${current.id}:${gate.id}`;
+        localPassedInRunRef.current.add(passedKey);
+        if (res.reviewAnswer || res.reviewHint) {
+          setRememberedAnswers((prev) => ({
+            ...prev,
+            [passedKey]: {
+              reviewAnswer: res.reviewAnswer || '',
+              reviewHint: res.reviewHint || '',
+            },
+          }));
+        }
         setMissed(false);
         gameSounds.win();
         setCheer(true);
@@ -599,6 +617,15 @@ export default function PathVideoModal({
     try {
       const res = await dailyPracticeApi.student.skipVideoCheck(unit.id, current.id, gate.id);
       syncXpStats(res, Number(res?.charged ?? res?.cost ?? 0));
+      if (res?.reviewAnswer || res?.reviewHint) {
+        setRememberedAnswers((prev) => ({
+          ...prev,
+          [`${current.id}:${gate.id}`]: {
+            reviewAnswer: res.reviewAnswer || '',
+            reviewHint: res.reviewHint || '',
+          },
+        }));
+      }
       gameSounds.tap();
       setConfirmingSkip(false);
       finishCheck(gate.id);
@@ -910,6 +937,66 @@ export default function PathVideoModal({
         )}
       </div>
 
+      {(() => {
+        if (!current || current.source === 'lesson') return null;
+        const checksList = Array.isArray(current.checks) ? current.checks : [];
+        const passedList = checksList.filter((c) => {
+          const cid = String(c.id || c._id || '');
+          const key = `${current.id}:${cid}`;
+          return currentWatched || c.passed || passedKeys.has(key);
+        });
+        if (!passedList.length) return null;
+        return (
+          <div className="mx-3 mt-3 sm:mx-4 rounded-2xl border border-emerald-400/25 bg-[#16181E] p-3 sm:p-3.5 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-xs font-black text-emerald-300">
+                <CheckCircle2 size={14} className="shrink-0 text-emerald-400" aria-hidden="true" />
+                <span>Câu hỏi đã qua · Đáp án đã ghi nhớ ({passedList.length}/{checksList.length})</span>
+              </p>
+              {pendingOf(current).length === 0 && (
+                <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-black text-emerald-300 ring-1 ring-emerald-400/30">
+                  Đã đạt điều kiện
+                </span>
+              )}
+            </div>
+            <div className="mt-2.5 space-y-2">
+              {passedList.map((c, idx) => {
+                const cid = String(c.id || c._id || idx);
+                const fullKey = `${current.id}:${cid}`;
+                const mem = rememberedAnswers[fullKey] || {};
+                const remembered = mem.reviewAnswer || c.reviewAnswer || '';
+                const hint = mem.reviewHint || c.reviewHint || '';
+                return (
+                  <div key={cid} className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => seekVideoTo(Number(c.atSec) || 0, { allowAdvance: true })}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-black text-amber-300 hover:bg-amber-400/25 cursor-pointer !shadow-none"
+                        title="Tua tới mốc câu hỏi này"
+                      >
+                        <Clock size={10} aria-hidden="true" /> Giây {Math.max(0, Math.floor(Number(c.atSec) || 0))}
+                      </button>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-300">
+                        <CheckCircle2 size={10} aria-hidden="true" /> Đã qua
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs font-bold text-white/95">{c.prompt}</p>
+                    <p className="mt-1 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-400/20">
+                      <span className="font-black text-emerald-300">Đáp án: </span>
+                      {remembered || 'Đã hoàn thành'}
+                    </p>
+                    {hint ? (
+                      <p className="mt-1 text-[11px] font-medium text-white/60">Ghi chú: {hint}</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {!isSingleMode && playlist.length > 0 && (
         <div className="space-y-1.5 px-4 pt-3">
           <p className="text-[11px] font-black uppercase tracking-wider text-white/50">Danh sách video ({playlist.length})</p>
@@ -924,15 +1011,6 @@ export default function PathVideoModal({
                 disabled={locked}
                 onClick={() => {
                   gameSounds.tap();
-                  if (replayRequiredIdsRef.current.has(video.id)) {
-                    for (const k of [...localPassedInRunRef.current]) {
-                      if (k.startsWith(`${video.id}:`)) localPassedInRunRef.current.delete(k);
-                    }
-                    const next = new Set([...passedRef.current].filter((k) => !k.startsWith(`${video.id}:`)));
-                    passedRef.current = next;
-                    setPassedKeys(next);
-                    syncedSectionRef.current.delete(video.id);
-                  }
                   setCurrentId(video.id);
                 }}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition !shadow-none ${active ? 'bg-white/15 ring-1 ring-white/25' : 'hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-50`}

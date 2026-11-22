@@ -1540,10 +1540,13 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
 }) {
   const stepVideo = step.videos?.[0] || null;
   const checkBucketId = stepVideo?.id || `lesson-${step.key}`;
+  const [syncedChecks, setSyncedChecks] = useState<any[] | null>(null);
+  const [rememberedAnswers, setRememberedAnswers] = useState<Record<string, { reviewAnswer: string; reviewHint: string }>>({});
   const checks = useMemo(
-    () => stepVideo?.checks || [],
-    [stepVideo?.checks],
+    () => syncedChecks || stepVideo?.checks || [],
+    [syncedChecks, stepVideo?.checks],
   );
+  useEffect(() => { setSyncedChecks(null); }, [stepVideo?.id]);
   const lessonBodyContent = step.content || stepVideo?.content || '';
   const [passedKeys, setPassedKeys] = useState<Set<string>>(() => new Set());
   const [gate, setGate] = useState<any>(null);
@@ -1589,16 +1592,36 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
     dailyPracticeApi.unitVideos(unit.id)
       .then((res: any) => {
         if (!alive) return;
-        if (Array.isArray(res?.passedCheckIds)) {
-          setPassedKeys(new Set(res.passedCheckIds));
-        }
+        const nextPassed = new Set<string>(Array.isArray(res?.passedCheckIds) ? res.passedCheckIds : []);
+        const nextRemembered: Record<string, { reviewAnswer: string; reviewHint: string }> = {};
         if (stepVideo?.id && Array.isArray(res?.videos)) {
           const matched = res.videos.find((v: any) => v.id === stepVideo.id);
           if (matched) {
             const watchedOnServer = matched.state === 'completed';
+            if (Array.isArray(matched.checks)) {
+              setSyncedChecks(matched.checks);
+              for (const c of matched.checks) {
+                const cid = String(c._id || c.id || '');
+                const fullKey = `${stepVideo.id}:${cid}`;
+                if (watchedOnServer || c.passed || nextPassed.has(fullKey) || nextPassed.has(cid)) {
+                  nextPassed.add(fullKey);
+                  nextPassed.add(cid);
+                  if (c.reviewAnswer || c.reviewHint) {
+                    nextRemembered[fullKey] = {
+                      reviewAnswer: c.reviewAnswer || '',
+                      reviewHint: c.reviewHint || '',
+                    };
+                  }
+                }
+              }
+            }
             setWatchedEnough(watchedOnServer);
             setDone(watchedOnServer);
           }
+        }
+        setPassedKeys(nextPassed);
+        if (Object.keys(nextRemembered).length > 0) {
+          setRememberedAnswers((prev) => ({ ...nextRemembered, ...prev }));
         }
       })
       .catch(() => { });
@@ -1724,10 +1747,20 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
       );
       if (res.correct) {
         const nextPassed = new Set(passedRef.current);
-        nextPassed.add(`${stepVideo.id}:${checkId}`);
+        const fullKey = `${stepVideo.id}:${checkId}`;
+        nextPassed.add(fullKey);
         nextPassed.add(checkId);
         passedRef.current = nextPassed;
         setPassedKeys(nextPassed);
+        if (res.reviewAnswer || res.reviewHint) {
+          setRememberedAnswers((prev) => ({
+            ...prev,
+            [fullKey]: {
+              reviewAnswer: res.reviewAnswer || '',
+              reviewHint: res.reviewHint || '',
+            },
+          }));
+        }
         setMissed(false);
         play('correct');
         setCheer(true);
@@ -1821,12 +1854,22 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
     try {
       const checkId = String(gate._id || gate.id || '');
       const checkIndex = checks.findIndex((c: any) => String(c._id || c.id || '') === checkId);
-      await dailyPracticeApi.skipVideoCheck(unit.id, stepVideo.id, Math.max(0, checkIndex), checkId);
+      const res = await dailyPracticeApi.skipVideoCheck(unit.id, stepVideo.id, Math.max(0, checkIndex), checkId);
       const nextPassed = new Set(passedRef.current);
-      nextPassed.add(`${stepVideo.id}:${checkId}`);
+      const fullKey = `${stepVideo.id}:${checkId}`;
+      nextPassed.add(fullKey);
       nextPassed.add(checkId);
       passedRef.current = nextPassed;
       setPassedKeys(nextPassed);
+      if (res?.reviewAnswer || res?.reviewHint) {
+        setRememberedAnswers((prev) => ({
+          ...prev,
+          [fullKey]: {
+            reviewAnswer: res.reviewAnswer || '',
+            reviewHint: res.reviewHint || '',
+          },
+        }));
+      }
       setMissed(false);
       play('tap');
       finishPassedGate(gate, nextPassed);
@@ -2018,6 +2061,60 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
             ) : null}
 
             {lessonCheckpointNode && !videoFullscreen ? lessonCheckpointNode : null}
+
+            {(() => {
+              const passedList = checks.filter((c: any) => {
+                const cid = String(c._id || c.id || '');
+                return done || Boolean(c.passed) || passedKeys.has(`${stepVideo?.id}:${cid}`) || passedKeys.has(cid);
+              });
+              if (!stepVideo?.url || !passedList.length) return null;
+              return (
+                <View style={{ padding: 12, borderRadius: 16, backgroundColor: '#ECFDF5', borderWidth: 1.5, borderColor: '#A7F3D0', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+                      <CheckCircle2 size={14} color="#047857" />
+                      <Text style={{ color: '#065F46', fontSize: 12, fontWeight: '900', flexShrink: 1 }}>
+                        {`Câu hỏi đã qua · Đáp án đã ghi nhớ (${passedList.length}/${checks.length})`}
+                      </Text>
+                    </View>
+                    {pendingChecksCount === 0 ? (
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#059669' }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '900' }}>Đã đạt điều kiện</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {passedList.map((c: any, idx: number) => {
+                    const cid = String(c._id || c.id || idx);
+                    const fullKey = `${stepVideo?.id}:${cid}`;
+                    const mem = rememberedAnswers[fullKey];
+                    const ans = mem?.reviewAnswer || c.reviewAnswer || '';
+                    const hint = mem?.reviewHint || c.reviewHint || '';
+                    return (
+                      <View key={cid} style={{ padding: 10, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D1FAE5', gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#FEF3C7' }}>
+                            <Text style={{ color: '#92400E', fontSize: 10, fontWeight: '900' }}>
+                              {`Giây ${Math.max(0, Math.floor(Number(c.atSec) || 0))}`}
+                            </Text>
+                          </View>
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#D1FAE5' }}>
+                            <Text style={{ color: '#047857', fontSize: 10, fontWeight: '900' }}>Đã qua</Text>
+                          </View>
+                        </View>
+                        <Text style={{ color: '#0F172A', fontSize: 12.5, fontWeight: '800' }}>{c.prompt}</Text>
+                        <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#ECFDF5' }}>
+                          <Text style={{ color: '#064E3B', fontSize: 12, fontWeight: '700' }}>
+                            <Text style={{ color: '#047857', fontWeight: '900' }}>Đáp án: </Text>
+                            {ans || 'Đã hoàn thành'}
+                          </Text>
+                        </View>
+                        {hint ? <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '600' }}>{`Ghi chú: ${hint}`}</Text> : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}
 
             {stepVideo?.url && pendingChecksCount > 0 && !gate ? (
               <View style={styles.lessonPendingBanner}>
@@ -3838,7 +3935,16 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
   const [comboCelebration, setComboCelebration] = useState<number | null>(null);
   const [explainOpen, setExplainOpen] = useState(false);
   const [buyXpOpen, setBuyXpOpen] = useState(false);
-  const [videoDoneIds, setVideoDoneIds] = useState<Record<string, boolean>>({});
+  const [videoDoneIds, setVideoDoneIds] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const q of session?.questions || []) {
+      const qAny = q as { id?: string; type?: string; watched?: boolean };
+      if (qAny?.type === 'video' && qAny.watched && qAny.id) {
+        init[qAny.id] = true;
+      }
+    }
+    return init;
+  });
   const { focusMode, toggle: toggleFocus, setFocusMode } = useMobileFocusMode();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const comboPop = useRef(new Animated.Value(1)).current;
@@ -4325,7 +4431,9 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
               <View style={[styles.videoGateNotice, videoCompleted && styles.videoGateNoticeDone]}>
                 <Text style={[styles.videoGateNoticeText, videoCompleted && styles.videoGateNoticeTextDone]}>
                   {videoCompleted
-                    ? 'Đã xem video và trả lời đúng hết câu hỏi tương tác — bạn có thể chuyển sang câu tiếp theo.'
+                    ? ((question as { watched?: boolean }).watched
+                      ? 'Video này bạn đã hoàn thành trước đó — đáp án đã được ghi nhớ ở trên, bạn có thể bấm tiếp tục ngay.'
+                      : 'Đã xem video và trả lời đúng hết câu hỏi tương tác — bạn có thể chuyển sang câu tiếp theo.')
                     : 'Xem video và trả lời đúng tất cả mốc trắc nghiệm trong video để mở khóa câu tiếp theo.'}
                 </Text>
               </View>

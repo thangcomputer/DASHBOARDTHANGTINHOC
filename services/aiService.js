@@ -1,7 +1,8 @@
 /**
  * AI service - cong cu admin: quiz, notification draft, summarize, complete.
  */
-const { isAiConfigured, getConfig, chatCompletion } = require('./ai/llmClient');
+const { isAiConfigured, getConfig } = require('./ai/llmClient');
+const { chatWithProfile } = require('./ai/modelRouter');
 const logger = require('../config/logger');
 
 const MAX_INPUT = 8000;
@@ -119,7 +120,11 @@ async function probeHealth() {
     return { ...base, healthy: false, healthError: 'Chua co API key trong .env (GEMINI_API_KEY hoac AI_API_KEY)' };
   }
   try {
-    await chatCompletion({ messages: [{ role: 'user', content: 'ping' }], maxTokens: 8 });
+    await chatWithProfile('admin_light', {
+      messages: [{ role: 'user', content: 'ping' }],
+      maxTokens: 8,
+      thinkingBudget: 0,
+    });
     return { ...base, healthy: true, healthError: null };
   } catch (e) {
     return { ...base, healthy: false, healthError: humanizeAiError(e.message) };
@@ -153,13 +158,14 @@ async function generateQuiz({ topic, count = 10, subject = 'Tin hoc van phong' }
     'Sinh ' + n + ' cau trac nghiem mon "' + clampText(subject, 80) + '", chu de: ' + t;
 
   try {
-    const result = await chatCompletion({
+    const result = await chatWithProfile('admin_quiz', {
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
       temperature: 0.5,
-      maxTokens: Math.min(8000, 800 + n * 350),
+      maxTokens: Math.min(4000, 600 + n * 300),
+      thinkingBudget: 0,
       responseFormat: 'json',
     });
 
@@ -200,7 +206,7 @@ async function draftNotification({ purpose, audience = 'all', tone = 'profession
     };
   }
   try {
-    const result = await chatCompletion({
+    const result = await chatWithProfile('admin_light', {
       messages: [
         {
           role: 'system',
@@ -215,6 +221,7 @@ async function draftNotification({ purpose, audience = 'all', tone = 'profession
       ],
       temperature: 0.4,
       maxTokens: 600,
+      thinkingBudget: 0,
       responseFormat: 'json',
     });
     const parsed = parseJsonLoose(result.content) || {};
@@ -248,7 +255,7 @@ async function summarizeText({ text, maxWords = 120 } = {}) {
     };
   }
   try {
-    const result = await chatCompletion({
+    const result = await chatWithProfile('admin_light', {
       messages: [
         {
           role: 'system',
@@ -258,6 +265,7 @@ async function summarizeText({ text, maxWords = 120 } = {}) {
       ],
       temperature: 0.2,
       maxTokens: 400,
+      thinkingBudget: 0,
     });
     return {
       summary: String(result.content || '').trim().slice(0, 2000),
@@ -293,10 +301,11 @@ async function complete({ prompt, system } = {}) {
   if (system) messages.push({ role: 'system', content: clampText(system, 1000) });
   messages.push({ role: 'user', content: p });
   try {
-    const result = await chatCompletion({
+    const result = await chatWithProfile('admin_light', {
       messages,
       temperature: 0.5,
-      maxTokens: 1500,
+      maxTokens: 1200,
+      thinkingBudget: 0,
     });
     return {
       content: String(result.content || '').trim(),

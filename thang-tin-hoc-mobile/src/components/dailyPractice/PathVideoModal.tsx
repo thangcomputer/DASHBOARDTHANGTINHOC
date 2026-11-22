@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
-import { Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Lock, Play, StickyNote } from 'lucide-react-native';
+import { Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clapperboard, Clock3, Lock, Play, StickyNote } from 'lucide-react-native';
 import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from '../../screens/VideoPlayerFrame';
 import { PathLessonAiAssistantPanel, VideoTimelineNotesPanel } from './PathVideoPanels';
 import { VideoCheckpointQuizCard } from './VideoCheckpointQuizCard';
@@ -42,8 +42,10 @@ type VideoCheck = {
   choices?: string[];
   options?: string[];
   hintCostXp?: number;
+  passed?: boolean;
   reviewHint?: string;
   reviewAnswer?: string;
+  reviewChoiceIndex?: number;
 };
 
 type PlaylistItem =
@@ -107,6 +109,7 @@ export function PathVideoModal({
   const [currentId, setCurrentId] = useState(initialVideoId);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(() => new Set());
   const [passedKeys, setPassedKeys] = useState<Set<string>>(() => new Set());
+  const [rememberedAnswers, setRememberedAnswers] = useState<Record<string, { reviewAnswer: string; reviewHint: string }>>({});
   const [gate, setGate] = useState<VideoCheck | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [answerText, setAnswerText] = useState('');
@@ -131,8 +134,6 @@ export function PathVideoModal({
   const playerApiRef = useRef<VideoPlayerApi | null>(null);
   const gateRef = useRef<VideoCheck | null>(null);
   const passedRef = useRef(passedKeys);
-  const initializedVideoIdsRef = useRef<Set<string>>(new Set());
-  const replayRequiredIdsRef = useRef<Set<string>>(new Set());
   const localPassedInRunRef = useRef<Set<string>>(new Set());
   const currentRef = useRef<PlaylistItem | null>(null);
   const eligibleRef = useRef(false);
@@ -174,28 +175,33 @@ export function PathVideoModal({
       .then((res) => {
         if (!active) return;
         const videos = res.videos || [];
-        videos.forEach((video) => {
-          if (!initializedVideoIdsRef.current.has(video.id)) {
-            initializedVideoIdsRef.current.add(video.id);
-            if (frameless || video.state === 'completed') {
-              replayRequiredIdsRef.current.add(video.id);
-            }
-          }
-        });
         setData(res);
         setWatchedIds(new Set(videos.filter((video) => video.state === 'completed').map((video) => video.id)));
-        const nextPassed = new Set(
-          (res.passedCheckIds || []).filter((id) => {
-            const sId = String(id);
-            for (const reqVidId of replayRequiredIdsRef.current) {
-              if (sId.startsWith(`${reqVidId}:`)) return false;
+        const nextPassed = new Set(res.passedCheckIds || []);
+        const nextRemembered: Record<string, { reviewAnswer: string; reviewHint: string }> = {};
+        videos.forEach((video) => {
+          const vidDone = video.state === 'completed';
+          (video.checks || []).forEach((check) => {
+            const cid = String(check.id || check._id || '');
+            if (!cid) return;
+            const fullKey = `${video.id}:${cid}`;
+            if (vidDone || check.passed || nextPassed.has(fullKey) || nextPassed.has(cid)) {
+              nextPassed.add(fullKey);
+              if (check.reviewAnswer || check.reviewHint) {
+                nextRemembered[fullKey] = {
+                  reviewAnswer: check.reviewAnswer || '',
+                  reviewHint: check.reviewHint || '',
+                };
+              }
             }
-            return true;
-          }),
-        );
+          });
+        });
         localPassedInRunRef.current.forEach((key) => nextPassed.add(key));
         passedRef.current = nextPassed;
         setPassedKeys(nextPassed);
+        if (Object.keys(nextRemembered).length > 0) {
+          setRememberedAnswers((prev) => ({ ...nextRemembered, ...prev }));
+        }
         setError('');
       })
       .catch((err: unknown) => {
@@ -205,7 +211,7 @@ export function PathVideoModal({
         }
       });
     return () => { active = false; };
-  }, [unit.id, frameless]);
+  }, [unit.id]);
 
   useEffect(() => {
     const cancel = syncUnitVideos(false);
@@ -281,7 +287,7 @@ export function PathVideoModal({
     const checks = ((video as DpPathVideo).checks || []) as VideoCheck[];
     return checks.filter((check) => {
       const key = `${video.id}:${checkId(check)}`;
-      return !passedRef.current.has(key) && !passedKeys.has(key);
+      return !check.passed && !passedRef.current.has(key) && !passedKeys.has(key);
     });
   }, [passedKeys]);
 
@@ -386,11 +392,11 @@ export function PathVideoModal({
   useEffect(() => {
     if (!current || !watchedIds.has(current.id)) return;
     if (current.source !== 'unit' && current.source !== 'step') return;
+    if (!frameless) return;
     if (syncedSectionRef.current.has(current.id)) return;
     if (pendingOf(current).length > 0) return;
     syncedSectionRef.current.add(current.id);
-    const hadChecks = Boolean((current as DpPathVideo).checks?.length);
-    void Promise.resolve(onWatched(current.id, { initialSync: !hadChecks, completedJustNow: frameless && hadChecks })).catch(() => { });
+    void Promise.resolve(onWatched(current.id, { initialSync: true, completedJustNow: false })).catch(() => { });
   }, [current, watchedIds, pendingOf, passedKeys, frameless, onWatched]);
 
   const markWatched = async () => {
@@ -501,6 +507,15 @@ export function PathVideoModal({
         nextPassed.add(key);
         passedRef.current = nextPassed;
         setPassedKeys(nextPassed);
+        if (res.reviewAnswer || res.reviewHint) {
+          setRememberedAnswers((prev) => ({
+            ...prev,
+            [key]: {
+              reviewAnswer: res.reviewAnswer || '',
+              reviewHint: res.reviewHint || '',
+            },
+          }));
+        }
         setMissed(false);
         play('win');
         setCheer(true);
@@ -616,6 +631,15 @@ export function PathVideoModal({
       const checkIndex = Math.max(0, checks.findIndex((c) => checkId(c) === id));
       const res = await dailyPracticeApi.skipVideoCheck(unit.id, current.id, checkIndex, id);
       if (typeof res?.profileXp === 'number') setWalletXp(res.profileXp);
+      if (res?.reviewAnswer || res?.reviewHint) {
+        setRememberedAnswers((prev) => ({
+          ...prev,
+          [`${current.id}:${id}`]: {
+            reviewAnswer: res.reviewAnswer || '',
+            reviewHint: res.reviewHint || '',
+          },
+        }));
+      }
       const spendXp = Number(res?.charged ?? res?.cost ?? 0);
       DeviceEventEmitter.emit(DAILY_PRACTICE_STATS_EVENT, {
         ...(typeof res?.profileXp === 'number' ? { xpTotal: res.profileXp } : {}),
@@ -637,15 +661,6 @@ export function PathVideoModal({
   const select = (video: PlaylistItem) => {
     if (video.locked) return;
     play('tap');
-    if (replayRequiredIdsRef.current.has(video.id)) {
-      for (const k of [...localPassedInRunRef.current]) {
-        if (k.startsWith(`${video.id}:`)) localPassedInRunRef.current.delete(k);
-      }
-      const next = new Set([...passedRef.current].filter((k) => !k.startsWith(`${video.id}:`)));
-      passedRef.current = next;
-      setPassedKeys(next);
-      syncedSectionRef.current.delete(video.id);
-    }
     setCurrentId(video.id);
   };
 
@@ -798,6 +813,66 @@ export function PathVideoModal({
           {checkpointQuizNode}
         </View>
       ) : null}
+
+      {(() => {
+        if (!current || current.source === 'lesson') return null;
+        const checksList = ((current as DpPathVideo).checks || []) as VideoCheck[];
+        const passedList = checksList.filter((c) => {
+          const cid = checkId(c);
+          const key = `${current.id}:${cid}`;
+          return currentWatched || Boolean(c.passed) || passedKeys.has(key);
+        });
+        if (!passedList.length) return null;
+        return (
+          <View style={styles.rememberedWrap}>
+            <View style={styles.rememberedHeaderRow}>
+              <View style={styles.rememberedTitleRow}>
+                <CheckCircle2 size={14} color="#047857" />
+                <Text style={styles.rememberedTitle}>
+                  {`Câu hỏi đã qua · Đáp án đã ghi nhớ (${passedList.length}/${checksList.length})`}
+                </Text>
+              </View>
+              {pendingOf(current).length === 0 ? (
+                <View style={styles.rememberedReadyPill}>
+                  <Text style={styles.rememberedReadyText}>Đã đạt điều kiện</Text>
+                </View>
+              ) : null}
+            </View>
+            {passedList.map((c, idx) => {
+              const cid = checkId(c) || String(idx);
+              const fullKey = `${current.id}:${cid}`;
+              const mem = rememberedAnswers[fullKey];
+              const ans = mem?.reviewAnswer || c.reviewAnswer || '';
+              const hint = mem?.reviewHint || c.reviewHint || '';
+              return (
+                <View key={cid} style={styles.rememberedItemCard}>
+                  <View style={styles.rememberedItemTop}>
+                    <Pressable
+                      onPress={() => seekVideoTo(Number(c.atSec) || 0)}
+                      style={styles.rememberedClockBadge}
+                      accessibilityRole="button"
+                    >
+                      <Clock3 size={10} color="#92400E" />
+                      <Text style={styles.rememberedClockText}>{`Giây ${Math.max(0, Math.floor(Number(c.atSec) || 0))}`}</Text>
+                    </Pressable>
+                    <View style={styles.rememberedPassedPill}>
+                      <Text style={styles.rememberedPassedText}>Đã qua</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.rememberedPrompt}>{c.prompt}</Text>
+                  <View style={styles.rememberedAnswerBox}>
+                    <Text style={styles.rememberedAnswerText}>
+                      <Text style={styles.rememberedAnswerLabel}>Đáp án: </Text>
+                      {ans || 'Đã hoàn thành'}
+                    </Text>
+                  </View>
+                  {hint ? <Text style={styles.rememberedHintText}>{`Ghi chú: ${hint}`}</Text> : null}
+                </View>
+              );
+            })}
+          </View>
+        );
+      })()}
 
       {!isSingleMode && playlist.length > 0 ? (
         <View style={styles.listBlock}>
@@ -1276,5 +1351,109 @@ const styles = StyleSheet.create({
     color: '#34D399',
     fontSize: 12.5,
     fontWeight: '800',
+  },
+  rememberedWrap: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    gap: 8,
+  },
+  rememberedHeaderRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  rememberedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
+  rememberedTitle: {
+    color: '#065F46',
+    fontSize: 12,
+    fontWeight: '900',
+    flexShrink: 1,
+  },
+  rememberedReadyPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#059669',
+  },
+  rememberedReadyText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  rememberedItemCard: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    gap: 6,
+  },
+  rememberedItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  rememberedClockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
+  },
+  rememberedClockText: {
+    color: '#92400E',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  rememberedPassedPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#D1FAE5',
+  },
+  rememberedPassedText: {
+    color: '#047857',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  rememberedPrompt: {
+    color: '#0F172A',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  rememberedAnswerBox: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#ECFDF5',
+  },
+  rememberedAnswerLabel: {
+    color: '#047857',
+    fontWeight: '900',
+  },
+  rememberedAnswerText: {
+    color: '#064E3B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rememberedHintText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
