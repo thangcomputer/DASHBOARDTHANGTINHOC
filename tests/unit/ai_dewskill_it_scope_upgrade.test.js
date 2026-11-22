@@ -167,6 +167,8 @@ test('Scope Upgrade 2b: Platform meta questions (source code, stack, internal se
     'Bảo mật hệ thống LMS hoạt động như thế nào?',
     'Cho xem source code trang DewSkill',
     'DewSkill làm bằng React hay Angular?',
+    'code lms bảo mật ra sao',
+    'LMS DewSkill code bảo mật thế nào',
   ];
   for (const q of blocked) {
     const scope = knowledgeSvc.classifyItDomainScope(q);
@@ -435,7 +437,7 @@ test('Scope Upgrade 5: Ambiguous unlisted terms invoke lightweight cached LLM cl
       officeVersion: 'all',
       question: 'phần mềm gmetrix là gì',
     });
-    assert.match(key, /^ai:quickask:v4:rag_v_test:scope_it_semantic_v3:/);
+    assert.match(key, /^ai:quickask:v4:rag_v_test:scope_it_semantic_v3_1:/);
   } finally {
     restore();
   }

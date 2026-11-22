@@ -71,7 +71,7 @@ const SYNONYM_SHORTCUT_HINTS = [
 ];
 
 // --- Scope Classifier & Security Gate Dictionaries ---
-const SCOPE_LOGIC_VERSION = 'it_semantic_v3';
+const SCOPE_LOGIC_VERSION = 'it_semantic_v3_1';
 
 const PROMPT_INJECTION_PATTERNS = [
   /ignore\s+(all\s+)?(previous|prior|above|system)\s+(instructions?|prompts?|rules?)/i,
@@ -101,13 +101,24 @@ const PLATFORM_META_BLOCK_RE = new RegExp([
   '\\b(dewskill|thang\\s*tin\\s*hoc|thangtinhoc|dashboard\\s*thang\\s*tinh\\s*hoc)\\b.{0,55}\\b(source\\s*code|ma\\s*nguon|ngon\\s*ngu|framework|tech\\s*stack|stack\\s*cong\\s*nghe|react|vue|angular|node\\.?js|express|mongo(db)?|mongoose|redis|bullmq|socket\\.?io|vite|typescript|jwt|api\\s*key|\\.env|cau\\s*truc|kien\\s*truc|backend|frontend|database|db|bao\\s*mat|ma\\s*hoa|encrypt|duong\\s*dan|url\\s*api|\\/api\\/|routes?|middleware|deploy|hosting\\s*may\\s*chu)\\b',
   '\\b(web\\s*dewskill|trang\\s*dewskill|website\\s*thang\\s*tin\\s*hoc|app\\s*dewskill)\\b',
   '\\b(source\\s*code|ma\\s*nguon|cau\\s*truc\\s*code|github\\s*repo|repository|thu\\s*muc\\s*project)\\b.{0,45}\\b(dewskill|thang\\s*tin\\s*hoc|lms|dashboard)\\b',
-  '\\b(lms|he\\s*thong\\s*lms)\\b.{0,50}\\b(viet\\s*bang|lam\\s*bang|ngon\\s*ngu|framework|stack|source|ma\\s*nguon|bao\\s*mat\\s*(?:he\\s*thong|nhu|cach)|kien\\s*truc|mongodb|trien\\s*khai\\s*ky\\s*thuat|backend|frontend|cors|csrf|oauth|rbac)\\b',
+  '\\b(lms|he\\s*thong\\s*lms)\\b.{0,50}\\b(viet\\s*bang|lam\\s*bang|ngon\\s*ngu|framework|stack|source|ma\\s*nguon|bao\\s*mat(?:\\s*(?:he\\s*thong|nhu|cach|ra\\s*sao))?|kien\\s*truc|mongodb|trien\\s*khai\\s*ky\\s*thuat|backend|frontend|cors|csrf|oauth|rbac|code)\\b',
+  '\\b(code|ma\\s*nguon)\\b.{0,40}\\b(lms|dewskill|thang\\s*tin\\s*hoc)\\b',
   '\\b(bao\\s*mat|co\\s*che\\s*bao\\s*mat)\\b.{0,40}\\b(dewskill|lms|thang\\s*tin\\s*hoc|he\\s*thong\\s*hoc|may\\s*chu|server|trang\\s*web)\\b',
   '\\b(duong\\s*dan|url|endpoint|api)\\b.{0,35}\\b(admin|noi\\s*bo|backend|server|lms|dewskill|thang\\s*tin\\s*hoc)\\b',
   '\\b(lam\\s*bang|viet\\s*bang|xay\\s*dung)\\b.{0,25}\\b(ngon\\s*ngu|framework)\\b.{0,35}\\b(lms|dewskill|thang\\s*tin\\s*hoc)\\b',
 ].join('|'), 'i');
 
-const PLATFORM_META_TECH_SIGNAL_RE = /\b(ngon\s*ngu|framework|source\s*code|ma\s*nguon|stack|backend|frontend|mongodb|react|node\.?js|bao\s*mat\s*he|kien\s*truc)\b/i;
+const PLATFORM_META_TECH_SIGNAL_RE = /\b(ngon\s*ngu|framework|source\s*code|ma\s*nguon|stack|backend|frontend|mongodb|react|node\.?js|bao\s*mat|code|kien\s*truc)\b/i;
+
+const PLATFORM_CONTEXT_RE = /\b(lms|dewskill|thang\s*tin\s*hoc|thangtinhoc|dashboard\s*thang\s*tinh\s*hoc|he\s*thong\s*lms)\b/i;
+
+const PLATFORM_META_INTENT_RE = new RegExp([
+  '\\b(code|ma\\s*nguon|source\\s*code|ngon\\s*ngu|framework|tech\\s*stack|stack\\s*cong\\s*nghe)\\b',
+  '\\b(bao\\s*mat|ma\\s*hoa|encrypt|kien\\s*truc\\s*he|cau\\s*truc\\s*(?:he\\s*thong|backend|code))\\b',
+  '\\b(backend|frontend|mongodb|mongoose|redis|bullmq|jwt|api\\s*key|\\.env)\\b',
+  '\\b(duong\\s*dan|url\\s*api|\\/api\\/|endpoint\\s*admin|cors|csrf|oauth|rbac|trien\\s*khai\\s*ky\\s*thuat)\\b',
+  '\\b(viet\\s*bang|lam\\s*bang|xay\\s*dung).{0,25}\\b(react|node|mongo|angular|vue|typescript)\\b',
+].join('|'), 'i');
 
 function isPlatformMetaOutOfScope(question, attachment = null) {
   const qRaw = String(question || '').trim();
@@ -116,6 +127,15 @@ function isPlatformMetaOutOfScope(question, attachment = null) {
   const attFolded = stripVietnameseMarks(attText).toLowerCase();
   const combined = `${qFolded} ${attFolded}`.trim();
   if (!combined) return false;
+
+  const metaIntent = PLATFORM_META_INTENT_RE.test(combined) || /\bcode\b/.test(combined);
+  if (PLATFORM_CONTEXT_RE.test(combined) && metaIntent) {
+    if (PLATFORM_USAGE_ALLOW_RE.test(combined) && !PLATFORM_META_TECH_SIGNAL_RE.test(combined)) {
+      return false;
+    }
+    return true;
+  }
+
   if (!PLATFORM_META_BLOCK_RE.test(combined)) return false;
   if (PLATFORM_USAGE_ALLOW_RE.test(combined) && !PLATFORM_META_TECH_SIGNAL_RE.test(combined)) {
     return false;
