@@ -60,6 +60,8 @@ const EMPTY_REPLY_EN = 'Sorry, I could not generate a reply right now. Please tr
 const AI_BRAND_NAME = 'DewSkill AI';
 const OUT_OF_SCOPE_REPLY = 'Mình là DewSkill AI, trợ lý chuyên về Tin học văn phòng và Công nghệ thông tin tại Thắng Tin Học. Câu hỏi này hiện nằm ngoài phạm vi hỗ trợ.';
 const OUT_OF_SCOPE_REPLY_EN = 'I am DewSkill AI, an IT and Digital Skills assistant at Thang Tin Hoc. This question is currently outside my scope of support.';
+const PLATFORM_META_REPLY = 'Mình hỗ trợ học Tin học, Office và **cách dùng LMS** (lịch học, bài tập, video). Mình **không** trả lời về mã nguồn, đường dẫn kỹ thuật, công nghệ nền hay bảo mật nội bộ của web DewSkill / Thắng Tin Học.';
+const PLATFORM_META_REPLY_EN = 'I help with digital skills, Office, and **how to use the LMS** (schedule, assignments, videos). I **cannot** discuss source code, internal URLs, underlying tech stack, or internal security of the DewSkill / Thang Tin Hoc website.';
 const SECURITY_REFUSE_REPLY = 'Yêu cầu này nằm ngoài phạm vi hỗ trợ an toàn của DewSkill AI. Mình không thể tiết lộ cấu hình hệ thống, thông tin bảo mật, tài khoản nội bộ hoặc bỏ qua quy tắc vận hành.';
 const SECURITY_REFUSE_REPLY_EN = 'This request is outside my scope of safe support with DewSkill AI. I cannot reveal system prompts, secrets, internal credentials, or bypass safety rules.';
 const AMBIGUOUS_CLARIFY_REPLY = 'Mình là DewSkill AI. Mình chưa rõ bạn đang hỏi về phần mềm, công cụ hoặc nội dung CNTT cụ thể nào. Bạn vui lòng nêu rõ tên phần mềm, ngữ cảnh sử dụng hoặc lỗi đang gặp để mình hỗ trợ chính xác nhé!';
@@ -1937,6 +1939,36 @@ async function replyToUserMessage({
     });
   }
 
+  const securityGate = classifySecurityRisk(userText);
+  if (securityGate.blocked) {
+    sessionDoc.consecutiveAiFailures = 0;
+    await sessionDoc.save();
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: lang === 'en' ? SECURITY_REFUSE_REPLY_EN : SECURITY_REFUSE_REPLY,
+      io,
+      notifyUser,
+    });
+  }
+
+  const scopeCheck = classifyItDomainScope(userText, threadHistory);
+  if (scopeCheck.decision === 'OUT_OF_SCOPE' && scopeCheck.reason === 'platform_meta') {
+    sessionDoc.consecutiveAiFailures = 0;
+    await sessionDoc.save();
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: lang === 'en' ? PLATFORM_META_REPLY_EN : PLATFORM_META_REPLY,
+      io,
+      notifyUser,
+    });
+  }
+
   const faq = lmsFaqReply(humanRole, userText, lang)
     || teacherFaqReply(humanRole, userText, lang)
     || studentFaqReply(humanRole, userText, lang);
@@ -3653,7 +3685,7 @@ async function classifyAmbiguousWithLlm(question, { history = [], lang = 'vi' } 
   const classifierPrompt = [
     'You are the semantic scope classifier for DewSkill AI (Thang Tin Hoc).',
     'Allowed IN_SCOPE domains: Office IT (Word/Excel/PowerPoint/Access/Outlook), Computer Science & IT concepts, software/apps/digital tools (even unfamiliar/newer software or specialized apps), IT certifications & exam-prep software (MOS, IC3, ICDL, GMetrix, Certiport...), operating systems, hardware/peripherals, networking/Internet, programming, databases, websites, cloud, DevOps, and AI tools/usage.',
-    'OUT_OF_SCOPE: Clearly unrelated to IT, computers, digital software, or DewSkill LMS (e.g., romance advice, cooking recipes, horoscopes, medical diagnoses, sports betting, non-IT trivia/history/geography).',
+    'OUT_OF_SCOPE: Clearly unrelated to IT, computers, digital software, or DewSkill LMS usage (e.g., romance, cooking, horoscopes, medicine, sports betting, non-IT trivia). Also OUT_OF_SCOPE: DewSkill/Thang Tin Hoc/LMS source code, internal URLs/API paths, tech stack, hosting, or internal security.',
     'AMBIGUOUS: Underspecified question missing critical software/context (e.g. literal placeholders like "software X", vague pronouns like "how to fix this?" with no topic).',
     'Important: Never reject a real software, programming term, digital platform, or IT tool simply because its name is specialized or uncommon.',
     'Reply with STRICT single-line JSON ONLY: {"decision":"IN_SCOPE|OUT_OF_SCOPE|AMBIGUOUS","category":"office|cert_exam|software|hardware|network|programming|ai|lms|non_it|unknown","reason":"brief reason","clarification":"optional short question in user language if AMBIGUOUS"}',
@@ -3851,8 +3883,11 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
 
   if (initialScope.decision === 'OUT_OF_SCOPE') {
     recordQuickAskSecurityEvent('outOfScopeBlocked', safePlatform);
+    const oosAnswer = initialScope.reason === 'platform_meta'
+      ? (lang === 'en' ? PLATFORM_META_REPLY_EN : PLATFORM_META_REPLY)
+      : (lang === 'en' ? OUT_OF_SCOPE_REPLY_EN : OUT_OF_SCOPE_REPLY);
     return finishTelemetry({
-      answer: lang === 'en' ? OUT_OF_SCOPE_REPLY_EN : OUT_OF_SCOPE_REPLY,
+      answer: oosAnswer,
       source: 'memory',
       lang,
       actions: [],
@@ -3892,8 +3927,11 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       const semanticVerdict = await classifyAmbiguousWithLlm(rawQuestion, { history: historyMessages, lang });
       if (semanticVerdict.decision === 'OUT_OF_SCOPE') {
         recordQuickAskSecurityEvent('outOfScopeBlocked', safePlatform);
+        const oosAnswer = semanticVerdict.reason === 'platform_meta' || semanticVerdict.category === 'platform_internal'
+          ? (lang === 'en' ? PLATFORM_META_REPLY_EN : PLATFORM_META_REPLY)
+          : (lang === 'en' ? OUT_OF_SCOPE_REPLY_EN : OUT_OF_SCOPE_REPLY);
         return finishTelemetry({
-          answer: lang === 'en' ? OUT_OF_SCOPE_REPLY_EN : OUT_OF_SCOPE_REPLY,
+          answer: oosAnswer,
           source: 'memory',
           lang,
           actions: [],

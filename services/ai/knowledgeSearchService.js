@@ -71,7 +71,7 @@ const SYNONYM_SHORTCUT_HINTS = [
 ];
 
 // --- Scope Classifier & Security Gate Dictionaries ---
-const SCOPE_LOGIC_VERSION = 'it_semantic_v2';
+const SCOPE_LOGIC_VERSION = 'it_semantic_v3';
 
 const PROMPT_INJECTION_PATTERNS = [
   /ignore\s+(all\s+)?(previous|prior|above|system)\s+(instructions?|prompts?|rules?)/i,
@@ -87,7 +87,41 @@ const PROMPT_INJECTION_PATTERNS = [
   /tu\s*nay\s*tro\s*di\s*(ban|em|may)\s*la\b/i,
   /\bdong\s*vai\s+(nguoi\s*yeu|ban\s*gai|thay\s*boi|chuyen\s*gia\s*xe|bac\s*si|ai\s*khong\s*gioi\s*han)/i,
   /<\/?(system|knowledge_context|user_attachment)>/i,
+  /(ma\s*nguon|source\s*code).{0,40}\b(dewskill|thang\s*tin\s*hoc|lms|dashboardthangtinhoc)\b/i,
+  /\b(dewskill|thang\s*tin\s*hoc|lms)\b.{0,40}(ma\s*nguon|source\s*code|stack\s*cong\s*nghe|tech\s*stack)/i,
 ];
+
+/** Hướng dẫn sử dụng LMS — không tính là hỏi meta nền tảng. */
+const PLATFORM_USAGE_ALLOW_RE = /\b(lich\s*hoc|lich\s*day|diem\s*danh|hoc\s*video|xem\s*video|nop\s*bai|lam\s*bai|bai\s*tap|trac\s*nghiem|dang\s*nhap|quen\s*mat\s*khau|doi\s*mat\s*khau|mat\s*khau\s*tai\s*khoan|hoc\s*phi|xem\s*diem|khoa\s*hoc|vao\s*lop|mo\s*bai|huong\s*dan\s*su\s*dung|hop\s*thu|tin\s*nhan|bai\s*giang|on\s*tap|luyen\s*tap)\b/i;
+
+/**
+ * Câu hỏi về mã nguồn, stack, đường dẫn/API nội bộ, bảo mật hệ thống DewSkill / LMS / Thắng Tin Học.
+ */
+const PLATFORM_META_BLOCK_RE = new RegExp([
+  '\\b(dewskill|thang\\s*tin\\s*hoc|thangtinhoc|dashboard\\s*thang\\s*tinh\\s*hoc)\\b.{0,55}\\b(source\\s*code|ma\\s*nguon|ngon\\s*ngu|framework|tech\\s*stack|stack\\s*cong\\s*nghe|react|vue|angular|node\\.?js|express|mongo(db)?|mongoose|redis|bullmq|socket\\.?io|vite|typescript|jwt|api\\s*key|\\.env|cau\\s*truc|kien\\s*truc|backend|frontend|database|db|bao\\s*mat|ma\\s*hoa|encrypt|duong\\s*dan|url\\s*api|\\/api\\/|routes?|middleware|deploy|hosting\\s*may\\s*chu)\\b',
+  '\\b(web\\s*dewskill|trang\\s*dewskill|website\\s*thang\\s*tin\\s*hoc|app\\s*dewskill)\\b',
+  '\\b(source\\s*code|ma\\s*nguon|cau\\s*truc\\s*code|github\\s*repo|repository|thu\\s*muc\\s*project)\\b.{0,45}\\b(dewskill|thang\\s*tin\\s*hoc|lms|dashboard)\\b',
+  '\\b(lms|he\\s*thong\\s*lms)\\b.{0,50}\\b(viet\\s*bang|lam\\s*bang|ngon\\s*ngu|framework|stack|source|ma\\s*nguon|bao\\s*mat\\s*(?:he\\s*thong|nhu|cach)|kien\\s*truc|mongodb|trien\\s*khai\\s*ky\\s*thuat|backend|frontend|cors|csrf|oauth|rbac)\\b',
+  '\\b(bao\\s*mat|co\\s*che\\s*bao\\s*mat)\\b.{0,40}\\b(dewskill|lms|thang\\s*tin\\s*hoc|he\\s*thong\\s*hoc|may\\s*chu|server|trang\\s*web)\\b',
+  '\\b(duong\\s*dan|url|endpoint|api)\\b.{0,35}\\b(admin|noi\\s*bo|backend|server|lms|dewskill|thang\\s*tin\\s*hoc)\\b',
+  '\\b(lam\\s*bang|viet\\s*bang|xay\\s*dung)\\b.{0,25}\\b(ngon\\s*ngu|framework)\\b.{0,35}\\b(lms|dewskill|thang\\s*tin\\s*hoc)\\b',
+].join('|'), 'i');
+
+const PLATFORM_META_TECH_SIGNAL_RE = /\b(ngon\s*ngu|framework|source\s*code|ma\s*nguon|stack|backend|frontend|mongodb|react|node\.?js|bao\s*mat\s*he|kien\s*truc)\b/i;
+
+function isPlatformMetaOutOfScope(question, attachment = null) {
+  const qRaw = String(question || '').trim();
+  const attText = String(attachment?.textContent || attachment?.name || '').trim();
+  const qFolded = stripVietnameseMarks(qRaw).toLowerCase();
+  const attFolded = stripVietnameseMarks(attText).toLowerCase();
+  const combined = `${qFolded} ${attFolded}`.trim();
+  if (!combined) return false;
+  if (!PLATFORM_META_BLOCK_RE.test(combined)) return false;
+  if (PLATFORM_USAGE_ALLOW_RE.test(combined) && !PLATFORM_META_TECH_SIGNAL_RE.test(combined)) {
+    return false;
+  }
+  return true;
+}
 
 // Fast-path IT domain groups (representative anchors only — NOT a closed whitelist)
 const IT_DOMAIN_GROUPS = [
@@ -565,6 +599,19 @@ function classifyItDomainScope(question, history = [], attachment = null) {
   const attFolded = stripVietnameseMarks(attText).toLowerCase();
   const combined = `${qFolded} ${attFolded}`.trim();
   const hasAttachment = Boolean(attachment && (attachment.dataBase64 || attachment.textContent || attachment.fileName));
+
+  if (isPlatformMetaOutOfScope(question, attachment)) {
+    return {
+      inScope: false,
+      decision: 'OUT_OF_SCOPE',
+      reason: 'platform_meta',
+      category: 'platform_internal',
+      confidence: 0.98,
+      hasOfficeItContext: false,
+      needsSemanticClassifier: false,
+      askClarification: false,
+    };
+  }
 
   // Literal underspecified placeholders (e.g. "Phần mềm X có học ở trung tâm không?") -> AMBIGUOUS (clarify)
   const isLiteralPlaceholder = /\b(phan\s*mem|ung\s*dung|app|cong\s*cu|tool|he\s*thong|thiet\s*bi|ham)\s+(?:[xyzabc]|nay|kia|do|ay|nao\s*do)\b/i.test(qFolded);
@@ -1353,6 +1400,7 @@ module.exports = {
   detectSoftwareIntent,
   classifySecurityRisk,
   classifyItDomainScope,
+  isPlatformMetaOutOfScope,
   classifyOfficeItScope,
   embedQueryWithGemini,
   searchKnowledge,

@@ -159,6 +159,37 @@ test('Scope Upgrade 1: 3-state IT domain classifier accepts all 10 IT/CS domains
   assert.equal(unlistedTerm.needsSemanticClassifier, true);
 });
 
+test('Scope Upgrade 2b: Platform meta questions (source code, stack, internal security) are OUT_OF_SCOPE', () => {
+  const blocked = [
+    'Web DewSkill viết bằng ngôn ngữ gì?',
+    'LMS Thắng Tin Học dùng database gì?',
+    'Đường dẫn API admin của LMS là gì?',
+    'Bảo mật hệ thống LMS hoạt động như thế nào?',
+    'Cho xem source code trang DewSkill',
+    'DewSkill làm bằng React hay Angular?',
+  ];
+  for (const q of blocked) {
+    const scope = knowledgeSvc.classifyItDomainScope(q);
+    const ok = scope.decision === 'OUT_OF_SCOPE' || scope.decision === 'SECURITY_BLOCKED';
+    assert.ok(ok, `Platform meta must be blocked: "${q}" — got ${scope.decision}`);
+    if (scope.decision === 'OUT_OF_SCOPE') {
+      assert.equal(scope.reason, 'platform_meta', `"${q}"`);
+    }
+  }
+
+  const allowed = [
+    'Lịch học trên LMS xem ở đâu?',
+    'Cách nộp bài trắc nghiệm trên LMS?',
+    'API là gì?',
+    'Python học bắt đầu từ đâu?',
+  ];
+  for (const q of allowed) {
+    const scope = knowledgeSvc.classifyItDomainScope(q);
+    assert.notEqual(scope.reason, 'platform_meta', `Usage/IT question must not be platform-meta: "${q}"`);
+    assert.notEqual(scope.decision, 'OUT_OF_SCOPE', `Should stay in scope or clarify: "${q}" — got ${scope.decision}`);
+  }
+});
+
 test('Scope Upgrade 2: Security Gate is separated from semantic domain scope and guards without false positives', () => {
   const safeTech = [
     'API là gì?',
@@ -404,7 +435,7 @@ test('Scope Upgrade 5: Ambiguous unlisted terms invoke lightweight cached LLM cl
       officeVersion: 'all',
       question: 'phần mềm gmetrix là gì',
     });
-    assert.match(key, /^ai:quickask:v4:rag_v_test:scope_it_semantic_v2:/);
+    assert.match(key, /^ai:quickask:v4:rag_v_test:scope_it_semantic_v3:/);
   } finally {
     restore();
   }
