@@ -9,6 +9,7 @@ const http = require('http');
 const https = require('https');
 const mongoose = require('mongoose');
 const Message = require('../models/Message');
+const Student = require('../models/Student');
 const AiSupportSession = require('../models/AiSupportSession');
 const AiQuickAskDailyStat = require('../models/AiQuickAskDailyStat');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
@@ -36,6 +37,7 @@ const {
 const { enrichMessageIdentities } = require('./messagingIdentity');
 const { sanitizeMessageDoc, resolveDiskPath } = require('../utils/messageFileRetention');
 const { getMessagingRole } = require('../utils/messagingRoles');
+const { hasRealCourseEnrollment, isSubscriptionExpired } = require('./freePortal');
 const { AI_SUPPORT_STATUS, HANDOFF_REASONS } = require('../shared/enums/AiSupportStatus');
 const { wantsHumanEscalation, isHumanHandoffButtonHallucination } = require('../shared/aiSupportHandoff');
 const logger = require('../config/logger');
@@ -43,10 +45,48 @@ const logger = require('../config/logger');
 const AI_PEER_ID = 'ai_support';
 const AI_PEER_NAME = 'Trợ lý Thắng Tin Học';
 const TYPING_MS = 900;
-const AI_IMAGE_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT) || 3);
-const AI_IMAGE_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_TEACHER) || 5);
-const AI_QUESTION_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT) || 5);
-const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER) || 10);
+function parseNonNegativeIntEnv(raw, fallback) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function pickFirstEnv(...keys) {
+  for (const key of keys) {
+    const val = process.env[key];
+    if (val !== undefined && val !== null && String(val).trim() !== '') return val;
+  }
+  return undefined;
+}
+
+const AI_IMAGE_DAILY_LIMIT_STUDENT = parseNonNegativeIntEnv(
+  pickFirstEnv('AI_SUPPORT_IMAGE_DAILY_LIMIT_STUDENT', 'AI_SUPPORT_IMAGE_DAILY_LIMIT'),
+  5,
+);
+const AI_IMAGE_DAILY_LIMIT_FREE_STUDENT = parseNonNegativeIntEnv(
+  pickFirstEnv('AI_SUPPORT_IMAGE_DAILY_LIMIT_FREE_STUDENT'),
+  0,
+);
+const AI_IMAGE_DAILY_LIMIT_TEACHER = parseNonNegativeIntEnv(
+  pickFirstEnv('AI_SUPPORT_IMAGE_DAILY_LIMIT_TEACHER'),
+  10,
+);
+const AI_QUESTION_DAILY_LIMIT_STUDENT = Math.max(
+  1,
+  parseNonNegativeIntEnv(
+    pickFirstEnv('AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT', 'AI_SUPPORT_QUESTION_DAILY_LIMIT'),
+    10,
+  ),
+);
+const AI_QUESTION_DAILY_LIMIT_FREE_STUDENT = Math.max(
+  1,
+  parseNonNegativeIntEnv(pickFirstEnv('AI_SUPPORT_QUESTION_DAILY_LIMIT_FREE_STUDENT'), 2),
+);
+const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(
+  1,
+  parseNonNegativeIntEnv(pickFirstEnv('AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER'), 15),
+);
 const IDLE_PING_MS = Math.max(30_000, Number(process.env.AI_SUPPORT_IDLE_PING_MS) || 5 * 60 * 1000);
 const IDLE_END_MS = Math.max(15_000, Number(process.env.AI_SUPPORT_IDLE_END_MS) || 5 * 60 * 1000);
 const IDLE_SWEEP_MS = Math.max(10_000, Number(process.env.AI_SUPPORT_IDLE_SWEEP_MS) || 30_000);
@@ -76,7 +116,13 @@ function questionLimitReply(limit, lang = 'vi') {
 }
 
 function imageLimitReply(limit, lang = 'vi') {
-  const n = Number(limit) || 0;
+  const n = Number(limit);
+  if (!Number.isFinite(n) || n <= 0) {
+    if (lang === 'en') {
+      return 'Free accounts do not support sending images to DewSkill AI. You can ask by text or upgrade your account to unlock image uploads.';
+    }
+    return 'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ hoặc đăng ký gói để mở tính năng gửi ảnh.';
+  }
   if (lang === 'en') {
     return `You have used all ${n} image uploads for the AI Assistant today. Try again tomorrow, or ask with text if you still have AI turns left.`;
   }
@@ -209,7 +255,7 @@ function effectiveStatus(session) {
     : AI_SUPPORT_STATUS.AI_ACTIVE;
 }
 
-function sessionToClient(session) {
+function sessionToClient(session, user = null) {
   if (!session) return null;
   const status = effectiveStatus(session);
   return {
@@ -226,8 +272,8 @@ function sessionToClient(session) {
     claimedByName: session.claimedByName || '',
     claimedAt: session.claimedAt || null,
     resolvedAt: session.resolvedAt || null,
-    imageQuota: peekImageQuota(session),
-    questionQuota: peekQuestionQuota(session),
+    imageQuota: peekImageQuota(session, user),
+    questionQuota: peekQuestionQuota(session, user),
   };
 }
 
@@ -249,20 +295,81 @@ function isAiSessionStoreReady() {
   return Boolean(mongoose.connection && mongoose.connection.readyState === 1);
 }
 
-function imageDailyLimit(role) {
-  if (role === 'teacher') return AI_IMAGE_DAILY_LIMIT_TEACHER;
-  if (role === 'student') return AI_IMAGE_DAILY_LIMIT_STUDENT;
+function isFreeTierAiStudent(user) {
+  if (!user || typeof user !== 'object') return false;
+  const role = String(user.role || user.userRole || '').trim().toLowerCase();
+  if (role && role !== 'student') return false;
+  if (user.freePortal !== true) return false;
+  if (hasRealCourseEnrollment(user)) return false;
+  return user.freeUnlocked !== true || isSubscriptionExpired(user);
+}
+
+async function resolveStudentQuotaUser(user) {
+  if (!user || typeof user !== 'object') return user || null;
+  const role = String(user.role || user.userRole || getMessagingRole(user) || '').trim().toLowerCase();
+  if (role !== 'student') return user;
+  if (typeof user.freePortal === 'boolean') return user;
+  const uid = String(user.id || user._id || '').trim();
+  if (!uid || !isAiSessionStoreReady() || !mongoose.Types.ObjectId.isValid(uid)) {
+    return user;
+  }
+  try {
+    const dbStudent = await Student.findById(uid)
+      .select('freePortal freeUnlocked subscription enrollments.courseName enrollments.status enrollments.learningAccess enrollments.completedSessions enrollments.totalSessions')
+      .lean();
+    if (!dbStudent) return user;
+    return {
+      ...user,
+      freePortal: dbStudent.freePortal === true,
+      freeUnlocked: dbStudent.freeUnlocked === true,
+      subscription: dbStudent.subscription || user.subscription || null,
+      enrollments: Array.isArray(dbStudent.enrollments) ? dbStudent.enrollments : [],
+    };
+  } catch (err) {
+    logger.warn({ err: err?.message, userId: uid }, '[AI Quota] student lookup skipped');
+    return user;
+  }
+}
+
+function resolveQuotaContext(roleOrUser, user = null) {
+  if (user && typeof user === 'object') {
+    const role = typeof roleOrUser === 'string'
+      ? roleOrUser
+      : String(roleOrUser?.userRole || roleOrUser?.role || user.role || getMessagingRole(user) || '').toLowerCase();
+    return { role, user };
+  }
+  if (roleOrUser && typeof roleOrUser === 'object') {
+    const nestedUser = roleOrUser.user && typeof roleOrUser.user === 'object' ? roleOrUser.user : roleOrUser;
+    const role = String(roleOrUser.userRole || roleOrUser.role || nestedUser.role || '').toLowerCase();
+    return { role, user: nestedUser };
+  }
+  return { role: String(roleOrUser || '').toLowerCase(), user: null };
+}
+
+function imageDailyLimit(roleOrUser, user = null) {
+  const ctx = resolveQuotaContext(roleOrUser, user);
+  if (ctx.role === 'teacher') return AI_IMAGE_DAILY_LIMIT_TEACHER;
+  if (ctx.role === 'student') {
+    return isFreeTierAiStudent(ctx.user)
+      ? AI_IMAGE_DAILY_LIMIT_FREE_STUDENT
+      : AI_IMAGE_DAILY_LIMIT_STUDENT;
+  }
+  return null;
+}
+
+function questionDailyLimit(roleOrUser, user = null) {
+  const ctx = resolveQuotaContext(roleOrUser, user);
+  if (ctx.role === 'teacher') return AI_QUESTION_DAILY_LIMIT_TEACHER;
+  if (ctx.role === 'student') {
+    return isFreeTierAiStudent(ctx.user)
+      ? AI_QUESTION_DAILY_LIMIT_FREE_STUDENT
+      : AI_QUESTION_DAILY_LIMIT_STUDENT;
+  }
   return 0;
 }
 
-function questionDailyLimit(role) {
-  if (role === 'teacher') return AI_QUESTION_DAILY_LIMIT_TEACHER;
-  if (role === 'student') return AI_QUESTION_DAILY_LIMIT_STUDENT;
-  return 0;
-}
-
-function peekQuestionQuota(session) {
-  const limit = questionDailyLimit(session?.userRole);
+function peekQuestionQuota(session, user = null) {
+  const limit = questionDailyLimit(session, user);
   if (!limit) {
     return { applies: false, used: 0, remaining: null, limit: 0 };
   }
@@ -282,8 +389,8 @@ function peekQuestionQuota(session) {
 /**
  * Đếm 1 câu hỏi Gemini (HV/GV). FAQ / chào không gọi hàm này.
  */
-async function consumeAiQuestionQuota(sessionDoc) {
-  const limit = questionDailyLimit(sessionDoc?.userRole);
+async function consumeAiQuestionQuota(sessionDoc, user = null) {
+  const limit = questionDailyLimit(sessionDoc, user);
   if (!sessionDoc || !limit) {
     return { applies: false, blocked: false, remaining: null, used: 0, limit };
   }
@@ -338,13 +445,34 @@ function supportFailureReply(err, lang = 'vi') {
   return lang === 'en' ? BUSY_REPLY_EN : BUSY_REPLY;
 }
 
-function peekImageQuota(session) {
-  const limit = imageDailyLimit(session?.userRole);
+function peekImageQuota(session, user = null) {
+  const limit = imageDailyLimit(session, user);
+  if (limit === null) {
+    return {
+      applies: false,
+      allowed: true,
+      used: 0,
+      remaining: null,
+      limit: null,
+    };
+  }
   const today = vietnamDateKey();
+  if (limit <= 0) {
+    return {
+      applies: true,
+      allowed: false,
+      used: 0,
+      remaining: 0,
+      limit: 0,
+      date: today,
+    };
+  }
   const used = session && String(session.imageUploadDate || '') === today
     ? Number(session.imageUploadCount || 0)
     : 0;
   return {
+    applies: true,
+    allowed: true,
     used,
     remaining: Math.max(0, limit - used),
     limit,
@@ -354,15 +482,28 @@ function peekImageQuota(session) {
 
 /**
  * Đếm 1 ảnh gửi cho AI (không áp dụng khi nhân viên đã tiếp nhận).
- * @returns {{ applies: boolean, blocked: boolean, remaining: number|null, used: number, limit: number }}
+ * @returns {{ applies: boolean, blocked: boolean, disallowed: boolean, remaining: number|null, used: number, limit: number|null }}
  */
-async function consumeAiImageQuota(sessionDoc) {
-  const limit = imageDailyLimit(sessionDoc?.userRole);
-  if (!sessionDoc || !limit) {
-    return { applies: false, blocked: false, remaining: null, used: 0, limit };
+async function consumeAiImageQuota(sessionDoc, user = null) {
+  const limit = imageDailyLimit(sessionDoc, user);
+  if (limit === null) {
+    return { applies: false, blocked: false, disallowed: false, remaining: null, used: 0, limit: null };
   }
-  if (aiPaused(effectiveStatus(sessionDoc))) {
-    return { applies: false, blocked: false, remaining: null, used: 0, limit };
+  if (sessionDoc && aiPaused(effectiveStatus(sessionDoc))) {
+    return { applies: false, blocked: false, disallowed: false, remaining: null, used: 0, limit };
+  }
+  if (limit <= 0) {
+    return {
+      applies: true,
+      blocked: true,
+      disallowed: true,
+      remaining: 0,
+      used: 0,
+      limit: 0,
+    };
+  }
+  if (!sessionDoc) {
+    return { applies: false, blocked: false, disallowed: false, remaining: null, used: 0, limit };
   }
   const today = vietnamDateKey();
   const used = String(sessionDoc.imageUploadDate || '') === today
@@ -372,6 +513,7 @@ async function consumeAiImageQuota(sessionDoc) {
     return {
       applies: true,
       blocked: true,
+      disallowed: false,
       remaining: 0,
       used,
       limit,
@@ -383,6 +525,7 @@ async function consumeAiImageQuota(sessionDoc) {
   return {
     applies: true,
     blocked: false,
+    disallowed: false,
     remaining: limit - used - 1,
     used: used + 1,
     limit,
@@ -1794,6 +1937,8 @@ async function replyToUserMessage({
 
   if (!isAiChatUser(sender)) return null;
 
+  const quotaSender = await resolveStudentQuotaUser(sender);
+
   let sessionDoc = await ensureSession({
     conversationId,
     userId: humanUserId,
@@ -1816,7 +1961,7 @@ async function replyToUserMessage({
     sessionDoc.claimedAt = null;
     await sessionDoc.save();
     status = AI_SUPPORT_STATUS.AI_ACTIVE;
-    emitStatus(io, sessionDoc, humanUserId);
+    emitStatus(io, sessionDoc, humanUserId, quotaSender);
   }
 
   if (aiPaused(status)) {
@@ -1835,7 +1980,7 @@ async function replyToUserMessage({
       sessionDoc.consecutiveAiFailures = 0;
       await sessionDoc.save();
       status = AI_SUPPORT_STATUS.AI_ACTIVE;
-      emitStatus(io, sessionDoc, humanUserId);
+      emitStatus(io, sessionDoc, humanUserId, quotaSender);
     } else {
       fanoutUserMessageToSupport(io, {
         conversationId,
@@ -1988,8 +2133,22 @@ async function replyToUserMessage({
     });
   }
 
-  const q = await consumeAiQuestionQuota(sessionDoc);
-  if (q.applies) emitStatus(io, sessionDoc, humanUserId);
+  if (imageFileUrl && imageDailyLimit(humanRole, quotaSender) === 0) {
+    sessionDoc.consecutiveAiFailures = 0;
+    await sessionDoc.save();
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: imageLimitReply(0, lang),
+      io,
+      notifyUser,
+    });
+  }
+
+  const q = await consumeAiQuestionQuota(sessionDoc, quotaSender);
+  if (q.applies) emitStatus(io, sessionDoc, humanUserId, quotaSender);
   if (q.blocked) {
     return persistBotReply({
       conversationId,
@@ -2071,7 +2230,7 @@ async function replyToUserMessage({
     if (q.applies && !q.blocked) {
       try {
         await refundAiQuestionQuota(sessionDoc);
-        emitStatus(io, sessionDoc, humanUserId);
+        emitStatus(io, sessionDoc, humanUserId, quotaSender);
       } catch (refundErr) {
         logger.warn({ err: refundErr?.message }, '[AI Support] refund quota failed');
       }
@@ -2092,9 +2251,9 @@ async function replyToUserMessage({
   }
 }
 
-function emitStatus(io, session, userId) {
+function emitStatus(io, session, userId, user = null) {
   if (!io) return;
-  const payload = sessionToClient(session);
+  const payload = sessionToClient(session, user);
   if (userId) io.to(String(userId)).emit('ai-support:status', payload);
   io.to('ALL_SUPPORT').emit('ai-support:status', payload);
 }
@@ -2268,7 +2427,7 @@ function emitHandoffEvents(io, notifyUser, result, user) {
     summary: result.session?.handoffSummary || '',
     status: effectiveStatus(result.session),
   });
-  emitStatus(io, result.session, humanUserId);
+  emitStatus(io, result.session, humanUserId, user);
 }
 
 function fanoutUserMessageToSupport(io, { conversationId, session, sender, userText }) {
@@ -2406,7 +2565,7 @@ async function escalateToHuman({ conversationId, user, reason, io }) {
 
   const [clientMessage] = await enrichMessageIdentities([message]);
   const payload = sanitizeMessageDoc(clientMessage?.toObject ? clientMessage.toObject() : clientMessage);
-  if (io) emitStatus(io, session, humanUserId);
+  if (io) emitStatus(io, session, humanUserId, user);
 
   return { session, message: payload, alreadyEscalated: false };
 }
@@ -2438,7 +2597,7 @@ async function resetAiSession({ conversationId, user, io }) {
     err.status = 404;
     throw err;
   }
-  if (io) emitStatus(io, doc, userId);
+  if (io) emitStatus(io, doc, userId, user);
   return doc;
 }
 
@@ -2461,7 +2620,7 @@ async function endAiSession({ conversationId, user, io }) {
   doc.idlePingAt = null;
   doc.consecutiveAiFailures = 0;
   await doc.save();
-  if (io) emitStatus(io, doc, userId);
+  if (io) emitStatus(io, doc, userId, user);
   return doc;
 }
 
@@ -3780,6 +3939,10 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
 
   const userRole = String(user?.role || getMessagingRole(user) || 'student').toLowerCase();
   const userName = String(user?.name || '').trim();
+  const quotaUser = await resolveStudentQuotaUser(user);
+  const isFreeStudent = isFreeTierAiStudent(quotaUser);
+  const qDailyLimit = questionDailyLimit(userRole, quotaUser);
+  const imgDailyLimit = imageDailyLimit(userRole, quotaUser);
   const historyMessages = (Array.isArray(history) ? history : [])
     .slice(-8)
     .map((m) => ({
@@ -3871,6 +4034,93 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       actions: [],
     }, 'rejected');
   }
+
+  const hasImageOrVisionAttachment = Boolean(
+    att && (
+      (att.mimeType && (att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf'))
+      || (att.dataBase64 && !att.mimeType)
+    ),
+  );
+  if (hasImageOrVisionAttachment && imgDailyLimit === 0) {
+    const err = new Error(imageLimitReply(0, lang));
+    err.status = 403;
+    err.code = 'AI_IMAGE_QUOTA';
+    err.questionQuota = peekQuestionQuota({ userRole }, quotaUser);
+    err.imageQuota = peekImageQuota({ userRole }, quotaUser);
+    throw err;
+  }
+
+  const uid = String(user?.id || user?._id || '');
+  const branchId = String(user?.branchId || '');
+  const quotaAppliesToUser = qDailyLimit > 0 && Boolean(uid) && isAiSessionStoreReady();
+  let sessionDoc = null;
+  let consumedQuestionQuota = false;
+  let consumedImageQuota = false;
+  let quotaPayload = {};
+  let cacheKey = null;
+  let resolveInFlight = null;
+  let rejectInFlight = null;
+
+  const rejectPendingInFlight = (err) => {
+    if (cacheKey && rejectInFlight) {
+      const rejectFn = rejectInFlight;
+      resolveInFlight = null;
+      rejectInFlight = null;
+      inFlightQuickAsk.delete(cacheKey);
+      rejectFn(err);
+    }
+  };
+
+  const ensureQuotaSession = async () => {
+    if (sessionDoc) return sessionDoc;
+    const conversationId = buildAiSupportConversationId(userRole, uid);
+    sessionDoc = await ensureSession({
+      conversationId,
+      userId: uid,
+      userRole,
+      branchId,
+    });
+    return sessionDoc;
+  };
+
+  const consumeQuickAskTurn = async ({ countImage = false } = {}) => {
+    if (!quotaAppliesToUser) return {};
+    const doc = await ensureQuotaSession();
+    if (countImage && imgDailyLimit !== null) {
+      const imgQ = await consumeAiImageQuota(doc, quotaUser);
+      if (imgQ.blocked) {
+        rejectPendingInFlight(new Error('AI_IMAGE_QUOTA'));
+        const err = new Error(imageLimitReply(imgQ.limit, lang));
+        err.status = 403;
+        err.code = 'AI_IMAGE_QUOTA';
+        err.questionQuota = peekQuestionQuota(doc, quotaUser);
+        err.imageQuota = peekImageQuota(doc, quotaUser);
+        throw err;
+      }
+      consumedImageQuota = imgQ.applies && !imgQ.blocked;
+    }
+
+    const q = await consumeAiQuestionQuota(doc, quotaUser);
+    if (q.blocked) {
+      if (consumedImageQuota) {
+        await refundAiImageQuota(doc);
+        consumedImageQuota = false;
+      }
+      rejectPendingInFlight(new Error('AI_QUESTION_QUOTA'));
+      const err = new Error(questionLimitReply(q.limit, lang));
+      err.status = 403;
+      err.code = 'AI_QUESTION_QUOTA';
+      err.questionQuota = peekQuestionQuota(doc, quotaUser);
+      err.imageQuota = peekImageQuota(doc, quotaUser);
+      throw err;
+    }
+    consumedQuestionQuota = q.applies && !q.blocked;
+    quotaPayload = {
+      questionQuota: peekQuestionQuota(doc, quotaUser),
+      imageQuota: peekImageQuota(doc, quotaUser),
+    };
+    return quotaPayload;
+  };
 
   // 3. 3-State Semantic Domain Classification BEFORE memory/cache/Gemini (applies to BOTH RAG and Legacy accounts)
   const initialScope = classifyItDomainScope(rawQuestion, historyMessages, att);
@@ -3997,19 +4247,24 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     if (!specificIntent) {
       const officeHit = officeItQuickMemory(rawQuestion, lang);
       if (officeHit) {
-        return finishTelemetry({ answer: officeHit, source: 'memory', lang, actions: [] }, 'memory');
+        const turnQuota = isFreeStudent ? await consumeQuickAskTurn() : {};
+        return finishTelemetry({
+          answer: officeHit,
+          source: 'memory',
+          lang,
+          actions: [],
+          ...turnQuota,
+        }, 'memory');
       }
     }
   }
 
   // 5. Access-scoped, language-scoped, Office-version-scoped & knowledge-version-scoped cache lookup + single-flight dedup
   const canUseCache = ragEnabled && !hasAttachment && historyMessages.length === 0 && rawQuestion.length >= 3;
-  const cacheKey = canUseCache
+  cacheKey = canUseCache
     ? buildQuickAskCacheKey({ ragVersion, accessTier, lang, officeVersion: detectedOfficeVer, question: rawQuestion })
     : null;
 
-  let resolveInFlight = null;
-  let rejectInFlight = null;
   if (cacheKey) {
     // Check in-flight FIRST (synchronous, zero race across concurrent callers hitting the same cold key!)
     const inflightBefore = inFlightQuickAsk.get(cacheKey);
@@ -4017,9 +4272,14 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       try {
         const shared = await inflightBefore;
         if (shared && shared.answer && !containsPersonalUserData(shared.answer, user)) {
-          return finishTelemetry({ ...shared }, 'coalesced', false);
+          const { questionQuota: _q, imageQuota: _i, ...baseShared } = shared;
+          const turnQuota = await consumeQuickAskTurn();
+          return finishTelemetry({ ...baseShared, ...turnQuota }, 'coalesced', false);
         }
-      } catch {
+      } catch (coalesceErr) {
+        if (coalesceErr?.code === 'AI_QUESTION_QUOTA' || coalesceErr?.code === 'AI_IMAGE_QUOTA') {
+          throw coalesceErr;
+        }
         /* fall through to fresh attempt */
       }
     }
@@ -4037,9 +4297,13 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
           actions: Array.isArray(cached.actions) ? cached.actions : [],
           ...(cached.model ? { model: cached.model } : {}),
         };
-        return finishTelemetry(res, 'cache', false);
+        const turnQuota = await consumeQuickAskTurn();
+        return finishTelemetry({ ...res, ...turnQuota }, 'cache', false);
       }
     } catch (err) {
+      if (err?.code === 'AI_QUESTION_QUOTA' || err?.code === 'AI_IMAGE_QUOTA') {
+        throw err;
+      }
       logger.warn({ err: err?.message }, '[Quick Ask AI] cache read skipped');
     }
 
@@ -4049,9 +4313,14 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       try {
         const shared = await inflightAfter;
         if (shared && shared.answer && !containsPersonalUserData(shared.answer, user)) {
-          return finishTelemetry({ ...shared }, 'coalesced', false);
+          const { questionQuota: _q, imageQuota: _i, ...baseShared } = shared;
+          const turnQuota = await consumeQuickAskTurn();
+          return finishTelemetry({ ...baseShared, ...turnQuota }, 'coalesced', false);
         }
-      } catch {
+      } catch (coalesceErr) {
+        if (coalesceErr?.code === 'AI_QUESTION_QUOTA' || coalesceErr?.code === 'AI_IMAGE_QUOTA') {
+          throw coalesceErr;
+        }
         /* fall through */
       }
     }
@@ -4138,57 +4407,8 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     }, 'fallback');
   }
 
-  const uid = String(user?.id || user?._id || '');
-  const branchId = String(user?.branchId || '');
-  let sessionDoc = null;
-  let consumedQuestionQuota = false;
-  let consumedImageQuota = false;
-  let quotaPayload = {};
-
-  if (questionDailyLimit(userRole) > 0 && uid && isAiSessionStoreReady()) {
-    const conversationId = buildAiSupportConversationId(userRole, uid);
-    sessionDoc = await ensureSession({
-      conversationId,
-      userId: uid,
-      userRole,
-      branchId,
-    });
-
-    const hasVisionAttachment = images.length > 0;
-    if (hasVisionAttachment && imageDailyLimit(userRole) > 0) {
-      const imgQ = await consumeAiImageQuota(sessionDoc);
-      if (imgQ.blocked) {
-        if (cacheKey && rejectInFlight) {
-          inFlightQuickAsk.delete(cacheKey);
-          rejectInFlight(new Error('AI_IMAGE_QUOTA'));
-        }
-        const err = new Error(imageLimitReply(imgQ.limit, lang));
-        err.status = 403;
-        err.code = 'AI_IMAGE_QUOTA';
-        throw err;
-      }
-      consumedImageQuota = imgQ.applies && !imgQ.blocked;
-    }
-
-    const q = await consumeAiQuestionQuota(sessionDoc);
-    if (q.blocked) {
-      if (consumedImageQuota) {
-        await refundAiImageQuota(sessionDoc);
-      }
-      if (cacheKey && rejectInFlight) {
-        inFlightQuickAsk.delete(cacheKey);
-        rejectInFlight(new Error('AI_QUESTION_QUOTA'));
-      }
-      const err = new Error(questionLimitReply(q.limit, lang));
-      err.status = 403;
-      err.code = 'AI_QUESTION_QUOTA';
-      throw err;
-    }
-    consumedQuestionQuota = q.applies && !q.blocked;
-    quotaPayload = {
-      questionQuota: peekQuestionQuota(sessionDoc),
-      imageQuota: peekImageQuota(sessionDoc),
-    };
+  if (quotaAppliesToUser) {
+    await consumeQuickAskTurn({ countImage: images.length > 0 || hasImageOrVisionAttachment });
   }
 
   const messages = [
@@ -4231,12 +4451,15 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       }, 'fallback', true, result?.usage || null);
     }
 
-    const responsePayload = {
+    const baseCachePayload = {
       answer: cleanText,
       source: 'ai',
       lang,
       actions,
       ...(result?.model ? { model: result.model } : {}),
+    };
+    const responsePayload = {
+      ...baseCachePayload,
       ...(quotaPayload.questionQuota ? { questionQuota: quotaPayload.questionQuota } : {}),
       ...(quotaPayload.imageQuota ? { imageQuota: quotaPayload.imageQuota } : {}),
     };
@@ -4259,13 +4482,16 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     const hasPersonalData = containsPersonalUserData(cleanText, user);
     const safeToShare = Boolean(cacheKey && confidenceOk && !isApologyOrEmpty && !hasPersonalData && cleanText.length >= 25);
     if (safeToShare) {
-      cache.set(cacheKey, responsePayload, QUICK_ASK_CACHE_TTL_SEC).catch((err) => {
+      cache.set(cacheKey, baseCachePayload, QUICK_ASK_CACHE_TTL_SEC).catch((err) => {
         logger.warn({ err: err?.message }, '[Quick Ask AI] cache write skipped');
       });
     }
     if (cacheKey && resolveInFlight) {
+      const resolveFn = resolveInFlight;
+      resolveInFlight = null;
+      rejectInFlight = null;
       inFlightQuickAsk.delete(cacheKey);
-      resolveInFlight(safeToShare ? responsePayload : null);
+      resolveFn(safeToShare ? baseCachePayload : null);
     }
 
     return finishTelemetry(responsePayload, ragEnabled ? 'rag_ai' : 'legacy_ai', true, result?.usage || null);
@@ -4318,6 +4544,9 @@ module.exports = {
   peekImageQuota,
   consumeAiQuestionQuota,
   peekQuestionQuota,
+  isFreeTierAiStudent,
+  imageLimitReply,
+  resolveStudentQuotaUser,
   escalateToHuman,
   resetAiSession,
   endAiSession,

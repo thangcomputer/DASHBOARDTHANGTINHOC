@@ -345,7 +345,6 @@ function setCustomEmbedderForTests(fn) {
 function getUserAccessTier(user) {
   if (!user || (!user.id && !user._id)) return 'blocked';
   if (user.accountLocked) return 'blocked';
-  if (user.freePortal && !user.freeUnlocked) return 'blocked';
   const role = String(user.role || user.adminRole || 'student').trim().toLowerCase();
   if (ROLE_ACCESS_MAP[role]) return role === 'superadmin' ? 'admin' : role;
   return 'student';

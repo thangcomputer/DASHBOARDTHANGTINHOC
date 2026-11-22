@@ -144,6 +144,45 @@ export async function endAiSupportConversation(conversationId: string) {
   return payload.data?.session?.status || AI_SUPPORT_STATUS.CLOSED;
 }
 
+export type AiQuestionQuota = {
+  applies: boolean;
+  used: number;
+  remaining: number | null;
+  limit: number;
+  date?: string;
+};
+
+export type AiImageQuota = {
+  applies?: boolean;
+  allowed?: boolean;
+  used: number;
+  remaining: number | null;
+  limit: number | null;
+  date?: string;
+};
+
+export type AiDailyQuota = {
+  questionQuota?: AiQuestionQuota;
+  imageQuota?: AiImageQuota;
+};
+
+export type AiSupportStatusResponse = {
+  enabled: boolean;
+  configured: boolean;
+  dailyQuota?: AiDailyQuota | null;
+};
+
+export async function fetchAiSupportStatus(): Promise<AiSupportStatusResponse> {
+  const payload = await mobileApiRequest<{ data?: AiSupportStatusResponse }>('/ai-support/status', {
+    method: 'GET',
+  });
+  return {
+    enabled: Boolean(payload?.data?.enabled),
+    configured: Boolean(payload?.data?.configured),
+    dailyQuota: payload?.data?.dailyQuota || null,
+  };
+}
+
 export type QuickAiAction = {
   path: string;
   label: string;
@@ -155,6 +194,8 @@ export type QuickAiReply = {
   lang?: 'vi' | 'en';
   actions?: QuickAiAction[];
   model?: string;
+  questionQuota?: AiQuestionQuota;
+  imageQuota?: AiImageQuota;
 };
 
 export type QuickAiAttachment = {
@@ -202,6 +243,8 @@ export async function quickAskAi({
     lang: payload?.data?.lang,
     actions: Array.isArray(payload?.data?.actions) ? payload.data.actions : [],
     model: payload?.data?.model,
+    questionQuota: payload?.data?.questionQuota,
+    imageQuota: payload?.data?.imageQuota,
   };
 }
 

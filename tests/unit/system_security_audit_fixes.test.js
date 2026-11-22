@@ -247,6 +247,35 @@ test('monitoring ingest prevents source/user spoofing, formService escapes CSV f
   );
   assert.equal(freeBlockedSchedule, true);
 
+  assert.equal(
+    isFreePortalRequestBlocked(
+      { originalUrl: '/api/ai-support/quick-ask', url: '/api/ai-support/quick-ask' },
+      { freePortal: true, freeUnlocked: false, enrollments: [] },
+    ),
+    false,
+  );
+  assert.equal(
+    isFreePortalRequestBlocked(
+      { originalUrl: '/api/ai-support/status', url: '/api/ai-support/status' },
+      { freePortal: true, freeUnlocked: false, enrollments: [] },
+    ),
+    false,
+  );
+  assert.equal(
+    isFreePortalRequestBlocked(
+      { originalUrl: '/api/ai-support/open', url: '/api/ai-support/open' },
+      { freePortal: true, freeUnlocked: false, enrollments: [] },
+    ),
+    true,
+  );
+  assert.equal(
+    isFreePortalRequestBlocked(
+      { originalUrl: '/api/ai-support/message', url: '/api/ai-support/message' },
+      { freePortal: true, freeUnlocked: false, enrollments: [] },
+    ),
+    true,
+  );
+
   const centerInfoPageSrc = read('client/src/components/centerInfo/CenterInfoPage.jsx');
   assert.ok(centerInfoPageSrc.includes('safeExternalHref('));
   assert.ok(centerInfoPageSrc.includes('safeVideoEmbedUrl('));

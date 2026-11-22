@@ -10,12 +10,15 @@ import {
   BookOpen,
   Calendar,
   Check,
+  ChevronDown,
+  ChevronUp,
   CornerDownLeft,
   DollarSign,
   FileText,
   Gamepad2,
   GraduationCap,
   Headphones,
+  History,
   LayoutDashboard,
   Lock,
   Maximize2,
@@ -24,7 +27,6 @@ import {
   Newspaper,
   Plus,
   RefreshCw,
-  RotateCcw,
   Search,
   Send,
   Settings,
@@ -57,6 +59,17 @@ import {
   matchLocalOfficeMemory,
   normalizeQuickQuery,
 } from '../../../../shared/ai/quickSearchMemory.mjs';
+import {
+  SESSION_LIST_PREVIEW,
+  activateQuickAskSession,
+  beginNewQuickAskSession,
+  formatSessionRelativeTime,
+  isQuickAskPersistenceRole,
+  listQuickAskSessions,
+  loadQuickAskSessionArchive,
+  rememberQuickAskQuestion,
+  syncQuickAskSessions,
+} from '../../utils/quickAskRecentHistory';
 
 export const OPEN_COMMAND_PALETTE_EVENT = 'cms:open-command-palette';
 
@@ -428,11 +441,10 @@ function QuickAiFeedbackBar({ msg, language = 'vi' }) {
             void sendFeedback('helpful', '');
           }}
           aria-pressed={submittedRating === 'helpful'}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
-            submittedRating === 'helpful'
-              ? 'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 cursor-default'
-              : 'border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-emerald-300 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer'
-          } disabled:opacity-70`}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${submittedRating === 'helpful'
+            ? 'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 cursor-default'
+            : 'border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-emerald-300 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer'
+            } disabled:opacity-70`}
         >
           <ThumbsUp size={11} />
           <span>{isEn ? 'Helpful' : 'Hữu ích'}</span>
@@ -446,11 +458,10 @@ function QuickAiFeedbackBar({ msg, language = 'vi' }) {
             setShowReasonBox((prev) => !prev);
           }}
           aria-pressed={submittedRating === 'inaccurate' || showReasonBox}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
-            submittedRating === 'inaccurate' || showReasonBox
-              ? 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-              : 'border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-rose-300 hover:text-rose-700 dark:hover:text-rose-300'
-          } cursor-pointer disabled:opacity-70`}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${submittedRating === 'inaccurate' || showReasonBox
+            ? 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+            : 'border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-rose-300 hover:text-rose-700 dark:hover:text-rose-300'
+            } cursor-pointer disabled:opacity-70`}
         >
           <ThumbsDown size={11} />
           <span>{isEn ? 'Inaccurate' : 'Chưa chính xác'}</span>
@@ -526,6 +537,7 @@ function QuickAiFeedbackBar({ msg, language = 'vi' }) {
   );
 }
 
+const QUICK_IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const QUICK_TEXT_EXT_RE = /\.(txt|csv|tsv|json|md|markdown|xml|html|htm|css|js|jsx|ts|tsx|py|sql|log|yml|yaml|ini|conf)$/i;
 const QUICK_PDF_EXT_RE = /\.pdf$/i;
 const QUICK_OFFICE_EXT_RE = /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i;
@@ -600,7 +612,7 @@ async function processQuickAttachFile(file) {
   const mime = String(file.type || '').toLowerCase();
   const size = Number(file.size || 0);
 
-  if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(name)) {
+  if (mime.startsWith('image/') || QUICK_IMAGE_EXT_RE.test(name)) {
     const rawUrl = await readFileAsDataUrl(file);
     const { previewUrl, mimeType } = await compressQuickImageDataUrl(rawUrl, mime || 'image/png', size);
     const dataBase64 = previewUrl.includes(',') ? previewUrl.split(',')[1] : previewUrl;
@@ -656,7 +668,8 @@ async function processQuickAttachFile(file) {
   throw new Error('Hỗ trợ ảnh (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD hoặc tệp Office.');
 }
 
-export default function CommandPalette({ role = 'student' }) {
+export default function CommandPalette({ role = 'student', userId = '', isFreeTierStudent = false }) {
+  const safeUserId = String(userId || '').trim();
   const navigate = useNavigate();
   const { language, t } = useLanguage();
   const dataCtx = useData?.() || {};
@@ -675,9 +688,21 @@ export default function CommandPalette({ role = 'student' }) {
   const [attachError, setAttachError] = useState('');
   const [aiDailyQuota, setAiDailyQuota] = useState(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [sessionArchive, setSessionArchive] = useState({ activeSessionId: '', sessions: [] });
+  const [activeSessionId, setActiveSessionId] = useState('');
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const activeSessionIdRef = useRef('');
+
+  const syncSessionArchive = useCallback((thread, sessionIdOverride = '') => {
+    if (!isQuickAskPersistenceRole(role)) return;
+    const sid = sessionIdOverride || activeSessionIdRef.current;
+    if (!sid || !Array.isArray(thread) || thread.length === 0) return;
+    const nextArchive = syncQuickAskSessions(thread, role, safeUserId, sid);
+    setSessionArchive(nextArchive);
+  }, [role, safeUserId]);
 
   useEffect(() => {
     if (practiceSessionActive) setOpen(false);
@@ -698,6 +723,31 @@ export default function CommandPalette({ role = 'student' }) {
     })();
     return () => { cancelled = true; };
   }, [open, role]);
+
+  useEffect(() => {
+    if (!open || !isQuickAskPersistenceRole(role)) return;
+    setSessionArchive(loadQuickAskSessionArchive(role, safeUserId));
+  }, [open, role, safeUserId]);
+
+  useEffect(() => {
+    if (!isQuickAskPersistenceRole(role)) return;
+    if (messages.length > 0 && activeSessionIdRef.current) {
+      syncSessionArchive(messages, activeSessionIdRef.current);
+    }
+  }, [messages, syncSessionArchive, role, safeUserId]);
+
+  useEffect(() => {
+    const onUnload = () => {
+      if (!isQuickAskPersistenceRole(role)) return;
+      if (messages.length > 0 && activeSessionIdRef.current) {
+        syncSessionArchive(messages, activeSessionIdRef.current);
+      }
+    };
+    window.addEventListener('pagehide', onUnload);
+    return () => {
+      window.removeEventListener('pagehide', onUnload);
+    };
+  }, [messages, syncSessionArchive, role, safeUserId]);
 
   useEffect(() => {
     const syncSound = () => setSoundMutedState(isSoundMuted());
@@ -736,9 +786,12 @@ export default function CommandPalette({ role = 'student' }) {
 
   useEffect(() => {
     if (!open) {
+      activeSessionIdRef.current = '';
+      setActiveSessionId('');
+      setMessages([]);
+      setShowAllHistory(false);
       setQuery('');
       setActiveIndex(0);
-      setMessages([]);
       setAsking(false);
       setAttachment(null);
       setAttachError('');
@@ -918,9 +971,57 @@ export default function CommandPalette({ role = 'student' }) {
     setActiveIndex(0);
   }, [items.length, query]);
 
+  const defaultQuestionLimit = role === 'teacher' ? 15 : (isFreeTierStudent ? 2 : 10);
+  const defaultImageLimit = role === 'teacher' ? 10 : (isFreeTierStudent ? 0 : 5);
+  const questionQuotaApplies = Boolean(
+    aiDailyQuota?.questionQuota?.applies ?? (role === 'student' || role === 'teacher'),
+  );
+  const rawQuestionLimit = Number(aiDailyQuota?.questionQuota?.limit);
+  const questionQuotaLimit = Number.isFinite(rawQuestionLimit) && rawQuestionLimit > 0
+    ? rawQuestionLimit
+    : defaultQuestionLimit;
+  const questionQuotaLeft = aiDailyQuota?.questionQuota?.remaining != null
+    ? Number(aiDailyQuota.questionQuota.remaining)
+    : questionQuotaLimit;
+  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
+  const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
+  const imageQuotaLimit = rawImageLimit !== null
+    && rawImageLimit !== undefined
+    && rawImageLimit !== ''
+    && Number.isFinite(Number(rawImageLimit))
+    ? Number(rawImageLimit)
+    : defaultImageLimit;
+  const imageUploadDisallowed = Boolean(
+    role === 'student'
+    && (aiDailyQuota?.imageQuota
+      ? (aiDailyQuota.imageQuota.allowed === false || imageQuotaLimit === 0)
+      : isFreeTierStudent),
+  );
+  const imageQuotaLeft = aiDailyQuota?.imageQuota?.remaining != null
+    ? Number(aiDailyQuota.imageQuota.remaining)
+    : imageQuotaLimit;
+  const isVisionAttachment = Boolean(attachment?.isImage || attachment?.mimeType === 'application/pdf');
+  const imageQuotaBlocked = Boolean(
+    isVisionAttachment
+    && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0))),
+  );
+  const freeStudentImageBlockMsg = t(
+    'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ (tối đa 2 lượt/ngày) hoặc nâng cấp gói.',
+  );
+
   const handlePickedQuickFile = useCallback(async (file) => {
     if (!file) return;
     setAttachError('');
+    const pickedName = String(file.name || '').trim();
+    const pickedMime = String(file.type || '').toLowerCase();
+    const isPickedVision = pickedMime.startsWith('image/')
+      || QUICK_IMAGE_EXT_RE.test(pickedName)
+      || pickedMime === 'application/pdf'
+      || QUICK_PDF_EXT_RE.test(pickedName);
+    if (imageUploadDisallowed && isPickedVision) {
+      setAttachError(freeStudentImageBlockMsg);
+      return;
+    }
     try {
       const processed = await processQuickAttachFile(file);
       if (processed) {
@@ -930,7 +1031,7 @@ export default function CommandPalette({ role = 'student' }) {
     } catch (err) {
       setAttachError(err?.message || t('Không đọc được tệp đã chọn'));
     }
-  }, [t]);
+  }, [freeStudentImageBlockMsg, imageUploadDisallowed, t]);
 
   const handleFileInputChange = useCallback((e) => {
     const file = e.target?.files?.[0];
@@ -970,6 +1071,29 @@ export default function CommandPalette({ role = 'student' }) {
     const question = String(rawText || '').trim();
     const activeAttachment = rawAttachment || null;
     if ((!question && !activeAttachment) || asking) return;
+    if (questionQuotaBlocked) {
+      setAttachError(t(`Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00.`));
+      return;
+    }
+    const activeIsVision = Boolean(activeAttachment?.isImage || activeAttachment?.mimeType === 'application/pdf');
+    if (activeIsVision && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0)))) {
+      setAttachError(
+        imageUploadDisallowed
+          ? freeStudentImageBlockMsg
+          : t(`Bạn đã gửi đủ ${imageQuotaLimit} ảnh hôm nay — ngày mai gửi tiếp hoặc hỏi bằng chữ.`),
+      );
+      return;
+    }
+
+    const isNewThread = messages.length === 0;
+    let targetSessionId = activeSessionIdRef.current || activeSessionId;
+    if (!targetSessionId && isQuickAskPersistenceRole(role)) {
+      const rotated = beginNewQuickAskSession(role, safeUserId);
+      targetSessionId = rotated.activeSessionId;
+      activeSessionIdRef.current = targetSessionId;
+      setActiveSessionId(targetSessionId);
+      setSessionArchive(rotated);
+    }
 
     const userMsg = {
       id: `u_${Date.now()}`,
@@ -983,10 +1107,18 @@ export default function CommandPalette({ role = 'student' }) {
     }));
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
+    syncSessionArchive(nextHistory, targetSessionId);
     setQuery('');
     setAttachment(null);
     setAttachError('');
     setAsking(true);
+
+    const touchRecentQuestion = (q) => {
+      if (!isNewThread) return;
+      const text = String(q || '').trim();
+      if (!text) return;
+      rememberQuickAskQuestion(text, role, safeUserId);
+    };
 
     let failedErrorType = null;
     try {
@@ -1000,26 +1132,49 @@ export default function CommandPalette({ role = 'student' }) {
         failedErrorType = 'other';
         const quotaCode = res?.code;
         if (quotaCode === 'AI_QUESTION_QUOTA' || quotaCode === 'AI_IMAGE_QUOTA') {
+          setMessages(messages);
+          if (messages.length > 0) {
+            syncSessionArchive(messages, targetSessionId);
+          } else if (isQuickAskPersistenceRole(role)) {
+            setSessionArchive(loadQuickAskSessionArchive(role, safeUserId));
+          }
+          setQuery(question);
+          if (activeAttachment && quotaCode === 'AI_QUESTION_QUOTA') {
+            setAttachment(activeAttachment);
+          }
           setAttachError(res?.message || 'Bạn đã hết lượt AI hôm nay.');
           setAiDailyQuota((prev) => {
-            const base = prev || { questionQuota: {}, imageQuota: {} };
+            const base = prev || {};
+            const nextQuestionQuota = res?.questionQuota || base.questionQuota;
+            const nextImageQuota = res?.imageQuota || base.imageQuota;
             if (quotaCode === 'AI_QUESTION_QUOTA') {
+              const qLimit = nextQuestionQuota?.limit ?? defaultQuestionLimit;
               return {
                 ...base,
                 questionQuota: {
-                  ...(base.questionQuota || {}),
+                  ...(nextQuestionQuota || {}),
                   applies: true,
+                  limit: qLimit,
                   remaining: 0,
-                  used: base.questionQuota?.limit || 5,
+                  used: nextQuestionQuota?.used ?? qLimit,
                 },
+                ...(nextImageQuota ? { imageQuota: nextImageQuota } : {}),
               };
             }
+            const rawImgLim = nextImageQuota?.limit;
+            const imgLim = rawImgLim !== null && rawImgLim !== undefined && rawImgLim !== '' && Number.isFinite(Number(rawImgLim))
+              ? Number(rawImgLim)
+              : defaultImageLimit;
             return {
               ...base,
+              ...(nextQuestionQuota ? { questionQuota: nextQuestionQuota } : {}),
               imageQuota: {
-                ...(base.imageQuota || {}),
+                ...(nextImageQuota || {}),
+                applies: true,
+                allowed: nextImageQuota?.allowed !== undefined ? nextImageQuota.allowed : imgLim > 0,
+                limit: imgLim,
                 remaining: 0,
-                used: base.imageQuota?.limit || 3,
+                used: nextImageQuota?.used ?? imgLim,
               },
             };
           });
@@ -1035,18 +1190,23 @@ export default function CommandPalette({ role = 'student' }) {
           });
         }
         if (answerText) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-              role: 'assistant',
-              text: answerText,
-              question,
-              source: payload?.source || 'ai',
-              model: payload?.model || '',
-              actions: Array.isArray(payload?.actions) ? payload.actions : [],
-            },
-          ]);
+          touchRecentQuestion(question);
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              {
+                id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                role: 'assistant',
+                text: answerText,
+                question,
+                source: payload?.source || 'ai',
+                model: payload?.model || '',
+                actions: Array.isArray(payload?.actions) ? payload.actions : [],
+              },
+            ];
+            syncSessionArchive(next, targetSessionId);
+            return next;
+          });
           return;
         }
       }
@@ -1059,54 +1219,88 @@ export default function CommandPalette({ role = 'student' }) {
     }
 
     const localFallback = question ? matchLocalOfficeMemory(question, language) : null;
-    setMessages((prev) => [
-      ...prev,
-      localFallback
-        ? {
-          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          role: 'assistant',
-          text: localFallback.answer,
-          question,
-          source: 'memory',
-          model: '',
-          actions: localFallback.actions || [],
-        }
-        : {
-          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          role: 'assistant',
-          text: failedErrorType === 'timeout'
-            ? (language === 'en'
-              ? 'Request to DewSkill AI timed out. Please try again.'
-              : 'Yêu cầu tới DewSkill AI bị quá thời gian chờ. Bạn bấm thử lại nhé.')
-            : (language === 'en'
-              ? 'Unable to connect to DewSkill AI right now. Please try again shortly.'
-              : 'Chưa kết nối được DewSkill AI lúc này. Bạn vui lòng thử lại sau ít giây nhé.'),
-          question,
-          source: 'fallback',
-          retryQuestion: question,
-          retryAttachment: activeAttachment,
-          actions: [],
-        },
-    ]);
-  }, [asking, attachment, language, messages]);
+    if (localFallback) touchRecentQuestion(question);
+    setMessages((prev) => {
+      const next = [
+        ...prev,
+        localFallback
+          ? {
+            id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            role: 'assistant',
+            text: localFallback.answer,
+            question,
+            source: 'memory',
+            model: '',
+            actions: localFallback.actions || [],
+          }
+          : {
+            id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            role: 'assistant',
+            text: failedErrorType === 'timeout'
+              ? (language === 'en'
+                ? 'Request to DewSkill AI timed out. Please try again.'
+                : 'Yêu cầu tới DewSkill AI bị quá thời gian chờ. Bạn bấm thử lại nhé.')
+              : (language === 'en'
+                ? 'Unable to connect to DewSkill AI right now. Please try again shortly.'
+                : 'Chưa kết nối được DewSkill AI lúc này. Bạn vui lòng thử lại sau ít giây nhé.'),
+            question,
+            source: 'fallback',
+            retryQuestion: question,
+            retryAttachment: activeAttachment,
+            actions: [],
+          },
+      ];
+      syncSessionArchive(next, targetSessionId);
+      return next;
+    });
+  }, [
+    activeSessionId,
+    aiDailyQuota,
+    asking,
+    attachment,
+    defaultImageLimit,
+    defaultQuestionLimit,
+    freeStudentImageBlockMsg,
+    imageQuotaLeft,
+    imageQuotaLimit,
+    imageUploadDisallowed,
+    language,
+    messages,
+    questionQuotaBlocked,
+    questionQuotaLimit,
+    role,
+    safeUserId,
+    syncSessionArchive,
+    t,
+  ]);
+
+  const starterPrompts = STARTER_PROMPTS[roleKey] || STARTER_PROMPTS.student;
+  const sessionList = useMemo(
+    () => listQuickAskSessions(sessionArchive, {
+      includeAll: showAllHistory,
+      previewLimit: SESSION_LIST_PREVIEW,
+    }),
+    [sessionArchive, showAllHistory],
+  );
+
+  const primaryNavItems = useMemo(() => {
+    const resumeItem = items.find((item) => item.id === 'act-resume-last');
+    const navOnly = items.filter((item) => item.group === 'Điều hướng nhanh');
+    if (resumeItem) return [resumeItem, ...navOnly.slice(0, 2)];
+    return navOnly.slice(0, 3);
+  }, [items]);
+
+  const landingListItems = useMemo(() => {
+    const q = query.trim();
+    if (q || attachment) return items.slice(0, 8);
+    return primaryNavItems;
+  }, [items, primaryNavItems, query, attachment]);
 
   if (!open || typeof document === 'undefined') return null;
 
   const isChatMode = messages.length > 0 || asking;
   const trimmedQuery = query.trim();
-  const questionQuotaApplies = Boolean(aiDailyQuota?.questionQuota?.applies);
-  const questionQuotaLeft = Number(aiDailyQuota?.questionQuota?.remaining);
-  const questionQuotaLimit = Number(aiDailyQuota?.questionQuota?.limit) || (role === 'teacher' ? 10 : 5);
-  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
-  const imageQuotaLeft = Number(aiDailyQuota?.imageQuota?.remaining);
-  const imageQuotaLimit = Number(aiDailyQuota?.imageQuota?.limit) || (role === 'teacher' ? 5 : 3);
-  const imageQuotaBlocked = Boolean(
-    attachment?.isImage
-    && aiDailyQuota?.imageQuota
-    && !(imageQuotaLeft > 0),
-  );
   const canSend = Boolean(trimmedQuery || attachment) && !asking && !questionQuotaBlocked && !imageQuotaBlocked;
-  const starterPrompts = STARTER_PROMPTS[roleKey] || STARTER_PROMPTS.student;
   const composerPlaceholder = getAiComposerPlaceholder(roleKey, language, 'initial');
   const composerContinuePlaceholder = getAiComposerPlaceholder(roleKey, language, 'continue');
   const composerAttachPlaceholder = getAiComposerPlaceholder(roleKey, language, 'attach');
@@ -1117,8 +1311,51 @@ export default function CommandPalette({ role = 'student' }) {
     item.run?.();
   };
 
-  const resetToSearch = () => {
+  const openSavedSession = (session) => {
+    if (!session) return;
+    const nextArchive = isQuickAskPersistenceRole(role)
+      ? activateQuickAskSession(session.id, role, safeUserId)
+      : sessionArchive;
+    setSessionArchive(nextArchive);
+    activeSessionIdRef.current = session.id;
+    setActiveSessionId(session.id);
+    setMessages(Array.isArray(session.messages) ? session.messages : []);
+    setShowAllHistory(false);
+    setQuery('');
+    setAttachment(null);
+    setAttachError('');
+    setAsking(false);
+    window.setTimeout(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+      inputRef.current?.focus();
+    }, 40);
+  };
+
+  const startNewChat = () => {
+    if (isQuickAskPersistenceRole(role)) {
+      setSessionArchive(beginNewQuickAskSession(role, safeUserId));
+    }
+    activeSessionIdRef.current = '';
+    setActiveSessionId('');
     setMessages([]);
+    setShowAllHistory(false);
+    setQuery('');
+    setAttachment(null);
+    setAttachError('');
+    setAsking(false);
+    window.setTimeout(() => inputRef.current?.focus(), 20);
+  };
+
+  const returnToLanding = () => {
+    if (isQuickAskPersistenceRole(role)) {
+      setSessionArchive(loadQuickAskSessionArchive(role, safeUserId));
+    }
+    activeSessionIdRef.current = '';
+    setActiveSessionId('');
+    setMessages([]);
+    setShowAllHistory(false);
     setQuery('');
     setAttachment(null);
     setAttachError('');
@@ -1183,7 +1420,9 @@ export default function CommandPalette({ role = 'student' }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        accept={imageUploadDisallowed
+          ? '.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'
+          : 'image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'}
         onChange={handleFileInputChange}
         className="hidden"
       />
@@ -1230,14 +1469,18 @@ export default function CommandPalette({ role = 'student' }) {
           {attachError}
         </div>
       ) : null}
-      {(role === 'student' || role === 'teacher') && aiDailyQuota?.questionQuota?.applies ? (
+      {(role === 'student' || role === 'teacher') && questionQuotaApplies ? (
         <div className="mb-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
           {questionQuotaBlocked
-            ? t(`Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00, hoặc mở Trợ lý AI trong tin nhắn.`)
+            ? (isFreeTierStudent || imageUploadDisallowed
+              ? t(`Hết ${questionQuotaLimit} lượt AI miễn phí hôm nay — reset 0:00, hoặc nâng cấp gói để có 10 lượt AI & 5 ảnh/ngày.`)
+              : t(`Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00, hoặc mở Trợ lý AI trong tin nhắn.`))
             : t(`Hôm nay: ${Math.max(0, questionQuotaLimit - Math.max(0, questionQuotaLeft))}/${questionQuotaLimit} lượt AI`)}
-          {attachment?.isImage && aiDailyQuota?.imageQuota
-            ? ` · ${t('ảnh')}: ${imageQuotaLimit - Math.max(0, imageQuotaLeft)}/${imageQuotaLimit}`
-            : ''}
+          {imageUploadDisallowed
+            ? ` · ${t('Không hỗ trợ gửi ảnh')}`
+            : (imageQuotaLimit > 0
+              ? ` · ${t('ảnh')}: ${Math.max(0, imageQuotaLimit - Math.max(0, imageQuotaLeft))}/${imageQuotaLimit}`
+              : '')}
         </div>
       ) : null}
       {attachment?.isImage && !attachError ? (
@@ -1269,7 +1512,9 @@ export default function CommandPalette({ role = 'student' }) {
             <Plus size={15} />
           </button>
           <span className="truncate text-[11px] font-medium text-slate-400">
-            {t('Dán ảnh (Ctrl+V) hoặc thêm tệp')}
+            {imageUploadDisallowed
+              ? t('Đính kèm tệp văn bản (tài khoản miễn phí không gửi ảnh)')
+              : t('Dán ảnh (Ctrl+V) hoặc thêm tệp')}
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -1281,11 +1526,10 @@ export default function CommandPalette({ role = 'student' }) {
             disabled={!canSend}
             onClick={() => void askAiQuestion(trimmedQuery, attachment)}
             aria-label="Gửi câu hỏi cho AI"
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
-              canSend
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer'
-                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-400 cursor-not-allowed'
-            }`}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition ${canSend
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer'
+              : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-400 cursor-not-allowed'
+              }`}
           >
             <ArrowUp size={16} strokeWidth={2.5} />
           </button>
@@ -1303,17 +1547,16 @@ export default function CommandPalette({ role = 'student' }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="DewSkill AI và tìm kiếm nhanh"
+        aria-label="DewSkill AI, trợ lý cá nhân và tìm kiếm nhanh"
         onClick={(e) => e.stopPropagation()}
         onPaste={handlePaste}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border bg-[var(--cms-surface,#ffffff)] shadow-2xl max-h-[84vh] transition ${
-          isDraggingOver
-            ? 'border-emerald-500 ring-4 ring-emerald-400/25'
-            : 'border-slate-200/90 dark:border-slate-800'
-        }`}
+        className={`relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border bg-[var(--cms-surface,#ffffff)] shadow-2xl max-h-[84vh] transition ${isDraggingOver
+          ? 'border-emerald-500 ring-4 ring-emerald-400/25'
+          : 'border-slate-200/90 dark:border-slate-800'
+          }`}
       >
         {isChatMode ? (
           <>
@@ -1327,14 +1570,22 @@ export default function CommandPalette({ role = 'student' }) {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={resetToSearch}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+                  onClick={returnToLanding}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
                 >
-                  <RotateCcw size={12} />
-                  <span>Tìm nhanh</span>
+                  <History size={12} />
+                  <span>{language === 'en' ? 'History' : 'Lịch sử'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={startNewChat}
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
+                >
+                  <Plus size={12} />
+                  <span>{language === 'en' ? 'New chat' : 'Chat mới'}</span>
                 </button>
                 <button
                   type="button"
@@ -1388,19 +1639,22 @@ export default function CommandPalette({ role = 'student' }) {
                       <AiMarkdownMessage text={msg.text} />
                       {Array.isArray(msg.actions) && msg.actions.length > 0 ? (
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
-                          {msg.actions.map((act) => (
-                            <button
-                              key={`${act.path}-${act.label}`}
-                              type="button"
-                              onClick={() => {
-                                setOpen(false);
-                                navigatePath(act.path);
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition cursor-pointer"
-                            >
-                              <span>{act.label}</span>
-                            </button>
-                          ))}
+                          {msg.actions.map((act) => {
+                            const actionPath = act.path || act.href;
+                            return (
+                              <button
+                                key={`${actionPath}-${act.label}`}
+                                type="button"
+                                onClick={() => {
+                                  setOpen(false);
+                                  if (actionPath) navigatePath(actionPath);
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition cursor-pointer"
+                              >
+                                <span>{act.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : null}
                       {msg.source === 'fallback' && (msg.retryQuestion || msg.retryAttachment) ? (
@@ -1449,27 +1703,82 @@ export default function CommandPalette({ role = 'student' }) {
               <X size={16} />
             </button>
 
-            <div className="overflow-y-auto px-5 pb-5 pt-7">
-              <div className="mx-auto flex max-w-xl flex-col items-center text-center">
-                <DewSkillAiOrb size={50} />
-                <h2 className="mt-3 text-[22px] sm:text-[25px] font-extrabold tracking-tight text-slate-900 dark:text-white leading-snug">
-                  DewSkill AI, trợ lý cá nhân
-                </h2>
-                <p className="text-[17px] sm:text-[20px] font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-indigo-500 bg-clip-text text-transparent leading-snug">
-                  Word · Excel · PowerPoint · CNTT · LMS
-                </p>
-                <p className="mt-1 max-w-md text-[12px] font-semibold text-slate-500 dark:text-slate-400">
-                  {language === 'en'
-                    ? 'One topic per question — name the app and what you need.'
-                    : 'Mỗi lần hỏi một chủ đề — ghi rõ phần mềm và việc cần làm.'}
-                </p>
+            <div className="overflow-y-auto px-5 pb-5 pt-6 max-h-[min(72vh,640px)]">
+              <div className="mx-auto flex max-w-xl items-center gap-3">
+                <DewSkillAiOrb size={40} />
+                <div className="min-w-0 text-left">
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                    DewSkill AI
+                  </h2>
+                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    {language === 'en'
+                      ? 'Personal IT & LMS assistant · 30-day history'
+                      : 'Trợ lý cá nhân · lịch sử lưu 30 ngày'}
+                  </p>
+                </div>
               </div>
 
-              <div className="mx-auto mt-5 max-w-xl">
+              <div className="mx-auto mt-3 max-w-xl">
                 {renderComposerPill(composerPlaceholder)}
               </div>
 
-              {!trimmedQuery ? (
+              {!trimmedQuery && !attachment && sessionList.totalCount > 0 ? (
+                <div className="mx-auto mt-3.5 max-w-xl">
+                  <div className="mb-1.5 flex items-center justify-between px-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {language === 'en' ? 'Recent chats' : 'Lịch sử gần đây'}
+                    </span>
+                    {showAllHistory ? (
+                      <span className="text-[11px] font-medium text-slate-400">
+                        {language === 'en' ? `Last 30 days (${sessionList.totalCount})` : `Trong 30 ngày (${sessionList.totalCount})`}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className={`space-y-1 ${showAllHistory ? 'max-h-60 overflow-y-auto pr-0.5' : ''}`}>
+                    {sessionList.items.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => openSavedSession(session)}
+                        className="flex w-full items-center justify-between gap-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/60 px-3 py-2 text-left hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition cursor-pointer"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <History size={14} className="shrink-0 text-slate-400" />
+                          <span className="truncate text-[13px] font-semibold text-slate-700 dark:text-slate-200">
+                            {session.preview}
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2 text-[11px] text-slate-400">
+                          <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 font-semibold text-slate-500 dark:text-slate-300">
+                            {language === 'en'
+                              ? `${session.messages.length} msgs`
+                              : `${session.messages.length} tin`}
+                          </span>
+                          <span>{formatSessionRelativeTime(session.updatedAt, language)}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {sessionList.hasMore ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllHistory((prev) => !prev)}
+                      className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-3 py-1 text-[11.5px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+                    >
+                      {showAllHistory ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      <span>
+                        {showAllHistory
+                          ? (language === 'en' ? 'Show less' : 'Thu gọn')
+                          : (language === 'en'
+                            ? `View more (${sessionList.hiddenCount} in 30 days)`
+                            : `Xem thêm (${sessionList.hiddenCount} lịch sử trong 30 ngày)`)}
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {!trimmedQuery && !attachment && sessionList.totalCount === 0 ? (
                 <div className="mx-auto mt-4 max-w-xl">
                   <div className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     {language === 'en' ? 'Example prompts' : 'Gợi ý câu hỏi mẫu'}
@@ -1510,7 +1819,7 @@ export default function CommandPalette({ role = 'student' }) {
                         <span className="block truncate text-xs text-emerald-700/80 dark:text-emerald-300/80">
                           {attachment
                             ? (attachment.name || t('Ảnh đính kèm'))
-                            : 'Tìm trong bộ nhớ nhanh trước, nếu chưa có AI sẽ trả lời'}
+                            : (language === 'en' ? 'Quick memory, then AI' : 'Bộ nhớ nhanh, rồi AI')}
                         </span>
                       </span>
                     </span>
@@ -1518,56 +1827,78 @@ export default function CommandPalette({ role = 'student' }) {
                   </button>
                 ) : null}
 
-                {items.length > 0 ? (
-                  <ul role="listbox" className="space-y-0.5">
-                    {items.map((item, idx) => {
-                      const Icon = item.icon || Search;
-                      const active = idx === activeIndex;
-                      const showGroupHeader = idx === 0 || items[idx - 1].group !== item.group;
-                      return (
-                        <li key={item.id}>
-                          {showGroupHeader ? (
-                            <div className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                              {item.group}
-                            </div>
-                          ) : null}
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={active}
-                            onMouseEnter={() => setActiveIndex(idx)}
-                            onClick={() => executeItem(item)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition cursor-pointer ${
-                              active
+                {landingListItems.length > 0 ? (
+                  !trimmedQuery && !attachment ? (
+                    <div>
+                      <div className="mb-1.5 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        {language === 'en' ? 'Quick navigation' : 'Điều hướng nhanh'}
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                        {landingListItems.map((item) => {
+                          const Icon = item.icon || Search;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => executeItem(item)}
+                              className="flex items-center gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/50 px-2.5 py-2 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30 transition cursor-pointer"
+                            >
+                              <Icon size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                              <span className="truncate">{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <ul role="listbox" className="space-y-0.5">
+                      {landingListItems.map((item, idx) => {
+                        const Icon = item.icon || Search;
+                        const active = idx === activeIndex;
+                        const showGroupHeader = idx === 0 || landingListItems[idx - 1].group !== item.group;
+                        return (
+                          <li key={item.id}>
+                            {showGroupHeader ? (
+                              <div className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                {item.group}
+                              </div>
+                            ) : null}
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={active}
+                              onMouseEnter={() => setActiveIndex(idx)}
+                              onClick={() => executeItem(item)}
+                              className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition cursor-pointer ${active
                                 ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-100'
                                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                            }`}
-                          >
-                            <span className="flex min-w-0 items-center gap-3">
-                              <span
-                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                                  active
+                                }`}
+                            >
+                              <span className="flex min-w-0 items-center gap-3">
+                                <span
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active
                                     ? 'bg-emerald-600 text-white'
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300'
-                                }`}
-                              >
-                                <Icon size={15} aria-hidden="true" />
+                                    }`}
+                                >
+                                  <Icon size={15} aria-hidden="true" />
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-bold leading-tight">{item.label}</span>
+                                  {item.hint ? (
+                                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">{item.hint}</span>
+                                  ) : null}
+                                </span>
                               </span>
-                              <span className="min-w-0">
-                                <span className="block truncate text-sm font-bold leading-tight">{item.label}</span>
-                                {item.hint ? (
-                                  <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">{item.hint}</span>
-                                ) : null}
-                              </span>
-                            </span>
-                            {active ? (
-                              <CornerDownLeft size={14} className="shrink-0 text-emerald-600" aria-hidden="true" />
-                            ) : null}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                              {active ? (
+                                <CornerDownLeft size={14} className="shrink-0 text-emerald-600" aria-hidden="true" />
+                              ) : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )
                 ) : null}
               </div>
             </div>

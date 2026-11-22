@@ -274,13 +274,27 @@ async function sendCanonicalMessageInner({
       ensureSession,
       consumeAiImageQuota,
       peekImageQuota,
+      imageLimitReply,
+      resolveStudentQuotaUser,
     } = require('./aiSupportService');
+    const quotaSender = await resolveStudentQuotaUser(sender);
     const sessionDoc = await ensureSession({
       conversationId,
       userId: senderId,
       userRole: senderRole,
       branchId: sender.branchId || '',
     });
+    const initialPeek = peekImageQuota(sessionDoc, quotaSender);
+    if (initialPeek.allowed === false) {
+      return {
+        ok: false,
+        status: 403,
+        code: 'AI_IMAGE_QUOTA',
+        message: imageLimitReply(initialPeek.limit, 'vi'),
+        remaining: 0,
+        limit: initialPeek.limit,
+      };
+    }
     // Hỏi lại cùng URL ảnh đã gửi trước đó → không trừ thêm quota ảnh trong ngày
     const reusedSameImage = await Message.exists({
       conversationId,
@@ -290,16 +304,16 @@ async function sendCanonicalMessageInner({
       isRecalled: { $ne: true },
     });
     if (reusedSameImage) {
-      const peek = peekImageQuota(sessionDoc);
+      const peek = peekImageQuota(sessionDoc, quotaSender);
       if (peek.limit) aiImageRemaining = peek.remaining;
     } else {
-      const quota = await consumeAiImageQuota(sessionDoc);
+      const quota = await consumeAiImageQuota(sessionDoc, quotaSender);
       if (quota.blocked) {
         return {
           ok: false,
           status: 403,
           code: 'AI_IMAGE_QUOTA',
-          message: 'Bạn đã gửi đủ ảnh cho Trợ lý AI hôm nay. Ngày mai gửi tiếp nhé. Bạn vẫn có thể hỏi bằng chữ nếu còn lượt AI.',
+          message: imageLimitReply(quota.limit, 'vi'),
           remaining: 0,
           limit: quota.limit,
         };

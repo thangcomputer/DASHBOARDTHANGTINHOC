@@ -81,8 +81,8 @@ router.get('/status', authMiddleware, async (req, res) => {
     const session = await getSession(conversationId);
     const roleKey = session?.userRole || role;
     dailyQuota = {
-      questionQuota: peekQuestionQuota(session || { userRole: roleKey }),
-      imageQuota: peekImageQuota(session || { userRole: roleKey }),
+      questionQuota: peekQuestionQuota(session || { userRole: roleKey }, req.user),
+      imageQuota: peekImageQuota(session || { userRole: roleKey }, req.user),
     };
   }
   res.json({
@@ -173,10 +173,10 @@ router.post('/open', authMiddleware, async (req, res) => {
 
     const io = req.app.get('io');
     let session = await getSession(conversationId);
-    if (session && sessionToClient(session)?.status === 'CLOSED') {
+    if (session && sessionToClient(session, req.user)?.status === 'CLOSED') {
       session = await resetAiSession({ conversationId, user: req.user, io });
     }
-    const welcome = session && sessionToClient(session)?.escalated
+    const welcome = session && sessionToClient(session, req.user)?.escalated
       ? null
       : await sendWelcomeIfEmpty({
         conversationId,
@@ -185,16 +185,19 @@ router.post('/open', authMiddleware, async (req, res) => {
         notifyUser: req.app.notifyUser,
       });
 
+    const fallbackQuotaSeed = { userRole: role };
     return res.json({
       success: true,
       data: {
         conversationId,
         peer: { id: AI_PEER_ID, name: AI_PEER_NAME, role: 'system' },
         welcome,
-        session: sessionToClient(session) || {
+        session: sessionToClient(session, req.user) || {
           conversationId,
           status: 'AI_ACTIVE',
           escalated: false,
+          imageQuota: peekImageQuota(fallbackQuotaSeed, req.user),
+          questionQuota: peekQuestionQuota(fallbackQuotaSeed, req.user),
         },
       },
     });
@@ -253,7 +256,7 @@ router.post('/escalate', authMiddleware, async (req, res) => {
 
     return res.json({
       success: true,
-      data: { session: sessionToClient(session), message, alreadyEscalated: !!alreadyEscalated },
+      data: { session: sessionToClient(session, req.user), message, alreadyEscalated: !!alreadyEscalated },
       message: alreadyEscalated ? 'Đã chuyển nhân viên từ trước' : 'Đã chuyển tới nhân viên hỗ trợ',
     });
   } catch (err) {
@@ -277,7 +280,7 @@ router.post('/reset', authMiddleware, async (req, res) => {
     const session = await resetAiSession({ conversationId, user: req.user, io });
     return res.json({
       success: true,
-      data: { session: sessionToClient(session), escalated: false },
+      data: { session: sessionToClient(session, req.user), escalated: false },
       message: 'Đã bật lại Trợ lý AI',
     });
   } catch (err) {
@@ -301,7 +304,7 @@ router.post('/end', authMiddleware, async (req, res) => {
     const session = await endAiSession({ conversationId, user: req.user, io });
     return res.json({
       success: true,
-      data: { session: sessionToClient(session), ended: true },
+      data: { session: sessionToClient(session, req.user), ended: true },
       message: 'Đã kết thúc phiên trả lời với Trợ lý AI',
     });
   } catch (err) {
@@ -334,7 +337,7 @@ router.post('/clear-history', authMiddleware, async (req, res) => {
       success: true,
       data: {
         conversationId,
-        session: sessionToClient(result.session),
+        session: sessionToClient(result.session, req.user),
         welcome: result.welcome,
       },
     });
@@ -464,6 +467,8 @@ router.post('/quick-ask', authMiddleware, quickAskLimiter, async (req, res) => {
       success: false,
       message: err.message || 'Lỗi server',
       ...(err.code ? { code: err.code } : {}),
+      ...(err.questionQuota ? { questionQuota: err.questionQuota } : {}),
+      ...(err.imageQuota ? { imageQuota: err.imageQuota } : {}),
     });
   }
 });

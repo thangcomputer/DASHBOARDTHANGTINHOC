@@ -125,6 +125,7 @@ module.exports = {
   FREE_COURSE_NAME,
   isFreePortalLocked,
   hasRealCourseEnrollment,
+  isSubscriptionExpired,
   freePortalFlags,
   saveFreeSurvey,
   unlockFreePortal,

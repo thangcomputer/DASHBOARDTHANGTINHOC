@@ -22,10 +22,13 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   DollarSign,
   FileText,
   Gamepad2,
   Headphones,
+  History,
   House,
   Lock,
   Maximize2,
@@ -34,7 +37,6 @@ import {
   Plus,
   Radio,
   RefreshCw,
-  RotateCcw,
   Sparkles,
   Target,
   ThumbsDown,
@@ -52,12 +54,15 @@ import { useLanguage } from '../i18n/LanguageContext';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { navigationRef } from '../navigation/navigationRef';
 import {
+  fetchAiSupportStatus,
   quickAskAi,
   reportQuickAskClientError,
   submitQuickAskFeedback,
+  type AiDailyQuota,
   type QuickAiAction,
   type QuickAiAttachment,
 } from '../services/aiSupportApi';
+import { MobileApiError } from '../services/apiClient';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import {
   getMobileSoundEnabled,
@@ -74,6 +79,19 @@ import {
   matchLocalOfficeMemory,
   normalizeQuickQuery,
 } from '../../../shared/ai/quickSearchMemory.mjs';
+import {
+  SESSION_LIST_PREVIEW,
+  activateQuickAskSession,
+  beginNewQuickAskSession,
+  formatSessionRelativeTime,
+  getQuickAskRecentScopeId,
+  listQuickAskSessions,
+  loadQuickAskSessionArchive,
+  rememberQuickAskQuestion,
+  syncQuickAskSessions,
+  type QuickAskSessionArchive,
+  type QuickAskSessionEntry,
+} from '../utils/quickAskRecentHistory';
 
 const MOBILE_OPEN_FREE_LOCK_MODAL_EVENT = 'mobile:open-free-lock-modal';
 
@@ -580,6 +598,7 @@ export function QuickAiPopupModal({
 }) {
   const { user } = useAuth();
   const { language } = useLanguage();
+  const isEn = language === 'en';
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const { focusMode } = useMobileFocusMode();
@@ -590,11 +609,79 @@ export function QuickAiPopupModal({
   const [asking, setAsking] = useState(false);
   const [attachment, setAttachment] = useState<QuickAiAttachment | null>(null);
   const [attachError, setAttachError] = useState('');
+  const [sessionArchive, setSessionArchive] = useState<QuickAskSessionArchive>({ activeSessionId: '', sessions: [] });
+  const [activeSessionId, setActiveSessionId] = useState('');
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [aiDailyQuota, setAiDailyQuota] = useState<AiDailyQuota | null>(null);
 
   const inputRef = useRef<React.ComponentRef<typeof TextInput> | null>(null);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
+  const activeSessionIdRef = useRef('');
+
+  const recentScopeId = useMemo(
+    () => getQuickAskRecentScopeId(user, role),
+    [user, role],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void loadQuickAskSessionArchive(recentScopeId).then((archive) => {
+      if (active) setSessionArchive(archive);
+    });
+    return () => { active = false; };
+  }, [recentScopeId]);
+
+  useEffect(() => {
+    if (role !== 'student' && role !== 'teacher') return undefined;
+    let active = true;
+    void fetchAiSupportStatus()
+      .then((res) => {
+        if (active && res?.dailyQuota) {
+          setAiDailyQuota(res.dailyQuota);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [role, recentScopeId]);
 
   const freeLocked = role === 'student' && isFreePortalLocked(user);
+  const isFreeTierStudent = role === 'student' && freeLocked;
+  const defaultQuestionLimit = role === 'teacher' ? 15 : (isFreeTierStudent ? 2 : 10);
+  const defaultImageLimit = role === 'teacher' ? 10 : (isFreeTierStudent ? 0 : 5);
+  const questionQuotaApplies = Boolean(
+    aiDailyQuota?.questionQuota?.applies ?? (role === 'student' || role === 'teacher'),
+  );
+  const rawQuestionLimit = Number(aiDailyQuota?.questionQuota?.limit);
+  const questionQuotaLimit = Number.isFinite(rawQuestionLimit) && rawQuestionLimit > 0
+    ? rawQuestionLimit
+    : defaultQuestionLimit;
+  const questionQuotaLeft = aiDailyQuota?.questionQuota?.remaining != null
+    ? Number(aiDailyQuota.questionQuota.remaining)
+    : questionQuotaLimit;
+  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
+  const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
+  const imageQuotaLimit = rawImageLimit !== null
+    && rawImageLimit !== undefined
+    && Number.isFinite(Number(rawImageLimit))
+    ? Number(rawImageLimit)
+    : defaultImageLimit;
+  const imageUploadDisallowed = Boolean(
+    role === 'student'
+    && (aiDailyQuota?.imageQuota
+      ? (aiDailyQuota.imageQuota.allowed === false || imageQuotaLimit === 0)
+      : isFreeTierStudent),
+  );
+  const imageQuotaLeft = aiDailyQuota?.imageQuota?.remaining != null
+    ? Number(aiDailyQuota.imageQuota.remaining)
+    : imageQuotaLimit;
+  const isVisionAttachment = Boolean(attachment?.isImage || attachment?.mimeType === 'application/pdf');
+  const imageQuotaBlocked = Boolean(
+    isVisionAttachment
+    && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0))),
+  );
+  const freeStudentImageBlockMsg = isEn
+    ? 'Free accounts do not support sending images to DewSkill AI. Ask by text (up to 2 turns/day) or upgrade.'
+    : 'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ (tối đa 2 lượt/ngày) hoặc nâng cấp gói.';
   const isWideWeb = Platform.OS === 'web' && windowWidth >= 640;
   const sheetMaxHeight = Math.round(windowHeight * (isWideWeb ? 0.86 : 0.92));
 
@@ -644,6 +731,16 @@ export function QuickAiPopupModal({
       if (!file) return;
       e.preventDefault();
       setAttachError('');
+      const pasteName = String(file.name || '').trim();
+      const pasteMime = String(file.type || '').toLowerCase();
+      const isPasteVision = pasteMime.startsWith('image/')
+        || MOBILE_IMAGE_EXT_RE.test(pasteName)
+        || pasteMime === 'application/pdf'
+        || MOBILE_PDF_EXT_RE.test(pasteName);
+      if (imageUploadDisallowed && isPasteVision) {
+        setAttachError(freeStudentImageBlockMsg);
+        return;
+      }
       void processWebBlobToAttachment(file, file.name || 'pasted-image.png', file.type || 'image/png')
         .then((att) => {
           setAttachment(att);
@@ -655,7 +752,7 @@ export function QuickAiPopupModal({
     };
     window.addEventListener('paste', onWindowPaste);
     return () => window.removeEventListener('paste', onWindowPaste);
-  }, []);
+  }, [freeStudentImageBlockMsg, imageUploadDisallowed]);
 
   const navigateTab = useCallback((screen: keyof MainTabsParamList, locked = false) => {
     triggerMobileHaptic('light');
@@ -793,15 +890,33 @@ export function QuickAiPopupModal({
   const firstMatch = filteredDestinations[0] || filteredActions[0] || null;
   const trimmedQuery = query.trim();
   const isChatMode = messages.length > 0 || asking;
-  const canSend = Boolean(trimmedQuery || attachment) && !asking;
+  const canSend = Boolean(trimmedQuery || attachment) && !asking && !questionQuotaBlocked && !imageQuotaBlocked;
   const starterList = STARTER_PROMPTS[role === 'teacher' ? 'teacher' : 'student'];
+  const sessionList = useMemo(
+    () => listQuickAskSessions(sessionArchive, {
+      includeAll: showAllHistory,
+      previewLimit: SESSION_LIST_PREVIEW,
+    }) as {
+      items: QuickAskSessionEntry[];
+      totalCount: number;
+      hiddenCount: number;
+      hasMore: boolean;
+    },
+    [sessionArchive, showAllHistory],
+  );
+  const visibleDestinations = useMemo(
+    () => (trimmedQuery ? filteredDestinations : destinations.slice(0, 3)),
+    [destinations, filteredDestinations, trimmedQuery],
+  );
 
   const handlePickAttachment = useCallback(async () => {
     triggerMobileHaptic('light');
     setAttachError('');
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf', 'text/*', '*/*'],
+        type: imageUploadDisallowed
+          ? ['text/*', 'application/json', 'application/xml']
+          : ['image/*', 'application/pdf', 'text/*', '*/*'],
         copyToCacheDirectory: true,
         multiple: false,
       });
@@ -809,6 +924,14 @@ export function QuickAiPopupModal({
       const asset = result.assets[0];
       const fileName = String(asset.name || 'file').trim();
       const mime = String(asset.mimeType || '').toLowerCase();
+      const isVisionPick = mime.startsWith('image/')
+        || MOBILE_IMAGE_EXT_RE.test(fileName)
+        || mime === 'application/pdf'
+        || MOBILE_PDF_EXT_RE.test(fileName);
+      if (imageUploadDisallowed && isVisionPick) {
+        setAttachError(freeStudentImageBlockMsg);
+        return;
+      }
 
       if (Platform.OS === 'web') {
         const webFile = (asset as { file?: File }).file;
@@ -891,13 +1014,42 @@ export function QuickAiPopupModal({
     } catch (err) {
       setAttachError(err instanceof Error ? err.message : 'Không đọc được tệp đã chọn');
     }
-  }, []);
+  }, [freeStudentImageBlockMsg, imageUploadDisallowed]);
 
   const askAiQuestion = useCallback(async (rawQuestion: string, rawAttachment: QuickAiAttachment | null = attachment) => {
     const question = String(rawQuestion || '').trim();
     const activeAttachment = rawAttachment || null;
     if ((!question && !activeAttachment) || asking) return;
+    if (questionQuotaBlocked) {
+      setAttachError(
+        isEn
+          ? `Used all ${questionQuotaLimit} AI turns today — resets 0:00.`
+          : `Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00.`,
+      );
+      return;
+    }
+    const activeIsVision = Boolean(activeAttachment?.isImage || activeAttachment?.mimeType === 'application/pdf');
+    if (activeIsVision && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0)))) {
+      setAttachError(
+        imageUploadDisallowed
+          ? freeStudentImageBlockMsg
+          : (isEn
+            ? `Used all ${imageQuotaLimit} images today — ask by text if turns remain.`
+            : `Bạn đã gửi đủ ${imageQuotaLimit} ảnh hôm nay — ngày mai gửi tiếp hoặc hỏi bằng chữ.`),
+      );
+      return;
+    }
     triggerMobileHaptic('light');
+
+    const isNewThread = messages.length === 0;
+    let targetSessionId = activeSessionIdRef.current || activeSessionId;
+    if (!targetSessionId) {
+      const rotated = await beginNewQuickAskSession(recentScopeId);
+      targetSessionId = rotated.activeSessionId;
+      activeSessionIdRef.current = targetSessionId;
+      setActiveSessionId(targetSessionId);
+      setSessionArchive(rotated);
+    }
 
     const userMsg: ChatMessage = {
       id: `u_${Date.now()}`,
@@ -909,11 +1061,20 @@ export function QuickAiPopupModal({
       role: m.role,
       text: m.text || (m.attachment?.name ? `[Đính kèm: ${m.attachment.name}]` : ''),
     }));
-    setMessages((prev) => [...prev, userMsg]);
+    const nextWithUser = [...messages, userMsg];
+    setMessages(nextWithUser);
+    void syncQuickAskSessions(recentScopeId, nextWithUser, targetSessionId).then(setSessionArchive);
     setQuery('');
     setAttachment(null);
     setAttachError('');
     setAsking(true);
+
+    const touchRecentQuestion = (q: string) => {
+      if (!isNewThread) return;
+      const text = String(q || '').trim();
+      if (!text) return;
+      void rememberQuickAskQuestion(recentScopeId, text);
+    };
 
     let failedErrorType: 'timeout' | 'network' | 'other' | null = null;
     try {
@@ -923,22 +1084,80 @@ export function QuickAiPopupModal({
         preferredLang: language,
         attachment: activeAttachment,
       });
+      if (result.questionQuota || result.imageQuota) {
+        setAiDailyQuota((prev) => ({
+          questionQuota: result.questionQuota ?? prev?.questionQuota,
+          imageQuota: result.imageQuota ?? prev?.imageQuota,
+        }));
+      }
       if (result.answer) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            role: 'assistant',
-            text: result.answer,
-            question,
-            model: result.model || '',
-            source: result.source,
-            actions: result.actions,
-          },
-        ]);
+        touchRecentQuestion(question);
+        const replyMsg: ChatMessage = {
+          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          role: 'assistant',
+          text: result.answer,
+          question,
+          model: result.model || '',
+          source: result.source,
+          actions: result.actions,
+        };
+        const nextWithReply = [...nextWithUser, replyMsg];
+        setMessages(nextWithReply);
+        void syncQuickAskSessions(recentScopeId, nextWithReply, targetSessionId).then(setSessionArchive);
         return;
       }
     } catch (err) {
+      if (err instanceof MobileApiError && (err.code === 'AI_QUESTION_QUOTA' || err.code === 'AI_IMAGE_QUOTA')) {
+        setMessages(messages);
+        if (messages.length > 0) {
+          void syncQuickAskSessions(recentScopeId, messages, targetSessionId).then(setSessionArchive);
+        } else {
+          void loadQuickAskSessionArchive(recentScopeId).then(setSessionArchive);
+        }
+        setQuery(question);
+        if (activeAttachment && err.code === 'AI_QUESTION_QUOTA') {
+          setAttachment(activeAttachment);
+        }
+        setAttachError(err.message);
+        const errCode = err.code;
+        setAiDailyQuota((prev) => {
+          const base = prev || {};
+          if (errCode === 'AI_QUESTION_QUOTA') {
+            const qLimit = base.questionQuota?.limit ?? defaultQuestionLimit;
+            return {
+              ...base,
+              questionQuota: {
+                ...(base.questionQuota || {}),
+                applies: true,
+                limit: qLimit,
+                remaining: 0,
+                used: qLimit,
+              },
+            };
+          }
+          const rawLim = base.imageQuota?.limit;
+          const imgLim = rawLim !== null && rawLim !== undefined && Number.isFinite(Number(rawLim))
+            ? Number(rawLim)
+            : defaultImageLimit;
+          return {
+            ...base,
+            imageQuota: {
+              ...(base.imageQuota || {}),
+              applies: true,
+              allowed: base.imageQuota?.allowed !== undefined ? base.imageQuota.allowed : imgLim > 0,
+              limit: imgLim,
+              remaining: 0,
+              used: imgLim,
+            },
+          };
+        });
+        void fetchAiSupportStatus()
+          .then((st) => {
+            if (st?.dailyQuota) setAiDailyQuota(st.dailyQuota);
+          })
+          .catch(() => {});
+        return;
+      }
       const errMsg = err instanceof Error ? err.message.toLowerCase() : '';
       failedErrorType = /timeout|abort/.test(errMsg) ? 'timeout' : 'network';
       void reportQuickAskClientError(failedErrorType);
@@ -947,36 +1166,54 @@ export function QuickAiPopupModal({
     }
 
     const localHit = question ? matchLocalOfficeMemory(question, language) : null;
-    setMessages((prev) => [
-      ...prev,
-      localHit
-        ? {
-          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          role: 'assistant',
-          text: localHit.answer,
-          question,
-          model: '',
-          source: 'memory',
-          actions: [],
-        }
-        : {
-          id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          role: 'assistant',
-          text: failedErrorType === 'timeout'
-            ? (language === 'en'
-              ? 'Request to DewSkill AI timed out. Please try again.'
-              : 'Yêu cầu tới DewSkill AI quá thời gian chờ. Bạn bấm thử lại nhé.')
-            : (language === 'en'
-              ? 'Unable to connect to DewSkill AI right now. Please check your connection and try again.'
-              : 'Chưa kết nối được DewSkill AI lúc này. Bạn kiểm tra mạng rồi thử lại nhé.'),
-          question,
-          source: 'fallback',
-          retryQuestion: question,
-          retryAttachment: activeAttachment,
-          actions: [],
-        },
-    ]);
-  }, [asking, attachment, language, messages]);
+    if (localHit) touchRecentQuestion(question);
+    const fallbackMsg: ChatMessage = localHit
+      ? {
+        id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        role: 'assistant',
+        text: localHit.answer,
+        question,
+        model: '',
+        source: 'memory',
+        actions: [],
+      }
+      : {
+        id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        role: 'assistant',
+        text: failedErrorType === 'timeout'
+          ? (language === 'en'
+            ? 'Request to DewSkill AI timed out. Please try again.'
+            : 'Yêu cầu tới DewSkill AI quá thời gian chờ. Bạn bấm thử lại nhé.')
+          : (language === 'en'
+            ? 'Unable to connect to DewSkill AI right now. Please check your connection and try again.'
+            : 'Chưa kết nối được DewSkill AI lúc này. Bạn kiểm tra mạng rồi thử lại nhé.'),
+        question,
+        source: 'fallback',
+        retryQuestion: question,
+        retryAttachment: activeAttachment,
+        actions: [],
+      };
+    const nextWithFallback = [...nextWithUser, fallbackMsg];
+    setMessages(nextWithFallback);
+    void syncQuickAskSessions(recentScopeId, nextWithFallback, targetSessionId).then(setSessionArchive);
+  }, [
+    activeSessionId,
+    aiDailyQuota,
+    asking,
+    attachment,
+    defaultImageLimit,
+    defaultQuestionLimit,
+    freeStudentImageBlockMsg,
+    imageQuotaLeft,
+    imageQuotaLimit,
+    imageUploadDisallowed,
+    isEn,
+    language,
+    messages,
+    questionQuotaBlocked,
+    questionQuotaLimit,
+    recentScopeId,
+  ]);
 
   const handleSubmit = () => {
     if (!trimmedQuery && !attachment) return;
@@ -989,13 +1226,44 @@ export function QuickAiPopupModal({
     }
   };
 
-  const handleResetToExplore = () => {
+  const openSavedSession = (session: QuickAskSessionEntry) => {
     triggerMobileHaptic('light');
-    setMessages([]);
+    activeSessionIdRef.current = session.id;
+    setActiveSessionId(session.id);
+    setMessages((Array.isArray(session.messages) ? session.messages : []) as ChatMessage[]);
+    setShowAllHistory(false);
     setQuery('');
     setAttachment(null);
     setAttachError('');
     setAsking(false);
+    void activateQuickAskSession(recentScopeId, session.id).then(setSessionArchive);
+  };
+
+  const handleStartNewChat = () => {
+    triggerMobileHaptic('light');
+    activeSessionIdRef.current = '';
+    setActiveSessionId('');
+    setMessages([]);
+    setShowAllHistory(false);
+    setQuery('');
+    setAttachment(null);
+    setAttachError('');
+    setAsking(false);
+    void beginNewQuickAskSession(recentScopeId).then(setSessionArchive);
+    setTimeout(() => inputRef.current?.focus(), 40);
+  };
+
+  const handleResetToExplore = () => {
+    triggerMobileHaptic('light');
+    activeSessionIdRef.current = '';
+    setActiveSessionId('');
+    setMessages([]);
+    setShowAllHistory(false);
+    setQuery('');
+    setAttachment(null);
+    setAttachError('');
+    setAsking(false);
+    void loadQuickAskSessionArchive(recentScopeId).then(setSessionArchive);
     setTimeout(() => inputRef.current?.focus(), 40);
   };
 
@@ -1025,14 +1293,24 @@ export function QuickAiPopupModal({
 
           <View style={styles.headerRow}>
             {isChatMode ? (
-              <Pressable
-                onPress={handleResetToExplore}
-                style={styles.headerSideBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Tìm nhanh"
-              >
-                <RotateCcw size={17} color="#475569" />
-              </Pressable>
+              <View style={styles.headerSideGroup}>
+                <Pressable
+                  onPress={handleResetToExplore}
+                  style={styles.headerSideBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={isEn ? 'History' : 'Lịch sử'}
+                >
+                  <History size={16} color="#475569" />
+                </Pressable>
+                <Pressable
+                  onPress={handleStartNewChat}
+                  style={[styles.headerSideBtn, styles.headerNewBtn]}
+                  accessibilityRole="button"
+                  accessibilityLabel={isEn ? 'New chat' : 'Chat mới'}
+                >
+                  <Plus size={16} color="#047857" />
+                </Pressable>
+              </View>
             ) : (
               <View style={styles.headerSideSpacer} />
             )}
@@ -1101,16 +1379,21 @@ export function QuickAiPopupModal({
                       <AiMarkdownBlock text={msg.text} />
                       {Array.isArray(msg.actions) && msg.actions.length > 0 ? (
                         <View style={styles.actionLinksRow}>
-                          {msg.actions.map((act) => (
-                            <Pressable
-                              key={`${act.path}-${act.label}`}
-                              onPress={() => navigateActionPath(act.path)}
-                              style={({ pressed }) => [styles.actionLinkBtn, pressed && styles.rowPressed]}
-                              accessibilityRole="button"
-                            >
-                              <Text style={styles.actionLinkBtnText}>{act.label}</Text>
-                            </Pressable>
-                          ))}
+                          {msg.actions.map((act) => {
+                            const actionTarget = (act as { path?: string; href?: string }).path
+                              || (act as { path?: string; href?: string }).href
+                              || '';
+                            return (
+                              <Pressable
+                                key={`${actionTarget}-${act.label}`}
+                                onPress={() => { if (actionTarget) navigateActionPath(actionTarget); }}
+                                style={({ pressed }) => [styles.actionLinkBtn, pressed && styles.rowPressed]}
+                                accessibilityRole="button"
+                              >
+                                <Text style={styles.actionLinkBtnText}>{act.label}</Text>
+                              </Pressable>
+                            );
+                          })}
                         </View>
                       ) : null}
                       {msg.source === 'fallback' && (msg.retryQuestion || msg.retryAttachment) ? (
@@ -1158,7 +1441,7 @@ export function QuickAiPopupModal({
                 <View style={styles.heroWrap}>
                   <DewSkillAiOrb size={56} />
                   <Text style={styles.heroSubtext}>
-                    Tìm nhanh tác vụ hoặc hỏi bất kỳ điều gì về tin học &amp; LMS
+                    {isEn ? 'Personal IT & LMS assistant · 30-day history' : 'Trợ lý cá nhân · lịch sử lưu 30 ngày'}
                   </Text>
                 </View>
               ) : (
@@ -1185,9 +1468,70 @@ export function QuickAiPopupModal({
                 </Pressable>
               )}
 
-              {!trimmedQuery ? (
+              {!trimmedQuery && !attachment && sessionList.totalCount > 0 ? (
                 <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionTitle}>Gợi ý hỏi AI</Text>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>
+                      {isEn ? 'Recent chats' : 'Lịch sử gần đây'}
+                    </Text>
+                    {showAllHistory ? (
+                      <Text style={styles.sectionBadgeText}>
+                        {isEn ? `30 days (${sessionList.totalCount})` : `30 ngày (${sessionList.totalCount})`}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.groupedBox}>
+                    {sessionList.items.map((session, idx) => (
+                      <Pressable
+                        key={session.id}
+                        onPress={() => openSavedSession(session)}
+                        style={({ pressed }) => [
+                          styles.groupRow,
+                          idx < sessionList.items.length - 1 && styles.groupRowDivider,
+                          pressed && styles.rowPressed,
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <View style={styles.groupIconCircle}>
+                          <History size={14} color="#64748B" />
+                        </View>
+                        <View style={styles.rowTextWrap}>
+                          <Text style={styles.groupRowTitle} numberOfLines={1}>
+                            {session.preview}
+                          </Text>
+                          <Text style={styles.groupRowSub} numberOfLines={1}>
+                            {`${isEn ? `${session.messages.length} msgs` : `${session.messages.length} tin`} · ${formatSessionRelativeTime(session.updatedAt, language)}`}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {sessionList.hasMore ? (
+                    <Pressable
+                      onPress={() => setShowAllHistory((prev) => !prev)}
+                      style={({ pressed }) => [styles.historyToggleBtn, pressed && styles.rowPressed]}
+                      accessibilityRole="button"
+                    >
+                      {showAllHistory ? (
+                        <ChevronUp size={14} color="#475569" />
+                      ) : (
+                        <ChevronDown size={14} color="#475569" />
+                      )}
+                      <Text style={styles.historyToggleText}>
+                        {showAllHistory
+                          ? (isEn ? 'Show less' : 'Thu gọn')
+                          : (isEn
+                            ? `View more (${sessionList.hiddenCount} in 30 days)`
+                            : `Xem thêm (${sessionList.hiddenCount} trong 30 ngày)`)}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {!trimmedQuery && !attachment && sessionList.totalCount === 0 ? (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionTitle}>{isEn ? 'Example prompts' : 'Gợi ý hỏi AI'}</Text>
                   <View style={styles.groupedBox}>
                     {starterList.map((promptText, idx) => (
                       <Pressable
@@ -1210,9 +1554,9 @@ export function QuickAiPopupModal({
                 </View>
               ) : null}
 
-              {filteredActions.length > 0 ? (
+              {trimmedQuery && filteredActions.length > 0 ? (
                 <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionTitle}>Tác vụ nhanh</Text>
+                  <Text style={styles.sectionTitle}>{isEn ? 'Quick actions' : 'Tác vụ nhanh'}</Text>
                   <View style={styles.groupedBox}>
                     {filteredActions.map((entry, idx) => {
                       const Icon = entry.icon;
@@ -1242,11 +1586,11 @@ export function QuickAiPopupModal({
                 </View>
               ) : null}
 
-              {filteredDestinations.length > 0 ? (
+              {visibleDestinations.length > 0 ? (
                 <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionTitle}>Đi tới nhanh</Text>
+                  <Text style={styles.sectionTitle}>{isEn ? 'Quick navigation' : 'Đi tới nhanh'}</Text>
                   <View style={styles.groupedBox}>
-                    {filteredDestinations.map((entry, idx) => {
+                    {visibleDestinations.map((entry, idx) => {
                       const Icon = entry.icon;
                       return (
                         <Pressable
@@ -1254,7 +1598,7 @@ export function QuickAiPopupModal({
                           onPress={entry.onSelect}
                           style={({ pressed }) => [
                             styles.groupRow,
-                            idx < filteredDestinations.length - 1 && styles.groupRowDivider,
+                            idx < visibleDestinations.length - 1 && styles.groupRowDivider,
                             pressed && styles.rowPressed,
                           ]}
                           accessibilityRole="button"
@@ -1313,6 +1657,24 @@ export function QuickAiPopupModal({
             ) : null}
             {attachError ? (
               <Text style={styles.attachErrorText}>{attachError}</Text>
+            ) : null}
+            {(role === 'student' || role === 'teacher') && questionQuotaApplies ? (
+              <Text style={styles.quotaBarText}>
+                {questionQuotaBlocked
+                  ? (isFreeTierStudent || imageUploadDisallowed
+                    ? (isEn
+                      ? `Used all ${questionQuotaLimit} free AI turns today — resets 0:00, or upgrade for 10 turns & 5 images/day.`
+                      : `Hết ${questionQuotaLimit} lượt AI miễn phí hôm nay — reset 0:00, hoặc nâng cấp gói để có 10 lượt AI & 5 ảnh/ngày.`)
+                    : (isEn
+                      ? `Used all ${questionQuotaLimit} AI turns today — resets 0:00.`
+                      : `Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00.`))
+                  : `${isEn ? 'Today' : 'Hôm nay'}: ${Math.max(0, questionQuotaLimit - Math.max(0, questionQuotaLeft))}/${questionQuotaLimit} ${isEn ? 'AI turns' : 'lượt AI'}`}
+                {imageUploadDisallowed
+                  ? ` · ${isEn ? 'Images not supported' : 'Không hỗ trợ gửi ảnh'}`
+                  : (imageQuotaLimit > 0
+                    ? ` · ${isEn ? 'images' : 'ảnh'}: ${Math.max(0, imageQuotaLimit - Math.max(0, imageQuotaLeft))}/${imageQuotaLimit}`
+                    : '')}
+              </Text>
             ) : null}
             <View style={styles.composerPill}>
               <Pressable
@@ -1419,6 +1781,11 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
   },
+  headerSideGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   headerSideBtn: {
     width: 34,
     height: 34,
@@ -1426,6 +1793,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerNewBtn: {
+    backgroundColor: '#ECFDF5',
   },
   headerCenter: {
     flexDirection: 'row',
@@ -1470,11 +1840,39 @@ const styles = StyleSheet.create({
   sectionBlock: {
     gap: 8,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '800',
     color: '#94A3B8',
     paddingHorizontal: 4,
+  },
+  sectionBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  historyToggleBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  historyToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
   },
   groupedBox: {
     backgroundColor: '#F3F4F6',
@@ -1790,6 +2188,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#DC2626',
+    paddingHorizontal: 4,
+  },
+  quotaBarText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#64748B',
     paddingHorizontal: 4,
   },
   composerPill: {

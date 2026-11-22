@@ -53,7 +53,7 @@ import TeacherStudentNoteModal, {
 } from './teacher/TeacherStudentNoteModal';
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
 import DailyPracticeReminder from './student/dailyPractice/DailyPracticeReminder';
-import { isStudentSchedulesApiBlocked, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
+import { isStudentSchedulesApiBlocked, useFreePortalLock, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
 import dailyPracticeApi from '../services/dailyPracticeApi';
 import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
@@ -300,6 +300,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   })();
   const freeMenuFromData = useFreePortalMenu(studentForPortalUi);
+  const freePortalLocked = useFreePortalLock(studentForPortalUi);
+  const isFreeTierAiStudent = role === 'student' && Boolean(freeMenuFromData && freePortalLocked);
   const isFreePortalStudent = role === 'student' && Boolean(
     freeMenuFromData
     || studentForPortalUi?.freePortal === true
@@ -2808,7 +2810,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         {/* Chat nổi toàn site + Command Palette (Ctrl+K) tải nền sau initial paint */}
         <IdleMount>
           <FloatingMessenger session={session} role={role} hidden={practiceSessionActive} />
-          <CommandPalette role={role} />
+          <CommandPalette
+            role={role}
+            userId={String(session?.id || session?._id || '')}
+            isFreeTierStudent={isFreeTierAiStudent}
+          />
         </IdleMount>
         {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
           <div className="cms-lms-attention" role="status" aria-live="polite">

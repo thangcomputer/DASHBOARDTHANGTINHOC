@@ -39,9 +39,21 @@ function isStudentExamPath(url) {
   return /\/api\/students\/[^/]+\/exam-/.test(url);
 }
 
+const FREE_PORTAL_QUICK_ASK_PATHS = new Set([
+  '/api/ai-support/status',
+  '/api/ai-support/quick-ask',
+  '/api/ai-support/quick-ask/feedback',
+  '/api/ai-support/quick-ask/client-event',
+]);
+
+function normalizeRequestPath(req) {
+  const raw = String(req?.originalUrl || req?.url || '').split('?')[0];
+  return raw.length > 1 ? raw.replace(/\/+$/, '') : (raw || '/');
+}
+
 function isFreePortalRequestBlocked(req, student) {
   if (!student?.freePortal || hasRealCourseEnrollment(student)) return false;
-  const url = String(req.originalUrl || req.url || '').split('?')[0];
+  const url = normalizeRequestPath(req);
   if (url === '/api/evaluations/mine') return false;
   const hidden = [
     '/api/schedules',
@@ -49,6 +61,7 @@ function isFreePortalRequestBlocked(req, student) {
   ];
   if (hidden.some((prefix) => url === prefix || url.startsWith(`${prefix}/`))) return true;
   if (student.freeUnlocked === true) return false;
+  if (FREE_PORTAL_QUICK_ASK_PATHS.has(url)) return false;
   if (isStudentExamPath(url)) return true;
   const locked = [
     '/api/messages',
@@ -62,9 +75,12 @@ function isFreePortalRequestBlocked(req, student) {
   return locked.some((prefix) => url === prefix || url.startsWith(`${prefix}/`));
 }
 
-function isAllowedWhenExpired(req) {
-  const url = String(req.originalUrl || req.url || '').split('?')[0];
+function isAllowedWhenExpired(req, student = null) {
+  const url = normalizeRequestPath(req);
   if (isStudentExamPath(url)) return false;
+  if (student?.freePortal === true && !hasRealCourseEnrollment(student) && FREE_PORTAL_QUICK_ASK_PATHS.has(url)) {
+    return true;
+  }
   return EXPIRED_ALLOWED_PREFIXES.some((prefix) => url === prefix.replace(/\/$/, '') || url.startsWith(prefix));
 }
 
@@ -163,6 +179,7 @@ const authMiddleware = async (req, res, next) => {
         if (decoded.role === 'student') {
           req.user.freePortal = dbUser.freePortal === true;
           req.user.freeUnlocked = dbUser.freeUnlocked === true;
+          req.user.subscription = dbUser.subscription || null;
           req.user.enrollments = Array.isArray(dbUser.enrollments) ? dbUser.enrollments : [];
         }
       }
@@ -193,7 +210,7 @@ const authMiddleware = async (req, res, next) => {
         });
       }
 
-      if (decoded.role === 'student' && isSubscriptionExpired(dbUser) && !isAllowedWhenExpired(req)) {
+      if (decoded.role === 'student' && isSubscriptionExpired(dbUser) && !isAllowedWhenExpired(req, dbUser)) {
         return res.status(403).json({
           success: false,
           code: 'SUBSCRIPTION_EXPIRED',

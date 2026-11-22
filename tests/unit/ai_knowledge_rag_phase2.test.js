@@ -391,11 +391,19 @@ test('TC35-TC38: Role ACL filtering, cache isolation by role/version, PII skip, 
     svc.resetQuickAskMetrics();
 
     try {
-      // Auth check: unauthenticated & locked freePortal
+      // Auth check: unauthenticated & accountLocked -> 401/403; freePortal image -> 403 AI_IMAGE_QUOTA
       await assert.rejects(() => svc.quickAskAssistant({ user: null, question: 'XLOOKUP là gì' }), { status: 401 });
       await assert.rejects(
-        () => svc.quickAskAssistant({ user: { id: 'f1', role: 'student', freePortal: true, freeUnlocked: false }, question: 'XLOOKUP là gì' }),
+        () => svc.quickAskAssistant({ user: { id: 'locked1', role: 'student', accountLocked: true }, question: 'XLOOKUP là gì' }),
         { status: 403 }
+      );
+      await assert.rejects(
+        () => svc.quickAskAssistant({
+          user: { id: 'f1', role: 'student', freePortal: true, freeUnlocked: false },
+          question: 'Xem giup loi Excel trong anh',
+          attachment: { name: 'err.png', mimeType: 'image/png', dataBase64: 'AA==' },
+        }),
+        (err) => err?.status === 403 && err?.code === 'AI_IMAGE_QUOTA'
       );
 
       // Student 1 asks -> misses cache, hits RAG+Gemini (call 1), writes access_student cache
