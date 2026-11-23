@@ -80,7 +80,13 @@ async function resolveEnrollmentExamSubjects({ courseName, courseId }) {
   if (!course) return null;
   const settings = await getCachedSettings();
   const custom = settings?.examSubjectsCustomRaw;
-  return sanitizeExamSubjects(course.examSubjects, custom);
+  const sanitized = sanitizeExamSubjects(course.examSubjects, custom);
+  if (sanitized.length) return sanitized;
+  return [...new Set(
+    (Array.isArray(course.examSubjects) ? course.examSubjects : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean),
+  )];
 }
 
 function isPlaceholderCourseName(name) {

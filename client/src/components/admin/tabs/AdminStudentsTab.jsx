@@ -639,16 +639,45 @@ export default function AdminStudentsTab() {
     (t) => t && (t.role == null || t.role === 'teacher') && isTeacherActive(t.status),
   );
 
+  const findCatalogCourseFor = (courseOrEnrollment) => {
+    if (!courseOrEnrollment || !dbCourses?.length) return null;
+    const cid = typeof courseOrEnrollment === 'object' ? String(courseOrEnrollment.courseId || '').trim() : '';
+    if (cid) {
+      const byId = dbCourses.find((c) => String(c._id || c.id || '') === cid);
+      if (byId) return byId;
+    }
+    const rawName = typeof courseOrEnrollment === 'string'
+      ? courseOrEnrollment
+      : (courseOrEnrollment.courseName || courseOrEnrollment.name || '');
+    const normName = String(rawName || '').trim().toLowerCase();
+    if (!normName) return null;
+    return dbCourses.find((c) => String(c.name || '').trim().toLowerCase() === normName) || null;
+  };
+
   const teachersForCourse = (courseOrEnrollment, studentBranchId = '') => {
     const matched = [];
     const branchId = toBranchId(studentBranchId);
+    const catalogCourse = findCatalogCourseFor(courseOrEnrollment);
     for (const t of assignableTeachers) {
       if (!teacherInStudentBranch(t, branchId)) continue;
-      if (teacherMatchesCourse(t, courseOrEnrollment, examSubjectsCatalog)) {
+      const matchesEnrollment = teacherMatchesCourse(t, courseOrEnrollment, examSubjectsCatalog);
+      const matchesCatalog = catalogCourse
+        ? teacherMatchesCourse(t, catalogCourse, examSubjectsCatalog)
+        : false;
+      if (matchesEnrollment || matchesCatalog) {
         matched.push(t);
       }
     }
     return matched;
+  };
+
+  const withAssignedTeacherOption = (matched, assignedId, fallbackName = '') => {
+    const tid = assignedId ? String(assignedId) : '';
+    if (!tid) return matched;
+    if (matched.some((t) => String(t.id || t._id) === tid)) return matched;
+    const existing = (safeTeachers || []).find((t) => String(t.id || t._id) === tid);
+    if (existing) return [existing, ...matched];
+    return [{ id: tid, _id: tid, name: fallbackName || 'Giảng viên hiện tại' }, ...matched];
   };
 
   const handleAssignTeacher = async (studentId, teacherId, enrollmentId) => {
@@ -689,7 +718,11 @@ export default function AdminStudentsTab() {
             const enrTeacherVal = enr.teacherId || '';
             const enrId = enr.enrollmentId || enr.id;
             const courseLabel = enr.courseName || enr.name || '';
-            const matched = teachersForCourse(enr, studentBranchId);
+            const matched = withAssignedTeacherOption(
+              teachersForCourse(enr, studentBranchId),
+              enrTeacherVal,
+              enr.teacherName,
+            );
             return (
               <div key={enrId} className="space-y-1 min-w-0">
                 <p className="text-xs font-semibold text-sky-700 truncate" title={courseLabel}>{courseLabel}</p>
@@ -715,7 +748,11 @@ export default function AdminStudentsTab() {
       );
     }
     const courseRef = primaryEnr || s.course;
-    const matched = teachersForCourse(courseRef, studentBranchId);
+    const matched = withAssignedTeacherOption(
+      teachersForCourse(courseRef, studentBranchId),
+      teacherVal,
+      primaryEnr?.teacherName || s.teacherName,
+    );
     return (
       <CmsSelect
         value={teacherVal ? String(teacherVal) : ''}
@@ -1027,7 +1064,11 @@ export default function AdminStudentsTab() {
                         const enrId = enr.enrollmentId || enr.id;
                         const enrTeacherVal = enr.teacherId || '';
                         const courseLabel = enr.courseName || enr.name || '';
-                        const matched = teachersForCourse(enr, s?.branchId);
+                        const matched = withAssignedTeacherOption(
+                          teachersForCourse(enr, s?.branchId),
+                          enrTeacherVal,
+                          enr.teacherName,
+                        );
                         return (
                           <div key={enrId} className="contents">
                             <div className="min-w-0 space-y-1">

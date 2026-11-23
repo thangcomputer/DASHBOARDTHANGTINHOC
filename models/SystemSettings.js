@@ -148,6 +148,18 @@ const systemSettingsSchema = new mongoose.Schema({
     order: { type: Number, default: 0 }
   }],
   teacherBannerSpeed: { type: Number, default: 5 }, // giây
+
+  // ── Cấu hình toàn cục DewSkill AI Auto-Reply (Admin quản trị) ──────────────
+  aiAutoReplyGlobal: {
+    enabled: { type: Boolean, default: true },
+    defaultDelayMinutes: { type: Number, enum: [1, 3, 5, 10, 15, 30], default: 5 },
+    allowTeacherToggle: { type: Boolean, default: true },
+    maxConsecutiveReplies: { type: Number, default: 2 },
+    maxDailyRepliesPerConversation: { type: Number, default: 10 },
+    updatedBy: { type: String, default: '' },
+    updatedByName: { type: String, default: '' },
+    updatedAt: { type: Date, default: null },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

@@ -44,6 +44,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import AiUsageIndicator from './AiUsageIndicator';
 import { useLanguage } from '../../context/LanguageContext';
 import { aiSupportAPI } from '../../services/api';
 import { useTheme } from '../../utils/theme';
@@ -139,36 +140,36 @@ const STARTER_PROMPTS = {
 const AI_COMPOSER_HINTS = {
   student: {
     vi: {
-      initial: 'VD: Excel—SUMIFS; Word—mục lục; LMS—lịch học. Ghi phần mềm + việc cần làm…',
+      initial: 'VD: Hàm này để làm gì và cách sử dụng',
       continue: 'Hỏi tiếp: nêu phần mềm (Word/Excel/PPT) và bước bạn đang kẹt…',
       attach: 'Mô tả lỗi hoặc đề trên ảnh (VD: Excel #N/A, Word lệch lề)…',
     },
     en: {
-      initial: 'E.g. Excel—SUMIFS; Word—TOC; LMS—schedule. Name the app + what you need…',
+      initial: 'What is this function used for, and how do I use it?',
       continue: 'Follow up: name the app (Word/Excel/PPT) and the step you’re stuck on…',
       attach: 'Describe the error or task in the image (e.g. Excel #N/A)…',
     },
   },
   teacher: {
     vi: {
-      initial: 'VD: Excel—chấm điểm; PPT—Slide Master; LMS—lịch dạy. Ghi phần mềm + mục tiêu…',
+      initial: 'VD: Hàm này để làm gì và cách sử dụng',
       continue: 'Hỏi tiếp: nêu phần mềm và bối cảnh lớp/bài bạn đang soạn…',
       attach: 'Mô tả màn hình cần xử lý (bảng điểm, slide, lỗi Office)…',
     },
     en: {
-      initial: 'E.g. Excel—grading; PPT—masters; LMS—schedule. App + goal in one line…',
+      initial: 'EWhat is this function used for, and how do I use it?',
       continue: 'Follow up: app name + class/material context…',
       attach: 'Describe the screen to fix (grade sheet, slide, Office error)…',
     },
   },
   admin: {
     vi: {
-      initial: 'VD: Word—mẫu văn bản; Excel—báo cáo; hệ thống LMS. Ghi phần mềm + việc cần làm…',
+      initial: 'VD: Hàm này để làm gì và cách sử dụng',
       continue: 'Hỏi tiếp: nêu công cụ và thao tác cụ thể…',
       attach: 'Mô tả nội dung ảnh/tệp cần kiểm tra…',
     },
     en: {
-      initial: 'E.g. Word—templates; Excel—reports; LMS. App + task…',
+      initial: 'What is this function used for, and how do I use it?',
       continue: 'Follow up: tool name + exact action…',
       attach: 'Describe what to check in the attachment…',
     },
@@ -971,18 +972,14 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
     setActiveIndex(0);
   }, [items.length, query]);
 
-  const defaultQuestionLimit = role === 'teacher' ? 15 : (isFreeTierStudent ? 2 : 10);
-  const defaultImageLimit = role === 'teacher' ? 10 : (isFreeTierStudent ? 0 : 5);
+  const normalizedRole = String(role || '').trim().toLowerCase();
   const questionQuotaApplies = Boolean(
-    aiDailyQuota?.questionQuota?.applies ?? (role === 'student' || role === 'teacher'),
+    aiDailyQuota?.questionQuota?.applies ?? (normalizedRole === 'student' || normalizedRole === 'teacher'),
   );
-  const rawQuestionLimit = Number(aiDailyQuota?.questionQuota?.limit);
-  const questionQuotaLimit = Number.isFinite(rawQuestionLimit) && rawQuestionLimit > 0
-    ? rawQuestionLimit
-    : defaultQuestionLimit;
-  const questionQuotaLeft = aiDailyQuota?.questionQuota?.remaining != null
-    ? Number(aiDailyQuota.questionQuota.remaining)
-    : questionQuotaLimit;
+  const rawPercentLeft = aiDailyQuota?.questionQuota?.percentLeft ?? aiDailyQuota?.questionQuota?.remaining;
+  const questionQuotaLeft = rawPercentLeft != null
+    ? Math.max(0, Math.min(100, Number(rawPercentLeft)))
+    : 100;
   const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
   const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
   const imageQuotaLimit = rawImageLimit !== null
@@ -990,23 +987,24 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
     && rawImageLimit !== ''
     && Number.isFinite(Number(rawImageLimit))
     ? Number(rawImageLimit)
-    : defaultImageLimit;
+    : (isFreeTierStudent ? 0 : 100);
   const imageUploadDisallowed = Boolean(
-    role === 'student'
+    normalizedRole === 'student'
     && (aiDailyQuota?.imageQuota
       ? (aiDailyQuota.imageQuota.allowed === false || imageQuotaLimit === 0)
       : isFreeTierStudent),
   );
-  const imageQuotaLeft = aiDailyQuota?.imageQuota?.remaining != null
-    ? Number(aiDailyQuota.imageQuota.remaining)
-    : imageQuotaLimit;
+  const rawImgPercentLeft = aiDailyQuota?.imageQuota?.percentLeft ?? aiDailyQuota?.imageQuota?.remaining;
+  const imageQuotaLeft = rawImgPercentLeft != null
+    ? Math.max(0, Math.min(100, Number(rawImgPercentLeft)))
+    : (imageUploadDisallowed ? 0 : questionQuotaLeft);
   const isVisionAttachment = Boolean(attachment?.isImage || attachment?.mimeType === 'application/pdf');
   const imageQuotaBlocked = Boolean(
     isVisionAttachment
     && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0))),
   );
   const freeStudentImageBlockMsg = t(
-    'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ (tối đa 2 lượt/ngày) hoặc nâng cấp gói.',
+    'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ hoặc nâng cấp gói.',
   );
 
   const handlePickedQuickFile = useCallback(async (file) => {
@@ -1072,7 +1070,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
     const activeAttachment = rawAttachment || null;
     if ((!question && !activeAttachment) || asking) return;
     if (questionQuotaBlocked) {
-      setAttachError(t(`Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00.`));
+      setAttachError(t('Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%) — tự động reset lúc 00:00.'));
       return;
     }
     const activeIsVision = Boolean(activeAttachment?.isImage || activeAttachment?.mimeType === 'application/pdf');
@@ -1080,7 +1078,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
       setAttachError(
         imageUploadDisallowed
           ? freeStudentImageBlockMsg
-          : t(`Bạn đã gửi đủ ${imageQuotaLimit} ảnh hôm nay — ngày mai gửi tiếp hoặc hỏi bằng chữ.`),
+          : t('Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%) — tự động reset lúc 00:00.'),
       );
       return;
     }
@@ -1142,21 +1140,23 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
           if (activeAttachment && quotaCode === 'AI_QUESTION_QUOTA') {
             setAttachment(activeAttachment);
           }
-          setAttachError(res?.message || 'Bạn đã hết lượt AI hôm nay.');
+          setAttachError(res?.message || 'Bạn đã dùng hết 100% hạn mức AI hôm nay.');
           setAiDailyQuota((prev) => {
             const base = prev || {};
             const nextQuestionQuota = res?.questionQuota || base.questionQuota;
             const nextImageQuota = res?.imageQuota || base.imageQuota;
             if (quotaCode === 'AI_QUESTION_QUOTA') {
-              const qLimit = nextQuestionQuota?.limit ?? defaultQuestionLimit;
               return {
                 ...base,
                 questionQuota: {
                   ...(nextQuestionQuota || {}),
                   applies: true,
-                  limit: qLimit,
+                  mode: 'percent',
+                  limit: 100,
                   remaining: 0,
-                  used: nextQuestionQuota?.used ?? qLimit,
+                  percentLeft: 0,
+                  used: 100,
+                  percentUsed: 100,
                 },
                 ...(nextImageQuota ? { imageQuota: nextImageQuota } : {}),
               };
@@ -1164,17 +1164,20 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
             const rawImgLim = nextImageQuota?.limit;
             const imgLim = rawImgLim !== null && rawImgLim !== undefined && rawImgLim !== '' && Number.isFinite(Number(rawImgLim))
               ? Number(rawImgLim)
-              : defaultImageLimit;
+              : (isFreeTierStudent ? 0 : 100);
+            const nextLeft = imgLim === 0 ? 0 : (nextImageQuota?.percentLeft ?? nextImageQuota?.remaining ?? 0);
             return {
               ...base,
               ...(nextQuestionQuota ? { questionQuota: nextQuestionQuota } : {}),
               imageQuota: {
                 ...(nextImageQuota || {}),
                 applies: true,
+                mode: 'percent',
                 allowed: nextImageQuota?.allowed !== undefined ? nextImageQuota.allowed : imgLim > 0,
                 limit: imgLim,
-                remaining: 0,
-                used: nextImageQuota?.used ?? imgLim,
+                remaining: nextLeft,
+                percentLeft: nextLeft,
+                used: imgLim === 0 ? 100 : (nextImageQuota?.used ?? 100),
               },
             };
           });
@@ -1258,16 +1261,13 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
     aiDailyQuota,
     asking,
     attachment,
-    defaultImageLimit,
-    defaultQuestionLimit,
     freeStudentImageBlockMsg,
     imageQuotaLeft,
-    imageQuotaLimit,
     imageUploadDisallowed,
+    isFreeTierStudent,
     language,
     messages,
     questionQuotaBlocked,
-    questionQuotaLimit,
     role,
     safeUserId,
     syncSessionArchive,
@@ -1416,125 +1416,123 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
   };
 
   const renderComposerPill = (placeholderText) => (
-    <div className="rounded-[24px] border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:focus-within:ring-emerald-950/60 transition">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={imageUploadDisallowed
-          ? '.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'
-          : 'image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'}
-        onChange={handleFileInputChange}
-        className="hidden"
-      />
-      {attachment ? (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 px-2.5 py-1.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            {attachment.isImage && attachment.previewUrl ? (
-              <img
-                src={attachment.previewUrl}
-                alt={attachment.name || 'Ảnh đính kèm'}
-                className="h-11 w-11 shrink-0 rounded-xl border border-emerald-200/70 object-cover bg-white"
-              />
-            ) : (
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600/15 text-emerald-700 dark:text-emerald-300">
-                <FileText size={18} />
-              </span>
-            )}
-            <div className="min-w-0">
-              <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
-                {attachment.name || t('Ảnh đính kèm')}
-              </div>
-              <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                {[attachment.isImage ? t('Hình ảnh') : t('Tệp đính kèm'), formatQuickFileSize(attachment.size)]
-                  .filter(Boolean)
-                  .join(' · ')}
+    <div>
+      <div className="rounded-[24px] border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:focus-within:ring-emerald-950/60 transition">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={imageUploadDisallowed
+            ? '.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'
+            : 'image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'}
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
+        {attachment ? (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 px-2.5 py-1.5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              {attachment.isImage && attachment.previewUrl ? (
+                <img
+                  src={attachment.previewUrl}
+                  alt={attachment.name || 'Ảnh đính kèm'}
+                  className="h-11 w-11 shrink-0 rounded-xl border border-emerald-200/70 object-cover bg-white"
+                />
+              ) : (
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600/15 text-emerald-700 dark:text-emerald-300">
+                  <FileText size={18} />
+                </span>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
+                  {attachment.name || t('Ảnh đính kèm')}
+                </div>
+                <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                  {[attachment.isImage ? t('Hình ảnh') : t('Tệp đính kèm'), formatQuickFileSize(attachment.size)]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setAttachment(null);
+                setAttachError('');
+              }}
+              aria-label={t('Gỡ tệp đính kèm')}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/90 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition cursor-pointer"
+            >
+              <X size={13} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setAttachment(null);
-              setAttachError('');
-            }}
-            aria-label={t('Gỡ tệp đính kèm')}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/90 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition cursor-pointer"
-          >
-            <X size={13} />
-          </button>
+        ) : null}
+        {attachError ? (
+          <div className="mb-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-[11.5px] font-semibold text-rose-600 dark:text-rose-300">
+            {attachError}
+          </div>
+        ) : null}
+        {attachment?.isImage && !attachError ? (
+          <p className="mb-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+            {t('Mẹo: chụp rõ màn hình + một câu mô tả — mỗi lần gửi có ảnh tính 1 lượt AI và 1 lần gửi ảnh.')}
+          </p>
+        ) : null}
+        <div className="flex items-center gap-2.5">
+          <Search size={17} className="shrink-0 text-slate-400" aria-hidden="true" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleInputKeyDown}
+            placeholder={attachment ? composerAttachPlaceholder : placeholderText}
+            className="w-full min-w-0 bg-transparent text-[14px] font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none"
+          />
         </div>
-      ) : null}
-      {attachError ? (
-        <div className="mb-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-[11.5px] font-semibold text-rose-600 dark:text-rose-300">
-          {attachError}
-        </div>
-      ) : null}
-      {(role === 'student' || role === 'teacher') && questionQuotaApplies ? (
-        <div className="mb-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-          {questionQuotaBlocked
-            ? (isFreeTierStudent || imageUploadDisallowed
-              ? t(`Hết ${questionQuotaLimit} lượt AI miễn phí hôm nay — reset 0:00, hoặc nâng cấp gói để có 10 lượt AI & 5 ảnh/ngày.`)
-              : t(`Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00, hoặc mở Trợ lý AI trong tin nhắn.`))
-            : t(`Hôm nay: ${Math.max(0, questionQuotaLimit - Math.max(0, questionQuotaLeft))}/${questionQuotaLimit} lượt AI`)}
-          {imageUploadDisallowed
-            ? ` · ${t('Không hỗ trợ gửi ảnh')}`
-            : (imageQuotaLimit > 0
-              ? ` · ${t('ảnh')}: ${Math.max(0, imageQuotaLimit - Math.max(0, imageQuotaLeft))}/${imageQuotaLimit}`
-              : '')}
-        </div>
-      ) : null}
-      {attachment?.isImage && !attachError ? (
-        <p className="mb-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-          {t('Mẹo: chụp rõ màn hình + một câu mô tả — mỗi lần gửi có ảnh tính 1 lượt AI và 1 lần gửi ảnh.')}
-        </p>
-      ) : null}
-      <div className="flex items-center gap-2.5">
-        <Search size={17} className="shrink-0 text-slate-400" aria-hidden="true" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleInputKeyDown}
-          placeholder={attachment ? composerAttachPlaceholder : placeholderText}
-          className="w-full min-w-0 bg-transparent text-[14px] font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none"
-        />
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            title={t('Đính kèm ảnh hoặc tệp (hoặc dán Ctrl+V)')}
-            aria-label={t('Đính kèm ảnh hoặc tệp')}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-slate-700 transition cursor-pointer"
-          >
-            <Plus size={15} />
-          </button>
-          <span className="truncate text-[11px] font-medium text-slate-400">
-            {imageUploadDisallowed
-              ? t('Đính kèm tệp văn bản (tài khoản miễn phí không gửi ảnh)')
-              : t('Dán ảnh (Ctrl+V) hoặc thêm tệp')}
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="hidden sm:inline text-[11px] font-medium text-slate-400">
-            Ctrl / ⌘ + K
-          </span>
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={() => void askAiQuestion(trimmedQuery, attachment)}
-            aria-label="Gửi câu hỏi cho AI"
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition ${canSend
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer'
-              : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-400 cursor-not-allowed'
-              }`}
-          >
-            <ArrowUp size={16} strokeWidth={2.5} />
-          </button>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              title={t('Đính kèm ảnh hoặc tệp (hoặc dán Ctrl+V)')}
+              aria-label={t('Đính kèm ảnh hoặc tệp')}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-slate-700 transition cursor-pointer"
+            >
+              <Plus size={15} />
+            </button>
+            <span className="truncate text-[11px] font-medium text-slate-400">
+              {imageUploadDisallowed
+                ? t('Đính kèm tệp văn bản (tài khoản miễn phí không gửi ảnh)')
+                : t('Dán ảnh | Tệp tin (Bấm dấu cột hoặc CTRL + V)')}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden sm:inline text-[11px] font-medium text-slate-400">
+              Ctrl / ⌘ + K
+            </span>
+            <button
+              type="button"
+              disabled={!canSend}
+              onClick={() => void askAiQuestion(trimmedQuery, attachment)}
+              aria-label="Gửi câu hỏi cho AI"
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition ${canSend
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer'
+                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-400 cursor-not-allowed'
+                }`}
+            >
+              <ArrowUp size={16} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       </div>
+      <AiUsageIndicator
+        applies={questionQuotaApplies}
+        percentLeft={questionQuotaLeft}
+        resetInMs={aiDailyQuota?.questionQuota?.resetInMs}
+        resetsAt={aiDailyQuota?.questionQuota?.resetsAt}
+        imageDisallowed={imageUploadDisallowed}
+        isFreeTier={isFreeTierStudent}
+        isEn={language === 'en'}
+        className="mt-1.5 pl-2.5"
+      />
     </div>
   );
 

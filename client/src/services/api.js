@@ -1619,6 +1619,45 @@ export const messagesAPI = {
     const res = await apiFetch(`/messages/${messageId}/soft-delete`, { method: 'PATCH' });
     return res.json();
   },
+  aiAutoReply: {
+    getGlobal: async () => {
+      const res = await apiFetch('/messages/ai-auto-reply/global');
+      return res.json();
+    },
+    updateGlobal: async (data) => {
+      const res = await apiFetch('/messages/ai-auto-reply/global', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+    getHistory: async ({ page = 1, limit = 25, status = '', conversationId = '' } = {}) => {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      if (status) params.set('status', status);
+      if (conversationId) params.set('conversationId', conversationId);
+      const res = await apiFetch(`/messages/ai-auto-reply/history?${params.toString()}`);
+      return res.json();
+    },
+    adminDisable: async (conversationId) => {
+      const res = await apiFetch(`/messages/ai-auto-reply/${encodeURIComponent(conversationId)}/admin-disable`, {
+        method: 'POST',
+      });
+      return res.json();
+    },
+    getConversation: async (conversationId) => {
+      const res = await apiFetch(`/messages/ai-auto-reply/${encodeURIComponent(conversationId)}`);
+      return res.json();
+    },
+    updateConversation: async (conversationId, data) => {
+      const res = await apiFetch(`/messages/ai-auto-reply/${encodeURIComponent(conversationId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+  },
   createGroup: async (name, participants) => {
     const res = await apiFetch('/messages/groups', {
       method: 'POST',

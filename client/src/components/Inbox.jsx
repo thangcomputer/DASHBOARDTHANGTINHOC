@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft, Phone,
   User, Circle, Image, Paperclip, Download,
-  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video, Lock
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video, Lock, Bot,
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -58,6 +58,12 @@ import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatS
 import { getChatFileType } from '../utils/chatFileType';
 import CommunicationPreferences from './CommunicationPreferences';
 import StickerPicker from './StickerPicker';
+import AiAutoReplyComposerControl, {
+  AiAutoReplyStatusBanner,
+  AiAutoReplyMessageHeader,
+  AiAutoReplyMessageFooter,
+  isAiAutoReplyMessage,
+} from './AiAutoReplyComposerControl';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 
@@ -437,7 +443,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const navigate = useNavigate();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { isConnected, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onGroupDelete, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
+  const { isConnected, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onGroupDelete, onContactListUpdated, onAiAutoReplyStatus, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers, groups,
@@ -479,6 +485,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [aiHandoffSession, setAiHandoffSession] = useState(null);
   const [showPriorAiThread, setShowPriorAiThread] = useState(false);
   const [handoffQueue, setHandoffQueue] = useState([]);
+  const [aiAutoReplyState, setAiAutoReplyState] = useState(null);
   useEffect(() => {
     const intervalId = window.setInterval(() => setScheduleNow(new Date()), 15000);
     return () => window.clearInterval(intervalId);
@@ -1491,6 +1498,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       fileExpired: m.fileExpired || false,
       reactions: m.reactions || [],
       isPinned: m.isPinned || false,
+      senderType: m.senderType || (String(m.senderId) === 'ai_support' ? 'ai' : 'human'),
+      aiMetadata: m.aiMetadata && typeof m.aiMetadata === 'object' ? m.aiMetadata : null,
       payload: m.payload && typeof m.payload === 'object' ? m.payload : null,
     };
   }, [resolveSenderMeta, currentUserId, currentUserName, activeConv?.user?.role]);
@@ -1697,6 +1706,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               fileExpired: data.fileExpired || false,
               reactions: data.reactions || [],
               isPinned: data.isPinned || false,
+              senderType: data.senderType || (String(data.senderId) === 'ai_support' ? 'ai' : 'human'),
+              aiMetadata: data.aiMetadata && typeof data.aiMetadata === 'object' ? data.aiMetadata : null,
               payload: data.payload && typeof data.payload === 'object' ? data.payload : null,
             };
             return [...prev, mappedMsg];
@@ -1732,6 +1743,46 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (unsubGroupDelete) unsubGroupDelete();
     };
   }, [activeConv, onMessageReceive, onRecallReceive, onReactionReceive, onMessagePinned, onGroupDelete, currentUserId, currentUserRole, markMessagesRead, resolveSenderName, resolveSenderMeta, toast]);
+
+  const isStaffOrAdminViewer = Boolean(currentUserRole && String(currentUserRole).toLowerCase() !== 'student');
+  const isStudentDirectPeer = Boolean(
+    activeConvId
+    && !activeConv?.isGroup
+    && !activeConv?.isAiHandoff
+    && (
+      String(activeConv?.user?.role || activeConv?.role || '').toLowerCase() === 'student'
+      || String(activeConv?.user?.productRole || '').toUpperCase() === 'STUDENT'
+      || String(activeConvId).includes('student_')
+    )
+  );
+  const canManageAiAutoReply = Boolean(isStaffOrAdminViewer && isStudentDirectPeer);
+  const showAiAutoReplyButton = Boolean(activeConvId && isStaffOrAdminViewer);
+  const isAdminViewer = Boolean(
+    String(currentUserRole || '').toLowerCase() === 'admin'
+    || isSuperAdmin
+    || isHighAdmin
+  );
+  const aiAutoReplyIneligibleReason = activeConv?.isGroup
+    ? 'AI tự động trả lời chỉ áp dụng cho hộp thư trực tiếp 1-1 với học viên, không áp dụng cho nhóm chat.'
+    : activeConv?.isAiHandoff
+      ? 'Đây là phiên Hỗ trợ AI chuyển tiếp (Handoff). AI tự động trả lời áp dụng cho hộp thư trực tiếp giữa giảng viên/nhân sự hỗ trợ và học viên.'
+      : 'Hội thoại hiện tại không phải với học viên. DewSkill AI tự động trả lời chỉ kích hoạt trong hộp thư trực tiếp với học viên.';
+
+  useEffect(() => {
+    setAiAutoReplyState(null);
+  }, [activeConvId]);
+
+  useEffect(() => {
+    if (!onAiAutoReplyStatus || !canManageAiAutoReply || !activeConvId) return undefined;
+    return onAiAutoReplyStatus((payload) => {
+      const targetIds = [payload?.conversationId, ...(payload?.aliasConversationIds || [])].map(String);
+      if (!targetIds.includes(String(activeConvId))) return;
+      setAiAutoReplyState((prev) => ({
+        ...(prev || {}),
+        ...payload,
+      }));
+    });
+  }, [onAiAutoReplyStatus, canManageAiAutoReply, activeConvId]);
 
   useEffect(() => {
     if (!socket || !activeConv?.isAiHandoff) return undefined;
@@ -3502,6 +3553,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     );
                   }
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
+                  const isAiAutoReplyMsg = isAiAutoReplyMessage(msg);
                   const nextMessage = displayedMessages[index + 1];
                   const previousMessageContinuesGroup = areConsecutiveMessagesInGroup(previousMessage, msg);
                   const nextMessageStartsGroup = !areConsecutiveMessagesInGroup(msg, nextMessage);
@@ -3602,32 +3654,43 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       >
                         <div className={`relative ${isMine ? 'max-w-[85%] items-end' : 'w-full items-start gap-2'} flex ${isMine ? 'flex-col' : 'flex-row'}`}>
                           {!isMine && (
-                            <img
-                              src={resolveAvatarUrl({
-                                ...messageAvatar,
-                                id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
-                                name: messageAvatar?.name || msg.senderName,
-                                role: messageAvatar?.role || role,
-                                avatar: messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar,
-                              })}
-                              alt=""
-                              aria-hidden="true"
-                              className={`mt-0.5 h-[34px] w-[34px] shrink-0 rounded-full border border-slate-200 bg-white object-cover ${isRealAvatar(messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar) ? 'cms-fm-avatar--photo' : ''}`}
-                              onError={(event) => {
-                                event.currentTarget.onerror = null;
-                                event.currentTarget.src = resolveAvatarUrl({
+                            isAiAutoReplyMsg ? (
+                              <span
+                                className="mt-0.5 flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm"
+                                aria-hidden="true"
+                              >
+                                <Bot size={17} strokeWidth={2.3} />
+                              </span>
+                            ) : (
+                              <img
+                                src={resolveAvatarUrl({
+                                  ...messageAvatar,
                                   id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
                                   name: messageAvatar?.name || msg.senderName,
                                   role: messageAvatar?.role || role,
-                                  adminRole: messageAvatar?.adminRole || msg.senderAdminRole,
-                                  gender: messageAvatar?.gender || messageAvatar?.genderCode,
-                                  avatar: '',
-                                });
-                              }}
-                            />
+                                  avatar: messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar,
+                                })}
+                                alt=""
+                                aria-hidden="true"
+                                className={`mt-0.5 h-[34px] w-[34px] shrink-0 rounded-full border border-slate-200 bg-white object-cover ${isRealAvatar(messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar) ? 'cms-fm-avatar--photo' : ''}`}
+                                onError={(event) => {
+                                  event.currentTarget.onerror = null;
+                                  event.currentTarget.src = resolveAvatarUrl({
+                                    id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
+                                    name: messageAvatar?.name || msg.senderName,
+                                    role: messageAvatar?.role || role,
+                                    adminRole: messageAvatar?.adminRole || msg.senderAdminRole,
+                                    gender: messageAvatar?.gender || messageAvatar?.genderCode,
+                                    avatar: '',
+                                  });
+                                }}
+                              />
+                            )
                           )}
                           <div className={`relative flex min-w-0 flex-col ${isMine ? 'items-end' : 'flex-1 items-start'}`}>
-                            {!isMine && activeConv?.isGroup && (
+                            {!isMine && isAiAutoReplyMsg ? (
+                              <AiAutoReplyMessageHeader isMine={false} />
+                            ) : !isMine && activeConv?.isGroup && (
                               <div className="mb-1 ml-1 flex min-w-0 items-center gap-1.5">
                                 <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
                                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-emerald-500 text-white' :
@@ -3643,7 +3706,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             <div className={`cms-chat-message-content flex min-w-0 items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                               {/* Message bubble */}
-                              <div className={`cms-chat-message-bubble relative min-w-0 text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                              <div className={`cms-chat-message-bubble relative min-w-0 text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass} ${isAiAutoReplyMsg && !msg.isRecalled ? '!border-emerald-200 !bg-emerald-50/50' : ''}`}>
                                 {!msg.isRecalled && msg.payload?.replyTo && (
                                   <button
                                     type="button"
@@ -3724,6 +3787,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                     <MessageRichText text={msg.content} payload={msg.payload} mine={isMine} highlight={normalizedMessageSearch} />
                                   </div>
                                 )}
+                                {isAiAutoReplyMsg && !msg.isRecalled ? (
+                                  <AiAutoReplyMessageFooter msg={msg} />
+                                ) : null}
                                 {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
                                   <div className="mt-1 self-start text-[11px] leading-[14px] font-medium tabular-nums text-slate-500">
                                     {formatMessageTime(msg.time)}
@@ -3954,6 +4020,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
                 )}
+                {!superAdminReadOnly ? (
+                  <AiAutoReplyStatusBanner visible={canManageAiAutoReply} state={aiAutoReplyState} />
+                ) : null}
                 {superAdminReadOnly ? (
                   <div
                     className="mx-auto flex max-w-4xl items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-500"
@@ -4082,6 +4151,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         />
                       </div>
                     </div>
+                    <AiAutoReplyComposerControl
+                      conversationId={activeConvId}
+                      visible={showAiAutoReplyButton}
+                      eligible={canManageAiAutoReply}
+                      ineligibleReason={aiAutoReplyIneligibleReason}
+                      isAdminViewer={isAdminViewer}
+                      state={aiAutoReplyState}
+                      onStateChange={setAiAutoReplyState}
+                    />
                     <button
                       onClick={() => handleSend()}
                       disabled={!newMsg.trim() && !pendingImage}

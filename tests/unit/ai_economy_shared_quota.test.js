@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-function createMockAiSupportHarness({ envOverrides = {} } = {}) {
+function createMockAiSupportHarness({ envOverrides = {}, failLlm = false } = {}) {
   const llmPath = require.resolve('../../services/ai/llmClient');
   const svcPath = require.resolve('../../services/aiSupportService');
   const sessionPath = require.resolve('../../models/AiSupportSession');
@@ -13,6 +13,7 @@ function createMockAiSupportHarness({ envOverrides = {} } = {}) {
 
   const sessions = new Map();
   let llmCalls = 0;
+  let shouldFailLlm = Boolean(failLlm);
 
   require.cache[sessionPath] = {
     id: sessionPath,
@@ -34,6 +35,8 @@ function createMockAiSupportHarness({ envOverrides = {} } = {}) {
           ...data,
           questionCount: 0,
           imageUploadCount: 0,
+          budgetDate: '',
+          budgetUsedBp: 0,
           save: async function save() {
             sessions.set(String(this.conversationId), this);
             return this;
@@ -54,6 +57,9 @@ function createMockAiSupportHarness({ envOverrides = {} } = {}) {
       getApiKeys: () => ['mock-key'],
       chatCompletion: async () => {
         llmCalls += 1;
+        if (shouldFailLlm) {
+          throw new Error('Mock Gemini temporary failure');
+        }
         return {
           content: 'Hướng dẫn Word từ **DewSkill AI** — căn giữa đoạn văn qua tab Home.',
           model: 'gemini-3.5-flash-lite',
@@ -113,36 +119,75 @@ function createMockAiSupportHarness({ envOverrides = {} } = {}) {
     svc,
     sessions,
     getLlmCalls: () => llmCalls,
+    setFailLlm: (v) => { shouldFailLlm = Boolean(v); },
     restore,
   };
 }
 
-test('Quick Ask shares daily Gemini quota with messenger session', async (t) => {
-  const harness = createMockAiSupportHarness({
-    envOverrides: { AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT: '2' },
-  });
+function repeatedWords(count, prefix = 'excel') {
+  return Array.from({ length: count }, (_, idx) => `${prefix}${idx + 1}`).join(' ');
+}
+
+test('calculateAiUsageCostBp computes weighted basis-points by tier, word count, and attachment', (t) => {
+  const harness = createMockAiSupportHarness();
   t.after(harness.restore);
+  const { calculateAiUsageCostBp, DAILY_BUDGET_BP } = harness.svc;
 
-  const user = { id: `quota-unit-${Date.now()}`, role: 'student', name: 'Quota Test' };
-  const q1 = 'API là gì trong lập trình web?';
-  const q2 = 'REST API khác gRPC như thế nào?';
-  const q3 = 'GraphQL so với REST API có ưu nhược điểm gì?';
+  assert.equal(DAILY_BUDGET_BP, 1000);
 
-  const r1 = await harness.svc.quickAskAssistant({ user, question: q1, preferredLang: 'vi' });
-  assert.equal(r1.source, 'ai');
-  assert.ok(r1.questionQuota);
+  // Free student: 50% short, +25% per 50 extra words > 40, max 100%
+  assert.equal(calculateAiUsageCostBp({ role: 'student', isFreeStudent: true, text: 'VLOOKUP dùng sao?' }), 500);
+  assert.equal(calculateAiUsageCostBp({ role: 'student', isFreeStudent: true, text: repeatedWords(70) }), 750);
+  assert.equal(calculateAiUsageCostBp({ role: 'student', isFreeStudent: true, text: repeatedWords(140) }), 1000);
 
-  await harness.svc.quickAskAssistant({ user, question: q2, preferredLang: 'vi' });
-
-  await assert.rejects(
-    () => harness.svc.quickAskAssistant({ user, question: q3, preferredLang: 'vi' }),
-    (err) => err?.code === 'AI_QUESTION_QUOTA',
+  // Official student: 8% short, +3%/50 extra words (max +20%), +12% image/PDF, +6% text file
+  assert.equal(calculateAiUsageCostBp({ role: 'student', isFreeStudent: false, text: 'SUMIFS là gì?' }), 80);
+  assert.equal(calculateAiUsageCostBp({ role: 'student', isFreeStudent: false, text: repeatedWords(90) }), 110);
+  assert.equal(calculateAiUsageCostBp({ role: 'student', isFreeStudent: false, text: repeatedWords(600) }), 280);
+  assert.equal(
+    calculateAiUsageCostBp({
+      role: 'student',
+      isFreeStudent: false,
+      text: 'Giải thích ảnh giúp mình',
+      attachment: { mimeType: 'image/png', dataBase64: 'AAA' },
+    }),
+    200,
+  );
+  assert.equal(
+    calculateAiUsageCostBp({
+      role: 'student',
+      isFreeStudent: false,
+      text: 'Tóm tắt tệp CSV',
+      attachment: { name: 'data.csv', mimeType: 'text/csv', textContent: 'col1 col2 col3' },
+    }),
+    140,
   );
 
-  assert.equal(harness.getLlmCalls(), 2, 'Third question must be blocked after limit of 2');
+  // Teacher: 5% short, +2%/50 extra words (max +15%), +7% image/PDF, +4% text file
+  assert.equal(calculateAiUsageCostBp({ role: 'teacher', text: 'Soạn rubric Word?' }), 50);
+  assert.equal(
+    calculateAiUsageCostBp({
+      role: 'teacher',
+      text: 'Xem ảnh bài làm học viên',
+      hasImage: true,
+    }),
+    120,
+  );
+  assert.equal(
+    calculateAiUsageCostBp({
+      role: 'teacher',
+      text: 'Đọc file txt',
+      attachment: { name: 'notes.txt', mimeType: 'text/plain', textContent: 'abc' },
+    }),
+    90,
+  );
+
+  // Admin & staff exempt -> 0 bp
+  assert.equal(calculateAiUsageCostBp({ role: 'admin', text: repeatedWords(100), hasImage: true }), 0);
+  assert.equal(calculateAiUsageCostBp({ role: 'staff', text: repeatedWords(100), hasImage: true }), 0);
 });
 
-test('Official student gets 10 questions and 5 images per day across Quick Ask and Messenger', async (t) => {
+test('Official student gets unified 100% daily budget shared across text, image, and Messenger peek', async (t) => {
   const harness = createMockAiSupportHarness();
   t.after(harness.restore);
   const { svc } = harness;
@@ -168,234 +213,183 @@ test('Official student gets 10 questions and 5 images per day across Quick Ask a
     const qPeek = svc.peekQuestionQuota({ userRole: 'student' }, stu);
     const iPeek = svc.peekImageQuota({ userRole: 'student' }, stu);
     assert.equal(qPeek.applies, true);
-    assert.equal(qPeek.limit, 10);
-    assert.equal(qPeek.remaining, 10);
-    assert.equal(iPeek.applies, true);
+    assert.equal(qPeek.mode, 'percent');
+    assert.equal(qPeek.limit, 100);
+    assert.equal(qPeek.percentLeft, 100);
     assert.equal(iPeek.allowed, true);
-    assert.equal(iPeek.limit, 5);
-    assert.equal(iPeek.remaining, 5);
+    assert.equal(iPeek.limit, 100);
+    assert.equal(iPeek.percentLeft, 100);
   }
 
-  for (let i = 1; i <= 10; i += 1) {
+  // Send 5 short image queries: each costs 8% + 12% = 20%, reaching 0% cleanly
+  const imgStu = { id: `stu-img-pct-${Date.now()}`, role: 'student', freePortal: false };
+  for (let i = 1; i <= 5; i += 1) {
     const res = await svc.quickAskAssistant({
-      user: officialCenterStudent,
-      question: `Giải thích khái niệm DNS số ${i} trong mạng máy tính?`,
+      user: imgStu,
+      question: `Giải thích lỗi công thức Excel trong ảnh số ${i} giúp em?`,
       preferredLang: 'vi',
+      attachment: { name: `img-${i}.png`, mimeType: 'image/png', dataBase64: 'iVBORw0KGgo=' },
     });
-    assert.equal(res.questionQuota.limit, 10);
-    assert.equal(res.questionQuota.used, i);
-    assert.equal(res.questionQuota.remaining, 10 - i);
+    assert.equal(res.questionQuota.mode, 'percent');
+    assert.equal(res.questionQuota.percentLeft, 100 - i * 20);
+    assert.equal(res.questionQuota.used, i * 20);
+    assert.equal(res.imageQuota.percentLeft, 100 - i * 20);
   }
+
+  // 6th call (either image or text) is blocked because daily % is 0%
+  await assert.rejects(
+    () => svc.quickAskAssistant({
+      user: imgStu,
+      question: 'Cách hoạt động của DNS và địa chỉ IP trong mạng máy tính?',
+      preferredLang: 'vi',
+    }),
+    (err) => err?.status === 403 && err?.code === 'AI_QUESTION_QUOTA' && err?.questionQuota?.percentLeft === 0,
+  );
+
+  // Last-turn partial drain test: 4 images (80% used, 20% left) + 1 short text (8% used, 12% left) + 1 image (costs 20%, still allowed to drain remaining 12% to 0%)
+  const drainStu = { id: `stu-drain-${Date.now()}`, role: 'student', freePortal: false };
+  for (let i = 1; i <= 4; i += 1) {
+    await svc.quickAskAssistant({
+      user: drainStu,
+      question: `Kiểm tra lỗi hệ thống mạng nội bộ lần ${i}`,
+      attachment: { name: `d-${i}.png`, mimeType: 'image/png', dataBase64: 'AAA' },
+    });
+  }
+  const afterText = await svc.quickAskAssistant({
+    user: drainStu,
+    question: 'Giao thức TCP và UDP khác nhau điểm nào trong lập trình mạng?',
+  });
+  assert.equal(afterText.questionQuota.percentLeft, 12);
+
+  const lastImage = await svc.quickAskAssistant({
+    user: drainStu,
+    question: 'Giải thích sơ đồ kiến trúc client-server trong ảnh cuối này',
+    attachment: { name: 'last.png', mimeType: 'image/png', dataBase64: 'AAA' },
+  });
+  assert.equal(lastImage.questionQuota.percentLeft, 0);
+  assert.equal(lastImage.questionQuota.budgetUsedBp, 1000);
 
   await assert.rejects(
     () => svc.quickAskAssistant({
-      user: officialCenterStudent,
-      question: 'Giải thích khái niệm DNS số 11 trong mạng máy tính?',
-      preferredLang: 'vi',
+      user: drainStu,
+      question: 'So sánh mô hình OSI và TCP/IP trong truyền thông dữ liệu?',
     }),
     (err) => err?.status === 403 && err?.code === 'AI_QUESTION_QUOTA',
   );
-
-  // Separate official student tests 5 image quota limit + ensures 6th image does NOT burn question quota
-  const imgUser = { id: `stu-img-${Date.now()}`, role: 'student', freePortal: false, name: 'HV Anh' };
-  const fakeImage = { name: 'sheet.png', mimeType: 'image/png', dataBase64: 'iVBORw0KGgo=' };
-  for (let i = 1; i <= 5; i += 1) {
-    const res = await svc.quickAskAssistant({
-      user: imgUser,
-      question: `Xem giúp lỗi Excel trong ảnh số ${i}`,
-      attachment: fakeImage,
-      preferredLang: 'vi',
-    });
-    assert.equal(res.imageQuota.limit, 5);
-    assert.equal(res.imageQuota.allowed, true);
-    assert.equal(res.imageQuota.used, i);
-    assert.equal(res.imageQuota.remaining, 5 - i);
-    assert.equal(res.questionQuota.used, i);
-  }
-
-  await assert.rejects(
-    () => svc.quickAskAssistant({
-      user: imgUser,
-      question: 'Xem giúp lỗi Excel trong ảnh số 6',
-      attachment: fakeImage,
-      preferredLang: 'vi',
-    }),
-    (err) => err?.status === 403 && err?.code === 'AI_IMAGE_QUOTA',
-  );
-
-  // Still has 5 text questions remaining after 5 images (and 6th rejected image didn't consume one)
-  const textAfterImageLimit = await svc.quickAskAssistant({
-    user: imgUser,
-    question: 'Cách kết hợp Power Query gộp nhiều sheet bán hàng tự động trong Excel?',
-    preferredLang: 'vi',
-  });
-  assert.equal(textAfterImageLimit.source, 'ai');
-  assert.equal(textAfterImageLimit.questionQuota.used, 6);
-  assert.equal(textAfterImageLimit.questionQuota.remaining, 4);
 });
 
-test('Free student gets 2 text questions and 0 images per day (images blocked without LLM/question cost)', async (t) => {
+test('Free locked student gets 50%/short turn, no images, and scaled long-question drain', async (t) => {
   const harness = createMockAiSupportHarness();
   t.after(harness.restore);
   const { svc } = harness;
 
   const freeLockedStudent = {
-    id: `stu-free-${Date.now()}`,
+    id: `stu-free-locked-${Date.now()}`,
     role: 'student',
     freePortal: true,
     freeUnlocked: false,
     enrollments: [],
   };
-  const expiredMeetStudent = {
-    id: `stu-free-exp-${Date.now()}`,
-    role: 'student',
-    freePortal: true,
-    freeUnlocked: true,
-    subscription: { plan: '1m', expiresAt: new Date(Date.now() - 86_400_000).toISOString() },
-    enrollments: [],
-  };
 
-  for (const stu of [freeLockedStudent, expiredMeetStudent]) {
-    assert.equal(svc.isFreeTierAiStudent(stu), true);
-    const qPeek = svc.peekQuestionQuota({ userRole: 'student' }, stu);
-    const iPeek = svc.peekImageQuota({ userRole: 'student' }, stu);
-    assert.equal(qPeek.applies, true);
-    assert.equal(qPeek.limit, 2);
-    assert.equal(qPeek.remaining, 2);
-    assert.equal(iPeek.applies, true);
-    assert.equal(iPeek.allowed, false);
-    assert.equal(iPeek.limit, 0);
-    assert.equal(iPeek.remaining, 0);
-  }
+  assert.equal(svc.peekQuestionQuota({ userRole: 'student' }, freeLockedStudent).percentLeft, 100);
+  const iPeek = svc.peekImageQuota({ userRole: 'student' }, freeLockedStudent);
+  assert.equal(iPeek.allowed, false);
+  assert.equal(iPeek.limit, 0);
 
-  // Blocking applies cleanly even before any session exists or via consumeAiImageQuota
+  // consumeAiImageQuota rejects free student immediately
   const messengerImgQuota = await svc.consumeAiImageQuota({ userRole: 'student' }, freeLockedStudent);
-  assert.equal(messengerImgQuota.applies, true);
   assert.equal(messengerImgQuota.blocked, true);
   assert.equal(messengerImgQuota.disallowed, true);
   assert.equal(messengerImgQuota.limit, 0);
 
-  // Quick Ask image or PDF vision MUST be rejected immediately with zero LLM calls and zero question consumption
-  const callsBeforeImg = harness.getLlmCalls();
+  // Free student sending image/PDF in Quick Ask -> 403 AI_IMAGE_QUOTA, 0 LLM calls, preserves 100% text quota
   await assert.rejects(
     () => svc.quickAskAssistant({
       user: freeLockedStudent,
-      question: 'Xem lỗi Excel trong ảnh',
-      attachment: { name: 'err.png', mimeType: 'image/png', dataBase64: 'iVBORw0KGgo=' },
+      question: 'Xem hộ lỗi hàm Python trong ảnh này với',
       preferredLang: 'vi',
+      attachment: { name: 'hw.png', mimeType: 'image/png', dataBase64: 'AAA' },
     }),
     (err) => err?.status === 403 && err?.code === 'AI_IMAGE_QUOTA' && err?.imageQuota?.limit === 0,
   );
   await assert.rejects(
     () => svc.quickAskAssistant({
       user: freeLockedStudent,
-      question: 'Đọc file PDF này giúp mình',
-      attachment: { name: 'bai.pdf', mimeType: 'application/pdf', dataBase64: 'JVBERi0x' },
+      question: 'Xem hộ file PDF đề thi Python này',
       preferredLang: 'vi',
+      attachment: { name: 'doc.pdf', mimeType: 'application/pdf', dataBase64: 'JVBERi0xLjQ=' },
     }),
     (err) => err?.status === 403 && err?.code === 'AI_IMAGE_QUOTA' && err?.imageQuota?.limit === 0,
   );
-  assert.equal(harness.getLlmCalls(), callsBeforeImg);
+  assert.equal(harness.getLlmCalls(), 0);
 
-  // Plain text attachment + 1st memory-hit question still count toward 2/day limit for free students
+  // Two short text questions consume 50% each -> 50% then 0%, third blocks
   const r1 = await svc.quickAskAssistant({
     user: freeLockedStudent,
-    question: 'VLOOKUP là gì',
+    question: `Sự khác nhau giữa REST API và GraphQL trong lập trình web ${Date.now()}?`,
     preferredLang: 'vi',
   });
-  assert.equal(r1.questionQuota.limit, 2);
-  assert.equal(r1.questionQuota.used, 1);
-  assert.equal(r1.questionQuota.remaining, 1);
-  assert.equal(r1.imageQuota.limit, 0);
+  assert.equal(r1.questionQuota.percentLeft, 50);
   assert.equal(r1.imageQuota.allowed, false);
 
   const r2 = await svc.quickAskAssistant({
     user: freeLockedStudent,
-    question: 'Giải thích công thức CSV này giúp mình',
-    attachment: { name: 'data.csv', mimeType: 'text/csv', textContent: 'Name,Score\nAn,9' },
+    question: `Giải thích cơ chế HTTPS và chứng chỉ SSL trong bảo mật web ${Date.now()}?`,
     preferredLang: 'vi',
   });
-  assert.equal(r2.questionQuota.used, 2);
-  assert.equal(r2.questionQuota.remaining, 0);
+  assert.equal(r2.questionQuota.percentLeft, 0);
 
-  // 3rd question rejected for both locked free student and expired Meet free student
   await assert.rejects(
     () => svc.quickAskAssistant({
       user: freeLockedStudent,
-      question: 'Hàm SUMIFS dùng ra sao?',
-      preferredLang: 'vi',
-    }),
-    (err) => err?.status === 403 && err?.code === 'AI_QUESTION_QUOTA' && err?.questionQuota?.limit === 2,
-  );
-
-  await assert.rejects(
-    () => svc.quickAskAssistant({
-      user: expiredMeetStudent,
-      question: 'Xem lỗi Excel này',
-      attachment: { name: 'err.jpg', mimeType: 'image/jpeg', dataBase64: '/9j/4AAQ' },
-      preferredLang: 'vi',
-    }),
-    (err) => err?.status === 403 && err?.code === 'AI_IMAGE_QUOTA',
-  );
-});
-
-test('Teacher gets 15 questions and 10 images per day; admin/staff remain exempt', async (t) => {
-  const harness = createMockAiSupportHarness();
-  t.after(harness.restore);
-  const { svc } = harness;
-
-  const teacher = { id: `tea-${Date.now()}`, role: 'teacher', name: 'Thay Giao' };
-  const tQPeek = svc.peekQuestionQuota({ userRole: 'teacher' }, teacher);
-  const tIPeek = svc.peekImageQuota({ userRole: 'teacher' }, teacher);
-  assert.equal(tQPeek.applies, true);
-  assert.equal(tQPeek.limit, 15);
-  assert.equal(tIPeek.applies, true);
-  assert.equal(tIPeek.allowed, true);
-  assert.equal(tIPeek.limit, 10);
-
-  const fakeImg = { name: 'slide.png', mimeType: 'image/png', dataBase64: 'iVBORw0KGgo=' };
-  for (let i = 1; i <= 10; i += 1) {
-    const r = await svc.quickAskAssistant({
-      user: teacher,
-      question: `Gợi ý chỉnh slide ${i}`,
-      attachment: fakeImg,
-      preferredLang: 'vi',
-    });
-    assert.equal(r.imageQuota.limit, 10);
-    assert.equal(r.imageQuota.used, i);
-    assert.equal(r.imageQuota.remaining, 10 - i);
-    assert.equal(r.questionQuota.limit, 15);
-    assert.equal(r.questionQuota.used, i);
-  }
-
-  await assert.rejects(
-    () => svc.quickAskAssistant({
-      user: teacher,
-      question: 'Gợi ý chỉnh slide 11',
-      attachment: fakeImg,
-      preferredLang: 'vi',
-    }),
-    (err) => err?.status === 403 && err?.code === 'AI_IMAGE_QUOTA',
-  );
-
-  for (let i = 11; i <= 15; i += 1) {
-    const r = await svc.quickAskAssistant({
-      user: teacher,
-      question: `Soạn đề bài thực hành Excel nâng cao số ${i}`,
-      preferredLang: 'vi',
-    });
-    assert.equal(r.questionQuota.used, i);
-    assert.equal(r.questionQuota.remaining, 15 - i);
-  }
-
-  await assert.rejects(
-    () => svc.quickAskAssistant({
-      user: teacher,
-      question: 'Soạn đề bài thực hành Excel nâng cao số 16',
+      question: `Docker container khác máy ảo VM ở điểm nào ${Date.now()}?`,
       preferredLang: 'vi',
     }),
     (err) => err?.status === 403 && err?.code === 'AI_QUESTION_QUOTA',
   );
+
+  // Single long question (>90 words) consumes full 100% on one turn
+  const freeLongStudent = {
+    id: `stu-free-long-${Date.now()}`,
+    role: 'student',
+    freePortal: true,
+    freeUnlocked: false,
+    enrollments: [],
+  };
+  const rLong = await svc.quickAskAssistant({
+    user: freeLongStudent,
+    question: `Giải thích kiến trúc microservices và API gateway: ${repeatedWords(100, 'service')}`,
+    preferredLang: 'vi',
+  });
+  assert.equal(rLong.questionQuota.percentLeft, 0);
+  assert.equal(harness.getLlmCalls(), 3);
+});
+
+test('Teacher gets lighter % weights (5% text, 12% image) and Admin/Staff stay exempt', async (t) => {
+  const harness = createMockAiSupportHarness();
+  t.after(harness.restore);
+  const { svc } = harness;
+
+  const teacher = { id: `teacher-pct-${Date.now()}`, role: 'teacher', name: 'GV Tin Hoc' };
+  const tQPeek = svc.peekQuestionQuota({ userRole: 'teacher' }, teacher);
+  const tIPeek = svc.peekImageQuota({ userRole: 'teacher' }, teacher);
+  assert.equal(tQPeek.percentLeft, 100);
+  assert.equal(tIPeek.allowed, true);
+
+  // 1st query: short text + image = 5% + 7% = 12% -> 88% left
+  const rImg = await svc.quickAskAssistant({
+    user: teacher,
+    question: `Đánh giá sơ đồ quan hệ bảng SQL trong ảnh bài thực hành ${Date.now()}`,
+    attachment: { name: 't-1.png', mimeType: 'image/png', dataBase64: 'AAA' },
+  });
+  assert.equal(rImg.questionQuota.percentLeft, 88);
+
+  // 2nd query: short text = 5% -> 83% left
+  const rTxt = await svc.quickAskAssistant({
+    user: teacher,
+    question: `Gợi ý tiêu chí chấm bài thiết kế cơ sở dữ liệu SQL của lớp ${Date.now()}`,
+  });
+  assert.equal(rTxt.questionQuota.percentLeft, 83);
 
   for (const exemptRole of ['admin', 'staff']) {
     const q = svc.peekQuestionQuota({ userRole: exemptRole }, { id: `${exemptRole}-1`, role: exemptRole });
@@ -404,6 +398,50 @@ test('Teacher gets 15 questions and 10 images per day; admin/staff remain exempt
     assert.equal(q.remaining, null);
     assert.equal(img.applies, false);
     assert.equal(img.allowed, true);
-    assert.equal(img.remaining, null);
   }
+});
+
+test('Non-LLM interactions cost 0% and Gemini failures refund exact consumed % budget', async (t) => {
+  const harness = createMockAiSupportHarness();
+  t.after(harness.restore);
+  const { svc } = harness;
+
+  const stu = { id: `stu-refund-${Date.now()}`, role: 'student', freePortal: false };
+
+  // Greeting costs 0% and makes 0 LLM calls
+  const greetRes = await svc.quickAskAssistant({ user: stu, question: 'xin chào', preferredLang: 'vi' });
+  assert.equal(greetRes.source, 'memory');
+  assert.equal(harness.getLlmCalls(), 0);
+  const findStudentSession = () => [...harness.sessions.values()].find((s) => String(s.userId) === String(stu.id));
+  assert.equal(findStudentSession(), undefined);
+
+  // First image succeeds: 100% -> 80%
+  const okImg = await svc.quickAskAssistant({
+    user: stu,
+    question: `Kiểm tra lỗi truy vấn SQL trên ảnh ${Date.now()}`,
+    attachment: { name: 'ok.png', mimeType: 'image/png', dataBase64: 'AAA' },
+  });
+  assert.equal(okImg.questionQuota.percentLeft, 80);
+
+  // Next query fails at Gemini -> must refund its 20% cleanly back to 80%
+  harness.setFailLlm(true);
+  const failRes = await svc.quickAskAssistant({
+    user: stu,
+    question: `Ảnh thứ 2 phân tích mã lỗi JavaScript gặp lỗi API Gemini ${Date.now()}`,
+    attachment: { name: 'fail.png', mimeType: 'image/png', dataBase64: 'AAA' },
+  });
+  assert.equal(failRes.source, 'fallback');
+  harness.setFailLlm(false);
+
+  const sessionAfterFail = findStudentSession();
+  assert.ok(sessionAfterFail);
+  assert.equal(svc.peekQuestionQuota(sessionAfterFail, stu).percentLeft, 80);
+  assert.equal(sessionAfterFail.budgetUsedBp, 200);
+
+  // Yesterday's exhausted session resets to 100% today & reset meta is bounded within 24h
+  const expiredSession = { userRole: 'student', budgetDate: '2020-01-01', budgetUsedBp: 1000 };
+  assert.equal(svc.peekQuestionQuota(expiredSession, stu).percentLeft, 100);
+  const resetMeta = svc.getVietnamResetMeta();
+  assert.ok(resetMeta.resetInMs >= 1000 && resetMeta.resetInMs <= 24 * 60 * 60 * 1000);
+  assert.ok(Date.parse(resetMeta.resetsAt) > Date.now());
 });

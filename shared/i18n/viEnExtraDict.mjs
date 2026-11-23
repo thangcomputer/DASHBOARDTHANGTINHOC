@@ -2328,7 +2328,7 @@ export const VI_EN_EXTRA = {
   'Không tải được ảnh đã dán': 'Unable to upload pasted image',
   'Đính kèm ảnh hoặc tệp': 'Attach image or file',
   'Đính kèm ảnh hoặc tệp (hoặc dán Ctrl+V)': 'Attach image or file (or paste Ctrl+V)',
-  'Dán ảnh (Ctrl+V) hoặc thêm tệp': 'Paste image (Ctrl+V) or attach file',
+  'Dán ảnh | Tệp tin (Bấm dấu cột hoặc CTRL + V)': 'Paste image (Ctrl+V) or attach file',
   'Ảnh đính kèm': 'Attached Image',
   'Tệp đính kèm': 'Attached File',
   'Hình ảnh': 'Image',

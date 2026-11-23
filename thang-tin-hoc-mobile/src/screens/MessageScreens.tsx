@@ -4,6 +4,7 @@ import {
   Alert,
   DeviceEventEmitter,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -11,6 +12,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   useWindowDimensions,
@@ -50,11 +52,14 @@ import {
   getBlockedChatUsers,
   getChatReactionEmoji,
   getChatReactionType,
+  getConversationAiAutoReplyState,
   mapLiveChatMessage,
   mapLiveReaction,
   MESSAGE_PAGE_SIZE,
   reportChatViolation,
   unblockChatUser,
+  updateConversationAiAutoReplyConfig,
+  type AiAutoReplyState,
   type ChatReportReason,
 } from '../services/messageApi';
 import {
@@ -1463,6 +1468,80 @@ export function ConversationScreen() {
   const conversationName = isAiSupportConversation
     ? 'Trợ lý AI'
     : route.params.conversationName || 'Cuộc trò chuyện';
+  const canManageAiAutoReply = Boolean(
+    !isPreview
+    && !isGroupConversation
+    && !isAiSupportConversation
+    && user
+    && user.role !== 'student'
+    && (
+      String(route.params.participantRole || '').toLowerCase() === 'student'
+      || String(route.params.conversationId || '').includes('student_')
+    ),
+  );
+  const [aiAutoReplyState, setAiAutoReplyState] = useState<AiAutoReplyState | null>(null);
+  const [aiAutoReplyModalOpen, setAiAutoReplyModalOpen] = useState(false);
+  const [aiAutoReplySaving, setAiAutoReplySaving] = useState(false);
+  const [aiCountdownTick, setAiCountdownTick] = useState(0);
+
+  useEffect(() => {
+    if (!canManageAiAutoReply || !isFocused) return;
+    let active = true;
+    void getConversationAiAutoReplyState(route.params.conversationId)
+      .then((state) => {
+        if (active && state) setAiAutoReplyState(state);
+      })
+      .catch(() => { /* ignore transient fetch failure */ });
+    return () => { active = false; };
+  }, [canManageAiAutoReply, isFocused, route.params.conversationId]);
+
+  useEffect(() => {
+    if (!canManageAiAutoReply || aiAutoReplyState?.status !== 'pending' || !aiAutoReplyState?.dueAt) return undefined;
+    const timer = setInterval(() => setAiCountdownTick((tick) => tick + 1), 1000);
+    return () => clearInterval(timer);
+  }, [canManageAiAutoReply, aiAutoReplyState?.status, aiAutoReplyState?.dueAt]);
+
+  const aiAutoReplyStatusNotice = useMemo(() => {
+    void aiCountdownTick;
+    if (!canManageAiAutoReply || !aiAutoReplyState) return null;
+    const st = aiAutoReplyState.status;
+    if (st === 'pending' && aiAutoReplyState.dueAt) {
+      const diffMs = new Date(aiAutoReplyState.dueAt).getTime() - Date.now();
+      if (diffMs <= 0) {
+        return { text: 'AI đang chờ · Chuẩn bị phản hồi...', tone: 'emerald' as const };
+      }
+      const totalSec = Math.ceil(diffMs / 1000);
+      const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const ss = String(totalSec % 60).padStart(2, '0');
+      return { text: `AI đang chờ · AI sẽ trả lời sau ${mm}:${ss}`, tone: 'emerald' as const };
+    }
+    if (st === 'processing') {
+      return { text: 'DewSkill AI đang soạn phản hồi...', tone: 'emerald' as const };
+    }
+    if (st === 'cancelled_human') {
+      return { text: aiAutoReplyState.statusLabel || 'Đã hủy vì giảng viên trả lời', tone: 'slate' as const };
+    }
+    if (st === 'sent') {
+      return { text: 'AI đã tự động trả lời', tone: 'emerald' as const };
+    }
+    if (st === 'needs_human') {
+      return { text: 'AI không thể trả lời, cần giảng viên hỗ trợ', tone: 'amber' as const };
+    }
+    return null;
+  }, [canManageAiAutoReply, aiAutoReplyState, aiCountdownTick]);
+
+  const handleUpdateMobileAiAutoReply = async (patch: { enabled?: boolean; delayMinutes?: number }) => {
+    if (!canManageAiAutoReply || aiAutoReplySaving) return;
+    setAiAutoReplySaving(true);
+    try {
+      const updated = await updateConversationAiAutoReplyConfig(route.params.conversationId, patch);
+      if (updated) setAiAutoReplyState(updated);
+    } catch (error) {
+      Alert.alert('Không cập nhật được', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setAiAutoReplySaving(false);
+    }
+  };
   const canShowMeetButton = Boolean(
     user
     && user.role !== route.params.participantRole
@@ -2198,14 +2277,34 @@ export function ConversationScreen() {
       setMessages((current) => (current || resource.data || []).map(markOwnMessagesRead));
       setSearchResults((current) => current?.map(markOwnMessagesRead) || null);
     });
+    const aiAutoReplySubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.AI_AUTO_REPLY_STATUS, (payload: unknown) => {
+      if (!canManageAiAutoReply || !payload || typeof payload !== 'object') return;
+      const event = payload as Record<string, unknown>;
+      const aliases = Array.isArray(event.aliasConversationIds) ? event.aliasConversationIds.map(String) : [];
+      const conv = String(event.conversationId || '');
+      if (conv !== route.params.conversationId && !aliases.includes(route.params.conversationId)) return;
+      setAiAutoReplyState((prev) => ({
+        ...(prev || {
+          conversationId: route.params.conversationId,
+          enabled: true,
+          delayMinutes: 5,
+          globalEnabled: true,
+          allowTeacherToggle: true,
+          canToggle: true,
+          status: 'idle',
+        }),
+        ...(event as Partial<AiAutoReplyState>),
+      }));
+    });
     return () => {
       reactionSubscription.remove();
       recallSubscription.remove();
       deleteSubscription.remove();
       pinnedSubscription.remove();
       readAckSubscription.remove();
+      aiAutoReplySubscription.remove();
     };
-  }, [isPreview, resource.data, route.params.conversationId, user]);
+  }, [canManageAiAutoReply, isPreview, resource.data, route.params.conversationId, user]);
 
   const send = async (quickPrompt?: string) => {
     if (superAdminReadOnly) return;
@@ -2979,6 +3078,10 @@ export function ConversationScreen() {
                 && !message.mine
                 && message.senderId === 'ai_support'
                 && !message.recalled;
+              const isAiAutoReplyMsg = !isAiSupportConversation
+                && !message.mine
+                && !message.recalled
+                && (message.senderType === 'ai' || message.aiMetadata?.source === 'ai_auto_reply' || message.senderId === 'ai_support');
               const aiReplyPresentation = isAiSupportAssistantMessage && !message.attachmentType
                 ? getAiSupportReplyPresentation(message.text)
                 : { content: message.text, suggestions: [] as string[] };
@@ -3014,7 +3117,8 @@ export function ConversationScreen() {
                     style={[
                 styles.bubble,
                       isMine ? styles.bubbleMine : styles.bubbleOther,
-                      isAiSupportAssistantMessage && styles.bubbleAiSupport,
+                      (isAiSupportAssistantMessage || isAiAutoReplyMsg) && styles.bubbleAiSupport,
+                      isAiAutoReplyMsg && styles.bubbleAiAutoReply,
                       message.attachmentType === 'image' && styles.imageMessageBubble,
                       message.recalled && styles.recalledMessageBubble,
                 message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
@@ -3055,6 +3159,14 @@ export function ConversationScreen() {
                         <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.gifLabel}</Text>
             </View>
                     ) : null}
+                    {isAiAutoReplyMsg ? (
+                      <View style={styles.aiAutoReplyIdentityRow}>
+                        <Text style={styles.aiAutoReplySenderName}>DewSkill AI</Text>
+                        <View style={styles.aiAutoReplyBadgePill}>
+                          <Text style={styles.aiAutoReplyBadgeText}>Trợ lý AI</Text>
+                        </View>
+                      </View>
+                    ) : null}
                     {message.text && !message.recalled && message.attachmentType !== 'file' ? (
                       message.attachmentType === 'image' ? (
                         <View style={[styles.imageCaption, isMine ? styles.imageCaptionMine : styles.imageCaptionOther]}>
@@ -3090,6 +3202,11 @@ export function ConversationScreen() {
                     ) : null}
                     {endsSenderGroup && message.time ? (
                       <Text style={styles.messageBubbleTime}>{message.time}</Text>
+                    ) : null}
+                    {isAiAutoReplyMsg ? (
+                      <Text style={styles.aiAutoReplyFooterCaption}>
+                        {message.aiMetadata?.caption || 'AI tự động phản hồi vì giảng viên chưa trả lời trong thời gian chờ.'}
+                      </Text>
                     ) : null}
                   </Pressable>
 
@@ -3598,6 +3715,32 @@ export function ConversationScreen() {
           ) : null
         }
         {
+          aiAutoReplyStatusNotice ? (
+            <View
+              style={[
+                styles.aiAutoReplyStatusBar,
+                aiAutoReplyStatusNotice.tone === 'amber' && styles.aiAutoReplyStatusBarAmber,
+                aiAutoReplyStatusNotice.tone === 'slate' && styles.aiAutoReplyStatusBarSlate,
+              ]}
+            >
+              <Sparkles
+                size={13}
+                color={aiAutoReplyStatusNotice.tone === 'amber' ? '#B45309' : aiAutoReplyStatusNotice.tone === 'slate' ? '#475569' : '#047857'}
+              />
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.aiAutoReplyStatusText,
+                  aiAutoReplyStatusNotice.tone === 'amber' && styles.aiAutoReplyStatusTextAmber,
+                  aiAutoReplyStatusNotice.tone === 'slate' && styles.aiAutoReplyStatusTextSlate,
+                ]}
+              >
+                {aiAutoReplyStatusNotice.text}
+              </Text>
+            </View>
+          ) : null
+        }
+        {
           superAdminReadOnly ? (
             <View style={[styles.composerBar, styles.composerLocked]} accessibilityRole="text">
               <Lock size={16} color="#94A3B8" />
@@ -3665,6 +3808,34 @@ export function ConversationScreen() {
                   <Smile size={19} color="#94A3B8" />
             </Pressable>
           </View>
+          {canManageAiAutoReply ? (
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setAiAutoReplyModalOpen(true);
+              }}
+              style={[
+                styles.composerAiBtn,
+                aiAutoReplyState?.enabled && styles.composerAiBtnActive,
+                windowWidth < 360 && styles.composerAiBtnCompact,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Cài đặt AI tự động trả lời"
+              accessibilityState={{ selected: Boolean(aiAutoReplyState?.enabled) }}
+            >
+              <Sparkles size={14} color={aiAutoReplyState?.enabled ? '#047857' : '#64748B'} />
+              {windowWidth >= 360 ? (
+                <Text style={[styles.composerAiBtnText, aiAutoReplyState?.enabled && styles.composerAiBtnTextActive]}>
+                  AI
+                </Text>
+              ) : null}
+              {aiAutoReplyState?.enabled ? (
+                <View style={styles.composerAiOnBadge}>
+                  <Text style={styles.composerAiOnBadgeText}>{windowWidth < 360 ? 'ON' : 'Bật'}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
           <Pressable
                 onPress={() => { void send(); }}
             disabled={sending || (!draft.trim() && !selectedAttachment)}
@@ -3678,6 +3849,117 @@ export function ConversationScreen() {
         </View>
           )
         }
+        <Modal
+          visible={aiAutoReplyModalOpen && canManageAiAutoReply}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAiAutoReplyModalOpen(false)}
+        >
+          <View style={styles.pickerBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setAiAutoReplyModalOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Đóng cài đặt AI tự động trả lời"
+            />
+            <View style={styles.aiAutoReplySheet}>
+              <View style={styles.aiAutoReplyHandle} />
+              <View style={styles.aiAutoReplySheetHeader}>
+                <View style={styles.aiAutoReplySheetTitleWrap}>
+                  <View style={styles.aiAutoReplyIconBadge}>
+                    <Sparkles size={15} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.aiAutoReplyTitleMeta}>
+                    <Text style={styles.aiAutoReplySheetTitle} numberOfLines={1}>AI tự động trả lời</Text>
+                    <Text style={styles.aiAutoReplySheetSub} numberOfLines={1}>Trợ lý DewSkill AI</Text>
+                  </View>
+                </View>
+                <View style={[styles.aiAutoReplyStateChip, aiAutoReplyState?.enabled && styles.aiAutoReplyStateChipOn]}>
+                  <View style={[styles.aiAutoReplyStateDot, aiAutoReplyState?.enabled && styles.aiAutoReplyStateDotOn]} />
+                  <Text
+                    style={[styles.aiAutoReplyStateChipText, aiAutoReplyState?.enabled && styles.aiAutoReplyStateChipTextOn]}
+                    numberOfLines={1}
+                  >
+                    {aiAutoReplyState?.enabled ? 'Đang bật' : 'Đang tắt'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.aiAutoReplySwitchRow, aiAutoReplyState?.enabled && styles.aiAutoReplySwitchRowOn]}>
+                <View style={styles.aiAutoReplySwitchCopy}>
+                  <Text style={styles.aiAutoReplySwitchLabel}>Tự động trả lời khi chưa có phản hồi</Text>
+                  <Text style={styles.aiAutoReplySwitchSub}>DewSkill AI hỗ trợ học viên khi bạn chưa kịp trả lời</Text>
+                </View>
+                <Switch
+                  value={Boolean(aiAutoReplyState?.enabled)}
+                  disabled={aiAutoReplySaving || aiAutoReplyState?.canToggle === false}
+                  onValueChange={(nextVal) => {
+                    void handleUpdateMobileAiAutoReply({
+                      enabled: nextVal,
+                      delayMinutes: aiAutoReplyState?.delayMinutes || 5,
+                    });
+                  }}
+                  trackColor={{ false: '#CBD5E1', true: '#34D399' }}
+                  thumbColor={aiAutoReplyState?.enabled ? '#059669' : '#FFFFFF'}
+                />
+              </View>
+
+              <View style={styles.aiAutoReplyDelayHeaderRow}>
+                <Text style={styles.aiAutoReplyDelayHeading}>Thời gian chờ giảng viên/Admin</Text>
+                <View style={styles.aiAutoReplyDelaySummaryChip}>
+                  <Text style={styles.aiAutoReplyDelaySummaryText}>{aiAutoReplyState?.delayMinutes || 5} phút</Text>
+                </View>
+              </View>
+              <View style={styles.aiAutoReplyDelayGrid}>
+                {[1, 3, 5, 10, 15, 30].map((mins) => {
+                  const active = (aiAutoReplyState?.delayMinutes || 5) === mins;
+                  return (
+                    <Pressable
+                      key={mins}
+                      disabled={aiAutoReplySaving || aiAutoReplyState?.canToggle === false}
+                      onPress={() => { void handleUpdateMobileAiAutoReply({ delayMinutes: mins }); }}
+                      style={[
+                        styles.aiAutoReplyDelayChip,
+                        active && styles.aiAutoReplyDelayChipActive,
+                        aiAutoReplyState?.canToggle === false && styles.aiAutoReplyDisabled,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text style={[styles.aiAutoReplyDelayChipText, active && styles.aiAutoReplyDelayChipTextActive]}>
+                        {mins} phút
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.aiAutoReplyDescCard}>
+                <Text style={styles.aiAutoReplyDesc}>
+                  Nếu giảng viên hoặc Admin chưa phản hồi trong {aiAutoReplyState?.delayMinutes || 5} phút, DewSkill AI sẽ tự động trả lời học viên.
+                </Text>
+              </View>
+
+              {aiAutoReplyState?.canToggle === false ? (
+                <View style={styles.aiAutoReplyLockBanner}>
+                  <Lock size={13} color="#92400E" />
+                  <Text style={styles.aiAutoReplyLockText}>
+                    {aiAutoReplyState?.lockedReason || 'Admin đang khóa cài đặt AI tự động trả lời.'}
+                  </Text>
+                </View>
+              ) : null}
+
+              <Pressable
+                onPress={() => setAiAutoReplyModalOpen(false)}
+                style={styles.aiAutoReplyCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Xong"
+              >
+                <Text style={styles.aiAutoReplyCloseBtnText}>Xong</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
         <Modal visible={picker !== null} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
           <View style={styles.pickerBackdrop}>
             <Pressable
@@ -5042,15 +5324,69 @@ const styles = createThemedStyles((colors) => StyleSheet.create({
   aiRestartFooterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#059669' },
   aiRestartFooterBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   sticker: { fontSize: 38, lineHeight: 46 },
-  composerBar: { alignSelf: 'stretch', marginHorizontal: -spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  composerBar: { alignSelf: 'stretch', marginHorizontal: -spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 8, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
   composerLocked: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 14, backgroundColor: '#F1F5F9' },
   composerLockedText: { flex: 1, color: '#64748B', fontSize: 13, fontWeight: '700' },
-  composerTools: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  composerIcon: { width: 32, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  composerInputPill: { flex: 1, height: 42, minHeight: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 21, paddingHorizontal: 12 },
-  composerTextInput: { flex: 1, height: 40, color: '#1E293B', fontSize: typography.small, lineHeight: 20, paddingTop: Platform.OS === 'web' ? 10 : 0, paddingBottom: 0, paddingHorizontal: 0, textAlignVertical: 'center' },
-  composerEmoji: { width: 28, height: 38, alignItems: 'center', justifyContent: 'center' },
-  composerSendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#34D399', alignItems: 'center', justifyContent: 'center', shadowColor: '#34D399', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 },
+  composerTools: { flexDirection: 'row', alignItems: 'center', gap: 1, flexShrink: 0 },
+  composerIcon: { width: 30, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  composerInputPill: { flex: 1, minWidth: 0, height: 42, minHeight: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 21, paddingHorizontal: 10 },
+  composerTextInput: { flex: 1, minWidth: 0, height: 40, color: '#1E293B', fontSize: typography.small, lineHeight: 20, paddingTop: Platform.OS === 'web' ? 10 : 0, paddingBottom: 0, paddingHorizontal: 0, textAlignVertical: 'center' },
+  composerEmoji: { width: 26, height: 38, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  composerAiBtn: { height: 38, flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 19, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  composerAiBtnActive: { borderColor: '#6EE7B7', backgroundColor: '#ECFDF5' },
+  composerAiBtnCompact: { paddingHorizontal: 8 },
+  composerAiBtnText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  composerAiBtnTextActive: { color: '#065F46' },
+  composerAiOnBadge: { borderRadius: 999, backgroundColor: '#059669', paddingHorizontal: 6, paddingVertical: 2 },
+  composerAiOnBadgeText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' },
+  composerSendBtn: { width: 40, height: 40, flexShrink: 0, borderRadius: 20, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center', shadowColor: '#059669', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 },
+  bubbleAiAutoReply: { backgroundColor: '#F0FDF4', borderColor: '#A7F3D0' },
+  aiAutoReplyIdentityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  aiAutoReplySenderName: { color: '#065F46', fontSize: 11.5, fontWeight: '800' },
+  aiAutoReplyBadgePill: { paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 999, backgroundColor: '#D1FAE5', borderWidth: 1, borderColor: '#A7F3D0' },
+  aiAutoReplyBadgeText: { color: '#047857', fontSize: 9.5, fontWeight: '800' },
+  aiAutoReplyFooterCaption: { marginTop: 6, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#D1FAE5', color: '#047857', fontSize: 10.5, fontStyle: 'italic', lineHeight: 14 },
+  aiAutoReplyStatusBar: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: -spacing.sm, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
+  aiAutoReplyStatusBarAmber: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  aiAutoReplyStatusBarSlate: { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+  aiAutoReplyStatusText: { flex: 1, color: '#065F46', fontSize: 11.5, fontWeight: '700' },
+  aiAutoReplyStatusTextAmber: { color: '#92400E' },
+  aiAutoReplyStatusTextSlate: { color: '#475569' },
+  aiAutoReplySheet: { width: '100%', paddingHorizontal: spacing.lg, paddingTop: 10, paddingBottom: spacing.xl, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: '#FFFFFF', gap: 14 },
+  aiAutoReplyHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 999, backgroundColor: '#E2E8F0', marginBottom: 2 },
+  aiAutoReplySheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  aiAutoReplySheetTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
+  aiAutoReplyIconBadge: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  aiAutoReplyTitleMeta: { flex: 1, minWidth: 0 },
+  aiAutoReplySheetTitle: { fontSize: 14.5, fontWeight: '800', color: '#0F172A' },
+  aiAutoReplySheetSub: { fontSize: 11.5, fontWeight: '500', color: '#64748B', marginTop: 1 },
+  aiAutoReplyStateChip: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: '#F1F5F9' },
+  aiAutoReplyStateChipOn: { backgroundColor: '#D1FAE5' },
+  aiAutoReplyStateDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' },
+  aiAutoReplyStateDotOn: { backgroundColor: '#10B981' },
+  aiAutoReplyStateChipText: { fontSize: 11, fontWeight: '700', color: '#475569' },
+  aiAutoReplyStateChipTextOn: { color: '#047857' },
+  aiAutoReplySwitchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 14, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  aiAutoReplySwitchRowOn: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  aiAutoReplySwitchCopy: { flex: 1, minWidth: 0, gap: 3 },
+  aiAutoReplySwitchLabel: { fontSize: 13, fontWeight: '700', color: '#1E293B' },
+  aiAutoReplySwitchSub: { fontSize: 11.5, color: '#64748B', lineHeight: 16 },
+  aiAutoReplyDelayHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  aiAutoReplyDelayHeading: { fontSize: 12.5, fontWeight: '700', color: '#334155' },
+  aiAutoReplyDelaySummaryChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
+  aiAutoReplyDelaySummaryText: { fontSize: 11, fontWeight: '700', color: '#047857' },
+  aiAutoReplyDelayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  aiAutoReplyDelayChip: { flexBasis: '31%', flexGrow: 1, height: 38, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  aiAutoReplyDelayChipActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  aiAutoReplyDelayChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  aiAutoReplyDelayChipTextActive: { color: '#FFFFFF' },
+  aiAutoReplyDescCard: { padding: 12, borderRadius: 14, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9' },
+  aiAutoReplyDesc: { fontSize: 11.5, color: '#64748B', lineHeight: 17 },
+  aiAutoReplyLockBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
+  aiAutoReplyLockText: { flex: 1, fontSize: 11.5, fontWeight: '600', color: '#92400E' },
+  aiAutoReplyDisabled: { opacity: 0.45 },
+  aiAutoReplyCloseBtn: { marginTop: 2, minHeight: 44, borderRadius: 14, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
+  aiAutoReplyCloseBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   messageInput: { minHeight: 42, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, color: colors.ink, fontSize: typography.small },
   composerSendBtnDisabled: { opacity: 0.45, shadowOpacity: 0 },
   replyBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.brandSoft, borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },

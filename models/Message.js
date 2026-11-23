@@ -64,6 +64,14 @@ const messageSchema = new mongoose.Schema({
   fileExpiredAt: { type: Date },
   /** Metadata tùy chọn (vd. xếp lịch: scheduleId, date, course…). */
   payload: { type: mongoose.Schema.Types.Mixed, default: null },
+  /** Nguồn gửi: human (người dùng), ai (DewSkill AI Auto-Reply), system. */
+  senderType: {
+    type: String,
+    enum: ['human', 'ai', 'system'],
+    default: 'human',
+  },
+  /** Metadata tin nhắn DewSkill AI Auto-Reply (source, trigger, triggeringMessageId, idempotencyKey, knowledgeReferences...). */
+  aiMetadata: { type: mongoose.Schema.Types.Mixed, default: null },
   /** Số lượt ảnh AI còn lại sau tin này (chỉ tin ảnh gửi Trợ lý AI). */
   aiImageRemaining: { type: Number, default: null },
 
@@ -97,5 +105,9 @@ messageSchema.index({ receiverId: 1, isRead: 1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });
 messageSchema.index({ receiverId: 1, createdAt: -1 });
 messageSchema.index({ messageType: 1, fileExpired: 1, createdAt: 1 });
+messageSchema.index(
+  { 'aiMetadata.idempotencyKey': 1 },
+  { unique: true, sparse: true },
+);
 
 module.exports = mongoose.model('Message', messageSchema);

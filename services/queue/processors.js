@@ -169,6 +169,12 @@ async function processBackupJob(data) {
   return backupService.runBackupJob(data.jobId);
 }
 
+async function processAiAutoReplyJob(data) {
+  const { executeAutoReplyTask } = require('../aiAutoReplyService');
+  if (!data?.taskId) return { ok: false, skipped: 'missing_task_id' };
+  return executeAutoReplyTask(String(data.taskId));
+}
+
 async function processNotifyJob(jobName, data) {
   switch (jobName) {
     case 'otp':
@@ -203,4 +209,5 @@ module.exports = {
   processWelcomeJob,
   processInvoicePdfJob,
   processBackupJob,
+  processAiAutoReplyJob,
 };

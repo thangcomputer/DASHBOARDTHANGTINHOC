@@ -52,6 +52,7 @@ export const SOCKET_EVENTS = {
   SUBMISSION_CHANGED: 'socket:submission:changed',
   STUDENT_CHANGED: 'socket:student:changed',
   AI_SUPPORT_STATUS: 'socket:ai-support:status',
+  AI_AUTO_REPLY_STATUS: 'socket:ai-auto-reply:status',
   CLASS_REMINDER: 'socket:class:reminder',
   NOTIFICATION_READ_SYNC: 'socket:notification:read-sync',
   SCHEDULE_REMINDER_REVOKED: 'socket:schedule:reminder-revoked',
@@ -187,6 +188,7 @@ function bindSocketEvents(instance: Socket, token: string) {
   instance.on('message:delete', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_DELETED, data));
   instance.on('message:pinned', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_PINNED, data));
   instance.on('ai-support:status', (data) => emitDeviceEvent(SOCKET_EVENTS.AI_SUPPORT_STATUS, data));
+  instance.on('ai-auto-reply:status', (data) => emitDeviceEvent(SOCKET_EVENTS.AI_AUTO_REPLY_STATUS, data));
   instance.on('message:read_ack', (data) => emitDeviceEvent(SOCKET_EVENTS.READ_ACK, data));
   instance.on('typing:show', (data) => emitDeviceEvent(SOCKET_EVENTS.TYPING_CHANGE, { ...(data as object), isTyping: true }));
   instance.on('typing:hide', (data) => emitDeviceEvent(SOCKET_EVENTS.TYPING_CHANGE, { ...(data as object), isTyping: false }));

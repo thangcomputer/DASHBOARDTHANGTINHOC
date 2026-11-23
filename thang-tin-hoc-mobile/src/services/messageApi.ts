@@ -46,11 +46,29 @@ type RawMessage = {
   groupId?: string;
   updatedAt?: string;
   isPinned?: boolean;
+  senderType?: 'human' | 'ai' | 'system';
+  aiMetadata?: {
+    senderType?: string;
+    source?: string;
+    trigger?: string;
+    triggeringMessageId?: string;
+    needsHuman?: boolean;
+    caption?: string;
+    knowledgeReferences?: Array<{ docTitle?: string; location?: string }>;
+  } | null;
   reactions?: Array<{ type?: string; userId?: string; userName?: string }>;
   payload?: {
     type?: string;
     sticker_id?: string;
     replyTo?: { id?: string; content?: string; messageType?: string };
+    aiAutoReply?: {
+      senderType?: string;
+      source?: string;
+      trigger?: string;
+      triggeringMessageId?: string;
+      needsHuman?: boolean;
+      caption?: string;
+    };
   };
 };
 
@@ -260,6 +278,12 @@ function mapMessage(raw: RawMessage, user: DemoUser, index: number): ChatMessage
     reactions,
     reaction: getCurrentUserReaction(reactions, user.id),
     pinned: Boolean(raw.isPinned),
+    ...(raw.senderType ? { senderType: raw.senderType } : (raw.senderId === 'ai_support' ? { senderType: 'ai' as const } : {})),
+    ...((raw.aiMetadata && typeof raw.aiMetadata === 'object')
+      ? { aiMetadata: raw.aiMetadata }
+      : (raw.payload?.aiAutoReply && typeof raw.payload.aiAutoReply === 'object'
+        ? { aiMetadata: raw.payload.aiAutoReply }
+        : {})),
     ...(raw.payload?.replyTo?.id ? {
       replyTo: {
         id: String(raw.payload.replyTo.id),
@@ -617,4 +641,40 @@ export async function unblockChatUser(blockedUserId: string) {
   return mobileApiRequest<{ success: boolean; message?: string }>(`/messages/block/${encodeURIComponent(blockedUserId)}`, {
     method: 'DELETE',
   });
+}
+
+export type AiAutoReplyState = {
+  conversationId: string;
+  enabled: boolean;
+  delayMinutes: 1 | 3 | 5 | 10 | 15 | 30 | number;
+  globalEnabled: boolean;
+  allowTeacherToggle: boolean;
+  canToggle: boolean;
+  lockedReason?: string;
+  status: string;
+  statusLabel?: string;
+  dueAt?: string | null;
+  triggeringMessageId?: string;
+};
+
+export async function getConversationAiAutoReplyState(conversationId: string): Promise<AiAutoReplyState | null> {
+  const payload = await mobileApiRequest<{ success?: boolean; data?: AiAutoReplyState }>(
+    `/messages/ai-auto-reply/${encodeURIComponent(conversationId)}`,
+  );
+  return payload?.data || null;
+}
+
+export async function updateConversationAiAutoReplyConfig(
+  conversationId: string,
+  patch: { enabled?: boolean; delayMinutes?: number },
+): Promise<AiAutoReplyState | null> {
+  const payload = await mobileApiRequest<{ success?: boolean; data?: AiAutoReplyState; message?: string }>(
+    `/messages/ai-auto-reply/${encodeURIComponent(conversationId)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    },
+  );
+  return payload?.data || null;
 }

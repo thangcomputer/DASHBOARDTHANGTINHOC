@@ -9,7 +9,7 @@ import {
   Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3, Award,
   Laptop, Lock, Unlock,
 } from 'lucide-react';
-import api from '../services/api';
+import api, { apiFetch } from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments, getActiveClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
@@ -287,6 +287,20 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   /** { [enrollmentId]: { totalSessions, completedSessions, remainingSessions, courseName, isPrimary, status, teacherAlert } } */
   const [enrollmentSessionForms, setEnrollmentSessionForms] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
+  const [dbCourses, setDbCourses] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/courses')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json?.success && Array.isArray(json.data)) {
+          setDbCourses(json.data);
+        }
+      })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const {
     updateStudent, assignTeacher, teachers, triggerBackgroundSync, examSubjectsCatalog, currentUser,
@@ -650,8 +664,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     const enrParam = enrollmentId && enrollmentId !== 'main' ? enrollmentId : undefined;
     try {
       await assignTeacher?.(sid, teacherId || null, enrParam);
+      toast.success(teacherId ? 'Đã phân công giảng viên' : 'Đã bỏ phân công giảng viên');
       reloadProfile();
-    } catch { /* ignore */ }
+    } catch (err) {
+      toast.error(err?.message || 'Không phân công được giảng viên');
+    }
   };
 
   const handleAddEnrollmentSubmit = async (payload) => {
@@ -1792,14 +1809,42 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                           if (enrollments.length === 0) return null;
                           const activeTeachers = (teachers || []).filter((t) => String(t.status || '').toLowerCase() === 'active');
                           const studentBranchId = data.student?.branchId;
+                          const findCatalogCourse = (courseOrEnr) => {
+                            if (!courseOrEnr || !dbCourses?.length) return null;
+                            const cid = typeof courseOrEnr === 'object' ? String(courseOrEnr.courseId || '').trim() : '';
+                            if (cid) {
+                              const byId = dbCourses.find((c) => String(c._id || c.id || '') === cid);
+                              if (byId) return byId;
+                            }
+                            const rawName = typeof courseOrEnr === 'string'
+                              ? courseOrEnr
+                              : (courseOrEnr.courseName || courseOrEnr.name || '');
+                            const normName = String(rawName || '').trim().toLowerCase();
+                            if (!normName) return null;
+                            return dbCourses.find((c) => String(c.name || '').trim().toLowerCase() === normName) || null;
+                          };
                           const splitTeachers = (courseOrEnr) => {
                             const matched = [];
                             const branchId = toBranchId(studentBranchId);
+                            const catalogCourse = findCatalogCourse(courseOrEnr);
                             for (const t of activeTeachers) {
                               if (!teacherInStudentBranch(t, branchId)) continue;
-                              if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog)) {
+                              const matchesEnr = teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog);
+                              const matchesCatalog = catalogCourse
+                                ? teacherMatchesCourse(t, catalogCourse, examSubjectsCatalog)
+                                : false;
+                              if (matchesEnr || matchesCatalog) {
                                 matched.push(t);
                               }
+                            }
+                            const currentTid = courseOrEnr?.teacherId ? String(courseOrEnr.teacherId?._id || courseOrEnr.teacherId) : '';
+                            if (currentTid && !matched.some((t) => String(t.id || t._id) === currentTid)) {
+                              const currentTeacher = (teachers || []).find((t) => String(t.id || t._id) === currentTid);
+                              matched.unshift(currentTeacher || {
+                                id: currentTid,
+                                _id: currentTid,
+                                name: courseOrEnr?.teacherName || 'Giảng viên hiện tại',
+                              });
                             }
                             return matched;
                           };

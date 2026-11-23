@@ -146,18 +146,34 @@ export async function endAiSupportConversation(conversationId: string) {
 
 export type AiQuestionQuota = {
   applies: boolean;
+  mode?: 'percent';
+  unit?: 'percent';
   used: number;
   remaining: number | null;
   limit: number;
+  percentUsed?: number;
+  percentLeft?: number;
+  budgetUsedBp?: number;
+  budgetLimitBp?: number;
+  resetInMs?: number;
+  resetsAt?: string;
   date?: string;
 };
 
 export type AiImageQuota = {
   applies?: boolean;
   allowed?: boolean;
+  mode?: 'percent';
+  unit?: 'percent';
   used: number;
   remaining: number | null;
   limit: number | null;
+  percentUsed?: number;
+  percentLeft?: number;
+  budgetUsedBp?: number;
+  budgetLimitBp?: number;
+  resetInMs?: number;
+  resetsAt?: string;
   date?: string;
 };
 

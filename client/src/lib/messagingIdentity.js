@@ -269,6 +269,10 @@ export function normalizeMessage(raw = {}) {
     fileName: raw.fileName || '',
     fileExpired: Boolean(raw.fileExpired),
     payload: raw.payload && typeof raw.payload === 'object' ? raw.payload : null,
+    senderType: raw.senderType || (senderId === 'ai_support' ? 'ai' : 'human'),
+    aiMetadata: raw.aiMetadata && typeof raw.aiMetadata === 'object'
+      ? raw.aiMetadata
+      : (raw.payload?.aiAutoReply && typeof raw.payload.aiAutoReply === 'object' ? raw.payload.aiAutoReply : null),
     aiImageRemaining: raw.aiImageRemaining == null ? null : Number(raw.aiImageRemaining),
     time: raw.time || (raw.createdAt ? new Date(raw.createdAt) : new Date()),
     createdAt: raw.createdAt,

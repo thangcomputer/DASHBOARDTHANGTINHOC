@@ -204,6 +204,16 @@ async function enrichMessageIdentities(messages = []) {
 
   function resolveSide(id, role, name) {
     const sid = String(id || '');
+    if (sid === 'ai_support') {
+      return {
+        id: 'ai_support',
+        role: 'system',
+        displayRole: 'AI_ASSISTANT',
+        adminRole: null,
+        displayName: String(name || '').trim() || 'DewSkill AI',
+        avatar: '',
+      };
+    }
     if (sid === 'admin') {
       return identityFromHint({
         id: 'admin',

@@ -62,6 +62,7 @@ import {
   type QuickAiAction,
   type QuickAiAttachment,
 } from '../services/aiSupportApi';
+import Svg, { Circle } from 'react-native-svg';
 import { MobileApiError } from '../services/apiClient';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import {
@@ -646,42 +647,58 @@ export function QuickAiPopupModal({
 
   const freeLocked = role === 'student' && isFreePortalLocked(user);
   const isFreeTierStudent = role === 'student' && freeLocked;
-  const defaultQuestionLimit = role === 'teacher' ? 15 : (isFreeTierStudent ? 2 : 10);
-  const defaultImageLimit = role === 'teacher' ? 10 : (isFreeTierStudent ? 0 : 5);
   const questionQuotaApplies = Boolean(
     aiDailyQuota?.questionQuota?.applies ?? (role === 'student' || role === 'teacher'),
   );
-  const rawQuestionLimit = Number(aiDailyQuota?.questionQuota?.limit);
-  const questionQuotaLimit = Number.isFinite(rawQuestionLimit) && rawQuestionLimit > 0
-    ? rawQuestionLimit
-    : defaultQuestionLimit;
-  const questionQuotaLeft = aiDailyQuota?.questionQuota?.remaining != null
-    ? Number(aiDailyQuota.questionQuota.remaining)
-    : questionQuotaLimit;
+  const rawPercentLeft = aiDailyQuota?.questionQuota?.percentLeft ?? aiDailyQuota?.questionQuota?.remaining;
+  const questionQuotaLeft = rawPercentLeft != null
+    ? Math.max(0, Math.min(100, Number(rawPercentLeft)))
+    : 100;
   const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
   const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
   const imageQuotaLimit = rawImageLimit !== null
     && rawImageLimit !== undefined
     && Number.isFinite(Number(rawImageLimit))
     ? Number(rawImageLimit)
-    : defaultImageLimit;
+    : (isFreeTierStudent ? 0 : 100);
   const imageUploadDisallowed = Boolean(
     role === 'student'
     && (aiDailyQuota?.imageQuota
       ? (aiDailyQuota.imageQuota.allowed === false || imageQuotaLimit === 0)
       : isFreeTierStudent),
   );
-  const imageQuotaLeft = aiDailyQuota?.imageQuota?.remaining != null
-    ? Number(aiDailyQuota.imageQuota.remaining)
-    : imageQuotaLimit;
+  const rawImgPercentLeft = aiDailyQuota?.imageQuota?.percentLeft ?? aiDailyQuota?.imageQuota?.remaining;
+  const imageQuotaLeft = rawImgPercentLeft != null
+    ? Math.max(0, Math.min(100, Number(rawImgPercentLeft)))
+    : (imageUploadDisallowed ? 0 : questionQuotaLeft);
   const isVisionAttachment = Boolean(attachment?.isImage || attachment?.mimeType === 'application/pdf');
   const imageQuotaBlocked = Boolean(
     isVisionAttachment
     && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0))),
   );
+  const resetCountdownText = useMemo(() => {
+    let ms = Number(aiDailyQuota?.questionQuota?.resetInMs);
+    const resetsAt = aiDailyQuota?.questionQuota?.resetsAt;
+    if (!Number.isFinite(ms) && resetsAt) {
+      ms = new Date(resetsAt).getTime() - Date.now();
+    }
+    if (!Number.isFinite(ms)) {
+      const vnNow = Date.now() + 7 * 60 * 60 * 1000;
+      const dayMs = 24 * 60 * 60 * 1000;
+      const elapsed = ((vnNow % dayMs) + dayMs) % dayMs;
+      ms = Math.max(60 * 1000, dayMs - elapsed);
+    }
+    const totalMins = Math.max(1, Math.ceil(Math.max(60 * 1000, ms) / 60000));
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (isEn) {
+      return h > 0 && m > 0 ? `${h}h ${m}m` : (h > 0 ? `${h}h` : `${m}m`);
+    }
+    return h > 0 && m > 0 ? `${h}h ${m}p` : (h > 0 ? `${h}h` : `${m}p`);
+  }, [aiDailyQuota?.questionQuota?.resetInMs, aiDailyQuota?.questionQuota?.resetsAt, isEn]);
   const freeStudentImageBlockMsg = isEn
-    ? 'Free accounts do not support sending images to DewSkill AI. Ask by text (up to 2 turns/day) or upgrade.'
-    : 'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ (tối đa 2 lượt/ngày) hoặc nâng cấp gói.';
+    ? 'Free accounts do not support sending images to DewSkill AI. Ask by text or upgrade your plan.'
+    : 'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ hoặc nâng cấp gói.';
   const isWideWeb = Platform.OS === 'web' && windowWidth >= 640;
   const sheetMaxHeight = Math.round(windowHeight * (isWideWeb ? 0.86 : 0.92));
 
@@ -1023,8 +1040,8 @@ export function QuickAiPopupModal({
     if (questionQuotaBlocked) {
       setAttachError(
         isEn
-          ? `Used all ${questionQuotaLimit} AI turns today — resets 0:00.`
-          : `Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00.`,
+          ? 'You have used 100% of your daily AI quota (0% left) — resets at 00:00.'
+          : 'Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%) — tự động reset lúc 00:00.',
       );
       return;
     }
@@ -1034,8 +1051,8 @@ export function QuickAiPopupModal({
         imageUploadDisallowed
           ? freeStudentImageBlockMsg
           : (isEn
-            ? `Used all ${imageQuotaLimit} images today — ask by text if turns remain.`
-            : `Bạn đã gửi đủ ${imageQuotaLimit} ảnh hôm nay — ngày mai gửi tiếp hoặc hỏi bằng chữ.`),
+            ? 'You have used 100% of your daily AI quota (0% left) — resets at 00:00.'
+            : 'Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%) — tự động reset lúc 00:00.'),
       );
       return;
     }
@@ -1123,31 +1140,36 @@ export function QuickAiPopupModal({
         setAiDailyQuota((prev) => {
           const base = prev || {};
           if (errCode === 'AI_QUESTION_QUOTA') {
-            const qLimit = base.questionQuota?.limit ?? defaultQuestionLimit;
             return {
               ...base,
               questionQuota: {
                 ...(base.questionQuota || {}),
                 applies: true,
-                limit: qLimit,
+                mode: 'percent',
+                limit: 100,
                 remaining: 0,
-                used: qLimit,
+                percentLeft: 0,
+                used: 100,
+                percentUsed: 100,
               },
             };
           }
           const rawLim = base.imageQuota?.limit;
           const imgLim = rawLim !== null && rawLim !== undefined && Number.isFinite(Number(rawLim))
             ? Number(rawLim)
-            : defaultImageLimit;
+            : (isFreeTierStudent ? 0 : 100);
           return {
             ...base,
             imageQuota: {
               ...(base.imageQuota || {}),
               applies: true,
+              mode: 'percent',
               allowed: base.imageQuota?.allowed !== undefined ? base.imageQuota.allowed : imgLim > 0,
               limit: imgLim,
               remaining: 0,
-              used: imgLim,
+              percentLeft: 0,
+              used: 100,
+              percentUsed: 100,
             },
           };
         });
@@ -1201,17 +1223,14 @@ export function QuickAiPopupModal({
     aiDailyQuota,
     asking,
     attachment,
-    defaultImageLimit,
-    defaultQuestionLimit,
     freeStudentImageBlockMsg,
     imageQuotaLeft,
-    imageQuotaLimit,
     imageUploadDisallowed,
     isEn,
+    isFreeTierStudent,
     language,
     messages,
     questionQuotaBlocked,
-    questionQuotaLimit,
     recentScopeId,
   ]);
 
@@ -1658,24 +1677,6 @@ export function QuickAiPopupModal({
             {attachError ? (
               <Text style={styles.attachErrorText}>{attachError}</Text>
             ) : null}
-            {(role === 'student' || role === 'teacher') && questionQuotaApplies ? (
-              <Text style={styles.quotaBarText}>
-                {questionQuotaBlocked
-                  ? (isFreeTierStudent || imageUploadDisallowed
-                    ? (isEn
-                      ? `Used all ${questionQuotaLimit} free AI turns today — resets 0:00, or upgrade for 10 turns & 5 images/day.`
-                      : `Hết ${questionQuotaLimit} lượt AI miễn phí hôm nay — reset 0:00, hoặc nâng cấp gói để có 10 lượt AI & 5 ảnh/ngày.`)
-                    : (isEn
-                      ? `Used all ${questionQuotaLimit} AI turns today — resets 0:00.`
-                      : `Hết ${questionQuotaLimit} lượt AI hôm nay — reset 0:00.`))
-                  : `${isEn ? 'Today' : 'Hôm nay'}: ${Math.max(0, questionQuotaLimit - Math.max(0, questionQuotaLeft))}/${questionQuotaLimit} ${isEn ? 'AI turns' : 'lượt AI'}`}
-                {imageUploadDisallowed
-                  ? ` · ${isEn ? 'Images not supported' : 'Không hỗ trợ gửi ảnh'}`
-                  : (imageQuotaLimit > 0
-                    ? ` · ${isEn ? 'images' : 'ảnh'}: ${Math.max(0, imageQuotaLimit - Math.max(0, imageQuotaLeft))}/${imageQuotaLimit}`
-                    : '')}
-              </Text>
-            ) : null}
             <View style={styles.composerPill}>
               <Pressable
                 onPress={() => void handlePickAttachment()}
@@ -1721,6 +1722,59 @@ export function QuickAiPopupModal({
                 )}
               </Pressable>
             </View>
+            {(role === 'student' || role === 'teacher') && questionQuotaApplies ? (() => {
+              const radius = 5;
+              const circumference = 2 * Math.PI * radius;
+              const clampedPct = Math.max(0, Math.min(100, Number(questionQuotaLeft) || 0));
+              const strokeDashoffset = circumference * (1 - clampedPct / 100);
+              const ringColor = questionQuotaBlocked ? '#EF4444' : (clampedPct <= 20 ? '#F59E0B' : '#10B981');
+              const statusText = questionQuotaBlocked
+                ? (isFreeTierStudent || imageUploadDisallowed
+                  ? (isEn
+                    ? `0% left · Resets in ${resetCountdownText} · Upgrade for more & images`
+                    : `0% còn lại · Reset sau ${resetCountdownText} · Nâng cấp để dùng thêm & gửi ảnh`)
+                  : (isEn
+                    ? `0% left · Resets in ${resetCountdownText}`
+                    : `0% còn lại · Reset sau ${resetCountdownText}`))
+                : (isEn
+                  ? `${clampedPct}% left · Resets in ${resetCountdownText}${imageUploadDisallowed ? ' · No images' : ''}`
+                  : `${clampedPct}% còn lại · Reset sau ${resetCountdownText}${imageUploadDisallowed ? ' · Không gửi ảnh' : ''}`);
+              return (
+                <View style={styles.quotaBarRow}>
+                  <View style={styles.quotaRingWrap}>
+                    <Svg width={13} height={13} viewBox="0 0 14 14">
+                      <Circle
+                        cx={7}
+                        cy={7}
+                        r={radius}
+                        fill="none"
+                        stroke="#CBD5E1"
+                        strokeWidth={2}
+                      />
+                      {clampedPct > 0 ? (
+                        <Circle
+                          cx={7}
+                          cy={7}
+                          r={radius}
+                          fill="none"
+                          stroke={ringColor}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeDasharray={`${circumference} ${circumference}`}
+                          strokeDashoffset={strokeDashoffset}
+                          rotation={-90}
+                          originX={7}
+                          originY={7}
+                        />
+                      ) : null}
+                    </Svg>
+                  </View>
+                  <Text style={[styles.quotaBarText, questionQuotaBlocked && styles.quotaBarTextWarn]}>
+                    {statusText}
+                  </Text>
+                </View>
+              );
+            })() : null}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -2190,11 +2244,28 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     paddingHorizontal: 4,
   },
+  quotaBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    marginTop: 5,
+  },
+  quotaRingWrap: {
+    width: 13,
+    height: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   quotaBarText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#64748B',
-    paddingHorizontal: 4,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#94A3B8',
+    textAlign: 'left',
+  },
+  quotaBarTextWarn: {
+    color: '#D97706',
   },
   composerPill: {
     flexDirection: 'row',

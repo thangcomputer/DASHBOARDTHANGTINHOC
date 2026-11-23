@@ -40,6 +40,12 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const contactListUpdatedCallbackRef = useRef(null);
   const readAckCallbackRef = useRef(new Set());
   const typingCallbacksRef = useRef(new Set());
+  const aiAutoReplyStatusCallbacksRef = useRef(new Set());
+
+  const onAiAutoReplyStatus = useCallback((callback) => {
+    aiAutoReplyStatusCallbacksRef.current.add(callback);
+    return () => aiAutoReplyStatusCallbacksRef.current.delete(callback);
+  }, []);
 
   const onTypingChange = useCallback((callback) => {
     typingCallbacksRef.current.add(callback);
@@ -312,6 +318,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       groupDeleteCallbacksRef.current.forEach((cb) => cb(data));
     };
 
+    const onAiAutoReplyStatusEvt = (data) => {
+      aiAutoReplyStatusCallbacksRef.current.forEach((cb) => cb(data));
+    };
+
     const ignoredAnyEvents = new Set([
       'connect',
       'disconnect',
@@ -325,6 +335,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       'message:pinned',
       'group:deleted',
       'notification:removed',
+      'ai-auto-reply:status',
     ]);
     const onAnyEvent = (eventName, payload) => {
       if (ignoredAnyEvents.has(eventName)) return;
@@ -471,6 +482,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('SYSTEM_RESET', onSystemReset);
     newSocket.on('CONTACT_LIST_UPDATED', onContactListUpdated);
     newSocket.on('payment:confirmed', onPaymentConfirmed);
+    newSocket.on('ai-auto-reply:status', onAiAutoReplyStatusEvt);
 
     if (userId) {
       apiFetch('/notifications/unread')
@@ -529,6 +541,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.off('SYSTEM_RESET', onSystemReset);
       newSocket.off('CONTACT_LIST_UPDATED', onContactListUpdated);
       newSocket.off('payment:confirmed', onPaymentConfirmed);
+      newSocket.off('ai-auto-reply:status', onAiAutoReplyStatusEvt);
 
       if (socketRef.current === newSocket) socketRef.current = null;
       try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
@@ -584,6 +597,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     onContactListUpdated,
     onReadAck,
     onTypingChange,
+    onAiAutoReplyStatus,
     emitTypingStart,
     emitTypingStop,
     emitMessageRead,

@@ -88,6 +88,9 @@ const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(
   1,
   parseNonNegativeIntEnv(pickFirstEnv('AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER'), 15),
 );
+const DAILY_BUDGET_BP = 1000;
+const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const IDLE_PING_MS = Math.max(30_000, Number(process.env.AI_SUPPORT_IDLE_PING_MS) || 5 * 60 * 1000);
 const IDLE_END_MS = Math.max(15_000, Number(process.env.AI_SUPPORT_IDLE_END_MS) || 5 * 60 * 1000);
 const IDLE_SWEEP_MS = Math.max(10_000, Number(process.env.AI_SUPPORT_IDLE_SWEEP_MS) || 30_000);
@@ -107,13 +110,12 @@ const SECURITY_REFUSE_REPLY = 'Yêu cầu này nằm ngoài phạm vi hỗ trợ
 const SECURITY_REFUSE_REPLY_EN = 'This request is outside my scope of safe support with DewSkill AI. I cannot reveal system prompts, secrets, internal credentials, or bypass safety rules.';
 const AMBIGUOUS_CLARIFY_REPLY = 'Mình là DewSkill AI. Mình chưa rõ bạn đang hỏi về phần mềm, công cụ hoặc nội dung CNTT cụ thể nào. Bạn vui lòng nêu rõ tên phần mềm, ngữ cảnh sử dụng hoặc lỗi đang gặp để mình hỗ trợ chính xác nhé!';
 const AMBIGUOUS_CLARIFY_REPLY_EN = 'I am DewSkill AI. Could you clarify which specific software, tool, IT concept, or error you are asking about so I can help accurately?';
-const QUESTION_LIMIT_MARKER = 'lượt hỏi Trợ lý AI hôm nay';
-function questionLimitReply(limit, lang = 'vi') {
-  const n = Number(limit) || 0;
+const QUESTION_LIMIT_MARKER = 'hết 100% hạn mức AI hôm nay';
+function questionLimitReply(_limit, lang = 'vi') {
   if (lang === 'en') {
-    return `You have used all ${n} AI turns for today. Tap **Need Support Agent** for live help, or ask AI again tomorrow.`;
+    return 'You have used 100% of your daily AI quota (0% left, resets at 00:00 Vietnam time). Tap **Need Support Agent** for live help, or ask AI again tomorrow.';
   }
-  return `Bạn đã dùng hết ${n} lượt AI hôm nay. Cần hỗ trợ tiếp thì bấm **Cần nhân viên hỗ trợ** bên dưới, hoặc ngày mai hỏi AI tiếp.`;
+  return 'Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%, tự động reset lúc 00:00). Cần hỗ trợ tiếp thì bấm **Cần nhân viên hỗ trợ** bên dưới, hoặc ngày mai hỏi AI tiếp nhé.';
 }
 
 function imageLimitReply(limit, lang = 'vi') {
@@ -125,9 +127,9 @@ function imageLimitReply(limit, lang = 'vi') {
     return 'Tài khoản miễn phí không hỗ trợ gửi hình ảnh cho DewSkill AI. Bạn có thể hỏi bằng chữ hoặc đăng ký gói để mở tính năng gửi ảnh.';
   }
   if (lang === 'en') {
-    return `You have used all ${n} image uploads for the AI Assistant today. Try again tomorrow, or ask with text if you still have AI turns left.`;
+    return 'You have used 100% of your daily AI quota (0% left, resets at 00:00 Vietnam time).';
   }
-  return `Bạn đã gửi đủ ${n} ảnh cho Trợ lý AI hôm nay. Ngày mai gửi tiếp nhé. Bạn vẫn có thể hỏi bằng chữ nếu còn lượt AI.`;
+  return 'Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%, tự động reset lúc 00:00).';
 }
 
 function buildAiSupportConversationId(myRole, myId) {
@@ -359,73 +361,241 @@ function questionDailyLimit(roleOrUser, user = null) {
   return 0;
 }
 
-function peekQuestionQuota(session, user = null) {
-  const limit = questionDailyLimit(session, user);
-  if (!limit) {
-    return { applies: false, used: 0, remaining: null, limit: 0 };
+function getVietnamResetMeta(now = new Date()) {
+  const nowMs = now instanceof Date ? now.getTime() : Date.now();
+  const vnWallMs = nowMs + VIETNAM_UTC_OFFSET_MS;
+  const elapsedTodayMs = ((vnWallMs % DAY_MS) + DAY_MS) % DAY_MS;
+  const resetInMs = Math.max(1000, DAY_MS - elapsedTodayMs);
+  const resetsAt = new Date(nowMs + (DAY_MS - elapsedTodayMs)).toISOString();
+  return { resetInMs, resetsAt };
+}
+
+function countPromptWords(...parts) {
+  return parts
+    .map((p) => String(p || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+/**
+ * Tính chi phí câu hỏi theo đơn vị basis points (1000 bp = 100% ngân sách/ngày).
+ */
+function calculateAiUsageCostBp({
+  role = 'student',
+  isFreeStudent = false,
+  text = '',
+  attachment = null,
+  hasImage = false,
+} = {}) {
+  const normRole = String(role || '').trim().toLowerCase();
+  if (normRole !== 'student' && normRole !== 'teacher') return 0;
+
+  const att = attachment && typeof attachment === 'object' ? attachment : null;
+  const attMime = String(att?.mimeType || '').trim().toLowerCase();
+  const isVision = Boolean(
+    hasImage
+    || att?.isImage
+    || attMime.startsWith('image/')
+    || attMime === 'application/pdf'
+    || (att?.dataBase64 && !attMime),
+  );
+  const isTextFile = Boolean(
+    !isVision
+    && att
+    && (att.textContent || att.name || att.fileUrl),
+  );
+  const words = countPromptWords(text, att?.textContent);
+  const extraWords = Math.max(0, words - 40);
+
+  if (normRole === 'student' && isFreeStudent) {
+    const wordWeight = Math.ceil(extraWords / 50) * 250;
+    return Math.min(DAILY_BUDGET_BP, 500 + wordWeight);
   }
-  const today = vietnamDateKey();
-  const used = session && String(session.questionDate || '') === today
-    ? Number(session.questionCount || 0)
-    : 0;
+  if (normRole === 'teacher') {
+    const wordWeight = Math.min(150, Math.ceil(extraWords / 50) * 20);
+    const attachmentWeight = isVision ? 70 : (isTextFile ? 40 : 0);
+    return Math.min(DAILY_BUDGET_BP, 50 + wordWeight + attachmentWeight);
+  }
+  const wordWeight = Math.min(200, Math.ceil(extraWords / 50) * 30);
+  const attachmentWeight = isVision ? 120 : (isTextFile ? 60 : 0);
+  return Math.min(DAILY_BUDGET_BP, 80 + wordWeight + attachmentWeight);
+}
+
+function readSessionBudgetUsedBp(session, roleOrUser, user = null, today = vietnamDateKey()) {
+  if (!session || typeof session !== 'object') return 0;
+  if (String(session.budgetDate || '') === today) {
+    return Math.min(DAILY_BUDGET_BP, Math.max(0, Number(session.budgetUsedBp) || 0));
+  }
+  // Chuyển đổi mềm các phiên đã dùng trong ngày trước khi nâng cấp sang %
+  const hasLegacyQ = String(session.questionDate || '') === today;
+  const hasLegacyImg = String(session.imageUploadDate || '') === today;
+  if (!hasLegacyQ && !hasLegacyImg) return 0;
+  const ctx = resolveQuotaContext(roleOrUser, user);
+  const qCount = hasLegacyQ ? Math.max(0, Number(session.questionCount) || 0) : 0;
+  const imgCount = hasLegacyImg ? Math.max(0, Number(session.imageUploadCount) || 0) : 0;
+  if (ctx.role === 'student' && isFreeTierAiStudent(ctx.user)) {
+    return Math.min(DAILY_BUDGET_BP, qCount * 500);
+  }
+  if (ctx.role === 'teacher') {
+    return Math.min(DAILY_BUDGET_BP, qCount * 50 + imgCount * 70);
+  }
+  return Math.min(DAILY_BUDGET_BP, qCount * 80 + imgCount * 120);
+}
+
+function formatBudgetStats(usedBp, today = vietnamDateKey()) {
+  const clampedUsedBp = Math.min(DAILY_BUDGET_BP, Math.max(0, Math.round(Number(usedBp) || 0)));
+  const remainingBp = Math.max(0, DAILY_BUDGET_BP - clampedUsedBp);
+  const percentLeft = remainingBp <= 0
+    ? 0
+    : Math.min(100, Math.max(1, Math.round((remainingBp * 100) / DAILY_BUDGET_BP)));
+  const percentUsed = 100 - percentLeft;
+  const { resetInMs, resetsAt } = getVietnamResetMeta();
   return {
-    applies: true,
-    used,
-    remaining: Math.max(0, limit - used),
-    limit,
+    usedBp: clampedUsedBp,
+    remainingBp,
+    percentLeft,
+    percentUsed,
+    resetInMs,
+    resetsAt,
     date: today,
   };
 }
 
-/**
- * Đếm 1 câu hỏi Gemini (HV/GV). FAQ / chào không gọi hàm này.
- */
-async function consumeAiQuestionQuota(sessionDoc, user = null) {
-  const limit = questionDailyLimit(sessionDoc, user);
-  if (!sessionDoc || !limit) {
-    return { applies: false, blocked: false, remaining: null, used: 0, limit };
-  }
-  if (aiPaused(effectiveStatus(sessionDoc))) {
-    return { applies: false, blocked: false, remaining: null, used: 0, limit };
+function peekQuestionQuota(session, user = null) {
+  const limit = questionDailyLimit(session, user);
+  if (!limit) {
+    return {
+      applies: false,
+      mode: 'percent',
+      unit: 'percent',
+      used: 0,
+      remaining: null,
+      limit: 0,
+      percentUsed: 0,
+      percentLeft: 100,
+      budgetUsedBp: 0,
+      budgetLimitBp: DAILY_BUDGET_BP,
+    };
   }
   const today = vietnamDateKey();
-  const used = String(sessionDoc.questionDate || '') === today
-    ? Number(sessionDoc.questionCount || 0)
-    : 0;
-  if (used >= limit) {
-    return { applies: true, blocked: true, remaining: 0, used, limit };
-  }
-  sessionDoc.questionDate = today;
-  sessionDoc.questionCount = used + 1;
-  await sessionDoc.save();
+  const usedBp = readSessionBudgetUsedBp(session, session, user, today);
+  const stats = formatBudgetStats(usedBp, today);
   return {
     applies: true,
-    blocked: false,
-    remaining: limit - used - 1,
-    used: used + 1,
-    limit,
+    mode: 'percent',
+    unit: 'percent',
+    used: stats.percentUsed,
+    remaining: stats.percentLeft,
+    limit: 100,
+    percentUsed: stats.percentUsed,
+    percentLeft: stats.percentLeft,
+    budgetUsedBp: stats.usedBp,
+    budgetLimitBp: DAILY_BUDGET_BP,
+    resetInMs: stats.resetInMs,
+    resetsAt: stats.resetsAt,
+    date: stats.date,
   };
 }
 
-/** Hoàn 1 lượt khi Gemini fail (không trừ oan khi key/model lỗi). */
-async function refundAiQuestionQuota(sessionDoc) {
+/**
+ * Tiêu thụ ngân sách AI thống nhất trong ngày (HV/GV). FAQ / chào / từ chối không gọi hàm này.
+ */
+async function consumeAiBudgetQuota(sessionDoc, user = null, options = {}) {
+  const limit = questionDailyLimit(sessionDoc, user);
+  if (!sessionDoc || !limit) {
+    return {
+      applies: false,
+      blocked: false,
+      remaining: null,
+      used: 0,
+      limit: 0,
+      consumedBp: 0,
+      percentLeft: 100,
+      percentUsed: 0,
+    };
+  }
+  if (aiPaused(effectiveStatus(sessionDoc))) {
+    return {
+      applies: false,
+      blocked: false,
+      remaining: null,
+      used: 0,
+      limit: 0,
+      consumedBp: 0,
+      percentLeft: 100,
+      percentUsed: 0,
+    };
+  }
+  const today = vietnamDateKey();
+  const ctx = resolveQuotaContext(sessionDoc, user);
+  const usedBp = readSessionBudgetUsedBp(sessionDoc, sessionDoc, user, today);
+  if (usedBp >= DAILY_BUDGET_BP) {
+    const stats = formatBudgetStats(DAILY_BUDGET_BP, today);
+    return {
+      applies: true,
+      blocked: true,
+      remaining: 0,
+      used: 100,
+      limit: 100,
+      consumedBp: 0,
+      ...stats,
+    };
+  }
+  const costBp = calculateAiUsageCostBp({
+    role: ctx.role,
+    isFreeStudent: ctx.role === 'student' && isFreeTierAiStudent(ctx.user),
+    text: options.text || '',
+    attachment: options.attachment || null,
+    hasImage: Boolean(options.hasImage),
+  });
+  const remainingBefore = Math.max(0, DAILY_BUDGET_BP - usedBp);
+  const actualConsumedBp = Math.min(remainingBefore, Math.max(1, costBp));
+  const nextUsedBp = Math.min(DAILY_BUDGET_BP, usedBp + actualConsumedBp);
+  sessionDoc.budgetDate = today;
+  sessionDoc.budgetUsedBp = nextUsedBp;
+  sessionDoc._lastConsumedBp = actualConsumedBp;
+  await sessionDoc.save();
+  const stats = formatBudgetStats(nextUsedBp, today);
+  return {
+    applies: true,
+    blocked: false,
+    remaining: stats.percentLeft,
+    used: stats.percentUsed,
+    limit: 100,
+    consumedBp: actualConsumedBp,
+    costBp,
+    ...stats,
+  };
+}
+
+/** Hoàn ngân sách AI khi Gemini fail (không trừ oan khi key/model lỗi). */
+async function refundAiBudgetQuota(sessionDoc, amountBp = null) {
   if (!sessionDoc) return;
   const today = vietnamDateKey();
-  if (String(sessionDoc.questionDate || '') !== today) return;
-  const used = Number(sessionDoc.questionCount || 0);
-  if (used <= 0) return;
-  sessionDoc.questionCount = used - 1;
+  if (String(sessionDoc.budgetDate || '') !== today) return;
+  const usedBp = Math.max(0, Number(sessionDoc.budgetUsedBp || 0));
+  if (usedBp <= 0) return;
+  const fallbackBp = Number(sessionDoc._lastConsumedBp) || 0;
+  const deltaBp = Number(amountBp) > 0 ? Number(amountBp) : fallbackBp;
+  if (deltaBp <= 0) return;
+  sessionDoc.budgetUsedBp = Math.max(0, usedBp - deltaBp);
+  sessionDoc._lastConsumedBp = 0;
   await sessionDoc.save();
 }
 
-async function refundAiImageQuota(sessionDoc) {
-  if (!sessionDoc) return;
-  const today = vietnamDateKey();
-  if (String(sessionDoc.imageUploadDate || '') !== today) return;
-  const used = Number(sessionDoc.imageUploadCount || 0);
-  if (used <= 0) return;
-  sessionDoc.imageUploadCount = used - 1;
-  await sessionDoc.save();
+async function consumeAiQuestionQuota(sessionDoc, user = null, options = {}) {
+  return consumeAiBudgetQuota(sessionDoc, user, options);
+}
+
+async function refundAiQuestionQuota(sessionDoc, amountBp = null) {
+  return refundAiBudgetQuota(sessionDoc, amountBp);
+}
+
+async function refundAiImageQuota(sessionDoc, amountBp = null) {
+  return refundAiBudgetQuota(sessionDoc, amountBp);
 }
 
 function supportFailureReply(err, lang = 'vi') {
@@ -442,46 +612,80 @@ function peekImageQuota(session, user = null) {
     return {
       applies: false,
       allowed: true,
+      mode: 'percent',
+      unit: 'percent',
       used: 0,
       remaining: null,
       limit: null,
+      percentUsed: 0,
+      percentLeft: 100,
     };
   }
   const today = vietnamDateKey();
   if (limit <= 0) {
+    const { resetInMs, resetsAt } = getVietnamResetMeta();
     return {
       applies: true,
       allowed: false,
+      mode: 'percent',
+      unit: 'percent',
       used: 0,
       remaining: 0,
       limit: 0,
+      percentUsed: 100,
+      percentLeft: 0,
+      resetInMs,
+      resetsAt,
       date: today,
     };
   }
-  const used = session && String(session.imageUploadDate || '') === today
-    ? Number(session.imageUploadCount || 0)
-    : 0;
+  const usedBp = readSessionBudgetUsedBp(session, session, user, today);
+  const stats = formatBudgetStats(usedBp, today);
   return {
     applies: true,
     allowed: true,
-    used,
-    remaining: Math.max(0, limit - used),
-    limit,
-    date: today,
+    mode: 'percent',
+    unit: 'percent',
+    used: stats.percentUsed,
+    remaining: stats.percentLeft,
+    limit: 100,
+    percentUsed: stats.percentUsed,
+    percentLeft: stats.percentLeft,
+    budgetUsedBp: stats.usedBp,
+    budgetLimitBp: DAILY_BUDGET_BP,
+    resetInMs: stats.resetInMs,
+    resetsAt: stats.resetsAt,
+    date: stats.date,
   };
 }
 
 /**
- * Đếm 1 ảnh gửi cho AI (không áp dụng khi nhân viên đã tiếp nhận).
+ * Kiểm tra & tiêu thụ lượt có ảnh từ ngân sách % thống nhất (không áp dụng khi NV tiếp nhận).
  * @returns {{ applies: boolean, blocked: boolean, disallowed: boolean, remaining: number|null, used: number, limit: number|null }}
  */
-async function consumeAiImageQuota(sessionDoc, user = null) {
+async function consumeAiImageQuota(sessionDoc, user = null, options = {}) {
   const limit = imageDailyLimit(sessionDoc, user);
   if (limit === null) {
-    return { applies: false, blocked: false, disallowed: false, remaining: null, used: 0, limit: null };
+    return {
+      applies: false,
+      blocked: false,
+      disallowed: false,
+      remaining: null,
+      used: 0,
+      limit: null,
+      consumedBp: 0,
+    };
   }
   if (sessionDoc && aiPaused(effectiveStatus(sessionDoc))) {
-    return { applies: false, blocked: false, disallowed: false, remaining: null, used: 0, limit };
+    return {
+      applies: false,
+      blocked: false,
+      disallowed: false,
+      remaining: null,
+      used: 0,
+      limit: 100,
+      consumedBp: 0,
+    };
   }
   if (limit <= 0) {
     return {
@@ -491,35 +695,15 @@ async function consumeAiImageQuota(sessionDoc, user = null) {
       remaining: 0,
       used: 0,
       limit: 0,
+      percentUsed: 100,
+      percentLeft: 0,
+      consumedBp: 0,
     };
   }
-  if (!sessionDoc) {
-    return { applies: false, blocked: false, disallowed: false, remaining: null, used: 0, limit };
-  }
-  const today = vietnamDateKey();
-  const used = String(sessionDoc.imageUploadDate || '') === today
-    ? Number(sessionDoc.imageUploadCount || 0)
-    : 0;
-  if (used >= limit) {
-    return {
-      applies: true,
-      blocked: true,
-      disallowed: false,
-      remaining: 0,
-      used,
-      limit,
-    };
-  }
-  sessionDoc.imageUploadDate = today;
-  sessionDoc.imageUploadCount = used + 1;
-  await sessionDoc.save();
+  const res = await consumeAiBudgetQuota(sessionDoc, user, { ...options, hasImage: true });
   return {
-    applies: true,
-    blocked: false,
+    ...res,
     disallowed: false,
-    remaining: limit - used - 1,
-    used: used + 1,
-    limit,
   };
 }
 
@@ -1896,6 +2080,7 @@ async function replyToUserMessage({
   sender,
   userText,
   imageFileUrl = '',
+  reusedSameImage = false,
   io,
   notifyUser,
 }) {
@@ -2117,7 +2302,10 @@ async function replyToUserMessage({
     });
   }
 
-  const q = await consumeAiQuestionQuota(sessionDoc, quotaSender);
+  const q = await consumeAiBudgetQuota(sessionDoc, quotaSender, {
+    text: userText,
+    hasImage: Boolean(imageFileUrl) && !reusedSameImage,
+  });
   if (q.applies) emitStatus(io, sessionDoc, humanUserId, quotaSender);
   if (q.blocked) {
     return persistBotReply({
@@ -2132,6 +2320,10 @@ async function replyToUserMessage({
   }
 
   if (!aiSupportConfigured()) {
+    if (q.applies && !q.blocked && q.consumedBp > 0) {
+      await refundAiBudgetQuota(sessionDoc, q.consumedBp);
+      emitStatus(io, sessionDoc, humanUserId, quotaSender);
+    }
     return persistBotReply({
       conversationId,
       humanUserId,
@@ -2199,7 +2391,7 @@ async function replyToUserMessage({
     logger.warn({ err: err?.message, conversationId }, '[AI Support] reply failed');
     if (q.applies && !q.blocked) {
       try {
-        await refundAiQuestionQuota(sessionDoc);
+        await refundAiBudgetQuota(sessionDoc, q.consumedBp);
         emitStatus(io, sessionDoc, humanUserId, quotaSender);
       } catch (refundErr) {
         logger.warn({ err: refundErr?.message }, '[AI Support] refund quota failed');
@@ -3853,7 +4045,7 @@ async function classifyAmbiguousWithLlm(question, { history = [], lang = 'vi' } 
         if (parsed.decision === 'IN_SCOPE') quickAskMetrics.scopeClassifier.inScope += 1;
         else if (parsed.decision === 'OUT_OF_SCOPE') quickAskMetrics.scopeClassifier.outOfScope += 1;
         else quickAskMetrics.scopeClassifier.ambiguous += 1;
-        cache.set(key, parsed, SCOPE_CLASSIFIER_CACHE_TTL_SEC).catch(() => {});
+        cache.set(key, parsed, SCOPE_CLASSIFIER_CACHE_TTL_SEC).catch(() => { });
         return { ...parsed, fromCache: false, latencyMs: elapsed };
       }
     } catch (err) {
@@ -4023,8 +4215,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
   const branchId = String(user?.branchId || '');
   const quotaAppliesToUser = qDailyLimit > 0 && Boolean(uid) && isAiSessionStoreReady();
   let sessionDoc = null;
-  let consumedQuestionQuota = false;
-  let consumedImageQuota = false;
+  let consumedBudgetBp = 0;
   let quotaPayload = {};
   let cacheKey = null;
   let resolveInFlight = null;
@@ -4052,29 +4243,29 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     return sessionDoc;
   };
 
-  const consumeQuickAskTurn = async ({ countImage = false } = {}) => {
+  const consumeQuickAskTurn = async ({
+    countImage = false,
+    text = rawQuestion,
+    attachment: turnAttachment = att,
+  } = {}) => {
     if (!quotaAppliesToUser) return {};
     const doc = await ensureQuotaSession();
-    if (countImage && imgDailyLimit !== null) {
-      const imgQ = await consumeAiImageQuota(doc, quotaUser);
-      if (imgQ.blocked) {
-        rejectPendingInFlight(new Error('AI_IMAGE_QUOTA'));
-        const err = new Error(imageLimitReply(imgQ.limit, lang));
-        err.status = 403;
-        err.code = 'AI_IMAGE_QUOTA';
-        err.questionQuota = peekQuestionQuota(doc, quotaUser);
-        err.imageQuota = peekImageQuota(doc, quotaUser);
-        throw err;
-      }
-      consumedImageQuota = imgQ.applies && !imgQ.blocked;
+    if (countImage && imgDailyLimit === 0) {
+      rejectPendingInFlight(new Error('AI_IMAGE_QUOTA'));
+      const err = new Error(imageLimitReply(0, lang));
+      err.status = 403;
+      err.code = 'AI_IMAGE_QUOTA';
+      err.questionQuota = peekQuestionQuota(doc, quotaUser);
+      err.imageQuota = peekImageQuota(doc, quotaUser);
+      throw err;
     }
 
-    const q = await consumeAiQuestionQuota(doc, quotaUser);
+    const q = await consumeAiBudgetQuota(doc, quotaUser, {
+      text,
+      attachment: turnAttachment,
+      hasImage: Boolean(countImage),
+    });
     if (q.blocked) {
-      if (consumedImageQuota) {
-        await refundAiImageQuota(doc);
-        consumedImageQuota = false;
-      }
       rejectPendingInFlight(new Error('AI_QUESTION_QUOTA'));
       const err = new Error(questionLimitReply(q.limit, lang));
       err.status = 403;
@@ -4083,7 +4274,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       err.imageQuota = peekImageQuota(doc, quotaUser);
       throw err;
     }
-    consumedQuestionQuota = q.applies && !q.blocked;
+    consumedBudgetBp = q.applies ? (Number(q.consumedBp) || 0) : 0;
     quotaPayload = {
       questionQuota: peekQuestionQuota(doc, quotaUser),
       imageQuota: peekImageQuota(doc, quotaUser),
@@ -4216,13 +4407,11 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
     if (!specificIntent) {
       const officeHit = officeItQuickMemory(rawQuestion, lang);
       if (officeHit) {
-        const turnQuota = isFreeStudent ? await consumeQuickAskTurn() : {};
         return finishTelemetry({
           answer: officeHit,
           source: 'memory',
           lang,
           actions: [],
-          ...turnQuota,
         }, 'memory');
       }
     }
@@ -4248,7 +4437,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
         const shared = await inflightBefore;
         if (shared && shared.answer && !containsPersonalUserData(shared.answer, user)) {
           const { questionQuota: _q, imageQuota: _i, ...baseShared } = shared;
-          const turnQuota = await consumeQuickAskTurn();
+          const turnQuota = await consumeQuickAskTurn({ text: rawQuestion, attachment: att });
           return finishTelemetry({ ...baseShared, ...turnQuota }, 'coalesced', false);
         }
       } catch (coalesceErr) {
@@ -4272,7 +4461,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
           actions: Array.isArray(cached.actions) ? cached.actions : [],
           ...(cached.model ? { model: cached.model } : {}),
         };
-        const turnQuota = await consumeQuickAskTurn();
+        const turnQuota = await consumeQuickAskTurn({ text: rawQuestion, attachment: att });
         return finishTelemetry({ ...res, ...turnQuota }, 'cache', false);
       }
     } catch (err) {
@@ -4289,7 +4478,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
         const shared = await inflightAfter;
         if (shared && shared.answer && !containsPersonalUserData(shared.answer, user)) {
           const { questionQuota: _q, imageQuota: _i, ...baseShared } = shared;
-          const turnQuota = await consumeQuickAskTurn();
+          const turnQuota = await consumeQuickAskTurn({ text: rawQuestion, attachment: att });
           return finishTelemetry({ ...baseShared, ...turnQuota }, 'coalesced', false);
         }
       } catch (coalesceErr) {
@@ -4303,7 +4492,7 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       resolveInFlight = resolve;
       rejectInFlight = reject;
     });
-    p.catch(() => {});
+    p.catch(() => { });
     inFlightQuickAsk.set(cacheKey, p);
   }
 
@@ -4383,7 +4572,11 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
   }
 
   if (quotaAppliesToUser) {
-    await consumeQuickAskTurn({ countImage: images.length > 0 || hasImageOrVisionAttachment });
+    await consumeQuickAskTurn({
+      countImage: images.length > 0 || hasImageOrVisionAttachment,
+      text: rawQuestion,
+      attachment: att,
+    });
   }
 
   const messages = [
@@ -4424,11 +4617,25 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
         inFlightQuickAsk.delete(cacheKey);
         resolveInFlight(null);
       }
+      if (consumedBudgetBp > 0 && sessionDoc) {
+        try {
+          await refundAiBudgetQuota(sessionDoc, consumedBudgetBp);
+          consumedBudgetBp = 0;
+          quotaPayload = {
+            questionQuota: peekQuestionQuota(sessionDoc, quotaUser),
+            imageQuota: peekImageQuota(sessionDoc, quotaUser),
+          };
+        } catch (refundErr) {
+          logger.warn({ err: refundErr?.message }, '[Quick Ask AI] empty-reply refund skipped');
+        }
+      }
       return finishTelemetry({
         answer: lang === 'en' ? EMPTY_REPLY_EN : EMPTY_REPLY,
         source: 'fallback',
         lang,
         actions: [],
+        ...(quotaPayload.questionQuota ? { questionQuota: quotaPayload.questionQuota } : {}),
+        ...(quotaPayload.imageQuota ? { imageQuota: quotaPayload.imageQuota } : {}),
       }, 'fallback', true, result?.usage || null);
     }
 
@@ -4481,10 +4688,9 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
       inFlightQuickAsk.delete(cacheKey);
       rejectInFlight(err);
     }
-    if (consumedQuestionQuota && sessionDoc) {
+    if (consumedBudgetBp > 0 && sessionDoc) {
       try {
-        await refundAiQuestionQuota(sessionDoc);
-        if (consumedImageQuota) await refundAiImageQuota(sessionDoc);
+        await refundAiBudgetQuota(sessionDoc, consumedBudgetBp);
       } catch (refundErr) {
         logger.warn({ err: refundErr?.message }, '[Quick Ask AI] refund quota failed');
       }
@@ -4521,12 +4727,20 @@ module.exports = {
   ensureSession,
   scheduleAiSupportReply,
   sendWelcomeIfEmpty,
+  DAILY_BUDGET_BP,
+  calculateAiUsageCostBp,
+  getVietnamResetMeta,
+  consumeAiBudgetQuota,
+  refundAiBudgetQuota,
   consumeAiImageQuota,
+  refundAiImageQuota,
   peekImageQuota,
   consumeAiQuestionQuota,
+  refundAiQuestionQuota,
   peekQuestionQuota,
   isFreeTierAiStudent,
   imageLimitReply,
+  questionLimitReply,
   resolveStudentQuotaUser,
   escalateToHuman,
   resetAiSession,

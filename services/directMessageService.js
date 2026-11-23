@@ -264,17 +264,18 @@ async function sendCanonicalMessageInner({
     }
   }
 
-  let aiImageRemaining = null;
   const isAiImage = !isGroupFinal
     && String(finalReceiverId) === 'ai_support'
     && String(messageType || '') === 'image'
     && String(fileUrl || '').trim();
+  let aiReusedSameImage = false;
   if (isAiImage) {
     const {
       ensureSession,
-      consumeAiImageQuota,
       peekImageQuota,
+      peekQuestionQuota,
       imageLimitReply,
+      questionLimitReply,
       resolveStudentQuotaUser,
     } = require('./aiSupportService');
     const quotaSender = await resolveStudentQuotaUser(sender);
@@ -295,31 +296,25 @@ async function sendCanonicalMessageInner({
         limit: initialPeek.limit,
       };
     }
-    // Hỏi lại cùng URL ảnh đã gửi trước đó → không trừ thêm quota ảnh trong ngày
-    const reusedSameImage = await Message.exists({
+    const qPeek = peekQuestionQuota(sessionDoc, quotaSender);
+    if (qPeek.applies && !(Number(qPeek.remaining) > 0)) {
+      return {
+        ok: false,
+        status: 403,
+        code: 'AI_QUESTION_QUOTA',
+        message: questionLimitReply(qPeek.limit, 'vi'),
+        remaining: 0,
+        limit: qPeek.limit,
+      };
+    }
+    // Hỏi lại cùng URL ảnh đã gửi trước đó → không tính phụ thu ảnh thêm
+    aiReusedSameImage = Boolean(await Message.exists({
       conversationId,
       senderId: String(senderId),
       fileUrl: String(fileUrl).trim(),
       messageType: 'image',
       isRecalled: { $ne: true },
-    });
-    if (reusedSameImage) {
-      const peek = peekImageQuota(sessionDoc, quotaSender);
-      if (peek.limit) aiImageRemaining = peek.remaining;
-    } else {
-      const quota = await consumeAiImageQuota(sessionDoc, quotaSender);
-      if (quota.blocked) {
-        return {
-          ok: false,
-          status: 403,
-          code: 'AI_IMAGE_QUOTA',
-          message: imageLimitReply(quota.limit, 'vi'),
-          remaining: 0,
-          limit: quota.limit,
-        };
-      }
-      if (quota.applies) aiImageRemaining = quota.remaining;
-    }
+    }));
   }
 
   const messagePayload = {
@@ -328,6 +323,8 @@ async function sendCanonicalMessageInner({
     senderName,
     senderRole,
     senderBranchCode: sBranch,
+    senderType: 'human',
+    aiMetadata: null,
     receiverId: finalReceiverId,
     receiverName: finalReceiverName,
     receiverRole: finalReceiverRole,
@@ -340,9 +337,14 @@ async function sendCanonicalMessageInner({
     groupId: isGroupFinal ? groupIdFinal : null,
     recipientRejected,
   };
-  if (aiImageRemaining != null) messagePayload.aiImageRemaining = aiImageRemaining;
   if (payload != null && typeof payload === 'object') {
-    messagePayload.payload = payload;
+    const safePayload = { ...payload };
+    // Anti-spoofing: client không bao giờ được tự gắn metadata aiAutoReply
+    delete safePayload.aiAutoReply;
+    delete safePayload.senderType;
+    if (Object.keys(safePayload).length > 0) {
+      messagePayload.payload = safePayload;
+    }
   }
 
   const message = await Message.create(messagePayload);
@@ -415,12 +417,34 @@ async function sendCanonicalMessageInner({
         sender,
         userText: String(content || '').trim(),
         imageFileUrl: isAiImage ? String(fileUrl || '') : '',
+        reusedSameImage: Boolean(aiReusedSameImage),
         io,
         notifyUser,
       });
     } catch (hookErr) {
       const logger = require('../config/logger');
       logger.warn({ err: hookErr?.message }, '[AI Support] post-send hook');
+    }
+  }
+
+  // DewSkill AI Auto-Reply trong hộp thư Giảng viên & Admin (không chặn gửi tin thường)
+  if (!isGroupFinal && String(finalReceiverId) !== 'ai_support' && !recipientRejected) {
+    try {
+      const { handlePostMessageAutoReply } = require('./aiAutoReplyService');
+      await handlePostMessageAutoReply({
+        message,
+        sender,
+        conversationId,
+        finalReceiverId,
+        finalReceiverRole,
+        finalReceiverName,
+        isGroup: isGroupFinal,
+        io,
+        notifyUser,
+      });
+    } catch (autoReplyErr) {
+      const logger = require('../config/logger');
+      logger.warn({ err: autoReplyErr?.message, conversationId }, '[AI Auto-Reply] post-send hook failed');
     }
   }
 

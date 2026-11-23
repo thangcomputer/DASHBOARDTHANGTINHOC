@@ -1726,6 +1726,12 @@ const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
     } catch (idleErr) {
       logger.warn({ err: idleErr.message }, 'startAiIdleWatcher failed');
     }
+    try {
+      const { startAiAutoReplyWatcher } = require('./services/aiAutoReplyService');
+      startAiAutoReplyWatcher(io, app.notifyUser);
+    } catch (autoReplyErr) {
+      logger.warn({ err: autoReplyErr.message }, 'startAiAutoReplyWatcher failed');
+    }
   });
 })().catch((err) => {
   logger.error({ err: err.message }, 'Server boot failed');
@@ -1741,6 +1747,10 @@ async function shutdown(signal) {
     try {
       const { stopAiIdleWatcher } = require('./services/aiSupportService');
       stopAiIdleWatcher();
+    } catch (_) { /* ignore */ }
+    try {
+      const { stopAiAutoReplyWatcher } = require('./services/aiAutoReplyService');
+      stopAiAutoReplyWatcher();
     } catch (_) { /* ignore */ }
     await new Promise((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));

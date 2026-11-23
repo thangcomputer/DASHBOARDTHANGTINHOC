@@ -146,7 +146,7 @@ export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
   const hasCourseSubjects = Array.isArray(courseOrEnrollment?.examSubjects)
     && courseOrEnrollment.examSubjects.length > 0;
-  const courseSubjectIds = (hasCourseSubjects
+  const rawCourseSubjectIds = (hasCourseSubjects
     ? courseOrEnrollment.examSubjects
     : mapCourseToExamSubjectIdsStrict(
       typeof courseOrEnrollment === 'string'
@@ -154,11 +154,19 @@ export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
         : (courseOrEnrollment?.courseName || courseOrEnrollment?.name || ''),
       cat,
     ))
-    .map(String)
-    .filter((id) => isCatalogSubjectId(id, cat));
-  const teacherSubjectIds = new Set(resolveTeacherSubjectIds(teacher, cat)
-    .map(String)
-    .filter((id) => isCatalogSubjectId(id, cat)));
+    .map((id) => String(id || '').trim())
+    .filter((id) => !isExcludedExamSubjectId(id));
+  const catalogCourseSubjectIds = rawCourseSubjectIds.filter((id) => isCatalogSubjectId(id, cat));
+  const useCatalogFilter = catalogCourseSubjectIds.length > 0;
+  const courseSubjectIds = [...new Set(useCatalogFilter ? catalogCourseSubjectIds : rawCourseSubjectIds)];
+  const rawTeacherSubjectIds = resolveTeacherSubjectIds(teacher, cat)
+    .map((id) => String(id || '').trim())
+    .filter((id) => !isExcludedExamSubjectId(id));
+  const teacherSubjectIds = new Set(
+    useCatalogFilter
+      ? rawTeacherSubjectIds.filter((id) => isCatalogSubjectId(id, cat))
+      : rawTeacherSubjectIds,
+  );
   return courseSubjectIds.length > 0
     && courseSubjectIds.every((id) => teacherSubjectIds.has(id));
 }

@@ -98,6 +98,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
         aiImageRemaining: n.aiImageRemaining,
         reactions: n.reactions,
         payload: n.payload,
+        senderType: n.senderType,
+        aiMetadata: n.aiMetadata,
       };
 
       const tempIdx = prev.findIndex(
@@ -349,6 +351,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
                 fileUrl: n.fileUrl || m.fileUrl,
                 fileName: n.fileName || m.fileName,
                 payload: n.payload != null ? n.payload : m.payload,
+                senderType: n.senderType || m.senderType,
+                aiMetadata: n.aiMetadata != null ? n.aiMetadata : m.aiMetadata,
                 recipientRejected: n.recipientRejected,
                 aiImageRemaining: n.aiImageRemaining ?? m.aiImageRemaining,
                 time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
@@ -434,6 +438,9 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
             isRecalled: n.isRecalled,
             isPinned: n.isPinned,
             reactions: n.reactions,
+            payload: n.payload,
+            senderType: n.senderType,
+            aiMetadata: n.aiMetadata,
           };
         });
 

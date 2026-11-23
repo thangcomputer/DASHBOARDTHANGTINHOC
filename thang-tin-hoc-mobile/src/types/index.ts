@@ -217,6 +217,16 @@ export type ChatMessage = {
   gifLabel?: string;
   replyToText?: string;
   replyTo?: { id: string; content: string; messageType?: string };
+  senderType?: 'human' | 'ai' | 'system';
+  aiMetadata?: {
+    senderType?: string;
+    source?: string;
+    trigger?: string;
+    triggeringMessageId?: string;
+    needsHuman?: boolean;
+    caption?: string;
+    knowledgeReferences?: Array<{ docTitle?: string; location?: string }>;
+  } | null;
 };
 
 export type DemoStudent = {

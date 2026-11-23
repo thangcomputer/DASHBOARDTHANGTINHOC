@@ -13,7 +13,7 @@ import {
   Upload, Users, GraduationCap, ToggleLeft,
   ToggleRight, Landmark, X,
   DollarSign, Building2, Lock, User, KeyRound, EyeOff, CheckCircle2, FileText,
-  ShieldCheck, Briefcase,
+  ShieldCheck, Briefcase, Sparkles,
 } from 'lucide-react';
 import { BankSelect } from './BankSelect';
 import api, { resolveMediaUrl } from '../services/api';
@@ -21,6 +21,7 @@ import { useToast } from '../utils/useToast';
 import CoursePricingTab from './CoursePricingTab';
 import BranchManagementTab from './BranchManagementTab';
 import WebSettingsTab from './WebSettingsTab';
+import AiAutoReplyAdminPanel from './AiAutoReplyAdminPanel';
 import SystemResetModal from './SystemResetModal';
 import { AlertOctagon } from 'lucide-react';
 
@@ -357,6 +358,7 @@ export default function SystemSettingsTab() {
     { key: 'popup', label: 'Popup Thông báo', icon: Bell },
     { key: 'invoice', label: 'Hóa đơn', icon: FileText },
     { key: 'web', label: 'Cài đặt Web', icon: Settings },
+    { key: 'ai-auto-reply', label: 'AI Tự động trả lời', icon: Sparkles },
     { key: 'account', label: 'Tài khoản Admin', icon: Lock },
   ];
 
@@ -762,6 +764,11 @@ export default function SystemSettingsTab() {
           {/* ── TAB 5: CÀI ĐẶT WEB ── WebSettingsTab component ──────────────────── */}
           {activeSubTab === 'web' && (
             <WebSettingsTab />
+          )}
+
+          {/* ── TAB 5B: DEWSKILL AI TỰ ĐỘNG TRẢ LỜI ────────────────────────────────── */}
+          {activeSubTab === 'ai-auto-reply' && (
+            <AiAutoReplyAdminPanel />
           )}
 
           {/* ── TAB 6: TÀI KHOẢN ADMIN ──────────────────────────────────────────── */}

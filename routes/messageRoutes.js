@@ -120,7 +120,10 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
       $or: [
         { senderId: userId },
         { receiverId: userId },
-        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
+        { 'aiMetadata.recipientId': String(userId) },
+        ...(isAdminLevelAccount(req.user)
+          ? [{ senderId: 'admin' }, { receiverId: 'admin' }, { 'aiMetadata.recipientId': 'admin' }]
+          : [])
       ],
       $and: [
         { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(userId) }] },
@@ -134,6 +137,7 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
           $or: [
             { senderBranchCode: userBranch },
             { receiverBranchCode: userBranch },
+            { 'aiMetadata.recipientId': String(userId) },
             // Không leak hộp chung admin cho STAFF/TEACHER
             ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
           ]
@@ -169,17 +173,40 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
     ]);
 
     const conversations = messages.map(m => {
-      const isReceiver = m.lastMessage.receiverId === userId;
+      const lm = m.lastMessage;
+      if (lm.senderId === 'ai_support' && lm.aiMetadata?.source === 'ai_auto_reply') {
+        const viewerIsStudent = String(lm.receiverId) === String(userId);
+        return {
+          conversationId: m._id,
+          otherUser: viewerIsStudent
+            ? {
+              id: lm.aiMetadata.recipientId || 'admin',
+              name: lm.aiMetadata.recipientName || 'Giảng viên',
+              role: lm.aiMetadata.recipientRole || 'teacher',
+            }
+            : {
+              id: lm.aiMetadata.studentId || lm.receiverId,
+              name: lm.aiMetadata.studentName || lm.receiverName || 'Học viên',
+              role: 'student',
+            },
+          lastMessage: {
+            content: lm.content,
+            createdAt: lm.createdAt,
+          },
+          unreadCount: m.unreadCount,
+        };
+      }
+      const isReceiver = lm.receiverId === userId;
       return {
         conversationId: m._id,
         otherUser: {
-          id: isReceiver ? m.lastMessage.senderId : m.lastMessage.receiverId,
-          name: isReceiver ? m.lastMessage.senderName : m.lastMessage.receiverName,
-          role: isReceiver ? m.lastMessage.senderRole : m.lastMessage.receiverRole,
+          id: isReceiver ? lm.senderId : lm.receiverId,
+          name: isReceiver ? lm.senderName : lm.receiverName,
+          role: isReceiver ? lm.senderRole : lm.receiverRole,
         },
         lastMessage: {
-          content: m.lastMessage.content,
-          createdAt: m.lastMessage.createdAt,
+          content: lm.content,
+          createdAt: lm.createdAt,
         },
         unreadCount: m.unreadCount,
       };
@@ -548,6 +575,84 @@ router.delete('/block/:blockedUserId', async (req, res) => {
   }
 });
 
+// ── DewSkill AI Auto-Reply (Inbox Giảng viên & Admin) ──
+router.get('/ai-auto-reply/global', async (req, res) => {
+  try {
+    if (String(req.user?.role || '').toLowerCase() === 'student') {
+      return res.status(403).json({ success: false, message: 'Học viên không có quyền truy cập cấu hình AI.' });
+    }
+    const { getGlobalAiAutoReplySettings } = require('../services/aiAutoReplyService');
+    const data = await getGlobalAiAutoReplySettings();
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/ai-auto-reply/global', async (req, res) => {
+  try {
+    const { updateGlobalAiAutoReplySettings } = require('../services/aiAutoReplyService');
+    const data = await updateGlobalAiAutoReplySettings(req.user, req.body || {}, {
+      io: req.app?.get?.('io'),
+      notifyUser: req.app?.notifyUser,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/ai-auto-reply/history', async (req, res) => {
+  try {
+    const { listAiAutoReplyHistory } = require('../services/aiAutoReplyService');
+    const data = await listAiAutoReplyHistory(req.user, {
+      page: req.query.page,
+      limit: req.query.limit,
+      status: req.query.status,
+      conversationId: req.query.conversationId,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/ai-auto-reply/:conversationId/admin-disable', async (req, res) => {
+  try {
+    const { adminDisableConversationAutoReply } = require('../services/aiAutoReplyService');
+    const data = await adminDisableConversationAutoReply(req.user, req.params.conversationId, {
+      io: req.app?.get?.('io'),
+      notifyUser: req.app?.notifyUser,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/ai-auto-reply/:conversationId', async (req, res) => {
+  try {
+    const { getConversationAiAutoReplyState } = require('../services/aiAutoReplyService');
+    const data = await getConversationAiAutoReplyState(req.user, req.params.conversationId);
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/ai-auto-reply/:conversationId', async (req, res) => {
+  try {
+    const { updateConversationAiAutoReplyConfig } = require('../services/aiAutoReplyService');
+    const data = await updateConversationAiAutoReplyConfig(req.user, req.params.conversationId, req.body || {}, {
+      io: req.app?.get?.('io'),
+      notifyUser: req.app?.notifyUser,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
 // ── Lấy tin nhắn của cuộc trò chuyện ──
 router.get('/:conversationId', messagesGuard('get_conversation'), async (req, res) => {
   try {
@@ -662,8 +767,9 @@ router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
           $or: [
             { senderId: { $in: targetIds } },
             { receiverId: { $in: targetIds } },
+            { 'aiMetadata.recipientId': { $in: targetIds } },
             { receiverId: { $in: broadcastIds } },
-            ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
+            ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }, { 'aiMetadata.recipientId': 'admin' }] : []),
             ...(groupIds.length > 0 ? [
               { conversationId: { $in: groupIds.map(id => `group_${id}`) } },
               { groupId: { $in: groupIds } },
@@ -1004,7 +1110,8 @@ router.patch('/:messageId/reaction', messagesGuard('reaction'), async (req, res)
     } else {
       const isParticipant = String(message.senderId) === String(userId) ||
         String(message.receiverId) === String(userId) ||
-        (isAdminLevelAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
+        String(message.aiMetadata?.recipientId || '') === String(userId) ||
+        (isAdminLevelAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin' || message.aiMetadata?.recipientId === 'admin'));
       if (!isParticipant) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
       }
@@ -1155,7 +1262,8 @@ router.patch('/:messageId/soft-delete', messagesGuard('soft_delete'), async (req
     } else {
       const isParticipant = String(message.senderId) === String(userId) ||
         String(message.receiverId) === String(userId) ||
-        (isAdminLevelAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
+        String(message.aiMetadata?.recipientId || '') === String(userId) ||
+        (isAdminLevelAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin' || message.aiMetadata?.recipientId === 'admin'));
       if (!isParticipant) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
       }

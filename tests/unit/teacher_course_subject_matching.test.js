@@ -52,3 +52,25 @@ test('training access supports custom subjects stored on teachers and materials'
     ['custom-subject-a', 'mon-kiem-thu', 'sample-subject'],
   );
 });
+
+test('teacher matching handles real DB courses outside BUILTIN_EXAM_SUBJECTS', () => {
+  const cbCourse = {
+    name: 'TIN HỌC VĂN PHÒNG (CB)',
+    examSubjects: ['coban', 'word', 'excel', 'powerpoint'],
+  };
+  const ncCourse = {
+    name: 'TIN HỌC VĂN PHÒNG (NC)',
+    examSubjects: ['word-nc', 'powerpoint-nc', 'excel-nc', 'coban'],
+  };
+  const matchedTeacher = {
+    subjectIds: ['coban', 'word', 'excel', 'powerpoint', 'word-nc', 'powerpoint-nc', 'excel-nc'],
+  };
+  const ncOnlyTeacher = {
+    subjectIds: ['word-nc', 'powerpoint-nc', 'excel-nc', 'coban'],
+  };
+
+  assert.equal(teacherMatchesCourse(matchedTeacher, cbCourse), true);
+  assert.equal(teacherMatchesCourse(matchedTeacher, ncCourse), true);
+  assert.equal(teacherMatchesCourse(ncOnlyTeacher, ncCourse), true);
+  assert.equal(teacherMatchesCourse(ncOnlyTeacher, cbCourse), false);
+});

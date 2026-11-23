@@ -3572,11 +3572,9 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       }
     }
 
-    if (
-      !isUnassign && teacherDoc && targetCourse
-      && (!Array.isArray(targetExamSubjects) || !targetExamSubjects.filter(Boolean).length)
-    ) {
-      targetExamSubjects = await resolveEnrollmentExamSubjects({
+    let courseCatalogExamSubjects = [];
+    if (!isUnassign && teacherDoc && targetCourse) {
+      courseCatalogExamSubjects = await resolveEnrollmentExamSubjects({
         courseName: targetCourse,
         courseId: previewEnr?.courseId,
       }) || [];
@@ -3587,8 +3585,15 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       const teacherSubSet = new Set(
         resolveTeacherSubjectIds(teacherDoc).map(String).filter(Boolean),
       );
-      const courseSubIds = [...new Set((targetExamSubjects || []).map(String).filter(Boolean))];
-      const matched = courseSubIds.length > 0 && courseSubIds.every((id) => teacherSubSet.has(id));
+      const enrSubIds = [...new Set(
+        (targetExamSubjects || []).map((id) => String(id || '').trim()).filter(Boolean),
+      )];
+      const courseCatalogSubIds = [...new Set(
+        (courseCatalogExamSubjects || []).map((id) => String(id || '').trim()).filter(Boolean),
+      )];
+      const matched =
+        (enrSubIds.length > 0 && enrSubIds.every((id) => teacherSubSet.has(id)))
+        || (courseCatalogSubIds.length > 0 && courseCatalogSubIds.every((id) => teacherSubSet.has(id)));
       if (!matched) {
         return res.status(400).json({
           success: false,
@@ -3625,6 +3630,16 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         student.teacherId = isUnassign ? null : teacherId;
         student.teacherName = isUnassign ? '' : teacherName;
       }
+    }
+
+    if (
+      activeEnrollmentIdx >= 0
+      && student.enrollments?.[activeEnrollmentIdx]
+      && (!Array.isArray(student.enrollments[activeEnrollmentIdx].examSubjects)
+        || !student.enrollments[activeEnrollmentIdx].examSubjects.filter(Boolean).length)
+      && courseCatalogExamSubjects.length
+    ) {
+      student.enrollments[activeEnrollmentIdx].examSubjects = courseCatalogExamSubjects;
     }
 
     // Luôn đồng bộ khóa chính & trạng thái lên root Student (tránh root giữ teacherId cũ khi HV từng hoàn phí khóa cũ)

@@ -4,14 +4,16 @@
  */
 const logger = require('../../config/logger');
 const { resolveRedisUrl, resolveBullMqPrefix, ensureRedisReady, inspectRedisServerInfo } = require('../../config/redis');
-const { processNotifyJob, processPdfJob } = require('./processors');
+const { processNotifyJob, processPdfJob, processAiAutoReplyJob } = require('./processors');
 
 const QUEUE_NOTIFY = 'cms-notify';
 const QUEUE_PDF = 'cms-pdf';
+const QUEUE_AI_AUTOREPLY = 'cms-ai-autoreply';
 
 let mode = 'inline'; // 'bullmq' | 'inline'
 let notifyQueue = null;
 let pdfQueue = null;
+let aiAutoReplyQueue = null;
 const workers = [];
 const connections = [];
 /** Simple in-memory DLQ snapshot (last N failed jobs) for monitoring */
@@ -103,11 +105,13 @@ async function initJobQueue(opts = {}) {
 
     notifyQueue = new Queue(QUEUE_NOTIFY, { connection: qConn, prefix: bullPrefix });
     pdfQueue = new Queue(QUEUE_PDF, { connection: { ...base }, prefix: bullPrefix });
+    aiAutoReplyQueue = new Queue(QUEUE_AI_AUTOREPLY, { connection: { ...base }, prefix: bullPrefix });
 
     if (wantWorkers) {
       const wNotifyConn = { ...base };
       const wPdfConn = { ...base };
-      connections.push(wNotifyConn, wPdfConn);
+      const wAiAutoReplyConn = { ...base };
+      connections.push(wNotifyConn, wPdfConn, wAiAutoReplyConn);
 
       const notifyWorker = new Worker(
         QUEUE_NOTIFY,
@@ -119,8 +123,13 @@ async function initJobQueue(opts = {}) {
         async (job) => processPdfJob(job.name, job.data),
         { connection: wPdfConn, prefix: bullPrefix, concurrency: 2 },
       );
+      const aiAutoReplyWorker = new Worker(
+        QUEUE_AI_AUTOREPLY,
+        async (job) => processAiAutoReplyJob(job.data),
+        { connection: wAiAutoReplyConn, prefix: bullPrefix, concurrency: 3 },
+      );
 
-      for (const w of [notifyWorker, pdfWorker]) {
+      for (const w of [notifyWorker, pdfWorker, aiAutoReplyWorker]) {
         w.on('failed', (job, err) => {
           recordFailedJob(job, err);
           logger.warn({ job: job?.name, id: job?.id, err: err.message }, '[Queue] job failed (DLQ log)');
@@ -138,6 +147,7 @@ async function initJobQueue(opts = {}) {
     mode = 'inline';
     notifyQueue = null;
     pdfQueue = null;
+    aiAutoReplyQueue = null;
     logger.warn({ err: err.message }, 'Job queue: BullMQ init failed, fallback inline');
     return { mode, error: err.message };
   }
@@ -203,6 +213,48 @@ function enqueueBackup(data, opts = {}) {
   return enqueue('notify', 'backup', data, { attempts: 1, ...opts });
 }
 
+async function enqueueAiAutoReply(data, opts = {}) {
+  const jobId = String(opts.jobId || `autoreply:${data?.taskId || Date.now()}`);
+  const delay = Math.max(0, Number(opts.delayMs) || 0);
+  if (mode === 'bullmq' && aiAutoReplyQueue) {
+    try {
+      const existing = await aiAutoReplyQueue.getJob(jobId).catch(() => null);
+      if (existing) {
+        await existing.remove().catch(() => {});
+      }
+      const job = await Promise.race([
+        aiAutoReplyQueue.add('ai-autoreply', data, {
+          delay,
+          jobId,
+          attempts: 1,
+          removeOnComplete: 200,
+          removeOnFail: 200,
+        }),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('bullmq add timeout')), 1500);
+        }),
+      ]);
+      return { id: String(job.id), mode: 'bullmq', queue: QUEUE_AI_AUTOREPLY };
+    } catch (err) {
+      logger.warn({ err: err.message, jobId }, '[Queue] ai-autoreply bullmq add failed, DB recovery poller will handle');
+    }
+  }
+  // Do NOT fall back to volatile setTimeout: MongoDB AiAutoReplyTask + recovery poller drives delayed execution safely.
+  return { id: jobId, mode: 'db_poll', queue: QUEUE_AI_AUTOREPLY };
+}
+
+async function cancelAiAutoReplyJob(jobId) {
+  if (mode !== 'bullmq' || !aiAutoReplyQueue || !jobId) return false;
+  try {
+    const job = await aiAutoReplyQueue.getJob(String(jobId));
+    if (!job) return false;
+    await job.remove();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getQueueMode() {
   return mode;
 }
@@ -224,10 +276,15 @@ async function closeJobQueue() {
     try { await pdfQueue.close(); } catch { /* ignore */ }
     pdfQueue = null;
   }
+  if (aiAutoReplyQueue) {
+    try { await aiAutoReplyQueue.close(); } catch { /* ignore */ }
+    aiAutoReplyQueue = null;
+  }
   mode = 'inline';
 }
 
 module.exports = {
+  QUEUE_AI_AUTOREPLY,
   initJobQueue,
   closeJobQueue,
   getQueueMode,
@@ -238,5 +295,7 @@ module.exports = {
   enqueueInvoicePdf,
   enqueueInvoiceEmail,
   enqueueBackup,
+  enqueueAiAutoReply,
+  cancelAiAutoReplyJob,
   getFailedJobLog,
 };
