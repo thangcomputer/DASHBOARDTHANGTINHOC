@@ -1596,20 +1596,6 @@ function ChatWindow({
                 />
               ) : null}
             </div>
-            <AiAutoReplyComposerControl
-              compact
-              conversationId={tab.id}
-              visible={showAiAutoReplyButton || canManageAiAutoReply}
-              eligible={canManageAiAutoReply}
-              ineligibleReason={aiAutoReplyIneligibleReason}
-              isAdminViewer={isAdminViewer}
-              state={aiAutoReplyState}
-              onStateChange={onAiAutoReplyStateChange}
-            />
-            <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading || sending || questionBlocked} className="cms-fm-send shrink-0" aria-label={sending ? 'Đang xử lý' : 'Gửi'}>
-              {uploading || sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            </button>
-          </div>
           <AiAutoReplyComposerControl
             compact
             conversationId={tab.id}
