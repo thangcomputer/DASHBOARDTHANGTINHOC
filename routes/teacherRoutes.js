@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 
 const Teacher = require('../models/Teacher');
+const Student = require('../models/Student');
 const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
@@ -20,26 +21,17 @@ const { EXAM_SUBJECT_LABELS } = require('../services/examSubjectCatalog');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
 const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
+const {
+  buildSessionOrdinalMap,
+  buildPaymentSessionSnapshots,
+} = require('../services/financePayoutDetailService');
 
 function specialtyFromSubjectIds(ids) {
   return (Array.isArray(ids) ? ids : []).map((id) => EXAM_SUBJECT_LABELS[id] || id).join(', ');
 }
 
-function paymentSessionDetails(sessions = [], totalAmount = 0, starBonusAmount = 0) {
-  const list = Array.isArray(sessions) ? sessions : [];
-  const teachingAmount = Math.max(0, Number(totalAmount) - Number(starBonusAmount || 0));
-  const perSession = list.length ? Math.floor(teachingAmount / list.length) : 0;
-  const remainder = list.length ? teachingAmount - (perSession * list.length) : 0;
-  return list.map((session, index) => ({
-    sessionId: session._id,
-    studentId: session.studentId || null,
-    studentName: session.studentName || 'Học viên',
-    enrollmentId: session.enrollmentId || null,
-    courseId: session.courseId || null,
-    date: session.date || null,
-    courseName: session.courseName || session.course || session.subject || '',
-    allocatedAmount: perSession + (index === 0 ? remainder : 0),
-  }));
+function paymentSessionDetails(sessions = [], totalAmount = 0, starBonusAmount = 0, meta = {}) {
+  return buildPaymentSessionSnapshots(sessions, totalAmount, starBonusAmount, meta);
 }
 const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
@@ -1871,6 +1863,8 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
     let sessionIds = [];
     let actualCount = 0;
     let claimedSessions = [];
+    let sessionNoMap = new Map();
+    let studentCodeMap = new Map();
     if (paidCount > 0) {
       const pendingSessions = await Schedule.find({
         teacherId: req.params.id,
@@ -1882,15 +1876,26 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       sessionIds = pendingSessions.map(s => s._id);
 
       if (sessionIds.length > 0) {
-        const claim = await Schedule.updateMany(
-          {
-            _id: { $in: sessionIds },
-            status: 'completed',
-            is_paid_to_teacher: { $ne: true },
-          },
-          { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-        );
+        const stuIds = [...new Set(
+          pendingSessions.map((s) => (s.studentId ? String(s.studentId) : '')).filter(Boolean),
+        )];
+        const [claim, ordMap, stuDocs] = await Promise.all([
+          Schedule.updateMany(
+            {
+              _id: { $in: sessionIds },
+              status: 'completed',
+              is_paid_to_teacher: { $ne: true },
+            },
+            { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+          ),
+          buildSessionOrdinalMap(pendingSessions),
+          stuIds.length
+            ? Student.find({ _id: { $in: stuIds } }).select('_id studentCode').lean()
+            : Promise.resolve([]),
+        ]);
         actualCount = claim.modifiedCount || 0;
+        sessionNoMap = ordMap;
+        studentCodeMap = new Map(stuDocs.map((st) => [String(st._id), String(st.studentCode || '')]));
       }
     }
 
@@ -1903,7 +1908,9 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       ? claimedSessions.map((s) => {
         const name = s.studentName || 'HV';
         const d = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
-        return d ? `Buổi - ${name} (${d})` : `Buổi - ${name}`;
+        const no = sessionNoMap.get(String(s._id));
+        const buoi = no ? `Buổi ${no}` : 'Buổi';
+        return d ? `${buoi} - ${name} (${d})` : `${buoi} - ${name}`;
       }).join('; ')
       : '';
     const defaultDesc = paidCount > 0
@@ -1926,7 +1933,10 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
         bankAccount: teacher.bankAccount?.accountNumber || '',
         note: note || '',
         paymentSessionIds: sessionIds,
-        paymentSessionDetails: paymentSessionDetails(claimedSessions, amount, starBonusAmount),
+        paymentSessionDetails: paymentSessionDetails(claimedSessions, amount, starBonusAmount, {
+          sessionNoMap,
+          studentCodeMap,
+        }),
         sessionsCount: paidCount,
         teacherPaymentNoticePending: true,
         starBonusAmount,
@@ -2093,21 +2103,34 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
       teacherId: req.params.id,
       status: 'completed',
       is_paid_to_teacher: { $ne: true }
-    }).select('_id studentId studentName date courseName course subject').lean();
+    })
+      .sort({ date: 1, createdAt: 1 })
+      .select('_id studentId studentName enrollmentId courseId date startTime endTime courseName course subject createdAt')
+      .lean();
 
     const sessionIds = pendingSessions.map((s) => s._id);
     if (sessionIds.length === 0) {
       return res.status(409).json({ success: false, message: 'Các buổi đã được thanh toán bởi yêu cầu khác' });
     }
 
-    const claim = await Schedule.updateMany(
-      {
-        _id: { $in: sessionIds },
-        status: 'completed',
-        is_paid_to_teacher: { $ne: true }
-      },
-      { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-    );
+    const stuIds = [...new Set(
+      pendingSessions.map((s) => (s.studentId ? String(s.studentId) : '')).filter(Boolean),
+    )];
+    const [claim, sessionNoMap, stuDocs] = await Promise.all([
+      Schedule.updateMany(
+        {
+          _id: { $in: sessionIds },
+          status: 'completed',
+          is_paid_to_teacher: { $ne: true }
+        },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+      ),
+      buildSessionOrdinalMap(pendingSessions),
+      stuIds.length
+        ? Student.find({ _id: { $in: stuIds } }).select('_id studentCode').lean()
+        : Promise.resolve([]),
+    ]);
+    const studentCodeMap = new Map(stuDocs.map((st) => [String(st._id), String(st.studentCode || '')]));
 
     const paidCount = claim.modifiedCount || 0;
     if (paidCount === 0) {
@@ -2115,6 +2138,13 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
     }
 
     const totalAmount = paidCount * salaryPerSession;
+    const fifoSummary = pendingSessions.map((s) => {
+      const no = sessionNoMap.get(String(s._id));
+      const buoi = no ? `Buổi ${no}` : 'Buổi';
+      const name = s.studentName || 'HV';
+      const d = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
+      return d ? `${buoi} - ${name} (${d})` : `${buoi} - ${name}`;
+    }).join('; ');
 
     // Tạo giao dịch thanh toán
     const now = new Date();
@@ -2125,7 +2155,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
         teacherName: teacher.name,
         teacherPhone: teacher.phone,
         amount: totalAmount,
-        description: `Thanh toán thù lao ${paidCount} buổi dạy`,
+        description: fifoSummary || `Thanh toán thù lao ${paidCount} buổi dạy`,
         month: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
         status: 'confirmed',
         confirmedBy: req.user.name || 'Admin',
@@ -2133,7 +2163,10 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
         bankName: teacher.bankAccount?.bankName || '',
         bankAccount: teacher.bankAccount?.accountNumber || '',
         paymentSessionIds: sessionIds,
-        paymentSessionDetails: paymentSessionDetails(pendingSessions, totalAmount),
+        paymentSessionDetails: paymentSessionDetails(pendingSessions, totalAmount, 0, {
+          sessionNoMap,
+          studentCodeMap,
+        }),
         sessionsCount: paidCount,
         teacherPaymentNoticePending: true,
       });

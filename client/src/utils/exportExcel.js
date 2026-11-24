@@ -2,27 +2,35 @@
 // Export Excel Utility - Đúng chuẩn Blob Download
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { API_BASE } from '../services/api';
+import { apiFetch } from '../services/api';
+
+function buildQuery(params = {}) {
+  const q = new URLSearchParams();
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') {
+      q.set(k, String(v));
+    }
+  });
+  const str = q.toString();
+  return str ? `?${str}` : '';
+}
 
 /**
  * Tải file từ backend dưới dạng Blob và kích hoạt download
- * Đảm bảo KHÔNG parse JSON - nhận raw binary data
+ * Dùng apiFetch để tự động đính kèm Bearer/cookie, X-Tenant-Id và refresh token khi 401.
  *
  * @param {string} endpoint - API path (VD: /invoices/stats/export)
  * @param {string} filename  - Tên file lưu về (VD: 'bao-cao-2024.xlsx')
  * @param {Object} options   - fetch options (method, body,...)
  */
 export const downloadFileFromAPI = async (endpoint, filename, options = {}) => {
-  const token = localStorage.getItem('admin_access_token');
-  const headers = {
-    ...(options.headers || {}),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await apiFetch(endpoint, {
+    ...options,
     method: options.method || 'GET',
-    headers,
-    body: options.body,
+    headers: {
+      Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+      ...(options.headers || {}),
+    },
   });
 
   if (!res.ok) {
@@ -79,12 +87,22 @@ export const exportInvoicesExcel = async () => {
 };
 
 /**
- * Xuất báo cáo tài chính giảng viên ra Excel
+ * Xuất báo cáo tài chính giảng viên ra Excel (2 sheet: Tổng hợp phiếu chi + Chi tiết buổi dạy/học viên)
  */
-export const exportTransactionsExcel = async () => {
+export const exportTransactionsExcel = async (params = {}) => {
   return downloadFileFromAPI(
-    '/transactions/export',
-    `BaoCaoLuongGV_${getTodayStr()}.xlsx`
+    `/transactions/export${buildQuery(params)}`,
+    `BaoCaoLuongGV_ChiTiet_${getTodayStr()}.xlsx`
+  );
+};
+
+/**
+ * Xuất sổ cái (Ledger) ra Excel (2 sheet: Tổng hợp sổ cái + Chi tiết học viên/buổi học)
+ */
+export const exportLedgerExcel = async (params = {}) => {
+  return downloadFileFromAPI(
+    `/finance/ledger/export${buildQuery(params)}`,
+    `SoCai_ChiTiet_${getTodayStr()}.xlsx`
   );
 };
 

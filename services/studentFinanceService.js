@@ -7,6 +7,10 @@ const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
 const Teacher = require('../models/Teacher');
 const { postRefund, postSalary } = require('./ledgerService');
+const {
+  buildSessionOrdinalMap,
+  buildPaymentSessionSnapshots,
+} = require('./financePayoutDetailService');
 const logger = require('../config/logger');
 
 async function refundStudentTuition({
@@ -177,7 +181,10 @@ async function payTeacherForStudent({
     teacherId: teacher._id,
     status: 'completed',
     is_paid_to_teacher: { $ne: true },
-  }).sort({ date: 1, createdAt: 1 }).select('_id').lean();
+  })
+    .sort({ date: 1, createdAt: 1 })
+    .select('_id studentId studentName enrollmentId courseId date startTime endTime course')
+    .lean();
 
   const sessionIds = pendingSessions.map((s) => s._id);
   const paidCount = sessionIds.length;
@@ -206,16 +213,21 @@ async function payTeacherForStudent({
   }
 
   let actualCount = 0;
+  let sessionNoMap = new Map();
   if (sessionIds.length > 0) {
-    const claim = await Schedule.updateMany(
-      {
-        _id: { $in: sessionIds },
-        status: 'completed',
-        is_paid_to_teacher: { $ne: true },
-      },
-      { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-    );
+    const [claim, ordMap] = await Promise.all([
+      Schedule.updateMany(
+        {
+          _id: { $in: sessionIds },
+          status: 'completed',
+          is_paid_to_teacher: { $ne: true },
+        },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+      ),
+      buildSessionOrdinalMap(pendingSessions),
+    ]);
     actualCount = claim.modifiedCount || 0;
+    sessionNoMap = ordMap;
   }
 
   if (action === 'PAID_IN_ADVANCE') {
@@ -231,6 +243,8 @@ async function payTeacherForStudent({
   const defaultDesc = action === 'PAID_IN_ADVANCE'
     ? `Trả trước / thanh toán theo HV ${student.name} (${actualCount} buổi)`
     : `Thù lao ${actualCount} buổi - HV ${student.name}`;
+
+  const studentCodeMap = new Map([[String(student._id), String(student.studentCode || '')]]);
 
   let transaction = null;
   if (amount > 0 && actualCount > 0) {
@@ -248,6 +262,11 @@ async function payTeacherForStudent({
         bankName: teacher.bankAccount?.bankName || '',
         bankAccount: teacher.bankAccount?.accountNumber || '',
         note: `student:${studentId}`,
+        paymentSessionIds: sessionIds,
+        paymentSessionDetails: buildPaymentSessionSnapshots(pendingSessions, amount, 0, {
+          sessionNoMap,
+          studentCodeMap,
+        }),
         idempotencyKey: key,
         sessionsCount: actualCount,
         teacherPaymentNoticePending: true,

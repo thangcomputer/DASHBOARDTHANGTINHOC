@@ -13,25 +13,40 @@ const { policyShadowFinance } = require('../middleware/policyShadowFinance');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { postSalary, voidLedgerEntry } = require('../services/ledgerService');
+const {
+  enrichTransactionsWithSessionDetails,
+  buildTransactionsExportWorkbook,
+} = require('../services/financePayoutDetailService');
 const LedgerEntry = require('../models/LedgerEntry');
 const { allowHardDeleteFinance } = require('../utils/financeFlags');
 const { emitFinanceEvent, emitDataRefresh } = require('../utils/realtimeEmit');
 const { notifyTeacherPaymentReceived, teacherPaymentNotice } = require('../services/teacherPaymentNotice');
 
+function buildTransactionFilter(req) {
+  const { status, teacherId, month, branchId: queryBranch, branch_id, from, to } = req.query || {};
+  const filter = { ...req.branchFilter };
+  const branchParam = queryBranch || branch_id;
+  if (branchParam && branchParam !== 'all' && !filter.branchId) filter.branchId = branchParam;
+  if (status) filter.status = status;
+  if (teacherId) filter.teacherId = teacherId;
+  if (month) {
+    const safeMonth = sanitizeRegex(String(month), 32);
+    if (safeMonth) filter.month = { $regex: safeMonth, $options: 'i' };
+  }
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from);
+    if (to) filter.createdAt.$lte = new Date(to);
+  }
+  return filter;
+}
+
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
 router.get('/', [authMiddleware, branchFilter, policyShadowFinance('tx_list'), checkPermission(PERMISSIONS.MANAGE_FINANCE)], async (req, res) => {
   try {
-    const { status, teacherId, month, branchId: queryBranch, page, limit } = req.query;
-    const filter = { ...req.branchFilter };
-
-    if (queryBranch && queryBranch !== 'all' && !filter.branchId) filter.branchId = queryBranch;
-    if (status) filter.status = status;
-    if (teacherId) filter.teacherId = teacherId;
-    if (month) {
-      const safeMonth = sanitizeRegex(String(month), 32);
-      if (safeMonth) filter.month = { $regex: safeMonth, $options: 'i' };
-    }
+    const { page, limit } = req.query;
+    const filter = buildTransactionFilter(req);
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10) || 100));
@@ -46,16 +61,42 @@ router.get('/', [authMiddleware, branchFilter, policyShadowFinance('tx_list'), c
       Transaction.countDocuments(filter),
     ]);
 
+    const enriched = await enrichTransactionsWithSessionDetails(transactions);
+
     res.json({
       success: true,
-      count: transactions.length,
+      count: enriched.length,
       total,
       page: pageNum,
       limit: limitNum,
-      data: transactions,
+      data: enriched,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── GET /api/transactions/export ─────────────────────────────────────────────
+// Admin/Staff: Xuất Excel (.xlsx) đầy đủ chi tiết học viên, buổi thứ mấy, ngày học
+router.get('/export', [authMiddleware, branchFilter, policyShadowFinance('tx_export'), checkPermission(PERMISSIONS.MANAGE_FINANCE)], async (req, res) => {
+  try {
+    const filter = buildTransactionFilter(req);
+    const transactions = await Transaction.find(filter)
+      .populate('teacherId', 'name phone specialty bankAccount branchId branchCode')
+      .sort({ createdAt: -1 })
+      .limit(5000)
+      .lean();
+
+    const enriched = await enrichTransactionsWithSessionDetails(transactions);
+    const buffer = buildTransactionsExportWorkbook(enriched);
+    const dateStamp = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="BaoCaoLuongGV_ChiTiet_${dateStamp}.xlsx"`);
+    res.send(buffer);
+  } catch (err) {
+    logger.error('[TRANSACTIONS] export error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Lỗi xuất báo cáo lương GV' });
   }
 });
 

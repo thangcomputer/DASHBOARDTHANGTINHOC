@@ -9,6 +9,7 @@ const { policyShadowFinance } = require('../middleware/policyShadowFinance');
 const {
   sumFinancialRevenue,
   listLedgerEntries,
+  listAllLedgerEntriesForExport,
   getStudentFinanceCard,
   voidLedgerEntry,
   reconciliationReport,
@@ -17,6 +18,7 @@ const {
   postDiscount,
   healOrphanEnrollmentPayments,
 } = require('../services/ledgerService');
+const { buildLedgerExportWorkbook } = require('../services/financePayoutDetailService');
 const Student = require('../models/Student');
 const logger = require('../config/logger');
 const { isLedgerSot } = require('../utils/financeFlags');
@@ -103,6 +105,32 @@ router.get('/ledger', readGuard('ledger_list'), async (req, res) => {
   } catch (err) {
     logger.error('[FINANCE] ledger error:', err);
     return res.status(500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+// GET /api/finance/ledger/export - Xuất Excel (.xlsx) đầy đủ chi tiết học viên & buổi học
+router.get('/ledger/export', readGuard('ledger_export'), async (req, res) => {
+  try {
+    const branchId = resolveBranchId(req);
+    const items = await listAllLedgerEntriesForExport({
+      branchId,
+      studentId: req.query.studentId || null,
+      teacherId: req.query.teacherId || null,
+      type: req.query.type || null,
+      from: req.query.from || null,
+      to: req.query.to || null,
+      status: req.query.status || 'posted',
+      maxRows: 5000,
+    });
+    const buffer = buildLedgerExportWorkbook(items);
+    const dateStamp = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="SoCai_ChiTiet_${dateStamp}.xlsx"`);
+    return res.send(buffer);
+  } catch (err) {
+    logger.error('[FINANCE] ledger export error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Lỗi xuất sổ cái' });
   }
 });
 

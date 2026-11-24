@@ -388,10 +388,7 @@ function toObjectId(id) {
   return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
 }
 
-/**
- * Danh sách sổ cái (paginated).
- */
-async function listLedgerEntries({
+function buildLedgerMatch({
   branchId = null,
   studentId = null,
   teacherId = null,
@@ -399,8 +396,6 @@ async function listLedgerEntries({
   from = null,
   to = null,
   status = 'posted',
-  page = 1,
-  limit = 50,
 } = {}) {
   const match = {};
   if (status) match.status = status;
@@ -417,6 +412,25 @@ async function listLedgerEntries({
     if (from) match.postedAt.$gte = new Date(from);
     if (to) match.postedAt.$lte = new Date(to);
   }
+  return match;
+}
+
+/**
+ * Danh sách sổ cái (paginated + enriched với thông tin HV/GV và từng buổi học).
+ */
+async function listLedgerEntries({
+  branchId = null,
+  studentId = null,
+  teacherId = null,
+  type = null,
+  from = null,
+  to = null,
+  status = 'posted',
+  page = 1,
+  limit = 50,
+  includeDetails = true,
+} = {}) {
+  const match = buildLedgerMatch({ branchId, studentId, teacherId, type, from, to, status });
 
   const pageNum = Math.max(1, Number(page) || 1);
   const lim = Math.min(200, Math.max(1, Number(limit) || 50));
@@ -431,16 +445,53 @@ async function listLedgerEntries({
     LedgerEntry.countDocuments(match),
   ]);
 
+  const mapped = items.map((e) => ({
+    ...e,
+    signedAmount: signedOf(e),
+  }));
+
+  let finalItems = mapped;
+  if (includeDetails !== false && mapped.length > 0) {
+    const { enrichLedgerEntriesWithDetails } = require('./financePayoutDetailService');
+    finalItems = await enrichLedgerEntriesWithDetails(mapped);
+  }
+
   return {
-    items: items.map((e) => ({
-      ...e,
-      signedAmount: signedOf(e),
-    })),
+    items: finalItems,
     total,
     page: pageNum,
     limit: lim,
     pages: Math.ceil(total / lim) || 1,
   };
+}
+
+/**
+ * Lấy toàn bộ dòng sổ cái khớp bộ lọc (tối đa maxRows) để xuất báo cáo chi tiết.
+ */
+async function listAllLedgerEntriesForExport({
+  branchId = null,
+  studentId = null,
+  teacherId = null,
+  type = null,
+  from = null,
+  to = null,
+  status = 'posted',
+  maxRows = 5000,
+} = {}) {
+  const match = buildLedgerMatch({ branchId, studentId, teacherId, type, from, to, status });
+  const lim = Math.min(10000, Math.max(1, Number(maxRows) || 5000));
+  const items = await LedgerEntry.find(match)
+    .sort({ postedAt: -1, createdAt: -1 })
+    .limit(lim)
+    .lean();
+
+  const mapped = items.map((e) => ({
+    ...e,
+    signedAmount: signedOf(e),
+  }));
+  if (!mapped.length) return [];
+  const { enrichLedgerEntriesWithDetails } = require('./financePayoutDetailService');
+  return enrichLedgerEntriesWithDetails(mapped);
 }
 
 /**
@@ -1099,6 +1150,7 @@ module.exports = {
   postDiscount,
   voidLedgerEntry,
   listLedgerEntries,
+  listAllLedgerEntriesForExport,
   getStudentFinanceCard,
   healOrphanEnrollmentPayments,
   sumFinancialRevenue,
