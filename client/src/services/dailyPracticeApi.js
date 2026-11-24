@@ -1,5 +1,6 @@
 import { apiFetch, keepalivePost } from './api';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../utils/learningGoal';
+import { emitAiQuotaUpdated } from '../components/ui/AiUsageIndicator';
 
 export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
 
@@ -23,14 +24,28 @@ async function parse(res, emitStats = false) {
     if (emitStats && typeof data?.currentXp === 'number') {
       emitDailyPracticeStats({ xpTotal: data.currentXp });
     }
+    if (data?.questionQuota || data?.imageQuota) {
+      emitAiQuotaUpdated({
+        ...(data.questionQuota ? { questionQuota: data.questionQuota } : {}),
+        ...(data.imageQuota ? { imageQuota: data.imageQuota } : {}),
+      });
+    }
     const err = new Error(data.message || `Lỗi ${res.status}`);
     err.status = res.status;
     err.code = data.code || '';
     if (typeof data?.currentXp === 'number') err.currentXp = data.currentXp;
     if (typeof data?.needXp === 'number') err.needXp = data.needXp;
+    if (data?.questionQuota) err.questionQuota = data.questionQuota;
+    if (data?.imageQuota) err.imageQuota = data.imageQuota;
     throw err;
   }
   const payload = data.data;
+  if (payload && typeof payload === 'object' && (payload.questionQuota || payload.imageQuota)) {
+    emitAiQuotaUpdated({
+      ...(payload.questionQuota ? { questionQuota: payload.questionQuota } : {}),
+      ...(payload.imageQuota ? { imageQuota: payload.imageQuota } : {}),
+    });
+  }
   if (emitStats && payload && typeof payload === 'object') {
     const statsPatch = payload.stats && typeof payload.stats === 'object' ? { ...payload.stats } : {};
     if (typeof payload.profileXp === 'number') statsPatch.xpTotal = payload.profileXp;

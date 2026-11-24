@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  DeviceEventEmitter,
   Platform,
   Pressable,
   ScrollView,
@@ -33,6 +34,16 @@ import {
   dailyPracticeApi,
   type DpVideoGuide,
 } from '../../services/dailyPracticeApi';
+import { MobileApiError } from '../../services/apiClient';
+import {
+  AI_QUOTA_UPDATED_EVENT,
+  emitAiQuotaUpdated,
+  fetchAiSupportStatus,
+  type AiDailyQuota,
+} from '../../services/aiSupportApi';
+import Svg, { Circle } from 'react-native-svg';
+import { useAuth } from '../../app/AuthContext';
+import { isFreePortalLocked } from '../../utils/freePortalHelper';
 import { getCurrentLanguage } from '../../i18n/LanguageContext';
 import { translateText } from '../../../../shared/i18n/translate.mjs';
 
@@ -900,6 +911,9 @@ export function PathLessonAiAssistantPanel({
       : [];
   }, [guide, isCustom]);
 
+  const { user } = useAuth();
+  const isFreeTierStudent = user?.role === 'student' && isFreePortalLocked(user);
+  const [aiDailyQuota, setAiDailyQuota] = useState<AiDailyQuota | null>(null);
   const [tab, setTab] = useState<'formulas' | 'tips' | 'checklist' | 'chat'>(() => {
     if (isCustom && !formulas.length) {
       if (focusSummaryText || shortcutTips.length) return 'tips';
@@ -921,6 +935,64 @@ export function PathLessonAiAssistantPanel({
       body: 'Bạn cần gợi ý công thức Excel, tóm tắt trọng tâm bài hay kiểm lỗi trước khi nộp bài thực hành? Hãy chọn nút gợi ý nhanh hoặc nhập câu hỏi bên dưới nhé!',
     },
   ]));
+
+  useEffect(() => {
+    let active = true;
+    void fetchAiSupportStatus()
+      .then((res) => {
+        if (active && res?.dailyQuota) {
+          setAiDailyQuota(res.dailyQuota);
+        }
+      })
+      .catch(() => {});
+    const sub = DeviceEventEmitter.addListener(
+      AI_QUOTA_UPDATED_EVENT,
+      (patch: Partial<AiDailyQuota> | undefined) => {
+        if (!patch || (!patch.questionQuota && !patch.imageQuota)) return;
+        setAiDailyQuota((prev) => ({
+          ...(prev || {}),
+          ...(patch.questionQuota ? { questionQuota: patch.questionQuota } : {}),
+          ...(patch.imageQuota ? { imageQuota: patch.imageQuota } : {}),
+        }));
+      },
+    );
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, []);
+
+  const questionQuotaApplies = Boolean(aiDailyQuota?.questionQuota?.applies ?? true);
+  const rawPercentLeft = aiDailyQuota?.questionQuota?.percentLeft ?? aiDailyQuota?.questionQuota?.remaining;
+  const questionQuotaLeft = rawPercentLeft != null
+    ? Math.max(0, Math.min(100, Number(rawPercentLeft)))
+    : 100;
+  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
+  const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
+  const imageDisallowed = Boolean(
+    aiDailyQuota?.imageQuota
+      ? (aiDailyQuota.imageQuota.allowed === false
+        || (rawImageLimit !== null && rawImageLimit !== undefined && Number(rawImageLimit) === 0))
+      : isFreeTierStudent,
+  );
+  const countdownText = useMemo(() => {
+    let ms = Number(aiDailyQuota?.questionQuota?.resetInMs);
+    const resetsAt = aiDailyQuota?.questionQuota?.resetsAt;
+    if (!Number.isFinite(ms) && resetsAt) {
+      ms = new Date(resetsAt).getTime() - Date.now();
+    }
+    if (!Number.isFinite(ms)) {
+      const vnNow = Date.now() + 7 * 60 * 60 * 1000;
+      const dayMs = 24 * 60 * 60 * 1000;
+      const elapsed = ((vnNow % dayMs) + dayMs) % dayMs;
+      ms = Math.max(60 * 1000, dayMs - elapsed);
+    }
+    const totalMins = Math.max(1, Math.ceil(Math.max(60 * 1000, ms) / 60000));
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (h > 0 && m > 0) return `${h}h ${m}p`;
+    return h > 0 ? `${h}h` : `${m}p`;
+  }, [aiDailyQuota?.questionQuota?.resetInMs, aiDailyQuota?.questionQuota?.resetsAt]);
 
   useEffect(() => {
     if (tab !== 'chat') return;
@@ -946,7 +1018,7 @@ export function PathLessonAiAssistantPanel({
   const submitQuestion = useCallback(
     async (rawPrompt?: string) => {
       const q = String(rawPrompt ?? question).trim();
-      if (!q || asking) return;
+      if (!q || asking || questionQuotaBlocked) return;
       setTab('chat');
       if (rawPrompt === undefined) setQuestion('');
       const userMsg: AiChatMessage = { id: `u_${Date.now()}`, role: 'user', body: q };
@@ -964,6 +1036,13 @@ export function PathLessonAiAssistantPanel({
           courseTitle,
           history: historyPayload,
         });
+        if (res?.questionQuota || res?.imageQuota) {
+          setAiDailyQuota((prev) => ({
+            ...(prev || {}),
+            ...(res.questionQuota ? { questionQuota: res.questionQuota } : {}),
+            ...(res.imageQuota ? { imageQuota: res.imageQuota } : {}),
+          }));
+        }
         const answer = String(res?.answer || res?.text || '').trim();
         setMessages((prev) => [
           ...prev,
@@ -975,6 +1054,38 @@ export function PathLessonAiAssistantPanel({
           },
         ]);
       } catch (err: unknown) {
+        if (err instanceof MobileApiError && (err.code === 'AI_QUESTION_QUOTA' || err.status === 403)) {
+          const serverQ = (err.questionQuota && typeof err.questionQuota === 'object') ? err.questionQuota : {};
+          const nextQuota: AiDailyQuota = {
+            ...(aiDailyQuota || {}),
+            questionQuota: {
+              ...(aiDailyQuota?.questionQuota || {}),
+              ...(serverQ as Record<string, unknown>),
+              applies: true,
+              mode: 'percent',
+              limit: 100,
+              remaining: 0,
+              percentLeft: 0,
+              used: 100,
+              percentUsed: 100,
+            },
+            ...(err.imageQuota && typeof err.imageQuota === 'object'
+              ? { imageQuota: err.imageQuota as AiDailyQuota['imageQuota'] }
+              : {}),
+          };
+          setAiDailyQuota(nextQuota);
+          emitAiQuotaUpdated(nextQuota);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `a_${Date.now()}`,
+              role: 'assistant',
+              title: 'Đã hết hạn mức AI hôm nay',
+              body: err.message || 'Bạn đã dùng hết 100% hạn mức AI hôm nay. Hạn mức sẽ tự động làm mới vào 00:00.',
+            },
+          ]);
+          return;
+        }
         const fallback = buildContextualFallbackReply(q, lessonTitle, unitTitle, courseTitle);
         const errMsg = err instanceof Error && err.message ? err.message : 'Không kết nối được máy chủ AI';
         setMessages((prev) => [
@@ -991,7 +1102,7 @@ export function PathLessonAiAssistantPanel({
         setAsking(false);
       }
     },
-    [asking, courseTitle, lessonTitle, messages, question, unitTitle],
+    [aiDailyQuota, asking, courseTitle, lessonTitle, messages, question, questionQuotaBlocked, unitTitle],
   );
 
   return (
@@ -1184,8 +1295,9 @@ export function PathLessonAiAssistantPanel({
                 {QUICK_AI_PROMPTS.map((sample) => (
                   <Pressable
                     key={sample}
+                    disabled={questionQuotaBlocked}
                     onPress={() => void submitQuestion(sample)}
-                    style={styles.quickTagChip}
+                    style={[styles.quickTagChip, questionQuotaBlocked && styles.quickTagChipDisabled]}
                     accessibilityRole="button"
                   >
                     <Text style={styles.quickTagText}>{sample}</Text>
@@ -1207,29 +1319,69 @@ export function PathLessonAiAssistantPanel({
           value={question}
           onChangeText={setQuestion}
           onSubmitEditing={() => void submitQuestion()}
+          editable={!asking && !questionQuotaBlocked}
           returnKeyType="send"
-          placeholder="Hỏi AI (VD: lỗi #N/A vlookup, hàm IF, căn lề Word...)"
+          placeholder={
+            questionQuotaBlocked
+              ? 'Đã dùng hết hạn mức AI hôm nay — chờ reset để tiếp tục hỏi'
+              : 'Hỏi AI (VD: lỗi #N/A vlookup, hàm IF, căn lề Word...)'
+          }
           placeholderTextColor="#64748B"
-          style={styles.askInput}
+          style={[styles.askInput, questionQuotaBlocked && styles.askInputDisabled]}
         />
         <Pressable
           onPress={() => void submitQuestion()}
-          disabled={!question.trim() || asking}
-          style={[styles.askBtn, question.trim() && !asking ? styles.askBtnActive : null]}
+          disabled={!question.trim() || asking || questionQuotaBlocked}
+          style={[styles.askBtn, question.trim() && !asking && !questionQuotaBlocked ? styles.askBtnActive : null]}
           accessibilityRole="button"
         >
           {asking ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Send size={13} color={question.trim() ? '#FFFFFF' : '#94A3B8'} />
-              <Text style={[styles.askBtnText, question.trim() ? styles.askBtnTextActive : null]}>
+              <Send size={13} color={question.trim() && !questionQuotaBlocked ? '#FFFFFF' : '#94A3B8'} />
+              <Text style={[styles.askBtnText, question.trim() && !questionQuotaBlocked ? styles.askBtnTextActive : null]}>
                 Hỏi
               </Text>
             </>
           )}
         </Pressable>
       </View>
+
+      {questionQuotaApplies ? (() => {
+        const clampedPct = Math.max(0, Math.min(100, Number(questionQuotaLeft) || 0));
+        const circ = 2 * Math.PI * 5;
+        const offset = circ * (1 - clampedPct / 100);
+        const ringColor = questionQuotaBlocked ? '#EF4444' : (clampedPct <= 20 ? '#F59E0B' : '#10B981');
+        const statusText = questionQuotaBlocked
+          ? (isFreeTierStudent || imageDisallowed
+            ? `0% còn lại · Reset sau ${countdownText} · Nâng cấp để dùng thêm & gửi ảnh`
+            : `0% còn lại · Reset sau ${countdownText}`)
+          : `${clampedPct}% còn lại · Reset sau ${countdownText}${imageDisallowed ? ' · Không gửi ảnh' : ''}`;
+        return (
+          <View style={styles.quotaBarRow}>
+            <Svg width={13} height={13} viewBox="0 0 14 14" style={{ transform: [{ rotate: '-90deg' }] }}>
+              <Circle cx={7} cy={7} r={5} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={2} />
+              {clampedPct > 0 ? (
+                <Circle
+                  cx={7}
+                  cy={7}
+                  r={5}
+                  fill="none"
+                  stroke={ringColor}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeDasharray={circ}
+                  strokeDashoffset={offset}
+                />
+              ) : null}
+            </Svg>
+            <Text style={[styles.quotaBarText, questionQuotaBlocked && styles.quotaBarTextWarn]}>
+              {statusText}
+            </Text>
+          </View>
+        );
+      })() : null}
     </View>
   );
 }
@@ -1876,6 +2028,26 @@ const styles = StyleSheet.create({
   },
   askBtnTextActive: {
     color: '#FFFFFF',
+  },
+  quickTagChipDisabled: {
+    opacity: 0.45,
+  },
+  askInputDisabled: {
+    opacity: 0.55,
+  },
+  quotaBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  quotaBarText: {
+    color: '#CBD5E1',
+    fontSize: 10.5,
+    fontWeight: '400',
+  },
+  quotaBarTextWarn: {
+    color: '#FCD34D',
   },
 });
 

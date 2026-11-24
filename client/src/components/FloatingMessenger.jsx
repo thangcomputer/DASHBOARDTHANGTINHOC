@@ -14,7 +14,7 @@ import {
 import ScheduleMessagePreviewModal, {
   resolveScheduleMessagePayload,
 } from './ScheduleMessagePreviewModal';
-import AiUsageIndicator from './ui/AiUsageIndicator';
+import AiUsageIndicator, { AI_QUOTA_UPDATED_EVENT, emitAiQuotaUpdated } from './ui/AiUsageIndicator';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { getPresenceUserId } from '../utils/presence';
@@ -1740,7 +1740,7 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
   const freePortalApiLocked = isFreePortalLocked(session);
   const defaultImgLimit = freePortalApiLocked ? 0 : 100;
 
-  const syncQuotaPayload = useCallback((imgQ, qstQ) => {
+  const syncQuotaPayload = useCallback((imgQ, qstQ, broadcast = true) => {
     if (imgQ) {
       const rawLim = imgQ.limit === null || imgQ.limit === undefined || imgQ.limit === ''
         ? NaN
@@ -1769,7 +1769,26 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
         resetsAt: qstQ.resetsAt,
       });
     }
+    if (broadcast && (imgQ || qstQ)) {
+      emitAiQuotaUpdated({
+        _origin: 'fm',
+        ...(imgQ ? { imageQuota: imgQ } : {}),
+        ...(qstQ ? { questionQuota: qstQ } : {}),
+      });
+    }
   }, [defaultImgLimit]);
+
+  useEffect(() => {
+    const onQuotaUpdated = (event) => {
+      const detail = event?.detail;
+      if (!detail || typeof detail !== 'object' || detail._origin === 'fm') return;
+      if (detail.imageQuota || detail.questionQuota) {
+        syncQuotaPayload(detail.imageQuota || null, detail.questionQuota || null, false);
+      }
+    };
+    window.addEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
+    return () => window.removeEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
+  }, [syncQuotaPayload]);
 
   // HV/GV: không tự mở cửa sổ chat ngay khi login.
   // Chỉ hiển thị khi người dùng đã bấm (FAB hoặc chat-head).

@@ -22,6 +22,8 @@ export class MobileApiError extends Error {
   maxAttempts?: number;
   retryAfterSeconds?: number;
   lockDurationSeconds?: number;
+  questionQuota?: unknown;
+  imageQuota?: unknown;
 
   constructor(
     message: string,
@@ -34,6 +36,8 @@ export class MobileApiError extends Error {
       maxAttempts?: number;
       retryAfterSeconds?: number;
       lockDurationSeconds?: number;
+      questionQuota?: unknown;
+      imageQuota?: unknown;
     },
   ) {
     super(message);
@@ -46,6 +50,8 @@ export class MobileApiError extends Error {
     if (typeof extra?.maxAttempts === 'number') this.maxAttempts = extra.maxAttempts;
     if (typeof extra?.retryAfterSeconds === 'number') this.retryAfterSeconds = extra.retryAfterSeconds;
     if (typeof extra?.lockDurationSeconds === 'number') this.lockDurationSeconds = extra.lockDurationSeconds;
+    if (extra?.questionQuota !== undefined) this.questionQuota = extra.questionQuota;
+    if (extra?.imageQuota !== undefined) this.imageQuota = extra.imageQuota;
   }
 }
 
@@ -235,6 +241,8 @@ async function parseResponse(response: Response) {
         maxAttempts: typeof payload.maxAttempts === 'number' ? payload.maxAttempts : undefined,
         retryAfterSeconds: typeof payload.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : undefined,
         lockDurationSeconds: typeof payload.lockDurationSeconds === 'number' ? payload.lockDurationSeconds : undefined,
+        questionQuota: payload.questionQuota,
+        imageQuota: payload.imageQuota,
       },
     );
   }

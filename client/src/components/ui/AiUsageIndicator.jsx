@@ -1,6 +1,15 @@
 /**
  * Chỉ báo hạn mức DewSkill AI theo % còn lại + vòng tròn tiến trình + đếm ngược reset 00:00 GMT+7.
  */
+export const AI_QUOTA_UPDATED_EVENT = 'cms:ai-quota-updated';
+
+export function emitAiQuotaUpdated(dailyQuota) {
+  if (!dailyQuota || typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(AI_QUOTA_UPDATED_EVENT, { detail: dailyQuota }));
+  } catch { /* ignore */ }
+}
+
 export function formatAiResetCountdown(resetInMs, resetsAt, isEn = false) {
   let ms = Number(resetInMs);
   if (!Number.isFinite(ms) && resetsAt) {
@@ -31,6 +40,7 @@ export default function AiUsageIndicator({
   imageDisallowed = false,
   isFreeTier = false,
   isEn = false,
+  dark = false,
   className = '',
 }) {
   const clampedPct = applies ? Math.max(0, Math.min(100, Number(percentLeft ?? 100) || 0)) : 100;
@@ -62,9 +72,11 @@ export default function AiUsageIndicator({
   return (
     <div
       className={`flex items-center gap-1.5 text-left text-[10px] font-normal leading-snug ${
-        blocked
-          ? 'text-amber-600/85 dark:text-amber-400/85'
-          : 'text-slate-400/85 dark:text-slate-500'
+        dark
+          ? (blocked ? 'text-amber-300/95' : 'text-slate-300/80')
+          : (blocked
+            ? 'text-amber-600/85 dark:text-amber-400/85'
+            : 'text-slate-400/85 dark:text-slate-500')
       } ${className}`.trim()}
     >
       <svg
@@ -81,7 +93,7 @@ export default function AiUsageIndicator({
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
-          className="text-slate-300/70 dark:text-slate-700"
+          className={dark ? 'text-white/20' : 'text-slate-300/70 dark:text-slate-700'}
         />
         {clampedPct > 0 ? (
           <circle

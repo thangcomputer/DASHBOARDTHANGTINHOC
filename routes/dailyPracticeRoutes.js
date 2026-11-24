@@ -31,6 +31,8 @@ function sendError(res, err) {
       code: err.code || undefined,
       ...(typeof err.currentXp === 'number' ? { currentXp: err.currentXp } : {}),
       ...(typeof err.needXp === 'number' ? { needXp: err.needXp } : {}),
+      ...(err.questionQuota ? { questionQuota: err.questionQuota } : {}),
+      ...(err.imageQuota ? { imageQuota: err.imageQuota } : {}),
     });
   }
   logger.error('[DAILY_PRACTICE]', err);
@@ -167,6 +169,7 @@ router.post('/my/ai-assistant', ...requireStudent, handle((req) => aiService.ask
   unitTitle: req.body?.unitTitle,
   courseTitle: req.body?.courseTitle,
   history: req.body?.history,
+  user: req.user,
 })));
 router.post('/my/placement-advice', ...requireStudent, handle((req) => aiService.placementAdvice({
   score: req.body?.score,

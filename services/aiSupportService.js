@@ -4708,6 +4708,43 @@ async function quickAskAssistant({ user, question, history = [], preferredLang =
   }
 }
 
+/**
+ * Mở ngữ cảnh hạn mức AI dùng chung (AiSupportSession) cho mọi điểm hỏi AI của học viên/giảng viên.
+ */
+async function openSharedAiQuotaContext(user = null) {
+  if (!user || typeof user !== 'object') {
+    return { applies: false, sessionDoc: null, quotaUser: null };
+  }
+  const uid = String(user.id || user._id || '').trim();
+  const userRole = String(user.role || '').trim().toLowerCase();
+  if (!uid || (userRole !== 'student' && userRole !== 'teacher')) {
+    return { applies: false, sessionDoc: null, quotaUser: user };
+  }
+  const quotaUser = userRole === 'student' ? await resolveStudentQuotaUser(user) : user;
+  const qDailyLimit = questionDailyLimit({ userRole }, quotaUser);
+  if (!(qDailyLimit > 0) || !isAiSessionStoreReady()) {
+    return { applies: false, sessionDoc: null, quotaUser };
+  }
+  const sessionDoc = await ensureSession({
+    conversationId: buildAiSupportConversationId(userRole, uid),
+    userId: uid,
+    userRole,
+    branchId: String(user.branchId || ''),
+  });
+  return { applies: true, sessionDoc, quotaUser };
+}
+
+function buildAiQuotaError(sessionDoc, quotaUser = null, lang = 'vi') {
+  const questionQuota = peekQuestionQuota(sessionDoc, quotaUser);
+  const imageQuota = peekImageQuota(sessionDoc, quotaUser);
+  const err = new Error(questionLimitReply(questionQuota?.limit || 100, lang));
+  err.status = 403;
+  err.code = 'AI_QUESTION_QUOTA';
+  err.questionQuota = questionQuota;
+  err.imageQuota = imageQuota;
+  return err;
+}
+
 module.exports = {
   AI_PEER_ID,
   AI_PEER_NAME,
@@ -4721,6 +4758,9 @@ module.exports = {
   isAiChatUser,
   isSupportAgent,
   isAiSupportConversationId,
+  isAiSessionStoreReady,
+  openSharedAiQuotaContext,
+  buildAiQuotaError,
   sessionToClient,
   effectiveStatus,
   getSession,

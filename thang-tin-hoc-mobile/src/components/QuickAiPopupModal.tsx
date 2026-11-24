@@ -54,6 +54,8 @@ import { useLanguage } from '../i18n/LanguageContext';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { navigationRef } from '../navigation/navigationRef';
 import {
+  AI_QUOTA_UPDATED_EVENT,
+  emitAiQuotaUpdated,
   fetchAiSupportStatus,
   quickAskAi,
   reportQuickAskClientError,
@@ -633,6 +635,22 @@ export function QuickAiPopupModal({
   }, [recentScopeId]);
 
   useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      AI_QUOTA_UPDATED_EVENT,
+      (patch: (Partial<AiDailyQuota> & { _origin?: string }) | undefined) => {
+        if (!patch || patch._origin === 'quick_modal') return;
+        if (!patch.questionQuota && !patch.imageQuota) return;
+        setAiDailyQuota((prev) => ({
+          ...(prev || {}),
+          ...(patch.questionQuota ? { questionQuota: patch.questionQuota } : {}),
+          ...(patch.imageQuota ? { imageQuota: patch.imageQuota } : {}),
+        }));
+      },
+    );
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
     if (role !== 'student' && role !== 'teacher') return undefined;
     let active = true;
     void fetchAiSupportStatus()
@@ -1102,10 +1120,14 @@ export function QuickAiPopupModal({
         attachment: activeAttachment,
       });
       if (result.questionQuota || result.imageQuota) {
-        setAiDailyQuota((prev) => ({
-          questionQuota: result.questionQuota ?? prev?.questionQuota,
-          imageQuota: result.imageQuota ?? prev?.imageQuota,
-        }));
+        setAiDailyQuota((prev) => {
+          const next = {
+            questionQuota: result.questionQuota ?? prev?.questionQuota,
+            imageQuota: result.imageQuota ?? prev?.imageQuota,
+          };
+          emitAiQuotaUpdated({ ...next, _origin: 'quick_modal' });
+          return next;
+        });
       }
       if (result.answer) {
         touchRecentQuestion(question);
@@ -1139,43 +1161,49 @@ export function QuickAiPopupModal({
         const errCode = err.code;
         setAiDailyQuota((prev) => {
           const base = prev || {};
-          if (errCode === 'AI_QUESTION_QUOTA') {
-            return {
+          const updated: AiDailyQuota = errCode === 'AI_QUESTION_QUOTA'
+            ? {
               ...base,
               questionQuota: {
                 ...(base.questionQuota || {}),
                 applies: true,
-                mode: 'percent',
+                mode: 'percent' as const,
                 limit: 100,
                 remaining: 0,
                 percentLeft: 0,
                 used: 100,
                 percentUsed: 100,
               },
-            };
-          }
-          const rawLim = base.imageQuota?.limit;
-          const imgLim = rawLim !== null && rawLim !== undefined && Number.isFinite(Number(rawLim))
-            ? Number(rawLim)
-            : (isFreeTierStudent ? 0 : 100);
-          return {
-            ...base,
-            imageQuota: {
-              ...(base.imageQuota || {}),
-              applies: true,
-              mode: 'percent',
-              allowed: base.imageQuota?.allowed !== undefined ? base.imageQuota.allowed : imgLim > 0,
-              limit: imgLim,
-              remaining: 0,
-              percentLeft: 0,
-              used: 100,
-              percentUsed: 100,
-            },
-          };
+            }
+            : (() => {
+              const rawLim = base.imageQuota?.limit;
+              const imgLim = rawLim !== null && rawLim !== undefined && Number.isFinite(Number(rawLim))
+                ? Number(rawLim)
+                : (isFreeTierStudent ? 0 : 100);
+              return {
+                ...base,
+                imageQuota: {
+                  ...(base.imageQuota || {}),
+                  applies: true,
+                  mode: 'percent' as const,
+                  allowed: base.imageQuota?.allowed !== undefined ? base.imageQuota.allowed : imgLim > 0,
+                  limit: imgLim,
+                  remaining: 0,
+                  percentLeft: 0,
+                  used: 100,
+                  percentUsed: 100,
+                },
+              };
+            })();
+          emitAiQuotaUpdated({ ...updated, _origin: 'quick_modal' });
+          return updated;
         });
         void fetchAiSupportStatus()
           .then((st) => {
-            if (st?.dailyQuota) setAiDailyQuota(st.dailyQuota);
+            if (st?.dailyQuota) {
+              setAiDailyQuota(st.dailyQuota);
+              emitAiQuotaUpdated({ ...st.dailyQuota, _origin: 'quick_modal' });
+            }
           })
           .catch(() => {});
         return;

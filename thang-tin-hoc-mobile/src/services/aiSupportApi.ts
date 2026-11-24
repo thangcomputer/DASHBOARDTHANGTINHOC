@@ -1,3 +1,4 @@
+import { DeviceEventEmitter } from 'react-native';
 import { mobileApiRequest } from './apiClient';
 
 export const AI_SUPPORT_STATUS = {
@@ -181,6 +182,15 @@ export type AiDailyQuota = {
   questionQuota?: AiQuestionQuota;
   imageQuota?: AiImageQuota;
 };
+
+export const AI_QUOTA_UPDATED_EVENT = 'cms:ai-quota-updated';
+
+export type AiQuotaUpdateEvent = Partial<AiDailyQuota> & { _origin?: string };
+
+export function emitAiQuotaUpdated(patch?: AiQuotaUpdateEvent | null) {
+  if (!patch) return;
+  DeviceEventEmitter.emit(AI_QUOTA_UPDATED_EVENT, patch);
+}
 
 export type AiSupportStatusResponse = {
   enabled: boolean;

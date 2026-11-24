@@ -44,7 +44,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import AiUsageIndicator from './AiUsageIndicator';
+import AiUsageIndicator, { AI_QUOTA_UPDATED_EVENT, emitAiQuotaUpdated } from './AiUsageIndicator';
 import { useLanguage } from '../../context/LanguageContext';
 import { aiSupportAPI } from '../../services/api';
 import { useTheme } from '../../utils/theme';
@@ -710,6 +710,21 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
   }, [practiceSessionActive]);
 
   useEffect(() => {
+    const onQuotaUpdated = (event) => {
+      const detail = event?.detail;
+      if (!detail || typeof detail !== 'object' || detail._origin === 'palette') return;
+      if (!detail.questionQuota && !detail.imageQuota) return;
+      setAiDailyQuota((prev) => ({
+        ...(prev || {}),
+        ...(detail.questionQuota ? { questionQuota: detail.questionQuota } : {}),
+        ...(detail.imageQuota ? { imageQuota: detail.imageQuota } : {}),
+      }));
+    };
+    window.addEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
+    return () => window.removeEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
+  }, []);
+
+  useEffect(() => {
     if (!open || (role !== 'student' && role !== 'teacher')) return undefined;
     let cancelled = false;
     (async () => {
@@ -1145,8 +1160,8 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
             const base = prev || {};
             const nextQuestionQuota = res?.questionQuota || base.questionQuota;
             const nextImageQuota = res?.imageQuota || base.imageQuota;
-            if (quotaCode === 'AI_QUESTION_QUOTA') {
-              return {
+            const updated = quotaCode === 'AI_QUESTION_QUOTA'
+              ? {
                 ...base,
                 questionQuota: {
                   ...(nextQuestionQuota || {}),
@@ -1159,27 +1174,30 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
                   percentUsed: 100,
                 },
                 ...(nextImageQuota ? { imageQuota: nextImageQuota } : {}),
-              };
-            }
-            const rawImgLim = nextImageQuota?.limit;
-            const imgLim = rawImgLim !== null && rawImgLim !== undefined && rawImgLim !== '' && Number.isFinite(Number(rawImgLim))
-              ? Number(rawImgLim)
-              : (isFreeTierStudent ? 0 : 100);
-            const nextLeft = imgLim === 0 ? 0 : (nextImageQuota?.percentLeft ?? nextImageQuota?.remaining ?? 0);
-            return {
-              ...base,
-              ...(nextQuestionQuota ? { questionQuota: nextQuestionQuota } : {}),
-              imageQuota: {
-                ...(nextImageQuota || {}),
-                applies: true,
-                mode: 'percent',
-                allowed: nextImageQuota?.allowed !== undefined ? nextImageQuota.allowed : imgLim > 0,
-                limit: imgLim,
-                remaining: nextLeft,
-                percentLeft: nextLeft,
-                used: imgLim === 0 ? 100 : (nextImageQuota?.used ?? 100),
-              },
-            };
+              }
+              : (() => {
+                const rawImgLim = nextImageQuota?.limit;
+                const imgLim = rawImgLim !== null && rawImgLim !== undefined && rawImgLim !== '' && Number.isFinite(Number(rawImgLim))
+                  ? Number(rawImgLim)
+                  : (isFreeTierStudent ? 0 : 100);
+                const nextLeft = imgLim === 0 ? 0 : (nextImageQuota?.percentLeft ?? nextImageQuota?.remaining ?? 0);
+                return {
+                  ...base,
+                  ...(nextQuestionQuota ? { questionQuota: nextQuestionQuota } : {}),
+                  imageQuota: {
+                    ...(nextImageQuota || {}),
+                    applies: true,
+                    mode: 'percent',
+                    allowed: nextImageQuota?.allowed !== undefined ? nextImageQuota.allowed : imgLim > 0,
+                    limit: imgLim,
+                    remaining: nextLeft,
+                    percentLeft: nextLeft,
+                    used: imgLim === 0 ? 100 : (nextImageQuota?.used ?? 100),
+                  },
+                };
+              })();
+            emitAiQuotaUpdated({ ...updated, _origin: 'palette' });
+            return updated;
           });
           return;
         }
@@ -1187,10 +1205,12 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
         const payload = res?.data || res;
         const answerText = String(payload?.answer || '').trim();
         if (payload?.questionQuota || payload?.imageQuota) {
-          setAiDailyQuota({
+          const nextQuota = {
             questionQuota: payload.questionQuota,
             imageQuota: payload.imageQuota,
-          });
+          };
+          setAiDailyQuota(nextQuota);
+          emitAiQuotaUpdated({ ...nextQuota, _origin: 'palette' });
         }
         if (answerText) {
           touchRecentQuestion(question);
@@ -1501,7 +1521,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
             <span className="truncate text-[11px] font-medium text-slate-400">
               {imageUploadDisallowed
                 ? t('Đính kèm tệp văn bản (tài khoản miễn phí không gửi ảnh)')
-                : t('Dán ảnh | Tệp tin (Bấm dấu cột hoặc CTRL + V)')}
+                : t('Dán ảnh | Tệp tin (Bấm dấu cộng hoặc CTRL + V)')}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-2">

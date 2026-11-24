@@ -174,8 +174,8 @@ function detectLessonQuestionLang(cleanQuestion, safeHistory = []) {
 }
 
 /**
- * Trợ lý AI hỏi đáp trong bài học / video (dùng Gemini phân tầng theo độ phức tạp + cache + guard;
- * không áp hạn mức lượt hỏi/ngày vì câu trả lời sai trong video đã tính phí XP cao).
+ * Trợ lý AI hỏi đáp trong bài học / video: dùng chung hạn mức % AI hằng ngày với DewSkill AI
+ * (khóa cứng khi đã dùng hết 100%, trừ % khi trả lời từ memory/cache/AI, hoàn % nếu Gemini lỗi).
  */
 async function askLessonAssistant({
   question = '',
@@ -183,6 +183,8 @@ async function askLessonAssistant({
   unitTitle = '',
   courseTitle = '',
   history = [],
+  user = null,
+  _quotaAdapter = null,
 } = {}) {
   const cleanQuestion = String(question || '').trim().slice(0, 1000);
   if (!cleanQuestion) throw httpError(400, 'Vui lòng nhập câu hỏi');
@@ -198,6 +200,75 @@ async function askLessonAssistant({
   const lang = detectLessonQuestionLang(cleanQuestion, safeHistory);
   const isEn = lang === 'en';
 
+  const aiQuotaMod = _quotaAdapter ? null : require('./aiSupportService');
+  const quotaCtx = _quotaAdapter
+    ? await _quotaAdapter.open(user)
+    : await aiQuotaMod.openSharedAiQuotaContext(user);
+
+  const buildQuotaSnapshot = () => {
+    if (!quotaCtx?.applies) return {};
+    if (_quotaAdapter) {
+      return {
+        questionQuota: _quotaAdapter.peekQuestionQuota(quotaCtx.sessionDoc, quotaCtx.quotaUser),
+        imageQuota: _quotaAdapter.peekImageQuota(quotaCtx.sessionDoc, quotaCtx.quotaUser),
+      };
+    }
+    return {
+      questionQuota: aiQuotaMod.peekQuestionQuota(quotaCtx.sessionDoc, quotaCtx.quotaUser),
+      imageQuota: aiQuotaMod.peekImageQuota(quotaCtx.sessionDoc, quotaCtx.quotaUser),
+    };
+  };
+
+  const makeQuotaBlockedError = () => {
+    if (_quotaAdapter && typeof _quotaAdapter.buildQuotaError === 'function') {
+      return _quotaAdapter.buildQuotaError(quotaCtx.sessionDoc, quotaCtx.quotaUser, lang);
+    }
+    if (aiQuotaMod && typeof aiQuotaMod.buildAiQuotaError === 'function') {
+      return aiQuotaMod.buildAiQuotaError(quotaCtx.sessionDoc, quotaCtx.quotaUser, lang);
+    }
+    const snap = buildQuotaSnapshot();
+    const err = httpError(403, isEn
+      ? 'You have used 100% of your AI quota today. Please wait until daily reset to continue.'
+      : 'Bạn đã dùng hết 100% hạn mức AI hôm nay. Hạn mức sẽ tự động làm mới vào 00:00.');
+    err.code = 'AI_QUESTION_QUOTA';
+    if (snap.questionQuota) err.questionQuota = snap.questionQuota;
+    if (snap.imageQuota) err.imageQuota = snap.imageQuota;
+    return err;
+  };
+
+  // Kiểm tra khóa cứng ngay tại 0% trước mọi nhánh (bao gồm chào hỏi / memory / cache / Gemini)
+  if (quotaCtx?.applies) {
+    const initialSnap = buildQuotaSnapshot();
+    if (initialSnap.questionQuota?.applies && !(Number(initialSnap.questionQuota?.percentLeft) > 0)) {
+      throw makeQuotaBlockedError();
+    }
+  }
+
+  let consumedBudgetBp = 0;
+  const consumeQuotaTurn = async () => {
+    if (!quotaCtx?.applies) return {};
+    const q = _quotaAdapter
+      ? await _quotaAdapter.consume(quotaCtx.sessionDoc, quotaCtx.quotaUser, { text: cleanQuestion })
+      : await aiQuotaMod.consumeAiBudgetQuota(quotaCtx.sessionDoc, quotaCtx.quotaUser, { text: cleanQuestion });
+    if (q?.blocked) {
+      throw makeQuotaBlockedError();
+    }
+    consumedBudgetBp = q?.applies ? (Number(q.consumedBp) || 0) : 0;
+    return buildQuotaSnapshot();
+  };
+
+  const refundQuotaTurn = async () => {
+    if (!quotaCtx?.applies || !(consumedBudgetBp > 0) || !quotaCtx.sessionDoc) return;
+    try {
+      if (_quotaAdapter && typeof _quotaAdapter.refund === 'function') {
+        await _quotaAdapter.refund(quotaCtx.sessionDoc, consumedBudgetBp);
+      } else if (aiQuotaMod && typeof aiQuotaMod.refundAiBudgetQuota === 'function') {
+        await aiQuotaMod.refundAiBudgetQuota(quotaCtx.sessionDoc, consumedBudgetBp);
+      }
+      consumedBudgetBp = 0;
+    } catch { /* ignore refund failure */ }
+  };
+
   // 1. Security gate (0 token)
   const securityGate = classifySecurityRisk(cleanQuestion);
   if (securityGate.blocked) {
@@ -205,6 +276,7 @@ async function askLessonAssistant({
       answer: isEn ? GUARD_REPLIES.security.en : GUARD_REPLIES.security.vi,
       model: 'policy-guard',
       source: 'security_guard',
+      ...buildQuotaSnapshot(),
     };
   }
 
@@ -216,12 +288,14 @@ async function askLessonAssistant({
         answer: isEn ? GUARD_REPLIES.platformMeta.en : GUARD_REPLIES.platformMeta.vi,
         model: 'scope-guard',
         source: 'scope_guard',
+        ...buildQuotaSnapshot(),
       };
     }
     return {
       answer: isEn ? GUARD_REPLIES.outOfScope.en : GUARD_REPLIES.outOfScope.vi,
       model: 'scope-guard',
       source: 'scope_guard',
+      ...buildQuotaSnapshot(),
     };
   }
 
@@ -233,10 +307,12 @@ async function askLessonAssistant({
       ? matchLocalOfficeMemory(cleanQuestion, lang)
       : null;
     if (memoryHit?.answer) {
+      const turnQuota = await consumeQuotaTurn();
       return {
         answer: memoryHit.answer,
         model: 'quick-memory',
         source: 'memory',
+        ...turnQuota,
       };
     }
   }
@@ -251,13 +327,18 @@ async function askLessonAssistant({
     try {
       const cached = await cache.get(cacheKey);
       if (cached && cached.answer) {
+        const turnQuota = await consumeQuotaTurn();
         return {
           answer: cached.answer,
           model: cached.model || 'cache',
           source: 'cache',
+          ...turnQuota,
         };
       }
-    } catch { /* fallback to LLM */ }
+    } catch (cacheErr) {
+      if (cacheErr?.code === 'AI_QUESTION_QUOTA') throw cacheErr;
+      /* fallback to LLM */
+    }
   }
 
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
@@ -312,6 +393,8 @@ async function askLessonAssistant({
     { role: 'user', content: cleanQuestion },
   ];
 
+  const turnQuota = await consumeQuotaTurn();
+
   const profile = isComplexQuery(cleanQuestion)
     ? getModelProfile('qa_complex', { maxTokens: 1500 })
     : getModelProfile('lesson_assistant', { maxTokens: 1200 });
@@ -333,7 +416,7 @@ async function askLessonAssistant({
         if (cacheKey && answer.length >= 25 && !/(nằm ngoài phạm vi|outside the scope|outside my scope)/i.test(answer)) {
           cache.set(cacheKey, { answer, model }, LESSON_AI_CACHE_TTL_SEC).catch(() => { });
         }
-        return { answer, model, source: 'ai' };
+        return { answer, model, source: 'ai', ...turnQuota };
       }
     } catch (err) {
       lastErr = err;
@@ -341,6 +424,7 @@ async function askLessonAssistant({
     }
   }
 
+  await refundQuotaTurn();
   logger.warn({ err: lastErr?.message }, '[DAILY_PRACTICE] lesson AI assistant exhausted fallbacks');
   throw httpError(503, 'Trợ lý AI đang bận hoặc chưa kết nối được, bạn thử lại sau ít giây nhé.');
 }

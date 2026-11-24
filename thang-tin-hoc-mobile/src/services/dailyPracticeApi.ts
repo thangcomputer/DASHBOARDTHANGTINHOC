@@ -1,6 +1,11 @@
 import { DeviceEventEmitter } from 'react-native';
 import { MobileApiError, mobileApiRequest } from './apiClient';
 import { LEARNING_GOAL_CHANGED_EVENT } from './learningGoalApi';
+import {
+  emitAiQuotaUpdated,
+  type AiImageQuota,
+  type AiQuestionQuota,
+} from './aiSupportApi';
 import { coalesceCached, invalidateCache, peekCached, setCached } from '../utils/requestCache';
 
 const DP_OVERVIEW_CACHE_KEY = 'daily-practice:overview';
@@ -673,13 +678,37 @@ export const dailyPracticeApi = {
   relatedTopics: (subjectId: string, unitId = '') => call<DpTopic[]>(
     `/related-topics?subjectId=${encodeURIComponent(subjectId)}${unitId ? `&unitId=${encodeURIComponent(unitId)}` : ''}`,
   ),
-  askLessonAssistant: (body: {
+  askLessonAssistant: async (body: {
     question: string;
     lessonTitle?: string;
     unitTitle?: string;
     courseTitle?: string;
     history?: Array<{ role: string; body?: string; content?: string; text?: string }>;
-  }) => call<{ answer: string; text?: string }>('/ai-assistant', body),
+  }) => {
+    try {
+      const data = await call<{
+        answer: string;
+        text?: string;
+        questionQuota?: AiQuestionQuota;
+        imageQuota?: AiImageQuota;
+      }>('/ai-assistant', body);
+      if (data?.questionQuota || data?.imageQuota) {
+        emitAiQuotaUpdated({
+          ...(data.questionQuota ? { questionQuota: data.questionQuota } : {}),
+          ...(data.imageQuota ? { imageQuota: data.imageQuota } : {}),
+        });
+      }
+      return data;
+    } catch (err) {
+      if (err instanceof MobileApiError && (err.questionQuota || err.imageQuota)) {
+        emitAiQuotaUpdated({
+          ...(err.questionQuota ? { questionQuota: err.questionQuota as AiQuestionQuota } : {}),
+          ...(err.imageQuota ? { imageQuota: err.imageQuota as AiImageQuota } : {}),
+        });
+      }
+      throw err;
+    }
+  },
   placementAdvice: (body: Record<string, unknown>) => call<DpPlacementAdvice>('/placement-advice', body),
   startSpacedReview: () => call<DpSession>('/spaced-review/start', {}).then((data) => {
     invalidateCache('daily-practice:');
