@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,12 +14,40 @@ import type { Conversation } from '../types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
+function findDesignatedSupportContact(contacts: Conversation[]) {
+  return [...contacts]
+    .filter((contact) => ['SUPPORT', 'SUPPORT_AGENT'].includes(String(contact.adminRole || '').toUpperCase()))
+    .sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online))
+      || String(a.name || '').localeCompare(String(b.name || ''), 'vi'))[0] || null;
+}
+
 export function SupportEntryScreen() {
   const navigation = useNavigation<Navigation>();
   const { user } = useAuth();
   const [choiceVisible, setChoiceVisible] = useState(false);
   const [opening, setOpening] = useState<'ai' | 'staff' | null>(null);
   const [choiceError, setChoiceError] = useState('');
+  const [designatedAgent, setDesignatedAgent] = useState<Conversation | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setDesignatedAgent(null);
+      return;
+    }
+    let cancelled = false;
+    messageService.conversations(user.role, user)
+      .then((contacts) => {
+        if (!cancelled) {
+          setDesignatedAgent(findDesignatedSupportContact(contacts));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDesignatedAgent(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const openAiSupport = async () => {
     if (!user || opening) return;
@@ -49,13 +77,10 @@ export function SupportEntryScreen() {
     setChoiceError('');
     try {
       const contacts = await messageService.conversations(user.role, user);
-      const supportContacts = contacts.filter((contact) => (
-        contact.category === 'support'
-        || String(contact.adminRole || '').toUpperCase() === 'SUPPORT'
-      )).sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online)));
-      const contact = supportContacts[0];
+      const contact = findDesignatedSupportContact(contacts);
+      setDesignatedAgent(contact);
       if (!contact) {
-        setChoiceError('Hiện chưa có nhân viên hỗ trợ trong danh bạ.');
+        setChoiceError('Hiện chưa có Chuyên viên Hỗ trợ nào được phân công.');
         return;
       }
       openStaffConversation(contact);
@@ -175,7 +200,11 @@ export function SupportEntryScreen() {
                 <View style={styles.choiceIcon}><Users size={21} color={theme.brand} /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.choiceRowTitle}>Nhân viên hỗ trợ trực tiếp</Text>
-                  <Text style={styles.choiceRowDescription}>Trò chuyện trực tiếp với chuyên viên hỗ trợ.</Text>
+                  <Text style={styles.choiceRowDescription}>
+                    {designatedAgent
+                      ? `Chuyên viên phụ trách: ${designatedAgent.name}`
+                      : 'Chưa có chuyên viên hỗ trợ được phân công.'}
+                  </Text>
                 </View>
                 {opening === 'staff'
                   ? <ActivityIndicator color={theme.brand} />

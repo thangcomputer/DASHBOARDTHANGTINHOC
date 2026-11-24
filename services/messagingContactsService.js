@@ -142,6 +142,7 @@ function mapContactFromDoc(doc, transportRoleHint, branchTenantMap, branchProfil
     transportRole,
     adminRole: doc.adminRole || null,
     productRole,
+    status: doc.status || '',
     gender: doc.gender || '',
     phone: doc.phone || '',
     personalPhone: doc.phone || '',

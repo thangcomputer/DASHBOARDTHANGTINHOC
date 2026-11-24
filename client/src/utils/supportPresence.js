@@ -3,7 +3,7 @@
  * - SUPER / HIGH: mọi người đang online (presence directory)
  * - Student / Teacher / Staff / Support: chỉ peer từ GET /contacts (Phase 6/7)
  */
-import { normalizeChatRole } from './chatConversationId';
+import { normalizeChatRole } from './chatConversationId.js';
 
 /**
  * Elevated admins who may browse online presence as a directory.
@@ -206,4 +206,42 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [],
 /** Flatten people for simple lists (FeedBoard) */
 export function flattenSupportPeople(directory) {
   return (directory?.groups || []).flatMap((g) => g.people || []);
+}
+
+/**
+ * Chỉ khớp tài khoản được phân công vai trò Chuyên viên Hỗ trợ (SUPPORT / SUPPORT_AGENT).
+ * Không khớp STAFF chi nhánh, HIGH_ADMIN, SUPER_ADMIN hay admin/staff chung.
+ */
+export function isDesignatedSupportContact(contact) {
+  if (!contact || contact.isDeleted) return false;
+  const status = String(contact.status || '').trim().toLowerCase();
+  if (status === 'deleted' || status === 'inactive' || status === 'locked') return false;
+  const product = String(contact.productRole || '').trim().toUpperCase();
+  const ar = String(contact.adminRole || '').trim().toUpperCase();
+  const r = String(contact.role || '').trim().toLowerCase();
+  return product === 'SUPPORT' || ar === 'SUPPORT' || ar === 'SUPPORT_AGENT' || r === 'support';
+}
+
+/**
+ * Tìm đúng chuyên viên hỗ trợ được phân công từ danh bạ GET /api/messages/contacts.
+ */
+export function findDesignatedSupportAgent(contacts = [], onlineUsers = []) {
+  const onlineIds = new Set(
+    (Array.isArray(onlineUsers) ? onlineUsers : [])
+      .map((u) => String(u?.userId || u?.id || ''))
+      .filter(Boolean),
+  );
+  const list = (Array.isArray(contacts) ? contacts : [])
+    .filter(isDesignatedSupportContact)
+    .map((contact) => {
+      const id = String(contact.id || contact._id || '');
+      return {
+        ...contact,
+        id,
+        online: onlineIds.has(id),
+      };
+    })
+    .sort(compareByOnlineThenName);
+
+  return list[0] || null;
 }

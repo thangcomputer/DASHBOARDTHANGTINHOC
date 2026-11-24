@@ -45,7 +45,7 @@ function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
   if (adminRole === 'SUPPORT') {
     return (
       <span className="cms-rbac-badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
-        <Headset size={10} aria-hidden="true" />  Hỗ trợ viên
+        <Headset size={10} aria-hidden="true" />  Chuyên viên Hỗ trợ
       </span>
     );
   }
@@ -82,9 +82,15 @@ function StatusBadge({ status }) {
 }
 
 // ── Modal Thêm/Sửa ────────────────────────────────────────────────────────────
-function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin }) {
+function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin, existingSupportAgent, onConflictRefresh }) {
   const toast = useToast();
   const isEdit = !!staff?._id;
+  const supportHeldByOther = useMemo(() => {
+    if (!existingSupportAgent) return null;
+    const holderId = String(existingSupportAgent._id || existingSupportAgent.id || '');
+    const currentId = String(staff?._id || staff?.id || '');
+    return holderId && holderId !== currentId ? existingSupportAgent : null;
+  }, [existingSupportAgent, staff]);
 
   const [branches, setBranches] = useState([]);
   const [branchLoading, setBranchLoading] = useState(true);
@@ -135,6 +141,10 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
     if (!isEdit && !form.password) {
       toast.error('Vui lòng nhập mật khẩu'); return;
     }
+    if (form.adminRole === 'SUPPORT' && supportHeldByOther) {
+      toast.error(`Vai trò Chuyên viên Hỗ trợ đã được gán cho "${supportHeldByOther.name}". Chỉ được chọn 1 tài khoản duy nhất.`);
+      return;
+    }
     if (form.adminRole === 'STAFF' && !form.branchId) {
       toast.error('Nhân viên (STAFF) phải được gán vào một chi nhánh!'); return;
     }
@@ -169,6 +179,9 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
         onSaved(res.data);
         onClose();
       } else {
+        if (res?.code === 'SUPPORT_AGENT_ALREADY_ASSIGNED' && typeof onConflictRefresh === 'function') {
+          onConflictRefresh();
+        }
         toast.error(res.message || 'Lỗi lưu dữ liệu');
       }
     } catch (err) {
@@ -337,38 +350,65 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
                   <span><strong>Super Admin</strong> - tài khoản hệ thống, không đổi vai trò / không tạo thêm từ form này.</span>
                 </div>
               ) : (
-                <div
-                  className="cms-rbac-segment"
-                  role="radiogroup"
-                  aria-labelledby="rbac-role-label"
-                >
-                  {[
-                    ...(canPickElevatedRoles ? [{ val: 'HIGH_ADMIN', label: 'Admin cấp cao', icon: ShieldCheck }] : []),
-                    { val: 'SUPPORT', label: 'Chuyên viên Hỗ trợ', icon: Headset },
-                    { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
-                  ].map(({ val, label, icon: Icon }) => (
-                    <button
-                      key={val}
-                      type="button"
-                      role="radio"
-                      aria-checked={form.adminRole === val}
-                      onClick={() => setForm((f) => ({
-                        ...f,
-                        adminRole: val,
-                        permissions: val === 'HIGH_ADMIN'
-                          ? (f.adminRole === 'HIGH_ADMIN' && f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS)
-                          : val === 'SUPPORT'
-                            ? SUPPORT_DEFAULT_PERMISSIONS
-                            : (f.permissions.length && f.adminRole === 'STAFF' ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
-                        branchId: (val === 'HIGH_ADMIN' || val === 'SUPPORT') ? '' : f.branchId,
-                      }))}
-                      className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
-                    >
-                      <Icon size={14} aria-hidden="true" />
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div
+                    className="cms-rbac-segment"
+                    role="radiogroup"
+                    aria-labelledby="rbac-role-label"
+                  >
+                    {[
+                      ...(canPickElevatedRoles ? [{ val: 'HIGH_ADMIN', label: 'Admin cấp cao', icon: ShieldCheck }] : []),
+                      { val: 'SUPPORT', label: 'Chuyên viên Hỗ trợ', icon: Headset },
+                      { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
+                    ].map(({ val, label, icon: Icon }) => {
+                      const isDisabled = val === 'SUPPORT' && Boolean(supportHeldByOther);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          role="radio"
+                          aria-checked={form.adminRole === val}
+                          aria-disabled={isDisabled}
+                          disabled={isDisabled}
+                          title={
+                            isDisabled
+                              ? `Vai trò Chuyên viên Hỗ trợ đã được gán cho ${supportHeldByOther.name}. Chỉ cho phép 1 người.`
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (isDisabled) return;
+                            setForm((f) => ({
+                              ...f,
+                              adminRole: val,
+                              permissions: val === 'HIGH_ADMIN'
+                                ? (f.adminRole === 'HIGH_ADMIN' && f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS)
+                                : val === 'SUPPORT'
+                                  ? SUPPORT_DEFAULT_PERMISSIONS
+                                  : (f.permissions.length && f.adminRole === 'STAFF' ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
+                              branchId: (val === 'HIGH_ADMIN' || val === 'SUPPORT') ? '' : f.branchId,
+                            }));
+                          }}
+                          className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''} ${
+                            isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          <Icon size={14} aria-hidden="true" />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {supportHeldByOther && (
+                    <div className="mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
+                      <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>
+                        Vai trò <strong>Chuyên viên Hỗ trợ (Support Agent)</strong> hiện đang gắn cho{' '}
+                        <strong>{supportHeldByOther.name}</strong>. Hệ thống chỉ cho phép 1 người giữ vai trò này — hãy đổi vai trò của{' '}
+                        <strong>{supportHeldByOther.name}</strong> trước nếu muốn chuyển sang nhân viên khác.
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -891,6 +931,11 @@ export default function StaffManagementTab() {
     return (staffList || []).filter((s) => String(s?._id || s?.id || '') !== selfId);
   }, [staffList, selfId]);
 
+  const existingSupportAgent = useMemo(
+    () => (staffList || []).find((s) => ['SUPPORT', 'SUPPORT_AGENT'].includes(String(s?.adminRole || '').toUpperCase())) || null,
+    [staffList],
+  );
+
   const handleDelete = async (s) => {
     if (s.adminRole === 'SUPER_ADMIN' && !isRootSuperAdmin) {
       toast.error('Chỉ Admin Super (Hệ thống) mới có quyền xóa Super Admin.');
@@ -941,6 +986,8 @@ export default function StaffManagementTab() {
           onSaved={handleSaved}
           isRootSuperAdmin={isRootSuperAdmin}
           isSuperAdmin={isSuperAdmin}
+          existingSupportAgent={existingSupportAgent}
+          onConflictRefresh={fetchStaff}
         />
       )}
 

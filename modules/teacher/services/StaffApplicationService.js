@@ -3,6 +3,7 @@ const bcrypt  = require('bcryptjs');
 const { teacherRepository } = require('./../repositories');
 const Teacher = require('./../models/Teacher'); // Temp for new Teacher
 const Branch  = require('./../../branch/models/Branch');
+const { assertSingletonSupportAgent } = require('./../../../services/supportAgentService');
 
 function actorIsRootSuperAdmin(data) {
   return data.currentUser?.id === 'admin';
@@ -51,6 +52,19 @@ class StaffApplicationService {
         success: false,
         message: 'Chỉ Super Admin mới được phép tạo tài khoản Admin cấp cao.',
       } };
+    }
+
+    const singletonCheck = await assertSingletonSupportAgent({ TeacherModel: Teacher, adminRole });
+    if (!singletonCheck.ok) {
+      return {
+        _status: singletonCheck.status,
+        _body: {
+          success: false,
+          code: singletonCheck.code,
+          message: singletonCheck.message,
+          holder: singletonCheck.holder,
+        },
+      };
     }
 
     // Validate branch cho STAFF
@@ -145,6 +159,23 @@ class StaffApplicationService {
           success: false,
           message: 'Chỉ Admin Super mới có quyền thăng/hạ quyền Admin Cấp Cao.',
         } };
+      }
+
+      const singletonCheck = await assertSingletonSupportAgent({
+        TeacherModel: Teacher,
+        adminRole,
+        excludeId: data.id,
+      });
+      if (!singletonCheck.ok) {
+        return {
+          _status: singletonCheck.status,
+          _body: {
+            success: false,
+            code: singletonCheck.code,
+            message: singletonCheck.message,
+            holder: singletonCheck.holder,
+          },
+        };
       }
 
       updates.adminRole = adminRole;

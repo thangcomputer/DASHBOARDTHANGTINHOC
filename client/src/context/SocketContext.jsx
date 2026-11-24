@@ -37,7 +37,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const groupNewCallbackRef = useRef(null);
   const groupDeleteCallbacksRef = useRef(new Set());
   const dataRefreshCallbacksRef = useRef(new Set());
-  const contactListUpdatedCallbackRef = useRef(null);
+  const contactListUpdatedCallbacksRef = useRef(new Set());
   const readAckCallbackRef = useRef(new Set());
   const typingCallbacksRef = useRef(new Set());
   const aiAutoReplyStatusCallbacksRef = useRef(new Set());
@@ -118,11 +118,9 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   }, []);
 
   const onContactListUpdated = useCallback((callback) => {
-    contactListUpdatedCallbackRef.current = callback;
+    contactListUpdatedCallbacksRef.current.add(callback);
     return () => {
-      if (contactListUpdatedCallbackRef.current === callback) {
-        contactListUpdatedCallbackRef.current = null;
-      }
+      contactListUpdatedCallbacksRef.current.delete(callback);
     };
   }, []);
 
@@ -443,10 +441,8 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       window.location.href = '/login';
     };
 
-    const onContactListUpdated = () => {
-      if (contactListUpdatedCallbackRef.current) {
-        contactListUpdatedCallbackRef.current();
-      }
+    const onContactListUpdated = (payload) => {
+      contactListUpdatedCallbacksRef.current.forEach((cb) => cb(payload));
     };
 
     const onPaymentConfirmed = (data) => {
@@ -632,6 +628,7 @@ export const useSocket = () => {
       onGroupNew: () => () => {},
       onGroupDelete: () => () => {},
       onDataRefresh: () => () => {},
+      onContactListUpdated: () => () => {},
       emitMessageRead: () => {},
     };
   }

@@ -15,8 +15,16 @@ const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
 const logger = require('../config/logger');
 const { normalizeVNPhone } = require('../utils/phoneIdentity');
 const { assertUniqueContact } = require('../utils/uniqueContact');
+const { assertSingletonSupportAgent } = require('../services/supportAgentService');
 
 const router = express.Router();
+
+function emitContactsUpdated(req, reason) {
+  const io = req.app?.get?.('io');
+  if (io) {
+    io.emit('CONTACT_LIST_UPDATED', { reason });
+  }
+}
 /**
  * Phase 7.28 - Controlled cutover for LIVE /api/staff ONLY.
  *
@@ -90,6 +98,16 @@ router.post('/', guard('create'), async (req, res) => {
       });
     }
 
+    const singletonCheck = await assertSingletonSupportAgent({ TeacherModel: Teacher, adminRole });
+    if (!singletonCheck.ok) {
+      return res.status(singletonCheck.status).json({
+        success: false,
+        code: singletonCheck.code,
+        message: singletonCheck.message,
+        holder: singletonCheck.holder,
+      });
+    }
+
     // Validate branch cho STAFF
     let branchCode = '';
     if (adminRole === 'STAFF') {
@@ -128,6 +146,8 @@ router.post('/', guard('create'), async (req, res) => {
       approvedAt: new Date(),
       teacherCode: await generateTeacherCode(),
     });
+
+    emitContactsUpdated(req, 'staff_created');
 
     return res.status(201).json({
       success: true,
@@ -210,6 +230,20 @@ router.put('/:id', guard('update'), async (req, res) => {
         });
       }
 
+      const singletonCheck = await assertSingletonSupportAgent({
+        TeacherModel: Teacher,
+        adminRole,
+        excludeId: req.params.id,
+      });
+      if (!singletonCheck.ok) {
+        return res.status(singletonCheck.status).json({
+          success: false,
+          code: singletonCheck.code,
+          message: singletonCheck.message,
+          holder: singletonCheck.holder,
+        });
+      }
+
       updates.adminRole = adminRole;
       if (adminRole === 'SUPER_ADMIN') {
         updates.role = 'admin';
@@ -261,6 +295,7 @@ router.put('/:id', guard('update'), async (req, res) => {
     }).select('-password -refreshToken');
 
     if (!updated) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    emitContactsUpdated(req, 'staff_updated');
     return res.json({ success: true, message: 'Đã cập nhật phân quyền', data: updated });
   } catch (err) {
     if (err.status === 409) return res.status(409).json({ success: false, message: err.message });
@@ -295,6 +330,7 @@ router.delete('/:id', guard('delete'), async (req, res) => {
       teacherName: target.name || '',
     });
     await Teacher.findByIdAndDelete(req.params.id);
+    emitContactsUpdated(req, 'staff_deleted');
     logger.info('[STAFF] deleted with cascade', {
       id: req.params.id,
       messages: cascade.messages,

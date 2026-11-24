@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Bot,
   ChevronDown,
@@ -15,8 +15,13 @@ import {
   Calendar,
   BookOpen,
   Award,
+  Loader2,
 } from 'lucide-react';
 import { TEACHER_WELCOME_CHIPS, STUDENT_WELCOME_CHIPS } from '../utils/aiSupport';
+import { messagesAPI } from '../services/api';
+import { useSocket } from '../context/SocketContext';
+import { findDesignatedSupportAgent } from '../utils/supportPresence';
+import { resolveAvatarUrl } from '../utils/defaultAvatars';
 
 const TEACHER_FAQS = [
   {
@@ -66,6 +71,9 @@ const STUDENT_FAQS = [
 
 export default function SupportEntryPage() {
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [loadingAgent, setLoadingAgent] = useState(true);
+  const { onlineUsers, onContactListUpdated } = useSocket();
 
   const isTeacher = (() => {
     try {
@@ -80,8 +88,39 @@ export default function SupportEntryPage() {
     return false;
   })();
 
-  const chooseSupport = (mode, prompt = '') => {
-    window.dispatchEvent(new CustomEvent('cms:open-support-choice', { detail: { mode, prompt } }));
+  const loadSupportContacts = useCallback(async (isCancelled = () => false) => {
+    try {
+      const res = await messagesAPI.getContacts();
+      if (!isCancelled()) {
+        setContacts(res?.success && Array.isArray(res.data) ? res.data : []);
+      }
+    } catch {
+      if (!isCancelled()) setContacts([]);
+    } finally {
+      if (!isCancelled()) setLoadingAgent(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+    void loadSupportContacts(isCancelled);
+    const unsub = onContactListUpdated ? onContactListUpdated(() => {
+      void loadSupportContacts(isCancelled);
+    }) : null;
+    return () => {
+      cancelled = true;
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [loadSupportContacts, onContactListUpdated]);
+
+  const designatedAgent = useMemo(
+    () => findDesignatedSupportAgent(contacts, onlineUsers),
+    [contacts, onlineUsers],
+  );
+
+  const chooseSupport = (mode, prompt = '', contact = null) => {
+    window.dispatchEvent(new CustomEvent('cms:open-support-choice', { detail: { mode, prompt, contact } }));
   };
 
   const toggleFaq = (index) => {
@@ -108,7 +147,7 @@ export default function SupportEntryPage() {
               Trung tâm Hỗ trợ Thắng Tin Học
             </h1>
             <p className="mt-1 text-sm text-slate-600 max-w-2xl leading-relaxed">
-              Bạn cần giúp đỡ về bài học, bài tập, lịch dạy hay gặp khó khăn kỹ thuật? Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7 qua trợ lý AI thông minh hoặc đội ngũ chuyên viên trực tiếp.
+              Bạn cần giúp đỡ về bài học, bài tập, lịch dạy hay gặp khó khăn kỹ thuật? Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7 qua trợ lý AI thông minh hoặc chuyên viên hỗ trợ trực tiếp.
             </p>
           </div>
         </div>
@@ -176,21 +215,75 @@ export default function SupportEntryPage() {
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
-                  <Users size={26} strokeWidth={2.2} />
-                </div>
-                <div>
+              <div className="flex items-center gap-3 min-w-0">
+                {designatedAgent ? (
+                  <div className="relative shrink-0">
+                    <img
+                      src={resolveAvatarUrl({ ...designatedAgent, role: 'support' })}
+                      alt={designatedAgent.name}
+                      className="w-12 h-12 rounded-2xl object-cover border border-blue-200 bg-blue-50"
+                    />
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                        designatedAgent.online ? 'bg-emerald-500' : 'bg-slate-400'
+                      }`}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                    <Users size={26} strokeWidth={2.2} />
+                  </div>
+                )}
+                <div className="min-w-0">
                   <h2 className="text-base font-extrabold text-slate-900">
                     Chuyên viên Hỗ trợ Trực tiếp
                   </h2>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    Đội ngũ nhân sự • Giờ làm việc & ca tối
-                  </span>
+                  {designatedAgent ? (
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${designatedAgent.online ? 'text-emerald-600' : 'text-blue-600'}`}>
+                      <span className={`w-2 h-2 rounded-full ${designatedAgent.online ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                      {designatedAgent.online ? 'Đang trực tuyến • Sẵn sàng hỗ trợ' : 'Chuyên viên phụ trách • Giờ làm việc & ca tối'}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      Đội ngũ nhân sự • Giờ làm việc & ca tối
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
+
+            {loadingAgent ? (
+              <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <Loader2 size={14} className="animate-spin text-blue-600 shrink-0" />
+                <span>Đang tải thông tin chuyên viên hỗ trợ...</span>
+              </div>
+            ) : designatedAgent ? (
+              <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50/70 px-3.5 py-2.5 flex items-center justify-between gap-2.5">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-sky-700">
+                    Chuyên viên phụ trách
+                  </p>
+                  <p className="text-sm font-extrabold text-slate-900 truncate">
+                    {designatedAgent.name}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                    designatedAgent.online
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-white text-slate-600 border-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${designatedAgent.online ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                  {designatedAgent.online ? 'Trực tuyến' : 'Ngoại tuyến'}
+                </span>
+              </div>
+            ) : (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-3.5 py-2.5 text-xs font-semibold text-amber-800">
+                Hiện chưa có chuyên viên hỗ trợ nào được phân công.
+              </div>
+            )}
 
             <p className="text-sm text-slate-600 leading-relaxed mb-4">
               Trò chuyện trực tiếp 1-1 với nhân viên trung tâm để xử lý các vấn đề tài khoản, học phí, lịch học, lỗi phòng học trực tuyến hoặc khiếu nại đào tạo.
@@ -214,11 +307,18 @@ export default function SupportEntryPage() {
 
           <button
             type="button"
-            onClick={() => chooseSupport('staff')}
-            className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold bg-white border border-slate-300 border-b-4 border-b-slate-400 text-slate-800 hover:bg-slate-50 transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2"
+            disabled={!designatedAgent}
+            onClick={() => chooseSupport('staff', '', designatedAgent)}
+            className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold transition-all shadow-xs ${
+              designatedAgent
+                ? 'bg-white border border-slate-300 border-b-4 border-b-slate-400 text-slate-800 hover:bg-slate-50 cursor-pointer active:translate-y-[2px] active:border-b-2'
+                : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
           >
             <MessageCircle size={18} strokeWidth={2.4} />
-            <span>Trò chuyện với chuyên viên</span>
+            <span className="truncate">
+              {designatedAgent ? `Trò chuyện với ${designatedAgent.name}` : 'Chưa có chuyên viên phụ trách'}
+            </span>
           </button>
         </div>
       </section>

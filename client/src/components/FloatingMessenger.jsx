@@ -31,6 +31,8 @@ import {
   isSuperAdminViewer,
   isElevatedPresenceDirectoryViewer,
   buildSupportDirectory,
+  findDesignatedSupportAgent,
+  isDesignatedSupportContact,
 } from '../utils/supportPresence';
 import {
   AI_SUPPORT_PEER,
@@ -1611,25 +1613,26 @@ function ChatWindow({
           </button>
         </div>
         {isAiPeer && !talkingToHuman ? (
-          <AiUsageIndicator
-            applies={questionQuota?.applies ?? (viewerRole === 'student' || viewerRole === 'teacher')}
-            percentLeft={questionLimited ? questionLeft : 100}
-            resetInMs={questionQuota?.resetInMs}
-            resetsAt={questionQuota?.resetsAt}
-            imageDisallowed={imageDisallowed}
-            isEn={language === 'en'}
-            className="mt-1 pl-1"
-          />
-        ) : null}
-      </form>
-      )}
+        <AiUsageIndicator
+          applies={questionQuota?.applies ?? (viewerRole === 'student' || viewerRole === 'teacher')}
+          percentLeft={questionLimited ? questionLeft : 100}
+          resetInMs={questionQuota?.resetInMs}
+          resetsAt={questionQuota?.resetsAt}
+          imageDisallowed={imageDisallowed}
+          isEn={language === 'en'}
+          className="mt-1 pl-1"
+        />
+      ) : null}
+    </form>
+  )
+}
 
-      <ScheduleMessagePreviewModal
-        open={!!schedulePreview}
-        data={schedulePreview}
-        onClose={() => setSchedulePreview(null)}
-      />
-    </div>
+<ScheduleMessagePreviewModal
+  open={!!schedulePreview}
+  data={schedulePreview}
+  onClose={() => setSchedulePreview(null)}
+/>
+    </div >
   );
 }
 
@@ -2045,18 +2048,12 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
         }
         void handleOpenAiSupport();
       } else if (mode === 'staff') {
-        const onlineIds = new Set((onlineUsers || []).map((user) => String(user.userId || user.id || '')));
-        const supportContact = fmContacts
-          .filter((contact) => (
-            String(contact?.productRole || '').toUpperCase() === 'SUPPORT'
-            || String(contact?.adminRole || '').toUpperCase() === 'SUPPORT'
-            || String(contact?.role || '').toLowerCase() === 'support'
-            || String(contact?.role || '').toLowerCase() === 'staff'
-          ))
-          .sort((a, b) => Number(onlineIds.has(String(b.id || ''))) - Number(onlineIds.has(String(a.id || '')))
-            || String(a.name || '').localeCompare(String(b.name || ''), 'vi'))[0];
+        const passedContact = event.detail?.contact && isDesignatedSupportContact(event.detail.contact)
+          ? event.detail.contact
+          : null;
+        const supportContact = findDesignatedSupportAgent(fmContacts, onlineUsers) || passedContact;
         if (!supportContact) {
-          toast.error('Hiện chưa có nhân viên hỗ trợ trong danh bạ.');
+          toast.error('Hiện chưa có Chuyên viên Hỗ trợ nào được phân công.');
           return;
         }
         setSupportChatPage(true);
@@ -2416,21 +2413,11 @@ export default function FloatingMessenger({ session, role, hidden = false }) {
     } catch { /* ignore */ }
   }, [sendAiMessage, language]);
 
-  /** Gặp nhân viên trực tiếp → chuyển ngay sang cuộc trò chuyện với nhân viên */
+  /** Gặp nhân viên trực tiếp → chuyển ngay sang cuộc trò chuyện với chuyên viên hỗ trợ được phân công */
   const handleFinalStaff = useCallback(async (tab) => {
     if (!tab?.id) return;
     void aiSupportAPI.escalate(tab.id).catch(() => null);
-    const onlineIds = new Set((onlineUsers || []).map((user) => String(user.userId || user.id || '')));
-    const supportContact = fmContacts
-      .filter((contact) => (
-        String(contact?.productRole || '').toUpperCase() === 'SUPPORT'
-        || String(contact?.adminRole || '').toUpperCase() === 'SUPPORT'
-        || String(contact?.role || '').toLowerCase() === 'support'
-        || String(contact?.role || '').toLowerCase() === 'admin'
-        || String(contact?.role || '').toLowerCase() === 'staff'
-      ))
-      .sort((a, b) => Number(onlineIds.has(String(b.id || ''))) - Number(onlineIds.has(String(a.id || '')))
-        || String(a.name || '').localeCompare(String(b.name || ''), 'vi'))[0];
+    const supportContact = findDesignatedSupportAgent(fmContacts, onlineUsers);
     if (supportContact) {
       closeChat(tab.id);
       openChat(supportContact, { expand: true });
