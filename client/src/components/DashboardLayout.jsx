@@ -43,6 +43,7 @@ import DeferredMount, { IdleMount } from './ui/DeferredMount';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 import { isStudentConfirmExpired } from '../utils/scheduleTime';
 import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
+import { emitTabAttention } from '../utils/tabAttention';
 import TeacherRatingDetailModal, {
   getEvaluationIdFromNotif,
   isTeacherRatingNotif,
@@ -1688,6 +1689,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       sum + (Number(conversation?.unread) || 0)
     ), 0);
   }, [getConversations, myId]);
+
+  React.useEffect(() => {
+    emitTabAttention({
+      unreadMessages: unreadMessageCount,
+      unreadNotifications: unreadCount,
+    });
+  }, [unreadMessageCount, unreadCount]);
+
+  React.useEffect(() => () => {
+    emitTabAttention({ unreadMessages: 0, unreadNotifications: 0 });
+  }, []);
   const newUnreadNotificationCount = React.useMemo(() => {
     if (!lmsPlayerOpen || !lmsPlayerOpenedAt) return 0;
     return myNotifications.filter((notification) => {
@@ -2046,8 +2058,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   >
                     <Bell size={18} aria-hidden="true" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900" aria-hidden="true">
-                        {unreadCount > 9 ? '9+' : unreadCount}
+                      <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center" aria-hidden="true">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75 animate-ping" />
+                        <span className="relative min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
                       </span>
                     )}
                   </button>

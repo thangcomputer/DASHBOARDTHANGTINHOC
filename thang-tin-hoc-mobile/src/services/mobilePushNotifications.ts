@@ -272,9 +272,27 @@ export async function cancelScheduledRemindersForSchedule(scheduleId: string) {
 }
 
 export async function setMobileBadgeCount(count: number) {
-  if (Platform.OS === 'web' || !nativeNotifications) return;
+  const safeCount = Math.max(0, Math.floor(Number(count) || 0));
+  if (Platform.OS === 'web') {
+    try {
+      const nav = typeof navigator !== 'undefined'
+        ? (navigator as Navigator & {
+            setAppBadge?: (contents?: number) => Promise<void>;
+            clearAppBadge?: () => Promise<void>;
+          })
+        : null;
+      if (!nav) return;
+      if (safeCount > 0 && typeof nav.setAppBadge === 'function') {
+        await nav.setAppBadge(safeCount);
+      } else if (safeCount <= 0 && typeof nav.clearAppBadge === 'function') {
+        await nav.clearAppBadge();
+      }
+    } catch { /* ignore unsupported web app badge */ }
+    return;
+  }
+  if (!nativeNotifications) return;
   try {
-    await nativeNotifications.setBadgeCountAsync(Math.max(0, Math.floor(Number(count) || 0)));
+    await nativeNotifications.setBadgeCountAsync(safeCount);
   } catch { /* ignore badge errors on unsupported devices */ }
 }
 

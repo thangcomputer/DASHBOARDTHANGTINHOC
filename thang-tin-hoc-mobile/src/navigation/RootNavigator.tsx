@@ -287,6 +287,7 @@ export function RootNavigator() {
   const practiceSessionActive = useMobilePracticeSessionActive();
   const [surveyDismissed, setSurveyDismissed] = useState(false);
   const unreadNotificationCountRef = useRef(0);
+  const unreadConversationCountRef = useRef(0);
   const handledReadNotificationIds = useRef(new Set<string>());
   const [incomingCall, setIncomingCall] = useState<IncomingCallPrompt | null>(null);
   const [pendingPushResponse, setPendingPushResponse] = useState<MobileNotificationResponse | null>(null);
@@ -300,6 +301,22 @@ export function RootNavigator() {
     const state = navigationRef.getRootState();
     return state?.routes[state.index ?? 0]?.name;
   });
+  const syncMobileAppBadge = useCallback(() => {
+    const total = Math.max(0, unreadNotificationCountRef.current)
+      + Math.max(0, unreadConversationCountRef.current);
+    void setMobileBadgeCount(total);
+  }, []);
+  useEffect(() => {
+    unreadConversationCountRef.current = unreadConversationCount;
+    syncMobileAppBadge();
+  }, [unreadConversationCount, syncMobileAppBadge]);
+  useEffect(() => {
+    if (!user) {
+      unreadNotificationCountRef.current = 0;
+      unreadConversationCountRef.current = 0;
+      void setMobileBadgeCount(0);
+    }
+  }, [user]);
   useEffect(() => {
     const isStudyDestination = Boolean(
       (stackRouteName && ['DailyPractice', 'CourseVideos', 'StudentLearning', 'LearningLesson', 'CertPrepPlayer'].includes(stackRouteName))
@@ -324,7 +341,7 @@ export function RootNavigator() {
       (payload: { unread?: number } | undefined) => {
         if (typeof payload?.unread === 'number') {
           unreadNotificationCountRef.current = payload.unread;
-          void setMobileBadgeCount(payload.unread);
+          syncMobileAppBadge();
         }
       },
     );
@@ -332,7 +349,7 @@ export function RootNavigator() {
       revokedSub.remove();
       readSyncSub.remove();
     };
-  }, []);
+  }, [syncMobileAppBadge]);
   useEffect(() => {
     if (Platform.OS === 'web') return undefined;
     let active = true;
@@ -464,6 +481,7 @@ export function RootNavigator() {
     const publishCount = (count: number) => {
       unreadNotificationCountRef.current = count;
       DeviceEventEmitter.emit('mobile:notification-count-changed', count);
+      syncMobileAppBadge();
     };
     const refreshCount = async () => {
       if (refreshInFlight) {
@@ -499,11 +517,13 @@ export function RootNavigator() {
       handledReadNotificationIds.current.add(event.id);
       unreadNotificationCountRef.current = Math.max(0, unreadNotificationCountRef.current - 1);
       DeviceEventEmitter.emit('mobile:notification-count-changed', unreadNotificationCountRef.current);
+      syncMobileAppBadge();
       scheduleRefresh(true);
     };
     const clearUnreadCount = () => {
       unreadNotificationCountRef.current = 0;
       DeviceEventEmitter.emit('mobile:notification-count-changed', 0);
+      syncMobileAppBadge();
       scheduleRefresh(true);
     };
     const subscriptions = [
@@ -523,7 +543,7 @@ export function RootNavigator() {
       if (refreshTimer) clearTimeout(refreshTimer);
       subscriptions.forEach((subscription) => subscription.remove());
     };
-  }, [isRestoringSession, user?.id, user?.role, user?.previewMode]);
+  }, [isRestoringSession, syncMobileAppBadge, user?.id, user?.role, user?.previewMode]);
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:exam-room-active', setExamRoomActive);
     return () => subscription.remove();

@@ -179,6 +179,7 @@ function syncElementAttributes(el, lang) {
 
 export function syncDocumentTitle(lang) {
   if (typeof document === 'undefined') return;
+  if (document.documentElement?.dataset?.tabTitleBlinking === '1') return;
   const current = document.title ?? '';
   if (!current) return;
 
@@ -321,6 +322,7 @@ export function startDomAutoTranslation(getLanguage) {
   const titleEl = document.querySelector('title');
   if (titleEl) {
     titleObserver = new MutationObserver(() => {
+      if (document.documentElement?.dataset?.tabTitleBlinking === '1') return;
       const lang = getLanguage();
       if (document.title !== lastWrittenDocTitle) {
         syncDocumentTitle(lang);
