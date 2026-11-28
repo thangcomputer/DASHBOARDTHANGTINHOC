@@ -1,11 +1,12 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const SystemSettings = require('../models/SystemSettings');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
-const { hasRealCourseEnrollment } = require('../services/freePortal');
+const { hasRealCourseEnrollment, unlockFreePortal } = require('../services/freePortal');
 
 /** Gói tài khoản HV đã quá hạn (thiếu trường / vĩnh viễn = không hết hạn). */
 function isSubscriptionExpired(student, now = Date.now()) {
@@ -30,6 +31,9 @@ const EXPIRED_ALLOWED_PREFIXES = [
   '/api/invoices',
   '/api/files',
   '/api/communication-preferences',
+  '/api/dewskill-classes/my-visible',
+  '/api/dewskill-classes/my/',
+  '/api/ai-support/packages',
   '/api/students',
   '/api/feed',
   '/api/blog',
@@ -44,7 +48,14 @@ const FREE_PORTAL_QUICK_ASK_PATHS = new Set([
   '/api/ai-support/quick-ask',
   '/api/ai-support/quick-ask/feedback',
   '/api/ai-support/quick-ask/client-event',
+  '/api/ai-support/packages',
+  '/api/ai-support/packages/checkout',
+  '/api/ai-support/packages/simulate-paid',
 ]);
+
+function isAiPackagePath(url) {
+  return url === '/api/ai-support/packages' || url.startsWith('/api/ai-support/packages/');
+}
 
 function normalizeRequestPath(req) {
   const raw = String(req?.originalUrl || req?.url || '').split('?')[0];
@@ -61,7 +72,7 @@ function isFreePortalRequestBlocked(req, student) {
   ];
   if (hidden.some((prefix) => url === prefix || url.startsWith(`${prefix}/`))) return true;
   if (student.freeUnlocked === true) return false;
-  if (FREE_PORTAL_QUICK_ASK_PATHS.has(url)) return false;
+  if (FREE_PORTAL_QUICK_ASK_PATHS.has(url) || isAiPackagePath(url)) return false;
   if (isStudentExamPath(url)) return true;
   const locked = [
     '/api/messages',
@@ -163,7 +174,7 @@ const authMiddleware = async (req, res, next) => {
     if (decoded.id && decoded.id !== 'admin') {
       let dbUser = null;
       if (decoded.role === 'student') {
-        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked subscription freePortal freeUnlocked enrollments.courseName enrollments.status enrollments.learningAccess enrollments.completedSessions enrollments.totalSessions avatar gender').lean();
+        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked subscription aiPlan phone zalo studentCode freePortal freeUnlocked enrollments.courseName enrollments.status enrollments.learningAccess enrollments.completedSessions enrollments.totalSessions avatar gender').lean();
       } else {
         dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId branchCode avatar gender').lean();
       }
@@ -177,9 +188,32 @@ const authMiddleware = async (req, res, next) => {
         if (dbUser.avatar !== undefined) req.user.avatar = dbUser.avatar || '';
         if (dbUser.gender !== undefined) req.user.gender = dbUser.gender || '';
         if (decoded.role === 'student') {
+          if (
+            dbUser.freePortal === true
+            && dbUser.freeUnlocked !== true
+            && mongoose.connection?.readyState === 1
+            && mongoose.connection?.db
+          ) {
+            const StudentDewskillClassAccess = require('../models/StudentDewskillClassAccess');
+            const now = new Date();
+            const hasFullClass = await StudentDewskillClassAccess.exists({
+              studentId: dbUser._id,
+              accessLevel: 'full',
+              isVisible: { $ne: false },
+              $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            }).catch(() => false);
+            if (hasFullClass) {
+              dbUser.freeUnlocked = true;
+              unlockFreePortal(dbUser._id).catch(() => {});
+            }
+          }
           req.user.freePortal = dbUser.freePortal === true;
           req.user.freeUnlocked = dbUser.freeUnlocked === true;
           req.user.subscription = dbUser.subscription || null;
+          req.user.aiPlan = dbUser.aiPlan || null;
+          if (dbUser.phone) req.user.phone = dbUser.phone;
+          if (dbUser.zalo) req.user.zalo = dbUser.zalo;
+          if (dbUser.studentCode) req.user.studentCode = dbUser.studentCode;
           req.user.enrollments = Array.isArray(dbUser.enrollments) ? dbUser.enrollments : [];
         }
       }

@@ -499,7 +499,10 @@ async function canStudentPostFeed(user) {
   if (!user || user.role !== 'student') return true;
   const dbStudent = await Student.findById(user.id || user._id).lean();
   if (!dbStudent) return false;
-  const status = statusOf(dbStudent);
+  const { getStudentOwnedClassXpSummary } = require('../services/dewskillClassService');
+  const ownedClassSummary = await getStudentOwnedClassXpSummary(dbStudent._id).catch(() => null);
+  const status = statusOf(dbStudent, new Date(), null, ownedClassSummary);
+  if (status.state === 'course' || status.hasOwnedClass === true) return true;
   if (status.state === 'expired' || status.state === 'free' || status.freeTier) return false;
   if (status.state === 'active' || status.state === 'expiring') return true;
   if (status.state === 'lifetime') {

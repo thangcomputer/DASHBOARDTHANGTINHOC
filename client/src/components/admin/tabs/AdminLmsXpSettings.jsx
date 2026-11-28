@@ -16,7 +16,6 @@ const FIELDS = [
   ['streak7', 'Học 7 ngày liên tiếp'],
   ['streak14', 'Học 14 ngày liên tiếp'],
   ['streak30', 'Học 30 ngày liên tiếp'],
-  ['referral', 'Giới thiệu bạn bè (cả 2 cùng nhận)'],
 ];
 
 async function read(res) {
@@ -74,7 +73,7 @@ export default function AdminLmsXpSettings() {
             ) : (
               <div className="space-y-4">
                 <p className="text-sm text-slate-500">
-                  Mỗi việc chỉ cộng một lần. Video vẫn mở bài khi xem 70%; XP video chỉ cộng khi đạt ngưỡng bên dưới. Điểm XP học bài này được cộng trực tiếp vào điểm tích lũy và XP hôm nay trong Luyện tập hằng ngày (DewSkill).
+                  Mỗi việc chỉ cộng một lần. Video vẫn mở bài khi xem 70%; XP video chỉ cộng khi đạt ngưỡng bên dưới. Điểm XP học bài này được cộng trực tiếp vào điểm tích lũy và XP hôm nay trong Luyện tập hằng ngày (DewSkill). Riêng chương trình <strong>Giới thiệu bạn bè</strong> đã chuyển sang ưu đãi giảm học phí (mặc định 50.000đ) — cấu hình tại <strong>Mã kích hoạt &amp; Gói → Ưu đãi giới thiệu</strong>.
                 </p>
                 <label className="block max-w-xs text-sm font-bold text-slate-700">
                   Ngưỡng xem video để được XP

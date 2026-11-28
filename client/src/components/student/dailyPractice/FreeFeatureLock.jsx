@@ -3,7 +3,8 @@ import { Navigate } from 'react-router-dom';
 import { FileBox, Headphones, Lock, MessageSquare, Newspaper, Sparkles, X } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { hasRealCourseEnrollment } from '../../../utils/enrollments';
-import FreeMeetPlanModal from './FreeMeetPlanModal';
+import { useStudentSubscription } from '../subscription/subscriptionContext';
+import { dispatchOpenAiPackagesModal } from '../../../hooks/useAIQuota';
 
 const MASCOT = `/cam-xuc-animation/${encodeURI('vui tươi.webp')}`;
 
@@ -45,6 +46,17 @@ function readStudentSession() {
 export function useFreePortalLock(session) {
   const [stored, setStored] = useState(readStudentSession);
   const [unlockOverride, setUnlockOverride] = useState(null);
+  const subCtx = useStudentSubscription();
+  const sub = subCtx?.subscription;
+  const subUnlocked = Boolean(
+    sub && (
+      sub.hasOwnedClass
+      || sub.state === 'course'
+      || sub.state === 'active'
+      || sub.state === 'expiring'
+      || sub.meetLifetime
+    ),
+  );
   useEffect(() => {
     const onUnlock = () => {
       setUnlockOverride(true);
@@ -76,6 +88,9 @@ export function useFreePortalLock(session) {
     }
   }, [session?.freePortal, session?.freeUnlocked]);
   const source = session?.freePortal === true ? session : (stored || session);
+  if (subUnlocked && source?.role === 'student') {
+    return false;
+  }
   if (typeof unlockOverride === 'boolean' && source?.role === 'student' && source?.freePortal === true) {
     return !unlockOverride;
   }
@@ -92,6 +107,7 @@ export function useFreePortalMenu(session) {
     ? students.find((student) => String(student?.id || student?._id) === String(sid))
     : null;
   const target = me || source;
+  if (source?.accountType === 'dewskill' || me?.accountType === 'dewskill') return true;
   if (source?.freePortal !== true && me?.freePortal !== true) return false;
   return !hasRealCourseEnrollment(target);
 }
@@ -122,7 +138,7 @@ function LockCard({ onClose, onBuy }) {
           </span>
         </div>
         <h1 className="relative mt-3 text-xl font-black tracking-tight">Mục này đang khóa</h1>
-        <p className="relative mt-1 text-sm text-white/75">Đăng ký gói Meet để mở các mục đang khóa</p>
+        <p className="relative mt-1 text-sm text-white/75">Đăng ký khóa học hoặc gói hỗ trợ AI để mở các mục đang khóa</p>
       </div>
       <div className="px-5 py-5">
         <div className="grid grid-cols-2 gap-2">
@@ -138,10 +154,10 @@ function LockCard({ onClose, onBuy }) {
         <button
           type="button"
           onClick={onBuy}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-4 py-3 text-sm font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_24px_rgba(5,150,105,0.35)] hover:from-emerald-600 hover:to-emerald-800 transition-all"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-4 py-3 text-sm font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_24px_rgba(5,150,105,0.35)] hover:from-emerald-600 hover:to-emerald-800 transition-all cursor-pointer"
         >
           <Sparkles size={16} aria-hidden="true" />
-          Đăng ký gói Meet
+          Nâng cấp gói hỗ trợ AI
         </button>
       </div>
     </div>
@@ -151,17 +167,19 @@ function LockCard({ onClose, onBuy }) {
 export default function FreeFeatureLock({ session, children, onClose }) {
   const restricted = useFreePortalMenu(session);
   const locked = useFreePortalLock(session) && restricted;
-  const [openMeet, setOpenMeet] = useState(false);
   if (!locked) return children || null;
 
-  const card = openMeet ? null : <LockCard onClose={onClose} onBuy={() => setOpenMeet(true)} />;
+  const card = (
+    <LockCard
+      onClose={onClose}
+      onBuy={() => {
+        onClose?.();
+        dispatchOpenAiPackagesModal();
+      }}
+    />
+  );
 
-  return (
-    <>
-      {card && (onClose ? card : (
-        <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">{card}</div>
-      ))}
-      <FreeMeetPlanModal open={openMeet} onClose={() => setOpenMeet(false)} />
-    </>
+  return onClose ? card : (
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">{card}</div>
   );
 }

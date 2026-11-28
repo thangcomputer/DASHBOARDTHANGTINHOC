@@ -33,6 +33,7 @@ import {
   existingPeerIdsFromConversations,
 } from '../utils/messagingDeepLink';
 import { matchesPersonSearch } from '../utils/personSearch';
+import { useActiveCourse } from '../context/ActiveCourseContext';
 import { MessageRichText } from '../utils/messageRichText';
 import ScheduleMessagePreviewModal, {
   resolveScheduleMessagePayload,
@@ -57,6 +58,7 @@ import {
 import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
 import { getChatFileType } from '../utils/chatFileType';
 import CommunicationPreferences from './CommunicationPreferences';
+import { getDewSkillThemeAttr } from '../utils/dewskillTheme';
 import StickerPicker from './StickerPicker';
 import AiAutoReplyComposerControl, {
   AiAutoReplyStatusBanner,
@@ -470,6 +472,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     return Boolean(me?.freePortal === true || isFreePortalSelfRegistrationStudent(me));
   }, [currentUserRole, currentUserId, currentUser, students]);
   const _isGreenTheme = currentUserRole === 'teacher' || isFreePortalStudent;
+  const inboxThemeAttr = currentUserRole === 'student' ? getDewSkillThemeAttr(currentUser) : 'center';
+  const isDewInbox = inboxThemeAttr === 'dewskill';
+  const { enrolledCourses, activeCourseId, setActiveCourseId } = useActiveCourse();
+  const [inboxCourseFilter, setInboxCourseFilter] = useState('all');
+  const userClosedDesktopConvRef = useRef(false);
   const [scheduleNow, setScheduleNow] = useState(() => new Date());
   const [activeConv, setActiveConv] = useState(null);
   // Hội thoại với Admin Super một chiều (server cũng chặn); HIGH_ADMIN và STAFF vẫn nhắn như cũ.
@@ -2622,8 +2629,21 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setNewMsg(String(draft));
   }, [location.state?.selectUserId, location.state?.draftMessage, activeConv?.id, activeConv?.user?.id]);
 
+  // Auto-select first conversation on Desktop so right panel shows real thread immediately
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.innerWidth < 768) return;
+    if (activeConv || location.state?.selectUserId || userClosedDesktopConvRef.current) return;
+    if (!sortedConvs || sortedConvs.length === 0) return;
+    const activeCourseObj = enrolledCourses.find((c) => c.id === activeCourseId);
+    const activeKeyword = String(activeCourseObj?.shortTitle || activeCourseObj?.title || '').toLowerCase();
+    const preferred = isFreePortalStudent && activeKeyword
+      ? sortedConvs.find((c) => `${c.user?.name || ''} ${c.lastMessage || ''}`.toLowerCase().includes(activeKeyword)) || sortedConvs[0]
+      : sortedConvs[0];
+    if (preferred) selectConversation(preferred);
+  }, [activeConv, location.state?.selectUserId, sortedConvs.length, isFreePortalStudent, activeCourseId, enrolledCourses]);
+
   return (
-    <div className="cms-chat-shell">
+    <div data-theme={inboxThemeAttr} className="cms-chat-shell">
       {/* ═══════ MAIN AREA ═══════ */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
@@ -2704,17 +2724,75 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <button
                     key={tab.id}
                     onClick={() => setContactTab(tab.id)}
-                    className={`min-h-[38px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 flex items-center justify-center ${
-                      active
-                        ? 'bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
-                        : 'bg-white border-[1.5px] border-slate-200 border-b-4 border-b-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
+                    className={isDewInbox
+                      ? (active
+                        ? 'dew-btn-primary min-h-[38px] px-4 py-2 text-xs sm:text-sm font-extrabold flex items-center justify-center cursor-pointer'
+                        : 'dew-btn-white min-h-[38px] px-4 py-2 text-xs sm:text-sm font-bold text-slate-600 flex items-center justify-center cursor-pointer')
+                      : `min-h-[38px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 flex items-center justify-center ${
+                        active
+                          ? 'bg-[#10B981] border-[1.5px] border-[#34D399] border-b-4 border-b-[#059669] text-white hover:brightness-105'
+                          : 'bg-white border-[1.5px] border-slate-200 border-b-4 border-b-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}
                   >
                     {tab.label}
                   </button>
                 );
               })}
             </div>
+            {isFreePortalStudent && enrolledCourses.length > 0 && (
+              <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mr-0.5">
+                  Kênh lớp:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setInboxCourseFilter('all')}
+                  className={isDewInbox
+                    ? (inboxCourseFilter === 'all'
+                      ? 'dew-btn-primary shrink-0 px-3 py-1 text-[11px] font-extrabold cursor-pointer'
+                      : 'dew-btn-white shrink-0 px-3 py-1 text-[11px] font-bold text-slate-600 cursor-pointer')
+                    : `shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                      inboxCourseFilter === 'all'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                  Tất cả
+                </button>
+                {enrolledCourses.map((c) => {
+                  const active = inboxCourseFilter === c.id;
+                  const kw = String(c.shortTitle || c.title || '').toLowerCase();
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setInboxCourseFilter(c.id);
+                        setActiveCourseId(c.id);
+                        const match = sortedConvs.find((conv) =>
+                          `${conv.user?.name || ''} ${conv.lastMessage || ''}`.toLowerCase().includes(kw)
+                        );
+                        if (match) {
+                          userClosedDesktopConvRef.current = false;
+                          selectConversation(match);
+                        }
+                      }}
+                      className={isDewInbox
+                        ? (active
+                          ? 'dew-btn-primary shrink-0 px-3 py-1 text-[11px] font-extrabold cursor-pointer'
+                          : 'dew-btn-white shrink-0 px-3 py-1 text-[11px] font-bold text-emerald-700 cursor-pointer')
+                        : `shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                          active
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100'
+                        }`}
+                    >
+                      {c.shortTitle || c.title}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {!isConnected && (
               <div
                 className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
@@ -3000,7 +3078,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               <div className="cms-chat-header">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
                   <button
-                    onClick={() => setActiveConv(null)}
+                    onClick={() => {
+                      userClosedDesktopConvRef.current = true;
+                      setActiveConv(null);
+                    }}
                     className="md:hidden shrink-0 w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-xl text-slate-700 transition-colors"
                     aria-label="Quay lại danh sách"
                   >
@@ -4163,7 +4244,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <button
                       onClick={() => handleSend()}
                       disabled={!newMsg.trim() && !pendingImage}
-                      className="cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send shrink-0"
+                      className={isDewInbox
+                        ? 'dew-btn-primary cms-chat-composer-send h-10 w-10 flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-45'
+                        : 'cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send shrink-0'}
                       title="Gửi tin nhắn"
                     >
                       <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />

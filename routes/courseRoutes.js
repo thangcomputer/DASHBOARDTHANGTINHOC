@@ -174,6 +174,7 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
   try {
     const body = { ...req.body };
     delete body.courseCode; // server-only
+    body.deliveryMode = 'instructor';
     const schedule = parseDiscountSchedule(body.discountStartsAt, body.discountEndsAt);
     if (schedule.error) return res.status(400).json({ success: false, message: schedule.error });
     body.discountStartsAt = schedule.start;
@@ -189,6 +190,7 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
     body.courseCode = await generateCourseCode();
     const course = await Course.create(body);
     await invalidateCourseCache();
+    require('../services/lessonPracticeService').syncCourseSubjectsToLessonSubjects().catch(() => {});
     return res.status(201).json({
       success: true,
       message: `Đã tạo khóa học: ${course.name}`,
@@ -207,6 +209,7 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
 router.put('/:id', courseWriteGuard('update'), async (req, res) => {
   try {
     const body = { ...req.body };
+    if (body.deliveryMode !== undefined) body.deliveryMode = 'instructor';
     let course;
     if (
       body.price !== undefined
@@ -245,6 +248,7 @@ router.put('/:id', courseWriteGuard('update'), async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }
     await invalidateCourseCache();
+    require('../services/lessonPracticeService').syncCourseSubjectsToLessonSubjects().catch(() => {});
 
     const ep = effectiveCoursePrice(updated);
     return res.json({

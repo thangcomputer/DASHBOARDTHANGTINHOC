@@ -40,22 +40,24 @@ export function DailyPracticeOverviewCard({
     ? Math.min(100, Math.round(((completedUnits + activeFraction) / totalUnits) * 100))
     : 0;
   const barWidth = Math.max(pct, completedUnits > 0 || activeFraction > 0 ? 6 : 0);
-  const topicName = pathTopic?.topic?.name || 'Lộ trình kỹ năng';
+  const topicName = isBrandStudent ? 'Luyện tập tự do' : (pathTopic?.topic?.name || 'Lộ trình kỹ năng');
 
   const handlePractice = () => {
     navigation.navigate('DailyPractice');
   };
 
   let headline = 'Sẵn sàng thử thách hôm nay chưa?';
-  if (topicDone) headline = 'Đã hoàn thành lộ trình chủ đề này';
+  if (!isBrandStudent && topicDone) headline = 'Đã hoàn thành lộ trình chủ đề này';
   else if (playedToday) headline = 'Hôm nay bạn đã luyện tập — giỏi lắm!';
   else if (streak > 0) headline = `Giữ chuỗi ${streak} ngày luyện tập liên tiếp`;
 
-  const subtitle = topicDone
-    ? 'Có thể ôn lại từng chặng bên dưới để củng cố kiến thức.'
-    : pathTopic?.next?.unitTitle
-      ? `Tiếp theo: ${pathTopic.next.unitTitle}${pathTopic.next.stepLabel ? ` · ${pathTopic.next.stepLabel}` : ''}`
-      : 'Đi hết từng chặng để mở bài mới, nhận XP và giữ chuỗi ngày.';
+  const subtitle = isBrandStudent
+    ? 'Ôn tập trắc nghiệm các môn đã học — hoàn toàn không mất XP.'
+    : topicDone
+      ? 'Có thể ôn lại từng chặng bên dưới để củng cố kiến thức.'
+      : pathTopic?.next?.unitTitle
+        ? `Tiếp theo: ${pathTopic.next.unitTitle}${pathTopic.next.stepLabel ? ` · ${pathTopic.next.stepLabel}` : ''}`
+        : 'Đi hết từng chặng để mở bài mới, nhận XP và giữ chuỗi ngày.';
 
   return (
     <View style={styles.card}>

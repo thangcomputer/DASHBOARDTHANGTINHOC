@@ -43,6 +43,7 @@ import { DigitalCertificateModal } from '../components/DigitalCertificateModal';
 import { ShareAchievementModal, ShareTriggerButton, type ShareAchievementData } from '../components/ShareAchievementModal';
 import { buildPracticeShareData } from '../../../shared/dailyPractice/shareAchievement.mjs';
 import { buildVietQrUrl, getCenterBankAccount, type CenterBankAccount } from '../services/courseVideoApi';
+import { CenterFreePracticePanel } from './CourseVideosScreen';
 import { subscriptionApi } from '../services/subscriptionApi';
 import { reviewItemFollowUpLine } from '../../../shared/dailyPractice/reviewDisplay.mjs';
 import {
@@ -449,6 +450,7 @@ function DailyPracticeGoalPanel({
 function PracticeSubjectStrip({
   pathTopics,
   freeTopics,
+  variant = 'path',
   activeId,
   onSelect,
   play,
@@ -460,8 +462,9 @@ function PracticeSubjectStrip({
   onSelect: (id: string) => void;
   play: (s: GameSound) => void;
 }) {
-  const usePathList = pathTopics.length > 0;
-  if (!usePathList && !freeTopics.length) return null;
+  const usePathList = variant === 'path' && pathTopics.length > 0;
+  if (variant === 'path' && !pathTopics.length) return null;
+  if (variant === 'free' && !freeTopics.length) return null;
 
   return (
     <View style={styles.subjectGrid2Col}>
@@ -550,11 +553,12 @@ type PendingPathResume = {
 };
 
 function HomeView({
-  topics, stats, loading: _loading, error, starting, onStart: _onStart, play, initialTopicId = '',
+  topics, stats, loading: _loading, error, starting, onStart, play, initialTopicId = '',
   mode, onModeChange, pathTopics, pathLoading, pathError, pathCanTestOut = true, onStartStep, onQuickStart: _onQuickStart, onPathChanged, onBuyXp, onOpenUpgrade, onViewProgress: _onViewProgress, onScrollToPath,
   initialWatchStage = false, onContinueVideoOpened, pendingResume = null, onResumeConsumed, pathActiveTopicId = '',
   requestedLesson = null, onRequestedLessonOpened,
   spacedRepetition: _spacedRepetition, onStartSpacedReview: _onStartSpacedReview, placementResult: _placementResult, onOpenPlacement: _onOpenPlacement, recommendedTopic,
+  resumeSubjectId = '', onConsumeResumeSubject,
 }: {
   topics: DpTopic[];
   stats: DpStats | null;
@@ -590,31 +594,45 @@ function HomeView({
   placementResult: PlacementResult | null;
   onOpenPlacement: () => void;
   recommendedTopic?: { id: string; seq: number } | null;
+  resumeSubjectId?: string;
+  onConsumeResumeSubject?: () => void;
 }) {
   const { user } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 1024;
   const freePortal = isFreePortalMenu(user);
   const [topicId, setTopicId] = useState('');
+  const [difficulty, setDifficulty] = useState<DpDifficulty>('easy');
   const [selectedPathTopicId, setSelectedPathTopicId] = useState(initialTopicId);
   const [continueVideo, setContinueVideo] = useState(Boolean(initialWatchStage));
   const [focusLessonSeq, setFocusLessonSeq] = useState(0);
   const [certOpen, setCertOpen] = useState(false);
+  const [freeSummary, setFreeSummary] = useState<{ activeSubjectName: string; completedUnits: number; totalUnits: number }>({
+    activeSubjectName: '',
+    completedUnits: 0,
+    totalUnits: 0,
+  });
+  const [centerLessonOpen, setCenterLessonOpen] = useState(false);
   const [subjectStageOpen, setSubjectStageOpen] = useState<boolean>(() => Boolean(
-    initialTopicId || initialWatchStage || pendingResume || requestedLesson,
+    freePortal && (initialTopicId || initialWatchStage || pendingResume || requestedLesson),
   ));
 
   useEffect(() => {
-    if (mode !== 'path') onModeChange('path');
-  }, [mode, onModeChange]);
+    const expected: PracticeMode = freePortal ? 'path' : 'free';
+    if (mode !== expected) onModeChange(expected);
+  }, [freePortal, mode, onModeChange]);
   useEffect(() => {
+    if (!freePortal) {
+      setSubjectStageOpen(false);
+      return;
+    }
     if (initialTopicId || initialWatchStage || pendingResume || requestedLesson) {
       setSubjectStageOpen(true);
     }
     if (pendingResume?.topicId) {
       setSelectedPathTopicId(pendingResume.topicId);
     }
-  }, [initialTopicId, initialWatchStage, pendingResume, requestedLesson]);
+  }, [freePortal, initialTopicId, initialWatchStage, pendingResume, requestedLesson]);
   useEffect(() => {
     if (initialWatchStage) {
       setContinueVideo(true);
@@ -658,11 +676,17 @@ function HomeView({
   const topicPathDone = Boolean(
     activePathTopic?.totalUnits && (activePathTopic.completedUnits || 0) >= activePathTopic.totalUnits,
   );
-  const heroLabel = topicPathDone
-    ? 'Ôn lại lộ trình'
-    : (activePathTopic ? pathTopicPrimaryCtaLabel(activePathTopic) : 'Tiếp tục học');
+  const heroLabel = !freePortal
+    ? 'Vào học ngay'
+    : topicPathDone
+      ? 'Ôn lại lộ trình'
+      : (activePathTopic ? pathTopicPrimaryCtaLabel(activePathTopic) : 'Tiếp tục học');
   const heroAction = () => {
     play('tap');
+    if (!freePortal) {
+      onScrollToPath?.();
+      return;
+    }
     setSubjectStageOpen(true);
     if (pathContinue) {
       setFocusLessonSeq((n) => n + 1);
@@ -675,29 +699,34 @@ function HomeView({
   const studentName = String(rawUser?.fullName || rawUser?.name || rawUser?.username || '').trim() || 'bạn';
   const studentCode = String(rawUser?.studentCode || rawUser?.code || '').trim();
   const studentId = String(rawUser?.id || rawUser?._id || '').trim();
-  const subjectBarActiveId = activePathTopic?.topic.id || selectedPathTopicId || pathActiveTopicId || topicId;
+  const subjectBarActiveId = freePortal
+    ? (activePathTopic?.topic.id || selectedPathTopicId || pathActiveTopicId || topicId)
+    : topicId;
 
   return (
     <View style={styles.gapMd}>
-      {!subjectStageOpen ? (
+      {(!freePortal || !subjectStageOpen) ? (
         <>
-          <DailyPracticeHero
-            stats={stats}
-            displayName={studentName}
-            mode="path"
-            onPrimaryAction={heroAction}
-            primaryDisabled={starting}
-            primaryLabel={heroLabel}
-            starting={starting}
-            pathTopic={activePathTopic}
-            pathContinue={Boolean(pathContinue)}
-            onBuyXp={onBuyXp}
-            onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
-            play={play}
-          />
+          {!(!freePortal && centerLessonOpen) ? (
+            <DailyPracticeHero
+              stats={stats}
+              displayName={studentName}
+              mode={freePortal ? 'path' : 'free'}
+              onPrimaryAction={heroAction}
+              primaryDisabled={freePortal ? starting : false}
+              primaryLabel={heroLabel}
+              starting={starting}
+              pathTopic={freePortal ? activePathTopic : null}
+              pathContinue={Boolean(freePortal && pathContinue)}
+              freeSummary={!freePortal ? freeSummary : null}
+              onBuyXp={freePortal ? onBuyXp : undefined}
+              onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
+              play={play}
+            />
+          ) : null}
 
-          {/* Banner hết XP để luyện - khớp Web */}
-          {stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
+          {/* Banner hết XP để luyện - chỉ tài khoản DewSkill theo lộ trình */}
+          {freePortal && stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
             <View style={styles.xpEmptyBanner}>
               <View style={[styles.inline, { flex: 1 }]}>
                 <View style={styles.xpEmptyIconWrap}>
@@ -717,16 +746,27 @@ function HomeView({
             </View>
           ) : null}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {pathError ? <Text style={styles.error}>{pathError}</Text> : null}
+          {freePortal && error ? <Text style={styles.error}>{error}</Text> : null}
+          {freePortal && pathError ? <Text style={styles.error}>{pathError}</Text> : null}
 
-          {pathLoading && !pathTopics.length && !topics.length ? (
+          {!freePortal ? (
+            <View style={styles.practicePanel}>
+              <CenterFreePracticePanel
+                showBanner={false}
+                resumeSubjectId={resumeSubjectId}
+                onConsumeResume={onConsumeResumeSubject}
+                onSummaryChange={setFreeSummary}
+                onLessonOpenChange={setCenterLessonOpen}
+              />
+            </View>
+          ) : (pathLoading && !pathTopics.length) ? (
             <ActivityIndicator color={theme.brand} />
-          ) : (pathTopics.length || topics.length) ? (
+          ) : pathTopics.length > 0 ? (
             <View style={styles.practicePanel}>
               <PracticeSubjectStrip
                 pathTopics={pathTopics}
                 freeTopics={topics}
+                variant="path"
                 activeId={subjectBarActiveId}
                 onSelect={(id) => {
                   setTopicId(id);
@@ -3001,7 +3041,7 @@ function PathView({
         <View style={styles.empty}>
           <Mascot mood="thinking" size={72} />
           <Text style={styles.emptyTitle}>Trung tâm đang soạn lộ trình luyện tập.</Text>
-          <Text style={[styles.muted, styles.center]}>Bạn có thể dùng chế độ Luyện tự do trong lúc chờ nhé!</Text>
+          <Text style={[styles.muted, styles.center]}>Vui lòng quay lại sau nhé!</Text>
         </View>
       </View>
     );
@@ -4580,7 +4620,7 @@ function PlayView({ session, stats, pathUnit, play, onQuit, onFinished, onDraggi
 function RelatedLessonCard({ lesson }: { lesson: DpRelatedLesson }) {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const open = () => navigation.navigate('MainTabs', {
-    screen: 'CourseVideos',
+    screen: 'DailyPractice',
     params: {
       resumeKey: Date.now(),
       resumeSubjectId: lesson.subjectId,
@@ -4845,11 +4885,12 @@ export function DailyPracticeScreen() {
   const [lastPick, setLastPick] = useState<PracticePick | null>(null);
   const [starting, setStarting] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [mode, setMode] = useState<PracticeMode>('path');
+  const isDewskillStudent = isFreePortalMenu(user);
+  const [mode, setMode] = useState<PracticeMode>(() => (isDewskillStudent ? 'path' : 'free'));
   const [pathTopics, setPathTopics] = useState<DpTopicPath[]>([]);
   const [pathActiveTopicId, setPathActiveTopicId] = useState('');
   const [pathCanTestOut, setPathCanTestOut] = useState(true);
-  const [pathLoading, setPathLoading] = useState(true);
+  const [pathLoading, setPathLoading] = useState(isDewskillStudent);
   const [pathError, setPathError] = useState('');
   const [stakePrompt, setStakePrompt] = useState<{
     pick: Extract<PracticePick, { mode: 'path' }>;
@@ -4874,6 +4915,8 @@ export function DailyPracticeScreen() {
   } | null>(null);
   const [pendingWatchStage, setPendingWatchStage] = useState(false);
   const [pendingResume, setPendingResume] = useState<PendingPathResume | null>(null);
+  const [pendingCenterSubjectId, setPendingCenterSubjectId] = useState('');
+  const consumeCenterSubject = useCallback(() => setPendingCenterSubjectId(''), []);
   const handledResumeKeyRef = useRef(0);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const practiceLockRef = useRef(false);
@@ -4960,6 +5003,14 @@ export function DailyPracticeScreen() {
       });
   }, []);
   const loadPath = useCallback((silent = false) => {
+    if (!isDewskillStudent) {
+      setPathTopics([]);
+      setPathActiveTopicId('');
+      setPathCanTestOut(false);
+      setPathError('');
+      setPathLoading(false);
+      return;
+    }
     if (!silent) setPathLoading(true);
     dailyPracticeApi.path()
       .then((data) => {
@@ -4973,7 +5024,7 @@ export function DailyPracticeScreen() {
       .finally(() => {
         if (!silent) setPathLoading(false);
       });
-  }, []);
+  }, [isDewskillStudent]);
   useEffect(() => { load(false); loadPath(false); }, [load, loadPath]);
 
   const didFocusSyncRef = useRef(false);
@@ -5130,6 +5181,21 @@ export function DailyPracticeScreen() {
     const resumeKey = route.params?.resumeKey || 0;
     if (resumeKey && handledResumeKeyRef.current !== resumeKey) {
       handledResumeKeyRef.current = resumeKey;
+      if (!isDewskillStudent) {
+        setMode('free');
+        if (route.params?.resumeSubjectId) {
+          setPendingCenterSubjectId(String(route.params.resumeSubjectId));
+        }
+        navigation.setParams({
+          resumeKey: undefined,
+          resumeSubjectId: undefined,
+          resumeCourseId: undefined,
+          resumeUnitId: undefined,
+          resumeSectionId: undefined,
+          resumeAtSec: undefined,
+        } as never);
+        return;
+      }
       setMode('path');
       if (!session) {
         setCelebrating(false);
@@ -5156,13 +5222,20 @@ export function DailyPracticeScreen() {
       } as never);
       return;
     }
-    if (route.params?.watch === 'stage') {
+    if (!isDewskillStudent && route.params?.resumeSubjectId) {
+      setMode('free');
+      setPendingCenterSubjectId(String(route.params.resumeSubjectId));
+      navigation.setParams({ resumeSubjectId: undefined, resumeCourseId: undefined } as never);
+      return;
+    }
+    if (route.params?.watch === 'stage' && isDewskillStudent) {
       setMode('path');
       setPendingWatchStage(true);
       navigation.setParams({ watch: undefined } as never);
     }
   }, [
     route.params?.resumeKey,
+    route.params?.resumeSubjectId,
     route.params?.topicId,
     route.params?.resumeUnitId,
     route.params?.resumeNodeKey,
@@ -5172,10 +5245,11 @@ export function DailyPracticeScreen() {
     route.params?.watch,
     navigation,
     session,
+    isDewskillStudent,
   ]);
 
   useEffect(() => {
-    if (route.params?.practice !== 'stage' || session || summary || pathLoading || !pathTopics.length) return;
+    if (!isDewskillStudent || route.params?.practice !== 'stage' || session || summary || pathLoading || !pathTopics.length) return;
     if (practiceLockRef.current) return;
     const topic = pathTopics.find((item) => continuePracticeTarget(item));
     const target = topic ? continuePracticeTarget(topic) : null;
@@ -5363,7 +5437,7 @@ export function DailyPracticeScreen() {
     const lesson = summary?.relatedLesson;
     if (!lesson) return;
     navigation.navigate('MainTabs', {
-      screen: 'CourseVideos',
+      screen: 'DailyPractice',
       params: {
         resumeKey: Date.now(),
         resumeSubjectId: lesson.subjectId,
@@ -5472,6 +5546,8 @@ export function DailyPracticeScreen() {
             placementResult={placementResult}
             onOpenPlacement={() => setPlacementOpen(true)}
             recommendedTopic={recommendedTopic}
+            resumeSubjectId={pendingCenterSubjectId}
+            onConsumeResumeSubject={consumeCenterSubject}
           />
         )}
       </ChromeScrollView>
@@ -5568,16 +5644,18 @@ export function DailyPracticeScreen() {
           const chosen = allTopics.find((t) => t.id === res.matchedTopicId)
             || allTopics.find((t) => matchedNameLower && t.name.toLowerCase().includes(matchedNameLower));
           if (chosen) {
-            if (chosen.inPath) {
+            if (isDewskillStudent) {
               setMode('path');
-              setPathActiveTopicId(chosen.id);
-              void dailyPracticeApi.setActivePathTopic(chosen.id).catch(() => { });
+              if (chosen.inPath) {
+                setPathActiveTopicId(chosen.id);
+                void dailyPracticeApi.setActivePathTopic(chosen.id).catch(() => { });
+              }
             } else {
               setMode('free');
             }
             setRecommendedTopic((prev) => ({ id: chosen.id, seq: (prev?.seq || 0) + 1 }));
           } else {
-            setMode('path');
+            setMode(isDewskillStudent ? 'path' : 'free');
           }
           scrollRef.current?.scrollTo({ y: 0, animated: false });
         }}

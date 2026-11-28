@@ -1379,6 +1379,69 @@ export const aiSupportAPI = {
     const res = await apiFetch('/ai-support/status');
     return res.json();
   },
+  getPackages: async () => {
+    const res = await apiFetch('/ai-support/packages');
+    return res.json();
+  },
+  checkoutPackage: async (planId) => {
+    const res = await apiFetch('/ai-support/packages/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ planId }),
+    });
+    const payload = await res.json();
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không tạo được mã chuyển khoản gói Hỏi AI');
+    }
+    return payload;
+  },
+  getPackageSession: async (sessionId) => {
+    const res = await apiFetch(`/ai-support/packages/session/${encodeURIComponent(sessionId)}`);
+    const payload = await res.json();
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không kiểm tra được trạng thái thanh toán gói Hỏi AI');
+    }
+    return payload;
+  },
+  simulatePackagePaid: async (sessionId) => {
+    const res = await apiFetch('/ai-support/packages/simulate-paid', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+    const payload = await res.json();
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không giả lập được thanh toán gói Hỏi AI');
+    }
+    return payload;
+  },
+  getAdminModelPolicy: async () => {
+    const res = await apiFetch('/ai-support/admin/model-policy');
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không tải được cấu hình Model AI');
+    }
+    return payload.data;
+  },
+  updateAdminModelPolicy: async (tiers) => {
+    const res = await apiFetch('/ai-support/admin/model-policy', {
+      method: 'PUT',
+      body: JSON.stringify({ tiers }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không lưu được cấu hình Model AI');
+    }
+    return payload.data;
+  },
+  resetAdminModelPolicy: async () => {
+    const res = await apiFetch('/ai-support/admin/model-policy/reset', {
+      method: 'POST',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload?.success === false) {
+      throw new Error(payload?.message || 'Không khôi phục được cấu hình Model AI');
+    }
+    return payload.data;
+  },
   open: async () => {
     const res = await apiFetch('/ai-support/open', { method: 'POST', body: '{}' });
     return res.json();

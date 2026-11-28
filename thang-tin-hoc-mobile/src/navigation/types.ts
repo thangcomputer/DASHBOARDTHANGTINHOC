@@ -45,6 +45,7 @@ export type AppStackParamList = {
   TeacherFinance: undefined;
   Tuition: undefined;
   CertPrepCatalog: undefined;
+  StudentCourses: undefined;
   CertPrepLevel: { levelId: string; courseName: string };
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
@@ -53,6 +54,8 @@ export type AppStackParamList = {
     watch?: 'stage';
     practice?: 'stage';
     resumeKey?: number;
+    resumeSubjectId?: string;
+    resumeCourseId?: string;
     resumeUnitId?: string;
     resumeNodeKey?: string;
     resumeSectionId?: string;
@@ -68,6 +71,7 @@ export type AppStackParamList = {
     resumeAtSec?: number;
   } | undefined;
   Support: undefined;
+  LegalDocument: { tab?: 'terms' | 'privacy' } | undefined;
 };
 
 export type MainTabsParamList = {
@@ -88,6 +92,8 @@ export type MainTabsParamList = {
     watch?: 'stage';
     practice?: 'stage';
     resumeKey?: number;
+    resumeSubjectId?: string;
+    resumeCourseId?: string;
     resumeUnitId?: string;
     resumeNodeKey?: string;
     resumeSectionId?: string;

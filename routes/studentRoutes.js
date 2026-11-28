@@ -71,6 +71,7 @@ async function reconcileCertPrepAfterRefund(student) {
   }
 }
 const { sendAccountWelcome } = require('../services/accountWelcome');
+const { FREE_COURSE_NAME } = require('../services/freePortal');
 const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
 const { extractSessionNumber, buildActivityEntry } = require('../utils/studentActivityLog');
 const {
@@ -267,6 +268,14 @@ router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), 
   try {
     const { teacherId, paid, status, course, search, page, limit, branch_id } = req.query;
     const andConditions = [];
+
+    if (req.query.includeDewskill !== 'true' && req.query.accountType !== 'all') {
+      andConditions.push({
+        accountType: { $ne: 'dewskill' },
+        freePortal: { $ne: true },
+        course: { $ne: FREE_COURSE_NAME },
+      });
+    }
 
     if (req.branchFilter && Object.keys(req.branchFilter).length > 0) {
       andConditions.push(req.branchFilter);
@@ -863,6 +872,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
     const plainPassword = canonicalPhone;
     req.body.password = plainPassword;
     req.body.isFirstLogin = true;
+    req.body.accountType = 'center';
 
     // Strangler: CQRS when flag/replica resolves on; otherwise LIVE legacy (never hard-503).
     let useCqrs = false;

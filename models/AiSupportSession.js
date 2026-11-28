@@ -32,6 +32,13 @@ const aiSupportSessionSchema = new mongoose.Schema({
   /** Ngân sách AI trong ngày theo basis points (0..1000 = 0..100%), reset 00:00 GMT+7. */
   budgetDate: { type: String, default: '' },
   budgetUsedBp: { type: Number, default: 0 },
+  /** Thống kê lượt dùng theo phân tầng Model AI trong ngày (Asia/Ho_Chi_Minh). */
+  planUsageDate: { type: String, default: '' },
+  planTotalCount: { type: Number, default: 0 },
+  planStandardCount: { type: Number, default: 0 },
+  planImageCount: { type: Number, default: 0 },
+  planFileFlashCount: { type: Number, default: 0 },
+  planFileProCount: { type: Number, default: 0 },
   /** Tin user gần nhất - dùng idle 5 phút. */
   lastUserMessageAt: { type: Date, default: null },
   /** Đã hỏi “còn đó không” - chờ phản hồi rồi kết thúc phiên. */

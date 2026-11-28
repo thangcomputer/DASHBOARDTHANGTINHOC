@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, BookOpen, Brain, CheckCircle2, ChevronDown, ChevronRight, Crown, Flame, Lightbulb, Loader2, Lock, LogOut, Maximize2, Minimize2, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Target, Trophy, Zap,
+  ArrowLeft, BookOpen, Brain, Check, ChevronDown, ChevronRight, Crown, Flame, Lightbulb, Loader2, Lock, Maximize2, Minimize2, Play, PlayCircle, Plus, RotateCcw, Route, Shuffle, Sparkles, Star, Target, Trophy, Zap,
 } from 'lucide-react';
+import { useActiveCourse } from '../../../context/ActiveCourseContext';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT, emitDailyPracticeStats } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { useFocusMode } from '../../../utils/focusMode';
@@ -16,16 +17,18 @@ import {
 import DailyPracticeHero from './DailyPracticeHero';
 import DailyPracticeSubjectBar from './DailyPracticeSubjectBar';
 import DailyPracticeGoalPanel from './DailyPracticeGoalPanel';
+import LessonPracticeCatalogPage from '../lessonPractice/LessonPracticeCatalogPage';
 import Mascot from './Mascot';
-import AnimatedProgressBar from './AnimatedProgressBar';
+import PracticeTopBar from './PracticeTopBar';
 import AnswerFeedback from './AnswerFeedback';
 import { SoundToggleButton } from './GameButton';
-import { AnimatedXpCounter } from './XPRewardAnimation';
 import { pathTopicPrimaryCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 import { reviewItemFollowUpLine } from '../../../../../shared/dailyPractice/reviewDisplay.mjs';
-import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
+import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic, resolveUpgradeCourse } from './PathView';
 import PathVideoModal from './PathVideoModal';
 import PracticeFinishOverlay from './PracticeFinishOverlay';
+import PracticeReadyModal from './PracticeReadyModal';
+import ExitPracticeWarningModal from './ExitPracticeWarningModal';
 import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
 import { buildPracticeShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
 import ComboCelebrationOverlay from './ComboCelebrationOverlay';
@@ -34,8 +37,10 @@ import BuyXpModal from './BuyXpModal';
 import DigitalCertificateModal from '../DigitalCertificateModal';
 import PlacementTestModal, { readPlacementResult } from './PlacementTestModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
-import FreeMeetPlanModal, { isFreePortalAccount } from './FreeMeetPlanModal';
-import subscriptionApi from '../../../services/subscriptionApi';
+import { isFreePortalAccount } from './FreeMeetPlanModal';
+import useAIQuota, { dispatchOpenAiPackagesModal } from '../../../hooks/useAIQuota';
+import CourseEnrollmentModal from '../courses/CourseEnrollmentModal';
+import { dewClass } from '../../../utils/dewskillTheme';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from './Questions';
 import './dailyPracticeDew.css';
 import './playQuestionChrome.css';
@@ -107,10 +112,23 @@ function HomeScreen({
   const certStudent = useMemo(() => readStudentCertificateMeta(), []);
   const [placementOpen, setPlacementOpen] = useState(false);
   const [placementResult, setPlacementResult] = useState(() => readPlacementResult(certStudent.studentId));
+  const [centerSummary, setCenterSummary] = useState({
+    activeSubjectName: '',
+    totalSubjects: 0,
+    completedUnits: 0,
+    totalUnits: 0,
+  });
+  const [centerSearchParams] = useSearchParams();
+  const centerLessonOpen = Boolean(centerSearchParams.get('lesson') || centerSearchParams.get('unitId'));
   const topics = useMemo(() => overview?.topics || [], [overview]);
   const stats = overview?.stats || {};
+  const aiQuota = useAIQuota({ autoFetch: true });
   const xpEmpty = Boolean(stats.xpEmpty || (stats.xpTotal || 0) <= 0);
+  const showLowAiBanner = Boolean(aiQuota.applies && !aiQuota.isUnlimited && aiQuota.aiQuotaPercent <= 20);
   const xpPacks = stats.xpPacks || [];
+  const openHomeXpOrUpgrade = () => {
+    aiQuota.openPackagesModal();
+  };
   const selected = topics.find((topic) => topic.id === topicId);
   const pathTopic = useMemo(() => {
     if (activePathTopicId) {
@@ -150,28 +168,79 @@ function HomeScreen({
     pathTopic?.totalUnits && (pathTopic.completedUnits || 0) >= pathTopic.totalUnits,
   );
 
+  const freePortal = isFreePortalAccount();
+  const effectiveMode = freePortal ? 'path' : 'free';
+  const { enrolledCourses, activeCourse, activeCourseId, setActiveCourseId, openAddCourse } = useActiveCourse();
+
+  const scopedPathTopics = useMemo(() => {
+    const allTopics = path?.topics || [];
+    if (!freePortal || !activeCourse?.topicIds?.length || !allTopics.length) return allTopics;
+    const topicSet = new Set(activeCourse.topicIds);
+    const matched = allTopics.filter((t) => topicSet.has(String(t?.topic?.id || '')));
+    return matched.length > 0 ? matched : allTopics;
+  }, [freePortal, activeCourse?.topicIds, path?.topics]);
+
+  const scopedPath = useMemo(
+    () => (path ? { ...path, topics: scopedPathTopics } : path),
+    [path, scopedPathTopics],
+  );
+
+  const scopedPathTopic = useMemo(() => {
+    if (activePathTopicId) {
+      const found = scopedPathTopics.find((item) => item.topic.id === activePathTopicId);
+      if (found) return found;
+    }
+    return pickActivePathTopic(scopedPath, initialTopicId);
+  }, [scopedPath, scopedPathTopics, activePathTopicId, initialTopicId]);
+
+  const activeTopicForHome = freePortal ? scopedPathTopic : pathTopic;
+
+  const lastCourseSyncRef = useRef('');
+  useEffect(() => {
+    if (!freePortal || !activeCourseId) return;
+    if (lastCourseSyncRef.current === activeCourseId) return;
+    lastCourseSyncRef.current = activeCourseId;
+    if (scopedPathTopics.length > 0) {
+      const existsInScope = scopedPathTopics.some((t) => t.topic.id === activePathTopicId);
+      if (!existsInScope) {
+        setActivePathTopicId(scopedPathTopics[0].topic.id);
+        setTopicId(scopedPathTopics[0].topic.id);
+      }
+    }
+  }, [freePortal, activeCourseId, scopedPathTopics, activePathTopicId]);
+
+  const effectivePathContinue = activeTopicForHome?.next
+    ? {
+      unitId: activeTopicForHome.next.unitId,
+      nodeKey: activeTopicForHome.next.nodeKey || 'study',
+      step: activeTopicForHome.next.step,
+    }
+    : pathContinue;
+  const effectiveTopicPathDone = Boolean(
+    activeTopicForHome?.totalUnits && (activeTopicForHome.completedUnits || 0) >= activeTopicForHome.totalUnits,
+  );
+
   const heroAction = () => {
     gameSounds.tap();
-    if (mode === 'path') {
-      if (pathContinue) focusCurrentPathLesson();
+    if (effectiveMode === 'path') {
+      if (effectivePathContinue) focusCurrentPathLesson();
       else document.getElementById('dp-path-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    if (topicId) onStart(topicId, difficulty);
+    document.getElementById('center-free-practice-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const heroLabel = mode === 'path'
-    ? (topicPathDone
+  const heroLabel = effectiveMode === 'path'
+    ? (effectiveTopicPathDone
       ? 'Ôn lại lộ trình'
-      : (pathTopic ? pathTopicPrimaryCtaLabel(pathTopic) : 'Xem chi tiết lộ trình'))
-    : 'Bắt đầu luyện tập';
-  const heroDisabled = mode === 'free' ? (!topicId || starting) : starting;
-  const freePortal = isFreePortalAccount();
-  const pathTopicRows = path?.topics || [];
-  const subjectBarTopics = pathTopicRows.length ? pathTopicRows : topics;
-  const subjectBarVariant = pathTopicRows.length ? 'path' : 'free';
-  const subjectBarActiveId = mode === 'path'
-    ? (activePathTopicId || topicId)
+      : (activeTopicForHome ? pathTopicPrimaryCtaLabel(activeTopicForHome) : 'Xem chi tiết lộ trình'))
+    : 'Vào học ngay';
+  const heroDisabled = effectiveMode === 'path' ? starting : false;
+  const pathTopicRows = freePortal ? scopedPathTopics : [];
+  const subjectBarTopics = freePortal ? pathTopicRows : topics;
+  const subjectBarVariant = freePortal ? 'path' : 'free';
+  const subjectBarActiveId = effectiveMode === 'path'
+    ? (activeTopicForHome?.topic?.id || activePathTopicId || topicId)
     : (topicId || activePathTopicId);
 
   const pickSubject = (id) => {
@@ -179,40 +248,99 @@ function HomeScreen({
     setTopicId(id);
   };
 
+  // Học viên Trung tâm mở một bài → hiển thị toàn chiều rộng (video + câu hỏi), ẩn banner & cột phải.
+  if (!freePortal && centerLessonOpen) {
+    return (
+      <div className="dp-shell mx-auto w-full max-w-6xl xl:max-w-7xl" data-lms-ui>
+        <LessonPracticeCatalogPage embedded onSummaryChange={setCenterSummary} />
+      </div>
+    );
+  }
+
   return (
     <div className="dp-shell mx-auto w-full max-w-6xl space-y-5 xl:max-w-7xl" data-lms-ui>
+      {freePortal && (
+        <div className="dew-app-card flex flex-wrap items-center gap-2 rounded-full px-4 py-2">
+          <span className="mr-1 text-xs font-extrabold text-slate-600">Đang học:</span>
+          {enrolledCourses.map((course) => {
+            const isSelected = course.id === activeCourseId;
+            return (
+              <button
+                key={course.id}
+                type="button"
+                onClick={() => {
+                  gameSounds.tap();
+                  setActiveCourseId(course.id);
+                  if (course.topicIds?.[0]) {
+                    setActivePathTopicId(course.topicIds[0]);
+                    setTopicId(course.topicIds[0]);
+                  }
+                }}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold cursor-pointer ${
+                  isSelected ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-700'
+                }`}
+              >
+                <span>{course.shortTitle}</span>
+                <span className={isSelected ? 'font-extrabold text-emerald-100' : 'font-bold text-slate-400'}>
+                  ({course.progress > 0 ? `${course.progress}%` : 'Mới'})
+                </span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => openAddCourse()}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-emerald-400 bg-emerald-50/75 px-3.5 py-1.5 text-xs font-extrabold text-emerald-700 transition hover:bg-emerald-100/80 cursor-pointer"
+          >
+            <Plus size={13} aria-hidden="true" />
+            <span>Đăng ký thêm khóa</span>
+          </button>
+        </div>
+      )}
 
       <DailyPracticeHero
         stats={stats}
-        mode={mode}
+        mode={effectiveMode}
         onPrimaryAction={heroAction}
         primaryDisabled={heroDisabled}
         primaryLabel={heroLabel}
-        pathTopic={mode === 'path' ? pathTopic : null}
-        pathContinue={Boolean(pathContinue)}
-        freeTopicName={selected?.name || topics[0]?.name || ''}
-        onBuyXp={() => setBuyXpOpen(true)}
-        onOpenCertificate={freePortal && topicPathDone ? () => setCertOpen(true) : undefined}
+        pathTopic={effectiveMode === 'path' ? activeTopicForHome : null}
+        pathContinue={Boolean(effectivePathContinue)}
+        courseProgress={effectiveMode === 'free' ? {
+          completed: centerSummary.completedUnits,
+          total: centerSummary.totalUnits,
+          subjectName: centerSummary.activeSubjectName,
+        } : undefined}
+        freeTopicName={effectiveMode === 'free' ? centerSummary.activeSubjectName : (selected?.name || topics[0]?.name || '')}
+        onBuyXp={freePortal ? openHomeXpOrUpgrade : undefined}
+        onOpenCertificate={freePortal && effectiveTopicPathDone ? () => setCertOpen(true) : undefined}
       />
 
-      {xpEmpty && (
+      {freePortal && showLowAiBanner && (
         <section className="flex flex-col gap-3 rounded-[24px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 px-4 py-3.5 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-amber-950">Hết XP để luyện</p>
+            <p className="text-sm font-black text-amber-950">
+              {aiQuota.aiQuotaPercent <= 0 ? 'Đã hết dung lượng Hỗ trợ AI hôm nay' : 'Dung lượng Hỗ trợ AI sắp hết'}
+            </p>
             <p className="mt-0.5 text-xs font-semibold text-amber-800">
-              Mua thêm để luyện tiếp trong hôm nay. Ngày mai bạn được lại {stats.dailyAllowanceXp || stats.dailyRefillXp || 200} XP, XP đã mua vẫn được giữ.
+              {aiQuota.aiQuotaPercent <= 0
+                ? 'Dung lượng Hỗ trợ AI hôm nay đã còn 0% (XP Học tập tích lũy vẫn giữ nguyên). Nâng cấp gói Hỗ trợ AI Không Giới Hạn để tiếp tục hỏi AI không giới hạn!'
+                : `Dung lượng Hỗ trợ AI hôm nay chỉ còn ${aiQuota.aiQuotaPercent}% (XP Học tập tích lũy vẫn giữ nguyên). Nâng cấp gói Hỗ trợ AI Không Giới Hạn ngay!`}
             </p>
           </div>
-          <button type="button" onClick={() => setBuyXpOpen(true)} className="cms-btn cms-btn-primary shrink-0 !py-2.5">
-            <Zap size={16} className="fill-amber-300 text-white" /> Mua XP
+          <button type="button" onClick={openHomeXpOrUpgrade} className="cms-btn cms-btn-primary shrink-0 !py-2.5">
+            <Sparkles size={16} className="text-amber-200" /> Nâng cấp gói AI
           </button>
         </section>
       )}
 
       <div className="grid gap-5 lg:grid-cols-12 lg:items-start lg:gap-6">
         <div className="min-w-0 lg:col-span-8">
-          <section className="dp-dew-main-panel flex flex-col gap-3 sm:gap-4">
-            {subjectBarTopics.length > 0 ? (
+          <section className={freePortal
+            ? 'dew-app-card flex flex-col gap-4 rounded-[28px] p-4 sm:p-5'
+            : 'dp-dew-main-panel flex flex-col gap-3 sm:gap-4'}
+          >
+            {freePortal && subjectBarTopics.length > 0 ? (
               <DailyPracticeSubjectBar
                 className="dp-dew-subject-carousel--responsive"
                 topics={subjectBarTopics}
@@ -222,44 +350,16 @@ function HomeScreen({
               />
             ) : null}
 
-            <div
-              className={`grid grid-cols-2 gap-1 rounded-[16px] p-1 ${freePortal ? 'border border-[#D5E7DF] bg-[#E8F3EE]' : 'bg-slate-100'
-                }`}
-              role="tablist"
-              aria-label="Chế độ luyện tập"
-            >
-              {MODES.map((item) => {
-                const Icon = item.icon;
-                const active = mode === item.id;
-                const displayLabel = freePortal && item.id === 'path' ? 'Lộ trình' : item.label;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => { gameSounds.tap(); onModeChange(item.id); }}
-                    className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-black transition !shadow-none ${active
-                      ? 'bg-white text-[#059669] shadow-sm ring-1 ring-emerald-200/60'
-                      : 'text-[#64748B] hover:text-slate-700'
-                      }`}
-                  >
-                    <Icon size={15} aria-hidden="true" /> {displayLabel}
-                  </button>
-                );
-              })}
-            </div>
-
-            {mode === 'path' && (
+            {effectiveMode === 'path' && (
               <div id="dp-path-panel" className="scroll-mt-4">
                 <PathView
-                  path={path}
+                  path={scopedPath}
                   practiceStats={stats}
                   loading={pathLoading}
                   error={pathError}
                   starting={starting}
                   initialTopicId={initialTopicId}
-                  activeTopicId={activePathTopicId}
+                  activeTopicId={subjectBarActiveId}
                   onTopicChange={setActivePathTopicId}
                   onStartStep={onStartStep}
                   onPathChanged={onPathChanged}
@@ -273,72 +373,26 @@ function HomeScreen({
               </div>
             )}
 
-            {mode === 'free' && error && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{error}</p>}
-            {mode === 'free' && loading && <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang tải chủ đề…</p>}
-            {mode === 'free' && !loading && !topics.length && !error && (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-                <Mascot mood="thinking" size={80} className="mx-auto" />
-                <p className="mt-3 font-bold text-slate-700">Chưa có câu Luyện tự do.</p>
-                <p className="text-sm text-slate-500">Trung tâm cần soạn ngân hàng riêng (không dùng câu lộ trình). Quay lại sau nhé!</p>
-              </div>
-            )}
-
-            {mode === 'free' && topics.length > 0 && (
-              <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <p className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
-                  Luyện tự do chỉ <span className="font-black">trắc nghiệm ôn</span>, không tính XP, không video, không dùng câu đã gắn chặng.
-                </p>
-
-                <section>
-                  <h2 className="mb-2 text-sm font-black text-slate-800">Chọn độ khó</h2>
-                  <div className="grid grid-cols-3 gap-2">
-                    {DIFFICULTIES.map((level) => {
-                      const active = level.id === difficulty;
-                      const count = selected?.counts?.[level.id] || 0;
-                      return (
-                        <button
-                          key={level.id}
-                          type="button"
-                          onClick={() => { gameSounds.tap(); setDifficulty(level.id); }}
-                          className="rounded-2xl border-2 px-2 py-3 text-center transition !shadow-none"
-                          style={{ borderColor: active ? level.color : '#E2E8F0', background: active ? level.soft : '#FFFFFF' }}
-                        >
-                          <span className="flex justify-center gap-0.5">
-                            {[1, 2, 3].map((n) => (
-                              <Star key={n} size={16} fill={n <= level.stars ? level.color : 'none'} color={n <= level.stars ? level.color : '#CBD5E1'} />
-                            ))}
-                          </span>
-                          <span className="mt-1 block text-base font-black" style={{ color: active ? level.color : '#0F172A' }}>{level.label}</span>
-                          <span className="block text-[11px] font-semibold text-slate-400">{count} câu · không tính XP</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <button
-                  type="button"
-                  disabled={!topicId || starting}
-                  onClick={() => onStart(topicId, difficulty)}
-                  className="cms-btn cms-btn-primary w-full !py-3.5 text-base"
-                >
-                  {starting ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-                  Bắt đầu luyện tập
-                </button>
+            {effectiveMode === 'free' && (
+              <div id="center-free-practice-panel" className="scroll-mt-4">
+                <LessonPracticeCatalogPage embedded onSummaryChange={setCenterSummary} />
               </div>
             )}
           </section>
         </div>
 
         <aside className="min-w-0 space-y-4 lg:col-span-4">
-          <DailyPracticeGoalPanel practiceStats={stats} canSetGoal={hasCompletedFirstNode} />
+          <DailyPracticeGoalPanel practiceStats={stats} canSetGoal={!freePortal || hasCompletedFirstNode} dewdropStyle={freePortal} />
           {(() => {
             const spaced = overview?.spacedRepetition || stats?.spacedRepetition || { dueCount: 0, totalQueued: 0, rewardXp: 15, nextDueDay: '' };
             const dueCount = Number(spaced.dueCount) || 0;
             const totalQueued = Number(spaced.totalQueued) || 0;
             const rewardXp = Number(spaced.rewardXp) || 15;
             return (
-              <section className="rounded-[24px] border border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/60 p-4 shadow-sm">
+              <section className={freePortal
+                ? 'dew-app-card dew-app-card--emerald p-5'
+                : 'rounded-[24px] border border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/60 p-4 shadow-sm'}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h3 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
@@ -346,7 +400,7 @@ function HomeScreen({
                       <span>Ôn tập ngắt quãng</span>
                     </h3>
                     <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                      Chu kỳ 1–3–7 ngày · Đạt ≥ 70% nhận +{rewardXp} XP
+                      Chu kỳ 1–3–7 ngày · +{rewardXp} XP
                     </p>
                   </div>
                   <span
@@ -354,7 +408,9 @@ function HomeScreen({
                       ? 'bg-emerald-600 text-white'
                       : totalQueued > 0
                         ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-100 text-slate-500'
+                        : freePortal
+                          ? 'bg-emerald-50/90 border border-emerald-200/70 text-emerald-800'
+                          : 'bg-slate-100 text-slate-500'
                       }`}
                   >
                     {dueCount > 0
@@ -364,13 +420,15 @@ function HomeScreen({
                         : 'Sạch lỗi'}
                   </span>
                 </div>
-                <p className="mt-2.5 text-xs font-medium leading-relaxed text-slate-600">
-                  {totalQueued > 0
-                    ? dueCount > 0
-                      ? `Bạn có ${dueCount} câu từng làm sai đã tới lịch nhắc lại hôm nay (tổng ${totalQueued} câu đang theo dõi).`
-                      : `Chưa có câu đến hạn hôm nay (${totalQueued} câu sẽ nhắc lại${spaced.nextDueDay ? ` từ ${spaced.nextDueDay}` : ''}). Bạn vẫn có thể ôn sớm ngay!`
-                    : 'Các câu bạn làm sai trong quá trình luyện tập sẽ tự động vào đây để nhắc ôn sau 1, 3 và 7 ngày.'}
-                </p>
+                {(!freePortal || totalQueued > 0) ? (
+                  <p className="mt-2.5 text-xs font-medium leading-relaxed text-slate-600">
+                    {totalQueued > 0
+                      ? dueCount > 0
+                        ? `Bạn có ${dueCount} câu từng làm sai đã tới lịch nhắc lại hôm nay (tổng ${totalQueued} câu đang theo dõi).`
+                        : `Chưa có câu đến hạn hôm nay (${totalQueued} câu sẽ nhắc lại${spaced.nextDueDay ? ` từ ${spaced.nextDueDay}` : ''}). Bạn vẫn có thể ôn sớm ngay!`
+                      : 'Các câu bạn làm sai trong quá trình luyện tập sẽ tự động vào đây để nhắc ôn sau 1, 3 và 7 ngày.'}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   disabled={starting || totalQueued === 0}
@@ -378,47 +436,53 @@ function HomeScreen({
                     gameSounds.tap();
                     onStartSpacedReview?.();
                   }}
-                  className="cms-btn cms-btn-primary mt-3 w-full !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className={freePortal
+                    ? totalQueued === 0
+                      ? 'mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-100/90 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed'
+                      : 'dew-btn-primary mt-3 inline-flex w-full items-center justify-center gap-1.5 py-2.5 text-sm font-bold cursor-pointer disabled:opacity-50'
+                    : 'cms-btn cms-btn-primary mt-3 w-full !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50'}
                 >
-                  {starting ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                  {starting ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={15} />}
                   {dueCount > 0 ? `Ôn tập ngay (${Math.min(10, totalQueued)} câu)` : totalQueued > 0 ? 'Ôn sớm hàng đợi' : 'Chưa có câu cần ôn'}
                 </button>
               </section>
             );
           })()}
-          <section className="rounded-[24px] border border-sky-200/80 bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/60 p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                  <Target size={15} className="shrink-0 text-sky-600" aria-hidden="true" />
-                  <span>Lộ trình dành riêng cho bạn</span>
-                </h3>
-                <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                  {placementResult
-                    ? `Đạt ${placementResult.score}/${placementResult.total} · ${placementResult.recommendedLevel}`
-                    : 'Trả lời nhanh 10 câu để chọn đúng môn học phù hợp nhất'}
-                </p>
+          {freePortal && (
+            <section className="dew-app-card dew-app-card--emerald p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
+                    <BookOpen size={15} className="shrink-0 text-emerald-600" aria-hidden="true" />
+                    <span>Lộ trình dành riêng cho bạn</span>
+                  </h3>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">
+                    {placementResult
+                      ? `Đạt ${placementResult.score}/${placementResult.total} · ${placementResult.recommendedLevel}`
+                      : 'Trả lời nhanh 10 câu để chọn đúng môn học phù hợp nhất'}
+                  </p>
+                </div>
+                {placementResult && (
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
+                    Đã đánh giá
+                  </span>
+                )}
               </div>
               {placementResult && (
-                <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800">
-                  Đã đánh giá
-                </span>
+                <p className="mt-2 rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 border border-emerald-100">
+                  Gợi ý ưu tiên: <strong className="text-emerald-700">{placementResult.matchedTopicName}</strong>
+                </p>
               )}
-            </div>
-            {placementResult && (
-              <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 border border-sky-100">
-                Gợi ý ưu tiên: <strong className="text-emerald-700">{placementResult.matchedTopicName}</strong>
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => { gameSounds.tap(); setPlacementOpen(true); }}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-white px-3 py-2.5 text-xs font-black text-sky-700 transition hover:bg-sky-50 !shadow-none"
-            >
-              <Sparkles size={15} aria-hidden="true" />
-              {placementResult ? 'Xem đánh giá & Làm lại' : 'Đánh giá năng lực (10 câu)'}
-            </button>
-          </section>
+              <button
+                type="button"
+                onClick={() => { gameSounds.tap(); setPlacementOpen(true); }}
+                className="dew-btn-primary mt-3 flex w-full items-center justify-center gap-1.5 py-2.5 text-xs font-extrabold cursor-pointer"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                {placementResult ? 'Xem đánh giá & Làm lại' : 'Đánh giá năng lực (10 câu)'}
+              </button>
+            </section>
+          )}
         </aside>
       </div>
 
@@ -449,7 +513,7 @@ function HomeScreen({
             : 0}
         />
       )}
-      {placementOpen && (
+      {freePortal && placementOpen && (
         <PlacementTestModal
           open={placementOpen}
           intro={!placementResult}
@@ -478,66 +542,6 @@ function HomeScreen({
 }
 
 // ── Màn chơi ─────────────────────────────────────────────────────────────────
-function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, quitting, mode = 'quit', onStay, onQuit }) {
-  const left = Math.max(0, total - answered);
-  const lossOnQuit = Math.max(stakeXp, quitLossXp);
-  const loseXp = lossOnQuit > 0;
-  const isReload = mode === 'reload';
-
-  useEffect(() => { gameSounds.sad(); }, []);
-
-  return createPortal(
-    <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
-      <div className="cms-goal-in w-full max-w-sm overflow-hidden rounded-[28px] bg-white text-center shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="dp-quit-title">
-        <div className={`px-6 pb-5 pt-6 ${loseXp ? 'bg-gradient-to-br from-red-50 via-white to-amber-50' : 'bg-gradient-to-br from-sky-50 via-white to-slate-100'}`}>
-          <Mascot mood="quit" size={96} className="mx-auto" />
-          <h2 id="dp-quit-title" className="mt-2 text-xl font-black text-slate-900">
-            {isReload
-              ? (loseXp ? 'Tải lại trang sẽ mất XP!' : 'Tải lại trang lúc này?')
-              : (loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?')}
-          </h2>
-          <p className="mt-1.5 text-sm text-slate-600">
-            {isReload
-              ? (loseXp
-                ? (mandatory
-                  ? `Đây là lượt bắt buộc. Tải lại trang lúc này sẽ hủy lượt luyện tập và mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
-                  : `Tải lại trang lúc này sẽ hủy lượt luyện tập và mất thêm XP (tối đa −${lossOnQuit} XP).`)
-                : 'Tải lại trang lúc này sẽ hủy tiến độ lượt luyện tập hiện tại. Lượt phục hồi này không mất XP nhưng bạn nên hoàn thành để nhận XP.')
-              : (loseXp
-                ? (mandatory
-                  ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
-                  : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`)
-                : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.')}
-          </p>
-          {loseXp && (
-            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 ring-1 ring-red-200">
-              <Zap size={13} className="fill-amber-300 text-amber-500" aria-hidden="true" />
-              {isReload ? `Mất tối đa −${lossOnQuit} XP nếu tải lại` : `Mất tối đa −${lossOnQuit} XP nếu thoát`}
-            </p>
-          )}
-          {left > 0 && (
-            <p className="mt-2 text-xs font-semibold text-slate-500">
-              Đã làm {answered}/{total} câu, còn {left} câu nữa thôi!
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col gap-2 p-5">
-          <button type="button" onClick={onStay} disabled={quitting} className="cms-btn cms-btn-primary w-full !py-3">
-            <Play size={16} /> Ở lại luyện tiếp
-          </button>
-          <button type="button" onClick={onQuit} disabled={quitting} className="cms-btn cms-btn-outline w-full !py-2.5 !text-emerald-600">
-            {quitting ? <Loader2 size={16} className="animate-spin" /> : null}
-            {isReload
-              ? (loseXp ? `Tải lại trang và mất tối đa ${lossOnQuit} XP` : 'Vẫn tải lại trang')
-              : (loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát')}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
 function ReloadAbandonNoticeModal({ lostXp, onClose }) {
   useEffect(() => { gameSounds.sad(); }, []);
 
@@ -649,7 +653,15 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     try {
       const data = await dailyPracticeApi.student.answer(session.id, question.id, answer);
       setResult(data);
-      if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
+      if (typeof data.profileXp === 'number') {
+        setProfileXp(data.profileXp);
+        emitDailyPracticeStats({
+          xpTotal: data.profileXp,
+          ...(typeof data.studyXpTotal === 'number' ? { studyXpTotal: data.studyXpTotal } : {}),
+          ...(typeof data.purchasedXp === 'number' ? { purchasedXp: data.purchasedXp } : {}),
+          ...(typeof data.dailyXp === 'number' ? { dailyXp: data.dailyXp } : {}),
+        });
+      }
       if (data.correct) {
         const nextVal = comboRef.current + 1;
         comboRef.current = nextVal;
@@ -666,8 +678,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         gameSounds.wrong();
       }
     } catch (err) {
-      if (err.status === 402) setBuyXpOpen(true);
-      else setError(err.message || 'Không gửi được câu trả lời');
+      if (err.status === 402) {
+        dispatchOpenAiPackagesModal();
+      } else setError(err.message || 'Không gửi được câu trả lời');
     } finally {
       setBusy(false);
     }
@@ -676,7 +689,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const askHint = async () => {
     if (reveal || result || busy) return;
     if (!xpDisabled && hintShareXp > 0 && profileXp < hintShareXp) {
-      setBuyXpOpen(true);
+      dispatchOpenAiPackagesModal();
       return;
     }
     setBusy(true);
@@ -688,6 +701,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         setProfileXp(data.profileXp);
         emitDailyPracticeStats({
           xpTotal: data.profileXp,
+          ...(typeof data.studyXpTotal === 'number' ? { studyXpTotal: data.studyXpTotal } : {}),
           ...(typeof data.purchasedXp === 'number' ? { purchasedXp: data.purchasedXp } : {}),
           ...(typeof data.dailyXp === 'number' ? { dailyXp: data.dailyXp } : {}),
         });
@@ -696,8 +710,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       setReveal(data.reveal || {});
       setHintText(data.hint || '');
     } catch (err) {
-      if (err.status === 402) setBuyXpOpen(true);
-      else setError(err.message || 'Không lấy được gợi ý');
+      if (err.status === 402) {
+        dispatchOpenAiPackagesModal();
+      } else setError(err.message || 'Không lấy được gợi ý');
     } finally {
       setBusy(false);
     }
@@ -909,91 +924,82 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   }, []);
 
   return (
-    <div className={`mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 pb-10 sm:px-6 ${isVideoQuestion ? 'pt-4 sm:gap-4 sm:pt-5' : 'gap-5 pt-6 sm:gap-6 sm:pt-10 sm:pb-12'}`}>
-      <div className="flex items-center justify-start">
-        <button
-          type="button"
-          onClick={() => { setQuitMode('quit'); setQuitOpen(true); }}
-          aria-label="Thoát"
-          className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
-        >
-          <LogOut size={16} aria-hidden="true" /> Thoát
-        </button>
+    <div className="dew-student-theme relative min-h-[calc(100dvh-2rem)] overflow-hidden rounded-[32px] bg-gradient-to-br from-[#E0F2FE] via-[#ECFEFF] to-[#ECFDF5] px-3 py-5 sm:px-6 sm:py-8">
+      {/* 4 hạt giọt nước 3D mờ ở các góc */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="dew-water-orb -left-4 top-24 h-16 w-16 opacity-65" />
+        <div className="dew-water-orb right-8 top-6 h-12 w-12 opacity-60" />
+        <div className="dew-water-orb bottom-10 left-8 h-14 w-14 opacity-55" />
+        <div className="dew-water-orb bottom-16 right-6 h-20 w-20 opacity-50" />
       </div>
-      {/* Thanh trên: tiến độ · XP */}
-      <header className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/80 sm:gap-4 sm:px-5 sm:py-3.5">
-        <AnimatedProgressBar
-          progress={progress}
-          currentStep={index + 1}
-          totalSteps={total}
-          label={contextLabel}
-          confirmedXp={confirmedQuestionXp}
-        />
-        <div className="relative flex shrink-0 items-center gap-2">
-          {combo >= 2 && (
-            <span className="dp-combo absolute -top-3 right-12 z-[1] flex h-5 min-w-5 items-center justify-center whitespace-nowrap rounded-full bg-orange-500 px-2 text-[10px] font-black leading-none text-white shadow-sm">
-              Combo x{combo}
-            </span>
-          )}
-          <span
-            className="relative flex h-10 items-center gap-2 rounded-xl bg-amber-50/90 px-3.5 text-sm font-black tabular-nums text-amber-900 ring-1 ring-amber-200/90"
-            title={isTestOutStake
-              ? `Tổng ${walletXp} XP · ${stakeXp} XP đang cược (ví tạm ${profileXp}). Đạt sẽ hoàn cược.`
-              : (isPerQuestion
-                ? `Ví ${profileXp} XP · ${perQuestionStake} XP/câu, sai trừ ngay · đạt nhận +${perQuestionStake}/câu đúng`
-                : `Phục hồi · đạt nhận tối đa ${stakeLabel} XP`)}
-          >
-            <span className="flex items-center gap-1 leading-none">
-              <Zap size={16} className="fill-amber-400 text-amber-500" aria-hidden="true" />
-              <AnimatedXpCounter value={walletXp} />
-            </span>
-            {isTestOutStake ? (
-              <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">−{stakeXp} cược</span>
-            ) : (isPerQuestion ? (
-              <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">{perQuestionStake} XP/câu</span>
-            ) : null)}
-            {hintChargedXp > 0 ? (
-              <span className="dp-xp-hint-spend" aria-live="polite">−{hintChargedXp} XP</span>
-            ) : null}
-          </span>
-        </div>
-      </header>
 
-      {/* Thẻ câu */}
-      <section className={`relative rounded-[28px] bg-white p-5 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 sm:p-8 ${result && !result.correct ? 'dp-shake' : ''}`}>
+      <PracticeTopBar
+        contextLabel={contextLabel}
+        currentIndex={index + 1}
+        total={total}
+        progress={progress}
+        confirmedXp={confirmedQuestionXp}
+        userXP={walletXp}
+        perQuestionXp={isPerQuestion ? perQuestionStake : 0}
+        stakeXp={isTestOutStake ? stakeXp : 0}
+        xpDisabled={xpDisabled}
+        combo={combo}
+        hintChargedXp={hintChargedXp}
+        onQuit={() => { setQuitMode('quit'); setQuitOpen(true); }}
+      />
+
+      {/* Thẻ câu hỏi chính */}
+      <section
+        className={`${dewClass(
+          'dew-app-card relative z-10 mx-auto w-full max-w-4xl overflow-hidden rounded-[30px] p-6 md:p-8',
+          'relative z-10 mx-auto w-full max-w-4xl overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 shadow-md md:p-8',
+        )} ${
+          result && !result.correct ? 'dp-shake' : ''
+        }`}
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#10B981] via-[#34D399] to-[#0EA5E9]" />
         {result?.correct && <Confetti />}
-        {!result && !isVideoQuestion ? (
-          <button
-            type="button"
-            onClick={askHint}
-            disabled={Boolean(reveal) || busy}
-            aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, trừ ngay ${hintShareXp} XP`)}
-            title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, trừ ngay −${hintShareXp} XP`}
-            className="absolute right-4 top-4 z-20 dp-play-hint-corner sm:right-6 sm:top-6 disabled:opacity-50"
-          >
-            <Lightbulb size={PLAY_QUESTION_CHROME.icon.hintSize} strokeWidth={PLAY_QUESTION_CHROME.icon.strokeWidth} className={reveal ? 'text-slate-400' : 'text-slate-500'} />
-            <span>{reveal ? 'Đã gợi ý' : 'Gợi ý'}</span>
-            {!xpDisabled && !reveal && hintShareXp > 0 ? (
-              <span className="dp-play-hint-xp">−{hintShareXp}</span>
-            ) : null}
-          </button>
-        ) : null}
-        <div className={`flex items-start gap-3.5 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6 ${!result && !isVideoQuestion ? 'pr-20 sm:pr-24' : ''}`}>
-          <div className="dp-play-mascot-wrap">
-            <Mascot
-              mood={isVideoQuestion ? (videoCompleted ? 'correct' : 'learning') : (result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning')}
-              size={PLAY_QUESTION_CHROME.mascotSize.web}
-              className="shrink-0"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="dp-play-meta-row">
-              <span className="dp-play-eyebrow">{PLAY_QUESTION_CHROME.label}</span>
-              <span className="dp-play-meta-sep" aria-hidden="true">·</span>
-              <span className="dp-play-type-chip">{meta.label}</span>
+
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100/90 pb-5 sm:pb-6">
+          <div className="flex min-w-0 items-start gap-3.5 sm:gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-white bg-gradient-to-b from-[#ECFDF5] to-[#E0F2FE]/80 shadow-[0_8px_20px_-6px_rgba(16,185,129,0.25),inset_0_2px_4px_#fff] sm:h-16 sm:w-16">
+              <Mascot
+                mood={isVideoQuestion ? (videoCompleted ? 'correct' : 'learning') : (result ? (result.correct ? 'correct' : 'incorrect') : busy ? 'loading' : reveal ? 'idea' : 'learning')}
+                size={48}
+                className="shrink-0"
+              />
             </div>
-            <p className="dp-play-prompt">{question.prompt}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-slate-500 sm:text-[13px]">
+                {PLAY_QUESTION_CHROME.label} · {meta.label}
+              </p>
+              <h2 className="mt-0.5 text-lg font-extrabold leading-snug text-slate-900 sm:text-xl md:text-[22px]">
+                {question.prompt}
+              </h2>
+            </div>
           </div>
+
+          {!result && !isVideoQuestion ? (
+            <button
+              type="button"
+              onClick={askHint}
+              disabled={Boolean(reveal) || busy}
+              aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, trừ ngay ${hintShareXp} XP`)}
+              title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, trừ ngay −${hintShareXp} XP`}
+              className={dewClass(
+                'dew-btn-white inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50',
+                'inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 cursor-pointer disabled:opacity-50',
+              )}
+            >
+              <Lightbulb size={14} className={reveal ? 'text-slate-400' : 'text-amber-500'} aria-hidden="true" />
+              <span>{reveal ? 'Đã gợi ý' : 'Gợi ý'}</span>
+              {!xpDisabled && !reveal && hintShareXp > 0 ? (
+                <span className="rounded-full bg-amber-100/90 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-800">
+                  −{hintShareXp}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
         </div>
 
         {isVideoQuestion ? (
@@ -1118,34 +1124,44 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
               />
             )}
 
-            {!result && (
-              <div className="mt-6 flex flex-wrap items-center justify-end gap-2.5 border-t border-slate-100 pt-5">
-                {!immediate ? (
-                  <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary min-w-[160px] !py-3">
-                    {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
-                    {' '}
-                    Kiểm tra
+            {!result ? (
+              !immediate ? (
+                <div className="mt-6 flex flex-wrap items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => submit(pending)}
+                    disabled={!pending || busy}
+                    className={dewClass(
+                      'dew-btn-primary inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
+                      'inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3 text-sm font-extrabold shadow-md cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
+                    )}
+                  >
+                    {busy ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} strokeWidth={2.8} aria-hidden="true" />}
+                    <span>Kiểm tra</span>
                   </button>
-                ) : (
-                  <p className="text-xs font-semibold text-slate-400">Chọn một đáp án phía trên để trả lời</p>
-                )}
-              </div>
-            )}
+                </div>
+              ) : (
+                <p className="mt-5 text-center text-xs font-medium italic text-slate-500">
+                  Chọn một đáp án phía trên để trả lời
+                </p>
+              )
+            ) : null}
 
-            <p className="mt-4 hidden items-center justify-center gap-2 text-[11px] font-medium text-slate-400 sm:flex">
+            <p className="mt-4 hidden items-center justify-center gap-2 text-xs font-medium text-slate-500 sm:flex">
               <span>Phím tắt:</span>
               {result ? (
                 <span>
-                  <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">Enter</kbd>
+                  <kbd className="rounded-md border border-white bg-white/80 px-1.5 py-0.5 text-[11px] font-bold text-slate-600 shadow-2xs">Enter</kbd>
                   {' hoặc '}
-                  <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">→</kbd>
+                  <kbd className="rounded-md border border-white bg-white/80 px-1.5 py-0.5 text-[11px] font-bold text-slate-600 shadow-2xs">→</kbd>
                   {' sang câu tiếp'}
                 </span>
               ) : (
                 <span>
                   {question.type === 'mcq' || question.type === 'truefalse' ? '1–4 / A–D chọn đáp án · ' : ''}
-                  {!reveal ? 'H gợi ý · ' : ''}
-                  {!immediate ? 'Enter kiểm tra' : 'Chọn đáp án ở trên'}
+                  {!reveal ? 'H gợi ý' : ''}
+                  {!reveal && !immediate ? ' · ' : ''}
+                  {!immediate ? 'Enter kiểm tra' : ''}
                 </span>
               )}
             </p>
@@ -1154,7 +1170,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       </section>
 
       {quitOpen && (
-        <QuitConfirm
+        <ExitPracticeWarningModal
           answered={index + (result ? 1 : 0)}
           total={total}
           stakeXp={stakeXp}
@@ -1251,153 +1267,6 @@ function FireworkBurst() {
       aria-hidden="true"
     />
   ));
-}
-
-/** Xác nhận cược XP - lần đầu bấm Làm / Bắt đầu hoặc Làm lại sau kết quả. */
-function StakeSessionConfirm({
-  variant = 'rematch',
-  stakeXp,
-  xpTotal,
-  starting,
-  testOut = false,
-  testOutLocked = false,
-  review = false,
-  onStay,
-  onGo,
-  onOpenMeet,
-}) {
-  const isStart = variant === 'start';
-  const notEnoughXp = typeof xpTotal === 'number' && xpTotal < stakeXp;
-  const isBlockedFreeTestOut = testOut && testOutLocked;
-  const canAutoStart = !isBlockedFreeTestOut && !notEnoughXp;
-  const COUNTDOWN_MS = 3000;
-  const [remainingMs, setRemainingMs] = useState(COUNTDOWN_MS);
-  const onGoRef = useRef(onGo);
-  onGoRef.current = onGo;
-  const triggeredRef = useRef(false);
-  const titleId = isStart ? 'dp-stake-start-title' : 'dp-rematch-title';
-  useEffect(() => { gameSounds.pick(); }, []);
-  useEffect(() => {
-    if (!canAutoStart || starting) return undefined;
-    triggeredRef.current = false;
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      const left = Math.max(0, COUNTDOWN_MS - elapsed);
-      setRemainingMs(left);
-      if (left <= 0 && !triggeredRef.current) {
-        triggeredRef.current = true;
-        window.clearInterval(timer);
-        gameSounds.win();
-        onGoRef.current?.();
-      }
-    }, 50);
-    return () => window.clearInterval(timer);
-  }, [canAutoStart, starting]);
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === 'Escape' && !starting) onStay();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onStay, starting]);
-
-  let title = 'Bắt đầu lượt luyện?';
-  let body = '';
-  if (isBlockedFreeTestOut) {
-    title = 'Đặc quyền học viên gói Meet';
-    body = 'Kiểm tra vượt chặng là tính năng chỉ dành riêng cho học viên đã mua khóa / gói Google Meet. Vui lòng nâng cấp gói để mở khóa đặc quyền này và nhận thêm XP theo gói!';
-  } else if (review || stakeXp === 0) {
-    title = 'Chuẩn bị ôn lại';
-    body = 'Ôn lại bài đã qua hoàn toàn miễn phí, không trừ XP.';
-  } else if (notEnoughXp) {
-    title = 'Không đủ XP để làm bài';
-    body = `Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet hoặc mua thêm XP để tiếp tục!`;
-  } else if (isStart) {
-    title = testOut ? 'Cược để vượt chặng?' : 'Chuẩn bị vào luyện tập';
-    body = testOut
-      ? `Đặt ${stakeXp} XP. Đạt đủ điểm thì vượt chặng và nhận lại XP. Không đạt hoặc thoát giữa chừng thì mất trắng.`
-      : `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay, đạt % yêu cầu sẽ nhận +${QUESTION_STAKE_XP} XP/câu đúng.`;
-  } else {
-    title = 'Làm lại lượt luyện tập?';
-    body = `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay, đạt % yêu cầu sẽ nhận +${QUESTION_STAKE_XP} XP/câu đúng.`;
-  }
-
-  const pct = Math.max(0, Math.min(100, (remainingMs / COUNTDOWN_MS) * 100));
-  const secLeft = Math.max(1, Math.ceil(remainingMs / 1000));
-  const showXpPill = !(review || stakeXp === 0);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden bg-slate-950/60 p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onPointerDown={(event) => { if (event.target === event.currentTarget && !starting) onStay(); }}
-    >
-      <div className="cms-goal-in relative w-full max-w-[380px] overflow-hidden rounded-[28px] border border-emerald-100 bg-white text-center shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="relative bg-gradient-to-b from-emerald-50/90 via-white to-white px-6 pb-4 pt-6">
-          <span className="dp-twinkle absolute left-7 top-7 text-base text-emerald-500" aria-hidden="true">✦</span>
-          <span className="dp-flame absolute right-7 top-6 text-amber-500" aria-hidden="true"><Flame size={20} className="fill-amber-400" /></span>
-          <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-emerald-100">
-            <Mascot mood={isBlockedFreeTestOut || notEnoughXp ? 'thinking' : 'determined'} size={104} className="relative" />
-          </div>
-          <h2 id={titleId} className="mt-3 text-xl font-black tracking-tight text-slate-900">{title}</h2>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{body}</p>
-          {showXpPill && (
-            <div className="mt-3 inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-50 px-3 py-1.5 text-[11px] font-extrabold text-amber-800 ring-1 ring-amber-200/80">
-              <Zap size={13} className="shrink-0 fill-amber-400 text-amber-500" aria-hidden="true" />
-              <span>{testOut ? `Cược ${stakeXp} XP` : `${QUESTION_STAKE_XP} XP/câu · tối đa ${stakeXp} XP`}</span>
-              {typeof xpTotal === 'number' && <span className="text-amber-600">· đang có {xpTotal}</span>}
-            </div>
-          )}
-        </div>
-
-        {canAutoStart && (
-          <div className="mx-5 mb-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-left">
-            <div className="mb-2 flex items-center justify-between text-xs font-extrabold">
-              <span className="flex items-center gap-1.5 text-emerald-800">
-                {starting || remainingMs <= 0 ? <Loader2 size={13} className="animate-spin text-emerald-600" /> : <Play size={12} className="fill-emerald-600 text-emerald-600" />}
-                {starting || remainingMs <= 0 ? 'Đang vào bài luyện…' : 'Tự động vào luyện sau'}
-              </span>
-              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-black tabular-nums text-white">
-                {remainingMs <= 0 ? '0s' : `${secLeft}s`}
-              </span>
-            </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-emerald-100">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-[width] duration-75 ease-linear"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className={`px-5 pb-5 pt-2 ${isBlockedFreeTestOut || notEnoughXp ? 'grid grid-cols-2 gap-2.5' : ''}`}>
-          <button
-            type="button"
-            onClick={onStay}
-            disabled={starting}
-            className="cms-btn cms-btn-outline w-full !rounded-2xl !py-3 text-sm font-extrabold"
-          >
-            Để sau
-          </button>
-          {(isBlockedFreeTestOut || notEnoughXp) && (
-            <button
-              type="button"
-              onClick={() => {
-                onStay();
-                onOpenMeet?.();
-              }}
-              className="cms-btn cms-btn-primary w-full !rounded-2xl !py-3 text-sm font-extrabold"
-            >
-              <Crown size={16} className="text-amber-300" />
-              Nâng cấp gói
-            </button>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
 }
 
 function clientStakeMeta(pick) {
@@ -1544,9 +1413,10 @@ function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOp
         data={buildPracticeShareData(summary)}
       />
       {rematchOpen && (
-        <StakeSessionConfirm
+        <PracticeReadyModal
           stakeXp={rematchStakeXp}
           xpTotal={currentXpTotal}
+          isFreeTier={Boolean(summary.stats?.isFreeTier || summary.stats?.suggestedAction === 'upgrade_plan')}
           starting={starting}
           onStay={() => setRematchOpen(false)}
           onOpenMeet={() => {
@@ -1562,6 +1432,7 @@ function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOp
 
 /** Luyện tập hằng ngày kiểu trò chơi: chọn chủ đề + độ khó → 10 câu → kết quả. */
 export default function DailyPracticePage() {
+  const { activeCourse, allVisibleClasses, loading: coursesLoading, refreshCourses } = useActiveCourse();
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedTopicId = searchParams.get('topicId') || '';
   const watchStage = searchParams.get('watch') === 'stage';
@@ -1572,25 +1443,36 @@ export default function DailyPracticePage() {
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   const [celebrating, setCelebrating] = useState(false);
-  const [finishRematchOpen, setFinishRematchOpen] = useState(false);
   const [lastPick, setLastPick] = useState(null);
   const [starting, setStarting] = useState(false);
-  const [mode, setMode] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('watch') === 'stage' || params.get('practice') === 'stage') return 'path';
-    try { return localStorage.getItem(MODE_STORAGE_KEY) === 'free' ? 'free' : 'path'; } catch { return 'path'; }
-  });
+  const isDewskillStudent = isFreePortalAccount();
+  const [mode, setMode] = useState(() => (isDewskillStudent ? 'path' : 'free'));
   const [path, setPath] = useState(null);
   const [pathLoading, setPathLoading] = useState(true);
   const [pathError, setPathError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [meetOfferOpen, setMeetOfferOpen] = useState(false);
-  const [meetNotice, setMeetNotice] = useState('');
+  const [upgradeTopicId, setUpgradeTopicId] = useState('');
   const [requestedLesson, setRequestedLesson] = useState(null);
   const [welcomeTarget, setWelcomeTarget] = useState(null);
   const [stakeConfirm, setStakeConfirm] = useState(null);
   const [reloadNotice, setReloadNotice] = useState(null);
   const [reloadNoticeOpen, setReloadNoticeOpen] = useState(false);
+
+  const upgradeCourse = useMemo(
+    () => resolveUpgradeCourse(
+      allVisibleClasses,
+      activeCourse,
+      upgradeTopicId || linkedTopicId || path?.activeTopicId || path?.topics?.[0]?.topic?.id || '',
+    ),
+    [allVisibleClasses, activeCourse, upgradeTopicId, linkedTopicId, path?.activeTopicId, path?.topics],
+  );
+
+  useEffect(() => {
+    if (meetOfferOpen && !coursesLoading && !upgradeCourse) {
+      setMeetOfferOpen(false);
+    }
+  }, [meetOfferOpen, coursesLoading, upgradeCourse]);
 
   useEffect(() => {
     const notice = readReloadAbandonNotice();
@@ -1600,56 +1482,17 @@ export default function DailyPracticePage() {
   }, []);
   const practiceLockRef = useRef(false);
 
-  useEffect(() => {
-    if (!isFreePortalAccount() || session) return undefined;
-    let cancelled = false;
-    let timer = null;
-    const studentId = (() => {
-      try {
-        const user = JSON.parse(localStorage.getItem('student_user') || '{}');
-        return user.id || user._id || 'student';
-      } catch {
-        return 'student';
-      }
-    })();
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    subscriptionApi.student.overview()
-      .then((data) => {
-        if (cancelled) return;
-        const sub = data?.subscription;
-        if (sub?.meetLifetime || sub?.state === 'active') return;
-        let storageKey = `cms_meet_offer:${studentId}:${today}`;
-        let notice = '';
-        if (sub?.state === 'expiring') {
-          const days = Math.max(1, Number(sub.daysLeft) || 1);
-          const milestone = days <= 1 ? 1 : 7;
-          storageKey = `cms_meet_remind:${studentId}:${sub.expiresAt}:${milestone}`;
-          notice = `Gói của bạn còn ${days <= 1 ? 1 : days} ngày nữa là hết`;
-        }
-        try {
-          if (localStorage.getItem(storageKey) === '1') return;
-        } catch { /* vẫn cho hiện */ }
-        const scheduleMeetOffer = (delayMs) => {
-          timer = window.setTimeout(() => {
-            if (cancelled) return;
-            // Avoid stacking the onboarding Meet modal over another active dialog (goal/placement/survey).
-            if (typeof document !== 'undefined' && document.querySelector('[role="dialog"], [aria-modal="true"]')) {
-              scheduleMeetOffer(2500);
-              return;
-            }
-            try { localStorage.setItem(storageKey, '1'); } catch { /* ignore */ }
-            setMeetNotice(notice);
-            setMeetOfferOpen(true);
-          }, delayMs);
-        };
-        scheduleMeetOffer(5000);
-      })
-      .catch(() => { });
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [session]);
+  const resolveTopicForUnit = useCallback((pathObj, targetUnitId) => {
+    const uid = String(targetUnitId || '');
+    if (!uid) return null;
+    return (pathObj?.topics || []).find((t) => (t?.units || []).some((u) => String(u.id) === uid)) || null;
+  }, []);
+
+  const isTestOutUnlocked = useCallback((pathObj, targetUnitId) => {
+    const topic = resolveTopicForUnit(pathObj, targetUnitId);
+    if (topic && typeof topic.canTestOut === 'boolean') return topic.canTestOut;
+    return pathObj?.canTestOut === true;
+  }, [resolveTopicForUnit]);
 
   useEffect(() => {
     if (Number(overview?.stats?.dailyAllowanceXp) === 300) {
@@ -1679,6 +1522,12 @@ export default function DailyPracticePage() {
   }, []);
 
   const loadPath = useCallback((silent = false) => {
+    if (!isFreePortalAccount()) {
+      setPath(null);
+      setPathError('');
+      setPathLoading(false);
+      return;
+    }
     if (!silent) setPathLoading(true);
     dailyPracticeApi.student.path()
       .then((data) => { setPath(data); setPathError(''); })
@@ -1727,9 +1576,10 @@ export default function DailyPracticePage() {
     };
   }, [applyStats, loadOverview, loadPath]);
 
-  const changeMode = (next) => {
-    setMode(next);
-    try { localStorage.setItem(MODE_STORAGE_KEY, next); } catch { /* ignore */ }
+  const changeMode = () => {
+    const lockedMode = isFreePortalAccount() ? 'path' : 'free';
+    setMode(lockedMode);
+    try { localStorage.setItem(MODE_STORAGE_KEY, lockedMode); } catch { /* ignore */ }
   };
 
   const begin = async (pick) => {
@@ -1754,7 +1604,7 @@ export default function DailyPracticePage() {
       const message = err.message || 'Không bắt đầu được lượt chơi';
       if (err.status === 402 || /hết xp|không đủ xp/i.test(message)) {
         loadOverview(true);
-        setBuyXpOpen(true);
+        dispatchOpenAiPackagesModal();
       }
       if (pick.mode === 'path') {
         if (err.status !== 402) setPathError(message);
@@ -1790,7 +1640,7 @@ export default function DailyPracticePage() {
     return false;
   }
 
-  const queueBegin = (pick) => {
+  const queueBegin = (pick, options = {}) => {
     const resolvedPick = pick?.mode === 'path' && !pick.testOut
       ? { ...pick, review: Boolean(pick.review || isPathPickCompleted(path, pick)) }
       : pick;
@@ -1799,15 +1649,20 @@ export default function DailyPracticePage() {
       begin(resolvedPick);
       return;
     }
+    const effectiveStakeXp = typeof options.stakeXpOverride === 'number'
+      ? options.stakeXpOverride
+      : meta.stakeXp;
     const xpTotal = overview?.stats?.xpTotal;
-    const isBlockedFreeTestOut = meta.testOut && path?.canTestOut !== true;
-    if (!isBlockedFreeTestOut && typeof xpTotal === 'number' && xpTotal < meta.stakeXp) {
-      setBuyXpOpen(true);
+    const isBlockedFreeTestOut = meta.testOut && !isTestOutUnlocked(path, resolvedPick.unitId);
+    if (!isBlockedFreeTestOut && typeof xpTotal === 'number' && xpTotal < effectiveStakeXp) {
+      dispatchOpenAiPackagesModal();
       return;
     }
     setStakeConfirm({
       pick: resolvedPick,
       ...meta,
+      stakeXp: effectiveStakeXp,
+      variant: options.variant || 'start',
       xpTotal,
     });
   };
@@ -1827,10 +1682,12 @@ export default function DailyPracticePage() {
   }, [setSearchParams]);
 
   useEffect(() => {
+    if (!isFreePortalAccount()) return;
     if ((watchStage || practiceStage) && mode !== 'path') setMode('path');
   }, [watchStage, practiceStage, mode]);
 
   useEffect(() => {
+    if (!isFreePortalAccount()) return undefined;
     if (!practiceStage || session || summary || pathLoading || !path) return undefined;
     if (practiceLockRef.current) return undefined;
     const preferredTopic = pickActivePathTopic(path, linkedTopicId);
@@ -2019,11 +1876,6 @@ export default function DailyPracticePage() {
     }
   }, [path, session, celebrating]);
 
-  const finishRematchStakeXp = summary?.xpDisabled ? 0 : (
-    summary?.path?.testOut ? TEST_OUT_XP
-      : (summary?.recovery ? 0 : ((summary?.total || 10) * QUESTION_STAKE_XP))
-  );
-
   const handleFinishContinue = () => {
     resumeMilestoneAfterPractice(true);
   };
@@ -2031,19 +1883,38 @@ export default function DailyPracticePage() {
   const handleFinishReplay = () => {
     const pathResult = summary?.path;
     const currentXpTotal = overview?.stats?.xpTotal;
-    if (pathResult && !pathResult.passed) {
-      if (typeof currentXpTotal === 'number' && currentXpTotal < finishRematchStakeXp) {
-        setBuyXpOpen(true);
+    const fallbackPick = pathResult
+      ? {
+        mode: 'path',
+        unitId: pathResult.unitId,
+        nodeKey: pathResult.pathNodeKey || 'study',
+        step: pathResult.step || 'learn',
+        testOut: Boolean(pathResult.testOut),
+      }
+      : null;
+    const basePick = lastPick || fallbackPick;
+    if (!basePick) return;
+
+    const isReviewReplay = Boolean(pathResult?.passed || summary?.xpDisabled);
+    const replayPick = isReviewReplay ? { ...basePick, review: true } : basePick;
+
+    if (replayPick.mode === 'path' && !isReviewReplay && !isPathPickCompleted(path, replayPick)) {
+      const neededXp = replayPick.testOut
+        ? TEST_OUT_XP
+        : (summary?.recovery ? 0 : ((summary?.total || 10) * QUESTION_STAKE_XP));
+      if (typeof currentXpTotal === 'number' && currentXpTotal < neededXp) {
+        dispatchOpenAiPackagesModal();
         return;
       }
-      setFinishRematchOpen(true);
-      return;
-    }
-    if (lastPick) {
       setCelebrating(false);
       setSummary(null);
-      queueBegin(pathResult?.passed ? { ...lastPick, review: true } : lastPick);
+      queueBegin(replayPick, { variant: 'rematch', stakeXpOverride: neededXp });
+      return;
     }
+
+    setCelebrating(false);
+    setSummary(null);
+    queueBegin(replayPick, { variant: 'rematch' });
   };
 
   const handleFinishRelatedVideo = () => {
@@ -2053,7 +1924,7 @@ export default function DailyPracticePage() {
   };
 
   return (
-    <div className="dp-dew-page cms-sd-page min-h-full bg-slate-50/80 pb-10">
+    <div className={`dp-dew-page cms-sd-page min-h-full pb-10 ${isFreePortalAccount() ? 'bg-transparent' : 'bg-slate-50/80'}`}>
       {session ? (
         <PlayScreen
           session={session}
@@ -2113,21 +1984,30 @@ export default function DailyPracticePage() {
         />
       )}
       {stakeConfirm && !session && (
-        <StakeSessionConfirm
-          variant="start"
+        <PracticeReadyModal
+          variant={stakeConfirm.variant || 'start'}
           stakeXp={stakeConfirm.stakeXp}
           xpTotal={overview?.stats?.xpTotal ?? stakeConfirm.xpTotal}
           recovery={stakeConfirm.recovery}
           review={Boolean(stakeConfirm.pick?.review)}
+          isFreeTier={Boolean(overview?.stats?.isFreeTier || overview?.stats?.suggestedAction === 'upgrade_plan')}
           testOut={stakeConfirm.testOut}
-          testOutLocked={stakeConfirm.testOut && path?.canTestOut !== true}
+          testOutLocked={stakeConfirm.testOut && !isTestOutUnlocked(path, stakeConfirm.pick?.unitId)}
           starting={starting}
           onStay={() => setStakeConfirm(null)}
           onOpenMeet={() => {
-            const lockedTestOut = stakeConfirm.testOut && path?.canTestOut !== true;
+            const lockedTestOut = stakeConfirm.testOut && !isTestOutUnlocked(path, stakeConfirm.pick?.unitId);
+            if (lockedTestOut) {
+              const unitTopicId = resolveTopicForUnit(path, stakeConfirm.pick?.unitId)?.topic?.id || '';
+              setUpgradeTopicId(unitTopicId);
+            }
             setStakeConfirm(null);
-            if (lockedTestOut) setMeetOfferOpen(true);
-            else setBuyXpOpen(true);
+            if (lockedTestOut) {
+              setMeetOfferOpen(true);
+              if (!allVisibleClasses.length) refreshCourses?.();
+            } else {
+              dispatchOpenAiPackagesModal();
+            }
           }}
           onGo={() => {
             const pick = stakeConfirm.pick;
@@ -2146,30 +2026,19 @@ export default function DailyPracticePage() {
           }}
         />
       )}
-      <FreeMeetPlanModal
-        open={meetOfferOpen && !session}
-        notice={meetNotice}
-        onClose={() => setMeetOfferOpen(false)}
-        onPaid={() => { loadOverview(); loadPath(); }}
+      <CourseEnrollmentModal
+        open={meetOfferOpen && !session && Boolean(upgradeCourse)}
+        course={upgradeCourse}
+        onClose={() => {
+          setMeetOfferOpen(false);
+          setUpgradeTopicId('');
+        }}
+        onActivated={async () => {
+          await refreshCourses?.();
+          loadOverview();
+          loadPath();
+        }}
       />
-      {finishRematchOpen && summary ? (
-        <StakeSessionConfirm
-          stakeXp={finishRematchStakeXp}
-          xpTotal={overview?.stats?.xpTotal}
-          starting={starting}
-          onStay={() => setFinishRematchOpen(false)}
-          onOpenMeet={() => {
-            setFinishRematchOpen(false);
-            setBuyXpOpen(true);
-          }}
-          onGo={() => {
-            setFinishRematchOpen(false);
-            setCelebrating(false);
-            setSummary(null);
-            if (lastPick) queueBegin(lastPick);
-          }}
-        />
-      ) : null}
       {reloadNoticeOpen && reloadNotice ? (
         <ReloadAbandonNoticeModal
           lostXp={reloadNotice.lostXp}

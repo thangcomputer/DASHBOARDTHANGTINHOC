@@ -113,11 +113,34 @@ test('sessionTodayDisplayXp: hero XP luyện hôm nay', () => {
 });
 
 test('trừ XP của gói trước, XP mua được cộng vào ví mua', () => {
-  const spent = rules.applyXpDelta({ dailyXp: 200, purchasedXp: 100 }, -20, 'spend');
+  const spent = rules.applyXpDelta({ dailyXp: 200, purchasedXp: 100, studyXpTotal: 50 }, -20, 'spend');
   assert.equal(spent.dailyXp, 180);
   assert.equal(spent.purchasedXp, 100);
+  assert.equal(spent.studyXpTotal, 50, 'chi tiêu ví không trừ XP học tập');
   const bought = rules.applyXpDelta(spent, 300, 'purchase');
   assert.equal(bought.purchasedXp, 400);
   assert.equal(bought.dailyXp, 180);
   assert.equal(bought.xpTotal, 580);
+  assert.equal(bought.studyXpTotal, 50, 'mua XP chỉ cộng ví mua, không cộng XP học tập');
+});
+
+test('tách riêng XP học tập & chuỗi khỏi Ví XP quy định (reward không tăng dailyXp, clamp dailyXp cũ bị phình)', () => {
+  const rewarded = rules.applyXpDelta({ dailyXp: 100, purchasedXp: 20, studyXpTotal: 40 }, 50, 'reward');
+  assert.equal(rewarded.dailyXp, 100, 'thưởng học tập KHÔNG được cộng vào dailyXp');
+  assert.equal(rewarded.purchasedXp, 20);
+  assert.equal(rewarded.xpTotal, 120, 'Ví XP quy định giữ nguyên 120 XP');
+  assert.equal(rewarded.studyXpTotal, 90, 'thưởng học tập cộng đúng vào studyXpTotal');
+
+  const clamped = rules.applyDailyAllowance({
+    xpTotal: 325,
+    dailyXp: 325,
+    purchasedXp: 0,
+    xpAllowanceDay: '2026-11-28',
+    xpAllowanceAmount: 100,
+  }, '2026-11-28', 100, true);
+  assert.equal(clamped.changed, true);
+  assert.equal(clamped.sameDayClamp, true);
+  assert.equal(clamped.dailyXp, 100);
+  assert.equal(clamped.xpTotal, 100);
+  assert.equal(clamped.migratedExcessStudyXp, 225);
 });

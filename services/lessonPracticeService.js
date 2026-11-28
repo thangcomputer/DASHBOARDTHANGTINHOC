@@ -14,6 +14,7 @@ const { isCourseDiscountActive, effectiveCoursePrice } = require('../utils/cours
 const SystemSettings = require('../models/SystemSettings');
 const {
   getMergedExamCatalog,
+  normalizeCustomList,
   resolveExamSubjectsForCourse,
   isExcludedExamSubjectId,
 } = require('./examSubjectCatalog');
@@ -37,6 +38,22 @@ function isId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || ''));
 }
 
+function isDewskillStudentDoc(student) {
+  return Boolean(student && (student.accountType === 'dewskill' || student.freePortal === true));
+}
+
+async function assertCenterStudent(studentId) {
+  if (!isId(studentId)) throw httpError(400, 'Học viên không hợp lệ');
+  const student = await Student.findById(studentId)
+    .select('accountType freePortal course courseId enrollments')
+    .lean();
+  if (!student) throw httpError(404, 'Không tìm thấy học viên');
+  if (isDewskillStudentDoc(student)) {
+    throw httpError(403, 'Chức năng Luyện tập tự do chỉ dành cho học viên Trung tâm');
+  }
+  return student;
+}
+
 function mapSubject(doc, extra = {}) {
   return {
     id: String(doc._id),
@@ -44,7 +61,9 @@ function mapSubject(doc, extra = {}) {
     slug: doc.slug,
     examSubjectId: doc.examSubjectId || '',
     summary: doc.summary || '',
-    unlockMode: doc.unlockMode || 'sequential',
+    icon: doc.icon || 'book',
+    color: doc.color || 'green',
+    unlockMode: doc.unlockMode || 'open',
     sortOrder: doc.sortOrder || 0,
     isActive: doc.isActive !== false,
     ...extra,
@@ -125,6 +144,7 @@ function mapItemAdmin(doc) {
     hint: doc.hint || '',
     explanation: doc.explanation || '',
     timeLimitSec: rules.clampTimeLimit(doc.timeLimitSec),
+    checkpointSec: rules.clampCheckpointSec(doc.checkpointSec),
   };
 }
 
@@ -132,61 +152,254 @@ function catalogLabel(entry) {
   return entry.label;
 }
 
-async function syncCatalogSubjects() {
-  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
-  const catalog = getMergedExamCatalog(settings?.examSubjectsCustomRaw);
-  const rows = await LessonSubject.find({});
-  const byExam = new Map(rows.filter((row) => row.examSubjectId).map((row) => [row.examSubjectId, row]));
-  const bySlug = new Map(rows.map((row) => [row.slug, row]));
+const DEFAULT_CENTER_SUBJECTS = [
+  {
+    name: 'Windows cơ bản',
+    slug: 'windows-co-ban',
+    icon: 'monitor',
+    color: 'blue',
+    summary: 'Thao tác máy tính, quản lý tệp và thư mục',
+  },
+  {
+    name: 'Microsoft Word',
+    slug: 'microsoft-word',
+    icon: 'file-text',
+    color: 'sky',
+    summary: 'Soạn thảo, căn chỉnh và trình bày văn bản',
+  },
+  {
+    name: 'Microsoft Excel',
+    slug: 'microsoft-excel',
+    icon: 'sheet',
+    color: 'green',
+    summary: 'Bảng tính, công thức, hàm và biểu đồ',
+  },
+  {
+    name: 'PowerPoint',
+    slug: 'powerpoint',
+    icon: 'presentation',
+    color: 'orange',
+    summary: 'Thiết kế slide thuyết trình chuyên nghiệp',
+  },
+  {
+    name: 'Phím tắt văn phòng',
+    slug: 'phim-tat-van-phong',
+    icon: 'keyboard',
+    color: 'purple',
+    summary: 'Tổng hợp phím tắt tăng tốc làm việc',
+  },
+  {
+    name: 'Internet & An toàn thông tin',
+    slug: 'internet-an-toan-thong-tin',
+    icon: 'shield',
+    color: 'teal',
+    summary: 'Tra cứu thông tin, email và bảo mật trực tuyến',
+  },
+];
 
-  for (let i = 0; i < catalog.length; i += 1) {
-    const entry = catalog[i];
-    const found = byExam.get(entry.id) || bySlug.get(entry.id);
-    const name = catalogLabel(entry);
-    const sortOrder = i + 1;
-    if (!found) {
-      try {
-        const doc = await LessonSubject.create({
-          name,
-          slug: entry.id,
-          examSubjectId: entry.id,
-          unlockMode: 'sequential',
-          sortOrder,
-          isActive: true,
-        });
-        byExam.set(entry.id, doc);
-        bySlug.set(doc.slug, doc);
-      } catch (err) {
-        if (err?.code !== 11000) throw err;
-      }
-      continue;
-    }
-    let changed = false;
-    if (found.examSubjectId !== entry.id) {
-      found.examSubjectId = entry.id;
-      changed = true;
-    }
-    if (found.name !== name) {
-      found.name = name;
-      changed = true;
-    }
-    if (found.sortOrder !== sortOrder) {
-      found.sortOrder = sortOrder;
-      changed = true;
-    }
-    if (changed) await found.save();
+async function uniqueSubjectSlug(name) {
+  const base = rules.normalizeSubjectKey(name) || 'mon-hoc';
+  let slug = base;
+  let suffix = 2;
+  // Ensure slug uniqueness across LessonSubject documents
+  while (await LessonSubject.exists({ slug })) {
+    slug = `${base}-${suffix}`;
+    suffix += 1;
   }
+  return slug;
+}
+
+async function aggregateSubjectCounts(subjectIds, activeOnly = false) {
+  const unitCount = new Map();
+  const videoCount = new Map();
+  const contentCount = new Map();
+  const questionCount = new Map();
+  if (!Array.isArray(subjectIds) || !subjectIds.length) {
+    return { unitCount, videoCount, contentCount, questionCount };
+  }
+  const unitFilter = { subjectId: { $in: subjectIds } };
+  if (activeOnly) unitFilter.isActive = { $ne: false };
+  const [units, items] = await Promise.all([
+    LessonUnit.find(unitFilter).select('_id subjectId videos videoUrl contents note').lean(),
+    LessonItem.find({ subjectId: { $in: subjectIds } }).select('subjectId unitId type').lean(),
+  ]);
+  const activeUnitIds = new Set();
+  units.forEach((u) => {
+    const sid = String(u.subjectId);
+    activeUnitIds.add(String(u._id));
+    unitCount.set(sid, (unitCount.get(sid) || 0) + 1);
+    videoCount.set(sid, (videoCount.get(sid) || 0) + rules.unitVideos(u).length);
+    contentCount.set(sid, (contentCount.get(sid) || 0) + rules.unitContents(u).length);
+  });
+  items.forEach((item) => {
+    if (!rules.isQuestionType(item.type)) return;
+    if (activeOnly && !activeUnitIds.has(String(item.unitId))) return;
+    const sid = String(item.subjectId);
+    questionCount.set(sid, (questionCount.get(sid) || 0) + 1);
+  });
+  return { unitCount, videoCount, contentCount, questionCount };
+}
+
+async function createSubject(body) {
+  const name = String(body?.name || '').trim();
+  if (!name) throw httpError(400, 'Tên môn học không được để trống');
+  const slug = await uniqueSubjectSlug(name);
+  let sortOrder = body?.sortOrder != null ? Number(body.sortOrder) : null;
+  if (!Number.isFinite(sortOrder)) {
+    const last = await LessonSubject.findOne().sort({ sortOrder: -1 }).select('sortOrder').lean();
+    sortOrder = (last?.sortOrder || 0) + 1;
+  }
+  const doc = await LessonSubject.create({
+    name,
+    slug,
+    examSubjectId: '',
+    summary: String(body?.summary || '').trim().slice(0, 300),
+    icon: String(body?.icon || 'book').trim() || 'book',
+    color: String(body?.color || 'green').trim() || 'green',
+    unlockMode: 'open',
+    sortOrder,
+    isActive: body?.isActive !== false,
+  });
+  const createDefaultUnit = body?.createDefaultUnit !== false;
+  if (createDefaultUnit) {
+    await LessonUnit.create({
+      subjectId: doc._id,
+      title: 'Tổng hợp',
+      sortOrder: 1,
+      antiSeek: false,
+      isPreviewAllowed: true,
+      isActive: true,
+    });
+  }
+  return mapSubject(doc, {
+    unitCount: createDefaultUnit ? 1 : 0,
+    videoCount: 0,
+    contentCount: 0,
+    questionCount: 0,
+  });
+}
+
+function defaultVisualForSubject(idOrName) {
+  const key = rules.normalizeSubjectKey(idOrName);
+  if (key.includes('word') || key.includes('van-ban')) return { icon: 'file-text', color: 'sky' };
+  if (key.includes('excel') || key.includes('bang-tinh') || key.includes('tinh-toan')) return { icon: 'sheet', color: 'green' };
+  if (key.includes('powerpoint') || key.includes('trinh-chieu')) return { icon: 'presentation', color: 'orange' };
+  if (key.includes('windows') || key.includes('may-tinh') || key.includes('tin-hoc-co-ban')) return { icon: 'monitor', color: 'blue' };
+  if (key.includes('phim-tat') || key.includes('go-phim')) return { icon: 'keyboard', color: 'purple' };
+  if (key.includes('internet') || key.includes('an-toan') || key.includes('bao-mat')) return { icon: 'shield', color: 'teal' };
+  if (key.includes('photoshop') || key.includes('do-hoa') || key.includes('anh')) return { icon: 'image', color: 'pink' };
+  if (key.includes('code') || key.includes('python') || key.includes('lap-trinh')) return { icon: 'code', color: 'purple' };
+  return { icon: 'book', color: 'green' };
+}
+
+/**
+ * Đồng bộ danh sách môn Luyện tập tự do từ các môn Admin đã tạo trong Quản lý Khóa học
+ * (`examSubjectsCustomRaw` + `Course.examSubjects`). Không tạo bài học rỗng mặc định.
+ */
+async function syncCourseSubjectsToLessonSubjects() {
+  const [settings, courses] = await Promise.all([
+    SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
+    Course.find({ deletedAt: null }).select('name examSubjects status').sort({ createdAt: 1 }).lean(),
+  ]);
+  const customEntries = normalizeCustomList(settings?.examSubjectsCustomRaw);
+  const catalogEntries = getMergedExamCatalog(settings?.examSubjectsCustomRaw);
+  const catalogById = new Map(catalogEntries.map((entry) => [entry.id, entry]));
+
+  const orderedCatalogEntries = [];
+  const seenIds = new Set();
+  customEntries.forEach((entry) => {
+    if (!entry?.id || seenIds.has(entry.id)) return;
+    seenIds.add(entry.id);
+    orderedCatalogEntries.push(entry);
+  });
+
+  const courseMapBySubjectId = new Map();
+  courses.forEach((course) => {
+    const subjectIds = resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw);
+    subjectIds.forEach((sid) => {
+      const normalizedId = rules.normalizeSubjectKey(sid);
+      if (!normalizedId) return;
+      if (!courseMapBySubjectId.has(normalizedId)) {
+        courseMapBySubjectId.set(normalizedId, []);
+      }
+      courseMapBySubjectId.get(normalizedId).push({
+        id: String(course._id),
+        name: course.name,
+        status: course.status || 'published',
+      });
+      if (!seenIds.has(normalizedId) && catalogById.has(normalizedId)) {
+        seenIds.add(normalizedId);
+        orderedCatalogEntries.push(catalogById.get(normalizedId));
+      }
+    });
+  });
+
+  if (orderedCatalogEntries.length) {
+    const existingDocs = await LessonSubject.find({}).lean();
+    for (let idx = 0; idx < orderedCatalogEntries.length; idx += 1) {
+      const entry = orderedCatalogEntries[idx];
+      const match = existingDocs.find((doc) => rules.normalizeSubjectKey(doc.examSubjectId) === entry.id)
+        || existingDocs.find((doc) => !doc.examSubjectId && rules.normalizeSubjectKey(doc.slug) === entry.id);
+      if (match) {
+        const patch = {};
+        if (match.examSubjectId !== entry.id) patch.examSubjectId = entry.id;
+        if (match.name !== entry.label) patch.name = entry.label;
+        if (Object.keys(patch).length) {
+          await LessonSubject.updateOne({ _id: match._id }, { $set: patch });
+        }
+      } else {
+        const visual = defaultVisualForSubject(entry.id || entry.label);
+        const slug = await uniqueSubjectSlug(entry.id || entry.label);
+        try {
+          const created = await LessonSubject.create({
+            name: entry.label,
+            slug,
+            examSubjectId: entry.id,
+            summary: '',
+            icon: visual.icon,
+            color: visual.color,
+            unlockMode: 'open',
+            sortOrder: idx + 1,
+            isActive: true,
+          });
+          existingDocs.push(created.toObject());
+        } catch (err) {
+          if (err?.code !== 11000) throw err;
+        }
+      }
+    }
+  }
+
+  return {
+    allowedExamIds: new Set(orderedCatalogEntries.map((entry) => entry.id)),
+    orderedIds: orderedCatalogEntries.map((entry) => entry.id),
+    courseMapBySubjectId,
+  };
 }
 
 async function listSubjectsAdmin() {
-  await syncCatalogSubjects();
-  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
-  const catalogIds = getMergedExamCatalog(settings?.examSubjectsCustomRaw).map((entry) => entry.id);
-  const rows = await LessonSubject.find({
-    isActive: { $ne: false },
-    examSubjectId: { $in: catalogIds },
-  }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  return rows.map((row) => mapSubject(row));
+  const { allowedExamIds, orderedIds, courseMapBySubjectId } = await syncCourseSubjectsToLessonSubjects();
+  if (!allowedExamIds.size) return [];
+  const rows = await LessonSubject.find({ examSubjectId: { $in: [...allowedExamIds] } })
+    .sort({ sortOrder: 1, createdAt: 1 })
+    .lean();
+  const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+  rows.sort((a, b) => {
+    const d = (a.sortOrder || 0) - (b.sortOrder || 0);
+    if (d !== 0) return d;
+    return (orderMap.get(a.examSubjectId) ?? 999) - (orderMap.get(b.examSubjectId) ?? 999);
+  });
+  const counts = await aggregateSubjectCounts(rows.map((r) => r._id), false);
+  return rows.map((row) => {
+    const id = String(row._id);
+    return mapSubject(row, {
+      courses: courseMapBySubjectId.get(row.examSubjectId) || [],
+      unitCount: counts.unitCount.get(id) || 0,
+      videoCount: counts.videoCount.get(id) || 0,
+      contentCount: counts.contentCount.get(id) || 0,
+      questionCount: counts.questionCount.get(id) || 0,
+    });
+  });
 }
 
 async function listCoursesForAdmin() {
@@ -209,29 +422,33 @@ async function listCoursesForAdmin() {
 async function updateSubject(id, body) {
   if (!isId(id)) throw httpError(400, 'Môn không hợp lệ');
   const doc = await LessonSubject.findById(id);
-  if (!doc || isExcludedExamSubjectId(doc.examSubjectId) || isExcludedExamSubjectId(doc.slug)) {
-    throw httpError(404, 'Không tìm thấy môn');
-  }
+  if (!doc) throw httpError(404, 'Không tìm thấy môn');
   if (body.name != null && !doc.examSubjectId) {
     const name = String(body.name).trim();
     if (!name) throw httpError(400, 'Tên môn không được để trống');
     doc.name = name;
   }
-  if (body.summary != null) doc.summary = String(body.summary).trim();
-  if (body.unlockMode != null) doc.unlockMode = body.unlockMode === 'open' ? 'open' : 'sequential';
+  if (body.summary != null) doc.summary = String(body.summary).trim().slice(0, 300);
+  if (body.icon != null) doc.icon = String(body.icon).trim() || 'book';
+  if (body.color != null) doc.color = String(body.color).trim() || 'green';
+  if (body.unlockMode != null) doc.unlockMode = body.unlockMode === 'sequential' ? 'sequential' : 'open';
   if (body.sortOrder != null) doc.sortOrder = Number(body.sortOrder) || 0;
   if (body.isActive != null) doc.isActive = !!body.isActive;
   await doc.save();
-  return mapSubject(doc);
+  const counts = await aggregateSubjectCounts([doc._id], false);
+  const sid = String(doc._id);
+  return mapSubject(doc, {
+    unitCount: counts.unitCount.get(sid) || 0,
+    videoCount: counts.videoCount.get(sid) || 0,
+    contentCount: counts.contentCount.get(sid) || 0,
+    questionCount: counts.questionCount.get(sid) || 0,
+  });
 }
 
 async function deleteSubject(id) {
   if (!isId(id)) throw httpError(400, 'Môn không hợp lệ');
   const doc = await LessonSubject.findById(id);
-  if (!doc || isExcludedExamSubjectId(doc.examSubjectId) || isExcludedExamSubjectId(doc.slug)) {
-    throw httpError(404, 'Không tìm thấy môn');
-  }
-  if (doc.examSubjectId) throw httpError(400, 'Môn có sẵn trong danh sách khóa học, không xóa được');
+  if (!doc) throw httpError(404, 'Không tìm thấy môn');
   const units = await LessonUnit.find({ subjectId: id }).select('_id').lean();
   const unitIds = units.map((u) => u._id);
   await LessonItem.deleteMany({ subjectId: id });
@@ -243,44 +460,87 @@ async function deleteSubject(id) {
 }
 
 async function seedDefaults() {
-  await syncCatalogSubjects();
-  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
-  const catalogIds = getMergedExamCatalog(settings?.examSubjectsCustomRaw).map((entry) => entry.id);
-  const rows = await LessonSubject.find({
-    examSubjectId: { $in: catalogIds },
-    isActive: { $ne: false },
-  }).sort({ sortOrder: 1 }).lean();
-  return rows.map((row) => mapSubject(row));
+  let created = 0;
+  for (let i = 0; i < DEFAULT_CENTER_SUBJECTS.length; i += 1) {
+    const preset = DEFAULT_CENTER_SUBJECTS[i];
+    const exists = await LessonSubject.exists({ slug: preset.slug });
+    if (exists) continue;
+    const doc = await LessonSubject.create({
+      name: preset.name,
+      slug: preset.slug,
+      examSubjectId: '',
+      summary: preset.summary,
+      icon: preset.icon,
+      color: preset.color,
+      unlockMode: 'open',
+      sortOrder: i + 1,
+      isActive: true,
+    });
+    await LessonUnit.create({
+      subjectId: doc._id,
+      title: 'Tổng hợp',
+      sortOrder: 1,
+      antiSeek: false,
+      isPreviewAllowed: true,
+      isActive: true,
+    });
+    created += 1;
+  }
+  const subjects = await listSubjectsAdmin();
+  return { created, subjects };
 }
 
 async function assertSubject(id) {
   if (!isId(id)) throw httpError(400, 'Môn không hợp lệ');
   const doc = await LessonSubject.findById(id);
-  if (!doc || isExcludedExamSubjectId(doc.examSubjectId) || isExcludedExamSubjectId(doc.slug)) {
-    throw httpError(404, 'Không tìm thấy môn');
-  }
+  if (!doc) throw httpError(404, 'Không tìm thấy môn');
   return doc;
 }
 
 async function listUnits(subjectId) {
   await assertSubject(subjectId);
-  const rows = await LessonUnit.find({ subjectId }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  return rows.map((row) => mapUnit(row));
+  const [rows, items] = await Promise.all([
+    LessonUnit.find({ subjectId }).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    LessonItem.find({ subjectId }).select('unitId type').lean(),
+  ]);
+  const qCounts = new Map();
+  items.forEach((item) => {
+    if (!rules.isQuestionType(item.type)) return;
+    const key = String(item.unitId);
+    qCounts.set(key, (qCounts.get(key) || 0) + 1);
+  });
+  return rows.map((row) => mapUnit(row, {
+    questionCount: qCounts.get(String(row._id)) || 0,
+  }));
+}
+
+async function reorderUnits(subjectId, unitIds = []) {
+  await assertSubject(subjectId);
+  const validIds = (Array.isArray(unitIds) ? unitIds : []).filter((id) => isId(id));
+  await Promise.all(
+    validIds.map((unitId, index) => LessonUnit.updateOne(
+      { _id: unitId, subjectId },
+      { $set: { sortOrder: index + 1 } },
+    )),
+  );
+  return listUnits(subjectId);
 }
 
 async function createUnit(subjectId, body) {
   await assertSubject(subjectId);
   const title = String(body?.title || '').trim();
-  if (!title) throw httpError(400, 'Tên buổi không được để trống');
+  if (!title) throw httpError(400, 'Tên bài học không được để trống');
   const last = await LessonUnit.find({ subjectId }).sort({ sortOrder: -1 }).limit(1).lean();
   const sortOrder = body?.sortOrder != null ? Number(body.sortOrder) || 0 : ((last[0]?.sortOrder || 0) + 1);
   const doc = await LessonUnit.create({
     subjectId,
     title,
     sortOrder,
+    antiSeek: body?.antiSeek === true,
+    isPreviewAllowed: body?.isPreviewAllowed !== false,
     isActive: body?.isActive !== false,
   });
-  return mapUnit(doc);
+  return mapUnit(doc, { questionCount: 0 });
 }
 
 async function updateUnit(id, body) {
@@ -395,7 +655,6 @@ async function createItem(unitId, body) {
   const message = rules.validateItemPayload(body);
   if (message) throw httpError(400, message);
   const data = rules.normalizeItem(body);
-  data.videoId = '';
   if (body?.sortOrder == null) {
     const last = await LessonItem.find({ unitId }).sort({ sortOrder: -1 }).limit(1).lean();
     data.sortOrder = (last[0]?.sortOrder || 0) + 1;
@@ -414,7 +673,6 @@ async function updateItem(id, body) {
   const unit = await LessonUnit.findById(doc.unitId);
   if (!unit) throw httpError(404, 'Không tìm thấy buổi');
   const data = rules.normalizeItem(next);
-  data.videoId = '';
   Object.assign(doc, data);
   if (data.region) doc.region = data.region;
   else doc.region = undefined;
@@ -496,7 +754,7 @@ async function completionStates(studentId, units) {
     const practiceGroupIds = [...new Set(unitQuestions.map((question) => String(question.practiceGroupId || id)))];
     const practiceFinished = unitQuestions.length === 0 || practiceDoneGroupIds.length === practiceGroupIds.length;
     const progress = progressByUnit.get(id) || {};
-    const check = rules.unitChecklist(unit, progress, practiceFinished);
+    const check = rules.unitChecklist(unit, progress, practiceFinished, unitQuestions.length > 0);
     return [id, {
       check,
       completed: check.completed,
@@ -514,36 +772,59 @@ async function completedUnitIds(studentId, subjectId, units) {
 }
 
 async function grantedSubjectKeys(studentId, studentRecord = null) {
-  const student = studentRecord || await Student.findById(studentId).select('course courseId enrollments').lean();
-  const enrollments = Array.isArray(student?.enrollments) && student.enrollments.length
+  const [student, settings, courses] = await Promise.all([
+    studentRecord
+      ? Promise.resolve(studentRecord)
+      : Student.findById(studentId).select('course courseId enrollments').lean(),
+    SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
+    Course.find({ deletedAt: null }).select('name examSubjects').lean(),
+  ]);
+  if (!student) return new Set();
+
+  const usableStatuses = new Set(['active', 'completed', 'paused', 'hoàn thành', 'hoan thanh']);
+  const isUsableLegacyCourse = (name) => {
+    const clean = String(name || '').trim().toLowerCase();
+    return Boolean(clean) && clean !== '(đã hủy)' && clean !== 'chưa xếp lớp';
+  };
+
+  const enrollments = Array.isArray(student.enrollments) && student.enrollments.length
     ? student.enrollments
-    : (student?.course ? [{ courseName: student.course, courseId: student.courseId, status: 'active', learningAccess: true }] : []);
+    : (isUsableLegacyCourse(student.course)
+      ? [{ courseName: student.course, courseId: student.courseId, status: 'active', learningAccess: true }]
+      : []);
+
   const open = enrollments.filter((enr) => {
-    const status = String(enr?.status || 'active').toLowerCase();
-    return status === 'active' && enr?.learningAccess !== false;
+    if (enr?.learningAccess === false) return false;
+    const status = String(enr?.status || 'active').trim().toLowerCase();
+    return usableStatuses.has(status);
   });
+
+  const courseById = new Map(courses.map((course) => [String(course._id), course]));
+  const courseByNameKey = new Map(
+    courses.map((course) => [rules.normalizeSubjectKey(course.name), course]).filter(([key]) => Boolean(key)),
+  );
+
   const keys = new Set();
-  const courseIds = [];
   open.forEach((enr) => {
-    (enr.examSubjects || []).forEach((id) => {
-      const key = rules.normalizeSubjectKey(id);
-      if (key) keys.add(key);
-    });
-    const nameKey = rules.normalizeSubjectKey(enr.courseName);
-    if (nameKey) keys.add(nameKey);
-    if (enr.courseId) courseIds.push(enr.courseId);
-  });
-  if (courseIds.length) {
-    const courses = await Course.find({ _id: { $in: courseIds }, deletedAt: null }).select('name examSubjects').lean();
-    courses.forEach((course) => {
-      (course.examSubjects || []).forEach((id) => {
+    const matchedCourse = (enr.courseId && courseById.get(String(enr.courseId)))
+      || (enr.courseName && courseByNameKey.get(rules.normalizeSubjectKey(enr.courseName)))
+      || null;
+    if (matchedCourse) {
+      const liveIds = resolveExamSubjectsForCourse(matchedCourse, settings?.examSubjectsCustomRaw);
+      const sourceIds = liveIds.length ? liveIds : (enr.examSubjects || []);
+      sourceIds.forEach((id) => {
         const key = rules.normalizeSubjectKey(id);
         if (key) keys.add(key);
       });
-      const nameKey = rules.normalizeSubjectKey(course.name);
+    } else {
+      (enr.examSubjects || []).forEach((id) => {
+        const key = rules.normalizeSubjectKey(id);
+        if (key) keys.add(key);
+      });
+      const nameKey = rules.normalizeSubjectKey(enr.courseName);
       if (nameKey) keys.add(nameKey);
-    });
-  }
+    }
+  });
   return keys;
 }
 
@@ -619,202 +900,140 @@ async function courseOffersBySubject(subjects) {
   return result;
 }
 async function listSubjectsForStudent(studentId) {
-  await syncCatalogSubjects();
-  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
-  const catalogIds = getMergedExamCatalog(settings?.examSubjectsCustomRaw).map((entry) => entry.id);
-  const subjects = await LessonSubject.find({
-    isActive: true,
-    examSubjectId: { $in: catalogIds },
-  }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const student = await Student.findById(studentId)
+    .select('accountType freePortal course courseId enrollments')
+    .lean();
+  if (!student || isDewskillStudentDoc(student)) {
+    return { subjects: [], courses: [] };
+  }
+  const { allowedExamIds, orderedIds } = await syncCourseSubjectsToLessonSubjects();
+  if (!allowedExamIds.size) {
+    return { subjects: [], courses: [] };
+  }
+  const grantedKeys = await grantedSubjectKeys(studentId, student);
+  if (!grantedKeys.size) {
+    return { subjects: [], courses: [] };
+  }
+  const syncedSubjects = await LessonSubject.find({
+    isActive: { $ne: false },
+    examSubjectId: { $in: [...allowedExamIds] },
+  })
+    .sort({ sortOrder: 1, createdAt: 1 })
+    .lean();
+  const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+  const subjects = syncedSubjects
+    .filter((s) => rules.subjectOpenedByKeys(s, grantedKeys))
+    .sort((a, b) => {
+      const d = (a.sortOrder || 0) - (b.sortOrder || 0);
+      if (d !== 0) return d;
+      return (orderMap.get(a.examSubjectId) ?? 999) - (orderMap.get(b.examSubjectId) ?? 999);
+    });
+  if (!subjects.length) {
+    return { subjects: [], courses: [] };
+  }
   const subjectIds = subjects.map((s) => s._id);
-  const [units, progress, student, courses] = await Promise.all([
-    LessonUnit.find({ subjectId: { $in: subjectIds }, isActive: true }).select('subjectId').lean(),
-    LessonUnitProgress.find({ studentId, subjectId: { $in: subjectIds }, status: 'completed' }).select('subjectId').lean(),
-    Student.findById(studentId).select('course courseId teacherId enrollments').lean(),
-    Course.find({ deletedAt: null })
-      .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects deliveryMode status')
-      .sort({ createdAt: -1 })
+  const [counts, units] = await Promise.all([
+    aggregateSubjectCounts(subjectIds, true),
+    LessonUnit.find({ subjectId: { $in: subjectIds }, isActive: { $ne: false } })
+      .select('subjectId videos videoUrl contents note')
       .lean(),
   ]);
-  const totalBySubject = new Map();
-  units.forEach((u) => {
-    const key = String(u.subjectId);
-    totalBySubject.set(key, (totalBySubject.get(key) || 0) + 1);
-  });
+  const states = await completionStates(studentId, units);
   const doneBySubject = new Map();
-  progress.forEach((p) => {
-    const key = String(p.subjectId);
+  units.forEach((u) => {
+    const uid = String(u._id);
+    if (!states.get(uid)?.completed) return;
+    const key = String(u.subjectId);
     doneBySubject.set(key, (doneBySubject.get(key) || 0) + 1);
   });
-  const granted = await grantedSubjectKeys(studentId, student);
-  const offerBySubject = await courseOffersBySubject(subjects);
-  const catalog = getMergedExamCatalog(settings?.examSubjectsCustomRaw);
-  const labelsById = new Map(catalog.map((entry) => [entry.id, catalogLabel(entry)]));
-  const studentSubjects = subjects.map((s) => mapSubject(s, {
-    name: labelsById.get(s.examSubjectId) || s.name,
-    completedUnitCount: doneBySubject.get(String(s._id)) || 0,
-    totalUnitCount: totalBySubject.get(String(s._id)) || 0,
-    opened: rules.subjectOpenedByKeys(s, granted),
-    offer: rules.subjectOpenedByKeys(s, granted) ? null : (offerBySubject.get(String(s._id)) || null),
-    thumbnail: offerBySubject.get(String(s._id))?.thumbnail || '',
-  }));
-  const enrollmentRows = Array.isArray(student?.enrollments) && student.enrollments.length
-    ? student.enrollments
-    : (student?.course ? [{
-      courseName: student.course,
-      courseId: student.courseId,
-      teacherId: student.teacherId,
-      status: 'active',
-      learningAccess: true,
-    }] : []);
-  const learningEnrollments = enrollmentRows.filter((enrollment) =>
-    String(enrollment?.status || 'active').toLowerCase() === 'active'
-    && enrollment?.learningAccess !== false);
-  const courseCatalog = courses.map((course) => {
-    const examSubjectIds = rules.normalizeCourseExamSubjectIds(
-      resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw),
-    );
-    const courseSubjects = rules.mapCourseSubjectsToLessons(
-      examSubjectIds,
-      studentSubjects,
-      labelsById,
-      granted,
-    );
-    const lessonCount = courseSubjects.reduce(
-      (total, subject) => total + (Number(subject.totalUnitCount) || 0),
-      0,
-    );
-    const completedLessonCount = courseSubjects.reduce(
-      (total, subject) => total + (Number(subject.completedUnitCount) || 0),
-      0,
-    );
-    const matchesCourse = (enrollment) =>
-      (enrollment.courseId && String(enrollment.courseId) === String(course._id))
-      || (
-        enrollment.courseName
-        && rules.normalizeSubjectKey(enrollment.courseName) === rules.normalizeSubjectKey(course.name)
-      );
-    const courseEnrollment = learningEnrollments.find(matchesCourse);
-    const enrolled = Boolean(courseEnrollment);
-    const hasDiscount = isCourseDiscountActive(course);
-    return {
-      id: String(course._id),
-      name: course.name,
-      description: String(course.description || '').trim(),
-      thumbnail: String(course.thumbnail || '').trim(),
-      bannerColorStart: course.bannerColorStart || '',
-      bannerColorEnd: course.bannerColorEnd || '',
-      price: hasDiscount ? effectiveCoursePrice(course) : course.price,
-      originalPrice: hasDiscount ? course.price : null,
-      discountPercent: hasDiscount ? course.discountPercent : 0,
-      discountStartsAt: hasDiscount && course.discountStartsAt ? course.discountStartsAt : null,
-      discountEndsAt: hasDiscount && course.discountEndsAt ? course.discountEndsAt : null,
-      totalSessions: course.totalSessions || 0,
-      offerType: examSubjectIds.length === 1 ? 'single' : 'bundle',
-      availableForEnrollment: course.status === 'published',
-      subjectKeys: [...new Set(examSubjectIds.map(rules.normalizeSubjectKey).filter(Boolean))],
-      examSubjectIds,
-      subjects: courseSubjects,
-      lessonCount,
-      completedLessonCount,
-      enrolled,
-      deliveryMode: course.deliveryMode === 'video' ? 'video' : 'instructor',
-    };
-  });
-  const ownedSubjectKeys = new Set(
-    courseCatalog
-      .filter((course) => course.enrolled)
-      .flatMap((course) => course.subjectKeys),
-  );
-  const visibleCourseCatalog = courseCatalog
-    .filter((course) => course.enrolled || course.availableForEnrollment)
-    .map((course) => {
-      const { subjectKeys, ...publicCourse } = course;
-      return {
-        ...publicCourse,
-        hiddenByEnrollment: !course.enrolled
-          && rules.courseSubjectsCovered(subjectKeys, ownedSubjectKeys),
-      };
+  const studentSubjects = subjects.map((s) => {
+    const id = String(s._id);
+    return mapSubject(s, {
+      opened: true,
+      completedUnitCount: doneBySubject.get(id) || 0,
+      totalUnitCount: counts.unitCount.get(id) || 0,
+      videoCount: counts.videoCount.get(id) || 0,
+      contentCount: counts.contentCount.get(id) || 0,
+      questionCount: counts.questionCount.get(id) || 0,
     });
-  return { subjects: studentSubjects, courses: visibleCourseCatalog };
+  });
+  return { subjects: studentSubjects, courses: [] };
 }
 
-async function listUnitsForStudent(studentId, subjectId, requestedCourseId = '') {
+async function listUnitsForStudent(studentId, subjectId) {
+  const student = await assertCenterStudent(studentId);
+  const { allowedExamIds } = await syncCourseSubjectsToLessonSubjects();
   const subject = await assertSubject(subjectId);
-  if (subject.isActive === false) throw httpError(404, 'Không tìm thấy môn');
-  const granted = await grantedSubjectKeys(studentId);
-  const subjectIsOpen = rules.subjectOpenedByKeys(subject, granted);
-  const purchaseCourse = subjectIsOpen ? null : await previewCourseForSubject(subject, requestedCourseId);
-  if (!subjectIsOpen && !purchaseCourse) throw httpError(403, 'Đăng ký khóa học này để mở môn');
-  const units = await LessonUnit.find({ subjectId, isActive: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  const progress = await LessonUnitProgress.find({ studentId, subjectId }).lean();
+  if (
+    subject.isActive === false
+    || !subject.examSubjectId
+    || !allowedExamIds.has(rules.normalizeSubjectKey(subject.examSubjectId))
+  ) {
+    throw httpError(404, 'Không tìm thấy môn');
+  }
+  const grantedKeys = await grantedSubjectKeys(studentId, student);
+  if (!rules.subjectOpenedByKeys(subject, grantedKeys)) {
+    throw httpError(403, 'Bạn chưa đăng ký môn học này');
+  }
+  const units = await LessonUnit.find({ subjectId, isActive: { $ne: false } })
+    .sort({ sortOrder: 1, createdAt: 1 })
+    .lean();
+  const [progress, states, itemRows] = await Promise.all([
+    LessonUnitProgress.find({ studentId, subjectId }).lean(),
+    completionStates(studentId, units),
+    LessonItem.find({ subjectId }).select('unitId type').lean(),
+  ]);
   const progressByUnit = new Map(progress.map((p) => [String(p.unitId), p]));
-  const states = await completionStates(studentId, units);
-  const done = new Set([...states.entries()].filter(([, state]) => state.completed).map(([id]) => id));
-  const previewUnitIds = new Set(units.filter(isPreviewUnit).map((unit) => String(unit._id)));
+  const questionCountByUnit = new Map();
+  itemRows.forEach((item) => {
+    if (!rules.isQuestionType(item.type)) return;
+    const key = String(item.unitId);
+    questionCountByUnit.set(key, (questionCountByUnit.get(key) || 0) + 1);
+  });
   return {
     subject: mapSubject(subject, {
-      previewOnly: !subjectIsOpen,
-      purchaseCourse,
+      previewOnly: false,
+      purchaseCourse: null,
     }),
     units: units.map((unit) => {
-      const previewAllowed = previewUnitIds.has(String(unit._id));
-      const isPreview = !subjectIsOpen && previewAllowed;
-      const locked = rules.isUnitLocked(units, done, unit._id, previewAllowed ? previewUnitIds : undefined);
-      const row = progressByUnit.get(String(unit._id));
-      const check = states.get(String(unit._id))?.check || rules.unitChecklist(unit, row, false);
-      const purchaseRequired = !subjectIsOpen && !isPreview;
-      const status = check.completed ? 'completed' : row ? 'in_progress' : (locked ? 'locked' : 'open');
+      const uid = String(unit._id);
+      const row = progressByUnit.get(uid);
+      const hasPractice = (questionCountByUnit.get(uid) || 0) > 0;
+      const check = states.get(uid)?.check || rules.unitChecklist(unit, row, false, hasPractice);
+      const status = check.completed ? 'completed' : row ? 'in_progress' : 'open';
       return mapUnit(unit, {
-        locked: purchaseRequired || locked,
-        purchaseRequired,
-        isPreview,
-        status: purchaseRequired ? 'locked' : status,
+        locked: false,
+        purchaseRequired: false,
+        isPreview: false,
+        status,
         videoDone: check.videoDone,
         noteDone: check.noteDone,
         videoDoneIds: check.videoDoneIds,
         noteDoneIds: check.noteDoneIds,
         practiceDone: check.practiceDone,
-        hasPractice: states.get(String(unit._id))?.hasPractice === true,
-        practiceGroupIds: states.get(String(unit._id))?.practiceGroupIds || [],
-        practiceDoneGroupIds: states.get(String(unit._id))?.practiceDoneGroupIds || [],
-        videos: purchaseRequired ? [] : mapUnit(unit).videos,
-        contents: purchaseRequired ? [] : mapUnit(unit).contents,
-        videoUrl: purchaseRequired ? '' : (unit.videoUrl || ''),
-        note: purchaseRequired ? '' : (unit.note || ''),
+        hasPractice: states.get(uid)?.hasPractice === true,
+        questionCount: questionCountByUnit.get(uid) || 0,
+        practiceGroupIds: states.get(uid)?.practiceGroupIds || [],
+        practiceDoneGroupIds: states.get(uid)?.practiceDoneGroupIds || [],
       });
     }),
   };
 }
 
 async function loadStudentUnit(studentId, unitId) {
-  if (!isId(unitId)) throw httpError(400, 'Buổi không hợp lệ');
+  const student = await assertCenterStudent(studentId);
+  if (!isId(unitId)) throw httpError(400, 'Bài học không hợp lệ');
   const unit = await LessonUnit.findById(unitId);
-  if (!unit || unit.isActive === false) throw httpError(404, 'Không tìm thấy buổi');
+  if (!unit || unit.isActive === false) throw httpError(404, 'Không tìm thấy bài học');
   const subject = await LessonSubject.findById(unit.subjectId);
-  if (
-    !subject
-    || subject.isActive === false
-    || isExcludedExamSubjectId(subject.examSubjectId)
-    || isExcludedExamSubjectId(subject.slug)
-  ) {
+  if (!subject || subject.isActive === false) {
     throw httpError(404, 'Không tìm thấy môn');
   }
-  const granted = await grantedSubjectKeys(studentId);
-  const subjectIsOpen = rules.subjectOpenedByKeys(subject, granted);
-  const units = await LessonUnit.find({ subjectId: subject._id, isActive: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
-  const isPreview = !subjectIsOpen && isPreviewUnit(unit);
-  if (!subjectIsOpen && !isPreview) {
-    throw httpError(403, 'Mua khóa học để mở buổi này');
+  const grantedKeys = await grantedSubjectKeys(studentId, student);
+  if (!rules.subjectOpenedByKeys(subject, grantedKeys)) {
+    throw httpError(403, 'Bạn chưa đăng ký môn học này');
   }
-  if (!subjectIsOpen && !(await previewCourseForSubject(subject))) {
-    throw httpError(403, 'Khóa học này hiện không mở bán');
-  }
-  const done = await completedUnitIds(studentId, subject._id, units);
-  if (rules.isUnitLocked(units, done, unit._id, isPreviewUnit(unit) ? new Set([String(unit._id)]) : undefined)) {
-    throw httpError(403, 'Hoàn thành buổi trước để mở buổi này');
-  }
-  return { unit, subject, isPreview };
+  return { unit, subject, isPreview: false };
 }
 
 async function practiceFinishedFor(studentId, unit, items) {
@@ -844,12 +1063,13 @@ function checklistPayload(status, check) {
 }
 
 async function refreshUnitStatus(studentId, unit, items) {
+  const hasPractice = items.some((item) => rules.isQuestionType(item.type));
   const practiceFinished = await practiceFinishedFor(studentId, unit, items);
   const existing = await LessonUnitProgress.findOne({ studentId, unitId: unit._id });
   const check = rules.unitChecklist(unit, {
     ...existing?.toObject?.() || existing || {},
     practiceDone: practiceFinished,
-  }, practiceFinished);
+  }, practiceFinished, hasPractice);
   const nextStatus = check.completed ? 'completed' : 'in_progress';
   const patch = {
     subjectId: unit.subjectId,
@@ -869,15 +1089,6 @@ async function refreshUnitStatus(studentId, unit, items) {
   } catch (err) {
     if (err?.code !== 11000) throw err;
   }
-  const hadNotes = rules.unitContents(unit).length > 0;
-  const hadPractice = items.some((item) => rules.isQuestionType(item.type));
-  if (hadNotes && !existing?.noteDone && check.noteDone) {
-    await awardLessonXp(studentId, 'theory', `theory:${studentId}:${unit._id}`);
-  }
-  if (hadPractice && !existing?.practiceDone && check.practiceDone) {
-    await awardLessonXp(studentId, 'practice', `practice:${studentId}:${unit._id}`);
-  }
-  if (justCompleted) await awardSubjectAndCourse(studentId, unit.subjectId);
   return nextStatus;
 }
 
@@ -889,50 +1100,10 @@ async function awardLessonXp(studentId, activity, sourceKey, watchRatio) {
   }
 }
 
-async function awardSubjectAndCourse(studentId, subjectId) {
-  try {
-    const units = await LessonUnit.find({ subjectId, isActive: true }).select('_id').lean();
-    if (!units.length) return;
-    const done = await LessonUnitProgress.countDocuments({
-      studentId,
-      subjectId,
-      status: 'completed',
-      unitId: { $in: units.map((unit) => unit._id) },
-    });
-    if (done < units.length) return;
-    await awardLessonXp(studentId, 'subject', `subject:${studentId}:${subjectId}`);
-    const subject = await LessonSubject.findById(subjectId).select('examSubjectId').lean();
-    const subjectKey = rules.normalizeSubjectKey(subject?.examSubjectId);
-    if (!subjectKey) return;
-    const courses = await Course.find({ deletedAt: null, status: 'published' }).select('examSubjects').lean();
-    for (const course of courses) {
-      const keys = (course.examSubjects || []).map((id) => rules.normalizeSubjectKey(id)).filter(Boolean);
-      if (!keys.includes(subjectKey)) continue;
-      const subjects = await LessonSubject.find({ isActive: true }).select('examSubjectId').lean();
-      const linked = subjects.filter((row) => keys.includes(rules.normalizeSubjectKey(row.examSubjectId)));
-      if (!linked.length) continue;
-      let complete = true;
-      for (const row of linked) {
-        const rowUnits = await LessonUnit.find({ subjectId: row._id, isActive: true }).select('_id').lean();
-        if (!rowUnits.length) { complete = false; break; }
-        const rowDone = await LessonUnitProgress.countDocuments({
-          studentId,
-          subjectId: row._id,
-          status: 'completed',
-          unitId: { $in: rowUnits.map((unit) => unit._id) },
-        });
-        if (rowDone < rowUnits.length) { complete = false; break; }
-      }
-      if (complete) await awardLessonXp(studentId, 'course', `course:${studentId}:${course._id}`);
-    }
-  } catch (err) {
-    logger.warn({ err }, '[LMS_XP] bỏ qua XP chương/khóa, buổi học vẫn hoàn thành');
-  }
-}
-
-async function markUnitSection(studentId, unitId, section, itemId = '', watchRatio = 0) {
+async function markUnitSection(studentId, unitId, section, itemId = '') {
   const { unit } = await loadStudentUnit(studentId, unitId);
   const items = await LessonItem.find({ unitId: unit._id }).select('type').lean();
+  const hasPractice = items.some((item) => rules.isQuestionType(item.type));
   const collection = section === 'video' ? rules.unitVideos(unit) : section === 'note' ? rules.unitContents(unit) : null;
   if (!collection) throw httpError(400, 'Phần không hợp lệ');
   if (!collection.length) throw httpError(400, section === 'video' ? 'Buổi này chưa có video' : 'Buổi này chưa có nội dung');
@@ -958,22 +1129,20 @@ async function markUnitSection(studentId, unitId, section, itemId = '', watchRat
   if (section === 'video' && marked.modifiedCount) {
     learningGoalService.trackStudyActivity(studentId, { videos: 1 });
   }
-  if (section === 'video' && Number(watchRatio) > 0) {
-    await awardLessonXp(studentId, 'video', `video:${studentId}:${unit._id}:${selectedId}`, Number(watchRatio));
-  }
   const status = await refreshUnitStatus(studentId, unit, items);
   const row = await LessonUnitProgress.findOne({ studentId, unitId: unit._id }).lean();
-  return checklistPayload(status, rules.unitChecklist(unit, row, row?.practiceDone));
+  return checklistPayload(status, rules.unitChecklist(unit, row, row?.practiceDone, hasPractice));
 }
 
 async function getUnitForStudent(studentId, unitId) {
   const { unit, subject, isPreview } = await loadStudentUnit(studentId, unitId);
   const items = await LessonItem.find({ unitId }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const hasPractice = items.some((item) => rules.isQuestionType(item.type));
   const answers = await LessonAnswer.find({ studentId, unitId }).lean();
   const byItem = new Map(answers.map((a) => [String(a.itemId), a]));
   const status = await refreshUnitStatus(studentId, unit, items);
   const row = await LessonUnitProgress.findOne({ studentId, unitId }).lean();
-  const check = rules.unitChecklist(unit, row, row?.practiceDone);
+  const check = rules.unitChecklist(unit, row, row?.practiceDone, hasPractice);
   return {
     subject: mapSubject(subject),
     unit: mapUnit(unit, { ...checklistPayload(status, check), isPreview }),
@@ -1058,42 +1227,147 @@ async function explainWritten(item, text) {
   };
 }
 
+async function wrongQuestionXpResult({ isReview, item, currentXp, feedback, dailyPracticeService, dailyPracticeRules }) {
+  let xpDelta = 0;
+  let nextXp = currentXp;
+  if (!isReview) {
+    const deduct = Math.min(currentXp, dailyPracticeRules.QUESTION_STAKE_XP);
+    if (deduct > 0) {
+      const updated = await dailyPracticeService.adjustProfileXp(item.studentId, -deduct, { source: 'spend' });
+      xpDelta = -deduct;
+      nextXp = dailyPracticeRules.clampXp(updated?.xpTotal);
+    }
+  }
+  const xpExhausted = !isReview && nextXp <= 0;
+  return {
+    retry: true,
+    xpDelta,
+    xpTotal: nextXp,
+    xpExhausted,
+    message: xpExhausted ? 'Hôm nay bạn đã sử dụng hết XP, bạn có thể ôn bài cũ hoặc đợi ngày mai.' : '',
+    item: {
+      ...rules.publicItem(item.doc),
+      confirmed: false,
+      correct: false,
+      feedback: `${feedback}${xpDelta < 0 ? ` (${xpDelta} XP)` : ''}`,
+    },
+  };
+}
+
+const STREAK_SEVEN_BONUS_XP = 100;
+
+async function recordCenterPracticeStreakAndHonor(studentId, { dailyPracticeService, dailyPracticeRules }) {
+  const DailyPracticeProfile = require('../models/DailyPracticeProfile');
+  const day = learningGoalService.vnDayKey();
+  const before = await dailyPracticeService.getProfile(studentId);
+  const nextStreak = dailyPracticeRules.nextStreak(before, day);
+  const updatedProfile = await DailyPracticeProfile.findOneAndUpdate(
+    { studentId },
+    {
+      $set: { streak: nextStreak, lastPlayedDay: day },
+      $max: { bestStreak: nextStreak },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  ).lean();
+  learningGoalService.trackStudyActivity(studentId, { questions: 1 });
+
+  let streakBonusXp = 0;
+  let streakHonor = null;
+  let updatedXpTotal = null;
+  let updatedStudyXpTotal = null;
+  if (nextStreak >= 7 && nextStreak % 7 === 0) {
+    const streakStartedOn = lmsProgressService.shiftDayKey(day, -(nextStreak - 1));
+    const milestoneKey = `streak7:${nextStreak}:${streakStartedOn}`;
+    const claimed = await DailyPracticeProfile.findOneAndUpdate(
+      { studentId, streak7RewardKeys: { $ne: milestoneKey } },
+      { $addToSet: { streak7RewardKeys: milestoneKey } },
+      { new: true },
+    ).lean();
+    if (claimed) {
+      streakBonusXp = STREAK_SEVEN_BONUS_XP;
+      const bonusRes = await dailyPracticeService.adjustProfileXp(studentId, STREAK_SEVEN_BONUS_XP, { source: 'reward' });
+      updatedXpTotal = dailyPracticeRules.clampXp(bonusRes?.xpTotal);
+      updatedStudyXpTotal = dailyPracticeRules.clampXp(bonusRes?.studyXpTotal);
+      const student = await Student.findById(studentId).select('name fullName avatar').lean().catch(() => null);
+      streakHonor = {
+        id: `${studentId}:${milestoneKey}`,
+        studentId: String(studentId),
+        studentName: String(student?.fullName || student?.name || 'Học viên').trim(),
+        studentAvatar: String(student?.avatar || '').trim(),
+        streak: nextStreak,
+        rewardXp: STREAK_SEVEN_BONUS_XP,
+        achievedAt: new Date().toISOString(),
+        message: `Chúc mừng ${String(student?.fullName || student?.name || 'Học viên').trim()} hoàn thành chuỗi ${nextStreak} ngày liên tục (+${STREAK_SEVEN_BONUS_XP} XP)!`,
+      };
+      try {
+        const socketHub = require('../config/socketHub');
+        socketHub.getIo()?.to('CENTER_STUDENTS').emit('streak:honor', streakHonor);
+      } catch (err) {
+        logger.warn({ err: err?.message }, '[STREAK_HONOR] broadcast failed');
+      }
+    }
+  }
+  return {
+    streak: nextStreak,
+    bestStreak: Math.max(nextStreak, updatedProfile?.bestStreak || 0),
+    streakBonusXp,
+    streakHonor,
+    updatedXpTotal,
+    updatedStudyXpTotal,
+  };
+}
+
 async function confirmItem(studentId, itemId, body) {
   if (!isId(itemId)) throw httpError(400, 'Câu hỏi không hợp lệ');
   const item = await LessonItem.findById(itemId);
   if (!item || !rules.isQuestionType(item.type)) throw httpError(404, 'Không tìm thấy câu hỏi');
-  await loadStudentUnit(studentId, item.unitId);
+  const { unit } = await loadStudentUnit(studentId, item.unitId);
   const existing = await LessonAnswer.findOne({ studentId, itemId });
   if (existing?.correct === true) {
-    return { item: rules.withConfirmedAnswer(item, existing), alreadyConfirmed: true };
+    return { item: rules.withConfirmedAnswer(item, existing), alreadyConfirmed: true, isReview: true };
   }
+  const unitProgress = await LessonUnitProgress.findOne({ studentId, unitId: item.unitId }).select('status').lean();
+  const isReview = unitProgress?.status === 'completed';
+
+  const dailyPracticeService = require('./dailyPracticeService');
+  const dailyPracticeRules = require('./dailyPracticeRules');
+  const profile = await dailyPracticeService.getProfile(studentId);
+  const currentXp = dailyPracticeRules.clampXp(profile?.xpTotal);
+
+  if (!isReview && currentXp <= 0) {
+    return {
+      xpExhausted: true,
+      xpTotal: 0,
+      xpDelta: 0,
+      message: 'Hôm nay bạn đã sử dụng hết XP, bạn có thể ôn bài cũ hoặc đợi ngày mai.',
+    };
+  }
+
   let graded;
   if (rules.needsExactCorrect(item.type)) {
     graded = rules.gradeObjective(item, body || {});
     if (!graded.correct) {
-      return {
-        retry: true,
-        item: {
-          ...rules.publicItem(item),
-          confirmed: false,
-          correct: false,
-          feedback: 'Bạn sai rồi, vui lòng chọn lại đáp án',
-        },
-      };
+      return wrongQuestionXpResult({
+        isReview,
+        item: { doc: item, studentId },
+        currentXp,
+        feedback: 'Bạn sai rồi, vui lòng chọn lại đáp án',
+        dailyPracticeService,
+        dailyPracticeRules,
+      });
     }
     graded.explanation = 'Chúc mừng! Bạn đã chọn đúng.';
   } else if (item.type === 'written') {
     const explained = await explainWritten(item, body?.text);
     if (!explained.passed) {
-      return {
-        retry: true,
-        item: {
-          ...rules.publicItem(item),
-          confirmed: false,
-          correct: false,
-          feedback: explained.feedback,
-        },
-      };
+      return wrongQuestionXpResult({
+        isReview,
+        item: { doc: item, studentId },
+        currentXp,
+        feedback: explained.feedback,
+        dailyPracticeService,
+        dailyPracticeRules,
+      });
     }
     graded = {
       correct: true,
@@ -1118,10 +1392,35 @@ async function confirmItem(studentId, itemId, body) {
     },
     { upsert: true, new: true },
   );
+  let questionXpDelta = 0;
+  let nextXp = currentXp;
+  let nextStudyXp = dailyPracticeRules.clampXp(profile?.studyXpTotal);
+  if (!isReview) {
+    const reward = dailyPracticeRules.QUESTION_STAKE_XP;
+    const updated = await dailyPracticeService.adjustProfileXp(studentId, reward, { source: 'reward' });
+    questionXpDelta = reward;
+    nextXp = dailyPracticeRules.clampXp(updated?.xpTotal);
+    nextStudyXp = dailyPracticeRules.clampXp(updated?.studyXpTotal);
+  }
+  const streakInfo = await recordCenterPracticeStreakAndHonor(studentId, { dailyPracticeService, dailyPracticeRules });
+  const finalXpTotal = streakInfo.updatedXpTotal != null ? streakInfo.updatedXpTotal : nextXp;
+  const finalStudyXpTotal = streakInfo.updatedStudyXpTotal != null ? streakInfo.updatedStudyXpTotal : nextStudyXp;
   const items = await LessonItem.find({ unitId: item.unitId }).select('type').lean();
-  const unit = await LessonUnit.findById(item.unitId);
   const unitStatus = await refreshUnitStatus(studentId, unit, items);
-  return { item: rules.withConfirmedAnswer(item, saved), unitStatus, alreadyConfirmed: false };
+  return {
+    item: rules.withConfirmedAnswer(item, saved),
+    unitStatus,
+    alreadyConfirmed: false,
+    questionXpDelta,
+    streakBonusXp: streakInfo.streakBonusXp,
+    xpDelta: questionXpDelta + streakInfo.streakBonusXp,
+    xpTotal: finalXpTotal,
+    studyXpTotal: finalStudyXpTotal,
+    streak: streakInfo.streak,
+    bestStreak: streakInfo.bestStreak,
+    playedToday: true,
+    streakHonor: streakInfo.streakHonor,
+  };
 }
 
 async function resetPractice(studentId, unitId, practiceGroupId = '') {
@@ -1162,9 +1461,13 @@ async function backupSubjectsForCourse(courseId) {
 
 async function exportBackup(courseId = '') {
   const courseSubjects = await backupSubjectsForCourse(courseId);
-  const subjectFilter = courseSubjects
-    ? { _id: { $in: courseSubjects.map((subject) => subject._id) } }
-    : {};
+  let subjectFilter;
+  if (courseSubjects) {
+    subjectFilter = { _id: { $in: courseSubjects.map((subject) => subject._id) } };
+  } else {
+    const { allowedExamIds } = await syncCourseSubjectsToLessonSubjects();
+    subjectFilter = { examSubjectId: { $in: [...allowedExamIds] } };
+  }
   const subjectIds = courseSubjects ? courseSubjects.map((subject) => subject._id) : null;
   const unitFilter = subjectIds ? { subjectId: { $in: subjectIds } } : {};
   const [subjects, units, items] = await Promise.all([
@@ -1448,12 +1751,15 @@ async function relatedLessonForStudent(studentId, { subjectId, unitIds = [] } = 
 module.exports = {
   exportBackup,
   importBackup,
+  syncCourseSubjectsToLessonSubjects,
   listSubjectsAdmin,
   listCoursesForAdmin,
+  createSubject,
   updateSubject,
   deleteSubject,
   seedDefaults,
   listUnits,
+  reorderUnits,
   createUnit,
   updateUnit,
   deleteUnit,

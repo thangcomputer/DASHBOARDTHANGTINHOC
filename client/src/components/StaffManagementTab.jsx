@@ -14,7 +14,12 @@ import {
 } from 'lucide-react';
 import { useToast } from '../utils/useToast';
 import { useModal } from '../utils/Modal.jsx';
-import { ALL_PERMISSIONS, HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS } from '../constants/permissions';
+import {
+  ALL_PERMISSIONS,
+  DEWSKILL_ADMIN_DEFAULT_PERMISSIONS,
+  HIGH_ADMIN_DEFAULT_PERMISSIONS,
+  SUPPORT_DEFAULT_PERMISSIONS,
+} from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { staffAPI, apiFetch } from '../services/api';
 
@@ -26,6 +31,7 @@ const PERMISSION_GROUPS = [
   { id: 'schedule', title: 'Lịch dạy', icon: '📅', keys: ['manage_schedule'] },
   { id: 'finance', title: 'Tài chính', icon: '💰', keys: ['manage_finance', 'view_branch_revenue'] },
   { id: 'training', title: 'Đào tạo', icon: '🎓', keys: ['manage_training', 'manage_student_training', 'manage_cert_prep'] },
+  { id: 'dewskill', title: 'Hệ sinh thái DewSkill', icon: '💧', keys: [...DEWSKILL_ADMIN_DEFAULT_PERMISSIONS] },
   { id: 'hr', title: 'Nhân sự', icon: '👤', keys: ['manage_hr', 'manage_staff'] },
   { id: 'system', title: 'Hệ thống', icon: '⚙️', keys: ['system_settings', 'view_logs', 'view_evaluations'] },
 ];
@@ -61,6 +67,17 @@ function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
     return (
       <span className="cms-rbac-badge bg-blue-50 text-blue-700 border border-blue-200">
         <MessageSquare size={10} aria-hidden="true" />  Hỗ trợ viên
+      </span>
+    );
+  }
+  const isDewskillOnly =
+    Array.isArray(permissions) &&
+    permissions.length > 0 &&
+    permissions.every((p) => DEWSKILL_ADMIN_DEFAULT_PERMISSIONS.includes(p));
+  if (isDewskillOnly) {
+    return (
+      <span className="cms-rbac-badge bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <Shield size={10} aria-hidden="true" />  Quản trị DewSkill
       </span>
     );
   }
@@ -529,12 +546,22 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin, e
                         <button
                           type="button"
                           onClick={() => setForm(f => ({ ...f, permissions: DEFAULT_STAFF_PERMISSIONS }))}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${!isOnlyMessages && form.permissions.length > 1
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${!isOnlyMessages && !(form.permissions.length > 0 && form.permissions.every(p => DEWSKILL_ADMIN_DEFAULT_PERMISSIONS.includes(p))) && form.permissions.length > 1
                               ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                             }`}
                         >
                           🛡️ Mặc định: Admin-Staff
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, permissions: [...DEWSKILL_ADMIN_DEFAULT_PERMISSIONS] }))}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${form.permissions.length > 0 && form.permissions.every(p => DEWSKILL_ADMIN_DEFAULT_PERMISSIONS.includes(p))
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                        >
+                          💧 Quản trị DewSkill
                         </button>
                         <button
                           type="button"

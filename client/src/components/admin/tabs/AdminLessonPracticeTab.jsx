@@ -1,35 +1,81 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, CircleHelp, Clock, Download, GripVertical, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  CircleHelp,
+  Clapperboard,
+  Clock,
+  Download,
+  Gamepad2,
+  Loader2,
+  NotebookPen,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import RichTextEditor from '../shared/RichTextEditor';
 import AdminStudentTrainingTab from './AdminStudentTrainingTab';
 import { cmsConfirmAction } from '../../../utils/cmsDialog';
+import { useToast } from '../../../utils/useToast';
+import { TOPIC_COLORS, TOPIC_ICONS, topicColor, topicIcon } from '../../../utils/dailyPractice';
+
+const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
+const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
 
 const TYPES = [
+  { id: 'mcq', label: 'Trắc nghiệm 1 đáp án' },
   { id: 'multi', label: 'Chọn nhiều đáp án' },
   { id: 'match', label: 'Ghép đáp án' },
-  { id: 'mcq', label: 'Trắc nghiệm chọn 1 đáp án' },
+  { id: 'drag', label: 'Kéo thả thứ tự' },
   { id: 'written', label: 'Tự ghi AI chấm' },
-  { id: 'drag', label: 'Kéo thả đáp án' },
   { id: 'hotspot', label: 'Chọn vùng ảnh' },
 ];
 
 function newOption() {
-  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `opt-${Date.now()}`;
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `opt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return { id, text: '' };
 }
 
 function newPair() {
-  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pair-${Date.now()}`;
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return { id, left: '', right: '' };
 }
 
-function blankItem() {
+function newContentId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `content-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatCheckpointLabel(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+function resolveAdminItemVideoKey(item, videos = []) {
+  const list = Array.isArray(videos) ? videos : [];
+  const raw = String(item?.videoId || '').trim();
+  if (!list.length || raw === 'none') return 'none';
+  if (raw && list.some((v) => String(v.id) === raw)) return raw;
+  return String(list[0].id);
+}
+
+function blankItem(practiceGroupId = '', videoId = '') {
   const options = [newOption(), newOption(), newOption(), newOption()];
   return {
     type: 'mcq',
+    practiceGroupId,
+    videoId,
     prompt: '',
     imageUrl: '',
     imageName: '',
@@ -44,6 +90,7 @@ function blankItem() {
     pairs: [newPair(), newPair()],
     region: null,
     timeLimitSec: 0,
+    checkpointSec: 0,
   };
 }
 
@@ -64,56 +111,12 @@ function draftHasContent(item) {
   );
 }
 
-function draftIsComplete(item) {
-  if (!item) return false;
-  const prompt = String(item.prompt || '').trim();
-  const options = Array.isArray(item.options) ? item.options : [];
-  const optionsComplete = options.length >= 2
-    && options.length <= 6
-    && options.every((option) => String(option.text || '').trim() && String(option.id || '').trim())
-    && new Set(options.map((option) => String(option.id))).size === options.length;
-
-  if (item.type === 'mcq') {
-    return !!prompt && optionsComplete && options.some((option) => option.id === item.correctOptionId);
-  }
-  if (item.type === 'multi') {
-    return !!prompt && optionsComplete && (item.correctOptionIds || []).some((id) => options.some((option) => option.id === id));
-  }
-  if (item.type === 'drag') return !!prompt && optionsComplete;
-  if (item.type === 'match') {
-    return !!prompt
-      && item.pairs?.length >= 2
-      && item.pairs.length <= 6
-      && item.pairs.every((pair) => String(pair.left || '').trim() && String(pair.right || '').trim() && String(pair.id || '').trim());
-  }
-  if (item.type === 'written') {
-    return !!prompt && (!!String(item.rubric || '').trim() || !!String(item.modelAnswer || '').trim());
-  }
-  if (item.type === 'hotspot') {
-    const region = item.region || {};
-    const values = [region.x, region.y, region.w, region.h].map(Number);
-    return !!String(item.imageUrl || '').trim()
-      && values.every(Number.isFinite)
-      && values[0] >= 0 && values[1] >= 0
-      && values[2] >= 1 && values[3] >= 1
-      && values[0] + values[2] <= 100.01
-      && values[1] + values[3] <= 100.01;
-  }
-  return item.type === 'image_view' && !!String(item.imageUrl || '').trim();
-}
-
-function newContentId() {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `content-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 function normalizeUnitContents(unit) {
   return {
     ...unit,
     videos: unit.videos?.length
       ? unit.videos
-      : (unit.videoUrl ? [{ id: 'legacy-video', title: 'Video 1', url: unit.videoUrl }] : []),
+      : (unit.videoUrl ? [{ id: 'legacy-video', title: 'Video 1', url: unit.videoUrl, antiSeek: unit.antiSeek === true }] : []),
     contents: unit.contents?.length
       ? unit.contents
       : (unit.note ? [{ id: 'legacy-note', title: 'Nội dung 1', content: unit.note }] : []),
@@ -131,21 +134,25 @@ function unitContentOrder(unit, items) {
     else if (value.startsWith('quiz:') && unit?.id) practiceGroupIds.add(unit.id);
   });
   const available = new Set([
-    ...contents.map((item) => `content:${item.id}`),
     ...videos.map((item) => `video:${item.id}`),
     ...[...practiceGroupIds].map((id) => `practice:${id}`),
+    ...contents.map((item) => `content:${item.id}`),
   ]);
   const result = [];
   const seen = new Set();
-  [...(unit?.contentOrder || []), ...contents.map((item) => `content:${item.id}`), ...videos.map((item) => `video:${item.id}`), ...[...practiceGroupIds].map((id) => `practice:${id}`)]
-    .forEach((entry) => {
-      const value = String(entry);
-      const normalizedEntry = value.startsWith('quiz:') ? practiceEntry : value;
-      if (available.has(normalizedEntry) && !seen.has(normalizedEntry)) {
-        seen.add(normalizedEntry);
-        result.push(normalizedEntry);
-      }
-    });
+  [
+    ...(unit?.contentOrder || []),
+    ...videos.map((item) => `video:${item.id}`),
+    ...[...practiceGroupIds].map((id) => `practice:${id}`),
+    ...contents.map((item) => `content:${item.id}`),
+  ].forEach((entry) => {
+    const value = String(entry);
+    const normalizedEntry = value.startsWith('quiz:') ? practiceEntry : value;
+    if (available.has(normalizedEntry) && !seen.has(normalizedEntry)) {
+      seen.add(normalizedEntry);
+      result.push(normalizedEntry);
+    }
+  });
   return result;
 }
 
@@ -183,10 +190,10 @@ function RegionDraw({ imageUrl, region, onChange }) {
       onMouseUp={() => { drag.current = null; }}
       onMouseLeave={() => { drag.current = null; }}
     >
-      <img src={resolveMediaUrl(imageUrl)} alt="" className="block w-full max-h-80 object-contain pointer-events-none" />
+      <img src={resolveMediaUrl(imageUrl)} alt="" className="pointer-events-none block max-h-80 w-full object-contain" />
       {region && (
         <span
-          className="absolute border-2 border-emerald-500 bg-emerald-400/20 pointer-events-none"
+          className="pointer-events-none absolute border-2 border-emerald-500 bg-emerald-400/20"
           style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.w}%`, height: `${region.h}%` }}
         />
       )}
@@ -194,402 +201,398 @@ function RegionDraw({ imageUrl, region, onChange }) {
   );
 }
 
+function SubjectModal({ subject, onClose, onSaved }) {
+  const toast = useToast();
+  const [form, setForm] = useState(() => ({
+    name: subject?.name || '',
+    summary: subject?.summary || '',
+    icon: subject?.icon || 'book',
+    color: subject?.color || 'green',
+    sortOrder: subject?.sortOrder ?? 0,
+    isActive: subject?.isActive !== false,
+  }));
+  const [saving, setSaving] = useState(false);
+  const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const save = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const payload = subject?.examSubjectId
+        ? {
+            summary: form.summary,
+            icon: form.icon,
+            color: form.color,
+            sortOrder: form.sortOrder,
+            isActive: form.isActive,
+          }
+        : form;
+      const res = subject?.id
+        ? await lessonPracticeApi.admin.updateSubject(subject.id, payload)
+        : await lessonPracticeApi.admin.createSubject({ ...form, createDefaultUnit: true });
+      toast.success(subject?.id ? 'Đã cập nhật môn học' : 'Đã thêm môn học mới');
+      onSaved(res.data);
+    } catch (err) {
+      toast.error(err.message || 'Không lưu được môn học');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9300] flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+          <h3 className="text-base font-black text-slate-900">{subject?.id ? 'Sửa môn học' : 'Thêm môn học'}</h3>
+          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><X size={18} /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div>
+            <label className={LABEL} htmlFor="lp-subj-name">Tên môn học</label>
+            <input
+              id="lp-subj-name"
+              className={`${INPUT} ${subject?.examSubjectId ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+              value={form.name}
+              maxLength={80}
+              disabled={Boolean(subject?.examSubjectId)}
+              onChange={(e) => set({ name: e.target.value })}
+              placeholder="Ví dụ: Microsoft Excel"
+            />
+            {subject?.examSubjectId && (
+              <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                Tên môn tự động đồng bộ từ Quản lý Khóa học
+              </p>
+            )}
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="lp-subj-desc">Mô tả ngắn</label>
+            <input
+              id="lp-subj-desc"
+              className={INPUT}
+              value={form.summary}
+              maxLength={240}
+              onChange={(e) => set({ summary: e.target.value })}
+              placeholder="Bảng tính, công thức, hàm và biểu đồ"
+            />
+          </div>
+          <div>
+            <span className={LABEL}>Biểu tượng</span>
+            <div className="grid grid-cols-6 gap-2">
+              {Object.entries(TOPIC_ICONS).map(([key, Icon]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => set({ icon: key })}
+                  aria-label={key}
+                  className={`flex h-10 items-center justify-center rounded-xl border-2 ${form.icon === key ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-slate-200 text-slate-500'}`}
+                >
+                  <Icon size={18} />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className={LABEL}>Màu hiển thị</span>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(TOPIC_COLORS).map(([key, color]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => set({ color: key })}
+                  aria-label={key}
+                  className={`h-9 w-9 rounded-full ring-offset-2 ${form.color === key ? 'ring-2 ring-slate-900' : ''}`}
+                  style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL} htmlFor="lp-subj-order">Thứ tự hiển thị</label>
+              <input
+                id="lp-subj-order"
+                type="number"
+                className={INPUT}
+                value={form.sortOrder}
+                onChange={(e) => set({ sortOrder: Number(e.target.value) })}
+              />
+            </div>
+            <label className="mt-6 flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => set({ isActive: e.target.checked })}
+                className="h-4 w-4 accent-emerald-600"
+              />
+              Hiển thị cho học viên TT
+            </label>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">Hủy</button>
+          <button type="button" onClick={save} disabled={saving || !form.name.trim()} className="cms-btn cms-btn-primary">
+            {saving && <Loader2 size={16} className="animate-spin" />} Lưu môn học
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function statusLabel(row) {
-  if (row.status === 'completed') return 'Đã học xong môn';
-  if (row.currentUnitTitle) return `Đang học: ${row.currentUnitTitle}`;
+  if (row.status === 'completed') return 'Đã hoàn thành môn';
+  if (row.currentUnitTitle) return `Đang xem: ${row.currentUnitTitle}`;
   return 'Đang học';
 }
 
-function findCourseLessonSubject(subjects, examSubjectId) {
-  const id = String(examSubjectId || '').toLowerCase();
-  return (Array.isArray(subjects) ? subjects : []).find((row) => row && (
-    String(row.examSubjectId || '').toLowerCase() === id
-    || String(row.slug || '').toLowerCase() === id));
-}
-
 export default function AdminLessonPracticeTab() {
-  const [moduleTab, setModuleTab] = useState('lessons');
-  const [section, setSection] = useState('build');
+  const toast = useToast();
+  const [moduleTab, setModuleTab] = useState('lessons'); // lessons | progress | guide
   const [subjects, setSubjects] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [expandedCourseId, setExpandedCourseId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [units, setUnits] = useState([]);
   const [unitId, setUnitId] = useState('');
-  const [isUnitEditing, setIsUnitEditing] = useState(false);
+  const [editingUnitId, setEditingUnitId] = useState('');
+  const [editorSubTab, setEditorSubTab] = useState('video'); // video | practice | content
+  const [practiceVideoFilter, setPracticeVideoFilter] = useState('all'); // 'all' | 'none' | videoId
   const [items, setItems] = useState([]);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [draft, setDraft] = useState(null);
-  const [activePracticeGroupId, setActivePracticeGroupId] = useState('');
-  const practiceEditorContainers = useRef(new Map());
-  const practiceEditorRefs = useRef(new Map());
-  const [practiceEditorTarget, setPracticeEditorTarget] = useState(null);
-  const [showAddContentMenu, setShowAddContentMenu] = useState(false);
-  const [draggedEntry, setDraggedEntry] = useState('');
-  const [dragOverEntry, setDragOverEntry] = useState('');
-  const [dragOverAfter, setDragOverAfter] = useState(false);
-  const [backupBusy, setBackupBusy] = useState(false);
-  const [backupCourseId, setBackupCourseId] = useState('');
-  const [notice, setNotice] = useState('');
-  const [unitTitle, setUnitTitle] = useState('');
+  const [newUnitTitle, setNewUnitTitle] = useState('');
+  const [creatingUnit, setCreatingUnit] = useState(false);
+  const [subjectModal, setSubjectModal] = useState(null);
   const [progress, setProgress] = useState([]);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [syncingSubjects, setSyncingSubjects] = useState(false);
 
   const subject = subjects.find((row) => row.id === subjectId) || null;
-  const selectedUnit = units.find((row) => row.id === unitId) || null;
-  const practiceItems = items;
-  const practiceGroupIds = [...new Set([
-    ...items.map((item) => String(item.practiceGroupId || unitId || '')),
-    ...unitContentOrder(selectedUnit, items)
-      .filter((entry) => entry.startsWith('practice:'))
-      .map((entry) => entry.slice('practice:'.length)),
-  ].filter(Boolean))];
-  const selectedPracticeGroupId = activePracticeGroupId || practiceGroupIds[0] || '';
-  function practiceEditorRef(groupId) {
-    if (!practiceEditorRefs.current.has(groupId)) {
-      practiceEditorRefs.current.set(groupId, (element) => {
-        if (element) practiceEditorContainers.current.set(groupId, element);
-        else practiceEditorContainers.current.delete(groupId);
-      });
-    }
-    return practiceEditorRefs.current.get(groupId);
-  }
-  useEffect(() => {
-    const element = practiceEditorContainers.current.get(selectedPracticeGroupId);
-    setPracticeEditorTarget(element ? { groupId: selectedPracticeGroupId, element } : null);
-  }, [selectedPracticeGroupId, unitId, isUnitEditing, items]);
-  const lessonVideos = selectedUnit?.videos || [];
-  const lessonContents = selectedUnit?.contents || [];
-  const hasPracticeBlock = practiceGroupIds.length > 0;
-  const hasLessonContent = lessonVideos.length > 0 || lessonContents.length > 0 || hasPracticeBlock;
-  const lessonContentReady = hasLessonContent
-    && String(selectedUnit?.title || '').trim().length > 0
-    && lessonVideos.every((video) => {
-      try {
-        const url = new URL(String(video.url || '').trim());
-        return url.protocol === 'http:' || url.protocol === 'https:';
-      } catch {
-        return false;
-      }
-    })
-    && lessonContents.every((content) => String(content.content || '').trim().length > 0)
-    && (!hasPracticeBlock || (draftHasContent(draft) ? draftIsComplete(draft) : items.length > 0));
-  const orderedLessonEntries = unitContentOrder(selectedUnit, items);
-  const courseGroups = courses.map((course) => {
-    const courseSubjects = (course.examSubjects || [])
-      .map((examSubjectId) => {
-        return findCourseLessonSubject(subjects, examSubjectId);
-      })
-      .filter(Boolean)
-      .filter((row, index, rows) => rows.findIndex((candidate) => candidate?.id === row.id) === index);
-    return { ...course, subjects: courseSubjects };
-  }).filter((course) => course.subjects.length > 0);
+  const editingUnit = units.find((row) => row.id === editingUnitId) || null;
 
-  function toggleUnitEditor(id) {
-    if (isUnitEditing && unitId === id) {
-      setIsUnitEditing(false);
+  const loadSubjects = useCallback(async (preferId = '') => {
+    const res = await lessonPracticeApi.admin.subjects();
+    const rows = res.data || [];
+    setSubjects(rows);
+    setSubjectId((current) => {
+      if (preferId && rows.some((r) => r.id === preferId)) return preferId;
+      if (current && rows.some((r) => r.id === current)) return current;
+      return rows[0]?.id || '';
+    });
+    return rows;
+  }, []);
+
+  const loadUnits = useCallback(async (id) => {
+    if (!id) {
+      setUnits([]);
+      setUnitId('');
+      setEditingUnitId('');
+      return [];
+    }
+    const res = await lessonPracticeApi.admin.units(id);
+    const rows = (res.data || []).map(normalizeUnitContents);
+    setUnits(rows);
+    setUnitId((current) => (rows.some((r) => r.id === current) ? current : (rows[0]?.id || '')));
+    return rows;
+  }, []);
+
+  const loadItems = useCallback(async (id) => {
+    if (!id) {
+      setItems([]);
+      return [];
+    }
+    const res = await lessonPracticeApi.admin.items(id);
+    const rows = res.data || [];
+    setItems(rows);
+    return rows;
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    loadSubjects()
+      .catch((err) => { if (alive) toast.error(err.message || 'Không tải được danh sách môn học'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [loadSubjects, toast]);
+
+  useEffect(() => {
+    if (!subjectId) {
+      setUnits([]);
+      setUnitId('');
+      setEditingUnitId('');
+      setItems([]);
       return;
     }
+    setEditingUnitId('');
     setDraft(null);
-    setActivePracticeGroupId('');
-    setUnitId(id);
-    setIsUnitEditing(true);
+    setDeletedItemIds([]);
+    loadUnits(subjectId).catch((err) => toast.error(err.message || 'Không tải được bài học'));
+  }, [subjectId, loadUnits, toast]);
+
+  useEffect(() => {
+    setDeletedItemIds([]);
+    setDraft(null);
+    const targetId = editingUnitId || unitId;
+    if (!targetId) {
+      setItems([]);
+      return;
+    }
+    loadItems(targetId).catch((err) => toast.error(err.message || 'Không tải được câu hỏi luyện tập'));
+  }, [editingUnitId, unitId, loadItems, toast]);
+
+  useEffect(() => {
+    if (moduleTab !== 'progress') return undefined;
+    lessonPracticeApi.admin.progress(subjectId)
+      .then((res) => setProgress(res.data || []))
+      .catch((err) => toast.error(err.message || 'Không tải được tiến độ'));
+    return undefined;
+  }, [moduleTab, subjectId, toast]);
+
+  const primaryPracticeGroupId = items[0]?.practiceGroupId || editingUnitId || unitId || '';
+
+  function openUnitEditor(targetUnit) {
+    if (editingUnitId === targetUnit.id) {
+      setEditingUnitId('');
+      setDraft(null);
+      return;
+    }
+    setUnitId(targetUnit.id);
+    setEditingUnitId(targetUnit.id);
+    setDraft(null);
+    setEditorSubTab('video');
   }
 
-  function reorderLessonEntries(source, target, insertAfter = false) {
-    if (!source || !target || source === target) return;
-    setUnits((rows) => rows.map((unit) => {
-      if (unit.id !== unitId) return unit;
-      const order = unitContentOrder(unit, items);
-      const from = order.indexOf(source);
-      const to = order.indexOf(target);
-      if (from < 0 || to < 0) return unit;
-      const next = [...order];
-      next.splice(from, 1);
-      const targetIndex = next.indexOf(target);
-      next.splice(targetIndex + (insertAfter ? 1 : 0), 0, source);
-      return { ...unit, contentOrder: next };
-    }));
-  }
-
-  function setPracticeGroupTimeLimit(groupId, timeLimitSec) {
-    setUnits((rows) => rows.map((unit) => {
-      if (unit.id !== unitId) return unit;
-      const practiceTimeLimits = (unit.practiceTimeLimits || [])
-        .filter((entry) => String(entry.groupId) !== String(groupId));
-      return {
-        ...unit,
-        practiceTimeLimits: [...practiceTimeLimits, { groupId, timeLimitSec }],
-      };
-    }));
-  }
-
-  async function savePracticeGroupTimeLimit(groupId, timeLimitSec) {
-    const currentUnit = units.find((unit) => unit.id === unitId);
-    if (!currentUnit) return;
-    const practiceTimeLimits = (currentUnit.practiceTimeLimits || [])
-      .filter((entry) => String(entry.groupId) !== String(groupId));
-    practiceTimeLimits.push({ groupId, timeLimitSec });
-    setSaving(true);
-    setError('');
-    setNotice('');
+  async function handleSyncSubjects() {
+    setSyncingSubjects(true);
     try {
-      const res = await lessonPracticeApi.admin.updateUnit(unitId, { practiceTimeLimits });
-      setUnits((rows) => rows.map((unit) => (
-        unit.id === unitId
-          ? { ...unit, practiceTimeLimits: res.data.practiceTimeLimits || practiceTimeLimits }
-          : unit
-      )));
-      setNotice('Đã lưu thời gian cho phần luyện tập.');
+      await loadSubjects(subjectId);
+      toast.success('Đã đồng bộ môn từ Quản lý Khóa học');
     } catch (err) {
-      setError(err.message || 'Không lưu được thời gian cho phần luyện tập');
+      toast.error(err.message || 'Không đồng bộ được môn học');
+    } finally {
+      setSyncingSubjects(false);
+    }
+  }
+
+  async function handleCreateUnit(e) {
+    e.preventDefault();
+    const title = newUnitTitle.trim();
+    if (!title || !subjectId) return;
+    setCreatingUnit(true);
+    try {
+      const res = await lessonPracticeApi.admin.createUnit(subjectId, { title });
+      const created = normalizeUnitContents(res.data);
+      setNewUnitTitle('');
+      await Promise.all([loadUnits(subjectId), loadSubjects(subjectId)]);
+      setUnitId(created.id);
+      setEditingUnitId(created.id);
+      setEditorSubTab('video');
+      toast.success('Đã thêm bài học mới');
+    } catch (err) {
+      toast.error(err.message || 'Không tạo được bài học');
+    } finally {
+      setCreatingUnit(false);
+    }
+  }
+
+  async function handleMoveUnit(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= units.length || !subjectId) return;
+    const ids = units.map((u) => u.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    try {
+      const res = await lessonPracticeApi.admin.reorderUnits(subjectId, ids);
+      setUnits((res.data || []).map(normalizeUnitContents));
+    } catch (err) {
+      toast.error(err.message || 'Không đổi được thứ tự');
+    }
+  }
+
+  async function handleDeleteUnit(unit) {
+    if (!(await cmsConfirmAction(`Xóa bài "${unit.title}" và toàn bộ video, nội dung, câu hỏi trong đó?`))) return;
+    try {
+      await lessonPracticeApi.admin.deleteUnit(unit.id);
+      if (editingUnitId === unit.id) {
+        setEditingUnitId('');
+        setDraft(null);
+      }
+      await Promise.all([loadUnits(subjectId), loadSubjects(subjectId)]);
+      toast.success('Đã xóa bài học');
+    } catch (err) {
+      toast.error(err.message || 'Không xóa được bài học');
+    }
+  }
+
+  async function saveEditingUnit() {
+    if (!editingUnit) return;
+    const title = String(editingUnit.title || '').trim();
+    if (!title) {
+      toast.error('Tên bài học không được để trống');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let workingItems = items;
+      if (draftHasContent(draft)) {
+        const entryId = draft.id || `pending-${newContentId()}`;
+        const stagedDraft = { ...draft, id: entryId, practiceGroupId: draft.practiceGroupId || primaryPracticeGroupId };
+        workingItems = items.some((row) => row.id === entryId)
+          ? items.map((row) => (row.id === entryId ? stagedDraft : row))
+          : [...items, stagedDraft];
+      }
+
+      await lessonPracticeApi.admin.updateUnit(editingUnit.id, {
+        title,
+        videos: editingUnit.videos || [],
+        contents: editingUnit.contents || [],
+        antiSeek: editingUnit.antiSeek === true,
+        isPreviewAllowed: true,
+        timeLimitSec: editingUnit.timeLimitSec || 0,
+        practiceTimeLimits: editingUnit.practiceTimeLimits || [],
+      });
+
+      for (const delId of deletedItemIds) {
+        await lessonPracticeApi.admin.deleteItem(delId);
+      }
+
+      const savedItems = [];
+      for (const item of workingItems) {
+        const body = {
+          ...item,
+          videoId: item.videoId || '',
+          checkpointSec: Number(item.checkpointSec) || 0,
+          practiceGroupId: item.practiceGroupId || editingUnit.id,
+        };
+        if (String(item.id).startsWith('pending-')) {
+          const created = await lessonPracticeApi.admin.createItem(editingUnit.id, body);
+          if (!created.data?.id) throw new Error('Không nhận được mã câu hỏi sau khi lưu');
+          savedItems.push({ ...body, id: created.data.id });
+        } else {
+          await lessonPracticeApi.admin.updateItem(item.id, body);
+          savedItems.push(body);
+        }
+      }
+
+      const contentOrder = unitContentOrder(editingUnit, savedItems);
+      await lessonPracticeApi.admin.updateUnit(editingUnit.id, { contentOrder });
+
+      setDeletedItemIds([]);
+      setDraft(null);
+      await Promise.all([loadUnits(subjectId), loadItems(editingUnit.id), loadSubjects(subjectId)]);
+      toast.success('Đã lưu bài học');
+    } catch (err) {
+      toast.error(err.message || 'Không lưu được bài học');
     } finally {
       setSaving(false);
     }
   }
 
-  function handleLessonEntryDrop(event, target) {
-    event.preventDefault();
-    const source = event.dataTransfer.getData('text/plain') || draggedEntry;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const insertAfter = event.clientY > bounds.top + bounds.height / 2;
-    reorderLessonEntries(source, target, insertAfter);
-    setDraggedEntry('');
-    setDragOverEntry('');
-  }
-
-  function entryDropProps(entry) {
-    return {
-      onDragOver: (event) => {
-        event.preventDefault();
-        const bounds = event.currentTarget.getBoundingClientRect();
-        setDragOverEntry(entry);
-        setDragOverAfter(event.clientY > bounds.top + bounds.height / 2);
-      },
-      onDrop: (event) => handleLessonEntryDrop(event, entry),
-    };
-  }
-
-  function entryDragStart(event, entry) {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', entry);
-    const card = event.currentTarget.closest('[data-lesson-entry]');
-    if (card) event.dataTransfer.setDragImage(card, 24, 20);
-    setDraggedEntry(entry);
-    setDragOverEntry('');
-  }
-
-  function entryCardClass(entry) {
-    if (draggedEntry === entry) return 'space-y-2 rounded-xl border border-emerald-300 p-3 opacity-50 transition-colors';
-    const line = dragOverEntry === entry && draggedEntry
-      ? (dragOverAfter ? 'shadow-[0_5px_0_0_#10b981]' : 'shadow-[0_-5px_0_0_#10b981]')
-      : '';
-    return `space-y-2 rounded-xl border border-slate-200 p-3 transition-colors ${line}`;
-  }
-
-  async function loadSubjects(preferId) {
-    const res = await lessonPracticeApi.admin.subjects();
-    const rows = (res.data || []).map(normalizeUnitContents);
-    setSubjects(rows);
-    const nextId = preferId || subjectId || '';
-    setSubjectId(nextId);
-    return nextId;
-  }
-
-  async function loadUnits(id) {
-    if (!id) { setUnits([]); setUnitId(''); return; }
-    const res = await lessonPracticeApi.admin.units(id);
-    const rows = res.data || [];
-    setUnits(rows);
-    setUnitId((current) => (rows.some((row) => row.id === current) ? current : (rows[0]?.id || '')));
-  }
-
-  async function loadItems(id) {
-    if (!id) { setItems([]); return; }
-    const res = await lessonPracticeApi.admin.items(id);
-    setItems(res.data || []);
-  }
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const subjectRowsResponse = await lessonPracticeApi.admin.subjects();
-      if (!alive) return;
-      const subjectRows = subjectRowsResponse.data || [];
-      setSubjects(subjectRows);
-      const coursesResponse = await lessonPracticeApi.admin.courses();
-      if (!alive) return;
-      const courseRows = coursesResponse.data || [];
-      setCourses(courseRows);
-      const firstCourse = courseRows.find((course) =>
-        (course.examSubjects || []).some((examSubjectId) => findCourseLessonSubject(subjectRows, examSubjectId)));
-      const firstSubject = firstCourse?.examSubjects
-        .map((examSubjectId) => findCourseLessonSubject(subjectRows, examSubjectId))
-        .find(Boolean);
-      setExpandedCourseId(firstCourse?.id || '');
-      setSubjectId(firstSubject?.id || '');
-    })()
-      .catch((err) => { if (alive) setError(err.message || 'Không tải được môn học'); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!subjectId) return undefined;
-    setIsUnitEditing(false);
-    setItems([]);
-    loadUnits(subjectId).catch((err) => setError(err.message || 'Không tải được buổi học'));
-    return undefined;
-  }, [subjectId]);
-
-  useEffect(() => {
-    setDeletedItemIds([]);
-    setDraft(null);
-    if (!unitId) { setItems([]); return undefined; }
-    loadItems(unitId).catch((err) => setError(err.message || 'Không tải được nội dung'));
-    return undefined;
-  }, [unitId]);
-
-  useEffect(() => {
-    if (section !== 'progress') return undefined;
-    lessonPracticeApi.admin.progress(subjectId)
-      .then((res) => setProgress(res.data || []))
-      .catch((err) => setError(err.message || 'Không tải được tiến độ'));
-    return undefined;
-  }, [section, subjectId]);
-
-  async function run(task) {
-    setSaving(true);
-    setError('');
-    try { await task(); } catch (err) { setError(err.message || 'Không lưu được'); }
-    finally { setSaving(false); }
-  }
-
-  async function saveAllUnitContent() {
-    const unit = units.find((row) => row.id === unitId);
-    if (!unit) throw new Error('Vui lòng chọn buổi học');
-    if (!String(unit.title || '').trim()) throw new Error('Tên buổi không được để trống');
-
-    const itemsToSave = draftHasContent(draft)
-      ? (() => {
-        const stagedDraft = { ...draft, id: draft.id || `pending-${newContentId()}` };
-        return items.some((item) => item.id === stagedDraft.id)
-          ? items.map((item) => item.id === stagedDraft.id ? stagedDraft : item)
-          : [...items, stagedDraft];
-      })()
-      : items;
-
-    const videos = unit.videos || [];
-    await lessonPracticeApi.admin.updateUnit(unitId, {
-      title: String(unit.title || '').trim(),
-      videos,
-      contents: unit.contents || [],
-      antiSeek: unit.antiSeek !== false,
-      timeLimitSec: unit.timeLimitSec || 0,
-      practiceTimeLimits: unit.practiceTimeLimits || [],
-    });
-
-    for (const id of deletedItemIds) {
-      await lessonPracticeApi.admin.deleteItem(id);
-      setDeletedItemIds((rows) => rows.filter((row) => row !== id));
-    }
-
-    const savedItems = [];
-    for (const item of itemsToSave) {
-      const body = {
-        ...item,
-        videoId: '',
-      };
-      if (String(item.id).startsWith('pending-')) {
-        const created = await lessonPracticeApi.admin.createItem(unitId, body);
-        if (!created.data?.id) throw new Error('Không nhận được mã câu trắc nghiệm sau khi lưu');
-        const persisted = { ...body, id: created.data.id };
-        savedItems.push(persisted);
-        setItems((rows) => rows.map((row) => row.id === item.id ? persisted : row));
-      } else {
-        await lessonPracticeApi.admin.updateItem(item.id, body);
-        savedItems.push(body);
-      }
-    }
-
-    const allowedEntries = new Set([
-      ...(unit.videos || []).map((video) => `video:${video.id}`),
-      ...(unit.contents || []).map((content) => `content:${content.id}`),
-      ...savedItems.map((item) => `practice:${item.practiceGroupId || unitId}`),
-    ]);
-    const contentOrder = unitContentOrder(unit, itemsToSave).filter((entry) => allowedEntries.has(entry));
-    await lessonPracticeApi.admin.updateUnit(unitId, { contentOrder });
-    setDeletedItemIds([]);
-    setDraft(null);
-    setActivePracticeGroupId('');
-    await Promise.all([loadUnits(subject.id), loadItems(unitId)]);
-    setIsUnitEditing(false);
-  }
-
-  async function exportBackup(course = null) {
-    setBackupBusy(true);
-    setBackupCourseId(course?.id || '');
-    setError('');
-    setNotice('');
-    try {
-      const res = await lessonPracticeApi.admin.exportBackup(course?.id || '');
-      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const courseSlug = course?.name
-        ? `-${Array.from(course.name.trim(), (char) => (
-          char.charCodeAt(0) <= 0x1f ? '-' : char
-        )).join('').replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '-')}`
-        : '';
-      link.download = `sao-luu-bai-hoc${courseSlug}-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setNotice(course ? `Đã xuất toàn bộ dữ liệu khóa "${course.name}".` : 'Đã xuất dữ liệu bài học.');
-    } catch (err) {
-      setError(err.message || 'Không xuất được dữ liệu');
-    } finally {
-      setBackupBusy(false);
-      setBackupCourseId('');
-    }
-  }
-
-  async function importBackup(file, course = null) {
-    if (!file) return;
-    const scope = course ? ` của khóa "${course.name}"` : '';
-    if (!(await cmsConfirmAction(`Nhập dữ liệu${scope} sẽ cập nhật các buổi/câu hỏi/nội dung/video trùng và thêm phần còn thiếu (không xóa dữ liệu hiện có). Tiếp tục?`))) return;
-    setBackupBusy(true);
-    setBackupCourseId(course?.id || '');
-    setError('');
-    setNotice('');
-    try {
-      const res = await lessonPracticeApi.admin.importBackup(file, course?.id || '');
-      const d = res.data || {};
-      const skipped = d.skippedSubjects?.length ? ` Bỏ qua môn không tồn tại: ${d.skippedSubjects.join(', ')}.` : '';
-      setNotice(`Đã nhập${course ? ` vào khóa "${course.name}"` : ''} ${d.units || 0} buổi, ${d.items || 0} câu hỏi.${skipped}`);
-      const nextId = await loadSubjects(subjectId);
-      await loadUnits(nextId);
-    } catch (err) {
-      setError(err.message || 'Không nhập được dữ liệu');
-    } finally {
-      setBackupBusy(false);
-      setBackupCourseId('');
-    }
-  }
-
   async function uploadImage(file) {
     if (!file || !draft) return;
-    setDraft((current) => current && ({
-      ...current,
-      pendingImageName: file.name,
-      imageUploadStatus: 'uploading',
-    }));
+    setDraft((current) => current && ({ ...current, pendingImageName: file.name, imageUploadStatus: 'uploading' }));
     setSaving(true);
-    setError('');
     try {
       const res = await lessonPracticeApi.upload(file);
       setDraft((current) => current && ({
@@ -601,816 +604,824 @@ export default function AdminLessonPracticeTab() {
       }));
     } catch (err) {
       setDraft((current) => current && ({ ...current, imageUploadStatus: 'error' }));
-      setError(err.message || 'Không tải được ảnh');
+      toast.error(err.message || 'Không tải được ảnh');
     } finally {
       setSaving(false);
     }
   }
 
+  async function exportBackup() {
+    setBackupBusy(true);
+    try {
+      const res = await lessonPracticeApi.admin.exportBackup('');
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `luyen-tap-tu-do-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Đã xuất dữ liệu Luyện tập tự do.');
+    } catch (err) {
+      toast.error(err.message || 'Không xuất được dữ liệu');
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  async function importBackup(file) {
+    if (!file) return;
+    if (!(await cmsConfirmAction('Nhập dữ liệu JSON sẽ cập nhật bài học/video/câu hỏi trùng và bổ sung phần còn thiếu. Tiếp tục?'))) return;
+    setBackupBusy(true);
+    try {
+      const res = await lessonPracticeApi.admin.importBackup(file, '');
+      const d = res.data || {};
+      toast.success(`Đã nhập ${d.units || 0} bài học, ${d.items || 0} câu hỏi.`);
+      await loadSubjects();
+      if (subjectId) await loadUnits(subjectId);
+    } catch (err) {
+      toast.error(err.message || 'Không nhập được dữ liệu');
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  function updateEditingUnit(updater) {
+    if (!editingUnitId) return;
+    setUnits((rows) => rows.map((u) => (u.id === editingUnitId ? updater(u) : u)));
+  }
+
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-6">
-      <div className="w-full space-y-4">
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-100 bg-white p-2">
+    <div className="h-full space-y-4 overflow-y-auto p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setModuleTab('lessons')}
-            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'lessons' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${moduleTab === 'lessons' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
           >
-            Bài học học viên
+            <BookOpen size={15} /> Luyện tập tự do
+          </button>
+          <button
+            type="button"
+            onClick={() => setModuleTab('progress')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${moduleTab === 'progress' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+          >
+            <Gamepad2 size={15} /> Tiến độ HV TT
           </button>
           <button
             type="button"
             onClick={() => setModuleTab('guide')}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'guide' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${moduleTab === 'guide' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
           >
-            <CircleHelp size={16} />
-            Hướng dẫn học
+            <CircleHelp size={15} /> Hướng dẫn học
           </button>
         </div>
-        {moduleTab === 'guide' ? (
-          <AdminStudentTrainingTab learningGuideOnly />
-        ) : (
-          <>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-black text-slate-900">Bài học</h1>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={exportBackup} disabled={backupBusy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"><Download size={15} /> Xuất dữ liệu</button>
-                <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold ${backupBusy ? 'pointer-events-none opacity-50' : ''}`}>
-                  <Upload size={15} /> Nhập dữ liệu
-                  <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; importBackup(file); }} />
-                </label>
-                <button type="button" onClick={() => setSection('build')} className={`rounded-xl px-3 py-2 text-sm font-bold ${section === 'build' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200'}`}>Soạn bài</button>
-                <button type="button" onClick={() => setSection('progress')} className={`rounded-xl px-3 py-2 text-sm font-bold ${section === 'progress' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200'}`}>Tiến độ</button>
-              </div>
-            </div>
-            {loading && <div className="flex items-center gap-2 text-slate-400"><Loader2 className="animate-spin" size={18} /> Đang tải...</div>}
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            {notice && <p className="text-sm font-semibold text-emerald-700">{notice}</p>}
 
-            {section === 'progress' && (
-              <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-xs  tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">Học viên</th>
-                      <th className="px-4 py-3">Môn</th>
-                      <th className="px-4 py-3">Buổi đã xong</th>
-                      <th className="px-4 py-3">Hiện tại</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {progress.length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-6 text-slate-500">Chưa có học viên vào bài.</td></tr>
-                    )}
-                    {progress.map((row) => (
-                      <tr key={`${row.studentId}-${row.subjectId}`} className="border-t border-slate-100">
-                        <td className="px-4 py-3 font-bold text-slate-900">{row.studentName}</td>
-                        <td className="px-4 py-3">{row.subjectName}</td>
-                        <td className="px-4 py-3">{row.completedUnitCount}/{row.totalUnitCount}</td>
-                        <td className="px-4 py-3">{statusLabel(row)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        {moduleTab === 'lessons' && (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={handleSyncSubjects} disabled={syncingSubjects} className="cms-btn cms-btn-outline !py-2 text-xs">
+              <RefreshCw size={14} className={syncingSubjects ? 'animate-spin' : ''} /> Đồng bộ môn
+            </button>
+            <button type="button" onClick={exportBackup} disabled={backupBusy} className="cms-btn cms-btn-outline !py-2 text-xs">
+              <Download size={14} /> Xuất JSON
+            </button>
+            <label className={`cms-btn cms-btn-outline !py-2 cursor-pointer text-xs ${backupBusy ? 'pointer-events-none opacity-50' : ''}`}>
+              <Upload size={14} /> Nhập JSON
+              <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; importBackup(file); }} />
+            </label>
+          </div>
+        )}
+      </div>
 
-            {section === 'build' && (
-              <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-                <aside className="space-y-2">
-                  {courseGroups.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-4 text-xs text-slate-500">
-                      Chưa có khóa học đã xuất bản kèm môn để soạn bài.
+      {moduleTab === 'guide' ? (
+        <AdminStudentTrainingTab learningGuideOnly />
+      ) : moduleTab === 'progress' ? (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Học viên TT</th>
+                <th className="px-4 py-3">Môn</th>
+                <th className="px-4 py-3">Bài đã hoàn thành</th>
+                <th className="px-4 py-3">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {progress.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-6 text-slate-500">Chưa có học viên nào vào luyện tập tự do.</td></tr>
+              )}
+              {progress.map((row) => (
+                <tr key={`${row.studentId}-${row.subjectId}`} className="border-t border-slate-100">
+                  <td className="px-4 py-3 font-bold text-slate-900">{row.studentName}</td>
+                  <td className="px-4 py-3">{row.subjectName}</td>
+                  <td className="px-4 py-3">{row.completedUnitCount}/{row.totalUnitCount}</td>
+                  <td className="px-4 py-3">{statusLabel(row)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : loading ? (
+        <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang tải…</p>
+      ) : !subjects.length ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+          <p className="font-bold text-slate-700">Chưa có môn học nào được tạo trong Quản lý Khóa học.</p>
+          <p className="mt-1 text-sm text-slate-500">Vào Cài đặt hệ thống → Học phí Khóa học để thêm môn cho khóa học; môn sẽ tự động hiển thị tại đây.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <aside className="space-y-2">
+            {subjects.map((s) => {
+              const Icon = topicIcon(s.icon);
+              const color = topicColor(s.color);
+              const active = s.id === subjectId;
+              return (
+                <div
+                  key={s.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSubjectId(s.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setSubjectId(s.id); }}
+                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 bg-white p-3 transition ${active ? 'border-emerald-500 shadow-sm' : 'border-slate-100 hover:border-slate-200'} ${s.isActive ? '' : 'opacity-60'}`}
+                >
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+                    style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}
+                  >
+                    <Icon size={20} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-slate-900">
+                      {s.name}
+                      {!s.isActive && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
                     </p>
-                  )}
-                  {courseGroups.map((course) => {
-                    const expanded = expandedCourseId === course.id;
+                    <p className="text-[11px] text-slate-500">
+                      {s.unitCount || 0} bài · {s.videoCount || 0} video · {s.contentCount || 0} nội dung · {s.questionCount || 0} câu
+                    </p>
+                    <p className={`mt-0.5 truncate text-[10.5px] font-semibold ${s.courses?.length ? 'text-emerald-700' : 'text-amber-600'}`}>
+                      {s.courses?.length ? `Khóa: ${s.courses.map((c) => c.name).join(', ')}` : 'Chưa gắn vào khóa học nào'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setSubjectModal(s); }} aria-label="Sửa môn" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><Pencil size={14} /></button>
+                </div>
+              );
+            })}
+          </aside>
+
+          {subject && (
+            <section className="space-y-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const Icon = topicIcon(subject.icon);
+                    const color = topicColor(subject.color);
                     return (
-                      <div key={course.id} className="space-y-1">
-                        <div className={`flex items-center gap-1 rounded-xl border p-1 ${expanded ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
-                          <button
-                            type="button"
-                            onClick={() => setExpandedCourseId(expanded ? '' : course.id)}
-                            className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold ${expanded ? 'text-emerald-700' : 'text-slate-700'}`}
-                          >
-                            <span className="min-w-0 truncate">{course.name}</span>
-                            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => exportBackup(course)}
-                            disabled={backupBusy}
-                            aria-label={`Xuất dữ liệu khóa ${course.name}`}
-                            title="Xuất toàn bộ nội dung khóa học"
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-white disabled:opacity-50"
-                          >
-                            {backupBusy && backupCourseId === course.id
-                              ? <Loader2 size={15} className="animate-spin" />
-                              : <Download size={15} />}
-                          </button>
-                          <label
-                            aria-label={`Nhập dữ liệu khóa ${course.name}`}
-                            title="Nhập toàn bộ nội dung khóa học"
-                            className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-600 hover:bg-white ${backupBusy ? 'pointer-events-none opacity-50' : ''}`}
-                          >
-                            <Upload size={15} />
-                            <input
-                              type="file"
-                              accept="application/json,.json"
-                              className="sr-only"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = '';
-                                importBackup(file, course);
-                              }}
-                            />
-                          </label>
-                        </div>
-                        {expanded && (
-                          <div className="ml-3 space-y-1 border-l-2 border-slate-100 pl-2">
-                            {course.subjects.map((row) => (
-                              <button
-                                key={`${course.id}-${row.id}`}
-                                type="button"
-                                onClick={() => setSubjectId(row.id)}
-                                className={`w-full rounded-xl px-3 py-2 text-left text-xs font-bold ${row.id === subjectId ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-100 text-slate-700'}`}
-                              >
-                                {row.name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <span
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+                        style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}
+                      >
+                        <Icon size={20} />
+                      </span>
                     );
-                  })}
-                </aside>
-
-                {subject && (
-                  <section className="flex flex-col gap-4">
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex-1 min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800">{subject.name}</div>
-                        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-                          Học viên cần hoàn thành các nội dung đã thêm của buổi trước mới mở được buổi tiếp theo.
-                        </p>
+                  })()}
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">{subject.name}</h3>
+                    {subject.summary && <p className="text-xs text-slate-500">{subject.summary}</p>}
+                    {subject.courses?.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {subject.courses.map((c) => (
+                          <span key={c.id} className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-700">
+                            {c.name}
+                          </span>
+                        ))}
                       </div>
-                    </div>
+                    )}
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700">
+                  Gắn theo môn trong Khóa học
+                </span>
+              </div>
 
-                    <div
-                      style={{ order: Math.max(0, units.findIndex((unit) => unit.id === unitId)) + 1 }}
-                      className={`flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 ${isUnitEditing && unitId ? '' : 'hidden'}`}
-                    >
-                      {isUnitEditing && unitId && (() => {
-                        const selectedIndex = units.findIndex((unit) => unit.id === unitId);
-                        const unit = units[selectedIndex];
-                        if (!unit) return null;
-                        return (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto_auto] items-stretch gap-2">
-                              <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                <span className="shrink-0 text-sm font-bold text-slate-500">{selectedIndex + 1}.</span>
+              <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-black text-slate-800">Danh sách bài học trong môn</p>
+                    <p className="text-[11px] text-slate-500">
+                      Học viên TT đăng ký khóa có môn này sẽ thấy môn trong phần Luyện tập tự do (Web & Mobile).
+                    </p>
+                  </div>
+                  <form onSubmit={handleCreateUnit} className="flex items-center gap-2">
+                    <input
+                      value={newUnitTitle}
+                      onChange={(e) => setNewUnitTitle(e.target.value)}
+                      placeholder="Tên bài mới..."
+                      className="w-44 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-emerald-400 sm:w-56"
+                    />
+                    <button type="submit" disabled={creatingUnit || !newUnitTitle.trim()} className="cms-btn cms-btn-outline !py-1.5 text-xs">
+                      {creatingUnit ? <Loader2 size={13} className="animate-spin" /> : <Plus size={14} />} Thêm bài
+                    </button>
+                  </form>
+                </div>
+
+                {!units.length ? (
+                  <p className="rounded-xl bg-white p-4 text-center text-xs text-slate-500">Môn này chưa có bài học nào. Nhập tên bài mới ở trên để bắt đầu soạn Video, Luyện tập và Nội dung.</p>
+                ) : (
+                  <ol className="space-y-2">
+                    {units.map((unit, index) => {
+                      const isEditing = editingUnitId === unit.id;
+                      const currentItems = isEditing ? items : [];
+                      const qCount = isEditing ? currentItems.length : (unit.questionCount || 0);
+                      return (
+                        <li key={unit.id} className={`rounded-xl bg-white p-3 ring-1 ${isEditing ? 'ring-emerald-400 shadow-sm' : 'ring-slate-100'}`}>
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 text-xs font-black text-white">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-black text-slate-900">{unit.title}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {(unit.videos || []).length} video · {qCount} câu luyện tập · {(unit.contents || []).length} nội dung
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => openUnitEditor(unit)}
+                              className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-black transition !shadow-none ${isEditing ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}
+                            >
+                              {isEditing ? 'Đóng' : 'Soạn'}
+                            </button>
+                            <span className="flex shrink-0 flex-col">
+                              <button type="button" disabled={index === 0} onClick={() => handleMoveUnit(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
+                              <button type="button" disabled={index === units.length - 1} onClick={() => handleMoveUnit(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
+                            </span>
+                            <button type="button" onClick={() => handleDeleteUnit(unit)} aria-label="Xóa bài" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+                          </div>
+
+                          {isEditing && editingUnit && (
+                            <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                              <div>
+                                <label className={LABEL} htmlFor={`unit-title-${unit.id}`}>Tên bài học</label>
                                 <input
-                                  value={unit.title}
-                                  onChange={(event) => setUnits((rows) => rows.map((row) => row.id === unit.id
-                                    ? { ...row, title: event.target.value }
-                                    : row))}
-                                  aria-label={`Tiêu đề buổi ${selectedIndex + 1}`}
-                                  className="min-w-0 flex-1 text-sm font-bold text-slate-800 outline-none"
+                                  id={`unit-title-${unit.id}`}
+                                  className={INPUT}
+                                  value={editingUnit.title}
+                                  onChange={(e) => updateEditingUnit((u) => ({ ...u, title: e.target.value }))}
                                 />
                               </div>
-                              <button
-                                type="button"
-                                disabled={saving}
-                                onClick={() => run(async () => {
-                                  await lessonPracticeApi.admin.updateUnit(unit.id, { isPreviewAllowed: unit.isPreviewAllowed !== true });
-                                  await loadUnits(subject.id);
-                                })}
-                                className={`rounded-xl px-2 py-2 text-xs font-bold text-white disabled:opacity-60 ${unit.isPreviewAllowed ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-700 hover:bg-slate-800'}`}
-                              >
-                                {unit.isPreviewAllowed ? 'Đang mở' : 'Đang khóa'}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Chỉnh sửa ${unit.title}`}
-                                title={`Chỉnh sửa ${unit.title}`}
-                                onClick={() => toggleUnitEditor(unit.id)}
-                                className="inline-flex min-w-10 items-center justify-center rounded-xl px-3 py-2 text-slate-600 hover:bg-slate-100"
-                              >
-                                <Pencil size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Xóa ${unit.title}`}
-                                title={`Xóa ${unit.title}`}
-                                disabled={saving}
-                                onClick={async () => {
-                                  if (!(await cmsConfirmAction(`Xóa ${unit.title}?`))) return;
-                                  run(async () => {
-                                    await lessonPracticeApi.admin.deleteUnit(unit.id);
-                                    setUnitId('');
-                                    setIsUnitEditing(false);
-                                    await loadUnits(subject.id);
-                                  });
-                                }}
-                                className="inline-flex min-w-10 items-center justify-center rounded-xl px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-60"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      {isUnitEditing && unitId && (
-                        <div className="contents">
-                          {orderedLessonEntries.map((entry, entryIndex) => {
-                            if (entry.startsWith('content:')) {
-                              const contentId = entry.slice('content:'.length);
-                              const content = lessonContents.find((row) => row.id === contentId);
-                              if (!content) return null;
-                              const index = lessonContents.findIndex((row) => row.id === contentId);
-                              return (
-                                <div
-                                  key={entry}
-                                  data-lesson-entry={entry}
-                                  style={{ order: entryIndex }}
-                                  {...entryDropProps(entry)}
-                                  className={entryCardClass(entry)}
+
+                              <div className="flex flex-wrap gap-1.5 rounded-xl bg-slate-100 p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditorSubTab('video')}
+                                  className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black transition !shadow-none ${editorSubTab === 'video' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        draggable
-                                        onDragStart={(event) => entryDragStart(event, entry)}
-                                        onDragEnd={() => { setDraggedEntry(''); setDragOverEntry(''); }}
-                                        aria-label="Kéo để di chuyển nội dung buổi học"
-                                        title="Kéo để sắp xếp"
-                                        className="cursor-grab touch-none text-slate-400 active:cursor-grabbing"
-                                      >
-                                        <GripVertical size={17} />
-                                      </button>
-                                      <p className="text-sm font-bold text-slate-800">Nội dung bài học</p>
-                                    </div>
-                                  </div>
-                                  <div className="rounded-lg bg-slate-50 p-2">
-                                    <div className="mb-2 flex gap-2">
-                                      <input
-                                        value={content.title}
-                                        onChange={(event) => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                          ? { ...unit, contents: unit.contents.map((row) => row.id === content.id ? { ...row, title: event.target.value } : row) }
-                                          : unit))}
-                                        placeholder={`Tiêu đề nội dung ${index + 1}`}
-                                        aria-label={`Tiêu đề nội dung ${index + 1}`}
-                                        className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                      />
-                                      <button type="button" onClick={() => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                        ? {
-                                          ...unit,
-                                          contents: unit.contents.filter((row) => row.id !== content.id),
-                                          contentOrder: unitContentOrder(unit, items).filter((row) => row !== entry),
-                                        }
-                                        : unit))} aria-label={`Xóa nội dung ${index + 1}`} className="inline-flex items-center justify-center rounded-lg px-2 text-red-600 hover:bg-red-50">
-                                        <Trash2 size={16} />
-                                      </button>
-                                    </div>
-                                    <RichTextEditor
-                                      value={content.content}
-                                      onChange={(value) => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                        ? { ...unit, contents: unit.contents.map((row) => row.id === content.id ? { ...row, content: value } : row) }
-                                        : unit))}
-                                      placeholder="Nội dung học viên đọc trong buổi học"
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            }
-                            if (entry.startsWith('video:')) {
-                              const videoId = entry.slice('video:'.length);
-                              const video = lessonVideos.find((row) => row.id === videoId);
-                              if (!video) return null;
-                              const index = lessonVideos.findIndex((row) => row.id === videoId);
-                              return (
-                                <div
-                                  key={entry}
-                                  data-lesson-entry={entry}
-                                  style={{ order: entryIndex }}
-                                  {...entryDropProps(entry)}
-                                  className={entryCardClass(entry)}
+                                  <Clapperboard size={14} /> Xem video ({(editingUnit.videos || []).length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditorSubTab('practice')}
+                                  className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black transition !shadow-none ${editorSubTab === 'practice' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        draggable
-                                        onDragStart={(event) => entryDragStart(event, entry)}
-                                        onDragEnd={() => { setDraggedEntry(''); setDragOverEntry(''); }}
-                                        aria-label="Kéo để di chuyển video"
-                                        title="Kéo để sắp xếp"
-                                        className="cursor-grab touch-none text-slate-400 active:cursor-grabbing"
-                                      >
-                                        <GripVertical size={17} />
-                                      </button>
-                                      <p className="text-sm font-bold text-slate-800">Video bài học</p>
-                                    </div>
-                                  </div>
-                                  <div className="grid gap-2 rounded-lg bg-slate-50 p-2 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto]">
-                                    <input
-                                      value={video.title}
-                                      onChange={(event) => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                        ? { ...unit, videos: unit.videos.map((row) => row.id === video.id ? { ...row, title: event.target.value } : row) }
-                                        : unit))}
-                                      placeholder={`Tên video ${index + 1}`}
-                                      aria-label={`Tên video ${index + 1}`}
-                                      className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                    />
-                                    <input
-                                      value={video.url}
-                                      onChange={(event) => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                        ? { ...unit, videos: unit.videos.map((row) => row.id === video.id ? { ...row, url: event.target.value } : row) }
-                                        : unit))}
-                                      placeholder="HTTPS://www.youtube.com/watch?VN?=..."
-                                      aria-label={`Đường dẫn video ${index + 1}`}
-                                      className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                    />
-                                    <button type="button" onClick={() => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                      ? {
-                                        ...unit,
-                                        videos: unit.videos.filter((row) => row.id !== video.id),
-                                        contentOrder: unitContentOrder(unit, items).filter((row) => row !== entry),
-                                      }
-                                      : unit))} aria-label={`Xóa video ${index + 1}`} className="inline-flex items-center justify-center rounded-lg px-2 text-red-600 hover:bg-red-50">
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                  <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                    <input
-                                      type="checkbox"
-                                      checked={(video.antiSeek ?? selectedUnit?.antiSeek) !== false}
-                                      onChange={(event) => setUnits((rows) => rows.map((unit) => (unit.id === unitId
-                                        ? { ...unit, videos: unit.videos.map((row) => (row.id === video.id ? { ...row, antiSeek: event.target.checked } : row)) }
-                                        : unit)))}
-                                    />
-                                    Bật chống tua video (học viên phải xem tối thiểu 70%)
-                                  </label>
-                                </div>
-                              );
-                            }
-                            if (entry.startsWith('practice:')) {
-                              const groupId = entry.slice('practice:'.length);
-                              const groupItems = practiceItems.filter((item) => String(item.practiceGroupId || unitId) === groupId);
-                              return (
-                                <div
-                                  key={entry}
-                                  data-lesson-entry={entry}
-                                  style={{ order: entryIndex }}
-                                  {...entryDropProps(entry)}
-                                  className={entryCardClass(entry)}
+                                  <Gamepad2 size={14} /> Luyện tập ({items.length} câu)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditorSubTab('content')}
+                                  className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black transition !shadow-none ${editorSubTab === 'content' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        draggable
-                                        onDragStart={(event) => entryDragStart(event, entry)}
-                                        onDragEnd={() => { setDraggedEntry(''); setDragOverEntry(''); }}
-                                        aria-label="Kéo để di chuyển phần luyện tập"
-                                        title="Kéo để sắp xếp"
-                                        className="cursor-grab touch-none text-slate-400 active:cursor-grabbing"
-                                      >
-                                        <GripVertical size={17} />
-                                      </button>
-                                      <p className="text-sm font-bold text-slate-800">Luyện tập bài học · Phần {entryIndex + 1} · {groupItems.length} câu</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          if (groupItems.length > 0 && !(await cmsConfirmAction(`Xóa Phần ${entryIndex + 1} và toàn bộ ${groupItems.length} câu hỏi trong phần này?`))) return;
-                                          setItems((rows) => rows.filter((item) => String(item.practiceGroupId || unitId) !== groupId));
-                                          setDeletedItemIds((rows) => [
-                                            ...rows,
-                                            ...groupItems
-                                              .filter((item) => !String(item.id).startsWith('pending-'))
-                                              .map((item) => item.id)
-                                              .filter((id) => !rows.includes(id)),
-                                          ]);
-                                          setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                            ? { ...unit, contentOrder: unitContentOrder(unit, items).filter((value) => value !== entry) }
-                                            : unit));
-                                          if (activePracticeGroupId === groupId || draft?.practiceGroupId === groupId) {
-                                            setActivePracticeGroupId('');
-                                            setDraft(null);
-                                          }
-                                        }}
-                                        aria-label={`Xóa phần luyện tập ${entryIndex + 1}`}
-                                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700"
-                                      >
-                                        Xóa phần
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-2">
-                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800">
-                                      <Clock size={14} /> Thời gian chung
-                                    </span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="3600"
-                                      value={practiceGroupTimeLimit(selectedUnit, groupId)}
-                                      onChange={(event) => setPracticeGroupTimeLimit(groupId, event.target.value)}
-                                      onBlur={(event) => savePracticeGroupTimeLimit(groupId, event.target.value)}
-                                      aria-label={`Thời gian chung cho phần luyện tập ${entryIndex + 1}`}
-                                      className="w-16 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold"
-                                    />
-                                    <span className="text-[11px] text-emerald-700">giây · 0 = tắt</span>
-                                    {[30, 60, 90, 120].map((sec) => (
-                                      <button
-                                        key={sec}
-                                        type="button"
-                                        className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-bold text-emerald-700"
-                                        onMouseDown={(event) => event.preventDefault()}
-                                        onClick={() => {
-                                          setPracticeGroupTimeLimit(groupId, sec);
-                                          savePracticeGroupTimeLimit(groupId, sec);
-                                        }}
-                                      >
-                                        {sec}s
-                                      </button>
-                                    ))}
-                                  </div>
-                                  {groupItems.length > 0 ? (
-                                    <div className="space-y-1.5">
-                                      {groupItems.map((item, index) => (
-                                        <div key={item.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs">
-                                          <span className="font-bold text-slate-400">{index + 1}.</span>
-                                          <span className="min-w-0 flex-1 truncate">{TYPES.find((type) => type.id === item.type)?.label}: {item.prompt || item.caption || 'Ảnh'}</span>
-                                          {Number(item.timeLimitSec) > 0 && <span className="shrink-0 font-bold text-slate-500">{item.timeLimitSec}s</span>}
+                                  <NotebookPen size={14} /> Nội dung ({(editingUnit.contents || []).length})
+                                </button>
+                              </div>
+
+                              {editorSubTab === 'video' && (
+                                <div className="space-y-2.5">
+                                  {(editingUnit.videos || []).length === 0 ? (
+                                    <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">Chưa có video. Bấm "+ Thêm video" bên dưới.</p>
+                                  ) : (editingUnit.videos || []).map((video, vIdx) => {
+                                    const vCount = items.filter((item) => resolveAdminItemVideoKey(item, editingUnit.videos) === video.id).length;
+                                    const hasUrl = Boolean(String(video.url || '').trim());
+                                    return (
+                                      <div key={video.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
+                                          <input
+                                            className={INPUT}
+                                            value={video.title}
+                                            onChange={(e) => updateEditingUnit((u) => ({
+                                              ...u,
+                                              videos: u.videos.map((v) => (v.id === video.id ? { ...v, title: e.target.value } : v)),
+                                            }))}
+                                            placeholder={`Tên video ${vIdx + 1}`}
+                                          />
+                                          <input
+                                            className={INPUT}
+                                            value={video.url}
+                                            onChange={(e) => updateEditingUnit((u) => ({
+                                              ...u,
+                                              videos: u.videos.map((v) => (v.id === video.id ? { ...v, url: e.target.value } : v)),
+                                            }))}
+                                            placeholder="https://www.youtube.com/watch?v=... hoặc /uploads/..."
+                                          />
                                           <button
                                             type="button"
-                                            className="font-bold text-slate-700"
-                                            onClick={() => {
-                                              setActivePracticeGroupId(groupId);
-                                              setDraft({ ...blankItem(), ...item, practiceGroupId: groupId, videoId: '', options: item.options?.length ? item.options : blankItem().options, pairs: item.pairs?.length ? item.pairs : blankItem().pairs, correctOptionIds: item.correctOptionIds || [], region: item.region || null });
-                                            }}
+                                            onClick={() => updateEditingUnit((u) => ({
+                                              ...u,
+                                              videos: u.videos.filter((v) => v.id !== video.id),
+                                            }))}
+                                            aria-label={`Xóa video ${vIdx + 1}`}
+                                            className="inline-flex items-center justify-center rounded-xl px-2.5 text-red-600 hover:bg-red-50 !shadow-none"
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </div>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-600">
+                                            <input
+                                              type="checkbox"
+                                              checked={video.antiSeek === true}
+                                              onChange={(e) => updateEditingUnit((u) => ({
+                                                ...u,
+                                                videos: u.videos.map((v) => (v.id === video.id ? { ...v, antiSeek: e.target.checked } : v)),
+                                              }))}
+                                              className="h-4 w-4 accent-emerald-600"
+                                            />
+                                            Bật chống tua video (xem tối thiểu 70%)
+                                          </label>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {!hasUrl && (
+                                              <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 ring-1 ring-amber-200">
+                                                Chưa có link — trắc nghiệm vẫn mở làm ngay
+                                              </span>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setPracticeVideoFilter(video.id);
+                                                setEditorSubTab('practice');
+                                                if (vCount === 0) setDraft(blankItem(primaryPracticeGroupId, video.id));
+                                                else setDraft(null);
+                                              }}
+                                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-50 !shadow-none"
+                                            >
+                                              <Gamepad2 size={13} /> Mốc trắc nghiệm ({vCount} câu) · Thêm / Sửa
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  <button
+                                    type="button"
+                                    onClick={() => updateEditingUnit((u) => ({
+                                      ...u,
+                                      videos: [...(u.videos || []), { id: newContentId(), title: `Video ${(u.videos || []).length + 1}`, url: '', antiSeek: false }],
+                                    }))}
+                                    className="cms-btn cms-btn-outline !py-1.5 text-xs"
+                                  >
+                                    <Plus size={14} /> Thêm video
+                                  </button>
+                                </div>
+                              )}
+
+                              {editorSubTab === 'practice' && (() => {
+                                const unitVideosList = editingUnit.videos || [];
+                                const validFilter = practiceVideoFilter === 'none' || unitVideosList.some((v) => v.id === practiceVideoFilter)
+                                  ? practiceVideoFilter
+                                  : 'all';
+                                const filteredItems = validFilter === 'all'
+                                  ? items
+                                  : items.filter((item) => resolveAdminItemVideoKey(item, unitVideosList) === validFilter);
+                                const noneCount = items.filter((item) => resolveAdminItemVideoKey(item, unitVideosList) === 'none').length;
+                                const defaultVideoForNew = validFilter !== 'all' ? validFilter : (unitVideosList[0]?.id || 'none');
+                                const draftVideoKey = draft ? resolveAdminItemVideoKey(draft, unitVideosList) : 'none';
+                                const draftTargetVideo = unitVideosList.find((v) => v.id === draftVideoKey) || null;
+                                const draftIsImmediate = draftVideoKey === 'none' || !String(draftTargetVideo?.url || '').trim();
+
+                                return (
+                                <div className="space-y-3">
+                                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                                      <Clock size={14} /> Câu hỏi gắn theo mốc video:
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-emerald-700">
+                                      {unitVideosList.some((v) => String(v.url || '').trim())
+                                        ? 'Chọn từng video bên dưới để thêm/lọc mốc cho riêng video đó. Video chưa đặt link hoặc "Không gắn video" vẫn mở trắc nghiệm cho học viên làm ngay.'
+                                        : 'Bài chưa đặt link video — toàn bộ câu hỏi trắc nghiệm sẽ mở cho học viên làm ngay.'}
+                                    </span>
+                                  </div>
+
+                                  {unitVideosList.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => setPracticeVideoFilter('all')}
+                                        className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition !shadow-none ${validFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                      >
+                                        Tất cả ({items.length})
+                                      </button>
+                                      {unitVideosList.map((v, vIdx) => {
+                                        const vCount = items.filter((item) => resolveAdminItemVideoKey(item, unitVideosList) === v.id).length;
+                                        const noUrl = !String(v.url || '').trim();
+                                        return (
+                                          <button
+                                            key={v.id}
+                                            type="button"
+                                            onClick={() => setPracticeVideoFilter(v.id)}
+                                            className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition !shadow-none ${validFilter === v.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-emerald-50'}`}
+                                          >
+                                            {v.title || `Video ${vIdx + 1}`} ({vCount}){noUrl ? ' · chưa link' : ''}
+                                          </button>
+                                        );
+                                      })}
+                                      {(noneCount > 0 || validFilter === 'none') && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPracticeVideoFilter('none')}
+                                          className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition !shadow-none ${validFilter === 'none' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-emerald-50'}`}
+                                        >
+                                          Mở làm ngay ({noneCount})
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {filteredItems.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                      {filteredItems.map((item, qIdx) => {
+                                        const vKey = resolveAdminItemVideoKey(item, unitVideosList);
+                                        const vIdx = unitVideosList.findIndex((v) => v.id === vKey);
+                                        const vObj = vIdx >= 0 ? unitVideosList[vIdx] : null;
+                                        const immediate = !vObj || !String(vObj.url || '').trim();
+                                        return (
+                                        <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+                                          <span className="font-black text-slate-400">{qIdx + 1}.</span>
+                                          <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">
+                                            {TYPES.find((t) => t.id === item.type)?.label}: {item.prompt || item.caption || 'Ảnh'}
+                                          </span>
+                                          {unitVideosList.length > 0 && (
+                                            <span className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 ring-1 ring-sky-200">
+                                              {vObj ? (vObj.title || `Video ${vIdx + 1}`) : 'Không gắn video'}
+                                            </span>
+                                          )}
+                                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${immediate ? 'bg-amber-100 text-amber-800' : Number(item.checkpointSec) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                            {immediate ? 'Mở làm ngay' : Number(item.checkpointSec) > 0 ? `Mốc ${formatCheckpointLabel(item.checkpointSec)}` : 'Mốc tự động'}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDraft({
+                                              ...blankItem(item.practiceGroupId || primaryPracticeGroupId, vKey),
+                                              ...item,
+                                              videoId: vKey,
+                                              options: item.options?.length ? item.options : blankItem().options,
+                                              pairs: item.pairs?.length ? item.pairs : blankItem().pairs,
+                                              correctOptionIds: item.correctOptionIds || [],
+                                              region: item.region || null,
+                                            })}
+                                            className="font-bold text-emerald-700 hover:underline !shadow-none"
                                           >
                                             Sửa
                                           </button>
                                           <button
                                             type="button"
-                                            className="font-bold text-emerald-600"
                                             onClick={() => {
                                               setItems((rows) => rows.filter((row) => row.id !== item.id));
                                               if (!String(item.id).startsWith('pending-')) {
-                                                setDeletedItemIds((rows) => rows.includes(item.id) ? rows : [...rows, item.id]);
+                                                setDeletedItemIds((rows) => (rows.includes(item.id) ? rows : [...rows, item.id]));
                                               }
                                               if (draft?.id === item.id) setDraft(null);
                                             }}
+                                            className="font-bold text-red-600 hover:underline !shadow-none"
                                           >
                                             Xóa
                                           </button>
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-500">Chưa có câu luyện tập. Thêm câu để hoàn tất phần này.</p>
+                                    <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+                                      {validFilter === 'all' ? 'Chưa có câu hỏi luyện tập nào.' : 'Video/mục này chưa có câu hỏi nào. Bấm "+ Thêm câu hỏi" bên dưới.'}
+                                    </p>
                                   )}
-                                  <div ref={practiceEditorRef(groupId)} />
-                                </div>
-                              );
-                            }
-                            return null;
-                          })}
-                        </div>
-                      )}
-                      {unitId && hasPracticeBlock && selectedPracticeGroupId
-                        && practiceEditorTarget?.groupId === selectedPracticeGroupId
-                        && draft?.practiceGroupId === selectedPracticeGroupId
-                        && createPortal(
-                          <div className="space-y-2 rounded-xl border border-slate-200 p-3">
-                            <h2 className="text-sm font-black text-slate-900">
-                              Soạn câu luyện tập · Phần {orderedLessonEntries.indexOf(`practice:${selectedPracticeGroupId}`) + 1}
-                            </h2>
-                          {draft?.practiceGroupId === selectedPracticeGroupId && (
-                            <form className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5" onSubmit={(event) => {
-                              event.preventDefault();
-                              const addAnother = event.nativeEvent.submitter?.dataset?.next === '1';
-                              const entryId = draft.id || `pending-${newContentId()}`;
-                              const staged = { ...draft, id: entryId, practiceGroupId: selectedPracticeGroupId };
-                              setItems((rows) => rows.some((row) => row.id === entryId)
-                                ? rows.map((row) => row.id === entryId ? staged : row)
-                                : [...rows, staged]);
-                              if (addAnother) {
-                                setDraft({ ...blankItem(), practiceGroupId: selectedPracticeGroupId });
-                              } else {
-                                setDraft(null);
-                              }
-                            }}>
-                              <div className="flex flex-wrap gap-1">
-                                {TYPES.map((type) => (
-                                  <button key={type.id} type="button" onClick={() => setDraft((current) => ({ ...current, type: type.id }))} className={`rounded-lg px-2 py-1 text-[11px] font-bold ${draft.type === type.id ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>{type.label}</button>
-                                ))}
-                              </div>
-                              <textarea value={draft.prompt} onChange={(e) => setDraft({ ...draft, prompt: e.target.value })} rows={2} placeholder="Nội dung câu hỏi" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm" />
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                                  Thời gian riêng (giây)
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="3600"
-                                    value={draft.timeLimitSec ?? 0}
-                                    onChange={(e) => setDraft({ ...draft, timeLimitSec: e.target.value })}
-                                    className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
-                                  />
-                                </label>
-                                <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-500">
-                                  <span>Ảnh</span>
-                                  <span className="rounded border border-slate-300 bg-slate-100 px-2 py-1 text-slate-700">Choose File</span>
-                                  <span className="max-w-64 truncate font-normal text-slate-600" title={draft.imageName || draft.pendingImageName || ''}>
-                                    {draft.imageUploadStatus === 'uploading'
-                                      ? `Đang tải: ${draft.pendingImageName}`
-                                      : draft.imageUploadStatus === 'error'
-                                        ? `Tải lên thất bại: ${draft.pendingImageName}`
-                                        : draft.imageName || 'No file chosen'}
-                                  </span>
-                                  <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; uploadImage(file); }} />
-                                </label>
-                              </div>
-                              {draft.type === 'hotspot' && (
-                                <RegionDraw imageUrl={draft.imageUrl} region={draft.region} onChange={(region) => setDraft({ ...draft, region })} />
-                              )}
-                              {(draft.type === 'mcq' || draft.type === 'multi' || draft.type === 'drag') && (
-                                <div className="space-y-1.5">
-                                  {draft.type === 'drag' && <p className="text-xs text-slate-500">Xếp đúng thứ tự từ trên xuống. Học viên sẽ kéo thả để sắp lại.</p>}
-                                  {draft.type === 'multi' && <p className="text-xs text-slate-500">Tick các đáp án đúng. Học viên được chọn nhiều đáp án.</p>}
-                                  {draft.options.map((opt, index) => (
-                                    <div key={opt.id} className="flex items-center gap-1.5">
-                                      {draft.type === 'mcq' && (
-                                        <input type="radio" name="correct" checked={draft.correctOptionId === opt.id} onChange={() => setDraft({ ...draft, correctOptionId: opt.id })} />
-                                      )}
-                                      {draft.type === 'multi' && (
-                                        <input type="checkbox" checked={(draft.correctOptionIds || []).includes(opt.id)} onChange={() => {
-                                          const picked = new Set(draft.correctOptionIds || []);
-                                          if (picked.has(opt.id)) picked.delete(opt.id);
-                                          else picked.add(opt.id);
-                                          setDraft({ ...draft, correctOptionIds: [...picked] });
-                                        }} />
-                                      )}
-                                      <input value={opt.text} onChange={(e) => {
-                                        const options = draft.options.map((row) => (row.id === opt.id ? { ...row, text: e.target.value } : row));
-                                        setDraft({ ...draft, options });
-                                      }} placeholder={draft.type === 'drag' ? `Thứ tự ${index + 1}` : `Đáp án ${index + 1}`} className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                                    </div>
-                                  ))}
-                                  <div className="flex gap-3">
-                                    {draft.options.length < 6 && (
-                                      <button type="button" className="text-xs font-bold text-slate-600" onClick={() => setDraft({ ...draft, options: [...draft.options, newOption()] })}>Thêm đáp án</button>
-                                    )}
-                                    {draft.options.length > 2 && (
-                                      <button type="button" className="text-xs font-bold text-slate-600" onClick={() => {
-                                        const options = draft.options.slice(0, -1);
-                                        const correctOptionId = options.some((opt) => opt.id === draft.correctOptionId) ? draft.correctOptionId : options[0].id;
-                                        const correctOptionIds = (draft.correctOptionIds || []).filter((id) => options.some((opt) => opt.id === id));
-                                        setDraft({ ...draft, options, correctOptionId, correctOptionIds });
-                                      }}>Bớt đáp án</button>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              {draft.type === 'match' && (
-                                <div className="space-y-1.5">
-                                  <p className="text-xs text-slate-500">Mỗi dòng là một cặp đúng. Học viên sẽ ghép cột trái với cột phải.</p>
-                                  {draft.pairs.map((pair, index) => (
-                                    <div key={pair.id} className="grid gap-1.5 sm:grid-cols-2">
-                                      <input value={pair.left} onChange={(e) => {
-                                        const pairs = draft.pairs.map((row) => (row.id === pair.id ? { ...row, left: e.target.value } : row));
-                                        setDraft({ ...draft, pairs });
-                                      }} placeholder={`Vế trái ${index + 1}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                                      <input value={pair.right} onChange={(e) => {
-                                        const pairs = draft.pairs.map((row) => (row.id === pair.id ? { ...row, right: e.target.value } : row));
-                                        setDraft({ ...draft, pairs });
-                                      }} placeholder={`Vế phải ${index + 1}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                                    </div>
-                                  ))}
-                                  <div className="flex gap-3">
-                                    {draft.pairs.length < 6 && (
-                                      <button type="button" className="text-xs font-bold text-slate-600" onClick={() => setDraft({ ...draft, pairs: [...draft.pairs, newPair()] })}>Thêm cặp</button>
-                                    )}
-                                    {draft.pairs.length > 2 && (
-                                      <button type="button" className="text-xs font-bold text-slate-600" onClick={() => setDraft({ ...draft, pairs: draft.pairs.slice(0, -1) })}>Bớt cặp</button>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              {draft.type === 'written' && (
-                                <>
-                                  <p className="text-xs text-slate-500">AI đối chiếu câu hỏi với bài học viên. Đúng trên 70% thì qua, dưới 70% phải trả lời lại.</p>
-                                  <textarea value={draft.rubric} onChange={(e) => setDraft({ ...draft, rubric: e.target.value })} rows={1} placeholder="Barem: ý nào được tính là đúng" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                                  <textarea value={draft.modelAnswer} onChange={(e) => setDraft({ ...draft, modelAnswer: e.target.value })} rows={1} placeholder="Đáp án mẫu để AI đối chiếu" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                                </>
-                              )}
-                              <textarea value={draft.hint} onChange={(e) => setDraft({ ...draft, hint: e.target.value })} rows={1} placeholder="Gợi ý (hiện khi học viên bấm nút Gợi ý)" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                              <textarea value={draft.explanation} onChange={(e) => setDraft({ ...draft, explanation: e.target.value })} rows={1} placeholder="Lời giải (hiện sau khi học viên xác nhận)" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                              <div className="flex flex-wrap gap-1.5">
-                                {draft.id ? (
-                                  <>
-                                    <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">Cập nhật câu</button>
+
+                                  {!draft && (
                                     <button
-                                      type="submit"
-                                      data-next="1"
-                                      disabled={saving}
-                                      aria-label="Cập nhật câu và thêm câu mới"
-                                      title="Cập nhật câu và thêm câu mới"
-                                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white disabled:opacity-60"
+                                      type="button"
+                                      onClick={() => setDraft(blankItem(primaryPracticeGroupId, defaultVideoForNew))}
+                                      className="cms-btn cms-btn-outline !py-1.5 text-xs"
                                     >
-                                      <Plus size={17} />
+                                      <Plus size={14} /> Thêm câu hỏi
                                     </button>
-                                  </>
-                                ) : (
+                                  )}
+
+                                  {draft && (
+                                    <form
+                                      className="space-y-2.5 rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"
+                                      onSubmit={(event) => {
+                                        event.preventDefault();
+                                        const addAnother = event.nativeEvent.submitter?.dataset?.next === '1';
+                                        const entryId = draft.id || `pending-${newContentId()}`;
+                                        const resolvedVid = resolveAdminItemVideoKey(draft, unitVideosList);
+                                        const staged = { ...draft, id: entryId, videoId: resolvedVid, practiceGroupId: draft.practiceGroupId || primaryPracticeGroupId };
+                                        setItems((rows) => (rows.some((row) => row.id === entryId)
+                                          ? rows.map((row) => (row.id === entryId ? staged : row))
+                                          : [...rows, staged]));
+                                        if (addAnother) setDraft(blankItem(primaryPracticeGroupId, resolvedVid));
+                                        else setDraft(null);
+                                      }}
+                                    >
+                                      <div className="flex flex-wrap gap-1">
+                                        {TYPES.map((type) => (
+                                          <button
+                                            key={type.id}
+                                            type="button"
+                                            onClick={() => setDraft((cur) => ({ ...cur, type: type.id }))}
+                                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold ${draft.type === type.id ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}
+                                          >
+                                            {type.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <textarea
+                                        value={draft.prompt}
+                                        onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
+                                        rows={2}
+                                        placeholder="Nội dung câu hỏi"
+                                        className={INPUT}
+                                      />
+                                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                        {unitVideosList.length > 0 && (
+                                          <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                                            Gắn vào video
+                                            <select
+                                              value={draftVideoKey}
+                                              onChange={(e) => setDraft({ ...draft, videoId: e.target.value })}
+                                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold"
+                                            >
+                                              {unitVideosList.map((v, vIdx) => (
+                                                <option key={v.id} value={v.id}>
+                                                  {v.title || `Video ${vIdx + 1}`}{!String(v.url || '').trim() ? ' (chưa có link - làm ngay)' : ''}
+                                                </option>
+                                              ))}
+                                              <option value="none">Không gắn mốc video (mở làm ngay)</option>
+                                            </select>
+                                          </label>
+                                        )}
+                                        {!draftIsImmediate ? (
+                                          <>
+                                            <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                                              Mốc mở (giây)
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="86400"
+                                                value={draft.checkpointSec ?? 0}
+                                                onChange={(e) => setDraft({ ...draft, checkpointSec: e.target.value })}
+                                                className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold"
+                                              />
+                                            </label>
+                                            {[
+                                              { sec: 0, label: '0s (Tự động)' },
+                                              { sec: 15, label: '15s' },
+                                              { sec: 30, label: '30s' },
+                                              { sec: 60, label: '60s' },
+                                              { sec: 120, label: '120s' },
+                                              { sec: 180, label: '180s' },
+                                            ].map((preset) => (
+                                              <button
+                                                key={preset.sec}
+                                                type="button"
+                                                onClick={() => setDraft({ ...draft, checkpointSec: preset.sec })}
+                                                className={`rounded-md border px-2 py-1 text-[11px] font-bold !shadow-none ${Number(draft.checkpointSec || 0) === preset.sec
+                                                  ? 'border-emerald-500 bg-emerald-100 text-emerald-800'
+                                                  : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300'}`}
+                                              >
+                                                {preset.label}
+                                              </button>
+                                            ))}
+                                          </>
+                                        ) : (
+                                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 ring-1 ring-amber-200">
+                                            Chưa đặt link video → câu hỏi mở cho học viên làm ngay
+                                          </span>
+                                        )}
+                                        <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600">
+                                          <span>Ảnh</span>
+                                          <span className="rounded border border-slate-300 bg-slate-100 px-2 py-1 text-slate-700">Chọn ảnh</span>
+                                          <span className="max-w-52 truncate font-normal text-slate-600">
+                                            {draft.imageUploadStatus === 'uploading'
+                                              ? `Đang tải: ${draft.pendingImageName}`
+                                              : draft.imageUploadStatus === 'error'
+                                                ? `Lỗi tải: ${draft.pendingImageName}`
+                                                : draft.imageName || 'Chưa chọn'}
+                                          </span>
+                                          <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; uploadImage(file); }} />
+                                        </label>
+                                      </div>
+                                      {draft.type === 'hotspot' && (
+                                        <RegionDraw imageUrl={draft.imageUrl} region={draft.region} onChange={(region) => setDraft({ ...draft, region })} />
+                                      )}
+                                      {(draft.type === 'mcq' || draft.type === 'multi' || draft.type === 'drag') && (
+                                        <div className="space-y-1.5">
+                                          {draft.type === 'drag' && <p className="text-xs text-slate-500">Xếp đúng thứ tự từ trên xuống. Học viên sẽ kéo thả sắp lại.</p>}
+                                          {draft.type === 'multi' && <p className="text-xs text-slate-500">Tick các đáp án đúng.</p>}
+                                          {draft.options.map((opt, idx) => (
+                                            <div key={opt.id} className="flex items-center gap-1.5">
+                                              {draft.type === 'mcq' && (
+                                                <input type="radio" name="correct" checked={draft.correctOptionId === opt.id} onChange={() => setDraft({ ...draft, correctOptionId: opt.id })} />
+                                              )}
+                                              {draft.type === 'multi' && (
+                                                <input
+                                                  type="checkbox"
+                                                  checked={(draft.correctOptionIds || []).includes(opt.id)}
+                                                  onChange={() => {
+                                                    const picked = new Set(draft.correctOptionIds || []);
+                                                    if (picked.has(opt.id)) picked.delete(opt.id);
+                                                    else picked.add(opt.id);
+                                                    setDraft({ ...draft, correctOptionIds: [...picked] });
+                                                  }}
+                                                />
+                                              )}
+                                              <input
+                                                value={opt.text}
+                                                onChange={(e) => setDraft({
+                                                  ...draft,
+                                                  options: draft.options.map((row) => (row.id === opt.id ? { ...row, text: e.target.value } : row)),
+                                                })}
+                                                placeholder={draft.type === 'drag' ? `Thứ tự ${idx + 1}` : `Đáp án ${idx + 1}`}
+                                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm"
+                                              />
+                                            </div>
+                                          ))}
+                                          <div className="flex gap-3">
+                                            {draft.options.length < 6 && (
+                                              <button type="button" className="text-xs font-bold text-emerald-700 !shadow-none" onClick={() => setDraft({ ...draft, options: [...draft.options, newOption()] })}>+ Thêm đáp án</button>
+                                            )}
+                                            {draft.options.length > 2 && (
+                                              <button
+                                                type="button"
+                                                className="text-xs font-bold text-slate-600 !shadow-none"
+                                                onClick={() => {
+                                                  const options = draft.options.slice(0, -1);
+                                                  const correctOptionId = options.some((opt) => opt.id === draft.correctOptionId) ? draft.correctOptionId : options[0].id;
+                                                  const correctOptionIds = (draft.correctOptionIds || []).filter((id) => options.some((opt) => opt.id === id));
+                                                  setDraft({ ...draft, options, correctOptionId, correctOptionIds });
+                                                }}
+                                              >
+                                                - Bớt đáp án
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {draft.type === 'match' && (
+                                        <div className="space-y-1.5">
+                                          {draft.pairs.map((pair, idx) => (
+                                            <div key={pair.id} className="grid gap-1.5 sm:grid-cols-2">
+                                              <input
+                                                value={pair.left}
+                                                onChange={(e) => setDraft({ ...draft, pairs: draft.pairs.map((row) => (row.id === pair.id ? { ...row, left: e.target.value } : row)) })}
+                                                placeholder={`Vế trái ${idx + 1}`}
+                                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm"
+                                              />
+                                              <input
+                                                value={pair.right}
+                                                onChange={(e) => setDraft({ ...draft, pairs: draft.pairs.map((row) => (row.id === pair.id ? { ...row, right: e.target.value } : row)) })}
+                                                placeholder={`Vế phải ${idx + 1}`}
+                                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm"
+                                              />
+                                            </div>
+                                          ))}
+                                          <div className="flex gap-3">
+                                            {draft.pairs.length < 6 && (
+                                              <button type="button" className="text-xs font-bold text-emerald-700 !shadow-none" onClick={() => setDraft({ ...draft, pairs: [...draft.pairs, newPair()] })}>+ Thêm cặp</button>
+                                            )}
+                                            {draft.pairs.length > 2 && (
+                                              <button type="button" className="text-xs font-bold text-slate-600 !shadow-none" onClick={() => setDraft({ ...draft, pairs: draft.pairs.slice(0, -1) })}>- Bớt cặp</button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {draft.type === 'written' && (
+                                        <div className="space-y-2">
+                                          <textarea value={draft.rubric} onChange={(e) => setDraft({ ...draft, rubric: e.target.value })} rows={1} placeholder="Barem: ý nào được tính là đúng" className={INPUT} />
+                                          <textarea value={draft.modelAnswer} onChange={(e) => setDraft({ ...draft, modelAnswer: e.target.value })} rows={1} placeholder="Đáp án mẫu để AI đối chiếu" className={INPUT} />
+                                        </div>
+                                      )}
+                                      <input value={draft.hint} onChange={(e) => setDraft({ ...draft, hint: e.target.value })} placeholder="Gợi ý (tuỳ chọn)" className={INPUT} />
+                                      <input value={draft.explanation} onChange={(e) => setDraft({ ...draft, explanation: e.target.value })} placeholder="Giải thích sau khi xác nhận (tuỳ chọn)" className={INPUT} />
+                                      <div className="flex flex-wrap gap-2">
+                                        <button type="submit" disabled={saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">
+                                          {draft.id ? 'Cập nhật câu vào danh sách' : 'Thêm câu vào danh sách'}
+                                        </button>
+                                        {!draft.id && (
+                                          <button type="submit" data-next="1" disabled={saving} className="cms-btn cms-btn-outline !py-1.5 text-xs">
+                                            + Thêm & soạn tiếp
+                                          </button>
+                                        )}
+                                        <button type="button" onClick={() => setDraft(null)} className="cms-btn cms-btn-outline !py-1.5 text-xs">
+                                          Hủy
+                                        </button>
+                                      </div>
+                                    </form>
+                                  )}
+                                </div>
+                                );
+                              })()}
+
+                              {editorSubTab === 'content' && (
+                                <div className="space-y-2.5">
+                                  {(editingUnit.contents || []).length === 0 ? (
+                                    <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">Chưa có nội dung bài đọc. Bấm "+ Thêm nội dung" bên dưới.</p>
+                                  ) : (editingUnit.contents || []).map((content, cIdx) => (
+                                    <div key={content.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                                      <div className="flex gap-2">
+                                        <input
+                                          className={INPUT}
+                                          value={content.title}
+                                          onChange={(e) => updateEditingUnit((u) => ({
+                                            ...u,
+                                            contents: u.contents.map((c) => (c.id === content.id ? { ...c, title: e.target.value } : c)),
+                                          }))}
+                                          placeholder={`Tiêu đề nội dung ${cIdx + 1}`}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => updateEditingUnit((u) => ({
+                                            ...u,
+                                            contents: u.contents.filter((c) => c.id !== content.id),
+                                          }))}
+                                          aria-label={`Xóa nội dung ${cIdx + 1}`}
+                                          className="inline-flex items-center justify-center rounded-xl px-2.5 text-red-600 hover:bg-red-50 !shadow-none"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                      <RichTextEditor
+                                        value={content.content}
+                                        onChange={(value) => updateEditingUnit((u) => ({
+                                          ...u,
+                                          contents: u.contents.map((c) => (c.id === content.id ? { ...c, content: value } : c)),
+                                        }))}
+                                        placeholder="Nội dung học viên đọc trong môn học"
+                                      />
+                                    </div>
+                                  ))}
                                   <button
-                                    type="submit"
-                                    data-next="1"
-                                    disabled={saving}
-                                    aria-label="Thêm câu và tạo câu tiếp theo"
-                                    title="Thêm câu và tạo câu tiếp theo"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white disabled:opacity-60"
+                                    type="button"
+                                    onClick={() => updateEditingUnit((u) => ({
+                                      ...u,
+                                      contents: [...(u.contents || []), { id: newContentId(), title: `Nội dung ${(u.contents || []).length + 1}`, content: '' }],
+                                    }))}
+                                    className="cms-btn cms-btn-outline !py-1.5 text-xs"
                                   >
-                                    <Plus size={17} />
-                                  </button>
-                                )}
-                                <button type="button" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold" onClick={() => {
-                                  if (!items.some((item) => String(item.practiceGroupId || unitId) === selectedPracticeGroupId)) {
-                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                      ? { ...unit, contentOrder: unitContentOrder(unit, items).filter((entry) => entry !== `practice:${selectedPracticeGroupId}`) }
-                                      : unit));
-                                  }
-                                  setDraft(null);
-                                  setActivePracticeGroupId('');
-                                }}>Đóng</button>
-                              </div>
-                            </form>
-                          )}
-                          </div>,
-                          practiceEditorTarget.element,
-                        )}
-                      {isUnitEditing && unitId && (
-                        <>
-                          <div
-                            style={{ order: orderedLessonEntries.length + 1 }}
-                            className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4"
-                          >
-                            <div className="relative min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => setShowAddContentMenu((open) => !open)}
-                                aria-expanded={showAddContentMenu}
-                                className="inline-flex min-h-9 min-w-36 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
-                              >
-                                <Plus size={16} /> Thêm nội dung
-                              </button>
-                              {showAddContentMenu && (
-                                <div className="absolute bottom-full left-0 z-20 mb-2 grid min-w-52 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                                  <button type="button" onClick={() => {
-                                    const id = newContentId();
-                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                      ? {
-                                        ...unit,
-                                        contents: [...(unit.contents || []), { id, title: '', content: '' }],
-                                        contentOrder: [...unitContentOrder(unit, items), `content:${id}`],
-                                      }
-                                      : unit));
-                                    setShowAddContentMenu(false);
-                                  }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
-                                    Nội dung bài học
-                                  </button>
-                                  <button type="button" onClick={() => {
-                                    const id = newContentId();
-                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                      ? {
-                                        ...unit,
-                                        videos: [...(unit.videos || []), { id, title: '', url: '' }],
-                                        contentOrder: [...unitContentOrder(unit, items), `video:${id}`],
-                                      }
-                                      : unit));
-                                    setShowAddContentMenu(false);
-                                  }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
-                                    Video bài học
-                                  </button>
-                                  <button type="button" onClick={() => {
-                                    const groupId = newContentId();
-                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                      ? { ...unit, contentOrder: [...unitContentOrder(unit, items), `practice:${groupId}`] }
-                                      : unit));
-                                    setActivePracticeGroupId(groupId);
-                                    setDraft({ ...blankItem(), practiceGroupId: groupId });
-                                    setShowAddContentMenu(false);
-                                  }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
-                                    Luyện tập bài học
+                                    <Plus size={14} /> Thêm nội dung
                                   </button>
                                 </div>
                               )}
+
+                              <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                                <button type="button" onClick={() => setEditingUnitId('')} className="cms-btn cms-btn-outline !py-2 text-xs">
+                                  Đóng
+                                </button>
+                                <button type="button" onClick={saveEditingUnit} disabled={saving} className="cms-btn cms-btn-primary !py-2 text-xs">
+                                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Lưu bài học
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              disabled={!lessonContentReady || saving}
-                              className="min-h-9 min-w-36 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-emerald-700"
-                              onClick={() => run(saveAllUnitContent)}
-                            >
-                              Hoàn tất
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    {units.length > 0 && (!isUnitEditing || units.some((unit) => unit.id !== unitId)) && (
-                      <div className="contents">
-                        {units.map((unit, index) => isUnitEditing && unit.id === unitId ? null : (
-                          <div key={unit.id} style={{ order: index + 1 }} className="rounded-2xl border border-slate-100 bg-white p-2">
-                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto_auto] items-stretch gap-2">
-                              <button
-                                type="button"
-                                onClick={() => { setUnitId(unit.id); setIsUnitEditing(false); }}
-                                className={`min-w-0 rounded-xl px-3 py-2 text-left text-sm font-bold ${unit.id === unitId ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}
-                              >
-                                {index + 1}. {unit.title}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={saving}
-                                onClick={() => run(async () => {
-                                  await lessonPracticeApi.admin.updateUnit(unit.id, { isPreviewAllowed: unit.isPreviewAllowed !== true });
-                                  await loadUnits(subject.id);
-                                })}
-                                className={`rounded-xl px-2 py-2 text-xs font-bold text-white disabled:opacity-60 ${unit.isPreviewAllowed ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-700 hover:bg-slate-800'}`}
-                              >
-                                {unit.isPreviewAllowed ? 'Đang mở' : 'Đang khóa'}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Chỉnh sửa ${unit.title}`}
-                                title={`Chỉnh sửa ${unit.title}`}
-                                onClick={() => toggleUnitEditor(unit.id)}
-                                className="inline-flex min-w-10 items-center justify-center rounded-xl px-3 py-2 text-slate-600 hover:bg-slate-100"
-                              >
-                                <Pencil size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Xóa ${unit.title}`}
-                                title={`Xóa ${unit.title}`}
-                                disabled={saving}
-                                onClick={async () => {
-                                  if (!(await cmsConfirmAction(`Xóa ${unit.title}?`))) return;
-                                  run(async () => {
-                                    await lessonPracticeApi.admin.deleteUnit(unit.id);
-                                    if (unitId === unit.id) setUnitId('');
-                                    if (unitId === unit.id) setIsUnitEditing(false);
-                                    await loadUnits(subject.id);
-                                  });
-                                }}
-                                className="inline-flex min-w-10 items-center justify-center rounded-xl px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-60"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ order: units.length + 1 }} className="flex gap-2 rounded-2xl border border-slate-100 bg-white p-4">
-                      <input
-                        value={unitTitle}
-                        onChange={(event) => setUnitTitle(event.target.value)}
-                        placeholder="Tên bài, ví dụ Bài 1"
-                        className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={saving}
-                        className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
-                        onClick={() => run(async () => {
-                          const title = unitTitle.trim();
-                          if (!title) throw new Error('Nhập tên buổi');
-                          const created = await lessonPracticeApi.admin.createUnit(subject.id, { title });
-                          setUnitTitle('');
-                          await loadUnits(subject.id);
-                          setUnitId(created.data.id);
-                          setIsUnitEditing(true);
-                        })}
-                      >
-                        Thêm bài
-                      </button>
-                    </div>
-                  </section>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
                 )}
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {subjectModal && (
+        <SubjectModal
+          subject={subjectModal.id ? subjectModal : null}
+          onClose={() => setSubjectModal(null)}
+          onSaved={async (saved) => {
+            setSubjectModal(null);
+            await loadSubjects(saved?.id || '');
+            if (saved?.id) {
+              setSubjectId(saved.id);
+              const rows = await loadUnits(saved.id);
+              if (rows?.[0]?.id) {
+                setEditingUnitId(rows[0].id);
+                setEditorSubTab('video');
+              }
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

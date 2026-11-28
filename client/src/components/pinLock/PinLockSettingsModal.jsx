@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, KeyRound, Lock, X } from 'lucide-react';
 import PinPad from './PinPad';
+import { getDewSkillThemeAttr } from '../../utils/dewskillTheme';
 import {
   PIN_DEFAULT_TIMEOUT,
   PIN_LOCK_NOW_EVENT,
@@ -104,15 +105,31 @@ export default function PinLockSettingsModal({ userKey }) {
   };
 
   const close = () => setOpen(false);
+  const isStudentPinUser = String(userKey || '').startsWith('student:');
+  const themeAttr = isStudentPinUser ? getDewSkillThemeAttr() : 'center';
+  const isDewSkill = themeAttr === 'dewskill';
 
   return createPortal(
-    <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true" aria-label="Khóa mã PIN">
-      <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl sm:p-6">
+    <div
+      data-theme={themeAttr}
+      className="fixed inset-0 z-[10060] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-[3px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Khóa mã PIN"
+    >
+      <div className={`w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl sm:p-6${isDewSkill ? ' dew-modal' : ''}`}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-lg font-extrabold text-slate-900">
             <KeyRound size={20} className="text-emerald-600" aria-hidden="true" /> Khóa mã PIN
           </h2>
-          <button type="button" onClick={close} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Đóng">
+          <button
+            type="button"
+            onClick={close}
+            className={isDewSkill
+              ? 'dew-btn-white flex h-9 w-9 items-center justify-center text-slate-600 cursor-pointer'
+              : 'flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100'}
+            aria-label="Đóng"
+          >
             <X size={18} />
           </button>
         </div>
@@ -137,9 +154,13 @@ export default function PinLockSettingsModal({ userKey }) {
                     type="button"
                     onClick={() => changeTimeout(option.minutes)}
                     aria-pressed={timeout === option.minutes}
-                    className={`cms-pin-press rounded-xl border px-3 py-2 text-sm font-bold ${timeout === option.minutes
-                      ? 'border-emerald-600 bg-emerald-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    className={isDewSkill
+                      ? (timeout === option.minutes
+                        ? 'dew-btn-primary px-4 py-2 text-sm font-extrabold cursor-pointer'
+                        : 'dew-btn-white px-4 py-2 text-sm font-bold text-slate-700 cursor-pointer')
+                      : `cms-pin-press rounded-xl border px-3 py-2 text-sm font-bold ${timeout === option.minutes
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                   >
                     {option.label}
                   </button>
@@ -148,18 +169,42 @@ export default function PinLockSettingsModal({ userKey }) {
             </div>
             {config ? (
               <div className="grid gap-2 sm:grid-cols-3">
-                <button type="button" onClick={() => goStep('verify-change')} className="cms-pin-press rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50">Đổi mã PIN</button>
+                <button
+                  type="button"
+                  onClick={() => goStep('verify-change')}
+                  className={isDewSkill
+                    ? 'dew-btn-white px-3 py-2.5 text-sm font-bold text-slate-800 cursor-pointer'
+                    : 'cms-pin-press rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50'}
+                >
+                  Đổi mã PIN
+                </button>
                 <button
                   type="button"
                   onClick={() => { close(); window.dispatchEvent(new CustomEvent(PIN_LOCK_NOW_EVENT)); }}
-                  className="cms-pin-press inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-bold text-white"
+                  className={isDewSkill
+                    ? 'dew-btn-primary inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-extrabold text-white cursor-pointer'
+                    : 'cms-pin-press inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-bold text-white'}
                 >
                   <Lock size={15} aria-hidden="true" /> Khóa ngay
                 </button>
-                <button type="button" onClick={() => goStep('verify-remove')} className="cms-pin-press rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-bold text-emerald-600 hover:bg-emerald-50">Tắt khóa</button>
+                <button
+                  type="button"
+                  onClick={() => goStep('verify-remove')}
+                  className={isDewSkill
+                    ? 'dew-btn-red px-3 py-2.5 text-sm font-bold text-white cursor-pointer'
+                    : 'cms-pin-press rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-bold text-emerald-600 hover:bg-emerald-50'}
+                >
+                  Tắt khóa
+                </button>
               </div>
             ) : (
-              <button type="button" onClick={() => goStep('create')} className="cms-pin-press w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white">
+              <button
+                type="button"
+                onClick={() => goStep('create')}
+                className={isDewSkill
+                  ? 'dew-btn-primary w-full px-4 py-3 text-sm font-extrabold cursor-pointer'
+                  : 'cms-pin-press w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white'}
+              >
                 Tạo mã PIN
               </button>
             )}
@@ -168,7 +213,14 @@ export default function PinLockSettingsModal({ userKey }) {
           <div className="flex flex-col items-center gap-4">
             <p className="text-center text-sm font-bold text-slate-700">{STEP_TITLES[step]}</p>
             <PinPad onComplete={handlePin} error={error} resetKey={resetKey} />
-            <button type="button" onClick={() => goStep('overview')} style={{ boxShadow: 'none' }} className="bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800">
+            <button
+              type="button"
+              onClick={() => goStep('overview')}
+              style={isDewSkill ? undefined : { boxShadow: 'none' }}
+              className={isDewSkill
+                ? 'dew-btn-white px-5 py-2 text-sm font-bold text-slate-600 cursor-pointer'
+                : 'bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800'}
+            >
               Quay lại
             </button>
           </div>

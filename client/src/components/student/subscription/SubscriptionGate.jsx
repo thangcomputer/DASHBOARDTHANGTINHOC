@@ -11,6 +11,8 @@ import {
 import { MEET_MODAL_SHELL_CLASS } from './meetPlanConstants';
 import { MeetModalHeader } from './MeetPlanShared';
 import SubscriptionRenewPanel from './SubscriptionRenewPanel';
+import BuyXpModal from '../dailyPractice/BuyXpModal';
+import AIPackagesView from '../../ai/AIPackagesView';
 import { SubscriptionContext, useStudentSubscription } from './subscriptionContext';
 
 async function logoutToLogin() {
@@ -42,14 +44,14 @@ function RenewModal({ overview, onClose, onRenewed, isCourseStudent }) {
         className={MEET_MODAL_SHELL_CLASS}
         role="dialog"
         aria-modal="true"
-        aria-label={isCourseStudent ? 'Gói Khóa học' : 'Gói học Google Meet'}
+        aria-label={isCourseStudent ? 'Gói Khóa học' : 'Gói hỗ trợ AI'}
         onClick={(e) => e.stopPropagation()}
       >
         <MeetModalHeader
-          title={isCourseStudent ? 'Gói Khóa học' : 'Gói học Google Meet'}
+          title={isCourseStudent ? 'Gói Khóa học' : 'Gói hỗ trợ AI'}
           subtitle={isCourseStudent
             ? 'Gia hạn gói để tiếp tục học tập và sử dụng đầy đủ tính năng'
-            : 'Gia hạn gói học cùng giảng viên & mở khóa luyện tập DewSkill'}
+            : 'Gia hạn gói hỗ trợ AI & mở khóa luyện tập DewSkill'}
           badge={headerBadge}
           isCourseStudent={isCourseStudent}
           onClose={onClose}
@@ -172,12 +174,36 @@ export default function SubscriptionGate({ session, children }) {
   const studentId = session?.id || session?._id || '';
   const [overview, setOverview] = useState(() => (session?.subscription ? { subscription: session.subscription, plans: [], history: [] } : null));
   const [renewOpen, setRenewOpen] = useState(false);
+  const [buyXpOpen, setBuyXpOpen] = useState(false);
+  const [aiPackagesOpen, setAiPackagesOpen] = useState(false);
+  const [aiPackagesInitialGroup, setAiPackagesInitialGroup] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!isStudent) return;
     try {
       const data = await subscriptionApi.student.overview();
       setOverview(data);
+      const sub = data?.subscription;
+      const shouldUnlock = Boolean(
+        sub && (
+          sub.hasOwnedClass
+          || sub.state === 'course'
+          || sub.state === 'active'
+          || sub.state === 'expiring'
+          || sub.meetLifetime
+        ),
+      );
+      if (shouldUnlock) {
+        try {
+          const raw = localStorage.getItem('student_user');
+          const parsed = raw ? JSON.parse(raw) : null;
+          if (parsed && parsed.freePortal === true && parsed.freeUnlocked !== true) {
+            localStorage.setItem('student_user', JSON.stringify({ ...parsed, freeUnlocked: true }));
+            window.dispatchEvent(new CustomEvent('free-portal-unlocked'));
+            window.dispatchEvent(new CustomEvent('cms:subscription-updated', { detail: { freeUnlocked: true } }));
+          }
+        } catch { /* ignore */ }
+      }
     } catch { /* giữ trạng thái cũ khi lỗi mạng */ }
   }, [isStudent]);
 
@@ -189,11 +215,13 @@ export default function SubscriptionGate({ session, children }) {
     window.addEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
     window.addEventListener('free-portal-unlocked', onExpired);
     window.addEventListener('cms:subscription-updated', onExpired);
+    window.addEventListener('cms:xp-updated', onExpired);
     window.addEventListener('xp-config-updated', onExpired);
     return () => {
       window.removeEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
       window.removeEventListener('free-portal-unlocked', onExpired);
       window.removeEventListener('cms:subscription-updated', onExpired);
+      window.removeEventListener('cms:xp-updated', onExpired);
       window.removeEventListener('xp-config-updated', onExpired);
     };
   }, [isStudent, refresh]);
@@ -209,8 +237,22 @@ export default function SubscriptionGate({ session, children }) {
 
   useEffect(() => {
     const handler = (e) => setRenewOpen(Boolean(e.detail));
+    const onOpenBuyXp = () => setAiPackagesOpen(true);
+    const onOpenUpgradePlan = () => setAiPackagesOpen(true);
+    const onOpenAiPackages = (e) => {
+      setAiPackagesInitialGroup(e?.detail?.group || null);
+      setAiPackagesOpen(true);
+    };
     window.addEventListener('dewskill-test-renew-modal', handler);
-    return () => window.removeEventListener('dewskill-test-renew-modal', handler);
+    window.addEventListener('cms:open-buy-xp', onOpenBuyXp);
+    window.addEventListener('cms:open-upgrade-plan', onOpenUpgradePlan);
+    window.addEventListener('cms:open-ai-packages', onOpenAiPackages);
+    return () => {
+      window.removeEventListener('dewskill-test-renew-modal', handler);
+      window.removeEventListener('cms:open-buy-xp', onOpenBuyXp);
+      window.removeEventListener('cms:open-upgrade-plan', onOpenUpgradePlan);
+      window.removeEventListener('cms:open-ai-packages', onOpenAiPackages);
+    };
   }, []);
 
   const value = useMemo(() => ({
@@ -218,6 +260,7 @@ export default function SubscriptionGate({ session, children }) {
     subscription: overview?.subscription || null,
     refresh,
     openRenew: () => setRenewOpen(true),
+    openBuyXp: () => setBuyXpOpen(true),
   }), [overview, refresh]);
 
   if (!isStudent) return children;
@@ -234,6 +277,31 @@ export default function SubscriptionGate({ session, children }) {
           onRenewed={onRenewed}
           isCourseStudent={session?.freePortal !== true}
         />
+      )}
+      {buyXpOpen && (
+        <BuyXpModal
+          onClose={() => setBuyXpOpen(false)}
+          onPaid={() => refresh()}
+        />
+      )}
+      {aiPackagesOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[9600] flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-950/55 p-2.5 sm:p-4 md:p-6 backdrop-blur-sm"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setAiPackagesOpen(false);
+          }}
+        >
+          <div className="my-auto w-full max-w-[94vw] sm:max-w-xl md:max-w-3xl lg:max-w-[880px] xl:max-w-[920px]">
+            <AIPackagesView
+              inModal
+              initialGroup={aiPackagesInitialGroup}
+              onClose={() => setAiPackagesOpen(false)}
+              user={session}
+            />
+          </div>
+        </div>,
+        document.body,
       )}
       {subscription && session?.freePortal !== true && (
         <ExpiringReminder subscription={subscription} studentId={studentId} onRenew={() => setRenewOpen(true)} />

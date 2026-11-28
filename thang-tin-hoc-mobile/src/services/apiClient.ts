@@ -155,7 +155,8 @@ export function getMobileImageSource(value: string): ImageSourcePropType {
 
 function apiUrl(path: string) {
   const baseUrl = getMobileApiBaseUrl();
-  return `${baseUrl}/api${path.startsWith('/') ? path : `/${path}`}`;
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${baseUrl}${normalized.startsWith('/api/') || normalized === '/api' ? normalized : `/api${normalized}`}`;
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit) {

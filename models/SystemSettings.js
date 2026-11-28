@@ -38,6 +38,8 @@ const systemSettingsSchema = new mongoose.Schema({
       enum: ['daily', 'monthly', 'never'],
       default: 'daily',
     },
+    aiQuestionCostXp: { type: Number, default: 10 },
+    aiImageCostXp: { type: Number, default: 20 },
   },
 
   // ── Popup thông báo/quảng cáo (HV / GV / Nhân viên) ─────────────────────
@@ -159,6 +161,24 @@ const systemSettingsSchema = new mongoose.Schema({
     updatedBy: { type: String, default: '' },
     updatedByName: { type: String, default: '' },
     updatedAt: { type: Date, default: null },
+  },
+
+  // ── Cấu hình giao diện Danh mục khóa học DewSkill (Admin chỉnh sửa) ────
+  dewskillCatalogUi: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+
+  // ── Cấu hình phân tầng Model AI & giới hạn Fair-Use theo từng gói (Admin) ──
+  aiPlanModelPolicy: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+
+  // ── Cấu hình ưu đãi Giới thiệu bạn bè (giảm học phí, Admin chỉnh sửa) ──
+  referralSettings: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
   },
 }, { timestamps: true });
 

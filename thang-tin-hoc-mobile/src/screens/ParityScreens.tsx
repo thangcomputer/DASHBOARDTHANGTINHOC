@@ -15,7 +15,7 @@ import { translateText } from '../../../shared/i18n/translate.mjs';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { isFreePortalLocked, isFreePortalMenu } from '../utils/freePortalHelper';
 import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScreen';
-import { CourseVideosScreen } from './CourseVideosScreen';
+import { DailyPracticeScreen } from './DailyPracticeScreen';
 import { AssignmentsScreen } from './FeatureScreens';
 import {
   AlertCircle, BarChart3, BookOpen, Building2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight,
@@ -94,7 +94,7 @@ type MenuScreen = 'Assignments' | 'Materials' | 'StudentLearning' | 'Evaluations
 type MenuItem = { label: string; screen?: MenuScreen; description: string };
 
 const studentMenu: MenuItem[] = [
-  { label: 'Bài học', screen: 'StudentLearning', description: 'Khóa học đã đăng ký và tự học qua video' },
+  { label: 'Bài học', screen: 'StudentLearning', description: 'Khóa học đã đăng ký và bài luyện tập theo môn' },
   { label: 'Ôn thi chứng nhận MOS / IC3', screen: 'CertPrepCatalog', description: 'Luyện đề và thi thử chứng nhận theo cấp độ' },
   { label: 'Bài tập về nhà', screen: 'Assignments', description: 'Bài tập, hạn nộp và trạng thái bài làm' },
   { label: 'Tài liệu học tập', screen: 'Materials', description: 'Tài liệu và video theo khóa học' },
@@ -170,7 +170,7 @@ function MenuIcon({ label }: { label: string }) {
 }
 
 export function StudentLearningScreen() {
-  return <CourseVideosScreen />;
+  return <DailyPracticeScreen />;
 }
 
 export function StudentExamScreen() {
@@ -178,7 +178,7 @@ export function StudentExamScreen() {
 }
 
 export function LearningLessonScreen() {
-  return <CourseVideosScreen />;
+  return <DailyPracticeScreen />;
 }
 
 export function EvaluationsScreen() {

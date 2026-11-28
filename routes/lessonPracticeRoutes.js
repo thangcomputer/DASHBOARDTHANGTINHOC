@@ -87,7 +87,7 @@ router.post('/backup/import', ...requireAdmin, (req, res, next) => {
 router.get('/subjects', authMiddleware, async (req, res) => {
   try {
     if (req.user?.role === 'student') {
-      const data = await service.listStudentCatalog(req.user.id || req.user._id);
+      const data = await service.listSubjectsForStudent(studentId(req));
       return res.json({ success: true, data: data?.subjects || [] });
     }
     if (!req.user || !['admin', 'staff'].includes(req.user.role)) {
@@ -106,10 +106,10 @@ router.get('/courses', ...requireAdmin, async (req, res) => {
 });
 
 router.post('/subjects', ...requireAdmin, async (req, res) => {
-  return res.status(400).json({
-    success: false,
-    message: 'Môn học được đồng bộ từ khóa học. Hãy tạo hoặc chỉnh sửa khóa học để thay đổi danh sách môn.',
-  });
+  try {
+    const data = await service.createSubject(req.body || {});
+    return res.status(201).json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
 });
 
 router.post('/subjects/seed-defaults', ...requireAdmin, async (req, res) => {
@@ -136,6 +136,13 @@ router.delete('/subjects/:id', ...requireAdmin, async (req, res) => {
 router.get('/subjects/:id/units', ...requireAdmin, async (req, res) => {
   try {
     const data = await service.listUnits(req.params.id);
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.patch('/subjects/:id/units/reorder', ...requireAdmin, async (req, res) => {
+  try {
+    const data = await service.reorderUnits(req.params.id, req.body?.unitIds || []);
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });

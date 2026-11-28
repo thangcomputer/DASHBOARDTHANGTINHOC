@@ -4620,14 +4620,6 @@ export function ProfileScreen() {
   };
   const configuredLinks = [
     {
-      title: 'Chính sách quyền riêng tư',
-      url: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || 'https://thangtinhoc.vn/privacy-policy',
-    },
-    {
-      title: 'Điều khoản sử dụng',
-      url: process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL || 'https://thangtinhoc.vn/terms-of-service',
-    },
-    {
       title: 'Trang yêu cầu xóa tài khoản (Web)',
       url: process.env.EXPO_PUBLIC_DELETE_ACCOUNT_URL || 'https://thangtinhoc.vn/delete-account',
     },
@@ -4944,6 +4936,20 @@ export function ProfileScreen() {
                   borderless={false}
                 />
               ) : null}
+              <MenuRow
+                icon={<FileText size={18} color={theme.brand} />}
+                title="Điều khoản sử dụng"
+                subtitle="Xem quy định tài khoản, học liệu và thanh toán trong ứng dụng"
+                onPress={() => navigation.navigate('LegalDocument', { tab: 'terms' })}
+                borderless={false}
+              />
+              <MenuRow
+                icon={<Shield size={18} color={theme.brand} />}
+                title="Chính sách quyền riêng tư & bảo mật"
+                subtitle="Cách bảo vệ dữ liệu và quyền Micro, Camera, Face ID"
+                onPress={() => navigation.navigate('LegalDocument', { tab: 'privacy' })}
+                borderless={false}
+              />
               {configuredLinks.map((item) => (
                 <MenuRow
                   key={item.title}

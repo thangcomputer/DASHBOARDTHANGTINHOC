@@ -36,6 +36,7 @@ const lessonItemSchema = new mongoose.Schema({
     default: undefined,
   },
   timeLimitSec: { type: Number, default: 0, min: 0, max: 3600 },
+  checkpointSec: { type: Number, default: 0, min: 0, max: 86400 },
   rubric: { type: String, default: '' },
   modelAnswer: { type: String, default: '' },
   hint: { type: String, default: '' },

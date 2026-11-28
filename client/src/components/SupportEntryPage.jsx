@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Bot,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Users,
   HelpCircle,
   ArrowRight,
+  Scale,
   ShieldCheck,
   Calendar,
   BookOpen,
@@ -22,6 +24,7 @@ import { messagesAPI } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { findDesignatedSupportAgent } from '../utils/supportPresence';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
+import { dewClass } from '../utils/dewskillTheme';
 
 const TEACHER_FAQS = [
   {
@@ -133,7 +136,10 @@ export default function SupportEntryPage() {
   return (
     <div className="mx-auto w-full max-w-5xl pt-4 pb-12 px-3 sm:px-6 space-y-6">
       {/* ─── Hero Header ─── */}
-      <section className="rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white border-emerald-200/80">
+      <section className={dewClass(
+        'dew-card dew-card-accent-emerald p-6 sm:p-8 relative overflow-hidden transition-all',
+        'rounded-3xl border p-6 sm:p-8 relative overflow-hidden transition-all shadow-sm bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white border-emerald-200/80',
+      )}>
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
           <div className="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center shadow-md bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] text-white">
             <Headphones size={32} strokeWidth={2.3} />
@@ -156,7 +162,10 @@ export default function SupportEntryPage() {
       {/* ─── 2 Main Support Channels ─── */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Card 1: Trợ lý AI */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+        <div className={dewClass(
+          'dew-card dew-card-accent-emerald p-6 transition-all flex flex-col justify-between',
+          'rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between',
+        )}>
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
@@ -204,7 +213,10 @@ export default function SupportEntryPage() {
           <button
             type="button"
             onClick={() => chooseSupport('ai')}
-            className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105"
+            className={dewClass(
+              'dew-btn-primary w-full min-h-[46px] inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-extrabold cursor-pointer',
+              'w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white transition-all cursor-pointer shadow-xs active:translate-y-[2px] active:border-b-2 bg-[#10B981] border border-[#34D399] border-b-4 border-b-[#059669] hover:brightness-105',
+            )}
           >
             <Bot size={18} strokeWidth={2.4} />
             <span>Hỏi Trợ lý AI ngay</span>
@@ -212,7 +224,10 @@ export default function SupportEntryPage() {
         </div>
 
         {/* Card 2: Chuyên viên Hỗ trợ Trực tiếp */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+        <div className={dewClass(
+          'dew-card dew-card-accent-blue p-6 transition-all flex flex-col justify-between',
+          'rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between',
+        )}>
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3 min-w-0">
@@ -309,10 +324,13 @@ export default function SupportEntryPage() {
             type="button"
             disabled={!designatedAgent}
             onClick={() => chooseSupport('staff', '', designatedAgent)}
-            className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold transition-all shadow-xs ${
+            className={`w-full min-h-[46px] inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-extrabold transition-all ${
               designatedAgent
-                ? 'bg-white border border-slate-300 border-b-4 border-b-slate-400 text-slate-800 hover:bg-slate-50 cursor-pointer active:translate-y-[2px] active:border-b-2'
-                : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
+                ? dewClass(
+                  'dew-btn-white text-slate-800 cursor-pointer',
+                  'rounded-2xl shadow-xs bg-white border border-slate-300 border-b-4 border-b-slate-400 text-slate-800 hover:bg-slate-50 cursor-pointer active:translate-y-[2px] active:border-b-2',
+                )
+                : 'rounded-2xl bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
             <MessageCircle size={18} strokeWidth={2.4} />
@@ -325,7 +343,10 @@ export default function SupportEntryPage() {
 
       {/* ─── Hotline & Quick Contacts ─── */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex items-center gap-3.5 shadow-xs">
+        <div className={dewClass(
+          'dew-card p-4 flex items-center gap-3.5',
+          'rounded-2xl border border-slate-200 bg-white p-4 flex items-center gap-3.5 shadow-xs',
+        )}>
           <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
             <Phone size={20} />
           </div>
@@ -337,7 +358,10 @@ export default function SupportEntryPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex items-center gap-3.5 shadow-xs">
+        <div className={dewClass(
+          'dew-card p-4 flex items-center gap-3.5',
+          'rounded-2xl border border-slate-200 bg-white p-4 flex items-center gap-3.5 shadow-xs',
+        )}>
           <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
             <Mail size={20} />
           </div>
@@ -349,7 +373,10 @@ export default function SupportEntryPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex items-center gap-3.5 shadow-xs">
+        <div className={dewClass(
+          'dew-card p-4 flex items-center gap-3.5',
+          'rounded-2xl border border-slate-200 bg-white p-4 flex items-center gap-3.5 shadow-xs',
+        )}>
           <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
             <Clock size={20} />
           </div>
@@ -363,7 +390,10 @@ export default function SupportEntryPage() {
       </section>
 
       {/* ─── Frequently Asked Questions (FAQ) ─── */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-sm">
+      <section className={dewClass(
+        'dew-card p-6 sm:p-7',
+        'rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-sm',
+      )}>
         <div className="flex items-center gap-2.5 mb-5 pb-3 border-b border-slate-100">
           <HelpCircle size={22} className="text-emerald-600" />
           <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
@@ -408,6 +438,35 @@ export default function SupportEntryPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ─── Điều khoản & Bảo mật ─── */}
+      <section className={dewClass(
+        'dew-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4',
+        'rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4',
+      )}>
+        <div className="space-y-1">
+          <p className="text-sm font-extrabold text-slate-900">Điều khoản sử dụng &amp; Chính sách bảo mật</p>
+          <p className="text-xs text-slate-500">
+            Xem quy định bảo vệ dữ liệu học tập, quyền thiết bị và điều khoản sử dụng tài khoản DewSkill / Thắng Tin Học.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link
+            to="/dieu-khoan"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 transition"
+          >
+            <Scale size={14} />
+            <span>Điều khoản sử dụng</span>
+          </Link>
+          <Link
+            to="/bao-mat"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition"
+          >
+            <ShieldCheck size={14} />
+            <span>Chính sách bảo mật</span>
+          </Link>
         </div>
       </section>
     </div>

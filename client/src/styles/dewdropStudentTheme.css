@@ -1,0 +1,366 @@
+/* Shell & Bản đồ Lộ trình Giọt Nước 3D (Dewdrop Glossy) — 100% scoped cho tài khoản DewSkill */
+
+/* ── Shell DewSkill (chỉ áp dụng chế độ Sáng cho học viên DewSkill) ── */
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .student-canvas-bg {
+  background: transparent;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] {
+  background: rgba(255, 255, 255, 0.85) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+  color: #0f172a;
+  border: none !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.96) !important;
+  box-shadow:
+    4px 0 28px rgba(16, 185, 129, 0.08),
+    inset -1px 0 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__content {
+  background: transparent !important;
+  color: #0f172a;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__profile {
+  background: transparent !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__nav-item {
+  border-radius: 9999px;
+  color: #1e293b;
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__nav-item:not(:disabled):hover {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.09);
+  border-color: rgba(16, 185, 129, 0.14);
+  box-shadow: none;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__nav-item.cms-sidebar-glass__nav-active,
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__nav-active {
+  border-radius: 9999px !important;
+  background: linear-gradient(180deg, #22c55e 0%, #10b981 52%, #059669 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.36) !important;
+  border-bottom: 1px solid rgba(4, 120, 87, 0.42) !important;
+  box-shadow:
+    0 10px 22px -6px rgba(16, 185, 129, 0.48),
+    inset 0 2px 3px rgba(255, 255, 255, 0.56),
+    inset 0 -3px 6px rgba(4, 120, 87, 0.42) !important;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__nav-item.cms-sidebar-glass__nav-active:not(:disabled):hover {
+  background: linear-gradient(180deg, #34d399 0%, #10b981 52%, #059669 100%) !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__nav-active > span:first-child {
+  background: transparent !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+html:not(.dark):not([data-theme="dark"]) .cms-sidebar-glass[data-free-portal-student] .cms-sidebar-glass__footer {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+/* ── Top Header Bar DewSkill ── */
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar {
+  background: rgba(255, 255, 255, 0.75);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  backdrop-filter: blur(20px) saturate(1.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 20px -10px rgba(16, 185, 129, 0.12);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: 0;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .cms-topbar__row {
+  min-height: 64px;
+  margin-top: 0;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .cms-topbar__title {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .cms-topbar__action {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 6px 16px -6px rgba(15, 23, 42, 0.14),
+    inset 0 1.5px 0 #ffffff;
+  color: #334155;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .cms-topbar__action:hover {
+  background: #ffffff;
+  color: #047857;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .cms-topbar__action.is-open {
+  background: linear-gradient(180deg, #22c55e 0%, #10b981 55%, #059669 100%);
+  color: #ffffff;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .ai-search-pill-btn {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 6px 18px -6px rgba(16, 185, 129, 0.16),
+    inset 0 1.5px 0 #ffffff;
+}
+
+html:not(.dark):not([data-theme="dark"])[data-free-portal-student] .cms-topbar.dew-topbar .ai-search-pill-btn__badge {
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #22c55e 0%, #10b981 55%, #059669 100%);
+  box-shadow:
+    0 4px 10px -2px rgba(16, 185, 129, 0.45),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.55);
+}
+
+/* ── Bottom Navigation Bar viên thuốc kính mờ nổi trên Mobile ── */
+html:not(.dark):not([data-theme="dark"]) .cms-mobile-bottom-nav[data-free-portal-student] {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1.5px solid rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 14px 34px -8px rgba(16, 185, 129, 0.22),
+    inset 0 2px 0 #ffffff;
+  -webkit-backdrop-filter: blur(24px) saturate(1.45);
+  backdrop-filter: blur(24px) saturate(1.45);
+  padding: 0.75rem 0.65rem 0.5rem;
+}
+
+/* ── Bản đồ Lộ trình Chặng ngang uốn lượn 3D (DewSkill Practice) ── */
+@keyframes dew-float {
+  0%, 100% {
+    transform: translate(-50%, 0px);
+  }
+  50% {
+    transform: translate(-50%, -7px);
+  }
+}
+
+[data-theme="dewskill"] .animate-float {
+  animation: dew-float 3.2s ease-in-out infinite;
+}
+
+[data-theme="dewskill"] .dew-orb-node {
+  position: relative;
+  overflow: hidden;
+  opacity: 1 !important;
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out, filter 200ms ease-out;
+}
+
+[data-theme="dewskill"] .dew-orb-node:disabled {
+  opacity: 1 !important;
+}
+
+[data-theme="dewskill"] .dew-orb-node::before {
+  content: '';
+  position: absolute;
+  top: 6%;
+  left: 14%;
+  width: 58%;
+  height: 34%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    rgba(255, 255, 255, 0.88) 0%,
+    rgba(255, 255, 255, 0.32) 48%,
+    rgba(255, 255, 255, 0) 76%
+  );
+  transform: rotate(-14deg);
+  pointer-events: none;
+  z-index: 2;
+}
+
+[data-theme="dewskill"] .dew-orb-node::after {
+  content: '';
+  position: absolute;
+  bottom: 7%;
+  right: 12%;
+  width: 54%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 50% 60%,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0) 72%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+[data-theme="dewskill"] .dew-orb--done {
+  background:
+    radial-gradient(circle at 65% 75%, rgba(52, 211, 153, 0.72) 0%, rgba(16, 185, 129, 0) 46%),
+    radial-gradient(circle at 32% 28%, #6ee7b7 0%, #10b981 36%, #059669 68%, #064e3b 100%);
+  border: 2.5px solid rgba(167, 243, 208, 0.85);
+  box-shadow:
+    0 16px 30px -8px rgba(4, 120, 87, 0.45),
+    inset 0 4px 7px rgba(255, 255, 255, 0.72),
+    inset 0 -10px 18px rgba(6, 78, 59, 0.65);
+}
+
+[data-theme="dewskill"] .dew-orb--active {
+  background:
+    radial-gradient(circle at 65% 78%, rgba(103, 232, 249, 0.92) 0%, rgba(45, 212, 191, 0) 50%),
+    radial-gradient(circle at 32% 26%, #a7f3d0 0%, #34d399 34%, #10b981 66%, #047857 100%);
+  border: 3.5px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 0 0 5px rgba(153, 246, 228, 0.55),
+    0 0 34px 4px rgba(45, 212, 191, 0.62),
+    0 16px 28px -6px rgba(13, 148, 136, 0.45),
+    inset 0 4px 8px rgba(255, 255, 255, 0.85),
+    inset 0 -8px 14px rgba(13, 148, 136, 0.55);
+}
+
+[data-theme="dewskill"] .dew-orb--locked {
+  background: radial-gradient(circle at 36% 28%, #f8fafc 0%, #e2e8f0 32%, #cbd5e1 62%, #94a3b8 100%);
+  border: 4px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 14px 26px -8px rgba(71, 85, 105, 0.28),
+    inset 0 4px 7px rgba(255, 255, 255, 0.95),
+    inset 0 -8px 14px rgba(51, 65, 85, 0.28);
+}
+
+[data-theme="dewskill"] .dew-orb--trophy {
+  background:
+    radial-gradient(circle at 66% 78%, rgba(45, 212, 191, 0.78) 0%, rgba(16, 185, 129, 0) 48%),
+    radial-gradient(circle at 32% 28%, #5eead4 0%, #10b981 38%, #047857 72%, #064e3b 100%);
+  border: 2.5px solid rgba(167, 243, 208, 0.88);
+  box-shadow:
+    0 16px 30px -8px rgba(4, 120, 87, 0.46),
+    inset 0 4px 8px rgba(255, 255, 255, 0.75),
+    inset 0 -10px 18px rgba(6, 78, 59, 0.65);
+}
+
+[data-theme="dewskill"] .dew-orb-node:not(:disabled):hover {
+  transform: translateY(-3px) scale(1.03);
+}
+
+[data-theme="dewskill"] .dew-orb-node:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+html:not(.dark):not([data-theme="dark"]) [data-theme="dewskill"] .dp-dew-main-panel {
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  backdrop-filter: blur(20px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 14px 32px -12px rgba(16, 185, 129, 0.14),
+    0 4px 12px -4px rgba(15, 23, 42, 0.05),
+    inset 0 2px 0 #ffffff;
+}
+
+html:not(.dark):not([data-theme="dark"]) [data-theme="dewskill"] .dp-dew-path-lane {
+  background: transparent;
+}
+
+html:not(.dark):not([data-theme="dark"]) [data-theme="dewskill"] .dp-dew-welcome {
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(236, 253, 245, 0.88) 55%, rgba(224, 242, 254, 0.88) 100%);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  backdrop-filter: blur(20px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 14px 32px -12px rgba(16, 185, 129, 0.16),
+    inset 0 2px 0 #ffffff;
+}
+
+/* ── Active Subject Chip fix (chống trắng chìm trên nền trắng) ── */
+[data-theme="dewskill"] .dp-dew-subject-chip.dp-dew-subject-chip--dew-active {
+  background: linear-gradient(90deg, #0284c7 0%, #0d9488 55%, #10b981 100%) !important;
+  border-color: rgba(255, 255, 255, 0.72) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 10px 22px -6px rgba(2, 132, 199, 0.42),
+    0 4px 10px -2px rgba(16, 185, 129, 0.25),
+    inset 0 2px 2px rgba(255, 255, 255, 0.45) !important;
+}
+
+/* ── Hiệu ứng lóe sáng kim cương chỉ khi hover vào giọt chưa mở khóa ── */
+@keyframes dewDiamondSweep {
+  0% {
+    transform: translateX(-70px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateX(135px);
+    opacity: 0;
+  }
+}
+
+@keyframes dewDiamondSpark {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.18) rotate(22deg);
+  }
+  100% {
+    opacity: 0.72;
+    transform: scale(0.9) rotate(45deg);
+  }
+}
+
+[data-theme="dewskill"] .dew-diamond-sheen {
+  transform: translateX(-70px);
+  opacity: 0;
+}
+
+[data-theme="dewskill"] .group:hover .dew-diamond-sheen {
+  animation: dewDiamondSweep 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+[data-theme="dewskill"] .dew-diamond-spark {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+[data-theme="dewskill"] .group:hover .dew-diamond-spark {
+  animation: dewDiamondSpark 0.75s ease-out 0.12s forwards;
+}
+
+/* ── Thẻ Gói AI đầu Sidebar (Giọt Nước 3D chỉ cho DewSkill) ── */
+[data-theme="dewskill"].dew-sidebar-ai-card,
+[data-theme="dewskill"] .dew-sidebar-ai-card {
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  -webkit-backdrop-filter: blur(12px) saturate(1.18);
+  backdrop-filter: blur(12px) saturate(1.18);
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), filter 0.18s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="dewskill"].dew-sidebar-ai-card::before,
+[data-theme="dewskill"] .dew-sidebar-ai-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 70% at 18% 0%, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+}
+
+[data-theme="dewskill"].dew-sidebar-ai-card:hover,
+[data-theme="dewskill"] .dew-sidebar-ai-card:hover {
+  transform: translateY(-1px);
+}

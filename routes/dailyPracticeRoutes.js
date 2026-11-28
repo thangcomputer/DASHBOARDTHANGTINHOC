@@ -2,15 +2,19 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, checkPermission } = require('../middleware/auth');
+const { authMiddleware, checkAnyPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
+const Student = require('../models/Student');
 const service = require('../services/dailyPracticeService');
 const pathService = require('../services/dailyPracticePathService');
 const aiService = require('../services/dailyPracticeAi');
 const starter = require('../services/dailyPracticeStarter');
 
-const requireAdmin = [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING)];
+const requireAdmin = [
+  authMiddleware,
+  checkAnyPermission(PERMISSIONS.MANAGE_DEWSKILL_PRACTICE, PERMISSIONS.MANAGE_STUDENT_TRAINING),
+];
 
 function requireStudentRole(req, res, next) {
   if (!req.user) return res.status(401).json({ success: false, message: 'Chưa xác thực' });
@@ -20,7 +24,24 @@ function requireStudentRole(req, res, next) {
   return next();
 }
 
+async function requireDewskillStudent(req, res, next) {
+  try {
+    const sid = req.user?.id || req.user?._id;
+    const student = await Student.findById(sid).select('accountType freePortal').lean();
+    if (!student || (student.accountType !== 'dewskill' && student.freePortal !== true)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chế độ luyện tập theo lộ trình chỉ dành cho tài khoản DewSkill.',
+      });
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+}
+
 const requireStudent = [authMiddleware, requireStudentRole];
+const requireDewskillPath = [authMiddleware, requireStudentRole, requireDewskillStudent];
 const userId = (req) => req.user.id || req.user._id;
 
 function sendError(res, err) {
@@ -31,6 +52,9 @@ function sendError(res, err) {
       code: err.code || undefined,
       ...(typeof err.currentXp === 'number' ? { currentXp: err.currentXp } : {}),
       ...(typeof err.needXp === 'number' ? { needXp: err.needXp } : {}),
+      ...(typeof err.isFreeTier === 'boolean' ? { isFreeTier: err.isFreeTier } : {}),
+      ...(err.suggestedAction ? { suggestedAction: err.suggestedAction } : {}),
+      ...(err.xpWallet ? { xpWallet: err.xpWallet } : {}),
       ...(err.questionQuota ? { questionQuota: err.questionQuota } : {}),
       ...(err.imageQuota ? { imageQuota: err.imageQuota } : {}),
     });
@@ -75,19 +99,21 @@ router.get('/questions', ...requireAdmin, handle((req) => service.listQuestions(
   type: req.query.type,
   status: req.query.status,
   unitId: req.query.unitId,
+  nodeKey: req.query.nodeKey,
   forTestOut: req.query.forTestOut,
 })));
 router.post('/questions', ...requireAdmin, handle((req) => service.createQuestion(req.body || {}, userId(req))));
 router.post('/questions/ai-generate', ...requireAdmin, handle((req) => aiService.generateDrafts(req.body || {}, userId(req))));
 router.put('/questions/:id', ...requireAdmin, handle((req) => service.updateQuestion(req.params.id, req.body || {})));
 router.delete('/questions/:id', ...requireAdmin, handle((req) => service.deleteQuestion(req.params.id)));
+router.post('/exercises/test-grade', ...requireAdmin, handle((req) => pathService.testGradeExercise(req.body || {})));
 
 // ── Học viên (web + mobile dùng chung) ────────────────────────────────────────
 router.get('/my/overview', ...requireStudent, handle((req) => service.getOverview(userId(req))));
 router.get('/my/path', ...requireStudent, handle((req) => pathService.getPath(userId(req))));
-router.put('/my/path/active-topic', ...requireStudent, handle((req) => pathService.setActivePathTopic(userId(req), req.body?.topicId)));
-router.get('/my/path/units/:unitId/videos', ...requireStudent, handle((req) => pathService.unitVideos(userId(req), req.params.unitId)));
-router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/answer', ...requireStudent, handle((req) => pathService.answerVideoCheck(userId(req), {
+router.put('/my/path/active-topic', ...requireDewskillPath, handle((req) => pathService.setActivePathTopic(userId(req), req.body?.topicId)));
+router.get('/my/path/units/:unitId/videos', ...requireDewskillPath, handle((req) => pathService.unitVideos(userId(req), req.params.unitId)));
+router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/answer', ...requireDewskillPath, handle((req) => pathService.answerVideoCheck(userId(req), {
   unitId: req.params.unitId,
   videoId: decodeURIComponent(req.params.videoId),
   checkId: req.params.checkId,
@@ -95,7 +121,7 @@ router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/answer', ...
   text: req.body?.text,
   imageDataUrl: req.body?.imageDataUrl,
 })));
-router.post(['/my/path/videos/check', '/path/videos/check'], ...requireStudent, handle((req) => pathService.answerVideoCheck(userId(req), {
+router.post(['/my/path/videos/check', '/path/videos/check'], ...requireDewskillPath, handle((req) => pathService.answerVideoCheck(userId(req), {
   unitId: req.body?.unitId,
   videoId: decodeURIComponent(req.body?.videoId || ''),
   checkId: req.body?.checkId,
@@ -104,41 +130,47 @@ router.post(['/my/path/videos/check', '/path/videos/check'], ...requireStudent, 
   text: req.body?.text,
   imageDataUrl: req.body?.imageDataUrl,
 })));
-router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/hint', ...requireStudent, handle((req) => pathService.buyVideoHint(userId(req), {
+router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/hint', ...requireDewskillPath, handle((req) => pathService.buyVideoHint(userId(req), {
   unitId: req.params.unitId,
   videoId: decodeURIComponent(req.params.videoId),
   checkId: req.params.checkId,
 })));
-router.post(['/my/path/videos/hint', '/path/videos/hint'], ...requireStudent, handle((req) => pathService.buyVideoHint(userId(req), {
+router.post(['/my/path/videos/hint', '/path/videos/hint'], ...requireDewskillPath, handle((req) => pathService.buyVideoHint(userId(req), {
   unitId: req.body?.unitId,
   videoId: decodeURIComponent(req.body?.videoId || ''),
   checkId: req.body?.checkId,
   checkIndex: req.body?.checkIndex,
 })));
-router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/skip', ...requireStudent, handle((req) => pathService.skipVideoCheck(userId(req), {
+router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/skip', ...requireDewskillPath, handle((req) => pathService.skipVideoCheck(userId(req), {
   unitId: req.params.unitId,
   videoId: decodeURIComponent(req.params.videoId),
   checkId: req.params.checkId,
 })));
-router.post(['/my/path/videos/skip', '/path/videos/skip'], ...requireStudent, handle((req) => pathService.skipVideoCheck(userId(req), {
+router.post(['/my/path/videos/skip', '/path/videos/skip'], ...requireDewskillPath, handle((req) => pathService.skipVideoCheck(userId(req), {
   unitId: req.body?.unitId,
   videoId: decodeURIComponent(req.body?.videoId || ''),
   checkId: req.body?.checkId,
   checkIndex: req.body?.checkIndex,
 })));
-router.post('/my/path/videos/watched', ...requireStudent, handle((req) => pathService.markVideoWatched(userId(req), {
+router.post('/my/path/videos/watched', ...requireDewskillPath, handle((req) => pathService.markVideoWatched(userId(req), {
   unitId: req.body?.unitId,
   videoId: String(req.body?.videoId || ''),
   watchRatio: req.body?.watchRatio,
 })));
-router.post('/my/path/units/:unitId/sections/complete', ...requireStudent, handle((req) => pathService.toggleSectionProgress(userId(req), {
+router.post('/my/path/units/:unitId/sections/complete', ...requireDewskillPath, handle((req) => pathService.toggleSectionProgress(userId(req), {
   unitId: req.params.unitId,
   nodeKey: String(req.body?.nodeKey || ''),
   difficulty: String(req.body?.difficulty || ''),
   sectionKey: String(req.body?.sectionKey || ''),
   completed: req.body?.completed !== false,
 })));
-router.post('/my/path/units/:unitId/chest/claim', ...requireStudent, handle((req) => pathService.claimUnitChest(userId(req), req.params.unitId)));
+router.post('/my/path/units/:unitId/nodes/:nodeKey/exercises/:exerciseId/submit', ...requireDewskillPath, handle((req) => pathService.submitNodeExercise(userId(req), {
+  unitId: req.params.unitId,
+  nodeKey: decodeURIComponent(req.params.nodeKey || ''),
+  exerciseId: decodeURIComponent(req.params.exerciseId || ''),
+  answer: req.body?.answer,
+})));
+router.post('/my/path/units/:unitId/chest/claim', ...requireDewskillPath, handle((req) => pathService.claimUnitChest(userId(req), req.params.unitId)));
 router.post('/my/sessions', ...requireStudent, handle((req) => service.startSession(userId(req), {
   topicId: req.body?.topicId,
   difficulty: String(req.body?.difficulty || ''),
@@ -158,7 +190,7 @@ router.post('/my/sessions/:id/hint', ...requireStudent, handle((req) => service.
 router.post('/my/sessions/:id/finish', ...requireStudent, handle((req) => service.finishSession(userId(req), req.params.id)));
 router.post('/my/sessions/:id/abandon', ...requireStudent, handle((req) => service.abandonSession(userId(req), req.params.id)));
 router.post('/my/spaced-review/start', ...requireStudent, handle((req) => service.startSpacedReviewSession(userId(req))));
-router.post('/my/referral/redeem', ...requireStudent, handle((req) => service.redeemReferralCode(userId(req), req.body?.code)));
+router.post('/my/referral/redeem', ...requireStudent, handle((req) => service.redeemReferralCode(userId(req), req.body?.code, { io: req.app.get('io') })));
 router.get('/my/related-topics', ...requireStudent, handle((req) => service.relatedTopics({
   subjectId: String(req.query?.subjectId || ''),
   unitId: String(req.query?.unitId || ''),

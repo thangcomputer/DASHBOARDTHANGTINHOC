@@ -113,6 +113,7 @@ export const mobileLinkingConfig: LinkingOptions<AppStackParamList> = {
       CertPrepCatalog: 'cert-prep',
       Materials: 'materials',
       Grades: 'grades',
+      LegalDocument: 'legal/:tab?',
     },
   },
 };

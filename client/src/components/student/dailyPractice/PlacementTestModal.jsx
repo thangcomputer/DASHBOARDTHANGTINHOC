@@ -4,6 +4,7 @@ import { Check, CheckCircle2, Clock, Compass, FileText, Loader2, RotateCcw, Spar
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
 import { buildPlacementShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 
 const STORAGE_PREFIX = 'dewskill_placement_v1';
 
@@ -267,12 +268,12 @@ export default function PlacementTestModal({ open, onClose, studentId, topics = 
   const ai = showResultScreen ? activeResult.ai : null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/65 p-2 sm:p-5 backdrop-blur-xs">
+    <div data-theme={getDewSkillThemeAttr()} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/65 p-2 sm:p-5 backdrop-blur-xs">
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Kiểm tra đầu vào"
-        className="relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        className="dew-modal relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
       >
         {aiLoading && (
           <div

@@ -51,6 +51,15 @@ function formatClock(secs: number) {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
+export type VideoCheckpointPin = {
+  id: string;
+  atSec: number;
+  label?: string;
+  unlocked?: boolean;
+  completed?: boolean;
+  active?: boolean;
+};
+
 export function MobileLmsPlayerChrome({
   isPlaying,
   currentTime,
@@ -71,6 +80,8 @@ export function MobileLmsPlayerChrome({
   startOverlayVisible = false,
   pausedCheckpointSec = null,
   rightSlot = null,
+  checkpoints = [],
+  onSelectCheckpoint = null,
 }: {
   isPlaying: boolean;
   currentTime: number;
@@ -99,6 +110,8 @@ export function MobileLmsPlayerChrome({
   /** Khi đang mở câu hỏi tương tác tại mốc giây X bên dưới video. */
   pausedCheckpointSec?: number | null;
   rightSlot?: React.ReactNode;
+  checkpoints?: VideoCheckpointPin[];
+  onSelectCheckpoint?: ((cp: VideoCheckpointPin) => void) | null;
 }) {
   const windowLook = overlayVariant === 'window';
   const { width: windowWidth } = useWindowDimensions();
@@ -250,8 +263,9 @@ export function MobileLmsPlayerChrome({
     };
   }, [volPopoverOpen, chromeHovered, chromeTapped]);
 
+  const hasCheckpoints = Array.isArray(checkpoints) && checkpoints.length > 0;
   const showBottomChrome = !startOverlayVisible && (
-    chromeHovered || chromeTapped || seekingDrag || volDragging || volPopoverOpen
+    !isPlaying || hasCheckpoints || chromeHovered || chromeTapped || seekingDrag || volDragging || volPopoverOpen
   );
   const webHoverProps = Platform.OS === 'web'
     ? ({
@@ -428,6 +442,40 @@ export function MobileLmsPlayerChrome({
           >
             <View style={styles.progressBg} />
             <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+            {safeDur > 0 && hasCheckpoints ? checkpoints.map((cp, idx) => {
+              const leftPct = Math.min(96, Math.max(4, ((Number(cp.atSec) || 0) / safeDur) * 100));
+              const unlocked = Boolean(cp.unlocked);
+              const completed = Boolean(cp.completed);
+              const active = Boolean(cp.active);
+              return (
+                <Pressable
+                  key={cp.id || idx}
+                  onPressIn={(e) => {
+                    e.stopPropagation?.();
+                  }}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    if (unlocked) onSelectCheckpoint?.(cp);
+                  }}
+                  hitSlop={6}
+                  style={[
+                    styles.checkpointDot,
+                    completed
+                      ? styles.checkpointDotDone
+                      : unlocked
+                        ? (active ? styles.checkpointDotActive : styles.checkpointDotOpen)
+                        : styles.checkpointDotLocked,
+                    { left: `${leftPct}%` },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mốc ${idx + 1} (${formatClock(cp.atSec)})`}
+                >
+                  <Text style={[styles.checkpointDotText, active && !completed && { color: '#0F172A' }]}>
+                    {completed ? '✓' : (cp.label || String(idx + 1))}
+                  </Text>
+                </Pressable>
+              );
+            }) : null}
             <View style={[styles.progressThumb, { left: `${progressPct}%` }]} />
           </Pressable>
 
@@ -708,21 +756,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(8,15,28,0.72)',
   },
   progressTrack: {
-    height: 18,
+    position: 'relative',
+    height: 22,
     justifyContent: 'center',
+    overflow: 'visible',
     marginBottom: 4,
   },
   progressBg: {
-    height: 4,
+    height: 5,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.22)',
   },
   progressFill: {
     position: 'absolute',
     left: 0,
-    height: 4,
+    height: 5,
     borderRadius: 999,
     backgroundColor: '#10B981',
+  },
+  checkpointDot: {
+    position: 'absolute',
+    top: 1,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateX: -10 }],
+    zIndex: 10,
+  },
+  checkpointDotDone: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#10B981',
+  },
+  checkpointDotOpen: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#059669',
+  },
+  checkpointDotActive: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#34D399',
+  },
+  checkpointDotLocked: {
+    borderColor: 'rgba(255,255,255,0.65)',
+    backgroundColor: '#475569',
+  },
+  checkpointDotText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 12,
   },
   progressThumb: {
     position: 'absolute',
@@ -732,8 +817,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#A7F3D0',
-    top: 2,
+    top: 4,
     transform: [{ translateX: -7 }],
+    zIndex: 12,
   },
   controlsRow: {
     flexDirection: 'row',

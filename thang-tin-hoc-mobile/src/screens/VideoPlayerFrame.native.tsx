@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, StatusBar, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import { MobileLmsPlayerChrome } from '../components/dailyPractice/MobileLmsPlayerChrome';
+import { MobileLmsPlayerChrome, type VideoCheckpointPin } from '../components/dailyPractice/MobileLmsPlayerChrome';
 import { typography } from '../theme/tokens';
 import { getMobileApiBaseUrl } from '../services/apiClient';
 import { noteStudyMediaProgress } from '../services/studyActivity';
@@ -439,6 +439,10 @@ export function VideoPlayerFrame({
   initialAtSec = 0,
   pausedCheckpointSec = null,
   onFullscreenChange,
+  checkpoints = [],
+  onSelectCheckpoint = null,
+  maxCheckpointSec = null,
+  checkpointGateModal = null,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -458,6 +462,10 @@ export function VideoPlayerFrame({
   initialAtSec?: number;
   pausedCheckpointSec?: number | null;
   onFullscreenChange?: (fullscreen: boolean) => void;
+  checkpoints?: VideoCheckpointPin[];
+  onSelectCheckpoint?: ((cp: VideoCheckpointPin) => void) | null;
+  maxCheckpointSec?: number | null;
+  checkpointGateModal?: React.ReactNode | ((state: { isFullscreen: boolean }) => React.ReactNode);
 }) {
   const surfaceBg = chromeBg || YT_IFRAME_CROP.playerBg;
   const webViewRef = useRef<WebViewHandle | null>(null);
@@ -498,6 +506,8 @@ export function VideoPlayerFrame({
   const antiSeekInitRef = useRef(antiSeekEnabled);
   const doneInitRef = useRef(done);
   const initialAtSecRef = useRef(initialAtSec);
+  const maxCpRef = useRef<number | null>(maxCheckpointSec);
+  maxCpRef.current = maxCheckpointSec;
   const initIdentityRef = useRef('');
   const nextIdentity = `${lessonId}::${videoUrl}`;
   if (initIdentityRef.current !== nextIdentity) {
@@ -615,12 +625,24 @@ export function VideoPlayerFrame({
       return;
     }
     if (message.type !== 'progress') return;
+    const rawCurT = Number(message.currentTime) || 0;
+    const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+      ? Math.max(0, maxCpRef.current)
+      : Number.POSITIVE_INFINITY;
+    const clampedCurT = Math.min(rawCurT, cpCap);
+    const hitCpGate = rawCurT >= cpCap - 0.15;
+    if (hitCpGate) {
+      injectPlayerCommand('window.__mobileVideoCommands&&window.__mobileVideoCommands.pause();');
+      if (rawCurT > cpCap + 0.35) {
+        injectPlayerCommand(`window.__mobileVideoCommands&&window.__mobileVideoCommands.seekTo(${cpCap},true);`);
+      }
+    }
     const progress: VideoPlayerProgress = {
-      currentTime: Number(message.currentTime) || 0,
+      currentTime: clampedCurT,
       duration: Number(message.duration) || 0,
       watchedSeconds: Number(message.watchedSeconds) || 0,
       completed: Boolean(message.completed),
-      playing: Boolean(message.playing),
+      playing: hitCpGate ? false : Boolean(message.playing),
     };
     progressRef.current = progress;
     setUiProgress(progress);
@@ -648,14 +670,30 @@ export function VideoPlayerFrame({
     if (uiProgress.playing) {
       injectPlayerCommand('window.__mobileVideoCommands&&window.__mobileVideoCommands.pause();');
     } else {
+      const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+        ? Math.max(0, maxCpRef.current)
+        : Number.POSITIVE_INFINITY;
+      if (progressRef.current.currentTime >= cpCap - 0.15) {
+        injectPlayerCommand('window.__mobileVideoCommands&&window.__mobileVideoCommands.pause();');
+        onProgressRef.current({ ...progressRef.current, playing: false });
+        return;
+      }
       setAwaitingStart(false);
       injectPlayerCommand('window.__mobileVideoCommands&&window.__mobileVideoCommands.play();');
     }
   };
 
   const seekTo = (position: number) => {
-    injectPlayerCommand(`window.__mobileVideoCommands&&window.__mobileVideoCommands.seekTo(${position});`);
-    setUiProgress((prev) => ({ ...prev, currentTime: position }));
+    const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+      ? Math.max(0, maxCpRef.current)
+      : Number.POSITIVE_INFINITY;
+    const target = Math.min(Math.max(0, Number(position) || 0), cpCap);
+    injectPlayerCommand(`window.__mobileVideoCommands&&window.__mobileVideoCommands.seekTo(${target});`);
+    setUiProgress((prev) => ({ ...prev, currentTime: target }));
+    if (target >= cpCap - 0.15) {
+      injectPlayerCommand('window.__mobileVideoCommands&&window.__mobileVideoCommands.pause();');
+      onProgressRef.current({ ...progressRef.current, currentTime: target, playing: false });
+    }
   };
 
   const seekLocked = antiSeekEnabled && !done;
@@ -755,6 +793,8 @@ export function VideoPlayerFrame({
           overlayVariant={appearance === 'window' ? 'window' : 'default'}
           startOverlayVisible={appearance === 'window' && awaitingStart && !uiProgress.playing}
           pausedCheckpointSec={pausedCheckpointSec}
+          checkpoints={checkpoints}
+          onSelectCheckpoint={onSelectCheckpoint}
           isPlaying={uiProgress.playing}
           currentTime={uiProgress.currentTime}
           duration={uiProgress.duration}
@@ -782,6 +822,9 @@ export function VideoPlayerFrame({
           rightSlot={chromeRightSlot}
         />
       ) : null}
+      {typeof checkpointGateModal === 'function'
+        ? checkpointGateModal({ isFullscreen })
+        : checkpointGateModal}
       {playerError ? (
         <View pointerEvents="none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(8,13,25,0.82)' }}>
           <Text style={{ color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700', textAlign: 'center' }}>{playerError}</Text>

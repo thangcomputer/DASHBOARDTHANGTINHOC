@@ -195,7 +195,7 @@ function CourseTrophyStage({ summary, onNext }) {
               gameSounds.tap();
               setShareOpen(true);
             }}
-            label="SHARE"
+            label="Chia sẻ"
             variant="white"
             className="!rounded-2xl !px-4 !py-3.5"
           />

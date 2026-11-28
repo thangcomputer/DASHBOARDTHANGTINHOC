@@ -61,29 +61,77 @@ function nextExpiry(currentExpiresAt, plan, now = new Date()) {
 }
 
 /** Trạng thái gói để hiển thị + chặn truy cập. Thiếu trường (HV cũ) = vĩnh viễn. */
-function statusOf(student, now = new Date(), xpConfig = null) {
+function statusOf(student, now = new Date(), xpConfig = null, ownedClassSummary = null) {
   const sub = student?.subscription || {};
   const plan = PLANS.includes(sub.plan) ? sub.plan : 'lifetime';
   const expiresAt = sub.expiresAt ? new Date(sub.expiresAt) : null;
   const cfg = xpConfig || DEFAULT_XP_CONFIG;
   const resetCycle = cfg.resetCycle || 'daily';
+  const aiQuestionCostXp = Number.isFinite(Number(cfg.aiQuestionCostXp)) && Number(cfg.aiQuestionCostXp) >= 0
+    ? Math.round(Number(cfg.aiQuestionCostXp))
+    : DEFAULT_XP_CONFIG.aiQuestionCostXp;
+  const aiImageCostXp = Number.isFinite(Number(cfg.aiImageCostXp)) && Number(cfg.aiImageCostXp) >= 0
+    ? Math.round(Number(cfg.aiImageCostXp))
+    : DEFAULT_XP_CONFIG.aiImageCostXp;
+  const hasOwnedClass = Boolean(ownedClassSummary?.hasOwnedClass);
+  const ownedClassDailyXp = hasOwnedClass
+    ? (Number.isFinite(Number(ownedClassSummary.dailyXpAllowance)) && Number(ownedClassSummary.dailyXpAllowance) >= 0
+      ? Math.round(Number(ownedClassSummary.dailyXpAllowance))
+      : 100)
+    : 0;
+  const ownedClassMeta = hasOwnedClass
+    ? {
+      hasOwnedClass: true,
+      ownedClassCount: Number(ownedClassSummary.ownedClassCount) || 1,
+      ownedClassName: String(ownedClassSummary.primaryClassName || '').trim(),
+      ownedClassDailyXp,
+    }
+    : {
+      hasOwnedClass: false,
+      ownedClassCount: 0,
+      ownedClassName: '',
+      ownedClassDailyXp: 0,
+    };
+
   if (plan === 'lifetime' || !expiresAt) {
     const boughtLifetime = plan === 'lifetime' && Boolean(sub.activatedAt);
-    const freeTier = student?.freePortal === true && !boughtLifetime;
-    const dailyXpLimit = freeTier
+    const rawFreeTier = student?.freePortal === true && !boughtLifetime;
+    if (rawFreeTier && hasOwnedClass) {
+      return {
+        plan: 'course',
+        planLabel: ownedClassMeta.ownedClassName || 'Khóa học theo môn',
+        expiresAt: ownedClassSummary.latestExpiresAt || null,
+        courseExpiresAt: ownedClassSummary.latestExpiresAt || null,
+        hasCourseMeetAccess: ownedClassSummary.includesMeet !== false,
+        state: 'course',
+        daysLeft: null,
+        activated: true,
+        meetLifetime: false,
+        freeTier: false,
+        dailyXpLimit: ownedClassDailyXp > 0 ? ownedClassDailyXp : (cfg.courseAccountXp ?? 100),
+        resetCycle,
+        aiQuestionCostXp,
+        aiImageCostXp,
+        ...ownedClassMeta,
+      };
+    }
+    const baseDailyXp = rawFreeTier
       ? (cfg.freeAccountXp ?? 60)
       : (student?.freePortal === true && boughtLifetime ? (cfg.planXp?.lifetime ?? 1000) : (cfg.courseAccountXp ?? 200));
     return {
-      plan: freeTier ? 'free' : 'lifetime',
-      planLabel: freeTier ? 'Miễn phí' : PLAN_LABELS.lifetime,
+      plan: rawFreeTier ? 'free' : 'lifetime',
+      planLabel: rawFreeTier ? 'Miễn phí' : PLAN_LABELS.lifetime,
       expiresAt: null,
-      state: freeTier ? 'free' : 'lifetime',
+      state: rawFreeTier ? 'free' : 'lifetime',
       daysLeft: null,
       activated: student?.freePortal === true ? boughtLifetime : true,
       meetLifetime: student?.freePortal === true && boughtLifetime,
-      freeTier,
-      dailyXpLimit,
+      freeTier: rawFreeTier,
+      dailyXpLimit: hasOwnedClass ? Math.max(baseDailyXp, ownedClassDailyXp) : baseDailyXp,
       resetCycle,
+      aiQuestionCostXp,
+      aiImageCostXp,
+      ...ownedClassMeta,
     };
   }
   const msLeft = expiresAt.getTime() - now.getTime();
@@ -91,8 +139,27 @@ function statusOf(student, now = new Date(), xpConfig = null) {
   let state = 'active';
   if (msLeft <= 0) state = 'expired';
   else if (daysLeft <= EXPIRING_DAYS) state = 'expiring';
-  const freeTier = student?.freePortal === true && state === 'expired';
-  const dailyXpLimit = freeTier
+  const rawFreeTier = student?.freePortal === true && state === 'expired';
+  if (rawFreeTier && hasOwnedClass) {
+    return {
+      plan: 'course',
+      planLabel: ownedClassMeta.ownedClassName || 'Khóa học theo môn',
+      expiresAt: ownedClassSummary.latestExpiresAt || null,
+      courseExpiresAt: ownedClassSummary.latestExpiresAt || null,
+      hasCourseMeetAccess: ownedClassSummary.includesMeet !== false,
+      state: 'course',
+      daysLeft: null,
+      activated: true,
+      meetLifetime: false,
+      freeTier: false,
+      dailyXpLimit: ownedClassDailyXp > 0 ? ownedClassDailyXp : (cfg.courseAccountXp ?? 100),
+      resetCycle,
+      aiQuestionCostXp,
+      aiImageCostXp,
+      ...ownedClassMeta,
+    };
+  }
+  const baseDailyXp = rawFreeTier
     ? (cfg.freeAccountXp ?? 60)
     : (cfg.planXp?.[plan] ?? 400);
   return {
@@ -103,9 +170,12 @@ function statusOf(student, now = new Date(), xpConfig = null) {
     daysLeft: Math.max(0, daysLeft),
     activated: Boolean(sub.activatedAt),
     meetLifetime: false,
-    freeTier,
-    dailyXpLimit,
+    freeTier: rawFreeTier,
+    dailyXpLimit: hasOwnedClass ? Math.max(baseDailyXp, ownedClassDailyXp) : baseDailyXp,
     resetCycle,
+    aiQuestionCostXp,
+    aiImageCostXp,
+    ...ownedClassMeta,
   };
 }
 
@@ -114,14 +184,27 @@ function isExpired(student, now = new Date()) {
 }
 
 /**
- * Gói Meet còn hiệu lực - chỉ tài khoản miễn phí (freePortal) đã mua gói Meet.
- * HV đăng ký khóa học truyền thống (không freePortal) không thuộc nhóm Meet online.
+ * Gói Meet còn hiệu lực - tài khoản DewSkill/miễn phí đã mua gói Meet HOẶC sở hữu khóa học còn hạn có kèm Meet.
+ * HV trung tâm (không freePortal) dùng lịch trung tâm riêng, không thuộc nhóm Meet online.
  */
-function hasMeetAccess(student, now = new Date()) {
+function hasMeetAccess(student, now = new Date(), ownedClassSummary = null) {
   if (student?.freePortal !== true) return false;
+  if (ownedClassSummary?.hasOwnedClass && ownedClassSummary?.includesMeet !== false) {
+    return true;
+  }
   const status = statusOf(student, now);
   if (status.state === 'expired' || status.freeTier) return false;
   return Boolean(status.meetLifetime || status.state === 'active' || status.state === 'expiring');
+}
+
+async function hasMeetAccessWithCourses(student, now = new Date()) {
+  if (!student || student.freePortal !== true) return false;
+  if (hasMeetAccess(student, now)) return true;
+  const sid = student._id || student.id;
+  if (!sid) return false;
+  const dewskillClassService = require('./dewskillClassService');
+  const summary = await dewskillClassService.getStudentOwnedClassXpSummary(sid, now).catch(() => null);
+  return Boolean(summary?.hasOwnedClass && summary?.includesMeet !== false);
 }
 
 /** Gói Vĩnh viễn đã mua thì không gia hạn. Tài khoản miễn phí chưa mua Meet vẫn đăng ký được. */
@@ -347,6 +430,8 @@ const DEFAULT_XP_CONFIG = {
     lifetime: 1000,
   },
   resetCycle: 'daily',
+  aiQuestionCostXp: 10,
+  aiImageCostXp: 20,
 };
 
 async function getXpConfig() {
@@ -362,6 +447,8 @@ async function getXpConfig() {
       })
     ),
     resetCycle: ['daily', 'monthly', 'never'].includes(raw.resetCycle) ? raw.resetCycle : DEFAULT_XP_CONFIG.resetCycle,
+    aiQuestionCostXp: Number.isFinite(Number(raw.aiQuestionCostXp)) && Number(raw.aiQuestionCostXp) >= 0 ? Math.round(Number(raw.aiQuestionCostXp)) : DEFAULT_XP_CONFIG.aiQuestionCostXp,
+    aiImageCostXp: Number.isFinite(Number(raw.aiImageCostXp)) && Number(raw.aiImageCostXp) >= 0 ? Math.round(Number(raw.aiImageCostXp)) : DEFAULT_XP_CONFIG.aiImageCostXp,
   };
 }
 
@@ -382,6 +469,12 @@ async function setXpConfig(input = {}) {
   }
   if (input.resetCycle && ['daily', 'monthly', 'never'].includes(input.resetCycle)) {
     update['subscriptionXpSettings.resetCycle'] = input.resetCycle;
+  }
+  if (input.aiQuestionCostXp != null) {
+    update['subscriptionXpSettings.aiQuestionCostXp'] = Math.max(0, Math.round(Number(input.aiQuestionCostXp) || 0));
+  }
+  if (input.aiImageCostXp != null) {
+    update['subscriptionXpSettings.aiImageCostXp'] = Math.max(0, Math.round(Number(input.aiImageCostXp) || 0));
   }
   await SystemSettings.findOneAndUpdate({ _key: 'main' }, { $set: update }, { upsert: true, setDefaultsOnInsert: true });
   return getXpConfig();
@@ -459,14 +552,16 @@ async function planCatalog() {
 async function myOverview(studentId) {
   const student = await Student.findById(studentId).select('name subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
-  const [plans, history, xpPurchases, xpConfig] = await Promise.all([
+  const dewskillClassService = require('./dewskillClassService');
+  const [plans, history, xpPurchases, xpConfig, ownedClassSummary] = await Promise.all([
     planCatalog(),
     SubscriptionLog.find({ studentId }).sort({ createdAt: -1 }).limit(20).lean(),
     xpPurchaseHistory(studentId),
     getXpConfig(),
+    dewskillClassService.getStudentOwnedClassXpSummary(studentId).catch(() => null),
   ]);
   return {
-    subscription: statusOf(student, new Date(), xpConfig),
+    subscription: statusOf(student, new Date(), xpConfig, ownedClassSummary),
     plans,
     history: history.map(logView),
     xpPurchases,
@@ -752,18 +847,57 @@ async function adminSetSubscription(studentId, { mode = 'extend', plan = '', exp
 const MAX_MEET_CLASS_STUDENTS = 100;
 
 async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLASS_STUDENTS } = {}) {
+  const StudentDewskillClassAccess = require('../models/StudentDewskillClassAccess');
+  const DewskillClass = require('../models/DewskillClass');
   const query = { accountLocked: { $ne: true }, freePortal: true, ...(scopeFilter || {}) };
-  const [rows, xpConfig] = await Promise.all([
+  const now = new Date();
+  const [rows, xpConfig, meetClasses] = await Promise.all([
     Student.find(query)
       .select('name phone email studentCode subscription freePortal')
       .sort({ name: 1 })
       .limit(3000)
       .lean(),
     getXpConfig(),
+    DewskillClass.find({ isActive: true, includesMeet: { $ne: false } }).select('_id name dailyXpAllowance includesMeet').lean(),
   ]);
-  const now = new Date();
+  const meetClassMap = new Map(meetClasses.map((c) => [String(c._id), c]));
+  const accessRows = meetClasses.length
+    ? await StudentDewskillClassAccess.find({
+      classId: { $in: meetClasses.map((c) => c._id) },
+      isVisible: true,
+      accessLevel: 'full',
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+    })
+      .select('studentId classId expiresAt')
+      .lean()
+    : [];
+  const courseSummaryByStudent = new Map();
+  for (const acc of accessRows) {
+    const sid = String(acc.studentId || '');
+    const cls = meetClassMap.get(String(acc.classId || ''));
+    if (!sid || !cls) continue;
+    const prev = courseSummaryByStudent.get(sid);
+    const xpVal = Number.isFinite(Number(cls.dailyXpAllowance)) ? Number(cls.dailyXpAllowance) : 100;
+    const expIso = acc.expiresAt ? new Date(acc.expiresAt).toISOString() : null;
+    if (!prev) {
+      courseSummaryByStudent.set(sid, {
+        hasOwnedClass: true,
+        ownedClassCount: 1,
+        dailyXpAllowance: xpVal,
+        primaryClassName: cls.name || '',
+        includesMeet: true,
+        latestExpiresAt: expIso,
+      });
+    } else {
+      prev.ownedClassCount += 1;
+      prev.dailyXpAllowance = Math.max(prev.dailyXpAllowance, xpVal);
+      if (expIso && (!prev.latestExpiresAt || expIso > prev.latestExpiresAt)) {
+        prev.latestExpiresAt = expIso;
+      }
+    }
+  }
   return rows
-    .filter((row) => hasMeetAccess(row))
+    .filter((row) => hasMeetAccess(row, now, courseSummaryByStudent.get(String(row._id)) || null))
     .slice(0, Math.min(Math.max(1, limit), MAX_MEET_CLASS_STUDENTS))
     .map((row) => ({
       id: String(row._id),
@@ -771,7 +905,7 @@ async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLA
       phone: row.phone || '',
       email: row.email || '',
       studentCode: row.studentCode || '',
-      subscription: statusOf(row, now, xpConfig),
+      subscription: statusOf(row, now, xpConfig, courseSummaryByStudent.get(String(row._id)) || null),
     }));
 }
 
@@ -884,6 +1018,7 @@ module.exports = {
   statusOf,
   isExpired,
   hasMeetAccess,
+  hasMeetAccessWithCourses,
   listMeetEligibleStudents,
   MAX_MEET_CLASS_STUDENTS,
   applyRenewal,

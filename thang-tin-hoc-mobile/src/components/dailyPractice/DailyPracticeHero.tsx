@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { pathTopicPrimaryCtaLabel } from '../../../../shared/dailyPractice/lastPathTopic.mjs';
+import { buildHeroStreakTagline } from '../../../../shared/dailyPractice/heroTagline.mjs';
 import { Mascot, type MascotMood } from './Mascot';
 import type { GameSound } from './useGameSounds';
 import { DuoButton } from '../duo/DuoButton';
@@ -48,6 +49,7 @@ export type DailyPracticeHeroProps = {
   starting?: boolean;
   pathTopic?: DpTopicPath | null;
   pathContinue?: boolean;
+  freeSummary?: { activeSubjectName?: string; completedUnits?: number; totalUnits?: number } | null;
   onBuyXp?: () => void;
   onOpenCertificate?: () => void;
   play?: (s: GameSound) => void;
@@ -56,13 +58,13 @@ export type DailyPracticeHeroProps = {
 /** Banner chào mừng DewSkill — đồng bộ giao diện & số liệu từ Web DailyPracticeHero. */
 export function DailyPracticeHero({
   stats,
-  displayName = 'bạn',
   mode,
   onPrimaryAction,
   primaryDisabled = false,
   primaryLabel,
   starting = false,
   pathTopic = null,
+  freeSummary = null,
   onBuyXp,
   onOpenCertificate,
   play,
@@ -104,14 +106,17 @@ export function DailyPracticeHero({
         : 'studying';
 
   const pathMode = Boolean(mode === 'path' && pathTopic?.topic?.name);
-  const cleanName = (displayName || '').trim() || 'bạn';
 
-  const chapterCompleted = pathTopic?.completedUnits || 0;
-  const chapterTotal = pathTopic?.totalUnits || 0;
+  const chapterCompleted = freeSummary
+    ? (freeSummary.completedUnits || 0)
+    : (pathTopic?.completedUnits || 0);
+  const chapterTotal = freeSummary
+    ? (freeSummary.totalUnits || 0)
+    : (pathTopic?.totalUnits || 0);
   const chapterDone = chapterTotal > 0 && chapterCompleted >= chapterTotal;
   const activeUnit = (pathTopic?.units || []).find((u) => u.state === 'active') || null;
   const activeSteps = Array.isArray(activeUnit?.steps) ? activeUnit.steps : [];
-  const activeFraction = activeSteps.length
+  const activeFraction = !freeSummary && activeSteps.length
     ? activeSteps.filter((s) => s.state === 'completed').length / activeSteps.length
     : 0;
   const coursePct = chapterTotal > 0
@@ -119,9 +124,7 @@ export function DailyPracticeHero({
     : 0;
   const courseBar = Math.max(coursePct, chapterCompleted > 0 ? 5 : 0);
 
-  const tagline = pathMode
-    ? 'Tiếp tục hành trình chinh phục Tin học nhé!'
-    : 'Chọn chủ đề, hoàn thành lượt luyện và nhận XP mỗi ngày.';
+  const tagline = buildHeroStreakTagline(stats, { mode: pathMode ? 'path' : mode });
 
   const ctaLabel = pathMode && !chapterDone
     ? pathTopicPrimaryCtaLabel(pathTopic)
@@ -137,11 +140,6 @@ export function DailyPracticeHero({
             <Mascot mood={mood} size={isWide ? 80 : 72} />
           </View>
           <View style={styles.greetingCopy}>
-            <Text style={styles.greetingText} numberOfLines={1}>
-              {'Chào bạn, '}
-              <Text style={styles.greetingName}>{cleanName.toUpperCase()}</Text>
-              {' 👋'}
-            </Text>
             <Text style={styles.taglineText}>{tagline}</Text>
             {streakMilestone ? (
               <View style={styles.milestonePill}>
@@ -157,10 +155,17 @@ export function DailyPracticeHero({
 
         <View style={[styles.statGrid, isWide && styles.statGridWide]}>
           <Pressable
-            onPress={() => { play?.('tap'); onBuyXp?.(); }}
+            onPress={() => {
+              if (mode === 'free') return;
+              play?.('tap');
+              onBuyXp?.();
+            }}
+            disabled={mode === 'free'}
             style={styles.statCapsule}
             accessibilityRole="button"
-            accessibilityLabel={`Tích lũy ${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP, bấm để mua thêm XP`}
+            accessibilityLabel={mode === 'free'
+              ? `Tích lũy ${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP`
+              : `Tích lũy ${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP, bấm để mua thêm XP`}
           >
             <View style={styles.statLabelRow}>
               <Star size={12} color="#F59E0B" fill="#FBBF24" />
@@ -191,7 +196,7 @@ export function DailyPracticeHero({
               <Text style={styles.statLabel}>Chương</Text>
             </View>
             <Text style={styles.statValue} numberOfLines={1}>
-              {pathMode ? `${chapterCompleted}/${chapterTotal || '—'}` : '—'}
+              {(pathMode || (freeSummary && chapterTotal > 0)) ? `${chapterCompleted}/${chapterTotal || '—'}` : '—'}
             </Text>
           </View>
         </View>
@@ -216,9 +221,15 @@ export function DailyPracticeHero({
                   ? 'Bạn đã hoàn thành toàn bộ chặng của chủ đề đang học.'
                   : `Đang học: ${pathTopic?.topic.name} · ${chapterCompleted}/${chapterTotal} chặng`}
               </Text>
+            ) : mode === 'free' && freeSummary?.activeSubjectName ? (
+              <Text style={styles.progressSub} numberOfLines={2}>
+                {`Đang học: ${freeSummary.activeSubjectName} · ${chapterCompleted}/${chapterTotal} bài (trả lời đúng +5 XP · sai −5 XP)`}
+              </Text>
             ) : (
               <Text style={styles.progressSub} numberOfLines={2}>
-                Chọn chế độ Lộ trình hoặc Luyện tự do bên dưới để bắt đầu.
+                {mode === 'free'
+                  ? 'Chọn môn học bên dưới để xem video, làm trắc nghiệm theo mốc và tích lũy XP (đúng +5 XP · sai −5 XP).'
+                  : 'Chọn chủ đề bên dưới để bắt đầu hành trình học theo lộ trình.'}
               </Text>
             )}
           </View>
@@ -318,15 +329,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 3,
-  },
-  greetingText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#065F46',
-  },
-  greetingName: {
-    fontWeight: '900',
-    color: '#022C22',
   },
   taglineText: {
     fontSize: 15.5,

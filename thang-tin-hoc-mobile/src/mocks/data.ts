@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   AppNotification,
   Assignment,
   ChatMessage,
@@ -205,19 +205,6 @@ export const mockLearningCourses: LearningCourse[] = [
         ],
       },
     ],
-  },
-  {
-    _id: 'course-office-video',
-    title: 'Tin học văn phòng tự học qua video',
-    subject: 'Tin học văn phòng',
-    description: 'Khóa tự học theo video và tài liệu của khóa học.',
-    software: 'Microsoft Word, Microsoft Excel',
-    progress: 0,
-    enrolled: false,
-    deliveryMode: 'video',
-    totalSessions: 0,
-    price: 0,
-    units: [],
   },
   {
     _id: 'course-excel-instructor',

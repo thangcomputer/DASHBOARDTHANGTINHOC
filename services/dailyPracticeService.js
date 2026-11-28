@@ -14,11 +14,13 @@ const Student = require('../models/Student');
 const PaymentSession = require('../models/PaymentSession');
 const DailyPracticeXpPackPrice = require('../models/DailyPracticeXpPackPrice');
 const LmsXpGrant = require('../models/LmsXpGrant');
+const LmsLearnerProgress = require('../models/LmsLearnerProgress');
 const rules = require('./dailyPracticeRules');
 const pathService = require('./dailyPracticePathService');
 const learningGoalService = require('./learningGoalService');
 const lessonPracticeService = require('./lessonPracticeService');
 const subscriptionService = require('./subscriptionService');
+const referralConfigService = require('./referralConfigService');
 const logger = require('../config/logger');
 
 const { httpError } = rules;
@@ -147,12 +149,21 @@ function computeNextSpacedQueue({ existingQueue = [], finished, day }) {
   return Array.from(queueMap.values()).slice(-SPACED_QUEUE_MAX);
 }
 
-function referralSummaryView(profile, student, settings) {
-  const configured = Number(settings?.amounts?.referral);
-  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 50;
+function referralSummaryView(profile, student, referralConfig = null) {
+  const cfg = referralConfigService.sanitizeReferralConfig(referralConfig || {});
   return {
+    enabled: Boolean(cfg.enabled),
+    rewardType: 'discount',
     code: buildReferralCode(student),
-    rewardXp,
+    discountAmountVnd: cfg.discountAmountVnd,
+    referrerRewardVnd: cfg.referrerRewardVnd,
+    minOrderAmountVnd: cfg.minOrderAmountVnd,
+    applyToCourses: cfg.applyToCourses,
+    applyToAiPackages: cfg.applyToAiPackages,
+    availableDiscountVnd: Math.max(0, Math.round(Number(profile?.referralDiscountAvailableVnd) || 0)),
+    usedDiscountVnd: Math.max(0, Math.round(Number(profile?.referralDiscountUsedVnd) || 0)),
+    earnedDiscountVnd: Math.max(0, Math.round(Number(profile?.referralDiscountEarnedVnd) || 0)),
+    rewardXp: 0,
     referralCount: Number(profile?.referralCount) || 0,
     referralXpEarned: Number(profile?.referralXpEarned) || 0,
     redeemed: Boolean(profile?.referredByStudentId),
@@ -234,6 +245,7 @@ function questionAdminView(q) {
     distractors: q.distractors,
     groups: q.groups,
     unitId: q.unitId ? String(q.unitId) : '',
+    nodeKey: String(q.nodeKey || ''),
     forTestOut: Boolean(q.forTestOut),
     updatedAt: q.updatedAt,
   };
@@ -319,7 +331,7 @@ async function deleteTopic(id) {
 }
 
 // ── Admin: câu hỏi ──────────────────────────────────────────────────────────
-async function listQuestions({ topicId, difficulty, type, status, unitId, forTestOut } = {}) {
+async function listQuestions({ topicId, difficulty, type, status, unitId, forTestOut, nodeKey } = {}) {
   const filter = { topicId: requireId(topicId, 'Chủ đề') };
   if (rules.DIFFICULTIES.includes(difficulty)) filter.difficulty = difficulty;
   if (rules.TYPES.includes(type)) filter.type = type;
@@ -328,6 +340,8 @@ async function listQuestions({ topicId, difficulty, type, status, unitId, forTes
   else if (mongoose.Types.ObjectId.isValid(String(unitId || ''))) filter.unitId = new mongoose.Types.ObjectId(String(unitId));
   if (forTestOut === 'true' || forTestOut === true) filter.forTestOut = true;
   else if (forTestOut === 'false' || forTestOut === false) filter.forTestOut = { $ne: true };
+  if (nodeKey === '__unit__') filter.nodeKey = { $in: ['', null] };
+  else if (String(nodeKey || '').trim()) filter.nodeKey = String(nodeKey).trim();
   const questions = await DailyPracticeQuestion.find(filter).sort({ status: 1, updatedAt: -1 }).limit(500).lean();
   return questions.map(questionAdminView);
 }
@@ -339,11 +353,14 @@ async function createQuestion(body, userId) {
   const status = body?.status === 'draft' ? 'draft' : 'published';
   rules.assertExplanationForPublish(doc, status);
   const unitId = await pathService.resolveQuestionUnit(topicId, body?.unitId);
+  const forTestOut = Boolean(unitId && body?.forTestOut === true);
+  const nodeKey = unitId && !forTestOut ? String(body?.nodeKey || '').trim().slice(0, 40) : '';
   const question = await DailyPracticeQuestion.create({
     ...doc,
     topicId,
     unitId,
-    forTestOut: Boolean(unitId && body?.forTestOut === true),
+    nodeKey,
+    forTestOut,
     status,
     source: 'manual',
     createdBy: mongoose.Types.ObjectId.isValid(String(userId || '')) ? userId : null,
@@ -378,6 +395,12 @@ async function updateQuestion(id, body) {
       set.forTestOut = Boolean(nextUnitId && body.forTestOut === true);
     } else if (!nextUnitId) {
       set.forTestOut = false;
+    }
+    const nextTestOut = Object.prototype.hasOwnProperty.call(set, 'forTestOut') ? set.forTestOut : existing.forTestOut;
+    if (!nextUnitId || nextTestOut) {
+      set.nodeKey = '';
+    } else if (body && Object.prototype.hasOwnProperty.call(body, 'nodeKey')) {
+      set.nodeKey = String(body.nodeKey || '').trim().slice(0, 40);
     }
   }
   const unset = {};
@@ -433,12 +456,17 @@ async function getProfile(studentId) {
 /** Đặt ví về mức gói theo chu kỳ (mỗi ngày, mỗi tháng hoặc không reset). */
 async function refillDailyXp(studentId) {
   const today = learningGoalService.vnDayKey();
-  const xpConfig = await subscriptionService.getXpConfig();
-  const student = await Student.findById(studentId).select('subscription freePortal').lean();
-  const status = subscriptionService.statusOf(student, new Date(), xpConfig);
+  const dewskillClassService = require('./dewskillClassService');
+  const [xpConfig, student, ownedClassSummary] = await Promise.all([
+    subscriptionService.getXpConfig(),
+    Student.findById(studentId).select('subscription freePortal').lean(),
+    dewskillClassService.getStudentOwnedClassXpSummary(studentId).catch(() => null),
+  ]);
+  const status = subscriptionService.statusOf(student, new Date(), xpConfig, ownedClassSummary);
   const allowance = rules.allowanceForSubscription(status, student, xpConfig);
   const isMeetActive = status.meetLifetime || ((status.state === 'active' || status.state === 'expiring') && status.plan !== 'lifetime');
-  if (isMeetActive) {
+  const hasOwnedClass = Boolean(status.hasOwnedClass || status.state === 'course');
+  if (isMeetActive || hasOwnedClass) {
     const { unlockFreePortal } = require('./freePortal');
     await unlockFreePortal(studentId);
   }
@@ -461,12 +489,15 @@ async function refillDailyXp(studentId) {
   }
 
   if (!profile) {
+    const lmsDoc = await LmsLearnerProgress.findOne({ studentId }).select('xpTotal').lean().catch(() => null);
+    const seedStudyXp = Math.max(0, Number(lmsDoc?.xpTotal) || 0);
     try {
       return await DailyPracticeProfile.create({
         studentId,
         xpTotal: allowance,
         dailyXp: allowance,
         purchasedXp: 0,
+        studyXpTotal: seedStudyXp,
         xpBrokeDay: '',
         xpAllowanceDay: periodKey,
         xpAllowanceAmount: allowance,
@@ -477,47 +508,76 @@ async function refillDailyXp(studentId) {
     }
   }
   const next = rules.applyDailyAllowance(profile, periodKey, allowance, isSamePeriod);
-  if (!next.changed) return profile;
-  const filter = next.sameDayUpgrade
+  const needsStudyInit = profile.studyXpTotal == null;
+  if (!next.changed && !needsStudyInit) return profile;
+
+  let initStudyXp = null;
+  if (needsStudyInit) {
+    const lmsDoc = await LmsLearnerProgress.findOne({ studentId }).select('xpTotal').lean().catch(() => null);
+    initStudyXp = Math.max(0, Number(lmsDoc?.xpTotal) || 0) + Math.max(0, Number(next.migratedExcessStudyXp) || 0);
+  }
+
+  if (!next.changed && needsStudyInit) {
+    const initialized = await DailyPracticeProfile.findOneAndUpdate(
+      { studentId, $or: [{ studyXpTotal: null }, { studyXpTotal: { $exists: false } }] },
+      { $set: { studyXpTotal: initStudyXp } },
+      { new: true },
+    ).lean();
+    return initialized || DailyPracticeProfile.findOne({ studentId }).lean();
+  }
+
+  const filter = next.sameDayClamp
     ? {
       studentId,
       xpAllowanceDay: profile.xpAllowanceDay,
-      $or: [
-        { xpAllowanceAmount: { $lt: allowance } },
-        { xpAllowanceAmount: null },
-        { xpAllowanceAmount: { $exists: false } },
-      ],
+      dailyXp: { $gt: allowance },
     }
-    : next.sameDayDowngrade
+    : next.sameDayUpgrade
       ? {
         studentId,
         xpAllowanceDay: profile.xpAllowanceDay,
         $or: [
-          { xpAllowanceAmount: { $gt: allowance } },
+          { xpAllowanceAmount: { $lt: allowance } },
           { xpAllowanceAmount: null },
           { xpAllowanceAmount: { $exists: false } },
         ],
       }
-      : {
-        studentId,
-        $or: [
-          { xpAllowanceDay: { $ne: periodKey } },
-          { xpAllowanceDay: null },
-          { xpAllowanceDay: { $exists: false } },
-        ],
-      };
+      : next.sameDayDowngrade
+        ? {
+          studentId,
+          xpAllowanceDay: profile.xpAllowanceDay,
+          $or: [
+            { xpAllowanceAmount: { $gt: allowance } },
+            { xpAllowanceAmount: null },
+            { xpAllowanceAmount: { $exists: false } },
+          ],
+        }
+        : {
+          studentId,
+          $or: [
+            { xpAllowanceDay: { $ne: periodKey } },
+            { xpAllowanceDay: null },
+            { xpAllowanceDay: { $exists: false } },
+          ],
+        };
+  const setFields = {
+    xpTotal: next.xpTotal,
+    dailyXp: next.dailyXp,
+    purchasedXp: next.purchasedXp,
+    xpBrokeDay: next.xpBrokeDay,
+    xpAllowanceDay: periodKey,
+    xpAllowanceAmount: next.xpAllowanceAmount,
+  };
+  if (needsStudyInit) {
+    setFields.studyXpTotal = initStudyXp;
+  }
+  const updateDoc = { $set: setFields };
+  if (!needsStudyInit && next.migratedExcessStudyXp > 0 && Number(profile.studyXpTotal) === 0) {
+    updateDoc.$inc = { studyXpTotal: next.migratedExcessStudyXp };
+  }
   const updated = await DailyPracticeProfile.findOneAndUpdate(
     filter,
-    {
-      $set: {
-        xpTotal: next.xpTotal,
-        dailyXp: next.dailyXp,
-        purchasedXp: next.purchasedXp,
-        xpBrokeDay: next.xpBrokeDay,
-        xpAllowanceDay: periodKey,
-        xpAllowanceAmount: next.xpAllowanceAmount,
-      }
-    },
+    updateDoc,
     { new: true },
   ).lean();
   return updated || DailyPracticeProfile.findOne({ studentId }).lean();
@@ -613,9 +673,11 @@ async function syncDailyQuestRewards(
 function profileView(profile, today, recoveryXpEarnedToday = 0) {
   const status = rules.streakStatus(profile, today);
   const xpTotal = rules.clampXp(profile?.xpTotal);
+  const studyXpTotal = rules.clampXp(profile?.studyXpTotal);
   const allowance = Number(profile?.xpAllowanceAmount) > 0 ? Number(profile.xpAllowanceAmount) : rules.DAILY_ALLOWANCE_XP;
   return {
     xpTotal,
+    studyXpTotal,
     xpEmpty: xpTotal < rules.SESSION_STAKE_XP,
     recoveryXpEarnedToday,
     recoveryXpRemainingToday: Math.max(0, rules.RECOVERY_DAILY_CAP_XP - recoveryXpEarnedToday),
@@ -640,7 +702,7 @@ function profileView(profile, today, recoveryXpEarnedToday = 0) {
   };
 }
 
-/** Cộng/trừ XP hồ sơ, không âm. */
+/** Cộng/trừ XP hồ sơ, không âm. Tách biệt ví quy định (dailyXp + purchasedXp) và studyXpTotal. */
 async function adjustProfileXp(studentId, delta, { source = 'reward' } = {}) {
   await refillDailyXp(studentId);
   const amount = Math.round(Number(delta) || 0);
@@ -651,11 +713,21 @@ async function adjustProfileXp(studentId, delta, { source = 'reward' } = {}) {
       xpTotal: 0,
       dailyXp: 0,
       purchasedXp: 0,
+      studyXpTotal: 0,
     });
     profile = profile.toObject();
   }
   if (!amount) return profile;
   const next = rules.applyXpDelta(profile, amount, source);
+  if ((source === 'stake_refund' || source === 'refund') && amount > 0) {
+    const cap = Number(profile?.xpAllowanceAmount) > 0 ? Number(profile.xpAllowanceAmount) : rules.DAILY_ALLOWANCE_XP;
+    if (next.dailyXp > cap) {
+      const overflow = next.dailyXp - cap;
+      next.dailyXp = cap;
+      next.purchasedXp += overflow;
+      next.xpTotal = next.dailyXp + next.purchasedXp;
+    }
+  }
   const today = learningGoalService.vnDayKey();
   const broke = next.xpTotal < rules.SESSION_STAKE_XP;
   return DailyPracticeProfile.findOneAndUpdate(
@@ -665,6 +737,7 @@ async function adjustProfileXp(studentId, delta, { source = 'reward' } = {}) {
         xpTotal: next.xpTotal,
         dailyXp: next.dailyXp,
         purchasedXp: next.purchasedXp,
+        studyXpTotal: next.studyXpTotal,
         xpBrokeDay: broke ? today : '',
       }
     },
@@ -672,28 +745,43 @@ async function adjustProfileXp(studentId, delta, { source = 'reward' } = {}) {
   ).lean();
 }
 
+async function enrichXpInsufficientError(studentId, err) {
+  if (!err) return err;
+  const dewskillClassService = require('./dewskillClassService');
+  const [student, xpConfig, ownedClassSummary] = await Promise.all([
+    Student.findById(studentId).select('subscription freePortal').lean(),
+    subscriptionService.getXpConfig(),
+    dewskillClassService.getStudentOwnedClassXpSummary(studentId).catch(() => null),
+  ]);
+  const subStatus = subscriptionService.statusOf(student, new Date(), xpConfig, ownedClassSummary);
+  const isFreeTier = Boolean(subStatus?.freeTier);
+  const suggestedAction = isFreeTier ? 'upgrade_plan' : 'buy_xp';
+  err.code = err.code || 'XP_EMPTY';
+  err.isFreeTier = isFreeTier;
+  err.suggestedAction = suggestedAction;
+  return { err, isFreeTier, suggestedAction };
+}
+
 /**
  * Kiểm tra XP trước khi vào lượt.
- * - Lượt mới / cược: bắt buộc số XP trong ví (xpTotal) phải ≥ stake thì mới được làm.
- *   Nếu xpTotal < stake (ví dụ bài cần 50 XP mà chỉ có 15 XP): CHẶN TUYỆT ĐỐI, không cho làm, buộc mua gói hoặc đợi ngày mai.
+ * - Lượt mới / cược: bắt buộc số XP trong ví quy định (xpTotal) phải ≥ stake thì mới được làm.
  */
 async function assertCanSpendXp(studentId, { recovery = false, stake = rules.SESSION_STAKE_XP } = {}) {
   const profile = await getProfile(studentId);
   const xpTotal = rules.clampXp(profile?.xpTotal);
   const need = Math.max(0, Number(stake) || rules.SESSION_STAKE_XP);
   const allowance = Number(profile?.xpAllowanceAmount) > 0 ? Number(profile.xpAllowanceAmount) : rules.DAILY_ALLOWANCE_XP;
-  const today = learningGoalService.vnDayKey();
 
   if (xpTotal >= need) return { profile, stakeXp: need };
 
-  const err = httpError(
-    402,
-    `Không đủ XP để làm bài này (Cần ${need} XP · Bạn đang có ${xpTotal} XP). Vui lòng nâng cấp gói Google Meet (+300 XP/ngày) hoặc đợi sang ngày mai để nhận lại ${allowance} XP.`,
-  );
-  err.code = 'XP_EMPTY';
-  err.needXp = need;
-  err.currentXp = xpTotal;
-  throw err;
+  const baseErr = httpError(402, '');
+  baseErr.needXp = need;
+  baseErr.currentXp = xpTotal;
+  const { isFreeTier } = await enrichXpInsufficientError(studentId, baseErr);
+  baseErr.message = isFreeTier
+    ? `Không đủ Ví XP quy định để làm bài này (Cần ${need} XP · Bạn đang có ${xpTotal} XP). Tài khoản miễn phí bị giới hạn ${allowance} XP/ngày — vui lòng đăng ký gói tháng/năm để nhận thêm XP mỗi ngày!`
+    : `Không đủ Ví XP quy định để làm bài này (Cần ${need} XP · Bạn đang có ${xpTotal} XP). Vui lòng mua thêm gói XP để tiếp tục (hoặc đợi ngày mai nhận lại ${allowance} XP).`;
+  throw baseErr;
 }
 
 /** Tạo session + trừ stake (nếu có). */
@@ -731,7 +819,7 @@ async function getOverview(studentId) {
   const topics = await DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
   const [freeCounts, student, lmsSettings, baseTodayXp, todaySessions, todayPlayers, recoveryEarned, goalData] = await Promise.all([
     questionCounts(topics.map((topic) => topic._id), { freeOnly: true }),
-    Student.findById(sid).select('_id name studentCode').lean(),
+    Student.findById(sid).select('_id name studentCode freePortal accountType').lean(),
     lmsProgressService.loadSettings(),
     sumTodayPracticeDisplayXp(sid, today, { includeQuestBonus: false }),
     DailyPracticeSession.countDocuments({ studentId: sid, status: 'finished', day: today }),
@@ -739,6 +827,7 @@ async function getOverview(studentId) {
     sumRecoveryXpEarnedToday(sid, today),
     learningGoalService.getLearningGoal(sid).catch(() => null),
   ]);
+  const isDewskill = Boolean(student && (student.accountType === 'dewskill' || student.freePortal === true));
   const todayVideos = goalData?.progress?.todayVideos || 0;
   const todayQuestions = Math.max(
     goalData?.progress?.todayQuestions || 0,
@@ -751,14 +840,21 @@ async function getOverview(studentId) {
     baseTodayXp,
     hasPaidOrPathActivity: baseTodayXp > 0 || todayVideos > 0,
   });
-  const [rawProfile, todayXp] = await Promise.all([
+  const [rawProfile, todayXp, xpConfig, ownedClassSummary, referralConfig] = await Promise.all([
     getProfile(sid),
     sumTodayPracticeDisplayXp(sid, today),
+    subscriptionService.getXpConfig(),
+    require('./dewskillClassService').getStudentOwnedClassXpSummary(sid).catch(() => null),
+    referralConfigService.getReferralConfig().catch(() => null),
   ]);
+  const subStatus = subscriptionService.statusOf(student || {}, new Date(), xpConfig, ownedClassSummary);
+  const isFreeTier = Boolean(subStatus?.freeTier);
   const profile = await ensureSpacedQueue(sid, rawProfile, today);
   const spacedRepetition = spacedSummaryFromQueue(profile?.spacedQueue, today);
-  const referral = referralSummaryView(profile, student || { _id: sid }, lmsSettings);
+  const referral = referralSummaryView(profile, student || { _id: sid }, referralConfig);
   return {
+    accountType: isDewskill ? 'dewskill' : 'center',
+    allowedPracticeMode: isDewskill ? 'path' : 'free',
     /** Luyện tự do: chỉ câu chưa xếp chặng (không dùng câu lộ trình). */
     topics: topics
       .map((topic) => topicView(topic, freeCounts.get(String(topic._id))))
@@ -767,6 +863,13 @@ async function getOverview(studentId) {
     stats: {
       ...profileView(profile, today, recoveryEarned),
       xpPacks: await listXpPacks(),
+      aiQuestionCostXp: subStatus.aiQuestionCostXp ?? xpConfig.aiQuestionCostXp ?? 10,
+      aiImageCostXp: subStatus.aiImageCostXp ?? xpConfig.aiImageCostXp ?? 20,
+      isFreeTier,
+      suggestedAction: isFreeTier ? 'upgrade_plan' : 'buy_xp',
+      hasOwnedClass: Boolean(subStatus.hasOwnedClass),
+      ownedClassName: String(subStatus.ownedClassName || ''),
+      ownedClassDailyXp: Number(subStatus.ownedClassDailyXp) || 0,
       todaySessions,
       todayXp,
       todayVideos,
@@ -869,8 +972,17 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
 }
 
 async function startSession(studentId, { topicId, difficulty, mode, unitId, step, nodeKey, testOut } = {}) {
-  if (mode === 'path') return startPathSession(studentId, { unitId, step, nodeKey, testOut: Boolean(testOut) });
   const sid = requireId(studentId, 'Học viên');
+  const student = await Student.findById(sid).select('_id freePortal accountType').lean();
+  if (!student) throw httpError(404, 'Không tìm thấy tài khoản học viên');
+  const isDewskill = student.accountType === 'dewskill' || student.freePortal === true;
+  if (mode === 'path' && !isDewskill) {
+    throw httpError(403, 'Chế độ luyện tập theo lộ trình chỉ dành cho tài khoản DewSkill.');
+  }
+  if (mode !== 'path' && isDewskill) {
+    throw httpError(403, 'Tài khoản DewSkill chỉ hỗ trợ luyện tập theo lộ trình.');
+  }
+  if (mode === 'path') return startPathSession(sid, { unitId, step, nodeKey, testOut: Boolean(testOut) });
   const tid = requireId(topicId, 'Chủ đề');
   if (!rules.DIFFICULTIES.includes(difficulty)) throw httpError(400, 'Độ khó không hợp lệ');
   const topic = await DailyPracticeTopic.findOne({ _id: tid, active: true }).lean();
@@ -1010,9 +1122,17 @@ function collectDeviceFingerprints(student) {
   return fps;
 }
 
-/** Nhập mã giới thiệu bạn bè: cộng thưởng XP đôi (mặc định 50 XP) kèm chống tạo nhiều tài khoản ảo. */
-async function redeemReferralCode(studentId, rawCode) {
+/** Nhập mã giới thiệu bạn bè: nhận ưu đãi giảm học phí (mặc định 50.000đ) kèm chống tạo nhiều tài khoản ảo. */
+async function redeemReferralCode(studentId, rawCode, { io = null } = {}) {
   const sid = requireId(studentId, 'Học viên');
+  const cfg = await referralConfigService.getReferralConfig();
+  if (!cfg.enabled) {
+    throw httpError(403, 'Chương trình giới thiệu bạn bè hiện đang tạm tắt.');
+  }
+  if (cfg.discountAmountVnd <= 0 && cfg.referrerRewardVnd <= 0) {
+    throw httpError(400, 'Mức ưu đãi giới thiệu hiện chưa được cấu hình.');
+  }
+
   const code = String(rawCode || '').trim().toUpperCase();
   if (!code) throw httpError(400, 'Vui lòng nhập mã giới thiệu.');
 
@@ -1059,8 +1179,8 @@ async function redeemReferralCode(studentId, rawCode) {
     }
   }
 
-  // 4) Tài khoản miễn phí mới tạo phải hoàn thành ít nhất 1 bài luyện tập mới được nhận thưởng
-  if (meDoc.freePortal) {
+  // 4) Tuỳ chọn Admin: yêu cầu tài khoản miễn phí hoàn thành ít nhất 1 bài luyện tập mới được nhập mã
+  if (cfg.requireFinishedSession && meDoc.freePortal) {
     const hasFinishedSession = (Number(myProfile?.sessionsCount) || 0) >= 1
       || Boolean(await DailyPracticeSession.exists({ studentId: sid, status: 'finished' }));
     if (!hasFinishedSession) {
@@ -1068,66 +1188,94 @@ async function redeemReferralCode(studentId, rawCode) {
     }
   }
 
-  // 5) Giới hạn tổng số lượt (tối đa 10 bạn) & giới hạn theo ngày (tối đa 2 bạn/ngày) cho người giới thiệu
-  if ((Number(referrerProfile?.referralCount) || 0) >= MAX_REFERRALS_PER_STUDENT) {
-    throw httpError(409, `Người giới thiệu đã đạt giới hạn nhận thưởng tối đa (${MAX_REFERRALS_PER_STUDENT} bạn).`);
+  // 5) Giới hạn tổng số lượt & giới hạn theo ngày cho người giới thiệu (theo cấu hình Admin)
+  const maxPerStudent = cfg.maxReferralsPerStudent || MAX_REFERRALS_PER_STUDENT;
+  const maxPerDay = cfg.maxReferralsPerDay || MAX_REFERRALS_PER_DAY;
+  if ((Number(referrerProfile?.referralCount) || 0) >= maxPerStudent) {
+    throw httpError(409, `Người giới thiệu đã đạt giới hạn nhận thưởng tối đa (${maxPerStudent} bạn).`);
   }
   const todayStart = new Date(`${learningGoalService.vnDayKey()}T00:00:00.000+07:00`);
   const todayCount = await DailyPracticeProfile.countDocuments({
     referredByStudentId: referrer._id,
     referredAt: { $gte: todayStart },
   });
-  if (todayCount >= MAX_REFERRALS_PER_DAY) {
-    throw httpError(429, `Người giới thiệu đã đạt giới hạn tối đa ${MAX_REFERRALS_PER_DAY} lượt giới thiệu trong hôm nay.`);
+  if (todayCount >= maxPerDay) {
+    throw httpError(429, `Người giới thiệu đã đạt giới hạn tối đa ${maxPerDay} lượt giới thiệu trong hôm nay.`);
   }
 
-  const lmsProgressService = require('./lmsProgressService');
-  const lmsSettings = await lmsProgressService.loadSettings();
-  const configured = Number(lmsSettings?.amounts?.referral);
-  const rewardXp = Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 50;
+  const discountAmountVnd = cfg.discountAmountVnd;
+  const referrerRewardVnd = cfg.referrerRewardVnd;
   const referrerCode = buildReferralCode(referrer);
+
+  const refereeInc = {};
+  if (discountAmountVnd > 0) {
+    refereeInc.referralDiscountAvailableVnd = discountAmountVnd;
+    refereeInc.referralDiscountEarnedVnd = discountAmountVnd;
+  }
 
   const claimed = await DailyPracticeProfile.findOneAndUpdate(
     {
       studentId: sid,
       $or: [{ referredByStudentId: null }, { referredByStudentId: { $exists: false } }],
     },
-    { $set: { referredByStudentId: referrer._id, referredByCode: referrerCode, referredAt: new Date() } },
+    {
+      $set: { referredByStudentId: referrer._id, referredByCode: referrerCode, referredAt: new Date() },
+      ...(Object.keys(refereeInc).length ? { $inc: refereeInc } : {}),
+    },
     { new: true },
   ).lean();
   if (!claimed) throw httpError(409, 'Tài khoản của bạn đã áp dụng mã giới thiệu trước đó.');
 
+  const referrerInc = { referralCount: 1 };
+  if (referrerRewardVnd > 0) {
+    referrerInc.referralDiscountAvailableVnd = referrerRewardVnd;
+    referrerInc.referralDiscountEarnedVnd = referrerRewardVnd;
+  }
   await DailyPracticeProfile.updateOne(
     { studentId: referrer._id },
-    { $inc: { referralCount: 1, referralXpEarned: rewardXp } },
+    { $inc: referrerInc },
   );
 
-  if (rewardXp > 0) {
-    await Promise.all([
-      lmsProgressService.grantXp({
-        studentId: sid,
-        amount: rewardXp,
-        reason: 'referral',
-        sourceKey: `referral:referee:${sid}`,
-        countsForStreak: false,
-      }),
-      lmsProgressService.grantXp({
-        studentId: referrer._id,
-        amount: rewardXp,
-        reason: 'referral',
-        sourceKey: `referral:referrer:${referrer._id}:${sid}`,
-        countsForStreak: false,
-      }),
-    ]);
+  const NotificationService = require('./NotificationService');
+  const notifyTasks = [];
+  if (discountAmountVnd > 0) {
+    notifyTasks.push(
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: `🎁 Nhận ưu đãi giảm ${discountAmountVnd.toLocaleString('vi-VN')}đ`,
+        content: `Bạn đã áp mã giới thiệu ${referrerCode} từ ${referrer.name || 'bạn bè'}. Số tiền giảm sẽ tự động trừ khi đăng ký khóa học.`,
+        receivers: [String(sid)],
+        link: '/student/courses',
+        payload: { kind: 'referral_discount', discountAmountVnd, code: referrerCode },
+      }).catch(() => {}),
+    );
+  }
+  if (referrerRewardVnd > 0) {
+    notifyTasks.push(
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: `🎁 Bạn nhận thưởng giới thiệu giảm ${referrerRewardVnd.toLocaleString('vi-VN')}đ`,
+        content: `${meDoc.name || 'Một học viên'} vừa áp dụng mã giới thiệu của bạn. Ưu đãi sẽ tự động trừ khi bạn đăng ký khóa học.`,
+        receivers: [String(referrer._id)],
+        link: '/student/courses',
+        payload: { kind: 'referral_reward', discountAmountVnd: referrerRewardVnd, referredStudentId: String(sid) },
+      }).catch(() => {}),
+    );
+  }
+  if (notifyTasks.length > 0) {
+    await Promise.all(notifyTasks);
   }
 
   const updatedProfile = await getProfile(sid);
   return {
-    rewardXp,
+    rewardType: 'discount',
+    discountAmountVnd,
+    referrerRewardVnd,
+    rewardXp: 0,
     referrerName: referrer.name || 'Học viên',
     code: referrerCode,
-    profileXp: rules.clampXp(updatedProfile?.xpTotal),
-    referral: referralSummaryView(updatedProfile, meDoc, lmsSettings),
+    availableDiscountVnd: Math.max(0, Math.round(Number(updatedProfile?.referralDiscountAvailableVnd) || 0)),
+    referral: referralSummaryView(updatedProfile, meDoc, cfg),
   };
 }
 
@@ -1188,6 +1336,7 @@ async function answerQuestion(studentId, sessionId, { questionId, answer } = {})
       const err = httpError(402, `Cần ${cost} XP để tiếp tục sau câu sai. Bạn chưa đủ XP.`);
       err.currentXp = available;
       err.needXp = cost;
+      await enrichXpInsufficientError(session.studentId, err);
       throw err;
     }
     const deduct = Math.min(cost, available);
@@ -1250,6 +1399,7 @@ async function answerQuestion(studentId, sessionId, { questionId, answer } = {})
     stakeXp: session.stakeXp || 0,
     sessionXp: updated.xp || 0,
     profileXp: rules.clampXp(profile?.xpTotal),
+    studyXpTotal: rules.clampXp(profile?.studyXpTotal),
     purchasedXp: rules.clampXp(profile?.purchasedXp),
     dailyXp: rules.clampXp(profile?.dailyXp),
     xpEmpty: rules.clampXp(profile?.xpTotal) <= 0,
@@ -1279,6 +1429,7 @@ async function useHint(studentId, sessionId, { questionId } = {}) {
       const err = httpError(402, `Cần ${cost} XP để mở gợi ý. Bạn chưa đủ XP.`);
       err.currentXp = rules.clampXp(before?.xpTotal);
       err.needXp = cost;
+      await enrichXpInsufficientError(session.studentId, err);
       throw err;
     }
   }
@@ -1306,6 +1457,7 @@ async function useHint(studentId, sessionId, { questionId } = {}) {
     charged: chargedXp,
     xpDelta: chargedXp > 0 ? -chargedXp : 0,
     profileXp: rules.clampXp(profileAfter?.xpTotal),
+    studyXpTotal: rules.clampXp(profileAfter?.studyXpTotal),
     purchasedXp: rules.clampXp(profileAfter?.purchasedXp),
     dailyXp: rules.clampXp(profileAfter?.dailyXp),
     stakeXp,
@@ -1390,13 +1542,14 @@ async function finishSession(studentId, sessionId) {
   // Luyện tự do: không đụng XP. Lộ trình: cược theo câu hoặc lump test-out; phục hồi: +XP (cap/ngày).
   let rewardXp = 0;
   let hintPenaltyXp = 0;
+  let stakeRefundXp = 0;
   if (!xpOff && passed) {
     const hinted = new Set([
       ...(finished.hintsUsed || []).map(String),
       ...(finished.answers || []).filter((a) => a.hintUsed).map((a) => String(a.questionId)),
     ]);
     if (perQuestionStake) {
-      // Gợi ý đã trừ ngay khi mở, không trừ thêm vào thưởng.
+      // Gợi ý đã trừ ngay khi mở; câu đúng thưởng vào XP Học tập & Chuỗi.
       hintPenaltyXp = Math.round(hinted.size * rules.hintCostXp());
       rewardXp = Math.max(0, correct * perQ);
     } else if (isRecovery) {
@@ -1410,8 +1563,8 @@ async function finishSession(studentId, sessionId) {
       const lump = stakeXp > 0 ? stakeXp : 0;
       const perQuestion = total > 0 ? lump / total : 0;
       hintPenaltyXp = Math.round(hinted.size * (perQuestion / 2));
-      rewardXp = Math.max(0, Math.round(lump - hintPenaltyXp));
-      if (finished.testOut) rewardXp += rules.TEST_OUT_XP;
+      stakeRefundXp = Math.max(0, Math.round(lump - hintPenaltyXp));
+      rewardXp = finished.testOut ? (stakeRefundXp + rules.TEST_OUT_XP) : stakeRefundXp;
     }
   }
   const lostXp = (!xpOff && !passed && !isRecovery)
@@ -1442,9 +1595,18 @@ async function finishSession(studentId, sessionId) {
     spacedRewardXp = SPACED_REVIEW_REWARD_XP;
     rewardXp = spacedRewardXp;
     gainedXp = spacedRewardXp;
+  } else if (finished.testOut && passed) {
+    if (stakeRefundXp > 0) {
+      await adjustProfileXp(session.studentId, stakeRefundXp, { source: 'stake_refund' });
+    }
+    await adjustProfileXp(session.studentId, rules.TEST_OUT_XP, { source: 'reward' });
   } else if (rewardXp > 0) {
     await adjustProfileXp(session.studentId, rewardXp, { source: 'reward' });
   }
+  const studyXpGained = spacedRewardXp > 0
+    ? spacedRewardXp
+    : (passed ? (finished.testOut ? rules.TEST_OUT_XP : rewardXp) : 0);
+  const walletXpSpent = perQuestionStake ? answerLossXp : (passed ? 0 : lostXp);
   if (perQuestionStake) stakeXp = answerLossXp;
   await DailyPracticeSession.updateOne(
     { _id: finished._id },
@@ -1487,6 +1649,8 @@ async function finishSession(studentId, sessionId) {
     hintPenaltyXp,
     failPenaltyXp: lostXp,
     gainedXp,
+    studyXpGained,
+    walletXpSpent,
     xpDisabled: spacedRewardXp > 0 ? false : xpOff,
     streakIncreased: streak > rules.liveStreak(before, day),
     stats: {
@@ -1738,6 +1902,7 @@ async function getXpPurchaseStatus(studentId, sessionId) {
     xp: pack?.xp || 0,
     pack,
     profileXp: rules.clampXp(profile?.xpTotal),
+    studyXpTotal: rules.clampXp(profile?.studyXpTotal),
     purchasedXp: rules.clampXp(profile?.purchasedXp),
     dailyXp: rules.clampXp(profile?.dailyXp),
   };
@@ -1840,6 +2005,8 @@ module.exports = {
   fulfillDailyPracticeXpPurchase,
   listXpPacks,
   saveXpPackPrices,
+  refillDailyXp,
   adjustProfileXp,
+  enrichXpInsufficientError,
   getProfile,
 };

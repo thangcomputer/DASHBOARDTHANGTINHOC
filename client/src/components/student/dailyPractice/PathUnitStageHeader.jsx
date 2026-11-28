@@ -1,4 +1,4 @@
-import { BookOpen, Crown, FastForward, Play } from 'lucide-react';
+import { BookOpen, Crown, Play } from 'lucide-react';
 import { unitStageCtaLabel } from '../../../../../shared/dailyPractice/lastPathTopic.mjs';
 
 function darken(hex, amount = 0.28) {
@@ -158,7 +158,82 @@ export function UnitStageHeader({
   else if (locked) statusLabel = 'Chưa mở';
   else statusLabel = 'Chưa bắt đầu';
 
+  const isDewdrop = typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student');
   const ctaLabel = unitStageCtaLabel(unit, { isNextUnit });
+
+  if (isDewdrop) {
+    return (
+      <div className="w-full">
+        <div
+          className={`relative flex flex-col gap-3 overflow-hidden rounded-[22px] border border-white/40 p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4 ${
+            locked
+              ? 'bg-gradient-to-r from-slate-400 via-slate-500 to-slate-600 shadow-[0_12px_26px_-10px_rgba(71,85,105,0.35),inset_0_2px_3px_rgba(255,255,255,0.4)]'
+              : 'bg-gradient-to-r from-[#0F766E] via-[#10B981] to-[#059669] shadow-[0_14px_30px_-10px_rgba(16,185,129,0.4),inset_0_2px_3px_rgba(255,255,255,0.45)] cursor-pointer hover:brightness-[1.03] transition'
+          }`}
+          onClick={!locked && !isColored && onStartUnit ? onStartUnit : undefined}
+        >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-xl"
+          />
+          <div className="relative z-10 min-w-0 flex-1">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/85">
+              Chặng {unit.index}
+              {statusLabel ? ` · ${statusLabel}` : ''}
+            </p>
+            <h3 className="mt-0.5 truncate text-lg font-black leading-tight sm:text-xl">{unit.title}</h3>
+            {unit.description ? (
+              <p className="mt-0.5 line-clamp-1 text-xs font-medium text-white/85">{unit.description}</p>
+            ) : null}
+          </div>
+          <div className="relative z-10 flex shrink-0 items-center justify-end gap-2.5">
+            <span className="text-sm font-bold tabular-nums text-white/95">
+              {doneSteps}/{totalSteps}
+            </span>
+            {ctaLabel && onStageAction ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStageAction();
+                }}
+                className="dew-btn-white inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-extrabold cursor-pointer"
+              >
+                <Play size={13} fill="currentColor" aria-hidden="true" />
+                <span>{ctaLabel}</span>
+              </button>
+            ) : null}
+            {hasRoadmap && onRoadmap ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRoadmap();
+                }}
+                title="Lộ trình mốc trong chặng"
+                aria-label="Lộ trình mốc trong chặng — mốc đã mở và đang khóa"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-white/20 text-white backdrop-blur-md transition hover:bg-white/30 cursor-pointer"
+              >
+                <BookOpen size={17} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {locked && unit.requiresSubscription && onUpgrade ? (
+          <div className="mt-2.5 flex justify-center">
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="dew-btn-gold inline-flex items-center gap-1.5 px-4 py-2 text-xs font-extrabold cursor-pointer"
+            >
+              <Crown size={13} aria-hidden="true" />
+              <span>Đăng ký gói để mở Chặng {unit.index}</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -225,18 +300,6 @@ export function UnitStageHeader({
           >
             <Crown size={13} aria-hidden="true" />
             <span>Đăng ký gói để mở Chặng {unit.index}</span>
-          </button>
-        </div>
-      ) : locked && unit.canTestOut ? (
-        <div className="mt-2 flex justify-center">
-          <button
-            ref={testOutButtonRef}
-            type="button"
-            onClick={onTestOut}
-            className="duo-btn duo-btn--dark duo-btn--sm"
-          >
-            <FastForward size={13} aria-hidden="true" />
-            <span className="duo-btn__label">Kiểm tra vượt</span>
           </button>
         </div>
       ) : null}

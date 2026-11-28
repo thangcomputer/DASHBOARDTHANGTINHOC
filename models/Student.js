@@ -301,6 +301,8 @@ const StudentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /** Phân loại tài khoản theo hệ sinh thái: 'center' (Thắng Tin Học) hoặc 'dewskill' (DewSkill). */
+    accountType: { type: String, enum: ['center', 'dewskill'], default: 'center', index: true },
     /** Tự đăng ký ở /DANGNHAPMIENPHI. Học viên trung tâm không có field này. */
     freePortal: { type: Boolean, default: false },
     /** Gói Meet còn hạn thì mở hỗ trợ, tin nhắn, phòng thi và bài tập. Mua XP không mở các mục này. */
@@ -354,6 +356,14 @@ const StudentSchema = new mongoose.Schema(
       activatedAt: { type: Date, default: null },
       /** Mốc nhắc đã gửi cho kỳ hạn hiện tại, ví dụ "2026-12-01:7". */
       remindedFor: { type: [String], default: [] },
+    },
+    /** Gói Hỏi AI Không Giới Hạn (dùng chung DewSkill & Trung tâm). */
+    aiPlan: {
+      plan: { type: String, enum: ['', '1d', '1m', '3m', '6m', '12m'], default: '' },
+      isUnlimited: { type: Boolean, default: false },
+      activatedAt: { type: Date, default: null },
+      expiresAt: { type: Date, default: null },
+      lastPaymentSessionId: { type: String, default: '' },
     },
 
     // ── Audit: Ai là người thêm học viên này ──────────────────────

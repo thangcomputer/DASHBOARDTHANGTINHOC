@@ -175,3 +175,33 @@ test('POST /api/students/:id/reset-devices clears knownDevices, RegisteredDevice
   assert.match(tabSrc, /Xóa toàn bộ lịch sử thiết bị đã đăng nhập/);
   assert.match(modalSrc, /Xóa toàn bộ lịch sử thiết bị đã đăng nhập/);
 });
+
+test('POST /api/dewskill-students/:id/reset-devices clears RegisteredDevice slots, sessions, and UI exposes reset', () => {
+  const routesSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'routes', 'dewskillStudentRoutes.js'), 'utf8');
+  assert.match(routesSrc, /RegisteredDevice\.find\(/);
+
+  const start = routesSrc.indexOf("router.post('/:id/reset-devices'");
+  const end = routesSrc.indexOf("router.delete('/:id'", start);
+  assert.ok(start !== -1 && end > start, 'dewskill reset-devices route block must exist before DELETE /:id');
+  const block = routesSrc.slice(start, end);
+
+  assert.match(block, /DEWSKILL_STUDENT_FILTER/);
+  assert.match(block, /knownDevices:\s*\[\]/);
+  assert.match(block, /knownDeviceCount:\s*0/);
+  assert.match(block, /\$inc:\s*\{\s*tokenVersion:\s*1\s*\}/);
+  assert.match(block, /\$unset:\s*\{[^}]*refreshToken[^}]*deviceFingerprint/);
+  assert.match(block, /resetRegisteredDevicesForAccount\(/);
+  assert.match(block, /resetAccountDeviceSessions\(/);
+  assert.match(block, /reason:\s*'devices_reset'/);
+  assert.match(block, /emitUser\(io,\s*student\._id,\s*'auth:forceLogout'/);
+  assert.doesNotMatch(block, /\bio\.emit\('auth:forceLogout'/);
+
+  const dewskillTabSrc = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'client', 'src', 'components', 'admin', 'tabs', 'AdminDewskillStudentsTab.jsx'),
+    'utf8',
+  );
+  assert.match(dewskillTabSrc, /dewskillStudentApi\.resetDevices\(/);
+  assert.match(dewskillTabSrc, /MoreVertical/);
+  assert.match(dewskillTabSrc, /Reset thiết bị/);
+  assert.match(dewskillTabSrc, /Xóa toàn bộ lịch sử thiết bị đã đăng nhập/);
+});

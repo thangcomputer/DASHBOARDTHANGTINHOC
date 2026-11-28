@@ -4,6 +4,7 @@ import {
   BookOpen, Check, Crown, Dumbbell, Flame, Lock, Play, Route, Video as VideoIcon, X,
 } from 'lucide-react';
 import { gameSounds } from '../../../utils/sound';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import { collectUnitVideos } from './PathUnitStageHeader';
 
 const NODE_ICONS = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
@@ -78,6 +79,7 @@ export default function PathUnitRoadmapModal({
 
   return createPortal(
     <div
+      data-theme={getDewSkillThemeAttr()}
       className="fixed inset-0 z-[1200] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4"
       role="presentation"
       onClick={onClose}
@@ -85,7 +87,7 @@ export default function PathUnitRoadmapModal({
       <div
         role="dialog"
         aria-labelledby="unit-roadmap-title"
-        className="flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+        className="dew-modal flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <RoadmapModalHeader unit={unit} color={color} openCount={openCount} total={nodes.length} onClose={onClose} />

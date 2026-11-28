@@ -54,6 +54,10 @@ export const StudentVideoPlayer = ({
   /** 'window': giao diện popup video lộ trình (màn chờ xám + nút đỏ lớn, ẩn nhãn tua/mở bài). */
   appearance = 'default',
   chromeRightSlot = null,
+  checkpoints = [],
+  onSelectCheckpoint = null,
+  checkpointGateModal = null,
+  maxCheckpointSec = null,
 }) => {
   const requiredSecs = (d) => {
     const n = Number(d) || 0;
@@ -119,6 +123,8 @@ export const StudentVideoPlayer = ({
 
   lessonCompletedRef.current = lessonCompleted;
   antiSeekEnabledRef.current = antiSeekEnabled;
+  const maxCheckpointSecRef = useRef(maxCheckpointSec);
+  maxCheckpointSecRef.current = maxCheckpointSec;
   bestInitialRef.current = bestInitial;
   totalDurationRef.current = totalDuration;
 
@@ -388,6 +394,19 @@ export const StudentVideoPlayer = ({
         if (settlePendingSeek(t)) return;
         setCurrentTime(syncTime);
         uiTimeRef.current = Number(syncTime) || 0;
+        const cpCap = typeof maxCheckpointSecRef.current === 'number'
+          ? Math.max(0, maxCheckpointSecRef.current)
+          : Number.POSITIVE_INFINITY;
+        if (t > cpCap + 0.35 && !seekGuardRef.current) {
+          seekGuardRef.current = true;
+          playerRef.current?.pauseVideo?.();
+          playerRef.current?.seekTo?.(cpCap, true);
+          uiTimeRef.current = cpCap;
+          setCurrentTime(cpCap);
+          clearTimeout(seekGuardTimerRef.current);
+          seekGuardTimerRef.current = setTimeout(() => { seekGuardRef.current = false; }, 450);
+          return;
+        }
         const unlocked = seekUnlockedRef.current;
         if (antiSeekEnabled && !unlocked && !seekGuardRef.current) {
           if (t > maxPosRef.current + 1.25) {
@@ -570,6 +589,13 @@ export const StudentVideoPlayer = ({
       setPlayerError((prev) => prev || 'Đang tải video, thử lại sau 1–2 giây…');
       return;
     }
+    const cpCap = typeof maxCheckpointSecRef.current === 'number'
+      ? Math.max(0, maxCheckpointSecRef.current)
+      : Number.POSITIVE_INFINITY;
+    if (uiTimeRef.current >= cpCap - 0.15) {
+      try { playerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
+      return;
+    }
     try {
       playerRef.current.playVideo();
       setOverlayVisible(false);
@@ -594,6 +620,19 @@ export const StudentVideoPlayer = ({
         if (settlePendingSeek(t)) return;
         setCurrentTime(syncTime);
         uiTimeRef.current = Number(syncTime) || 0;
+        const cpCap = typeof maxCheckpointSecRef.current === 'number'
+          ? Math.max(0, maxCheckpointSecRef.current)
+          : Number.POSITIVE_INFINITY;
+        if (t > cpCap + 0.35 && !seekGuardRef.current) {
+          seekGuardRef.current = true;
+          playerRef.current?.pauseVideo?.();
+          playerRef.current?.seekTo?.(cpCap, true);
+          uiTimeRef.current = cpCap;
+          setCurrentTime(cpCap);
+          clearTimeout(seekGuardTimerRef.current);
+          seekGuardTimerRef.current = setTimeout(() => { seekGuardRef.current = false; }, 450);
+          return;
+        }
         const unlocked = seekUnlockedRef.current;
         if (antiSeekEnabled && !unlocked && t > maxPosRef.current) {
           maxPosRef.current = t;
@@ -658,6 +697,8 @@ export const StudentVideoPlayer = ({
           antiSeekEnabled={antiSeekEnabled}
           seekUnlocked={seekUnlocked}
           rightSlot={chromeRightSlot}
+          checkpoints={checkpoints}
+          onSelectCheckpoint={onSelectCheckpoint}
           volume={volume}
           muted={muted}
           onPlay={handlePlayClick}
@@ -665,12 +706,18 @@ export const StudentVideoPlayer = ({
           onSeek={(t) => {
             try {
               const unlocked = seekUnlockedRef.current;
+              const cpCap = typeof maxCheckpointSecRef.current === 'number'
+                ? Math.max(0, maxCheckpointSecRef.current)
+                : Number.POSITIVE_INFINITY;
               const cap = (antiSeekEnabled && !unlocked)
                 ? Math.max(maxPosRef.current, currentTime)
                 : Number.POSITIVE_INFINITY;
-              const capped = (antiSeekEnabled && !unlocked) ? Math.min(t, cap) : t;
+              const capped = Math.min((antiSeekEnabled && !unlocked) ? Math.min(t, cap) : t, cpCap);
               pendingSeekRef.current = null;
               seekGuardRef.current = true;
+              if (capped >= cpCap - 0.15) {
+                playerRef.current?.pauseVideo?.();
+              }
               playerRef.current?.seekTo?.(capped, true);
               uiTimeRef.current = capped;
               setCurrentTime(capped);
@@ -714,6 +761,10 @@ export const StudentVideoPlayer = ({
           actualPlaybackQuality={ytPlaybackQuality}
           overlayVariant={appearance === 'window' ? 'window' : 'default'}
         />
+
+        {typeof checkpointGateModal === 'function'
+          ? checkpointGateModal({ isFullscreen })
+          : checkpointGateModal}
 
         {/* INACTIVE TAB OVERLAY */}
         {!isTabActive && !overlayVisible && (

@@ -27,6 +27,9 @@ const subscriptionApi = {
     getXpConfig: async () => parse(await apiFetch('/subscription/xp-config')),
     setXpConfig: async (config) => parse(await apiFetch('/subscription/xp-config', json('PUT', config))),
     resetAllXp: async () => parse(await apiFetch('/subscription/xp-config/reset-all', json('POST'))),
+    getReferralConfig: async () => parse(await apiFetch('/subscription/referral-config')),
+    setReferralConfig: async (config) => parse(await apiFetch('/subscription/referral-config', json('PUT', config))),
+    resetReferralConfig: async () => parse(await apiFetch('/subscription/referral-config/reset', json('POST'))),
     codes: async (params = {}) => {
       const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
       return parse(await apiFetch(`/subscription/codes${query ? `?${query}` : ''}`));

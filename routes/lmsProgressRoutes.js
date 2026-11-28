@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, checkPermission } = require('../middleware/auth');
+const { authMiddleware, checkAnyPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const service = require('../services/lmsProgressService');
@@ -15,7 +15,10 @@ function requireStudentRole(req, res, next) {
   return next();
 }
 
-const requireAdmin = [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING)];
+const requireAdmin = [
+  authMiddleware,
+  checkAnyPermission(PERMISSIONS.MANAGE_DEWSKILL_XP, PERMISSIONS.MANAGE_STUDENT_TRAINING),
+];
 
 router.get('/settings', ...requireAdmin, async (req, res) => {
   try {

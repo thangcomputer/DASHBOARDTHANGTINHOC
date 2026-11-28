@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Ban, Copy, CreditCard, Download, Loader2, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Ticket, UserCog,
+  Ban, Copy, Cpu, CreditCard, Download, Gift, Loader2, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Ticket, UserCog,
 } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { useToast } from '../../../utils/useToast';
 import { PLAN_LABELS, formatExpiryDate } from '../../../utils/subscription';
 import AdminStudentSubscriptionPanel from '../subscription/AdminStudentSubscriptionPanel';
+import AdminAiModelPolicyPanel from '../subscription/AdminAiModelPolicyPanel';
+import AdminReferralConfigPanel from '../subscription/AdminReferralConfigPanel';
 import { cmsConfirmAction } from '../../../utils/cmsDialog';
 
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
@@ -326,6 +328,46 @@ function XpConfigCard() {
               ))}
             </div>
           </div>
+
+          {/* 4. Chi phí XP khi học viên dùng Trợ lý AI */}
+          <div className="pt-2 border-t border-slate-100">
+            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide mb-2">
+              3. Chi phí XP khi học viên dùng Trợ lý AI
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                Hỏi AI văn bản (XP / lượt)
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    className={INPUT}
+                    value={config.aiQuestionCostXp ?? 10}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, aiQuestionCostXp: Math.max(0, Math.round(Number(e.target.value) || 0)) }))}
+                  />
+                  <span className="text-xs font-semibold text-slate-500 shrink-0">XP</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 font-normal">Áp dụng khi học viên hỏi AI trong Thanh tìm kiếm hoặc Bài học (0 = miễn phí).</p>
+              </label>
+
+              <label className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                Hỏi AI kèm ảnh / tệp (XP / lượt)
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    className={INPUT}
+                    value={config.aiImageCostXp ?? 20}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, aiImageCostXp: Math.max(0, Math.round(Number(e.target.value) || 0)) }))}
+                  />
+                  <span className="text-xs font-semibold text-slate-500 shrink-0">XP</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 font-normal">Hết Ví XP quy định (Hỏi AI &amp; Trắc nghiệm): tài khoản miễn phí gợi ý gói tháng/năm; học viên đã có khóa/gói bắt mua thêm XP. Tách riêng hoàn toàn XP Học tập &amp; Chuỗi.</p>
+              </label>
+            </div>
+          </div>
         </div>
       )}
     </Card>
@@ -629,6 +671,8 @@ export default function AdminSubscriptionTab() {
 
   const TABS = [
     { key: 'pricing', icon: CreditCard, label: 'Bảng giá & Cấu hình XP' },
+    { key: 'ai_models', icon: Cpu, label: 'Phân tầng Model AI' },
+    { key: 'referral', icon: Gift, label: 'Ưu đãi giới thiệu' },
     { key: 'codes', icon: Ticket, label: 'Mã kích hoạt' },
     { key: 'students', icon: UserCog, label: 'Gia hạn học viên' },
   ];
@@ -669,6 +713,14 @@ export default function AdminSubscriptionTab() {
           </div>
           <XpConfigCard />
         </div>
+      )}
+
+      {activeTab === 'ai_models' && (
+        <AdminAiModelPolicyPanel />
+      )}
+
+      {activeTab === 'referral' && (
+        <AdminReferralConfigPanel />
       )}
 
       {activeTab === 'codes' && (

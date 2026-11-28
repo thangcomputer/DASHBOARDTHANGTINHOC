@@ -44,7 +44,10 @@ import {
   Zap,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import AiUsageIndicator, { AI_QUOTA_UPDATED_EVENT, emitAiQuotaUpdated } from './AiUsageIndicator';
+import { emitAiQuotaUpdated } from './AiUsageIndicator';
+import useAIQuota, { dispatchOpenAiPackagesModal } from '../../hooks/useAIQuota';
+import AIQuotaMeter from '../ai/AIQuotaMeter';
+import AIOutOfQuotaModal from '../ai/AIOutOfQuotaModal';
 import { useLanguage } from '../../context/LanguageContext';
 import { aiSupportAPI } from '../../services/api';
 import { useTheme } from '../../utils/theme';
@@ -541,9 +544,21 @@ function QuickAiFeedbackBar({ msg, language = 'vi' }) {
 const QUICK_IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const QUICK_TEXT_EXT_RE = /\.(txt|csv|tsv|json|md|markdown|xml|html|htm|css|js|jsx|ts|tsx|py|sql|log|yml|yaml|ini|conf)$/i;
 const QUICK_PDF_EXT_RE = /\.pdf$/i;
-const QUICK_OFFICE_EXT_RE = /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i;
-const MAX_QUICK_PDF_BYTES = 3.5 * 1024 * 1024;
+const QUICK_OFFICE_EXT_RE = /\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp)$/i;
+const MAX_QUICK_PDF_BYTES = 4.5 * 1024 * 1024;
+const MAX_QUICK_OFFICE_BYTES = 4.5 * 1024 * 1024;
 const MAX_QUICK_TEXT_BYTES = 2 * 1024 * 1024;
+
+function getQuickAttachmentBadge(attachment, t) {
+  if (!attachment) return '';
+  if (attachment.isImage) return t('Hình ảnh');
+  const name = String(attachment.name || '').toLowerCase();
+  if (/\.xlsx?$|\.xlsm$|\.ods$/.test(name)) return 'Tệp Excel';
+  if (/\.docx?$|\.odt$/.test(name)) return 'Tệp Word';
+  if (/\.pptx?$|\.odp$/.test(name)) return 'Tệp PowerPoint';
+  if (/\.pdf$/.test(name) || attachment.mimeType === 'application/pdf') return 'Tệp PDF';
+  return t('Tệp đính kèm');
+}
 
 function formatQuickFileSize(bytes) {
   const size = Number(bytes || 0);
@@ -575,9 +590,9 @@ function compressQuickImageDataUrl(dataUrl, originalMime, originalSize) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const maxDim = 1400;
+      const maxDim = 2048;
       let { width, height } = img;
-      const needsResize = width > maxDim || height > maxDim || originalSize > 450 * 1024;
+      const needsResize = width > maxDim || height > maxDim || originalSize > 900 * 1024;
       if (!needsResize && originalMime) {
         resolve({ previewUrl: dataUrl, mimeType: originalMime });
         return;
@@ -598,8 +613,8 @@ function compressQuickImageDataUrl(dataUrl, originalMime, originalSize) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      const outMime = originalMime === 'image/png' && originalSize <= 350 * 1024 ? 'image/png' : 'image/jpeg';
-      const outUrl = canvas.toDataURL(outMime, 0.84);
+      const outMime = originalMime === 'image/png' && originalSize <= 600 * 1024 ? 'image/png' : 'image/jpeg';
+      const outUrl = canvas.toDataURL(outMime, 0.90);
       resolve({ previewUrl: outUrl, mimeType: outMime });
     };
     img.onerror = () => reject(new Error('Không đọc được dữ liệu hình ảnh'));
@@ -629,7 +644,7 @@ async function processQuickAttachFile(file) {
 
   if (mime === 'application/pdf' || QUICK_PDF_EXT_RE.test(name)) {
     if (size > MAX_QUICK_PDF_BYTES) {
-      throw new Error('Tệp PDF quá lớn (tối đa 3.5 MB).');
+      throw new Error('Tệp PDF quá lớn (tối đa 4.5 MB).');
     }
     const rawUrl = await readFileAsDataUrl(file);
     const dataBase64 = rawUrl.includes(',') ? rawUrl.split(',')[1] : rawUrl;
@@ -646,7 +661,7 @@ async function processQuickAttachFile(file) {
     if (size > MAX_QUICK_TEXT_BYTES) {
       throw new Error('Tệp văn bản quá lớn (tối đa 2 MB).');
     }
-    const textContent = (await readFileAsTextContent(file)).slice(0, 15000);
+    const textContent = (await readFileAsTextContent(file)).slice(0, 30000);
     return {
       name,
       mimeType: mime || 'text/plain',
@@ -657,11 +672,17 @@ async function processQuickAttachFile(file) {
   }
 
   if (QUICK_OFFICE_EXT_RE.test(name)) {
+    if (size > MAX_QUICK_OFFICE_BYTES) {
+      throw new Error('Tệp Office quá lớn (tối đa 4.5 MB).');
+    }
+    const rawUrl = await readFileAsDataUrl(file);
+    const dataBase64 = rawUrl.includes(',') ? rawUrl.split(',')[1] : rawUrl;
     return {
       name,
       mimeType: mime || 'application/octet-stream',
-      textContent: `[Tệp Office đính kèm: ${name}]`,
+      dataBase64,
       isImage: false,
+      isOffice: true,
       size,
     };
   }
@@ -687,7 +708,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
   const [asking, setAsking] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const [attachError, setAttachError] = useState('');
-  const [aiDailyQuota, setAiDailyQuota] = useState(null);
+  const [outOfQuotaModalOpen, setOutOfQuotaModalOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [sessionArchive, setSessionArchive] = useState({ activeSessionId: '', sessions: [] });
   const [activeSessionId, setActiveSessionId] = useState('');
@@ -709,36 +730,25 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
     if (practiceSessionActive) setOpen(false);
   }, [practiceSessionActive]);
 
-  useEffect(() => {
-    const onQuotaUpdated = (event) => {
-      const detail = event?.detail;
-      if (!detail || typeof detail !== 'object' || detail._origin === 'palette') return;
-      if (!detail.questionQuota && !detail.imageQuota) return;
-      setAiDailyQuota((prev) => ({
-        ...(prev || {}),
-        ...(detail.questionQuota ? { questionQuota: detail.questionQuota } : {}),
-        ...(detail.imageQuota ? { imageQuota: detail.imageQuota } : {}),
-      }));
-    };
-    window.addEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
-    return () => window.removeEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
-  }, []);
+  const {
+    dailyQuota: aiDailyQuota,
+    aiQuotaPercent,
+    aiPlan,
+    isUnlimited: aiIsUnlimited,
+    isAdminUnlimited: aiIsAdminUnlimited,
+    applies: questionQuotaApplies,
+    isOutOfQuota: questionQuotaBlocked,
+    resetInMs: aiResetInMs,
+    resetsAt: aiResetsAt,
+    imageDisallowed: aiQuotaImageDisallowed,
+    refresh: refreshAiQuota,
+    applyQuotaUpdate: applyAiQuotaUpdate,
+  } = useAIQuota({ autoFetch: role === 'student' || role === 'teacher' });
 
   useEffect(() => {
-    if (!open || (role !== 'student' && role !== 'teacher')) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await aiSupportAPI.status();
-        if (!cancelled && res?.success && res?.data?.dailyQuota) {
-          setAiDailyQuota(res.data.dailyQuota);
-        }
-      } catch {
-        /* quota display optional */
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open, role]);
+    if (!open || (role !== 'student' && role !== 'teacher')) return;
+    refreshAiQuota();
+  }, [open, role, refreshAiQuota]);
 
   useEffect(() => {
     if (!open || !isQuickAskPersistenceRole(role)) return;
@@ -988,34 +998,27 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
   }, [items.length, query]);
 
   const normalizedRole = String(role || '').trim().toLowerCase();
-  const questionQuotaApplies = Boolean(
-    aiDailyQuota?.questionQuota?.applies ?? (normalizedRole === 'student' || normalizedRole === 'teacher'),
-  );
-  const rawPercentLeft = aiDailyQuota?.questionQuota?.percentLeft ?? aiDailyQuota?.questionQuota?.remaining;
-  const questionQuotaLeft = rawPercentLeft != null
-    ? Math.max(0, Math.min(100, Number(rawPercentLeft)))
-    : 100;
-  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
-  const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
-  const imageQuotaLimit = rawImageLimit !== null
-    && rawImageLimit !== undefined
-    && rawImageLimit !== ''
-    && Number.isFinite(Number(rawImageLimit))
-    ? Number(rawImageLimit)
-    : (isFreeTierStudent ? 0 : 100);
+  const questionQuotaLeft = aiQuotaPercent;
+  const openAiPackagesModal = useCallback((group = null) => {
+    setOutOfQuotaModalOpen(false);
+    setOpen(false);
+    dispatchOpenAiPackagesModal(group);
+  }, []);
   const imageUploadDisallowed = Boolean(
     normalizedRole === 'student'
-    && (aiDailyQuota?.imageQuota
-      ? (aiDailyQuota.imageQuota.allowed === false || imageQuotaLimit === 0)
-      : isFreeTierStudent),
+    && !aiIsUnlimited
+    && (aiDailyQuota?.imageQuota ? aiQuotaImageDisallowed : isFreeTierStudent),
   );
   const rawImgPercentLeft = aiDailyQuota?.imageQuota?.percentLeft ?? aiDailyQuota?.imageQuota?.remaining;
-  const imageQuotaLeft = rawImgPercentLeft != null
-    ? Math.max(0, Math.min(100, Number(rawImgPercentLeft)))
-    : (imageUploadDisallowed ? 0 : questionQuotaLeft);
+  const imageQuotaLeft = aiIsUnlimited
+    ? 100
+    : rawImgPercentLeft != null
+      ? Math.max(0, Math.min(100, Number(rawImgPercentLeft)))
+      : (imageUploadDisallowed ? 0 : questionQuotaLeft);
   const isVisionAttachment = Boolean(attachment?.isImage || attachment?.mimeType === 'application/pdf');
   const imageQuotaBlocked = Boolean(
-    isVisionAttachment
+    !aiIsUnlimited
+    && isVisionAttachment
     && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0))),
   );
   const freeStudentImageBlockMsg = t(
@@ -1085,16 +1088,18 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
     const activeAttachment = rawAttachment || null;
     if ((!question && !activeAttachment) || asking) return;
     if (questionQuotaBlocked) {
-      setAttachError(t('Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%) — tự động reset lúc 00:00.'));
+      setAttachError(t('Đã hết 0% dung lượng hỏi AI hôm nay. Nâng cấp gói để hỏi AI không giới hạn.'));
+      setOutOfQuotaModalOpen(true);
       return;
     }
     const activeIsVision = Boolean(activeAttachment?.isImage || activeAttachment?.mimeType === 'application/pdf');
-    if (activeIsVision && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0)))) {
+    if (activeIsVision && !aiIsUnlimited && (imageUploadDisallowed || (aiDailyQuota?.imageQuota && !(imageQuotaLeft > 0)))) {
       setAttachError(
         imageUploadDisallowed
           ? freeStudentImageBlockMsg
           : t('Bạn đã dùng hết 100% hạn mức AI hôm nay (còn 0%) — tự động reset lúc 00:00.'),
       );
+      if (!imageUploadDisallowed) setOutOfQuotaModalOpen(true);
       return;
     }
 
@@ -1144,7 +1149,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
       if (res?.success === false) {
         failedErrorType = 'other';
         const quotaCode = res?.code;
-        if (quotaCode === 'AI_QUESTION_QUOTA' || quotaCode === 'AI_IMAGE_QUOTA') {
+        if (quotaCode === 'AI_XP_INSUFFICIENT' || quotaCode === 'AI_QUESTION_QUOTA' || quotaCode === 'AI_IMAGE_QUOTA') {
           setMessages(messages);
           if (messages.length > 0) {
             syncSessionArchive(messages, targetSessionId);
@@ -1152,64 +1157,59 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
             setSessionArchive(loadQuickAskSessionArchive(role, safeUserId));
           }
           setQuery(question);
-          if (activeAttachment && quotaCode === 'AI_QUESTION_QUOTA') {
+          if (activeAttachment && quotaCode !== 'AI_IMAGE_QUOTA') {
             setAttachment(activeAttachment);
           }
-          setAttachError(res?.message || 'Bạn đã dùng hết 100% hạn mức AI hôm nay.');
-          setAiDailyQuota((prev) => {
-            const base = prev || {};
-            const nextQuestionQuota = res?.questionQuota || base.questionQuota;
-            const nextImageQuota = res?.imageQuota || base.imageQuota;
-            const updated = quotaCode === 'AI_QUESTION_QUOTA'
-              ? {
-                ...base,
-                questionQuota: {
-                  ...(nextQuestionQuota || {}),
-                  applies: true,
-                  mode: 'percent',
-                  limit: 100,
-                  remaining: 0,
-                  percentLeft: 0,
-                  used: 100,
-                  percentUsed: 100,
-                },
-                ...(nextImageQuota ? { imageQuota: nextImageQuota } : {}),
-              }
-              : (() => {
-                const rawImgLim = nextImageQuota?.limit;
-                const imgLim = rawImgLim !== null && rawImgLim !== undefined && rawImgLim !== '' && Number.isFinite(Number(rawImgLim))
-                  ? Number(rawImgLim)
-                  : (isFreeTierStudent ? 0 : 100);
-                const nextLeft = imgLim === 0 ? 0 : (nextImageQuota?.percentLeft ?? nextImageQuota?.remaining ?? 0);
-                return {
-                  ...base,
-                  ...(nextQuestionQuota ? { questionQuota: nextQuestionQuota } : {}),
-                  imageQuota: {
-                    ...(nextImageQuota || {}),
-                    applies: true,
-                    mode: 'percent',
-                    allowed: nextImageQuota?.allowed !== undefined ? nextImageQuota.allowed : imgLim > 0,
-                    limit: imgLim,
-                    remaining: nextLeft,
-                    percentLeft: nextLeft,
-                    used: imgLim === 0 ? 100 : (nextImageQuota?.used ?? 100),
-                  },
-                };
-              })();
-            emitAiQuotaUpdated({ ...updated, _origin: 'palette' });
-            return updated;
-          });
+          setAttachError(res?.message || 'Đã hết dung lượng hỏi AI hôm nay.');
+          const nextQuestionQuota = res?.questionQuota || aiDailyQuota?.questionQuota;
+          const nextImageQuota = res?.imageQuota || aiDailyQuota?.imageQuota;
+          const updated = quotaCode === 'AI_IMAGE_QUOTA'
+            ? {
+              ...(aiDailyQuota || {}),
+              ...(nextQuestionQuota ? { questionQuota: nextQuestionQuota } : {}),
+              imageQuota: {
+                ...(nextImageQuota || {}),
+                applies: true,
+                mode: 'percent',
+                allowed: nextImageQuota?.allowed !== undefined ? nextImageQuota.allowed : false,
+                limit: nextImageQuota?.limit ?? 0,
+                remaining: 0,
+                percentLeft: 0,
+                used: 100,
+              },
+            }
+            : {
+              ...(aiDailyQuota || {}),
+              questionQuota: {
+                ...(nextQuestionQuota || {}),
+                applies: true,
+                mode: 'percent',
+                isUnlimited: false,
+                limit: 100,
+                remaining: 0,
+                percentLeft: 0,
+                used: 100,
+                percentUsed: 100,
+              },
+              ...(nextImageQuota ? { imageQuota: nextImageQuota } : {}),
+            };
+          applyAiQuotaUpdate(updated);
+          emitAiQuotaUpdated({ ...updated, _origin: 'palette' });
+          if (quotaCode !== 'AI_IMAGE_QUOTA') {
+            setOutOfQuotaModalOpen(true);
+          }
           return;
         }
       } else {
         const payload = res?.data || res;
         const answerText = String(payload?.answer || '').trim();
-        if (payload?.questionQuota || payload?.imageQuota) {
+        if (payload?.questionQuota || payload?.imageQuota || payload?.aiPlan) {
           const nextQuota = {
-            questionQuota: payload.questionQuota,
-            imageQuota: payload.imageQuota,
+            ...(payload.questionQuota ? { questionQuota: payload.questionQuota } : {}),
+            ...(payload.imageQuota ? { imageQuota: payload.imageQuota } : {}),
+            ...(payload.aiPlan ? { aiPlan: payload.aiPlan } : {}),
           };
-          setAiDailyQuota(nextQuota);
+          applyAiQuotaUpdate(nextQuota);
           emitAiQuotaUpdated({ ...nextQuota, _origin: 'palette' });
         }
         if (answerText) {
@@ -1279,12 +1279,13 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
   }, [
     activeSessionId,
     aiDailyQuota,
+    aiIsUnlimited,
+    applyAiQuotaUpdate,
     asking,
     attachment,
     freeStudentImageBlockMsg,
     imageQuotaLeft,
     imageUploadDisallowed,
-    isFreeTierStudent,
     language,
     messages,
     questionQuotaBlocked,
@@ -1320,7 +1321,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
 
   const isChatMode = messages.length > 0 || asking;
   const trimmedQuery = query.trim();
-  const canSend = Boolean(trimmedQuery || attachment) && !asking && !questionQuotaBlocked && !imageQuotaBlocked;
+  const canSend = Boolean(trimmedQuery || attachment) && !asking && !imageQuotaBlocked;
   const composerPlaceholder = getAiComposerPlaceholder(roleKey, language, 'initial');
   const composerContinuePlaceholder = getAiComposerPlaceholder(roleKey, language, 'continue');
   const composerAttachPlaceholder = getAiComposerPlaceholder(roleKey, language, 'attach');
@@ -1442,8 +1443,8 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
           ref={fileInputRef}
           type="file"
           accept={imageUploadDisallowed
-            ? '.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'
-            : 'image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx'}
+            ? '.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.xlsm,.ppt,.pptx,.odt,.ods,.odp'
+            : 'image/*,.pdf,.txt,.csv,.tsv,.json,.md,.doc,.docx,.xls,.xlsx,.xlsm,.ppt,.pptx,.odt,.ods,.odp'}
           onChange={handleFileInputChange}
           className="hidden"
         />
@@ -1466,7 +1467,7 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
                   {attachment.name || t('Ảnh đính kèm')}
                 </div>
                 <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                  {[attachment.isImage ? t('Hình ảnh') : t('Tệp đính kèm'), formatQuickFileSize(attachment.size)]
+                  {[getQuickAttachmentBadge(attachment, t), formatQuickFileSize(attachment.size)]
                     .filter(Boolean)
                     .join(' · ')}
                 </div>
@@ -1486,8 +1487,18 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
           </div>
         ) : null}
         {attachError ? (
-          <div className="mb-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-[11.5px] font-semibold text-rose-600 dark:text-rose-300">
-            {attachError}
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1.5 text-[11.5px] font-semibold text-rose-600 dark:text-rose-300">
+            <span className="min-w-0 flex-1">{attachError}</span>
+            {questionQuotaBlocked ? (
+              <button
+                type="button"
+                onClick={() => openAiPackagesModal()}
+                className="shrink-0 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#34D399] to-[#059669] px-3 py-1 text-[11px] font-extrabold text-white shadow-xs hover:brightness-105 cursor-pointer"
+              >
+                <Zap size={11} className="fill-amber-200 text-amber-200" aria-hidden="true" />
+                Nâng cấp Không giới hạn
+              </button>
+            ) : null}
           </div>
         ) : null}
         {attachment?.isImage && !attachError ? (
@@ -1543,22 +1554,27 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
           </div>
         </div>
       </div>
-      <AiUsageIndicator
-        applies={questionQuotaApplies}
-        percentLeft={questionQuotaLeft}
-        resetInMs={aiDailyQuota?.questionQuota?.resetInMs}
-        resetsAt={aiDailyQuota?.questionQuota?.resetsAt}
-        imageDisallowed={imageUploadDisallowed}
-        isFreeTier={isFreeTierStudent}
-        isEn={language === 'en'}
-        className="mt-1.5 pl-2.5"
-      />
+      {questionQuotaApplies || aiIsUnlimited ? (
+        <AIQuotaMeter
+          compact
+          percent={questionQuotaLeft}
+          isUnlimited={aiIsUnlimited}
+          isAdminUnlimited={aiIsAdminUnlimited}
+          expiresAt={aiPlan?.expiresAt}
+          resetInMs={aiResetInMs}
+          resetsAt={aiResetsAt}
+          onUpgrade={() => openAiPackagesModal()}
+          className="mt-2 px-1"
+        />
+      ) : null}
     </div>
   );
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-900/50 px-3 py-4 backdrop-blur-xs"
+  return (
+    <>
+      {createPortal(
+        <div
+          className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-900/50 px-3 py-4 backdrop-blur-xs"
       onClick={() => setOpen(false)}
       role="presentation"
     >
@@ -1700,7 +1716,11 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
                 <div className="flex justify-start">
                   <div className="inline-flex items-center gap-2 rounded-[20px] bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <Sparkles size={14} className="animate-pulse text-emerald-600" />
-                    <span>DewSkill AI đang suy nghĩ…</span>
+                    <span>
+                      {messages[messages.length - 1]?.attachment
+                        ? 'DewSkill AI Pro đang đọc tệp & giải bài chính xác…'
+                        : 'DewSkill AI đang suy nghĩ…'}
+                    </span>
                   </div>
                 </div>
               ) : null}
@@ -1924,6 +1944,15 @@ export default function CommandPalette({ role = 'student', userId = '', isFreeTi
         )}
       </div>
     </div>,
-    document.body,
+        document.body,
+      )}
+      <AIOutOfQuotaModal
+        open={outOfQuotaModalOpen}
+        resetInMs={aiResetInMs}
+        resetsAt={aiResetsAt}
+        onClose={() => setOutOfQuotaModalOpen(false)}
+        onViewPackages={(group) => openAiPackagesModal(group)}
+      />
+    </>
   );
 }

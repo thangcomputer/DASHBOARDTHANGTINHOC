@@ -1008,6 +1008,7 @@ router.post('/exam-subjects', authMiddleware, ...settingsGuard('system_write'), 
         studentEssayRequiredRaw: sanitizeStudentEssayRequiredPayload(essayRequired),
       },
     });
+    require('../services/lessonPracticeService').syncCourseSubjectsToLessonSubjects().catch(() => {});
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
     return res.status(201).json({
@@ -1051,6 +1052,7 @@ router.put('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_write'
       item?.createdByAdmin === true && sanitizeCustomExamSubjectEntry(item)?.id === id ? updated : item
     ));
     await updateMainSettings({ $set: { examSubjectsCustomRaw: nextStored } });
+    require('../services/lessonPracticeService').syncCourseSubjectsToLessonSubjects().catch(() => {});
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
     return res.json({

@@ -192,7 +192,7 @@ app.use(session(sessionOptions));
 app.use(pinoHttp({ logger }));
 app.use(require('./shared/middleware/requestContext'));
 
-const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '6mb';
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '10mb';
 app.use(express.json({
   limit: JSON_BODY_LIMIT,
   verify: (req, _res, buf) => {
@@ -466,7 +466,19 @@ io.on('connection', (socket) => {
     if (mRole) {
       const uRole = mRole.toUpperCase();
       socket.join(`ALL_${uRole}`);
-      if (mRole === 'student') socket.join(`student_${uid}`);
+      if (mRole === 'student') {
+        socket.join(`student_${uid}`);
+        if (mongoose.Types.ObjectId.isValid(uid)) {
+          const Student = require('./models/Student');
+          Student.findById(uid).select('accountType freePortal').lean()
+            .then((doc) => {
+              if (doc && doc.accountType !== 'dewskill' && doc.freePortal !== true) {
+                socket.join('CENTER_STUDENTS');
+              }
+            })
+            .catch(() => {});
+        }
+      }
       if (mRole === 'teacher') socket.join(`teacher_${uid}`);
       if (mRole === 'admin' || mRole === 'staff') socket.join('admin_room');
     }
@@ -501,7 +513,15 @@ io.on('connection', (socket) => {
 
     if (messagingRole === 'student' && mongoose.Types.ObjectId.isValid(userId)) {
       const Student = require('./models/Student');
-      Student.updateOne({ _id: userId }, { $set: { lastAccessAt: new Date() } }).catch(() => {});
+      Student.findByIdAndUpdate(userId, { $set: { lastAccessAt: new Date() } })
+        .select('accountType freePortal')
+        .lean()
+        .then((doc) => {
+          if (doc && doc.accountType !== 'dewskill' && doc.freePortal !== true) {
+            socket.join('CENTER_STUDENTS');
+          }
+        })
+        .catch(() => {});
     }
 
     // Join rooms for Centralized Notification Service
@@ -1379,6 +1399,8 @@ app.use('/api/center-info', centerInfoRoutes);
 app.use('/api/cert-prep', certPrepRoutes);
 app.use('/api/lesson-practice', lessonPracticeRoutes);
 app.use('/api/daily-practice', dailyPracticeRoutes);
+app.use('/api/dewskill-classes', require('./routes/dewskillClassRoutes'));
+app.use('/api/dewskill-students', require('./routes/dewskillStudentRoutes'));
 app.use('/api/lms-progress', lmsProgressRoutes);
 app.use('/api/subscription', require('./routes/subscriptionRoutes'));
 app.use('/api/meet-classes', require('./routes/meetClassRoutes'));
@@ -1494,6 +1516,28 @@ const runSubscriptionReminders = async () => {
 };
 if (!isTest) {
   cron.schedule('0 8 * * *', runSubscriptionReminders, { timezone: 'Asia/Ho_Chi_Minh' });
+
+  const runExpiredDewskillCourseSweep = async () => {
+    try {
+      const dewskillClassService = require('./services/dewskillClassService');
+      const NotificationService = require('./services/NotificationService');
+      const { lockedCount, affectedStudents } = await dewskillClassService.enforceExpiredCourseAccessAndReset({ io });
+      for (const item of affectedStudents || []) {
+        await NotificationService.send(io, {
+          type: 'FINANCE',
+          title: `Khóa học ${item.courseName} đã hết hạn`,
+          content: 'Thời hạn 12 tháng của khóa học đã kết thúc nên lộ trình đã được khóa và đặt lại về ban đầu. Bạn có thể đăng ký gia hạn trong Danh mục khóa học.',
+          receivers: [item.studentId],
+          payload: { kind: 'dewskill_course_expired', classId: item.classId },
+          link: '/student/courses',
+        }).catch(() => {});
+      }
+      if (lockedCount) logger.info({ lockedCount }, '[CRON] expired dewskill courses locked & reset');
+    } catch (err) {
+      logger.error({ err: err.message }, '[CRON] expired dewskill courses sweep');
+    }
+  };
+  cron.schedule('*/15 * * * *', runExpiredDewskillCourseSweep, { timezone: 'Asia/Ho_Chi_Minh' });
 }
 
 // ==========================================

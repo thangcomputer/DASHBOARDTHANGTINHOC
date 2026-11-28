@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import CmsSelect from './ui/CmsSelect';
 import {
   User, Phone, BookOpen, GraduationCap, CheckCircle,
@@ -643,6 +643,27 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   Tiếp tục thanh toán
                   <NavArrow size={20} className="text-white" />
                 </button>
+                <p className="text-center text-xs text-slate-500 leading-relaxed">
+                  Bằng việc tiếp tục, bạn đồng ý với{' '}
+                  <Link
+                    to="/dieu-khoan"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-emerald-700 hover:underline"
+                  >
+                    Điều khoản sử dụng
+                  </Link>{' '}
+                  và{' '}
+                  <Link
+                    to="/bao-mat"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-emerald-700 hover:underline"
+                  >
+                    Chính sách bảo mật
+                  </Link>{' '}
+                  của Thắng Tin Học / DewSkill.
+                </p>
               </div>
             )}
 

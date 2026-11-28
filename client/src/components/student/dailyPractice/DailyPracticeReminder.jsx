@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { CalendarX2, Flame, Gamepad2, Play, Trophy, Users, X, Zap } from 'lucide-react';
 import { gameSounds } from '../../../utils/sound';
 import { reminderCopy } from '../../../utils/dailyPractice';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import Mascot from './Mascot';
 
 /** Popup nhắc luyện tập hằng ngày - hiện tối đa một lần mỗi ngày khi HV chưa luyện tập. */
@@ -29,8 +30,8 @@ export default function DailyPracticeReminder({ stats, topicCount, onStart, onCl
     ];
 
   return createPortal(
-    <div className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
-      <div className="cms-goal-in relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="daily-reminder-title">
+    <div data-theme={getDewSkillThemeAttr()} className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
+      <div className="dew-modal cms-goal-in relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="daily-reminder-title">
         <div className={`relative overflow-hidden px-6 pb-5 pt-7 text-center ${lost ? 'bg-gradient-to-br from-sky-50 via-white to-slate-100' : 'bg-gradient-to-br from-emerald-50 via-white to-amber-50'}`}>
           <span className="cms-goal-droplet left-5 top-6 h-6 w-6" aria-hidden="true" />
           <span className="cms-goal-droplet cms-goal-droplet--amber right-12 top-10 h-4 w-4 [animation-delay:1s]" aria-hidden="true" />

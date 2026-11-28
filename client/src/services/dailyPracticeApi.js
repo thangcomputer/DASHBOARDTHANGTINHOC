@@ -82,6 +82,10 @@ const dailyPracticeApi = {
       }
       return data;
     },
+    submitExercise: async (unitId, nodeKey, exerciseId, answer) => parse(await apiFetch(
+      `/daily-practice/my/path/units/${encodeURIComponent(unitId)}/nodes/${encodeURIComponent(nodeKey)}/exercises/${encodeURIComponent(exerciseId)}/submit`,
+      json('POST', { answer }),
+    ), true),
     claimUnitChest: async (unitId) => parse(await apiFetch(`/daily-practice/my/path/units/${encodeURIComponent(unitId)}/chest/claim`, json('POST', {})), true),
     answerVideoCheck: async (unitId, videoId, checkId, body) => parse(await apiFetch(
       `/daily-practice/my/path/units/${unitId}/videos/${encodeURIComponent(videoId)}/checks/${checkId}/answer`,
@@ -132,6 +136,7 @@ const dailyPracticeApi = {
     updateQuestion: async (id, body) => parse(await apiFetch(`/daily-practice/questions/${id}`, json('PUT', body))),
     deleteQuestion: async (id) => parse(await apiFetch(`/daily-practice/questions/${id}`, { method: 'DELETE' })),
     aiGenerate: async (body) => parse(await apiFetch('/daily-practice/questions/ai-generate', json('POST', body))),
+    testGradeExercise: async (body) => parse(await apiFetch('/daily-practice/exercises/test-grade', json('POST', body))),
     units: async (topicId) => parse(await apiFetch(`/daily-practice/topics/${topicId}/units`)),
     createUnit: async (topicId, body) => parse(await apiFetch(`/daily-practice/topics/${topicId}/units`, json('POST', body))),
     reorderUnits: async (topicId, unitIds) => parse(await apiFetch(`/daily-practice/topics/${topicId}/units/order`, json('PUT', { unitIds }))),

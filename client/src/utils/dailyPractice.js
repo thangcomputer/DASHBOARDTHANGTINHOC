@@ -173,24 +173,24 @@ export function practiceFinishXpDisplay(summary) {
   }
   const gained = Number(summary.gainedXp) || 0;
   const reward = Math.max(0, Number(summary.xp) || 0);
+  const studyXp = Math.max(0, Number(summary.studyXpGained ?? reward) || 0);
   const stake = Math.max(0, Number(summary.stakeXp) || 0);
+  const walletLoss = Math.max(0, Number(summary.walletXpSpent ?? (summary.passed ? Math.max(0, reward - gained) : Math.abs(gained))) || 0);
   const hintNote = summary.hintPenaltyXp ? ` (−${summary.hintPenaltyXp} gợi ý)` : '';
 
   if (!summary.passed) {
     return {
       amount: gained,
       prefix: gained < 0 ? '' : '+',
-      caption: gained < 0
-        ? `Ròng ${gained} XP · không đạt nên không nhận XP câu đúng`
-        : (stake ? `Mất trắng −${stake} XP` : 'XP lượt này'),
+      caption: 'Chưa đạt yêu cầu nên chưa nhận XP học tập',
       positive: false,
     };
   }
-  if (gained > 0) {
+  if (studyXp > 0) {
     return {
-      amount: gained,
+      amount: studyXp,
       prefix: '+',
-      caption: `Lời +${gained} XP${hintNote}`,
+      caption: `+${studyXp} XP Học tập (tích lũy)${hintNote}`,
       positive: true,
     };
   }
@@ -198,14 +198,14 @@ export function practiceFinishXpDisplay(summary) {
     return {
       amount: reward,
       prefix: '+',
-      caption: `Hoàn ${reward} XP cược · ví giữ nguyên${hintNote}`,
+      caption: `+${reward} XP Học tập${hintNote}`,
       positive: true,
     };
   }
   return {
     amount: 0,
     prefix: '',
-    caption: `Hoàn cược · ví giữ nguyên${hintNote}`,
+    caption: `Hoàn tất lượt luyện${hintNote}`,
     positive: true,
   };
 }

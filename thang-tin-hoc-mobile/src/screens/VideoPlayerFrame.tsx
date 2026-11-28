@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { VideoCheckpointPin } from '../components/dailyPractice/MobileLmsPlayerChrome';
 
 /**
  * Shared types & TypeScript barrel — runtime resolution uses VideoPlayerFrame.native.tsx (iOS/Android) or VideoPlayerFrame.web.tsx (web).
@@ -36,6 +37,10 @@ export type VideoPlayerFrameProps = {
   initialAtSec?: number;
   pausedCheckpointSec?: number | null;
   onFullscreenChange?: (fullscreen: boolean) => void;
+  checkpoints?: VideoCheckpointPin[];
+  onSelectCheckpoint?: (cp: VideoCheckpointPin) => void;
+  maxCheckpointSec?: number | null;
+  checkpointGateModal?: React.ReactNode | ((state: { isFullscreen: boolean }) => React.ReactNode);
 };
 
 export function VideoPlayerFrame(_props: VideoPlayerFrameProps): React.ReactElement | null {

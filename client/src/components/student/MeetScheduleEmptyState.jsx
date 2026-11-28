@@ -1,4 +1,4 @@
-import { Calendar, Video } from 'lucide-react';
+import { BookOpen, Calendar } from 'lucide-react';
 import { DuoButton } from '../duo';
 import { meetLessonName } from '../../utils/meetJoin';
 
@@ -19,54 +19,74 @@ export default function MeetScheduleEmptyState({
 }) {
   if (mode === 'purchase') {
     return (
-      <div className={`flex flex-col items-center justify-center rounded-xl border border-dashed p-4 text-center ${freePortalUi ? 'border-emerald-200 bg-emerald-50/40' : 'border-emerald-200/80 bg-emerald-50/30'}`}>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-          <Video size={22} aria-hidden="true" />
+      <div className={`flex flex-col items-center justify-center p-4 text-center ${freePortalUi ? 'rounded-2xl bg-slate-50/75 border border-white py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]' : 'rounded-xl border border-dashed border-emerald-200/80 bg-emerald-50/30'}`}>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100/90 text-emerald-600 shadow-2xs">
+          <BookOpen size={22} aria-hidden="true" />
         </div>
-        <p className="mt-2 text-sm font-black text-slate-900">Học Meet cùng giảng viên</p>
+        <p className="mt-2.5 text-sm font-extrabold text-slate-900">Đăng ký khóa học</p>
         <p className="mt-1 max-w-sm text-xs font-medium text-slate-600">
-          Mua gói Meet online để trung tâm xếp lịch và bạn vào lớp Google Meet học trực tiếp với giáo viên.
+          Khám phá danh mục khóa học DewSkill để chọn lộ trình phù hợp, học thực hành và chấm điểm trực tiếp.
         </p>
-        <DuoButton
-          variant="primary"
-          size="md"
-          className="mt-3 !from-emerald-500 !to-emerald-700"
-          icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
-          label="Mua gói Meet"
-          onClick={onPurchaseMeet}
-        />
+        {freePortalUi ? (
+          <button
+            type="button"
+            onClick={onPurchaseMeet}
+            className="dew-btn-primary mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold cursor-pointer"
+          >
+            <BookOpen size={15} color="#FFFFFF" aria-hidden="true" /> Đăng ký khóa học
+          </button>
+        ) : (
+          <DuoButton
+            variant="primary"
+            size="md"
+            className="mt-3 !from-emerald-500 !to-emerald-700"
+            icon={<BookOpen size={16} color="#FFFFFF" aria-hidden="true" />}
+            label="Đăng ký khóa học"
+            onClick={onPurchaseMeet}
+          />
+        )}
       </div>
     );
   }
 
   if (mode === 'renew') {
     return (
-      <div className={`flex flex-col items-center justify-center rounded-xl border border-dashed p-4 text-center ${freePortalUi ? 'border-amber-200 bg-amber-50/50' : 'border-orange-200 bg-orange-50/40'}`}>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+      <div className={`flex flex-col items-center justify-center p-4 text-center ${freePortalUi ? 'rounded-2xl bg-slate-50/75 border border-white py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]' : 'rounded-xl border border-dashed border-orange-200 bg-orange-50/40'}`}>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-2xs">
           <Calendar size={22} aria-hidden="true" />
         </div>
-        <p className="mt-2 text-sm font-black text-slate-900">Gói Meet đã hết hạn</p>
+        <p className="mt-2.5 text-sm font-extrabold text-slate-900">Gói Meet đã hết hạn</p>
         <p className="mt-1 max-w-sm text-xs font-medium text-slate-600">
           Gia hạn để tiếp tục nhận lịch học Meet và vào lớp cùng giảng viên.
         </p>
-        <DuoButton
-          variant="primary"
-          size="md"
-          className="mt-3"
-          icon={<Calendar size={16} color="#FFFFFF" aria-hidden="true" />}
-          label="Gia hạn ngay"
-          onClick={onRenewMeet}
-        />
+        {freePortalUi ? (
+          <button
+            type="button"
+            onClick={onRenewMeet}
+            className="dew-btn-primary mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold cursor-pointer"
+          >
+            <Calendar size={15} color="#FFFFFF" aria-hidden="true" /> Gia hạn ngay
+          </button>
+        ) : (
+          <DuoButton
+            variant="primary"
+            size="md"
+            className="mt-3"
+            icon={<Calendar size={16} color="#FFFFFF" aria-hidden="true" />}
+            label="Gia hạn ngay"
+            onClick={onRenewMeet}
+          />
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+    <div className={`flex flex-col items-center justify-center text-center ${freePortalUi ? 'rounded-2xl bg-slate-50/70 border border-white py-8 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]' : 'rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4'}`}>
+      <div className={`flex items-center justify-center text-slate-400 ${freePortalUi ? 'h-11 w-11 rounded-2xl bg-slate-200/70 text-slate-500' : 'h-10 w-10 rounded-full bg-slate-100'}`}>
         <Calendar size={20} aria-hidden="true" />
       </div>
-      <p className="mt-2 text-sm font-bold text-slate-700">
+      <p className="mt-2.5 text-sm font-bold text-slate-700">
         {freePortalUi ? 'Hôm nay chưa có lịch Meet' : 'Hôm nay không có lịch'}
       </p>
       {nextSchedule ? (
@@ -81,7 +101,7 @@ export default function MeetScheduleEmptyState({
           {' · '}
           {nextMeet.startTime}–{nextMeet.endTime} ({formatDayLabel(nextMeet.day)})
         </p>
-      ) : (
+      ) : freePortalUi ? null : (
         <p className="mt-1 text-xs text-slate-400">Bạn có thể tự ôn luyện hoặc làm bài tập hôm nay nhé!</p>
       )}
       {onViewSchedule ? (

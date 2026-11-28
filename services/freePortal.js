@@ -39,8 +39,10 @@ const SURVEY_LEVELS = new Set(['beginner', 'some', 'advanced']);
 const SURVEY_FEARS = new Set(['scam', 'no_guidance', 'not_understand', 'no_support', 'none']);
 
 function freePortalFlags(student) {
-  if (!student || student.freePortal !== true) {
+  const isDewskill = Boolean(student && (student.accountType === 'dewskill' || student.freePortal === true));
+  if (!isDewskill) {
     return {
+      accountType: 'center',
       freePortal: false,
       freeUnlocked: false,
       needsFreeSurvey: false,
@@ -53,6 +55,7 @@ function freePortalFlags(student) {
   const unlocked = student.freeUnlocked === true
     && (!isSubscriptionExpired(student) || hasCourse);
   return {
+    accountType: 'dewskill',
     freePortal: true,
     freeUnlocked: unlocked,
     needsFreeSurvey: !hasSurvey,

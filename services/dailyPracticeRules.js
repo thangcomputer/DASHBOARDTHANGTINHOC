@@ -386,16 +386,24 @@ function allowanceForSubscription(subscriptionStatus, student, xpConfig = null) 
   const freeXp = Number(xpConfig?.freeAccountXp) > 0 ? Number(xpConfig.freeAccountXp) : FREE_PORTAL_DAILY_XP;
   const courseXp = Number(xpConfig?.courseAccountXp) > 0 ? Number(xpConfig.courseAccountXp) : DAILY_ALLOWANCE_XP;
   const planXp = xpConfig?.planXp || {};
+  const ownedClassXp = subscriptionStatus?.hasOwnedClass
+    ? (Number.isFinite(Number(subscriptionStatus.ownedClassDailyXp)) && Number(subscriptionStatus.ownedClassDailyXp) >= 0
+      ? Math.round(Number(subscriptionStatus.ownedClassDailyXp))
+      : 100)
+    : 0;
   const getPlanXp = (p, fallback = MEET_PLAN_DAILY_XP) => {
     const val = Number(planXp[p]);
     return Number.isFinite(val) && val > 0 ? val : fallback;
   };
 
   if (state === 'lifetime' && student?.freePortal === true && subscriptionStatus?.meetLifetime) {
-    return getPlanXp('lifetime', 1000);
+    return Math.max(getPlanXp('lifetime', 1000), ownedClassXp);
   }
   if ((state === 'active' || state === 'expiring') && plan && plan !== 'lifetime') {
-    return getPlanXp(plan, 400);
+    return Math.max(getPlanXp(plan, 400), ownedClassXp);
+  }
+  if (state === 'course' || (student?.freePortal === true && subscriptionStatus?.hasOwnedClass)) {
+    return subscriptionStatus?.hasOwnedClass ? ownedClassXp : courseXp;
   }
   if (student?.freePortal === true) {
     return freeXp;
@@ -418,15 +426,33 @@ function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP, isS
     ? Number(profile.xpAllowanceAmount)
     : (sameDay ? DAILY_ALLOWANCE_XP : 0);
   if (sameDay && tracked && applied === allowance) {
-    const dailyXp = clampXp(profile.dailyXp);
+    const rawDailyXp = clampXp(profile.dailyXp);
     const purchasedXp = clampXp(profile.purchasedXp);
+    if (rawDailyXp > allowance) {
+      const migratedExcessStudyXp = rawDailyXp - allowance;
+      return {
+        changed: true,
+        sameDayUpgrade: false,
+        sameDayDowngrade: true,
+        sameDayClamp: true,
+        migratedExcessStudyXp,
+        dailyXp: allowance,
+        purchasedXp,
+        xpTotal: allowance + purchasedXp,
+        xpBrokeDay: String(profile.xpBrokeDay || ''),
+        xpAllowanceDay: day,
+        xpAllowanceAmount: allowance,
+      };
+    }
     return {
       changed: false,
       sameDayUpgrade: false,
       sameDayDowngrade: false,
-      dailyXp,
+      sameDayClamp: false,
+      migratedExcessStudyXp: 0,
+      dailyXp: rawDailyXp,
       purchasedXp,
-      xpTotal: dailyXp + purchasedXp,
+      xpTotal: rawDailyXp + purchasedXp,
       xpBrokeDay: String(profile.xpBrokeDay || ''),
       xpAllowanceDay: day,
       xpAllowanceAmount: applied,
@@ -439,6 +465,8 @@ function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP, isS
       changed: true,
       sameDayUpgrade: false,
       sameDayDowngrade: true,
+      sameDayClamp: false,
+      migratedExcessStudyXp: 0,
       dailyXp,
       purchasedXp,
       xpTotal: dailyXp + purchasedXp,
@@ -448,12 +476,14 @@ function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP, isS
     };
   }
   if (sameDay && tracked && applied < allowance) {
-    const dailyXp = clampXp(profile.dailyXp) + (allowance - applied);
+    const dailyXp = Math.min(allowance, clampXp(profile.dailyXp) + (allowance - applied));
     const purchasedXp = clampXp(profile.purchasedXp);
     return {
       changed: true,
       sameDayUpgrade: true,
       sameDayDowngrade: false,
+      sameDayClamp: false,
+      migratedExcessStudyXp: 0,
       dailyXp,
       purchasedXp,
       xpTotal: dailyXp + purchasedXp,
@@ -472,6 +502,8 @@ function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP, isS
     changed: true,
     sameDayUpgrade: false,
     sameDayDowngrade: false,
+    sameDayClamp: false,
+    migratedExcessStudyXp: 0,
     dailyXp,
     purchasedXp,
     xpTotal: dailyXp + purchasedXp,
@@ -481,21 +513,31 @@ function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP, isS
   };
 }
 
-/** Trừ XP của gói trước, rồi mới tới XP đã mua. XP mua vào ví mua; XP thưởng về ví trong ngày. */
+/**
+ * Tách 2 hệ XP:
+ * - Ví XP quy định (dailyXp + purchasedXp = xpTotal): dùng tiêu cho AI / trắc nghiệm sai / gợi ý;
+ *   chỉ tăng khi mua thêm ('purchase') hoặc hoàn cược ('stake_refund'/'refund').
+ * - XP học tập & chuỗi tích lũy (studyXpTotal): nhận mọi thưởng học tập / chuỗi ('reward'), chỉ tăng không trừ.
+ */
 function applyXpDelta(profile, delta, source = 'reward') {
   let dailyXp = clampXp(profile?.dailyXp);
   let purchasedXp = clampXp(profile?.purchasedXp);
+  let studyXpTotal = clampXp(profile?.studyXpTotal);
   const amount = Math.round(Number(delta) || 0);
-  if (source === 'purchase' && amount > 0) purchasedXp += amount;
-  else if (amount > 0) dailyXp += amount;
-  else if (amount < 0) {
+  if (source === 'purchase' && amount > 0) {
+    purchasedXp += amount;
+  } else if ((source === 'stake_refund' || source === 'refund') && amount > 0) {
+    dailyXp += amount;
+  } else if (amount > 0) {
+    studyXpTotal += amount;
+  } else if (amount < 0) {
     let left = -amount;
     const fromDaily = Math.min(dailyXp, left);
     dailyXp -= fromDaily;
     left -= fromDaily;
     purchasedXp = Math.max(0, purchasedXp - left);
   }
-  return { dailyXp, purchasedXp, xpTotal: dailyXp + purchasedXp };
+  return { dailyXp, purchasedXp, xpTotal: dailyXp + purchasedXp, studyXpTotal };
 }
 
 /**

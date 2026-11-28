@@ -52,14 +52,11 @@ test('web: HV hết hạn chỉ thấy màn gia hạn; hạn ở sidebar + hồ 
   assert.ok(gate.includes('SUBSCRIPTION_EXPIRED_EVENT'));
   assert.ok(read('client/src/services/api.js').includes('SUBSCRIPTION_EXPIRED'));
   const sidebar = read('client/src/components/AppSidebar.jsx');
-  assert.ok(
-    sidebar.includes('subscriptionShortLabel(studentSubscription.subscription)')
-    || sidebar.includes('subscriptionShortLabel(sub')
-  );
+  assert.ok(sidebar.includes('<SidebarAIPlanCard'));
   assert.ok(sidebar.includes("hash: 'subscription-codes'"));
   assert.ok(
     read('client/src/components/student/StudentProfileTab.jsx').includes('<SubscriptionProfileCard')
-    || read('client/src/components/student/StudentProfileTab.jsx').includes('Gói học Meet')
+    || read('client/src/components/student/StudentProfileTab.jsx').includes('Gói hỗ trợ AI')
   );
   assert.ok(read('client/src/components/AdminDashboard.jsx').includes("activeTab === 'subscription-codes'"));
 });

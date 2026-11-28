@@ -3759,6 +3759,7 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
       paidAmount: 0,
       status: 'Đang học',
       learningMode: 'ONLINE',
+      accountType: 'dewskill',
       freePortal: true,
       freeUnlocked: false,
       enrollments: [{

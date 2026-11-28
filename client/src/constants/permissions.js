@@ -22,6 +22,11 @@ export const PERMISSIONS = {
   MANAGE_TEACHERS: 'manage_teachers',      // Duyệt / chấm / từ chối giảng viên
   VIEW_CENTER_INFO: 'view_center_info',     // Xem Thông tin trung tâm
   MANAGE_CENTER_INFO: 'manage_center_info',   // Quản trị Thông tin trung tâm (Super)
+  MANAGE_DEWSKILL_STUDENTS: 'manage_dewskill_students',         // Học viên DewSkill
+  MANAGE_DEWSKILL_CLASSES: 'manage_dewskill_classes',           // Lớp học DewSkill
+  MANAGE_DEWSKILL_PRACTICE: 'manage_dewskill_practice',         // Luyện tập & Tài nguyên DewSkill
+  MANAGE_DEWSKILL_XP: 'manage_dewskill_xp',                     // Điểm XP học bài DewSkill
+  MANAGE_DEWSKILL_SUBSCRIPTIONS: 'manage_dewskill_subscriptions', // Mã kích hoạt & Gói DewSkill
 };
 
 /** Enum các adminRole - dùng chung thay vì hard-code string */
@@ -33,12 +38,21 @@ export const ADMIN_ROLES = {
 };
 
 /** Quyền mặc định khi tạo HIGH_ADMIN - có thể điều chỉnh sau */
+export const DEWSKILL_ADMIN_DEFAULT_PERMISSIONS = [
+  'manage_dewskill_students',
+  'manage_dewskill_classes',
+  'manage_dewskill_practice',
+  'manage_dewskill_xp',
+  'manage_dewskill_subscriptions',
+];
+
 export const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
   'manage_students', 'view_teachers', 'manage_teachers', 'manage_schedule',
   'manage_messages', 'manage_finance', 'view_branch_revenue',
   'manage_training', 'manage_student_training',
   'manage_hr', 'manage_blog',
   'view_logs', 'view_evaluations',
+  ...DEWSKILL_ADMIN_DEFAULT_PERMISSIONS,
 ];
 
 /** Quyền mặc định cho SUPPORT */
@@ -64,6 +78,11 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.VIEW_LOGS, label: 'Nhật ký hệ thống', desc: 'Xem log hoạt động hệ thống' },
   { key: PERMISSIONS.VIEW_EVALUATIONS, label: 'Đánh giá nội bộ', desc: 'Xem đánh giá và kiểm tra nội bộ' },
   { key: PERMISSIONS.MANAGE_STAFF, label: 'Quản lý Nhân viên', desc: 'Mở menu Phân quyền NV - nên cấp thận trọng (HIGH/Super)' },
+  { key: PERMISSIONS.MANAGE_DEWSKILL_STUDENTS, label: '💧 Học viên DewSkill', desc: 'Quản lý tài khoản học viên DewSkill (tạo, khóa, mở gói, cấp lớp)' },
+  { key: PERMISSIONS.MANAGE_DEWSKILL_CLASSES, label: '💧 Lớp học DewSkill', desc: 'Quản lý danh mục lớp học và phân quyền hiển thị lớp DewSkill' },
+  { key: PERMISSIONS.MANAGE_DEWSKILL_PRACTICE, label: '💧 Luyện tập & Tài nguyên DewSkill', desc: 'Quản lý bài luyện tập hằng ngày và tài nguyên học viên DewSkill' },
+  { key: PERMISSIONS.MANAGE_DEWSKILL_XP, label: '💧 Điểm XP học bài DewSkill', desc: 'Cấu hình và theo dõi điểm XP học tập của học viên DewSkill' },
+  { key: PERMISSIONS.MANAGE_DEWSKILL_SUBSCRIPTIONS, label: '💧 Mã kích hoạt & Gói DewSkill', desc: 'Tạo và quản lý mã kích hoạt gói học viên DewSkill' },
 ];
 
 /** Kiểm tra quyền: Super Admin có tất cả quyền */
@@ -76,7 +95,7 @@ export function hasPermission(session, permKey) {
 
   // 2. HIGH_ADMIN hoặc STAFF có permissions
   const perms = Array.isArray(session.permissions) ? session.permissions : [];
-  if (perms.includes(permKey)) return true;
+  if (Array.isArray(permKey) ? permKey.some((k) => perms.includes(k)) : perms.includes(permKey)) return true;
 
   // 3. Legacy admin không có adminRole vẫn được toàn quyền.
   // HIGH_ADMIN có role vận chuyển là "admin" nhưng phải tuân theo permissions.

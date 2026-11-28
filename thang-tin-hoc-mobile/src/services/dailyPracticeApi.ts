@@ -48,6 +48,9 @@ export function emitDailyPracticeStats(payload: unknown) {
     'todayXpCap',
     'todayQuestions',
     'todayVideos',
+    'streak',
+    'bestStreak',
+    'playedToday',
   ] as const) {
     if (obj[key] !== undefined && stats[key] === undefined) {
       stats[key] = obj[key];
@@ -109,10 +112,18 @@ export type DpPlacementAdvice = {
 };
 
 export type DpReferralInfo = {
+  enabled?: boolean;
+  rewardType?: 'discount' | 'xp';
   code: string;
-  rewardXp: number;
+  discountAmountVnd?: number;
+  referrerRewardVnd?: number;
+  minOrderAmountVnd?: number;
+  availableDiscountVnd?: number;
+  usedDiscountVnd?: number;
+  earnedDiscountVnd?: number;
+  rewardXp?: number;
   referralCount: number;
-  referralXpEarned: number;
+  referralXpEarned?: number;
   redeemed: boolean;
   referredByCode?: string;
 };
@@ -716,10 +727,14 @@ export const dailyPracticeApi = {
     return data;
   }),
   redeemReferral: (code: string) => call<{
-    rewardXp: number;
+    rewardType?: string;
+    discountAmountVnd?: number;
+    referrerRewardVnd?: number;
+    availableDiscountVnd?: number;
+    rewardXp?: number;
     referrerName: string;
     code: string;
-    profileXp: number;
+    profileXp?: number;
     referral?: DpReferralInfo | null;
   }>('/referral/redeem', { code }).then((data) => {
     invalidateCache('daily-practice:');

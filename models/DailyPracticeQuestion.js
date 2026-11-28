@@ -30,12 +30,15 @@ const dailyPracticeQuestionSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, default: null },
   /** Chặng lộ trình (null = chỉ dùng ở chế độ Luyện tự do). */
   unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeUnit', default: null },
+  /** Mã hạt nước (rỗng = câu dùng chung của cả chặng). */
+  nodeKey: { type: String, default: '', trim: true, maxlength: 40 },
   /** Chỉ dùng cho bài Kiểm tra vượt chặng của unitId (không trộn vào bài học thường). */
   forTestOut: { type: Boolean, default: false },
 }, { timestamps: true });
 
 dailyPracticeQuestionSchema.index({ topicId: 1, difficulty: 1, status: 1 });
 dailyPracticeQuestionSchema.index({ unitId: 1, status: 1, difficulty: 1 });
+dailyPracticeQuestionSchema.index({ unitId: 1, nodeKey: 1, difficulty: 1, status: 1 });
 dailyPracticeQuestionSchema.index({ unitId: 1, forTestOut: 1, status: 1 });
 
 module.exports = mongoose.models.DailyPracticeQuestion || mongoose.model('DailyPracticeQuestion', dailyPracticeQuestionSchema);

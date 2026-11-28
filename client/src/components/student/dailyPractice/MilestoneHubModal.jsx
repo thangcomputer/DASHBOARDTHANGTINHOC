@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import {
   ArrowLeft,
   BookOpen,
@@ -444,6 +445,7 @@ export default function MilestoneHubModal({
 
   return createPortal(
     <div
+      data-theme={getDewSkillThemeAttr()}
       className="fixed inset-0 z-[9100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs sm:p-4"
       role="presentation"
       onClick={(e) => {

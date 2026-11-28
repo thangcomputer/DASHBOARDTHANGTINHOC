@@ -22,7 +22,7 @@ import {
 import { openDeepLinkInApp } from './linking';
 import {
   BookOpen, Building2, CalendarDays, CheckSquare, FileBox, FileText, Gamepad2, GraduationCap,
-  DollarSign, Headphones, House, LayoutDashboard, Lock, LogOut, Menu, MessageCircle, Minimize2, Newspaper, Phone, PhoneOff, Radio, Sparkles, Star, Target, UserRound, Users, Volume2, VolumeX, WalletCards, X,
+  DollarSign, Headphones, House, Layers, LayoutDashboard, Lock, LogOut, Menu, MessageCircle, Minimize2, Newspaper, Phone, PhoneOff, Radio, Sparkles, Star, Target, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,7 +51,6 @@ import {
   NotificationsScreen, ProfileScreen, ScheduleScreen, StudentsScreen,
 } from '../screens/FeatureScreens';
 import { ConversationScreen, MessagesScreen } from '../screens/MessageScreens';
-import { CourseVideosScreen } from '../screens/CourseVideosScreen';
 import {
   CenterInfoScreen, EvaluationsScreen, FeedScreen, LearningLessonScreen, MobileMenuScreen,
   NewsDetailScreen, NewsScreen, SoftwareLinksScreen, StudentExamScreen, StudentLearningScreen,
@@ -59,10 +58,12 @@ import {
 } from '../screens/ParityScreens';
 import { TeacherFinanceScreen } from '../screens/TeacherFinanceScreen';
 import { SupportEntryScreen } from '../screens/SupportEntryScreen';
+import { LegalDocumentScreen } from '../screens/LegalDocumentScreen';
 import {
   CertPrepCatalogScreen, CertPrepLevelScreen, CertPrepPlayerScreen, CertPrepResultScreen,
 } from '../screens/CertPrepScreens';
 import { DailyPracticeScreen } from '../screens/DailyPracticeScreen';
+import { StudentCoursesScreen } from '../screens/StudentCoursesScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { ForcePasswordResetModal } from '../components/ForcePasswordResetModal';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
@@ -73,6 +74,7 @@ import { LearningGoalHost } from '../components/LearningGoalModal';
 import { FreeFeatureLockModal, FreeSurveyModal, isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
 import { KineticDotsLoader } from '../components/KineticDotsLoader';
 import { MobilePopupBanner } from '../components/MobilePopupBanner';
+import { StreakHonorPopup } from '../components/StreakHonorPopup';
 import { noteStudyActivity } from '../services/studyActivity';
 import { notePinActivity, pinUserKey } from '../services/pinLock';
 import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, MOBILE_OPEN_MENU_EVENT, animateChrome } from '../components/ui';
@@ -125,7 +127,7 @@ const NAV_TAB_LABELS: Record<'student' | 'teacher', Record<string, string>> = {
     Home: 'Tổng quan',
     DailyPractice: 'Luyện tập',
     Support: 'Hỗ trợ',
-    CourseVideos: 'Bài giảng',
+    CourseVideos: 'Luyện tập tự do',
     Profile: 'Hồ sơ',
   },
   teacher: {
@@ -248,9 +250,10 @@ const MainStackScreens = React.memo(function MainStackScreens({ isStudent }: { i
           <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
           <Stack.Screen name="CenterInfo" component={CenterInfoScreen} />
           <Stack.Screen name="SoftwareLinks" component={SoftwareLinksScreen} />
+          <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
         {isStudent ? (
             <>
-            <Stack.Screen name="CourseVideos" component={CourseVideosScreen} />
+            <Stack.Screen name="CourseVideos" component={DailyPracticeScreen} />
               <Stack.Screen name="Materials" component={MaterialsScreen} />
               <Stack.Screen name="Grades" component={GradesScreen} />
               <Stack.Screen name="StudentLearning" component={StudentLearningScreen} />
@@ -259,6 +262,7 @@ const MainStackScreens = React.memo(function MainStackScreens({ isStudent }: { i
               <Stack.Screen name="Evaluations" component={EvaluationsScreen} />
               <Stack.Screen name="Tuition" component={TuitionScreen} />
             <Stack.Screen name="CertPrepCatalog" component={CertPrepCatalogScreen} />
+            <Stack.Screen name="StudentCourses" component={StudentCoursesScreen} />
             <Stack.Screen name="CertPrepLevel" component={CertPrepLevelScreen} />
             <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
             <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
@@ -652,7 +656,7 @@ export function RootNavigator() {
           Conversation: 'Messages',
           Feed: 'Feed',
           TeacherFinance: 'Finance',
-          StudentLearning: 'CourseVideos',
+          StudentLearning: 'DailyPractice',
         };
         setActiveTab(stackRouteTabs[currentRouteName ?? ''] ?? '');
         return;
@@ -777,6 +781,7 @@ export function RootNavigator() {
       <NotificationOverlayHost />
       <QuickAiOverlayHost user={user} />
       <MobilePopupBanner role={user?.role || 'student'} />
+      <StreakHonorPopup user={user} />
       <Modal
         visible={Boolean(incomingCall)}
         transparent
@@ -818,6 +823,7 @@ export function RootNavigator() {
   ) : (
     <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
       <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
     </Stack.Navigator>
   );
 }
@@ -917,10 +923,10 @@ function getStudentFiveTabItems(freeMenu: boolean): StudentBarTabItem[] {
       matchTabs: ['Schedule'],
     },
     {
-      name: freeMenu ? 'DailyPractice' : 'CourseVideos',
+      name: 'DailyPractice',
       label: 'Học tập',
       shortLabel: 'Học tập',
-      icon: freeMenu ? Gamepad2 : BookOpen,
+      icon: Gamepad2,
       matchTabs: ['CourseVideos', 'DailyPractice', 'StudentLearning', 'CertPrepCatalog', 'CertPrepLevel'],
     },
     {
@@ -1170,7 +1176,7 @@ const PersistentTabBar = React.memo(function PersistentTabBar({
 type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVideos' | 'Feed'
   | 'Profile' | 'Assignments' | 'Materials' | 'StudentExam'
   | 'StudentLearning' | 'Evaluations' | 'News' | 'CenterInfo' | 'SoftwareLinks'
-  | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'Support' | 'DailyPractice';
+  | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'Support' | 'DailyPractice' | 'StudentCourses';
 
 type MenuEntry = { label: string; destination: MenuDestination; icon: LucideIcon };
 type MenuSection = { label: string; items: MenuEntry[] };
@@ -1272,9 +1278,9 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
         {
           label: 'KHÔNG GIAN HỌC TẬP',
           items: [
-      { label: 'Tổng quan', destination: 'Home', icon: House },
+            { label: 'Tổng quan', destination: 'Home', icon: House },
+            ...(freeMenu ? [{ label: 'Danh mục khóa học', destination: 'StudentCourses' as const, icon: Layers }] : []),
             { label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 },
-            ...(!freeMenu ? [{ label: 'Bài giảng', destination: 'CourseVideos' as const, icon: BookOpen }] : []),
       { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
             ...(!freeMenu ? [{ label: 'Lịch học', destination: 'Schedule' as const, icon: CalendarDays }] : []),
             { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
@@ -1434,6 +1440,7 @@ const FloatingNavigationMenu = React.memo(function FloatingNavigationMenu({ onSi
       return;
     }
     if (destination === 'Assignments') navigationRef.navigate('Assignments');
+    else if (destination === 'StudentCourses') navigationRef.navigate('StudentCourses');
     else if (destination === 'Materials') navigationRef.navigate('Materials');
     else if (destination === 'StudentExam') navigationRef.navigate('StudentExam');
     else if (destination === 'StudentLearning') navigationRef.navigate('StudentLearning');
@@ -1964,7 +1971,7 @@ const MainTabs = React.memo(function MainTabs() {
             <Tab.Screen name="Feed" component={FeedScreen} options={{ title: translateText('Bảng tin', language) }} />
             <Tab.Screen name="Home" component={HomeScreen} options={{ title: translateText('Trang chủ', language) }} />
             <Tab.Screen name="DailyPractice" component={DailyPracticeScreen} options={{ title: translateText('Luyện tập', language) }} />
-            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: translateText('Học tập', language) }} />
+            <Tab.Screen name="CourseVideos" component={DailyPracticeScreen} options={{ title: translateText('Học tập', language) }} />
             <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: translateText('Hồ sơ', language) }} />
         </>
       )}

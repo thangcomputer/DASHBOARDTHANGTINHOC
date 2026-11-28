@@ -10,6 +10,7 @@ import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { gameSounds } from '../../../utils/sound';
 import { VIDEO_CHECK_ANSWER_XP, VIDEO_CHECK_SKIP_XP } from '../../../utils/dailyPractice';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
 import {
   canMediaSeekTo,
@@ -480,9 +481,9 @@ export default function PathLessonModal({
   const canFinish = !done && pending.length === 0 && (!url || watchedEnough || vimeo);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9600] flex items-center justify-center bg-slate-950/55 p-3 sm:p-6" role="presentation">
+    <div data-theme={getDewSkillThemeAttr()} className="fixed inset-0 z-[9600] flex items-center justify-center bg-slate-950/55 p-3 sm:p-6" role="presentation">
       <div
-        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl"
+        className="dew-modal flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
       >

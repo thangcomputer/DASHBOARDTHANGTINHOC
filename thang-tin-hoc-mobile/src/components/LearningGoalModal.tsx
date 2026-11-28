@@ -237,7 +237,7 @@ function LearningGoalModal({
     onDone();
     if (!navigationRef.isReady()) return;
     navigationRef.navigate('MainTabs', {
-      screen: 'CourseVideos',
+      screen: 'DailyPractice',
       params: {
         resumeKey: Date.now(),
         resumeSubjectId: resume.subjectId,

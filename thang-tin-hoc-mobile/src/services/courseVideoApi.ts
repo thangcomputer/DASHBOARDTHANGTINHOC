@@ -1,13 +1,22 @@
 import { DeviceEventEmitter } from 'react-native';
 import { mobileApiRequest, resolveMobilePublicUrl } from './apiClient';
+import { emitDailyPracticeStats } from './dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from './learningGoalApi';
+import { SOCKET_EVENTS } from './socketService';
 
 export type LessonPracticeSubject = {
   id: string;
   name: string;
+  slug?: string;
+  summary?: string;
+  icon?: string;
+  color?: string;
   opened?: boolean;
   completedUnitCount?: number;
   totalUnitCount?: number;
+  videoCount?: number;
+  contentCount?: number;
+  questionCount?: number;
   thumbnail?: string;
   previewUnits?: LessonPracticeUnit[];
 };
@@ -91,6 +100,8 @@ export type LessonPracticeItem = {
   hint?: string;
   lefts?: Array<{ id: string; text: string }>;
   rights?: Array<{ id: string; text: string }>;
+  pairs?: Array<{ id?: string; left: string; right: string }>;
+  region?: { x: number; y: number; w: number; h: number } | null;
   confirmed?: boolean;
   correct?: boolean | null;
   explanation?: string;
@@ -99,6 +110,9 @@ export type LessonPracticeItem = {
   answer?: Record<string, unknown> | null;
   correctOptionId?: string;
   correctOptionIds?: string[];
+  videoId?: string;
+  checkpointSec?: number;
+  sortOrder?: number;
   atSec?: number;
   milestoneSec?: number;
 };
@@ -108,8 +122,10 @@ export type LessonPracticeUnit = {
   title: string;
   antiSeek?: boolean;
   locked?: boolean;
-  status?: 'completed' | 'in_progress' | 'locked' | 'open';
+  status?: 'not_started' | 'completed' | 'in_progress' | 'locked' | 'open';
   hasPractice?: boolean;
+  questionCount?: number;
+  videoDurationSeconds?: number;
   timeLimitSec?: number;
   practiceTimeLimits?: Array<{ groupId: string; timeLimitSec: number }>;
   note?: string;
@@ -136,12 +152,13 @@ type CatalogPayload = {
 
 export async function getCourseVideoCatalog() {
   const payload = await mobileApiRequest<CatalogPayload>('/lesson-practice/my/subjects');
-  if (!Array.isArray(payload.data?.subjects) || !Array.isArray(payload.data?.courses)) {
-    throw new Error('Máy chủ trả về danh sách khóa học không hợp lệ.');
+  if (!Array.isArray(payload.data?.subjects)) {
+    throw new Error('Máy chủ trả về danh sách môn học không hợp lệ.');
   }
+  const courses = Array.isArray(payload.data?.courses) ? payload.data.courses : [];
   return {
     subjects: payload.data.subjects,
-    courses: payload.data.courses.map((course) => ({
+    courses: courses.map((course) => ({
       ...course,
       thumbnail: course.thumbnail ? resolveMobilePublicUrl(course.thumbnail) : '',
     })),
@@ -206,12 +223,59 @@ export async function markCourseUnitSection(unitId: string, section: 'video' | '
   }
 }
 
+export type StreakHonorPayload = {
+  id?: string;
+  studentId?: string;
+  studentName: string;
+  studentAvatar?: string;
+  streak: number;
+  rewardXp?: number;
+  achievedAt?: string;
+  message?: string;
+};
+
+export type ConfirmCoursePracticePayload = {
+  retry?: boolean;
+  item?: LessonPracticeItem;
+  unitStatus?: 'not_started' | 'in_progress' | 'completed';
+  alreadyConfirmed?: boolean;
+  isReview?: boolean;
+  xpDelta?: number;
+  questionXpDelta?: number;
+  streakBonusXp?: number;
+  xpTotal?: number;
+  streak?: number;
+  bestStreak?: number;
+  playedToday?: boolean;
+  streakHonor?: StreakHonorPayload | null;
+  xpExhausted?: boolean;
+  message?: string;
+};
+
 export async function confirmCoursePracticeItem(itemId: string, answer: Record<string, unknown>) {
-  const res = await mobileApiRequest<{ data?: { retry?: boolean; item?: LessonPracticeItem } }>(
+  const res = await mobileApiRequest<{ data?: ConfirmCoursePracticePayload }>(
     `/lesson-practice/my/items/${encodeURIComponent(itemId)}/confirm`,
     { method: 'POST', body: JSON.stringify(answer) },
   );
-  if (res?.data && !res.data.retry) {
+  const data = res?.data;
+  if (
+    data
+    && (typeof data.xpTotal === 'number' || typeof data.streak === 'number' || data.playedToday)
+  ) {
+    emitDailyPracticeStats({
+      ...(typeof data.xpTotal === 'number' ? { xpTotal: data.xpTotal } : {}),
+      ...(typeof data.xpDelta === 'number' && data.xpDelta < 0
+        ? { spendXp: Math.abs(data.xpDelta) }
+        : {}),
+      ...(typeof data.streak === 'number' ? { streak: data.streak } : {}),
+      ...(typeof data.bestStreak === 'number' ? { bestStreak: data.bestStreak } : {}),
+      ...(data.playedToday ? { playedToday: true } : {}),
+    });
+  }
+  if (data?.streakHonor) {
+    DeviceEventEmitter.emit(SOCKET_EVENTS.STREAK_HONOR, data.streakHonor);
+  }
+  if (data && !data.retry) {
     DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT);
   }
   return res;

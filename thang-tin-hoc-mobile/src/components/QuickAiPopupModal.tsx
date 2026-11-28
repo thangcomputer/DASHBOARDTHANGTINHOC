@@ -125,7 +125,7 @@ type ChatMessage = {
 const MOBILE_TEXT_EXT_RE = /\.(txt|csv|tsv|json|md|markdown|xml|html|htm|css|js|jsx|ts|tsx|py|sql|log|yml|yaml|ini|conf)$/i;
 const MOBILE_PDF_EXT_RE = /\.pdf$/i;
 const MOBILE_IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|bmp)$/i;
-const MOBILE_OFFICE_EXT_RE = /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i;
+const MOBILE_OFFICE_EXT_RE = /\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp)$/i;
 
 function formatMobileFileSize(bytes?: number) {
   const size = Number(bytes || 0);
@@ -161,9 +161,9 @@ function compressWebImageDataUrl(dataUrl: string, originalMime: string, original
     const ImgCtor = globalThis.Image;
     const img = new ImgCtor();
     img.onload = () => {
-      const maxDim = 1400;
+      const maxDim = 2048;
       let { width, height } = img;
-      if (width <= maxDim && height <= maxDim && originalSize <= 450 * 1024) {
+      if (width <= maxDim && height <= maxDim && originalSize <= 900 * 1024) {
         resolve({ previewUrl: dataUrl, mimeType: originalMime || 'image/png' });
         return;
       }
@@ -183,8 +183,8 @@ function compressWebImageDataUrl(dataUrl: string, originalMime: string, original
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      const outMime = originalMime === 'image/png' && originalSize <= 350 * 1024 ? 'image/png' : 'image/jpeg';
-      resolve({ previewUrl: canvas.toDataURL(outMime, 0.84), mimeType: outMime });
+      const outMime = originalMime === 'image/png' && originalSize <= 600 * 1024 ? 'image/png' : 'image/jpeg';
+      resolve({ previewUrl: canvas.toDataURL(outMime, 0.90), mimeType: outMime });
     };
     img.onerror = () => resolve({ previewUrl: dataUrl, mimeType: originalMime || 'image/png' });
     img.src = dataUrl;
@@ -203,18 +203,21 @@ async function processWebBlobToAttachment(blob: Blob, rawName = 'pasted-image.pn
     return { name, mimeType, dataBase64, previewUrl, isImage: true, size };
   }
   if (mime === 'application/pdf' || MOBILE_PDF_EXT_RE.test(name)) {
-    if (size > 3.5 * 1024 * 1024) throw new Error('Tệp PDF quá lớn (tối đa 3.5 MB).');
+    if (size > 4.5 * 1024 * 1024) throw new Error('Tệp PDF quá lớn (tối đa 4.5 MB).');
     const rawUrl = await readWebBlobAsDataUrl(blob);
     const dataBase64 = rawUrl.includes(',') ? rawUrl.split(',')[1] : rawUrl;
     return { name, mimeType: 'application/pdf', dataBase64, isImage: false, size };
   }
   if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || MOBILE_TEXT_EXT_RE.test(name)) {
     if (size > 2 * 1024 * 1024) throw new Error('Tệp văn bản quá lớn (tối đa 2 MB).');
-    const textContent = (await readWebBlobAsText(blob)).slice(0, 15000);
+    const textContent = (await readWebBlobAsText(blob)).slice(0, 30000);
     return { name, mimeType: mime || 'text/plain', textContent, isImage: false, size };
   }
   if (MOBILE_OFFICE_EXT_RE.test(name)) {
-    return { name, mimeType: mime || 'application/octet-stream', textContent: `[Tệp Office đính kèm: ${name}]`, isImage: false, size };
+    if (size > 4.5 * 1024 * 1024) throw new Error('Tệp Office quá lớn (tối đa 4.5 MB).');
+    const rawUrl = await readWebBlobAsDataUrl(blob);
+    const dataBase64 = rawUrl.includes(',') ? rawUrl.split(',')[1] : rawUrl;
+    return { name, mimeType: mime || 'application/octet-stream', dataBase64, isImage: false, size };
   }
   throw new Error('Hỗ trợ ảnh (PNG, JPG, WEBP), PDF, TXT, CSV, JSON, MD hoặc tệp Office.');
 }
@@ -889,7 +892,7 @@ export function QuickAiPopupModal({
         { id: 'nav-home', label: 'Tổng quan', subtitle: 'Tiến độ & lịch học hôm nay', keywords: 'tong quan home dashboard', icon: House, onSelect: () => navigateTab('Home') },
         { id: 'nav-dp', label: 'Luyện tập hằng ngày', subtitle: 'Lộ trình XP & câu hỏi ngắn', keywords: 'luyen tap daily practice xp lo trinh', icon: Gamepad2, onSelect: () => navigateTab('DailyPractice') },
         ...(!freeMenu ? [
-          { id: 'nav-videos', label: 'Bài giảng', subtitle: 'Video & thực hành bài học', keywords: 'bai giang video thuc hanh course', icon: BookOpen, onSelect: () => navigateTab('CourseVideos') },
+          { id: 'nav-videos', label: 'Bài giảng', subtitle: 'Video & thực hành bài học', keywords: 'bai giang video thuc hanh course', icon: BookOpen, onSelect: () => navigateTab('DailyPractice') },
           { id: 'nav-schedule', label: 'Lịch học', subtitle: 'Lịch học trực tuyến qua Meet', keywords: 'lich hoc meet schedule', icon: CalendarDays, onSelect: () => navigateTab('Schedule') },
         ] : []),
         { id: 'nav-messages', label: 'Hộp thư', subtitle: 'Trao đổi với giảng viên', keywords: 'hop thu tin nhan chat messages', icon: MessageCircle, locked: freeLocked, onSelect: () => navigateTab('Messages', freeLocked) },
@@ -1001,8 +1004,8 @@ export function QuickAiPopupModal({
       }
 
       if (mime === 'application/pdf' || MOBILE_PDF_EXT_RE.test(fileName)) {
-        if (size > 3.5 * 1024 * 1024) {
-          throw new Error('Tệp PDF quá lớn (tối đa 3.5 MB).');
+        if (size > 4.5 * 1024 * 1024) {
+          throw new Error('Tệp PDF quá lớn (tối đa 4.5 MB).');
         }
         const dataBase64 = await FileSystem.readAsStringAsync(asset.uri, {
           encoding: FileSystem.EncodingType.Base64,
@@ -1023,7 +1026,7 @@ export function QuickAiPopupModal({
         }
         const textContent = (await FileSystem.readAsStringAsync(asset.uri, {
           encoding: FileSystem.EncodingType.UTF8,
-        })).slice(0, 15000);
+        })).slice(0, 30000);
         setAttachment({
           name: fileName,
           mimeType: mime || 'text/plain',
@@ -1035,10 +1038,16 @@ export function QuickAiPopupModal({
       }
 
       if (MOBILE_OFFICE_EXT_RE.test(fileName)) {
+        if (size > 4.5 * 1024 * 1024) {
+          throw new Error('Tệp Office quá lớn (tối đa 4.5 MB).');
+        }
+        const dataBase64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
         setAttachment({
           name: fileName,
           mimeType: mime || 'application/octet-stream',
-          textContent: `[Tệp Office đính kèm: ${fileName}]`,
+          dataBase64,
           isImage: false,
           size,
         });

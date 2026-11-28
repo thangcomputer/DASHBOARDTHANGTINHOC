@@ -6,12 +6,16 @@ const dailyPracticeProfileSchema = new mongoose.Schema({
   xpTotal: { type: Number, default: 0 },
   dailyXp: { type: Number, default: null }, // XP của gói trong ngày, sang ngày đặt lại
   purchasedXp: { type: Number, default: null }, // XP đã mua, giữ qua ngày
+  studyXpTotal: { type: Number, default: null }, // XP học tập & luyện tập theo chuỗi tích lũy (tách riêng ví XP quy định, chỉ tăng không trừ)
   streak: { type: Number, default: 0 },
   bestStreak: { type: Number, default: 0 },
   lastPlayedDay: { type: String, default: '' }, // YYYY-MM-DD giờ VN
+  streak7RewardKeys: { type: [String], default: [] },
   xpBrokeDay: { type: String, default: '' }, // Ngày VN học viên dùng XP xuống dưới một lượt
   xpAllowanceDay: { type: String, default: '' }, // Ngày VN đã đặt ví về mức gói
   xpAllowanceAmount: { type: Number, default: 0 }, // Mức XP gói đã đặt cho ngày đó (200 hoặc 300)
+  aiFreeAskDay: { type: String, default: '' }, // Ngày VN đếm câu hỏi AI miễn phí
+  aiFreeAskCount: { type: Number, default: 0 }, // Số câu hỏi AI miễn phí đã dùng trong ngày (tối đa 2)
   xpPurchases: {
     type: [{
       sessionId: { type: String, default: '' },
@@ -35,12 +39,16 @@ const dailyPracticeProfileSchema = new mongoose.Schema({
     wrongCount: { type: Number, default: 1 },
     lastReviewedDay: { type: String, default: '' },
   }],
-  /** Thông tin mã giới thiệu bạn bè (B4 Referral thưởng XP đôi). */
+  /** Thông tin mã giới thiệu bạn bè (ưu đãi giảm học phí khi được giới thiệu). */
   referredByStudentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
   referredByCode: { type: String, default: '' },
   referredAt: { type: Date, default: null },
   referralCount: { type: Number, default: 0 },
   referralXpEarned: { type: Number, default: 0 },
+  referralDiscountAvailableVnd: { type: Number, default: 0 },
+  referralDiscountEarnedVnd: { type: Number, default: 0 },
+  referralDiscountUsedVnd: { type: Number, default: 0 },
+  referralDiscountConsumedSessions: { type: [String], default: [] },
 }, { timestamps: true });
 
 module.exports = mongoose.models.DailyPracticeProfile || mongoose.model('DailyPracticeProfile', dailyPracticeProfileSchema);

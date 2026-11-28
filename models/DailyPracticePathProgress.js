@@ -11,6 +11,8 @@ const dailyPracticePathProgressSchema = new mongoose.Schema({
   watchedVideoIds: { type: [String], default: [] },
   /** Mốc video đã qua: `${videoId}:${checkId}`. */
   passedVideoChecks: { type: [String], default: [] },
+  /** Đề bài tập tự nhập đã vượt qua: `${nodeKey}:${exerciseId}`. */
+  passedExercises: { type: [String], default: [] },
   /** Qua bài kiểm tra chặng (hoặc kiểm tra vượt) → mở chặng kế tiếp. */
   completedAt: { type: Date, default: null },
   /** Đã nhận thưởng rương chặng (+UNIT_CHEST_REWARD_XP). */

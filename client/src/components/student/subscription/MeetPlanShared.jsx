@@ -86,7 +86,7 @@ export function MeetScheduleStrip() {
 }
 
 /** Thẻ Quyền lợi đồng bộ cho cả 2 popup. */
-export function MeetBenefitsCard({ benefits, title = 'Quyền lợi gói Meet' }) {
+export function MeetBenefitsCard({ benefits, title = 'Quyền lợi gói hỗ trợ AI' }) {
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-emerald-200/80 bg-emerald-50/55 p-3.5 sm:p-4">
       <div className="mb-2.5 flex items-center gap-1.5">
@@ -176,7 +176,7 @@ export function MeetPlanGrid({
                 </div>
 
                 <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                  {meta.hint || plan.hint || 'Gói học Meet'}
+                  {meta.hint || plan.hint || 'Gói hỗ trợ AI'}
                 </p>
 
                 {planXp != null ? (

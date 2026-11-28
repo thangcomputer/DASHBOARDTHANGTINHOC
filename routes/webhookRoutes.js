@@ -99,7 +99,7 @@ const handleCreateSession = async (req, res) => {
     ) {
       return res.status(400).json({ success: false, message: 'Mã học viên, khóa học hoặc giảng viên không hợp lệ' });
     }
-    if (!['tuition', 'video_course', 'course_purchase', 'admin_enrollment', 'daily_practice_xp'].includes(sessionKind)) {
+    if (!['tuition', 'video_course', 'course_purchase', 'admin_enrollment', 'daily_practice_xp', 'ai_package'].includes(sessionKind)) {
       return res.status(400).json({ success: false, message: 'Loại phiên thanh toán không hợp lệ' });
     }
     if (sessionKind === 'admin_enrollment') {
@@ -405,6 +405,31 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             logger.info(
               `[SEPAY] Course-purchase session ${claimed.sessionId} - student ${purchase.studentId} course ${purchase.courseId} - ${amount}đ`,
             );
+          } else if (String(claimed.kind || 'tuition') === 'dewskill_class') {
+            const dewskillClassService = require('../services/dewskillClassService');
+            const purchase = await dewskillClassService.fulfillClassPurchase({
+              session: claimed,
+              amount,
+              grantedBy: 'sepay',
+              io: req.app.get('io'),
+            });
+            const io = req.app.get('io');
+            if (io) {
+              emitFinanceEvent(io, {
+                branchId: claimed.branchId || null,
+                userIds: claimed.studentId ? [claimed.studentId] : [],
+              }, 'dewskillClass:paid', {
+                sessionId: claimed.sessionId,
+                classId: purchase.classId,
+                amount,
+                message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+              });
+            }
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(
+              `[SEPAY] DewSkill class session ${claimed.sessionId} - student ${purchase.studentId} class ${purchase.classId} - ${amount}đ`,
+            );
           } else if (String(claimed.kind || 'tuition') === 'subscription_renewal') {
             const { fulfillSubscriptionPayment } = require('../services/subscriptionService');
             const renewal = await fulfillSubscriptionPayment({ session: claimed, amount });
@@ -424,6 +449,19 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matchedRef = claimed.ref;
             logger.info(
               `[SEPAY] Subscription session ${claimed.sessionId} - student ${renewal.studentId} plan ${renewal.plan} - ${amount}đ`,
+            );
+          } else if (String(claimed.kind || 'tuition') === 'ai_package') {
+            const { fulfillAiPackagePurchase } = require('../services/aiPackageService');
+            const purchase = await fulfillAiPackagePurchase({
+              session: claimed,
+              amount,
+              grantedBy: 'sepay',
+              io: req.app.get('io'),
+            });
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(
+              `[SEPAY] AI-package session ${claimed.sessionId} - student ${purchase.studentId} plan ${purchase.plan} - ${amount}đ`,
             );
           } else if (String(claimed.kind || 'tuition') === 'admin_enrollment') {
             const { fulfillAdminEnrollmentPayment } = require('../services/adminEnrollmentPaymentService');

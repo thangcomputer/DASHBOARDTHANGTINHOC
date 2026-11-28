@@ -21,6 +21,11 @@ import StudentDetailModal from './StudentDetailModal';
 import LmsQaVideoPreview from './lms/LmsQaVideoPreview';
 import { formatLmsTimestamp } from '../utils/lmsLessonUi';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
+import {
+  isLongNotificationText,
+  isPurchaseNotification,
+  PurchaseNotificationReceipt,
+} from './notifications/PurchaseNotificationReceipt';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -562,9 +567,22 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                     <h3 className={`text-sm truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
                       {n.title}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                      {formatNotificationStudentMask(n.message || n.content || n.text, students, role === 'admin' || role === 'staff' || role === 'teacher')}
-                    </p>
+                    {(() => {
+                      const maskedText = formatNotificationStudentMask(n.message || n.content || n.text, students, role === 'admin' || role === 'staff' || role === 'teacher');
+                      const showMoreLink = isPurchaseNotification(n) || isLongNotificationText(maskedText);
+                      return (
+                        <>
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 whitespace-pre-line">
+                            {maskedText}
+                          </p>
+                          {showMoreLink ? (
+                            <span className="mt-1 inline-block text-[11px] font-extrabold text-emerald-600 hover:underline">
+                              Xem thêm ›
+                            </span>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="flex flex-col gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {!n.read && (
@@ -762,7 +780,10 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             </div>
 
             <div className="overflow-y-auto flex-1 text-sm text-slate-700 leading-relaxed whitespace-pre-line pr-1 font-medium space-y-3">
-              {!qaDetail ? (
+              {!qaDetail && isPurchaseNotification(selectedNotif) ? (
+                <PurchaseNotificationReceipt notif={selectedNotif} />
+              ) : null}
+              {!qaDetail && !isPurchaseNotification(selectedNotif) ? (
                 formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students, role === 'admin' || role === 'staff' || role === 'teacher')
               ) : null}
               {qaDetail ? (
@@ -874,7 +895,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                   }}
                   className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5"
                 >
-                  <ExternalLink size={14} /> Đi tới liên kết
+                  <ExternalLink size={14} /> {isPurchaseNotification(selectedNotif) ? 'Xem lịch sử trong Hồ sơ' : 'Đi tới liên kết'}
                 </button>
               ) : null}
               <button

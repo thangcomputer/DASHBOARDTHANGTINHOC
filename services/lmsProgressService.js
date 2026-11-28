@@ -203,6 +203,7 @@ async function syncToDailyPracticeProfile(studentId, xp, { countsForStreak, toda
   const DailyPracticeProfile = require('../models/DailyPracticeProfile');
   const dpRules = require('./dailyPracticeRules');
 
+  // Cộng thưởng học tập vào studyXpTotal + đồng bộ streak (không cộng vào Ví XP quy định dailyXp/purchasedXp).
   const dpProfile = await dailyPracticeService.adjustProfileXp(studentId, xp, { source: 'reward' });
   if (!countsForStreak || !dpProfile) return 0;
   if (dpProfile.lastPlayedDay === today) return dpProfile.streak || 0;

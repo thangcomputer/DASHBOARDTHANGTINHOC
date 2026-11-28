@@ -49,6 +49,7 @@ const FeedBoard = lazy(() => import('./components/FeedBoard'));
 const NewsPage = lazy(() => import('./components/NewsPage'));
 const CenterInfoPage = lazy(() => import('./components/centerInfo/CenterInfoPage'));
 const SupportEntryPage = lazy(() => import('./components/SupportEntryPage'));
+const LegalDocumentPage = lazy(() => import('./components/LegalDocumentPage'));
 const CenterInfoManagePage = lazy(() => import('./components/centerInfo/CenterInfoManagePage'));
 const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/CertPrepCatalogPage'));
 const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
@@ -58,8 +59,12 @@ const LessonPracticeCatalogPage = lazy(() => import('./components/student/lesson
 const LessonPracticeUnitsPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeUnitsPage'));
 const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonPractice/LessonPracticePlayerPage'));
 const DailyPracticePage = lazy(() => import('./components/student/dailyPractice/DailyPracticePage'));
+const StudentCoursesCatalogPage = lazy(() => import('./components/student/courses/StudentCoursesCatalogPage'));
+const StudentCourseCheckoutPage = lazy(() => import('./components/student/courses/StudentCourseCheckoutPage'));
+const AIPackagesView = lazy(() => import('./components/ai/AIPackagesView'));
 import DashboardLayout from './components/DashboardLayout';
 import StudentLearningAccessGate from './components/student/StudentLearningAccessGate';
+import { ActiveCourseProvider } from './context/ActiveCourseContext';
 import { SelfStudyLock } from './components/student/subscription/SubscriptionGate';
 import FreeFeatureLock, { FreeHiddenRoute } from './components/student/dailyPractice/FreeFeatureLock';
 import api, { clearTokens, getAccessToken, NetworkOfflineError } from './services/api';
@@ -69,6 +74,7 @@ import { BranchProvider } from './context/BranchContext';
 import LoadingScreen from './components/LoadingScreen';
 import TopLoadingBar from './components/ui/TopLoadingBar';
 import PopupBanner from './components/PopupBanner';
+import StreakHonorToast from './components/student/StreakHonorToast';
 import StudyHeartbeat from './components/student/StudyHeartbeat';
 import OfflineBanner from './components/OfflineBanner';
 import { ModalProvider, useModal } from './utils/Modal.jsx';
@@ -77,6 +83,7 @@ import FaviconSwitcher from './components/FaviconSwitcher';
 import { unlockAudio } from './utils/sound';
 import { getMessagingRole } from './lib/messagingRoles';
 import { hasPermission, PERMISSIONS } from './constants/permissions';
+import { isFreePortalSelfRegistrationStudent } from './utils/enrollments';
 import { clearStorageKeepingPreferences } from './utils/logoutStorage';
 import './App.css';
 
@@ -198,6 +205,11 @@ const PermissionGuard = ({ session, permission, anyOf, superAdminOnly, children,
   return children;
 };
 
+function LessonPracticeRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/student/daily-practice${location.search || ''}`} replace />;
+}
+
 // ── Student exam wrappers ─────────────────────────────────────────────────────
 function StudentExamWrapper() {
   const nav = useNavigate();
@@ -291,6 +303,10 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
       <Route path="/DANGNHAPMIENPHI" element={<FreePortalPage onLogin={onLogin} />} />
       <Route path="/admin/login" element={<AdminLoginPage onLogin={onLogin} />} />
       <Route path="/dangkykhoahoc" element={<RegistrationForm onNavigate={go} />} />
+      <Route path="/dieu-khoan" element={<LegalDocumentPage initialTab="terms" />} />
+      <Route path="/terms-of-service" element={<LegalDocumentPage initialTab="terms" />} />
+      <Route path="/bao-mat" element={<LegalDocumentPage initialTab="privacy" />} />
+      <Route path="/privacy-policy" element={<LegalDocumentPage initialTab="privacy" />} />
       <Route path="/pay/:sessionId" element={<Suspense fallback={<LoadingScreen message="Đang nạp cổng thanh toán…" />}><PublicPaymentPage /></Suspense>} />
 
       {/* ═══ Admin ═══ */}
@@ -424,14 +440,39 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
       {/* ═══ Student ═══ */}
       <Route element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
-          <StudentLearningAccessGate session={session}>
-            <DashboardLayout role="student" session={session} onLogout={onLogout} />
-          </StudentLearningAccessGate>
+          <ActiveCourseProvider session={session}>
+            <StudentLearningAccessGate session={session}>
+              <DashboardLayout role="student" session={session} onLogout={onLogout} />
+            </StudentLearningAccessGate>
+          </ActiveCourseProvider>
         </Guard>
       }>
         <Route path="/student" element={
           <ErrorBoundary inline>
             <StudentDashboard onNavigate={go} />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/courses" element={
+          (session?.role === 'admin' || session?.accountType === 'dewskill' || session?.freePortal === true || isFreePortalSelfRegistrationStudent(session)) ? (
+            <ErrorBoundary inline>
+              <StudentCoursesCatalogPage session={session} />
+            </ErrorBoundary>
+          ) : (
+            <Navigate to="/student" replace />
+          )
+        } />
+        <Route path="/student/courses/pay/:sessionId" element={
+          (session?.role === 'admin' || session?.accountType === 'dewskill' || session?.freePortal === true || isFreePortalSelfRegistrationStudent(session)) ? (
+            <ErrorBoundary inline>
+              <StudentCourseCheckoutPage />
+            </ErrorBoundary>
+          ) : (
+            <Navigate to="/student" replace />
+          )
+        } />
+        <Route path="/student/ai-packages" element={
+          <ErrorBoundary inline>
+            <AIPackagesView user={session} />
           </ErrorBoundary>
         } />
         <Route path="/student/exam" element={
@@ -497,13 +538,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
             <SelfStudyLock><CertPrepResult /></SelfStudyLock>
           </ErrorBoundary>
         } />
-        <Route path="/student/lesson-practice" element={
-          <ErrorBoundary inline>
-            <FreeHiddenRoute session={session}>
-              <SelfStudyLock><LessonPracticeCatalogPage /></SelfStudyLock>
-            </FreeHiddenRoute>
-          </ErrorBoundary>
-        } />
+        <Route path="/student/lesson-practice" element={<LessonPracticeRedirect />} />
         <Route path="/student/lesson-practice/subjects/:subjectId" element={
           <ErrorBoundary inline>
             <FreeHiddenRoute session={session}>
@@ -511,13 +546,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
             </FreeHiddenRoute>
           </ErrorBoundary>
         } />
-        <Route path="/student/lesson-practice/units/:unitId" element={
-          <ErrorBoundary inline>
-            <FreeHiddenRoute session={session}>
-              <SelfStudyLock><LessonPracticePlayerPage /></SelfStudyLock>
-            </FreeHiddenRoute>
-          </ErrorBoundary>
-        } />
+        <Route path="/student/lesson-practice/units/:unitId" element={<LessonPracticeRedirect />} />
         <Route path="/student/daily-practice" element={
           <ErrorBoundary inline>
             <SelfStudyLock allowWhenExpired={session?.freePortal === true}><DailyPracticePage /></SelfStudyLock>
@@ -886,6 +915,7 @@ function App() {
                         {/* Popup thông báo - Nhân viên (cùng cấu hình với tab Popup) */}
                         {session?.role === 'staff' && <PopupBanner role="staff" />}
                         {session?.role === 'student' && <StudyHeartbeat />}
+                        <StreakHonorToast session={session} />
                       </ToastProvider>
                     </BranchProvider>
                   </DataProvider>

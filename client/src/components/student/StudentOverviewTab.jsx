@@ -5,9 +5,11 @@ import { useStudentSubscription } from './subscription/subscriptionContext';
 import { hasMeetAccessClient } from '../../utils/subscription';
 import { useNavigate } from 'react-router-dom';
 import {
-  Award, BookOpen, Calendar, CheckCircle2, ChevronRight, ClipboardList, Clock, Copy, Crown, ExternalLink, Flame, Gamepad2, Gift, Plus,
+  ArrowRight, Award, BookOpen, Calendar, CheckCircle2, ChevronRight, ClipboardList, Clock, Copy, Crown, ExternalLink, Flame, Gamepad2, Gift, Play, Plus,
   PlayCircle, Trophy, Video, Zap,
 } from 'lucide-react';
+import { useToast } from '../../utils/useToast';
+import { useActiveCourse } from '../../context/ActiveCourseContext';
 import DigitalCertificateModal from './DigitalCertificateModal';
 import ShareAchievementModal, { ShareTriggerButton } from './ShareAchievementModal';
 import { buildCourseOrCertShareData } from '../../../../shared/dailyPractice/shareAchievement.mjs';
@@ -15,7 +17,6 @@ import LearningLeaderboardCard from './LearningLeaderboardCard';
 import { CompactCoursePicker } from './StudentShared';
 import WelcomeHero from '../WelcomeHero';
 import api from '../../services/api';
-import lessonPracticeApi from '../../services/lessonPracticeApi';
 import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../services/dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
 import { LAST_STUDY_UPDATED_EVENT, formatResumeTimeAgo, readLastStudySession } from '../../utils/resumeLearning';
@@ -25,9 +26,9 @@ import { isFreePortalCourseName, isFreePortalSelfRegistrationStudent } from '../
 import { isMeetEnded, isMeetLiveNow, meetLessonName, vnScheduleClock } from '../../utils/meetJoin';
 import { isFreePortalLocked } from './dailyPractice/FreeFeatureLock';
 import meetClassApi from '../../services/meetClassApi';
-import { DuoButton, DuoDailyQuestsCard, DuoHeroCard } from '../duo';
+import { DuoButton, DuoDailyQuestsCard } from '../duo';
 import { pickActivePathTopic } from './dailyPractice/PathView';
-import { pathTopicHasLearningProgress, pathTopicNextLinePrefix } from '../../../../shared/dailyPractice/lastPathTopic.mjs';
+import { pathTopicNextLinePrefix } from '../../../../shared/dailyPractice/lastPathTopic.mjs';
 import { resolveSavedPathTopicId, syncLastPathTopicFromServer } from '../../utils/lastPathTopic';
 
 function normalizeCourseName(name) {
@@ -93,7 +94,37 @@ function sortMeetClasses(rows = [], clock = vnScheduleClock()) {
     .sort((a, b) => a.nextStart - b.nextStart);
 }
 
-function TaskRow({ icon: Icon, tone, title, sub, cta, onClick, freePortalUi: _freePortalUi = false }) {
+function TaskRow({ icon: Icon, tone, title, sub, cta, onClick, freePortalUi = false }) {
+  if (freePortalUi) {
+    return (
+      <div
+        onClick={onClick}
+        className="flex w-full flex-col gap-3 rounded-2xl bg-white/75 backdrop-blur-md border border-white/95 px-4 py-3 shadow-[0_6px_18px_-8px_rgba(16,185,129,0.16),inset_0_1.5px_0_#fff] hover:bg-white/95 transition cursor-pointer sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-[#34D399] via-[#10B981] to-[#059669] text-white shadow-[0_8px_16px_-4px_rgba(16,185,129,0.45),inset_0_2px_2px_rgba(255,255,255,0.55)]">
+            <Icon size={20} aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-extrabold text-slate-900">{title}</span>
+            {sub ? <span className="block truncate text-xs font-medium text-slate-500">{sub}</span> : null}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="dew-btn-primary w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap cursor-pointer"
+        >
+          <span>{cta}</span>
+          <ArrowRight size={14} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       onClick={onClick}
@@ -135,7 +166,8 @@ export default function StudentOverviewTab({
   studyLogs: _studyLogs = [],
 }) {
   const navigate = useNavigate();
-  const [videoCourses, setVideoCourses] = useState({ byId: new Map(), byName: new Map(), error: '' });
+  const toast = useToast();
+  const { enrolledCourses, setActiveCourseId, openAddCourse } = useActiveCourse();
   const [practice, setPractice] = useState(null);
   const [pathData, setPathData] = useState(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -194,41 +226,6 @@ export default function StudentOverviewTab({
   useEffect(() => {
     reloadMeetClasses();
   }, [portalSub?.state, portalSub?.expiresAt, portalSub?.meetLifetime]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await lessonPracticeApi.student.subjects();
-        if (cancelled) return;
-        const byId = new Map();
-        const byName = new Map();
-        (res.data?.courses || [])
-          .filter((course) => course.enrolled && course.deliveryMode === 'video')
-          .forEach((course) => {
-            const info = {
-              id: String(course.id),
-              completed: Number(course.completedLessonCount) || 0,
-              total: Number(course.lessonCount) || 0,
-              subjects: course.subjects || [],
-            };
-            byId.set(info.id, info);
-            byName.set(normalizeCourseName(course.name), info);
-          });
-        setVideoCourses({ byId, byName, error: '' });
-      } catch (err) {
-        if (!cancelled) setVideoCourses({ byId: new Map(), byName: new Map(), error: err.message || 'Không tải được tiến độ bài học' });
-      }
-    };
-    load();
-    window.addEventListener('focus', load);
-    window.addEventListener('lesson-practice-progress-updated', load);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('focus', load);
-      window.removeEventListener('lesson-practice-progress-updated', load);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -454,13 +451,8 @@ export default function StudentOverviewTab({
   const coursePickerItems = useMemo(() => {
     return (enrollments || []).map((c, index) => {
       const name = c.courseName || c.name || `Khóa học ${index + 1}`;
-      const vc = (c.courseId && videoCourses.byId.get(String(c.courseId)))
-        || videoCourses.byName.get(normalizeCourseName(name))
-        || null;
-      const isVideo = c.deliveryMode === 'video' || Boolean(vc);
-      const d = isVideo ? (vc?.completed || 0) : (Number(c.completedSessions) || 0);
-      const t = isVideo ? (vc?.total || 0) : (Number(c.totalSessions) || 0);
-      const u = isVideo ? 'bài' : 'buổi';
+      const d = Number(c.completedSessions) || 0;
+      const t = Number(c.totalSessions) || 0;
       const p = t ? Math.min(100, Math.round((d / t) * 100)) : 0;
       return {
         key: c.enrollmentId || c.id || name,
@@ -468,25 +460,17 @@ export default function StudentOverviewTab({
         teacherName: c.teacherName || c.teacher,
         done: d,
         total: t,
-        unit: u,
+        unit: 'buổi',
         pct: p,
         completed: t > 0 && d >= t,
       };
     });
-  }, [enrollments, videoCourses]);
+  }, [enrollments]);
 
-  const videoCourse = (viewStudent?.courseId && videoCourses.byId.get(String(viewStudent.courseId)))
-    || videoCourses.byName.get(normalizeCourseName(currentCourseName))
-    || null;
-  const isVideoCourse = viewStudent?.deliveryMode === 'video' || Boolean(videoCourse);
-  const done = isVideoCourse ? (videoCourse?.completed || 0) : (Number(viewStudent?.completedSessions) || 0);
-  const total = isVideoCourse ? (videoCourse?.total || 0) : (Number(viewStudent?.totalSessions) || 0);
-  const unit = isVideoCourse ? 'bài' : 'buổi';
-  const pct = isVideoCourse
-    ? (total ? Math.min(100, Math.round((done / total) * 100)) : 0)
-    : (Number(progressPct) || 0);
-  const nextSubject = (videoCourse?.subjects || []).find((s) => s.opened !== false
-    && (Number(s.completedUnitCount) || 0) < (Number(s.totalUnitCount) || 0));
+  const done = Number(viewStudent?.completedSessions) || 0;
+  const total = Number(viewStudent?.totalSessions) || 0;
+  const unit = 'buổi';
+  const pct = Number(progressPct) || 0;
   const freePortalCourse = isFreePortalCourseName(currentCourseName);
   const freePortalUi = Boolean(
     portalSession?.freePortal === true
@@ -518,11 +502,23 @@ export default function StudentOverviewTab({
 
   const practiceStats = practice?.stats;
   const referralInfo = practice?.referral || practiceStats?.referral || null;
+  const formatShortReferralVnd = (amount) => {
+    const val = Math.max(0, Math.round(Number(amount) || 0));
+    if (val === 0) return '0đ';
+    if (val >= 1000 && val % 1000 === 0) return `${val / 1000}K`;
+    return `${val.toLocaleString('vi-VN')}đ`;
+  };
+  const referralDiscountVnd = Math.max(0, Math.round(Number(referralInfo?.discountAmountVnd ?? 50000)));
+  const referralReferrerVnd = Math.max(0, Math.round(Number(referralInfo?.referrerRewardVnd ?? 50000)));
+  const referralAvailableVnd = Math.max(0, Math.round(Number(referralInfo?.availableDiscountVnd || 0)));
+  const referralShortDiscount = formatShortReferralVnd(referralDiscountVnd);
+  const referralShortReferrer = formatShortReferralVnd(referralReferrerVnd);
   const handleCopyReferral = async () => {
     if (!referralInfo?.code) return;
     try {
       await navigator.clipboard?.writeText(referralInfo.code);
       setReferralCopied(true);
+      toast.success('Đã sao chép mã giới thiệu!');
       setTimeout(() => setReferralCopied(false), 2000);
     } catch {
       setReferralFeedback({ type: 'error', text: `Mã của bạn là ${referralInfo.code}` });
@@ -537,13 +533,13 @@ export default function StudentOverviewTab({
     try {
       const data = await dailyPracticeApi.student.redeemReferral(cleaned);
       setReferralInput('');
+      const gained = Math.max(0, Math.round(Number(data?.discountAmountVnd ?? referralDiscountVnd)));
       setReferralFeedback({
         type: 'success',
-        text: `Đã nhận +${data.rewardXp} XP cho cả bạn và ${data.referrerName}!`,
+        text: gained > 0
+          ? `Đã áp mã từ ${data.referrerName}! Bạn nhận ngay ưu đãi giảm ${gained.toLocaleString('vi-VN')}đ khi đăng ký khóa học.`
+          : `Đã áp dụng mã giới thiệu từ ${data.referrerName}!`,
       });
-      if (typeof data.profileXp === 'number') {
-        window.dispatchEvent(new CustomEvent(DAILY_PRACTICE_STATS_EVENT, { detail: { xpTotal: data.profileXp } }));
-      }
       dailyPracticeApi.student.overview().then(setPractice).catch(() => { });
     } catch (err) {
       setReferralFeedback({ type: 'error', text: err.message || 'Không thể áp dụng mã giới thiệu' });
@@ -700,93 +696,194 @@ export default function StudentOverviewTab({
         />
       </header>
 
-      <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
-        <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3">
-          <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3">
-            {effectiveLastStudy ? (
-              <section className="flex min-w-0 flex-col gap-3 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/60 p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white uppercase">
-                      <Zap size={11} aria-hidden="true" /> Học tiếp 1 chạm
-                    </span>
-                    <span className="text-[11px] font-bold text-emerald-700">
-                      {resumeKindLabel}
-                    </span>
+      <div className={freePortalUi ? 'cms-sd-page !pt-0 cms-sd-stack mt-5' : 'cms-sd-page !pt-0 cms-sd-stack lg:!gap-3'}>
+        <div className={freePortalUi ? 'grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-12' : 'grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3'}>
+          <div className={freePortalUi ? 'flex min-w-0 flex-col gap-5 xl:col-span-7' : 'flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3'}>
+            {freePortalUi ? (
+              <section className="dew-app-card dew-app-card--emerald flex min-w-0 flex-col gap-4 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <BookOpen size={18} className="shrink-0 text-emerald-600" aria-hidden="true" />
+                    <h2 className="truncate text-[15px] font-extrabold uppercase tracking-wide text-slate-900">
+                      KHÓA HỌC CỦA TÔI ({enrolledCourses.length})
+                    </h2>
                   </div>
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    {effectiveLastStudy.updatedAt > 0
-                      ? formatResumeTimeAgo(effectiveLastStudy.updatedAt)
-                      : 'Lộ trình hiện tại'}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openAddCourse()}
+                    className="dew-btn-primary inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold cursor-pointer"
+                  >
+                    <Plus size={14} aria-hidden="true" />
+                    <span>Đăng ký thêm khóa</span>
+                  </button>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="truncate text-[15px] font-black text-slate-900">
-                      {effectiveLastStudy.lessonTitle || effectiveLastStudy.unitTitle || effectiveLastStudy.courseTitle || 'Tiếp tục bài học'}
-                    </h3>
-                    <p className="truncate text-xs font-semibold text-slate-600">
-                      {[effectiveLastStudy.courseTitle || effectiveLastStudy.subjectName, effectiveLastStudy.sectionLabel].filter(Boolean).join(' · ') || 'Quay lại đúng vị trí bạn đang học dở'}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      {effectiveLastStudy.atSec > 0 ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700 tabular-nums">
-                          <Clock size={11} aria-hidden="true" />
-                          Đang xem tại {formatLmsTimestamp(effectiveLastStudy.atSec)}
-                        </span>
-                      ) : null}
-                      {effectiveLastStudy.progressPct != null ? (
-                        <span className="text-[11px] font-bold text-slate-500 tabular-nums">
-                          {effectiveLastStudy.progressPct}% hoàn thành
-                        </span>
-                      ) : null}
+                {enrolledCourses.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {enrolledCourses.map((course) => {
+                      const hasProgress = course.progress > 0;
+                      const goPractice = () => {
+                        setActiveCourseId(course.id);
+                        const firstTopicId = course.topicIds?.[0];
+                        navigate(firstTopicId
+                          ? `/student/daily-practice?topicId=${encodeURIComponent(firstTopicId)}`
+                          : '/student/daily-practice');
+                      };
+                      return (
+                        <div
+                          key={course.id}
+                          className={`flex flex-col justify-between gap-3.5 rounded-2xl border p-4 shadow-[0_8px_20px_-10px_rgba(16,185,129,0.16),inset_0_1.5px_0_#fff] transition hover:-translate-y-0.5 ${
+                            hasProgress
+                              ? 'border-emerald-200/80 bg-gradient-to-br from-[#F0FDF4]/90 to-[#ECFDF5]/85'
+                              : 'border-sky-200/80 bg-gradient-to-br from-[#F0F9FF]/90 to-[#ECFEFF]/85'
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="line-clamp-2 text-[15px] font-black leading-snug text-slate-900">
+                                {course.title}
+                              </h3>
+                              {course.status === 'trial' ? (
+                                <span className="shrink-0 rounded-full border border-sky-200 bg-sky-100/90 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">
+                                  Học thử
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-600">
+                              {course.currentStage}
+                            </p>
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/75 shadow-inner">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-[#34D399] via-[#10B981] to-[#059669] transition-all duration-500"
+                                style={{ width: `${course.progress}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-0.5">
+                            {hasProgress ? (
+                              <button
+                                type="button"
+                                onClick={goPractice}
+                                className="dew-btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold cursor-pointer"
+                              >
+                                <span>Học tiếp</span>
+                                <ArrowRight size={14} aria-hidden="true" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={goPractice}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-white/50 bg-gradient-to-b from-[#38BDF8] via-[#0EA5E9] to-[#0284C7] px-4 py-2 text-xs font-bold text-white shadow-[0_8px_18px_-6px_rgba(14,165,233,0.45),inset_0_2px_2px_rgba(255,255,255,0.5)] transition hover:brightness-105 cursor-pointer"
+                              >
+                                <span>Bắt đầu học</span>
+                                <ArrowRight size={14} aria-hidden="true" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-gradient-to-r from-[#ECFDF5]/90 to-[#E0F2FE]/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-extrabold text-slate-900">
+                        Chào mừng bạn đến với DewSkill!
+                      </p>
+                      <p className="text-xs font-medium text-slate-600">
+                        Chọn lớp học phù hợp để mở lộ trình từng chặng hoặc học thử Chặng 1 miễn phí ngay.
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openAddCourse()}
+                        className="dew-btn-white inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold cursor-pointer"
+                      >
+                        Chọn lộ trình
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/student/daily-practice')}
+                        className="dew-btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold cursor-pointer"
+                      >
+                        <Play size={13} fill="currentColor" aria-hidden="true" />
+                        <span>Học thử Chặng 1</span>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-                    {freePortalUi && activeResumeCertReady ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setCertOpen(true)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-800 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-                        >
-                          <Award size={14} className="text-emerald-600" aria-hidden="true" />
-                          Chứng nhận QR
-                        </button>
-                        <ShareTriggerButton
-                          onClick={() => setShareResumeOpen(true)}
-                          label="SHARE"
-                          size="sm"
-                          className="!py-2"
-                        />
-                      </>
-                    ) : null}
-                    <DuoButton
-                      variant="primary"
-                      size="sm"
-                      className="w-full shrink-0 sm:w-auto"
-                      icon={<PlayCircle size={15} color="#FFFFFF" aria-hidden="true" />}
-                      rightIcon={<ChevronRight size={14} color="#FFFFFF" aria-hidden="true" />}
-                      label="Học tiếp ngay"
-                      onClick={() => {
-                        const [pathname, hash] = String(effectiveLastStudy.href || '').split('#');
-                        if (hash) {
-                          navigate({ pathname: pathname || '/student', hash });
-                          window.location.hash = hash;
-                        } else {
-                          navigate(effectiveLastStudy.href);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
+                )}
               </section>
+            ) : effectiveLastStudy ? (
+                <section className="flex min-w-0 flex-col gap-3 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/60 p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white uppercase">
+                        <Zap size={11} aria-hidden="true" /> Học tiếp 1 chạm
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-700">
+                        {resumeKindLabel}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {effectiveLastStudy.updatedAt > 0
+                        ? formatResumeTimeAgo(effectiveLastStudy.updatedAt)
+                        : 'Lộ trình hiện tại'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="truncate text-[15px] font-black text-slate-900">
+                        {effectiveLastStudy.lessonTitle || effectiveLastStudy.unitTitle || effectiveLastStudy.courseTitle || 'Tiếp tục bài học'}
+                      </h3>
+                      <p className="truncate text-xs font-semibold text-slate-600">
+                        {[effectiveLastStudy.courseTitle || effectiveLastStudy.subjectName, effectiveLastStudy.sectionLabel].filter(Boolean).join(' · ') || 'Quay lại đúng vị trí bạn đang học dở'}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        {effectiveLastStudy.atSec > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700 tabular-nums">
+                            <Clock size={11} aria-hidden="true" />
+                            Đang xem tại {formatLmsTimestamp(effectiveLastStudy.atSec)}
+                          </span>
+                        ) : null}
+                        {effectiveLastStudy.progressPct != null ? (
+                          <span className="text-[11px] font-bold text-slate-500 tabular-nums">
+                            {effectiveLastStudy.progressPct}% hoàn thành
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                      <DuoButton
+                        variant="primary"
+                        size="sm"
+                        className="w-full shrink-0 sm:w-auto"
+                        icon={<PlayCircle size={15} color="#FFFFFF" aria-hidden="true" />}
+                        rightIcon={<ChevronRight size={14} color="#FFFFFF" aria-hidden="true" />}
+                        label="Học tiếp ngay"
+                        onClick={() => {
+                          const [pathname, hash] = String(effectiveLastStudy.href || '').split('#');
+                          if (hash) {
+                            navigate({ pathname: pathname || '/student', hash });
+                            window.location.hash = hash;
+                          } else {
+                            navigate(effectiveLastStudy.href);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </section>
             ) : null}
 
-            <section className={`flex min-w-0 flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm ${freePortalUi ? 'border-[#E2E8F0]' : 'border-slate-200'}`}>
+            <section className={freePortalUi
+              ? 'dew-app-card flex min-w-0 flex-col gap-3.5 p-5'
+              : 'flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'}
+            >
               <div className="flex items-center justify-between gap-2">
-                <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
+                <h3 className={`flex items-center gap-2 ${freePortalUi ? 'text-[15px] font-extrabold text-slate-900' : 'text-base font-black text-slate-900'}`}>
                   <Calendar size={18} className={accentIconClass} aria-hidden="true" /> Lịch học hôm nay
                 </h3>
                 {todayClasses.some((c) => c.live) ? (
@@ -873,7 +970,7 @@ export default function StudentOverviewTab({
                   formatDayLabel={formatDayLabel}
                   nextMeet={nextLessons.length ? null : meetCardsPre[0]}
                   onViewSchedule={canOpenScheduleTab ? () => navigate('/student#schedule') : undefined}
-                  onPurchaseMeet={() => setMeetPlanOpen(true)}
+                  onPurchaseMeet={() => navigate('/student/courses')}
                   onRenewMeet={() => subCtx?.openRenew?.()}
                 />
               )}
@@ -914,78 +1011,49 @@ export default function StudentOverviewTab({
                     onChange={setActiveCourseName}
                     showProgress={false}
                   />
-                ) : (
-                  <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
-                )}
+                ) : null}
 
                 <div>
+                  <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                    {coursePickerItems.length <= 1 ? (
+                      <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="shrink-0 text-xs font-black text-emerald-600 tabular-nums">{pct}%</span>
+                  </div>
                   <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        isVideoCourse
-                          ? 'bg-blue-500'
-                          : 'bg-gradient-to-r from-emerald-500 to-orange-400'
-                      }`}
+                      className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 to-orange-400"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-slate-600">
-                    <span><span className="text-slate-900">{done}/{total}</span> {unit} · {pct}%</span>
-                    <span>Còn {Math.max(0, total - done)} {unit}</span>
-                    {viewStudent?.avgGrade != null && viewStudent.avgGrade !== '' && (
-                      <span>Điểm TB <span className="text-slate-900">{viewStudent.avgGrade}</span>/10</span>
-                    )}
-                    {!isVideoCourse && viewStudent?.teacher && (
+                    <span>Đã học <span className="text-slate-900">{done}/{total}</span> {unit}</span>
+                    {viewStudent?.teacher && (
                       <span className="truncate">GV: {viewStudent.teacher}</span>
                     )}
                   </div>
-                  {videoCourses.error && (
-                    <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>
-                  )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  {isVideoCourse ? (
-                    <DuoButton
-                      variant="blue"
-                      size="md"
-                      className="flex-1 min-w-[200px]"
-                      icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
-                      label={nextSubject ? `Học tiếp: ${nextSubject.name}` : 'Vào học video'}
-                      onClick={() => {
-                        if (nextSubject && videoCourse?.id) {
-                          navigate(`/student/lesson-practice/subjects/${nextSubject.id}?courseId=${encodeURIComponent(videoCourse.id)}`);
-                        } else {
-                          navigate('/student/lesson-practice');
-                        }
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <DuoButton
-                        variant="primary"
-                        size="md"
-                        className="flex-1 min-w-[140px]"
-                        icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
-                        label="Vào bài học"
-                        onClick={() => navigate('/student/lesson-practice')}
-                      />
-                      <DuoButton
-                        variant="secondary"
-                        size="md"
-                        className="flex-1 min-w-[140px]"
-                        icon={<Calendar size={16} color="#475569" aria-hidden="true" />}
-                        label="Lịch học"
-                        onClick={() => navigate('/student#schedule')}
-                      />
-                    </>
-                  )}
+                <div className="flex items-center justify-end">
+                  <DuoButton
+                    variant="primary"
+                    size="md"
+                    className="w-[calc(50%-0.375rem)] min-w-[168px]"
+                    icon={<Video size={16} color="#FFFFFF" aria-hidden="true" />}
+                    label="Vào bài học"
+                    onClick={() => navigate('/student/daily-practice')}
+                  />
                 </div>
               </section>
             ) : null}
 
-            <section className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
+            <section className={freePortalUi
+              ? 'dew-app-card dew-app-card--emerald flex min-w-0 flex-col gap-3 p-5'
+              : 'flex min-w-0 flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'}
+            >
+              <h3 className={`flex items-center gap-2 ${freePortalUi ? 'text-[15px] font-extrabold text-slate-900' : 'text-base font-black text-slate-900'}`}>
                 <CheckCircle2 size={18} className={accentIconClass} aria-hidden="true" /> Việc cần làm hôm nay
               </h3>
               {tasks.length ? (
@@ -993,7 +1061,7 @@ export default function StudentOverviewTab({
                   {tasks.map(({ key, ...task }) => <TaskRow key={key} freePortalUi={freePortalUi} {...task} />)}
                 </div>
               ) : (
-                <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${freePortalUi ? 'bg-emerald-50/80 border border-emerald-100' : 'bg-emerald-50'}`}>
                   <CheckCircle2 size={26} className="shrink-0 text-emerald-500" aria-hidden="true" />
                   <div className="min-w-0">
                     <p className="text-sm font-black text-emerald-700">Hôm nay bạn đã hoàn thành hết việc!</p>
@@ -1004,65 +1072,64 @@ export default function StudentOverviewTab({
             </section>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3">
+          <div className={freePortalUi ? 'flex min-w-0 flex-col gap-5 xl:col-span-5' : 'flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3'}>
             <LearningLeaderboardCard />
             {!practiceLocked ? (
-              <>
-                <DuoHeroCard
-                  stageTitle={activePathUnit?.title || pathTopic?.topic?.name || 'Windows cơ bản'}
-                  lessonSubtitle={
-                    pathTopic?.next?.unitTitle
-                      ? `${pathTopicNextLinePrefix(pathTopic)}: ${pathTopic.next.unitTitle}`
-                      : activePathUnit?.description
-                      || (practiceStats?.playedToday ? 'Hôm nay bạn đã hoàn thành bài tập xuất sắc!' : 'Bắt đầu hành trình chinh phục kiến thức')
-                  }
-                  progressPercent={heroProgress}
-                  playedToday={practiceStats?.playedToday ?? false}
-                  streak={practiceStats?.streak ?? 0}
-                  onContinue={() => navigate(pathTopic?.next ? '/student/daily-practice?watch=stage' : '/student/daily-practice')}
-                  continueLabel={
-                    practiceStats?.playedToday
-                      ? 'ÔN TẬP THÊM'
-                      : (pathTopicHasLearningProgress(pathTopic) ? 'TIẾP TỤC HỌC' : 'BẮT ĐẦU')
-                  }
-                  mascotReaction={practiceStats?.playedToday ? 'happy' : 'studying'}
-                />
-                <DuoDailyQuestsCard
-                  todayAnswers={todayAnswers}
-                  todayVideos={todayVideos}
-                  todayXp={todayXp}
-                  onOpenPractice={() => navigate('/student/daily-practice')}
-                />
-              </>
+              <DuoDailyQuestsCard
+                todayAnswers={todayAnswers}
+                todayVideos={todayVideos}
+                todayXp={todayXp}
+                onOpenPractice={() => navigate('/student/daily-practice')}
+                dewdropStyle={freePortalUi}
+              />
             ) : null}
 
-            {referralInfo ? (
-              <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-emerald-50/50 p-4 shadow-sm">
+            {freePortalUi && referralInfo && referralInfo.enabled !== false ? (
+              <section className="dew-app-card dew-app-card--amber flex min-w-0 flex-col gap-3 p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                      <Gift size={17} className="shrink-0 text-amber-500" aria-hidden="true" />
-                      Giới thiệu bạn bè · Nhận thưởng XP
+                    <h3 className="flex items-center gap-2 text-[15px] font-extrabold text-slate-900">
+                      <Gift size={18} className="shrink-0 text-amber-500" aria-hidden="true" />
+                      {referralDiscountVnd > 0
+                        ? `Giới thiệu bạn bè · Giảm ${referralShortDiscount}`
+                        : 'Giới thiệu bạn bè'}
                     </h3>
                     <p className="mt-0.5 text-xs font-medium text-slate-500">
-                      Gửi mã cho bạn bè cùng học — cả 2 nhận ngay{' '}
-                      <span className="font-black text-emerald-700">+{referralInfo.rewardXp} XP</span>!
+                      {referralDiscountVnd > 0 ? (
+                        <>
+                          Giảm ngay{' '}
+                          <span className="font-extrabold text-emerald-700">
+                            {referralDiscountVnd.toLocaleString('vi-VN')}đ
+                          </span>{' '}
+                          khi được giới thiệu
+                          {referralReferrerVnd > 0 ? ` · Người giới thiệu nhận giảm ${referralShortReferrer}` : ''}
+                          {Number(referralInfo.minOrderAmountVnd) > 0
+                            ? ` (khóa từ ${formatShortReferralVnd(referralInfo.minOrderAmountVnd)})`
+                            : ''}.
+                        </>
+                      ) : (
+                        'Chia sẻ mã để giới thiệu bạn bè cùng học tại DewSkill.'
+                      )}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-black text-amber-800">
-                    {referralInfo.referralCount || 0} bạn · +{referralInfo.referralXpEarned || 0} XP
-                  </span>
+                  {(referralAvailableVnd > 0 || referralInfo.referralCount > 0) ? (
+                    <span className="shrink-0 rounded-full bg-amber-100/90 border border-amber-200/70 px-2.5 py-0.5 text-[11px] font-black text-amber-800">
+                      {referralAvailableVnd > 0
+                        ? `Đang có -${referralAvailableVnd.toLocaleString('vi-VN')}đ`
+                        : `${referralInfo.referralCount} bạn`}
+                    </span>
+                  ) : null}
                 </div>
 
-                <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mã của bạn</p>
-                    <p className="truncate font-mono text-sm font-black tracking-wide text-slate-900">{referralInfo.code}</p>
-                  </div>
+                <div className="flex items-center justify-between gap-2 rounded-2xl bg-white/80 backdrop-blur-md border border-slate-100 px-3.5 py-2.5 shadow-[inset_0_1px_0_#fff]">
+                  <p className="min-w-0 truncate text-xs text-slate-500 font-semibold">
+                    MÃ CỦA BẠN:{' '}
+                    <span className="font-mono text-sm font-black tracking-wide text-slate-900">{referralInfo.code}</span>
+                  </p>
                   <button
                     type="button"
                     onClick={handleCopyReferral}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700"
+                    className="dew-btn-primary inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold cursor-pointer"
                   >
                     <Copy size={13} aria-hidden="true" />
                     {referralCopied ? 'Đã sao chép' : 'Sao chép'}
@@ -1070,8 +1137,11 @@ export default function StudentOverviewTab({
                 </div>
 
                 {referralInfo.redeemed ? (
-                  <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                    ✓ Đã áp dụng mã giới thiệu {referralInfo.referredByCode || ''}.
+                  <p className="rounded-2xl bg-emerald-50/90 border border-emerald-100 px-3.5 py-2 text-xs font-semibold text-emerald-700">
+                    ✓ Đã áp dụng mã giới thiệu {referralInfo.referredByCode || ''}
+                    {referralAvailableVnd > 0
+                      ? ` · Còn ưu đãi giảm ${referralAvailableVnd.toLocaleString('vi-VN')}đ (tự động trừ khi đăng ký khóa học).`
+                      : '.'}
                   </p>
                 ) : (
                   <form onSubmit={handleRedeemReferral} className="flex items-center gap-2">
@@ -1079,23 +1149,27 @@ export default function StudentOverviewTab({
                       type="text"
                       value={referralInput}
                       onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                      placeholder="Nhập mã bạn bè (VD: DEW-XXXXXX)"
+                      placeholder="Nhập mã bạn bè (Ví dụ: DEW-XXXXXX)"
                       maxLength={32}
-                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase text-slate-800 placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+                      className="min-w-0 flex-1 rounded-full border border-slate-200/80 bg-white/85 px-4 py-2 text-xs font-bold uppercase text-slate-800 placeholder:normal-case placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]"
                     />
                     <button
                       type="submit"
                       disabled={referralBusy || !referralInput.trim()}
-                      className="shrink-0 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="dew-btn-gold shrink-0 px-4 py-2 text-xs font-extrabold cursor-pointer disabled:cursor-not-allowed disabled:opacity-55"
                     >
-                      {referralBusy ? 'Đang gửi...' : 'Nhận XP'}
+                      {referralBusy
+                        ? 'Đang gửi...'
+                        : referralDiscountVnd > 0
+                          ? `Nhận giảm ${referralShortDiscount}`
+                          : 'Áp dụng'}
                     </button>
                   </form>
                 )}
 
                 {referralFeedback.text ? (
                   <p
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                    className={`rounded-2xl px-3.5 py-2 text-xs font-semibold ${
                       referralFeedback.type === 'success'
                         ? 'bg-emerald-50 text-emerald-700'
                         : 'bg-rose-50 text-rose-700'

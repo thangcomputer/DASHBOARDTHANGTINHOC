@@ -15,6 +15,8 @@ import { pathNodeColor } from '../../../../../shared/dailyPractice/pathNodeColor
 import { pathPlainStageMinHeightPx } from '../../../../../shared/dailyPractice/pathPlainJourney.mjs';
 import { PATH_HUB_DUO } from '../../../../../shared/dailyPractice/pathHubDuoVisual.mjs';
 import VietnamJourneyStage from './VietnamJourneyStage';
+import DewdropHorizontalJourney from './DewdropHorizontalJourney';
+import StageNodePopover from './StageNodePopover';
 import {
   persistLastPathTopicId,
   readStudentUserId,
@@ -23,7 +25,7 @@ import {
 } from '../../../utils/lastPathTopic';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import PathLessonModal from './PathLessonModal';
-import MilestoneHubModal from './MilestoneHubModal';
+import VideoLessonWorkspace, { readVideoLessonProgress } from './VideoLessonWorkspace';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import PathVideoModal from './PathVideoModal';
 import PathUnitRoadmapModal from './PathUnitRoadmapModal';
@@ -31,7 +33,8 @@ import { gameSounds } from '../../../utils/sound';
 import { QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon, unitColor } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
 import { DropletMark, PathITBackdrop } from './PathDecor';
-import FreeMeetPlanModal from './FreeMeetPlanModal';
+import CourseEnrollmentModal from '../courses/CourseEnrollmentModal';
+import { useActiveCourse } from '../../../context/ActiveCourseContext';
 import { collectNodeVideos, collectUnitVideos, UnitStageHeader } from './PathUnitStageHeader';
 import { UnitStageChest } from './UnitStageChest';
 import LevelUnlockEffect, { useNewlyUnlockedUnit } from './LevelUnlockEffect';
@@ -40,6 +43,134 @@ export { collectUnitVideos, UnitStageHeader };
 
 const STEP_ICONS = { learn: BookOpen, practice: Dumbbell, challenge: Flame };
 const STEP_LABELS = { learn: 'Dễ', practice: 'Vừa', challenge: 'Khó' };
+
+function buildUnitStages(unit, unitLocked = false, practiceStats = null) {
+  const nodes = unit?.pathNodes || [];
+  const unitTotalQuestions = Number(unit?.counts?.total) || 0;
+  return nodes.map((node, index) => {
+    const isMilestone = node.icon === 'crown' || (nodes.length >= 2 && index === nodes.length - 1);
+    const isLesson = !isMilestone && (node.kind === 'study' || node.icon === 'book' || node.icon === 'clipboard');
+    const isLocked = Boolean(unitLocked || node.state === 'locked');
+    const levels = Array.isArray(node.levels) ? node.levels : [];
+    const doneLevels = levels.filter((lv) => lv?.state === 'completed').length;
+    const exercises = Array.isArray(node.exercises) ? node.exercises : [];
+    const passedExSet = new Set(Array.isArray(unit?.passedExercises) ? unit.passedExercises : []);
+    const exercisesTotalCount = exercises.length;
+    const exercisesDoneCount = exercises.filter((ex) => ex.passed || passedExSet.has(`${node.key}:${ex.id}`)).length;
+    const easyDone = !isLocked && (node.state === 'completed' || levels[0]?.state === 'completed');
+    const mediumDone = !isLocked && (node.state === 'completed' || (easyDone && levels[1]?.state === 'completed'));
+    const hardDone = !isLocked && (node.state === 'completed' || (mediumDone && levels[2]?.state === 'completed'));
+    const passedTier = hardDone ? 'hard' : mediumDone ? 'medium' : easyDone ? 'easy' : 'none';
+    const tiers = [
+      {
+        key: 'easy',
+        label: 'Dễ',
+        stepKey: levels[0]?.key || 'learn',
+        passed: easyDone,
+        unlocked: !isLocked,
+      },
+      {
+        key: 'medium',
+        label: 'Vừa',
+        stepKey: levels[1]?.key || 'practice',
+        passed: mediumDone,
+        unlocked: !isLocked && (easyDone || levels[1]?.state === 'active' || levels[1]?.state === 'completed'),
+      },
+      {
+        key: 'hard',
+        label: 'Khó',
+        stepKey: levels[2]?.key || 'challenge',
+        passed: hardDone,
+        unlocked: !isLocked && (mediumDone || levels[2]?.state === 'active' || levels[2]?.state === 'completed'),
+      },
+    ];
+
+    let progress = 0;
+    const localLesson = isLesson ? readVideoLessonProgress(unit?.id, node?.key) : null;
+    if (!isLocked && exercisesTotalCount > 0 && node.icon === 'clipboard' && !node.hasStudyContent) {
+      progress = Math.round((exercisesDoneCount / exercisesTotalCount) * 100);
+    } else if (localLesson && typeof localLesson.pct === 'number' && !isLocked) {
+      progress = localLesson.pct;
+    } else if (node.state === 'completed') {
+      progress = 100;
+    } else if (!isLocked) {
+      if (typeof node.progress === 'number' && Number.isFinite(node.progress)) {
+        progress = Math.max(0, Math.min(100, Math.round(node.progress)));
+      } else if (levels.length > 0) {
+        progress = Math.round((doneLevels / levels.length) * 100);
+      }
+    }
+
+    const status = isLocked
+      ? 'locked'
+      : (progress >= 100 || node.state === 'completed')
+        ? 'completed'
+        : progress > 0
+          ? 'in_progress'
+          : 'ready';
+
+    const rawLabel = pathNodeMapLabel(node);
+    const title = isMilestone && (!rawLabel || rawLabel === 'Hoàn thành')
+      ? 'Vượt chặng'
+      : (rawLabel || (index === 0 ? 'Học bài' : index === 1 ? 'Luyện tập' : index === 2 ? 'Thử thách' : 'Vượt chặng'));
+
+    const nextUnlockedLevel = levels.find((lv) => lv?.state !== 'completed' && lv?.state !== 'locked') || levels[0];
+    const nextLevelKey = nextUnlockedLevel?.key || (isMilestone ? 'challenge' : 'learn');
+
+    const firstLesson = levels[0] || null;
+    const hasVideo = levels.some((lv) => Boolean(lv?.videos?.[0]?.url || lv?.url))
+      || ['easy', 'medium', 'hard'].some((d) => Boolean(node?.levelConfigs?.[d]?.video?.url));
+    const hasTheory = levels.some((lv) => Boolean(lv?.content || lv?.fileUrl || lv?.videos?.[0]?.fileUrl))
+      || ['easy', 'medium', 'hard'].some((d) => Boolean(node?.levelConfigs?.[d]?.content?.body || node?.levelConfigs?.[d]?.files?.length));
+    const hasStudyContent = Boolean(node.hasStudyContent || hasVideo || hasTheory);
+    const checks = levels.flatMap((lv) => lv?.videos?.[0]?.checks || lv?.checks || []);
+    const doneChecks = checks.filter((c) => c?.completed).length;
+
+    const totalCount = isLesson ? (levels.length || exercisesTotalCount) : (unitTotalQuestions > 0 ? unitTotalQuestions : (levels.length || 3));
+    const doneCount = isLesson
+      ? (levels.length ? doneLevels : exercisesDoneCount)
+      : (unitTotalQuestions > 0 ? Math.round((progress / 100) * unitTotalQuestions) : doneLevels);
+    const accuracy = Number.isFinite(Number(practiceStats?.accuracy))
+      ? Math.round(Number(practiceStats.accuracy))
+      : (progress >= 100 ? 100 : 0);
+
+    return {
+      id: index + 1,
+      nodeKey: node.key,
+      title,
+      icon: node.icon,
+      type: isMilestone ? 'milestone' : isLesson ? 'lesson' : 'practice',
+      progress,
+      status,
+      nextLevelKey,
+      hasStudyContent,
+      hasExercises: exercisesTotalCount > 0,
+      exercisesDoneCount,
+      exercisesTotalCount,
+      heading: isLesson ? `Vòng ${index + 1}: ${firstLesson?.title || unit?.title || title}` : `Vòng ${index + 1}: ${title}`,
+      subtitle: isLesson
+        ? ([hasVideo ? 'Video bài giảng' : null, hasTheory ? 'Lý thuyết & File' : null, exercisesTotalCount > 0 ? `${exercisesTotalCount} đề bài tập` : null].filter(Boolean).join(' · ') || 'Bài giảng trọng tâm của chặng')
+        : '',
+      checklist: isLesson
+        ? [
+            ...(hasVideo || !exercisesTotalCount ? [{ label: 'Video bài giảng ngắn', done: progress >= 100 || Boolean(firstLesson?.state === 'completed' || firstLesson?.videos?.[0]?.watched) }] : []),
+            ...(hasTheory || !exercisesTotalCount ? [{ label: 'Tóm tắt thao tác thực hành', done: progress >= 100 || Boolean(hasTheory && (firstLesson?.state === 'completed' || doneLevels > 0)) }] : []),
+            ...(exercisesTotalCount > 0 ? [{ label: `Đề bài tập tự nhập (${exercisesDoneCount}/${exercisesTotalCount} bài)`, done: exercisesDoneCount >= exercisesTotalCount }] : []),
+            ...(checks.length > 0 || !exercisesTotalCount ? [{
+              label: checks.length > 0 ? `Câu hỏi kiểm tra nhanh (${doneChecks}/${checks.length} câu)` : 'Câu hỏi kiểm tra nhanh',
+              done: progress >= 100 || (checks.length > 0 && doneChecks >= checks.length),
+            }] : []),
+          ]
+        : [],
+      doneCount,
+      totalCount,
+      countUnit: unitTotalQuestions > 0 ? 'câu' : 'nấc',
+      accuracy,
+      passedTier,
+      tiers,
+    };
+  });
+}
 
 
 /** Nút học trên snake - không xen video (video nằm panel bên cạnh). */
@@ -466,7 +597,7 @@ function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose
       <p className="mt-1 text-xs text-white/80">
         {testOut
           ? (!canTestOut
-            ? 'Đặc quyền chỉ dành cho học viên mua khóa / gói Google Meet (+300 XP/ngày). Học viên miễn phí không thể thi vượt chặng.'
+            ? 'Đặc quyền chỉ dành cho học viên đã đăng ký khóa học. Học viên miễn phí chưa thể thi vượt chặng.'
             : `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`)
           : step.state === 'completed'
             ? 'Ôn lại miễn phí: làm sai không trừ XP, thoát giữa chừng không mất XP.'
@@ -845,12 +976,33 @@ export function pickActivePathTopic(path, initialTopicId = '', savedTopicId = ''
   return pickActivePathTopicShared(path, initialTopicId, saved);
 }
 
+/** Chọn khóa học DewSkill phù hợp với chủ đề đang mở để bật modal kích hoạt. */
+export function resolveUpgradeCourse(allVisibleClasses = [], activeCourse = null, currentTopicId = '') {
+  const classes = Array.isArray(allVisibleClasses) ? allVisibleClasses : [];
+  const tid = String(currentTopicId || '').trim();
+  if (tid) {
+    const matching = classes.filter((cls) => (cls?.dailyPracticeTopicIds || []).some(
+      (item) => String(item?._id || item?.id || item || '').trim() === tid,
+    ));
+    if (matching.length) {
+      return matching.find((cls) => cls?.accessLevel !== 'full') || matching[0];
+    }
+  }
+  const activeId = String(activeCourse?.id || activeCourse?._id || '').trim();
+  const activeRaw = activeCourse?.rawClass
+    || (activeId ? classes.find((cls) => String(cls?._id || cls?.id || '').trim() === activeId) : null)
+    || (activeCourse?._id ? activeCourse : null);
+  if (activeRaw && activeRaw.accessLevel !== 'full') return activeRaw;
+  return classes.find((cls) => cls?.accessLevel !== 'full') || activeRaw || classes[0] || null;
+}
+
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
   path, practiceStats, loading, error, starting, initialTopicId = '', activeTopicId = '',
   onTopicChange, onStartStep, onPathChanged, layout = 'default', showSubjectBar = true,
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
+  const { activeCourse, allVisibleClasses, loading: coursesLoading, refreshCourses } = useActiveCourse();
   const topics = useMemo(() => path?.topics || [], [path]);
   const [topicId, setTopicId] = useState('');
   const onTopicChangeRef = useRef(onTopicChange);
@@ -875,6 +1027,13 @@ export default function PathView({
   const [milestoneOpen, setMilestoneOpen] = useState(null);
   const [welcomeLesson, setWelcomeLesson] = useState(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const openUpgradeModal = useCallback(() => {
+    setPopover(null);
+    setUpgradeOpen(true);
+    if (!allVisibleClasses.length) {
+      refreshCourses?.();
+    }
+  }, [allVisibleClasses.length, refreshCourses]);
   const [trophyModalOpen, setTrophyModalOpen] = useState(false);
   const hubAnchorRef = useRef(null);
   const testOutAnchorRef = useRef(null);
@@ -1000,7 +1159,9 @@ export default function PathView({
       return;
     }
     continueOpenedRef.current = true;
-    setVideoOpen({ unit: target.unit, videoId: target.videoId });
+    const firstStudyKey = target.unit?.pathNodes?.[0]?.key || 'study';
+    setPopover(null);
+    setMilestoneOpen({ unitId: target.unit.id, nodeKey: firstStudyKey });
     onContinueOpenedRef.current?.();
   }, [continueVideo, topics, topicId]);
 
@@ -1024,6 +1185,15 @@ export default function PathView({
   }, [popover, videoOpen, lessonOpen]);
 
   const current = topics.find((item) => item.topic.id === topicId) || null;
+  const upgradeCourse = useMemo(
+    () => resolveUpgradeCourse(allVisibleClasses, activeCourse, current?.topic?.id || topicId),
+    [allVisibleClasses, activeCourse, current?.topic?.id, topicId],
+  );
+  useEffect(() => {
+    if (upgradeOpen && !coursesLoading && !upgradeCourse) {
+      setUpgradeOpen(false);
+    }
+  }, [upgradeOpen, coursesLoading, upgradeCourse]);
   const newlyUnlockedUnitId = useNewlyUnlockedUnit(current?.units || []);
   const newlyUnlockedUnit = useMemo(
     () => (newlyUnlockedUnitId ? current?.units?.find((u) => u.id === newlyUnlockedUnitId) || null : null),
@@ -1068,8 +1238,10 @@ export default function PathView({
     if (!unit) return null;
     const node = (unit.pathNodes || []).find((item) => item.key === popover.nodeKey);
     if (!node) return null;
-    return { unit, node, tone: unitColor(unit.index) };
-  }, [popover, current]);
+    const stages = buildUnitStages(unit, unit.state === 'locked', practiceStats);
+    const activeStage = stages.find((s) => s.nodeKey === node.key) || stages[0] || null;
+    return { unit, node, stages, activeStage, tone: unitColor(unit.index) };
+  }, [popover, current, practiceStats]);
   const openTestOut = useMemo(() => {
     if (!popover?.testOut || !current) return null;
     const unit = current.units.find((item) => item.id === popover.unitId);
@@ -1102,16 +1274,28 @@ export default function PathView({
       ? null
       : { unitId: unit.id, stepKey, testOut }));
   };
+  const isStudyFirstNode = (unit, nodeKey) => {
+    const nodes = unit?.pathNodes || [];
+    const idx = nodes.findIndex((n) => n.key === nodeKey);
+    const node = idx >= 0 ? nodes[idx] : null;
+    return Boolean(node && (idx === 0 || node.kind === 'study' || node.icon === 'book' || node.icon === 'clipboard'));
+  };
   const toggleHub = (unit, nodeKey) => {
     gameSounds.tap();
     if (unit?.id) markUnitStarted(unit.id);
+    if (unit?.state === 'locked' && unit?.requiresSubscription) {
+      openUpgradeModal();
+      return;
+    }
     const node = (unit?.pathNodes || []).find((n) => n.key === nodeKey);
-    if (node && (node.kind === 'study' || node.icon === 'book')) {
+    if (unit?.state !== 'locked' && node && node.state !== 'locked' && isStudyFirstNode(unit, nodeKey)) {
       setPopover(null);
       setMilestoneOpen({ unitId: unit.id, nodeKey });
       return;
     }
-    setPopover((prev) => (prev && prev.unitId === unit.id && prev.nodeKey === nodeKey && !prev.testOut ? null : { unitId: unit.id, nodeKey, testOut: false }));
+    setPopover((prev) => (prev && prev.unitId === unit.id && prev.nodeKey === nodeKey && !prev.testOut
+      ? null
+      : { unitId: unit.id, nodeKey, testOut: false }));
   };
   const openUnitStageAction = (unit, isNextUnit) => {
     gameSounds.tap();
@@ -1175,36 +1359,24 @@ export default function PathView({
             <LevelUnlockEffect unlockedUnit={newlyUnlockedUnit} active />
           )}
 
-          <div className="dp-dew-path-lane relative overflow-hidden">
+          <div className="dp-dew-path-lane relative space-y-5 overflow-visible">
             {current.units.map((unit, unitIndex) => {
               const tone = unitColor(unit.index);
               const locked = unit.state === 'locked';
-              const isUnitNewlyUnlocked = newlyUnlockedUnitId === unit.id;
               const testOutOpen = popover?.unitId === unit.id && popover.testOut;
               const isNextUnit = current.next?.unitId === unit.id;
               const pathItems = buildUnitPathItems(unit);
-              const stageMinH = pathPlainStageMinHeightPx(pathItems.length, laneWidthPx) + 48;
               const unitVideos = collectUnitVideos(unit);
               const hasVideo = Boolean(unit.lesson) || unitVideos.length > 0;
               const nextIdx = pathItems.findIndex((item) => (
                 current.next?.unitId === unit.id
                 && (current.next.nodeKey ? current.next.nodeKey === item.node?.key : item.node?.key === 'study')
               ));
-              const artAt = nextIdx >= 0 ? nextIdx : (unit.imageUrl ? 0 : -1);
               const isLast = unitIndex === current.units.length - 1;
+              const courseDone = !current.next && current.totalUnits > 0 && current.completedUnits >= current.totalUnits;
               return (
-                <article key={unit.id} className="dp-path-unit-stage relative z-[2] w-full" style={{ minHeight: stageMinH }}>
-                  <PathITBackdrop
-                    accentSoft={tone.soft}
-                    hideMap
-                    fullBleed
-                    topicCompletedUnits={current.completedUnits}
-                    topicTotalUnits={current.totalUnits}
-                    unitIndex={unitIndex}
-                    unitTotal={current.units.length}
-                    unitState={unit.state}
-                  />
-                  <div className="relative px-3 py-2 sm:px-4">
+                <article key={unit.id} className="dp-path-unit-stage relative z-[2] w-full">
+                  <div className="space-y-3">
                     <div className="relative z-20">
                       <UnitStageHeader
                         unit={unit}
@@ -1217,72 +1389,75 @@ export default function PathView({
                         onTestOut={() => toggle(unit, 'challenge', true)}
                         onUpgrade={() => {
                           gameSounds.tap();
-                          setPopover(null);
-                          setUpgradeOpen(true);
+                          openUpgradeModal();
                         }}
                         onRoadmap={() => {
                           gameSounds.tap();
-                          setPopover(null);
                           if (unit.requiresSubscription) {
-                            setUpgradeOpen(true);
+                            openUpgradeModal();
                             return;
                           }
+                          setPopover(null);
                           setRoadmapOpen({ unit });
                         }}
                         testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
                       />
                     </div>
-                    <div className="dp-path-unit-stage__journey relative z-30 w-full pb-0 pt-1 sm:pt-2">
-                      <div className="relative flex w-full flex-col items-stretch gap-2">
-                        <VietnamJourneyStage
-                          pathItems={pathItems}
-                          laneWidthPx={laneWidthPx}
-                          tone={tone}
-                          nextIdx={nextIdx}
-                          hubSelectedKey={popover && !popover.testOut && popover.unitId === unit.id ? popover.nodeKey : ''}
-                          unit={unit}
-                          locked={locked}
-                          isUnitNewlyUnlocked={isUnitNewlyUnlocked}
-                          artAt={artAt}
-                          hasVideo={hasVideo}
-                          unitImageUrl={unit.imageUrl}
-                          hubAnchorRef={hubAnchorRef}
-                          mapProps={{
-                            topicCompletedUnits: current.completedUnits,
-                            topicTotalUnits: current.totalUnits,
-                            unitIndex: unitIndex,
-                            unitTotal: current.units.length,
-                            unitState: unit.state,
-                          }}
-                          renderHub={(item, { hubNext, hubSelected, index }) => (
-                            <PracticeHubNode
-                              node={item.node}
-                              color={pathNodeColor(item.node, index, { mapDuo: true })}
-                              isNext={hubNext}
-                              isNewlyUnlocked={isUnitNewlyUnlocked && index === 0}
-                              selected={Boolean(hubSelected)}
-                              nodeIndex={index}
-                              completedSections={unit.completedSections}
-                              onClick={() => toggleHub(unit, item.node.key)}
-                            />
-                          )}
-                        />
-                        <div className="dp-path-unit-footer relative z-[2] mt-3 flex w-full justify-center px-1 pb-2">
+
+                    <div className="dp-path-unit-stage__journey relative z-30 w-full">
+                      <DewdropHorizontalJourney
+                        unit={unit}
+                        topicName={current.topic?.name || ''}
+                        pathItems={pathItems}
+                        nextIdx={nextIdx}
+                        hubSelectedKey={popover && !popover.testOut && popover.unitId === unit.id ? popover.nodeKey : ''}
+                        locked={locked}
+                        hubAnchorRef={hubAnchorRef}
+                        onSelectNode={(nodeKey) => toggleHub(unit, nodeKey)}
+                        onOpenLessonPill={(pill) => {
+                          gameSounds.tap();
+                          if (locked) {
+                            if (unit.requiresSubscription) openUpgradeModal();
+                            return;
+                          }
+                          const firstNodeKey = unit.pathNodes?.[0]?.key || 'study';
+                          if (pill?.nodeKey === firstNodeKey && isStudyFirstNode(unit, firstNodeKey)) {
+                            setPopover(null);
+                            setMilestoneOpen({ unitId: unit.id, nodeKey: firstNodeKey });
+                            return;
+                          }
+                          if (pill?.lesson && pill.lesson.state !== 'locked') {
+                            setPopover(null);
+                            setMilestoneOpen({ unitId: unit.id, nodeKey: pill?.nodeKey || firstNodeKey });
+                            return;
+                          }
+                          if (pill?.action === 'roadmap') {
+                            setPopover(null);
+                            setRoadmapOpen({ unit });
+                            return;
+                          }
+                          toggleHub(unit, pill?.nodeKey || firstNodeKey);
+                        }}
+                      />
+
+                      {unit.state === 'completed' ? (
+                        <div className="dp-path-unit-footer relative z-[2] mt-3 flex w-full justify-center px-1">
                           <UnitStageChest
                             unit={unit}
                             variant="chip"
                             onClaimed={() => onPathChanged?.()}
                           />
                         </div>
-                        <div className="relative z-[2] mt-1 flex w-full flex-col items-center pb-2">
-                          {isLast ? (
-                            <CourseFinaleCup
-                              courseDone={!current.next && current.totalUnits > 0 && current.completedUnits >= current.totalUnits}
-                              onCelebrate={() => setTrophyModalOpen(true)}
-                            />
-                          ) : null}
+                      ) : null}
+
+                      {isLast && courseDone ? (
+                        <div className="relative z-[2] mt-2 flex w-full flex-col items-center pb-2">
+                          <CourseFinaleCup
+                            courseDone
+                            onCelebrate={() => setTrophyModalOpen(true)}
+                          />
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                   </div>
                 </article>
@@ -1309,11 +1484,11 @@ export default function PathView({
             unit={openTestOut.unit}
             step={openTestOut.step}
             testOut
-            canTestOut={path?.canTestOut === true}
+            canTestOut={Boolean(current?.canTestOut ?? path?.canTestOut)}
             color={{ from: '#64748B', to: '#334155' }}
             starting={starting}
             onClose={closePopover}
-            onUpgrade={() => setUpgradeOpen(true)}
+            onUpgrade={openUpgradeModal}
             onStart={() => {
               setPopover(null);
               onStartStep(openTestOut.unit.id, 'study', 'challenge', true);
@@ -1321,46 +1496,51 @@ export default function PathView({
           />
         </PathHubPopoverPortal>
       )}
-      {openHub && (
-        <PathHubPopoverPortal
+      {openHub && openHub.activeStage && (
+        <StageNodePopover
+          open
+          stage={openHub.activeStage}
+          stages={openHub.stages}
           anchorRef={hubAnchorRef}
           anchorKey={`${openHub.unit.id}:${openHub.node.key}`}
-        >
-          {(openHub.node.kind === 'study' || openHub.node.icon === 'book') ? (
-            <StudyHubPopover
-              node={openHub.node}
-              unit={openHub.unit}
-              color={openHub.tone}
-              onClose={closePopover}
-              onOpenLesson={(lesson) => {
-                setPopover(null);
-                const next = { unit: openHub.unit, lesson, color: openHub.tone };
-                if (takeWelcomeBackTurn()) setWelcomeLesson(next);
-                else setLessonOpen(next);
-              }}
-              onStartPractice={() => {
-                const targetNode = openHub.unit.pathNodes?.find((n) => n.kind !== 'study' && n.icon !== 'book');
-                const nodeKey = targetNode?.key || 'practice';
-                const firstLvl = targetNode?.levels?.[0];
-                const isDone = targetNode?.state === 'completed' || firstLvl?.state === 'completed';
-                setPopover(null);
-                onStartStep(openHub.unit.id, nodeKey, 'learn', false, { review: isDone });
-              }}
-            />
-          ) : (
-            <LevelHubPopover
-              node={openHub.node}
-              color={openHub.tone}
-              practiceStats={practiceStats}
-              starting={starting}
-              onClose={closePopover}
-              onStartStep={(stepKey, opts) => {
-                setPopover(null);
-                onStartStep(openHub.unit.id, openHub.node.key, stepKey, false, opts);
-              }}
-            />
-          )}
-        </PathHubPopoverPortal>
+          starting={starting}
+          canTestOut={Boolean(current?.canTestOut ?? path?.canTestOut)}
+          onClose={closePopover}
+          onSelectStage={(targetStage) => {
+            if (!targetStage?.nodeKey) return;
+            gameSounds.tap();
+            setPopover({ unitId: openHub.unit.id, nodeKey: targetStage.nodeKey, testOut: false });
+          }}
+          onOpenLesson={(stage, opts) => {
+            setPopover(null);
+            setMilestoneOpen({
+              unitId: openHub.unit.id,
+              nodeKey: stage.nodeKey,
+              initialSection: opts?.restart ? 'video' : null,
+            });
+          }}
+          onStartPractice={(stage, opts) => {
+            setPopover(null);
+            onStartStep(
+              openHub.unit.id,
+              stage.nodeKey,
+              opts?.stepKey || stage.nextLevelKey || 'learn',
+              false,
+              { review: typeof opts?.review === 'boolean' ? opts.review : stage.status === 'completed' },
+            );
+          }}
+          onStartMilestone={(stage) => {
+            setPopover(null);
+            onStartStep(
+              openHub.unit.id,
+              stage.nodeKey,
+              stage.nextLevelKey || 'challenge',
+              false,
+              { review: stage.status === 'completed' },
+            );
+          }}
+          onUpgrade={openUpgradeModal}
+        />
       )}
       {videoOpen && (
         <PathVideoModal
@@ -1416,22 +1596,20 @@ export default function PathView({
         const mIdx = mNodes.findIndex((n) => n.key === milestoneOpen.nodeKey);
         const mNode = mIdx >= 0 ? mNodes[mIdx] : null;
         if (!mUnit || !mNode) return null;
+        const nextStageNode = mNodes.find((n, idx) => idx > mIdx && n.state !== 'locked')
+          || mNodes.find((n) => n.kind !== 'study' && n.icon !== 'book');
         return (
-          <MilestoneHubModal
+          <VideoLessonWorkspace
+            topicName={current?.topic?.name || ''}
             unit={mUnit}
             node={mNode}
-            milestoneIndex={mIdx}
             initialDifficulty={milestoneOpen.initialDifficulty ?? null}
-            initialSection={milestoneOpen.initialSection ?? null}
-            color={unitColor(mUnit.index)}
             onClose={() => setMilestoneOpen(null)}
             onProgressChanged={onPathChanged}
-            onOpenVideo={(targetUnit, videoId) => setVideoOpen({ unit: targetUnit, videoId, singleVideoOnly: true })}
-            onStartPractice={(stepKey) => {
-              const practiceNodeKey = mNode.key || 'study';
+            onStartNextStage={nextStageNode ? () => {
               setMilestoneOpen(null);
-              onStartStep(mUnit.id, practiceNodeKey, stepKey || 'learn', false);
-            }}
+              onStartStep(mUnit.id, nextStageNode.key, 'learn', false);
+            } : undefined}
           />
         );
       })()}
@@ -1454,10 +1632,14 @@ export default function PathView({
           }}
         />
       )}
-      <FreeMeetPlanModal
-        open={upgradeOpen}
+      <CourseEnrollmentModal
+        open={upgradeOpen && Boolean(upgradeCourse)}
+        course={upgradeCourse}
         onClose={() => setUpgradeOpen(false)}
-        onPaid={onPathChanged}
+        onActivated={async () => {
+          await refreshCourses?.();
+          await onPathChanged?.();
+        }}
       />
     </div>
   );

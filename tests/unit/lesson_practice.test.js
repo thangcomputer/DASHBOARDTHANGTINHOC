@@ -175,7 +175,8 @@ test('a unit completes only after video, reading and practice', () => {
   const unit = { videoUrl: 'https://youtu.be/abc', note: 'Nội dung' };
   assert.equal(rules.unitChecklist(unit, {}, false).completed, false);
   assert.equal(rules.unitChecklist(unit, { videoDone: true, noteDone: true }, true).completed, true);
-  assert.equal(rules.unitChecklist({ videoUrl: '', note: '' }, {}, true).completed, true);
+  assert.equal(rules.unitChecklist({ videoUrl: '', note: '' }, {}, true, false).completed, false);
+  assert.equal(rules.unitChecklist({ videoUrl: '', note: '' }, {}, true, true).completed, true);
   assert.equal(rules.unitChecklist(unit, { status: 'completed' }, false).videoDone, true);
 });
 
@@ -211,7 +212,8 @@ test('multiple videos and lesson contents must each be completed', () => {
 });
 
 test('optional sections do not block an empty unit, but every added requirement blocks the next unit', () => {
-  assert.equal(rules.unitChecklist({}, {}, true).completed, true);
+  assert.equal(rules.unitChecklist({}, {}, true, true).completed, true);
+  assert.equal(rules.unitChecklist({}, {}, true, false).completed, false);
   assert.equal(rules.unitChecklist({
     videos: [{ id: 'v1', url: 'https://youtu.be/one' }],
     contents: [],
@@ -244,7 +246,7 @@ test('optional sections do not block an empty unit, but every added requirement 
 });
 
 test('practice completion is independent from video completion', () => {
-  const unit = { videos: [{ id: 'video-1' }, { id: 'video-2' }] };
+  const unit = { videos: [{ id: 'video-1', url: 'https://youtu.be/v1' }, { id: 'video-2', url: 'https://youtu.be/v2' }] };
   const onlyPracticeDone = rules.unitChecklist(unit, {
     practiceDone: true,
     completedVideoIds: ['video-1'],

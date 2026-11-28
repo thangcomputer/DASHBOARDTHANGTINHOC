@@ -77,7 +77,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
     setCheckoutPlan(plan.id);
     try {
       const session = await subscriptionApi.student.checkout(plan.id);
-      setPayment({ ...session, title: `Gói Meet ${plan.label}` });
+      setPayment({ ...session, title: `Gói hỗ trợ AI ${plan.label}` });
     } catch (err) {
       toast.error(err.message || 'Không tạo được thanh toán');
     } finally {
@@ -111,13 +111,13 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
                       ) : null}
                     </div>
                     <p className="mt-2 text-xs font-medium leading-relaxed text-slate-600">
-                      Thanh toán hoặc nhập mã đều kích hoạt gói Meet ngay. Thời gian mới được cộng nối tiếp từ hạn hiện tại; XP đã mua riêng luôn được giữ nguyên.
+                      Thanh toán hoặc nhập mã đều kích hoạt gói hỗ trợ AI ngay. Thời gian mới được cộng nối tiếp từ hạn hiện tại.
                     </p>
                   </div>
                   <MeetScheduleStrip />
                 </div>
 
-                <MeetBenefitsCard benefits={benefits} title="Quyền lợi & Mức XP" />
+                <MeetBenefitsCard benefits={benefits} title="Quyền lợi gói hỗ trợ AI" />
               </div>
 
               {/* Lưới 5 thẻ gói thống nhất với FreeMeetPlanModal */}
@@ -126,7 +126,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
                 selectedId={selected?.id}
                 onSelect={setSelectedId}
                 xpSummary={xpSummary}
-                heading="Chọn gói học Meet"
+                heading="Chọn gói hỗ trợ AI"
               />
 
               {/* Nút CTA chính duy nhất bên dưới 5 gói */}
@@ -170,7 +170,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
           sessionId={payment.sessionId}
           refCode={payment.ref}
           amount={payment.amount}
-          paymentTitle={isFreePortal ? 'Gói học Meet' : 'Gói Khóa học'}
+          paymentTitle={isFreePortal ? 'Gói hỗ trợ AI' : 'Gói Khóa học'}
           paidEvent="subscription:renewed"
           getPaymentSession={subscriptionApi.student.session}
           simulatePayment={() => subscriptionApi.student.simulatePaid(payment.sessionId)}

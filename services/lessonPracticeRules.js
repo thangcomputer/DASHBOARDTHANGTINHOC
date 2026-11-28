@@ -15,6 +15,12 @@ function clampTimeLimit(n) {
   return Math.min(3600, x);
 }
 
+function clampCheckpointSec(n) {
+  const x = Math.round(Number(n) || 0);
+  if (!Number.isFinite(x) || x <= 0) return 0;
+  return Math.min(86400, x);
+}
+
 function pointInRegion(x, y, region) {
   const px = clampPercent(x);
   const py = clampPercent(y);
@@ -71,7 +77,9 @@ function compareByOrder(a, b) {
 }
 
 function unitVideos(unit) {
-  if (Array.isArray(unit?.videos) && unit.videos.length) return unit.videos;
+  if (Array.isArray(unit?.videos) && unit.videos.length) {
+    return unit.videos.filter((v) => Boolean(String(v?.url || '').trim()));
+  }
   return String(unit?.videoUrl || '').trim()
     ? [{ id: 'legacy-video', url: unit.videoUrl }]
     : [];
@@ -84,10 +92,11 @@ function unitContents(unit) {
     : [];
 }
 
-function unitChecklist(unit, progress = {}, practiceFinished = false) {
-  const sticky = progress?.status === 'completed';
+function unitChecklist(unit, progress = {}, practiceFinished = false, hasPractice = null) {
   const videos = unitVideos(unit);
   const contents = unitContents(unit);
+  const hasAnyContent = videos.length > 0 || contents.length > 0 || hasPractice === true;
+  const sticky = hasAnyContent && progress?.status === 'completed';
   const videoIds = new Set((progress?.completedVideoIds || []).map(String));
   const noteIds = new Set((progress?.completedNoteIds || []).map(String));
   if (sticky && videos.some((video) => video.id === 'legacy-video')) videoIds.add('legacy-video');
@@ -101,7 +110,7 @@ function unitChecklist(unit, progress = {}, practiceFinished = false) {
     videoDone,
     noteDone,
     practiceDone,
-    completed: videoDone && noteDone && practiceDone,
+    completed: hasAnyContent && videoDone && noteDone && practiceDone,
     videoDoneIds: [...videoIds],
     noteDoneIds: [...noteIds],
   };
@@ -224,6 +233,7 @@ function publicItem(item) {
     caption: item.caption || '',
     hint: item.hint || '',
     timeLimitSec: clampTimeLimit(item.timeLimitSec),
+    checkpointSec: clampCheckpointSec(item.checkpointSec),
   };
   if (item.type === 'mcq' || item.type === 'multi') {
     base.options = optionViews(item);
@@ -411,7 +421,7 @@ function normalizeItem(body) {
   const item = {
     type,
     practiceGroupId: String(body.practiceGroupId || '').trim().slice(0, 100),
-    videoId: String(body.videoId || ''),
+    videoId: String(body.videoId || '').trim().slice(0, 100),
     prompt: String(body.prompt || '').trim(),
     imageUrl: String(body.imageUrl || '').trim(),
     imageName: String(body.imageName || '').trim().slice(0, 255),
@@ -420,6 +430,7 @@ function normalizeItem(body) {
     explanation: String(body.explanation || '').trim(),
     sortOrder: Number(body.sortOrder) || 0,
     timeLimitSec: clampTimeLimit(body.timeLimitSec),
+    checkpointSec: clampCheckpointSec(body.checkpointSec),
     rubric: '',
     modelAnswer: '',
     correctOptionId: '',
@@ -461,6 +472,7 @@ function normalizeItem(body) {
 module.exports = {
   clampPercent,
   clampTimeLimit,
+  clampCheckpointSec,
   pointInRegion,
   isQuestionType,
   needsExactCorrect,

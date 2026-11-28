@@ -22,10 +22,12 @@ const lessonPracticeApi = {
   admin: {
     subjects: async () => parse(await apiFetch('/lesson-practice/subjects')),
     courses: async () => parse(await apiFetch('/lesson-practice/courses')),
+    createSubject: async (body) => parse(await apiFetch('/lesson-practice/subjects', { method: 'POST', body: JSON.stringify(body) })),
     updateSubject: async (id, body) => parse(await apiFetch(`/lesson-practice/subjects/${id}`, { method: 'PATCH', body: JSON.stringify(body) })),
     deleteSubject: async (id) => parse(await apiFetch(`/lesson-practice/subjects/${id}`, { method: 'DELETE' })),
     seedDefaults: async () => parse(await apiFetch('/lesson-practice/subjects/seed-defaults', { method: 'POST', body: '{}' })),
     units: async (subjectId) => parse(await apiFetch(`/lesson-practice/subjects/${subjectId}/units`)),
+    reorderUnits: async (subjectId, unitIds) => parse(await apiFetch(`/lesson-practice/subjects/${subjectId}/units/reorder`, { method: 'PATCH', body: JSON.stringify({ unitIds }) })),
     createUnit: async (subjectId, body) => parse(await apiFetch(`/lesson-practice/subjects/${subjectId}/units`, { method: 'POST', body: JSON.stringify(body) })),
     updateUnit: async (id, body) => parse(await apiFetch(`/lesson-practice/units/${id}`, { method: 'PATCH', body: JSON.stringify(body) })),
     deleteUnit: async (id) => parse(await apiFetch(`/lesson-practice/units/${id}`, { method: 'DELETE' })),

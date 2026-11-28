@@ -8,7 +8,7 @@ const Student = require('../models/Student');
 const { authMiddleware, checkPermission, branchFilter } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const {
-  hasMeetAccess,
+  hasMeetAccessWithCourses,
   listMeetEligibleStudents,
   MAX_MEET_CLASS_STUDENTS,
 } = require('../services/subscriptionService');
@@ -89,7 +89,7 @@ router.get('/mine', authMiddleware, async (req, res) => {
       return res.json({ success: true, data: [], meetAccess: false });
     }
     const student = await Student.findById(req.user.id).select('subscription freePortal').lean();
-    if (!student || !hasMeetAccess(student)) {
+    if (!student || !(await hasMeetAccessWithCourses(student))) {
       return res.json({ success: true, data: [], meetAccess: false });
     }
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -144,10 +144,13 @@ router.post('/', ...adminGuard, async (req, res) => {
     if (ids.some((id) => !mongoose.Types.ObjectId.isValid(id))) throw httpError(400, 'Học viên không hợp lệ');
     const found = await Student.find({ _id: { $in: ids } }).select('name subscription freePortal').lean();
     if (found.length !== ids.length) throw httpError(400, 'Có học viên không còn trong hệ thống');
-    const missingMeet = found.filter((row) => !hasMeetAccess(row)).map((row) => row.name || 'Học viên');
+    const missingCheck = await Promise.all(
+      found.map(async (row) => ((await hasMeetAccessWithCourses(row)) ? null : (row.name || 'Học viên')))
+    );
+    const missingMeet = missingCheck.filter(Boolean);
     const notFreePortal = found.filter((row) => row.freePortal !== true).map((row) => row.name || 'Học viên');
     if (notFreePortal.length) throw httpError(400, `Không phải tài khoản miễn phí / Meet online: ${notFreePortal.join(', ')}`);
-    if (missingMeet.length) throw httpError(400, `Học viên chưa có gói Meet: ${missingMeet.join(', ')}`);
+    if (missingMeet.length) throw httpError(400, `Học viên chưa có gói Meet hoặc khóa học 12 tháng: ${missingMeet.join(', ')}`);
     const byId = new Map(found.map((student) => [String(student._id), student.name || 'Học viên']));
     const created = await MeetClass.create({
       title: String(req.body?.title || 'Học Meet').trim().slice(0, 80) || 'Học Meet',

@@ -9,6 +9,11 @@ const { resolveQuestionUnit } = require('./dailyPracticePathService');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
 const { getModelProfile, isComplexQuery } = require('./ai/modelRouter');
 const { classifySecurityRisk, classifyItDomainScope } = require('./ai/knowledgeSearchService');
+const {
+  OUT_OF_SCOPE_REPLY_VI,
+  OUT_OF_SCOPE_REPLY_EN,
+  buildAssistantSystemPrompt,
+} = require('./ai/assistantSystemPrompt');
 const cache = require('../utils/cache');
 const logger = require('../config/logger');
 
@@ -29,8 +34,8 @@ const GUARD_REPLIES = {
     en: 'I help with digital skills, Office, and learning within the LMS. I cannot discuss source code, internal URLs, underlying tech stack, or internal security of DewSkill / Thang Tin Hoc.',
   },
   outOfScope: {
-    vi: 'Mình là DewSkill AI, trợ lý chuyên về Tin học văn phòng và Công nghệ thông tin tại Thắng Tin Học. Câu hỏi này hiện nằm ngoài phạm vi hỗ trợ của bài học.',
-    en: 'I am DewSkill AI, an IT and Digital Skills assistant at Thang Tin Hoc. This question is currently outside the scope of this lesson.',
+    vi: OUT_OF_SCOPE_REPLY_VI,
+    en: OUT_OF_SCOPE_REPLY_EN,
   },
 };
 
@@ -91,7 +96,7 @@ function buildMessages(topic, difficulty, types, count, forTestOut = false) {
 }
 
 /** AI soạn nháp câu hỏi (status draft) - admin duyệt rồi mới xuất bản cho học viên. */
-async function generateDrafts({ topicId, difficulty, types, count, unitId, forTestOut = false } = {}, userId = null) {
+async function generateDrafts({ topicId, difficulty, types, count, unitId, forTestOut = false, nodeKey = '' } = {}, userId = null) {
   if (!mongoose.Types.ObjectId.isValid(String(topicId || ''))) throw httpError(400, 'Chủ đề không hợp lệ');
   if (!rules.DIFFICULTIES.includes(difficulty)) throw httpError(400, 'Độ khó không hợp lệ');
   const wanted = (Array.isArray(types) ? types : []).filter((type) => rules.TYPES.includes(type));
@@ -101,6 +106,7 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId, forTe
   if (!topic) throw httpError(404, 'Không tìm thấy chủ đề');
   const targetUnitId = await resolveQuestionUnit(topic._id, unitId);
   const testOutFlag = Boolean(targetUnitId && forTestOut === true);
+  const cleanNodeKey = targetUnitId && !testOutFlag ? String(nodeKey || '').trim().slice(0, 40) : '';
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình');
 
   const profile = getModelProfile('admin_quiz', {
@@ -134,6 +140,7 @@ async function generateDrafts({ topicId, difficulty, types, count, unitId, forTe
             ...doc,
             topicId: topic._id,
             unitId: targetUnitId,
+            nodeKey: cleanNodeKey,
             forTestOut: testOutFlag,
             status: 'draft',
             source: 'ai',
@@ -200,12 +207,22 @@ async function askLessonAssistant({
   const lang = detectLessonQuestionLang(cleanQuestion, safeHistory);
   const isEn = lang === 'en';
 
+  const aiXpBillingService = _quotaAdapter ? null : require('./aiXpBillingService');
+  // Cơ chế hỏi AI đã chuyển sang dung lượng % + Gói AI Không Giới Hạn (không trừ XP)
+  const useXpBilling = false;
+  const studentUid = String(user?.id || user?._id || '').trim();
   const aiQuotaMod = _quotaAdapter ? null : require('./aiSupportService');
   const quotaCtx = _quotaAdapter
     ? await _quotaAdapter.open(user)
     : await aiQuotaMod.openSharedAiQuotaContext(user);
 
   const buildQuotaSnapshot = () => {
+    if (useXpBilling && quotaCtx?.xpWallet) {
+      return {
+        questionQuota: aiXpBillingService.formatXpQuotaView(quotaCtx.xpWallet),
+        xpWallet: quotaCtx.xpWallet,
+      };
+    }
     if (!quotaCtx?.applies) return {};
     if (_quotaAdapter) {
       return {
@@ -220,6 +237,19 @@ async function askLessonAssistant({
   };
 
   const makeQuotaBlockedError = () => {
+    if (useXpBilling && quotaCtx?.xpWallet) {
+      const w = quotaCtx.xpWallet;
+      return aiXpBillingService.buildInsufficientXpError({
+        costXp: w.aiQuestionCostXp,
+        currentXp: w.xpTotal,
+        dailyAllowanceXp: w.dailyAllowanceXp,
+        isFreeTier: w.isFreeTier,
+        freeLimitReached: Boolean(w.freeLimitReached),
+        freeDailyLimit: w.freeDailyLimit,
+        wallet: w,
+        lang,
+      });
+    }
     if (_quotaAdapter && typeof _quotaAdapter.buildQuotaError === 'function') {
       return _quotaAdapter.buildQuotaError(quotaCtx.sessionDoc, quotaCtx.quotaUser, lang);
     }
@@ -236,8 +266,12 @@ async function askLessonAssistant({
     return err;
   };
 
-  // Kiểm tra khóa cứng ngay tại 0% trước mọi nhánh (bao gồm chào hỏi / memory / cache / Gemini)
-  if (quotaCtx?.applies) {
+  // Kiểm tra khóa cứng ngay tại 0% / hết XP trước mọi nhánh (bao gồm chào hỏi / memory / cache / Gemini)
+  if (useXpBilling && quotaCtx?.xpWallet) {
+    if (aiXpBillingService.isWalletBlockedForAi(quotaCtx.xpWallet, { hasImage: false })) {
+      throw makeQuotaBlockedError();
+    }
+  } else if (quotaCtx?.applies) {
     const initialSnap = buildQuotaSnapshot();
     if (initialSnap.questionQuota?.applies && !(Number(initialSnap.questionQuota?.percentLeft) > 0)) {
       throw makeQuotaBlockedError();
@@ -245,7 +279,13 @@ async function askLessonAssistant({
   }
 
   let consumedBudgetBp = 0;
+  let chargedXpResult = null;
   const consumeQuotaTurn = async () => {
+    if (useXpBilling) {
+      chargedXpResult = await aiXpBillingService.chargeStudentAiXp(studentUid, { hasImage: false, lang });
+      quotaCtx.xpWallet = chargedXpResult.wallet;
+      return buildQuotaSnapshot();
+    }
     if (!quotaCtx?.applies) return {};
     const q = _quotaAdapter
       ? await _quotaAdapter.consume(quotaCtx.sessionDoc, quotaCtx.quotaUser, { text: cleanQuestion })
@@ -258,6 +298,14 @@ async function askLessonAssistant({
   };
 
   const refundQuotaTurn = async () => {
+    if (useXpBilling && chargedXpResult?.charged) {
+      try {
+        const refunded = await aiXpBillingService.refundStudentAiXp(studentUid, chargedXpResult);
+        chargedXpResult = null;
+        if (refunded) quotaCtx.xpWallet = refunded;
+      } catch { /* ignore refund failure */ }
+      return;
+    }
     if (!quotaCtx?.applies || !(consumedBudgetBp > 0) || !quotaCtx.sessionDoc) return;
     try {
       if (_quotaAdapter && typeof _quotaAdapter.refund === 'function') {
@@ -343,49 +391,16 @@ async function askLessonAssistant({
 
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình API key trên máy chủ');
 
-  const contextParts = isEn
-    ? [
-      courseTitle ? `Course/Topic: ${String(courseTitle).trim().slice(0, 160)}` : '',
-      unitTitle ? `Unit/Chapter: ${String(unitTitle).trim().slice(0, 160)}` : '',
-      lessonTitle ? `Current Lesson: ${String(lessonTitle).trim().slice(0, 160)}` : '',
-    ].filter(Boolean)
-    : [
-      courseTitle ? `Khóa học/Chủ đề: ${String(courseTitle).trim().slice(0, 160)}` : '',
-      unitTitle ? `Chặng/Chương: ${String(unitTitle).trim().slice(0, 160)}` : '',
-      lessonTitle ? `Bài học đang xem: ${String(lessonTitle).trim().slice(0, 160)}` : '',
-    ].filter(Boolean);
-
-  const systemPrompt = isEn
-    ? [
-      'You are DewSkill AI, the Office IT & Digital Skills Assistant at Thang Tin Hoc.',
-      'Task: help the student understand the current lesson and IT concepts (Windows 10/11, Microsoft Word, Excel, PowerPoint, MOS/IC3/GMetrix, shortcuts, and hands-on workflows).',
-      'CRITICAL LANGUAGE RULE: The student is asking in English. Write your ENTIRE response 100% in clear, natural English.',
-      'Markdown formatting rules for readability on dark backgrounds:',
-      '- Open with 1–2 concise sentences directly answering the core question.',
-      '- Use `###` headings with helpful icons (e.g., `### 🔍 Key Cause`, `### 🛠️ Step-by-Step Fix`, `### 📊 Quick Reference`).',
-      '- Use **bold (`**...**`)** for UI buttons, menu paths, important keywords, and step labels.',
-      '- Use `` `backtick` `` for Excel formulas, keyboard shortcuts (`Ctrl + S`), commands (`sfc /scannow`), or errors (`#N/A`).',
-      '- Prefer **Markdown Tables** (`| ... | ... |`) when comparing options or listing cause/fix pairs.',
-      '- Use blockquotes `> 💡 **Tip:** ...` or `> ⚠️ **Note:** ...` for helpful tips and warnings.',
-      '- Politely decline questions unrelated to studying or Office IT and guide back to the lesson.',
-      contextParts.length ? `Current lesson context:\n${contextParts.join('\n')}` : '',
-    ].filter(Boolean).join('\n')
-    : [
-      'Bạn là DewSkill AI — Trợ giảng AI chuyên về Tin học và Công nghệ thông tin của Trung tâm Thắng Tin Học.',
-      'Nhiệm vụ: giải đáp thắc mắc của học viên về bài học đang xem và kiến thức Tin học văn phòng / CNTT (Windows 10/11, Microsoft Word, Excel, PowerPoint, MOS/IC3/GMetrix, phím tắt, thao tác thực hành).',
-      'NGÔN NGỮ: Mặc định trả lời hoàn toàn bằng tiếng Việt có dấu (kể cả khi câu hỏi không dấu hoặc chứa thuật ngữ tiếng Anh). Chỉ trả lời tiếng Anh khi người dùng hỏi hoàn toàn bằng tiếng Anh hoặc chủ động yêu cầu.',
-      'Quy tắc trình bày Markdown để hiển thị đẹp, dễ đọc trên giao diện tối:',
-      '- Mở đầu ngắn gọn 1–2 câu đi thẳng vào vấn đề.',
-      '- Dùng tiêu đề `###` kèm 1 icon phù hợp (ví dụ: `### 🔍 Nguyên nhân chính`, `### 🛠️ Cách khắc phục từng bước`, `### 📊 Bảng tra nhanh`).',
-      '- **In đậm (`**...**`)** cho tên nút bấm, mục menu, từ khóa quan trọng và tên bước.',
-      '- *In nghiêng (`*...*`)* cho thuật ngữ tiếng Anh hoặc ghi chú bổ sung ngắn.',
-      '- Dùng `` `backtick` `` cho công thức Excel, phím tắt (`Ctrl + S`), tên lệnh (`sfc /scannow`) hoặc mã lỗi (`#N/A`).',
-      '- Khi liệt kê cặp Nguyên nhân – Cách xử lý, so sánh tính năng, hoặc tổng hợp hàm/phím tắt, hãy ưu tiên trình bày bằng **Bảng Markdown** (`| ... | ... |`).',
-      '- Dùng khối trích dẫn `> 💡 **Mẹo:** ...` hoặc `> ⚠️ **Lưu ý:** ...` cho cảnh báo hoặc mẹo quan trọng.',
-      '- Câu văn ngắn gọn, tách ý rõ ràng, không viết đoạn văn dài đặc chữ.',
-      'Nếu câu hỏi hoàn toàn không liên quan đến học tập/tin học, hãy từ chối lịch sự và hướng học viên quay lại nội dung bài học.',
-      contextParts.length ? `Ngữ cảnh bài học hiện tại:\n${contextParts.join('\n')}` : '',
-    ].filter(Boolean).join('\n');
+  const systemPrompt = buildAssistantSystemPrompt({
+    channel: 'lesson',
+    userRole: 'student',
+    lang,
+    lessonContext: {
+      courseTitle,
+      unitTitle,
+      lessonTitle,
+    },
+  });
 
   const messages = [
     { role: 'system', content: systemPrompt },

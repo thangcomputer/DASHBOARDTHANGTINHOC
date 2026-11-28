@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarCheck, Check, Circle, Flame, Gamepad2, Gift, Info, PlayCircle, Target,
+  CalendarCheck, Check, Circle, ExternalLink, Flame, Gamepad2, Gift, Info, PlayCircle, Target,
 } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import {
@@ -18,7 +18,8 @@ function pct(value, target) {
 }
 
 /** Cột phải: mục tiêu + nhiệm vụ + chuỗi (dữ liệu API thật). */
-export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = true }) {
+export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = true, dewdropStyle }) {
+  const isDewdrop = dewdropStyle ?? (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
   const navigate = useNavigate();
   const [data, setData] = useState(null);
 
@@ -96,25 +97,36 @@ export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = tru
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="dp-dew-side-card p-4">
+      <section className={isDewdrop ? 'dew-app-card dew-app-card--emerald p-5' : 'dp-dew-side-card p-4'}>
         <div className="flex items-start justify-between gap-2">
           <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-100">
+            <span className={isDewdrop
+              ? 'flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 border border-emerald-100'
+              : 'flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-100'}
+            >
               <Target size={16} className="text-emerald-600" aria-hidden="true" />
             </span>
             Mục tiêu hôm nay
           </h3>
-          <CalendarCheck size={18} className="shrink-0 text-emerald-500" aria-hidden="true" />
+          <CalendarCheck size={17} className="shrink-0 text-emerald-500" aria-hidden="true" />
         </div>
         {!goal ? (
-          <div className="mt-3 space-y-2">
-            <p className="text-xs font-semibold text-slate-600">
+          <div className="mt-3 space-y-2.5">
+            <p className="text-xs font-semibold text-slate-600 leading-relaxed">
               {canSetGoal
                 ? 'Chưa đặt mục tiêu giờ học. Vẫn theo dõi XP và chuỗi luyện tập bên dưới.'
                 : 'Hoàn thành bài học đầu tiên để mở khóa đặt mục tiêu học.'}
             </p>
             {canSetGoal && (
-              <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-outline !py-2 text-xs">Đặt mục tiêu học</button>
+              <button
+                type="button"
+                onClick={openLearningGoal}
+                className={isDewdrop
+                  ? 'dew-btn-white px-4 py-2 text-xs font-extrabold cursor-pointer'
+                  : 'cms-btn cms-btn-outline !py-2 text-xs'}
+              >
+                Đặt mục tiêu học
+              </button>
             )}
           </div>
         ) : (
@@ -177,22 +189,16 @@ export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = tru
         )}
       </section>
 
-      <section className="dp-dew-side-card p-4">
+      <section className={isDewdrop ? 'dew-app-card dew-app-card--amber p-5' : 'dp-dew-side-card p-4'}>
         <div className="flex items-start justify-between gap-2">
           <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
             <Flame size={18} className="text-orange-500" aria-hidden="true" />
             Chuỗi học tập
           </h3>
-          <span className="text-lg" aria-hidden="true">📅</span>
+          <CalendarCheck size={17} className="shrink-0 text-emerald-600" aria-hidden="true" />
         </div>
         <p className="mt-2 text-2xl font-black tabular-nums text-orange-600">{streak} ngày</p>
-        <p className="text-xs font-medium text-slate-600">
-          Học đều mỗi ngày để duy trì chuỗi và nhận thưởng lớn hơn!
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          {playedToday ? 'Hôm nay bạn đã hoàn thành ít nhất một lượt luyện tập.' : 'Hôm nay chưa có lượt luyện tập. Hoàn thành 10 câu để giữ chuỗi.'}
-        </p>
-        <div className="mt-3 grid grid-cols-7 gap-1">
+        <div className="mt-3 grid grid-cols-7 gap-1.5">
           {WEEK_LABELS.map((label, index) => {
             const isToday = index === todayIndex;
             const active = (isToday && playedToday)
@@ -201,12 +207,16 @@ export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = tru
               <div key={label} className="flex min-w-0 flex-col items-center gap-1">
                 <span
                   title={active ? `${label}: Đã hoàn thành (Chuỗi ${streak} ngày)` : isToday ? `${label}: Hôm nay (Chưa hoàn thành lượt luyện)` : label}
-                  className={`flex h-9 w-full max-w-9 items-center justify-center rounded-full text-[10px] font-black transition-all ${
+                  className={`flex h-9 w-full max-w-9 items-center justify-center rounded-full text-[11px] font-extrabold transition-all ${
                     active
-                      ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                      ? 'bg-gradient-to-b from-amber-400 to-orange-500 text-white shadow-md shadow-orange-200 border border-white'
                       : isToday
-                        ? 'border-2 border-dashed border-orange-400 bg-orange-50 text-orange-700'
-                        : 'bg-slate-100 text-slate-400'
+                        ? isDewdrop
+                          ? 'border-2 border-orange-300 bg-gradient-to-b from-amber-50 to-orange-100/90 text-orange-700 shadow-[0_4px_12px_-3px_rgba(249,115,22,0.38)]'
+                          : 'border-2 border-dashed border-orange-400 bg-orange-50 text-orange-700'
+                        : isDewdrop
+                          ? 'border border-white bg-slate-100/80 text-slate-500 shadow-[inset_0_1px_0_#fff]'
+                          : 'bg-slate-100 text-slate-400'
                   }`}
                 >
                   {active ? <Flame size={14} className="fill-amber-200" aria-hidden="true" /> : label}
@@ -219,12 +229,19 @@ export default function DailyPracticeGoalPanel({ practiceStats, canSetGoal = tru
           <Gift size={14} className="mt-0.5 shrink-0 text-emerald-600" aria-hidden="true" />
           Học liên tục 7 ngày để nhận thưởng đặc biệt!
         </p>
-        <p className="mt-2 flex items-start gap-1 text-[10px] leading-snug text-slate-400">
-          <Info size={11} className="mt-px shrink-0" aria-hidden="true" />
-          Lịch tuần hiển thị các ngày đạt chuỗi; hoàn thành ít nhất một lượt luyện tập mỗi ngày để giữ lửa.
-        </p>
-        <button type="button" onClick={() => navigate('/student')} className="mt-3 text-xs font-bold text-emerald-700 hover:underline">
-          Xem tiến độ học tập
+        {!isDewdrop ? (
+          <p className="mt-2 flex items-start gap-1 text-[10px] leading-snug text-slate-400">
+            <Info size={11} className="mt-px shrink-0" aria-hidden="true" />
+            Lịch tuần hiển thị các ngày đạt chuỗi; hoàn thành ít nhất một lượt luyện tập mỗi ngày để giữ lửa.
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => navigate('/student')}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 hover:underline cursor-pointer"
+        >
+          <span>Xem tiến độ học tập</span>
+          <ExternalLink size={12} aria-hidden="true" />
         </button>
       </section>
     </div>

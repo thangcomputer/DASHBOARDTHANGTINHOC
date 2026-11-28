@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDown, ArrowUp, Award, BookOpen, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Lock, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, Unlock, X,
+  AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Award, BookOpen, Bot, CheckCircle2, ChevronDown, ChevronRight, Clapperboard, ClipboardCheck, Eye, EyeOff, FileText, Flame, Gamepad2, ImagePlus, Loader2, Lock, Paperclip, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, Trophy, Unlock, X,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -11,6 +11,7 @@ import {
   DIFFICULTIES, QUESTION_TYPES, TOPIC_COLORS, TOPIC_ICONS, difficultyMeta, topicColor, topicIcon,
 } from '../../../utils/dailyPractice';
 import AdminMilestoneEditor, { VideoChecksEditor, normalizeLevelConfigs } from './AdminMilestoneEditor';
+import { normalizeExercises } from './AdminDropletExerciseEditor';
 import AdminFreePortalMaterialsPanel from './AdminFreePortalMaterialsPanel';
 import { cmsConfirmAction } from '../../../utils/cmsDialog';
 
@@ -355,23 +356,43 @@ function ListEditor({ values, onChange, min = 2, max = 8, placeholder, ordered =
 
 const splitList = (text) => String(text || '').split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
 
-function QuestionModal({ topicId, question, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, defaultForTestOut = false, lockTestOut = false, onClose, onSaved }) {
+function QuestionModal({
+  topicId,
+  question,
+  defaultDifficulty,
+  units = [],
+  defaultUnitId = '',
+  lockUnit = false,
+  defaultNodeKey = '',
+  lockNodeKey = false,
+  defaultForTestOut = false,
+  lockTestOut = false,
+  onClose,
+  onSaved,
+}) {
   const toast = useToast();
   const [form, setForm] = useState(() => (question
     ? fromQuestion(question)
-    : { ...blankQuestion('mcq', defaultDifficulty || 'easy'), unitId: defaultUnitId, forTestOut: Boolean(defaultForTestOut) }));
+    : {
+      ...blankQuestion('mcq', defaultDifficulty || 'easy'),
+      unitId: defaultUnitId,
+      nodeKey: defaultNodeKey || '',
+      forTestOut: Boolean(defaultForTestOut),
+    }));
   const [saving, setSaving] = useState(false);
   const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
   const blanks = useMemo(() => [...String(form.text || '').matchAll(/\{\{([^{}]+)\}\}/g)].map((m) => m[1]), [form.text]);
   const lockedUnitId = form.unitId || defaultUnitId || '';
   const lockedUnit = lockUnit && lockedUnitId ? units.find((u) => u.id === lockedUnitId) : null;
   const lockedUnitIndex = lockUnit && lockedUnitId ? units.findIndex((u) => u.id === lockedUnitId) : -1;
-  const freePracticeLock = lockUnit && !lockedUnitId;
+  const selectedUnit = units.find((u) => u.id === (form.unitId || ''));
+  const selectedNode = (selectedUnit?.pathNodes || []).find((n) => n.key === (form.nodeKey || ''));
 
   const payload = () => {
     const body = {
       topicId, type: form.type, difficulty: form.difficulty, prompt: form.prompt, imageUrl: form.imageUrl,
       hint: form.hint, explanation: form.explanation, status: form.status, unitId: form.unitId || '',
+      nodeKey: form.unitId && !form.forTestOut ? (form.nodeKey || '') : '',
       forTestOut: Boolean(form.unitId && form.forTestOut),
     };
     if (form.type === 'mcq') Object.assign(body, { options: form.options.filter((o) => o.trim()), correctIndex: form.correctIndex });
@@ -434,25 +455,23 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
       <div className="space-y-4">
         <div>
           <span className={LABEL}>Phạm vi câu hỏi</span>
-          {freePracticeLock ? (
-            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-900">
-              Luyện tự do
-              <span className="mt-0.5 block text-[11px] font-semibold text-sky-700">Chỉ dùng ở Luyện tự do. Không vào lộ trình, không gắn video.</span>
-            </p>
-          ) : lockUnit && lockedUnit ? (
+          {lockUnit && lockedUnit ? (
             <div className={`rounded-xl border px-3 py-2 text-sm font-bold ${
               lockTestOut && form.forTestOut
                 ? 'border-amber-200 bg-amber-50 text-amber-900'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-900'
             }`}>
               Chặng {lockedUnitIndex + 1}: {lockedUnit.title}
+              {lockNodeKey && selectedNode ? ` · Hạt nước: ${selectedNode.label}` : ''}
               {lockTestOut && form.forTestOut ? ' · Kiểm tra vượt chặng' : ''}
               <span className={`mt-0.5 block text-[11px] font-semibold ${
                 lockTestOut && form.forTestOut ? 'text-amber-700' : 'text-emerald-700'
               }`}>
                 {lockTestOut && form.forTestOut
                   ? 'Câu hỏi dành riêng cho bài Kiểm tra vượt chặng (không trộn vào bài học thường).'
-                  : 'Gắn theo nút trắc nghiệm bạn vừa bấm. Không đổi chặng tại đây.'}
+                  : lockNodeKey && selectedNode
+                    ? `Câu hỏi gắn trực tiếp vào hạt nước "${selectedNode.label}".`
+                    : 'Gắn theo nút trắc nghiệm bạn vừa bấm. Không đổi chặng tại đây.'}
               </span>
             </div>
           ) : (
@@ -461,15 +480,28 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
                 id="dp-q-unit"
                 units={units}
                 value={form.unitId || ''}
-                onChange={(unitId) => set({ unitId, forTestOut: unitId ? Boolean(form.forTestOut) : false })}
+                onChange={(unitId) => set({ unitId, nodeKey: '', forTestOut: unitId ? Boolean(form.forTestOut) : false })}
               />
+              {form.unitId && !form.forTestOut && (selectedUnit?.pathNodes || []).length > 0 ? (
+                <select
+                  className={INPUT}
+                  value={form.nodeKey || ''}
+                  onChange={(e) => set({ nodeKey: e.target.value })}
+                  aria-label="Hạt nước trong chặng"
+                >
+                  <option value="">Dùng chung cả chặng</option>
+                  {(selectedUnit?.pathNodes || []).map((n, nIdx) => (
+                    <option key={n.key} value={n.key}>Hạt nước {nIdx + 1}: {n.label}</option>
+                  ))}
+                </select>
+              ) : null}
               {form.unitId ? (
                 <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs font-bold text-amber-900">
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-amber-600"
                     checked={Boolean(form.forTestOut)}
-                    onChange={(e) => set({ forTestOut: e.target.checked })}
+                    onChange={(e) => set({ forTestOut: e.target.checked, nodeKey: e.target.checked ? '' : form.nodeKey })}
                   />
                   <span>Dùng riêng cho Kiểm tra vượt chặng (không trộn vào bài học thường)</span>
                 </label>
@@ -639,17 +671,31 @@ function QuestionModal({ topicId, question, defaultDifficulty, units = [], defau
   );
 }
 
-function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, defaultForTestOut = false, lockTestOut = false, onClose, onDone }) {
+function AiModal({
+  topic,
+  defaultDifficulty,
+  units = [],
+  defaultUnitId = '',
+  lockUnit = false,
+  defaultNodeKey = '',
+  lockNodeKey = false,
+  defaultForTestOut = false,
+  lockTestOut = false,
+  onClose,
+  onDone,
+}) {
   const toast = useToast();
   const [difficulty, setDifficulty] = useState(defaultDifficulty || 'easy');
   const [unitId, setUnitId] = useState(defaultUnitId);
+  const [nodeKey, setNodeKey] = useState(defaultNodeKey || '');
   const [forTestOut, setForTestOut] = useState(Boolean(defaultForTestOut));
   const [count, setCount] = useState(6);
   const [types, setTypes] = useState(TYPE_IDS);
   const [busy, setBusy] = useState(false);
   const lockedUnit = lockUnit && unitId ? units.find((u) => u.id === unitId) : null;
   const lockedUnitIndex = lockUnit && unitId ? units.findIndex((u) => u.id === unitId) : -1;
-  const freePracticeLock = lockUnit && !unitId;
+  const selectedUnit = units.find((u) => u.id === (unitId || ''));
+  const selectedNode = (selectedUnit?.pathNodes || []).find((n) => n.key === (nodeKey || ''));
 
   const run = async () => {
     setBusy(true);
@@ -660,6 +706,7 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
         count,
         types,
         unitId,
+        nodeKey: unitId && !forTestOut ? nodeKey : '',
         forTestOut: Boolean(unitId && forTestOut),
       });
       toast.success(`AI đã tạo ${result.created} câu nháp${result.skipped ? ` (bỏ ${result.skipped} câu lỗi)` : ''}. Hãy duyệt rồi xuất bản.`);
@@ -690,25 +737,23 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
         </p>
         <div>
           <span className={LABEL}>Phạm vi câu hỏi</span>
-          {freePracticeLock ? (
-            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-900">
-              Luyện tự do
-              <span className="mt-0.5 block text-[11px] font-semibold text-sky-700">Chỉ dùng ở Luyện tự do. Không vào lộ trình.</span>
-            </p>
-          ) : lockUnit && lockedUnit ? (
+          {lockUnit && lockedUnit ? (
             <div className={`rounded-xl border px-3 py-2 text-sm font-bold ${
               lockTestOut && forTestOut
                 ? 'border-amber-200 bg-amber-50 text-amber-900'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-900'
             }`}>
               Chặng {lockedUnitIndex + 1}: {lockedUnit.title}
+              {lockNodeKey && selectedNode ? ` · Hạt nước: ${selectedNode.label}` : ''}
               {lockTestOut && forTestOut ? ' · Kiểm tra vượt chặng' : ''}
               <span className={`mt-0.5 block text-[11px] font-semibold ${
                 lockTestOut && forTestOut ? 'text-amber-700' : 'text-emerald-700'
               }`}>
                 {lockTestOut && forTestOut
                   ? 'Câu hỏi dành riêng cho Kiểm tra vượt chặng.'
-                  : 'Gắn theo nút trắc nghiệm bạn vừa bấm.'}
+                  : lockNodeKey && selectedNode
+                    ? `Gắn vào hạt nước "${selectedNode.label}".`
+                    : 'Gắn theo nút trắc nghiệm bạn vừa bấm.'}
               </span>
             </div>
           ) : (
@@ -719,16 +764,33 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
                 value={unitId}
                 onChange={(nextUnitId) => {
                   setUnitId(nextUnitId);
+                  setNodeKey('');
                   if (!nextUnitId) setForTestOut(false);
                 }}
               />
+              {unitId && !forTestOut && (selectedUnit?.pathNodes || []).length > 0 ? (
+                <select
+                  className={INPUT}
+                  value={nodeKey}
+                  onChange={(e) => setNodeKey(e.target.value)}
+                  aria-label="Hạt nước trong chặng"
+                >
+                  <option value="">Dùng chung cả chặng</option>
+                  {(selectedUnit?.pathNodes || []).map((n, nIdx) => (
+                    <option key={n.key} value={n.key}>Hạt nước {nIdx + 1}: {n.label}</option>
+                  ))}
+                </select>
+              ) : null}
               {unitId ? (
                 <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs font-bold text-amber-900">
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-amber-600"
                     checked={forTestOut}
-                    onChange={(e) => setForTestOut(e.target.checked)}
+                    onChange={(e) => {
+                      setForTestOut(e.target.checked);
+                      if (e.target.checked) setNodeKey('');
+                    }}
                   />
                   <span>Tạo câu hỏi riêng cho Kiểm tra vượt chặng</span>
                 </label>
@@ -766,8 +828,58 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
   );
 }
 
-// ── Chặng lộ trình ───────────────────────────────────────────────────────────
+// ── Chặng lộ trình & 6 Hạt nước ──────────────────────────────────────────────
 const MIN_UNIT_QUESTIONS = 4;
+const MAX_DROPLETS_PER_UNIT = 6;
+
+const DROPLET_PRESETS = {
+  full6: [
+    { key: 'study', label: 'Học bài', icon: 'book' },
+    { key: 'practice-1', label: 'Luyện tập', icon: 'dumbbell' },
+    { key: 'exercise-1', label: 'Bài tập tự nhập', icon: 'clipboard' },
+    { key: 'practice-2', label: 'Thực hành nâng cao', icon: 'book' },
+    { key: 'challenge', label: 'Thử thách', icon: 'flame' },
+    { key: 'complete', label: 'Vượt chặng', icon: 'crown' },
+  ],
+  standard5: [
+    { key: 'study', label: 'Học bài', icon: 'book' },
+    { key: 'practice-1', label: 'Luyện tập', icon: 'dumbbell' },
+    { key: 'challenge', label: 'Thử thách', icon: 'flame' },
+    { key: 'exercise-1', label: 'Bài tập tự nhập', icon: 'clipboard' },
+    { key: 'complete', label: 'Vượt chặng', icon: 'crown' },
+  ],
+  compact3: [
+    { key: 'study', label: 'Học bài', icon: 'book' },
+    { key: 'practice-1', label: 'Luyện tập', icon: 'dumbbell' },
+    { key: 'complete', label: 'Vượt chặng', icon: 'crown' },
+  ],
+};
+
+const DROPLET_ROLE_META = {
+  book: { label: 'Học bài', badge: 'bg-sky-100 text-sky-800', dropGrad: 'from-sky-400 to-blue-600', ring: 'border-sky-200', icon: BookOpen },
+  dumbbell: { label: 'Luyện tập', badge: 'bg-emerald-100 text-emerald-800', dropGrad: 'from-emerald-400 to-emerald-600', ring: 'border-emerald-200', icon: Gamepad2 },
+  clipboard: { label: 'Bài tập tự nhập', badge: 'bg-violet-100 text-violet-800', dropGrad: 'from-violet-400 to-purple-600', ring: 'border-violet-200', icon: ClipboardCheck },
+  flame: { label: 'Thử thách', badge: 'bg-orange-100 text-orange-800', dropGrad: 'from-orange-400 to-rose-500', ring: 'border-orange-200', icon: Flame },
+  crown: { label: 'Vượt chặng', badge: 'bg-amber-100 text-amber-800', dropGrad: 'from-amber-400 to-amber-600', ring: 'border-amber-200', icon: Trophy },
+};
+
+const DEFAULT_ROLE_LABELS = new Set([
+  'Học bài',
+  'Luyện tập',
+  'Bài tập tự nhập',
+  'Bài tập thực hành',
+  'Bài tập',
+  'Thử thách',
+  'Vượt chặng',
+  'Nội dung & File',
+  'Thực hành nâng cao',
+  'Hoàn thành',
+]);
+
+function isDefaultRoleLabel(label) {
+  const clean = String(label || '').trim();
+  return !clean || DEFAULT_ROLE_LABELS.has(clean) || /^Hạt nước \d+$/i.test(clean);
+}
 
 function UnitModal({ topic, unit, onClose, onSaved }) {
   const toast = useToast();
@@ -778,6 +890,8 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
     active: unit?.active !== false,
     lessonUnitId: unit?.lessonUnitId || '',
   }));
+  const [activePreset, setActivePreset] = useState('standard5');
+  const [dropletDrafts, setDropletDrafts] = useState(() => DROPLET_PRESETS.standard5.map((d) => ({ ...d })));
   const [subjectId, setSubjectId] = useState(topic.lessonSubjectId || '');
   const [subjects, setSubjects] = useState(null);
   const [lessonUnits, setLessonUnits] = useState({ subjectId: '', rows: null });
@@ -807,12 +921,39 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
 
   const unitRows = lessonUnits.subjectId === subjectId ? lessonUnits.rows : null;
 
+  const applyPreset = (presetKey) => {
+    setActivePreset(presetKey);
+    setDropletDrafts((DROPLET_PRESETS[presetKey] || DROPLET_PRESETS.standard5).map((d) => ({ ...d })));
+  };
+
   const save = async () => {
     setSaving(true);
     try {
+      const payload = { ...form };
+      if (!unit && dropletDrafts.length > 0) {
+        const used = new Set();
+        payload.pathNodes = dropletDrafts.slice(0, MAX_DROPLETS_PER_UNIT).map((d, idx) => {
+          const base = String(d.key || `hat-${idx + 1}`).replace(/[^a-z0-9-_]/gi, '').slice(0, 40) || `hat-${idx + 1}`;
+          let key = base;
+          let n = 2;
+          while (used.has(key)) {
+            key = `${base}-${n}`.slice(0, 40);
+            n += 1;
+          }
+          used.add(key);
+          return {
+            key,
+            label: String(d.label || '').trim().slice(0, 40) || `Hạt ${idx + 1}`,
+            icon: d.icon || 'book',
+            sortOrder: idx,
+            active: true,
+            lockMode: 'sequential',
+          };
+        });
+      }
       const saved = unit
-        ? await dailyPracticeApi.admin.updateUnit(unit.id, form)
-        : await dailyPracticeApi.admin.createUnit(topic.id, form);
+        ? await dailyPracticeApi.admin.updateUnit(unit.id, payload)
+        : await dailyPracticeApi.admin.createUnit(topic.id, payload);
       toast.success(unit ? 'Đã cập nhật chặng' : 'Đã thêm chặng');
       onSaved(saved);
     } catch (err) {
@@ -824,7 +965,8 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
 
   return (
     <Modal
-      title={unit ? 'Sửa chặng' : `Thêm chặng: ${topic.name}`}
+      wide={!unit}
+      title={unit ? 'Sửa chặng' : `Thêm chặng mới: ${topic.name}`}
       onClose={onClose}
       footer={(
         <>
@@ -835,7 +977,7 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
             disabled={saving || !form.title.trim()}
             className="cms-btn cms-btn-primary"
           >
-            {saving && <Loader2 size={16} className="animate-spin" />} Lưu
+            {saving && <Loader2 size={16} className="animate-spin" />} {unit ? 'Lưu' : 'Tạo chặng'}
           </button>
         </>
       )}
@@ -843,30 +985,138 @@ function UnitModal({ topic, unit, onClose, onSaved }) {
       <div className="space-y-3">
         <div>
           <label className={LABEL} htmlFor="dp-unit-title">Tên chặng</label>
-          <input id="dp-unit-title" className={INPUT} value={form.title} maxLength={80} onChange={(e) => set({ title: e.target.value })} placeholder="Ví dụ: Định dạng chữ và đoạn văn" />
+          <input id="dp-unit-title" className={INPUT} value={form.title} maxLength={80} onChange={(e) => set({ title: e.target.value })} placeholder="Ví dụ: Khởi động Windows" />
         </div>
         <div>
           <label className={LABEL} htmlFor="dp-unit-desc">Mô tả ngắn</label>
-          <input id="dp-unit-desc" className={INPUT} value={form.description} maxLength={240} onChange={(e) => set({ description: e.target.value })} placeholder="Học viên sẽ luyện những gì ở chặng này" />
+          <input id="dp-unit-desc" className={INPUT} value={form.description} maxLength={240} onChange={(e) => set({ description: e.target.value })} placeholder="Học viên sẽ học & luyện gì ở chặng này" />
         </div>
-        <UnitImageField
-          id="dp-unit-image"
-          value={form.imageUrl}
-          onChange={(imageUrl) => set({ imageUrl })}
-        />
-        <div className="rounded-xl bg-slate-50 p-3">
-          <span className={LABEL}>Buổi video trong khóa bài giảng nên xem trước (không bắt buộc)</span>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <select className={INPUT} value={subjectId} onChange={(e) => { setSubjectId(e.target.value); set({ lessonUnitId: '' }); }} aria-label="Môn video">
-              <option value="">{subjects === null ? 'Đang tải môn…' : 'Không gắn video'}</option>
-              {(subjects || []).map((s) => <option key={s._id || s.id} value={s._id || s.id}>{s.name}</option>)}
-            </select>
-            <select className={INPUT} value={form.lessonUnitId} disabled={!subjectId} onChange={(e) => set({ lessonUnitId: e.target.value })} aria-label="Buổi video">
-              <option value="">{subjectId && unitRows === null ? 'Đang tải buổi…' : 'Chọn buổi'}</option>
-              {(unitRows || []).map((u) => <option key={u._id || u.id} value={u._id || u.id}>{u.title}</option>)}
-            </select>
+
+        {!unit && (
+          <div className="space-y-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/45 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-black text-emerald-950">
+                Chọn mẫu Hạt nước ({dropletDrafts.length}/{MAX_DROPLETS_PER_UNIT})
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { key: 'compact3', label: 'Gọn 3 hạt' },
+                  { key: 'standard5', label: 'Chuẩn 5 hạt' },
+                  { key: 'full6', label: 'Đầy đủ 6 hạt' },
+                ].map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => applyPreset(preset.key)}
+                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition !shadow-none ${
+                      activePreset === preset.key
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              Chọn đúng vai trò từng hạt (Học bài, Luyện tập, Bài tập tự nhập, Vượt chặng). Sau khi tạo chặng, bạn có thể bấm từng hạt để đổ nội dung chi tiết.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {dropletDrafts.map((d, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 rounded-xl border border-white bg-white p-2 shadow-2xs">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-black text-white">
+                    {idx + 1}
+                  </span>
+                  <input
+                    className={`${INPUT} !py-1 !text-xs flex-1 min-w-0`}
+                    maxLength={40}
+                    value={d.label}
+                    onChange={(e) => {
+                      setActivePreset('custom');
+                      setDropletDrafts((prev) => prev.map((it, i) => (i === idx ? { ...it, label: e.target.value } : it)));
+                    }}
+                    placeholder={`Hạt nước ${idx + 1}`}
+                  />
+                  <select
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 text-[11px] font-bold text-slate-700"
+                    value={d.icon}
+                    onChange={(e) => {
+                      const nextIcon = e.target.value;
+                      const nextRoleLabel = DROPLET_ROLE_META[nextIcon]?.label || 'Học bài';
+                      setActivePreset('custom');
+                      setDropletDrafts((prev) => prev.map((it, i) => (
+                        i === idx
+                          ? { ...it, icon: nextIcon, label: isDefaultRoleLabel(it.label) ? nextRoleLabel : it.label }
+                          : it
+                      )));
+                    }}
+                  >
+                    <option value="book">Học bài</option>
+                    <option value="dumbbell">Luyện tập</option>
+                    <option value="clipboard">Bài tập tự nhập</option>
+                    <option value="flame">Thử thách</option>
+                    <option value="crown">Vượt chặng</option>
+                  </select>
+                  <button
+                    type="button"
+                    disabled={dropletDrafts.length <= 1}
+                    onClick={() => {
+                      setActivePreset('custom');
+                      setDropletDrafts((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                    className="rounded p-1 text-slate-400 hover:text-rose-600 disabled:opacity-25 !shadow-none"
+                    title="Xóa hạt nước"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {dropletDrafts.length < MAX_DROPLETS_PER_UNIT && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePreset('custom');
+                  setDropletDrafts((prev) => [
+                    ...prev,
+                    { key: `hat-${prev.length + 1}`, label: `Hạt nước ${prev.length + 1}`, icon: 'book' },
+                  ]);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-black text-emerald-700 hover:underline !shadow-none"
+              >
+                <Plus size={14} /> Thêm hạt nước ({dropletDrafts.length}/{MAX_DROPLETS_PER_UNIT})
+              </button>
+            )}
           </div>
-        </div>
+        )}
+
+        <details className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs">
+          <summary className="cursor-pointer font-bold text-slate-700">
+            Tuỳ chọn nâng cao (ảnh minh họa chặng, gắn buổi video bài giảng)
+          </summary>
+          <div className="mt-3 space-y-3">
+            <UnitImageField
+              id="dp-unit-image"
+              value={form.imageUrl}
+              onChange={(imageUrl) => set({ imageUrl })}
+            />
+            <div className="rounded-xl bg-white p-2.5 ring-1 ring-slate-200">
+              <span className={LABEL}>Buổi video trong khóa bài giảng nên xem trước (không bắt buộc)</span>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select className={INPUT} value={subjectId} onChange={(e) => { setSubjectId(e.target.value); set({ lessonUnitId: '' }); }} aria-label="Môn video">
+                  <option value="">{subjects === null ? 'Đang tải môn…' : 'Không gắn video'}</option>
+                  {(subjects || []).map((s) => <option key={s._id || s.id} value={s._id || s.id}>{s.name}</option>)}
+                </select>
+                <select className={INPUT} value={form.lessonUnitId} disabled={!subjectId} onChange={(e) => set({ lessonUnitId: e.target.value })} aria-label="Buổi video">
+                  <option value="">{subjectId && unitRows === null ? 'Đang tải buổi…' : 'Chọn buổi'}</option>
+                  {(unitRows || []).map((u) => <option key={u._id || u.id} value={u._id || u.id}>{u.title}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </details>
+
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={form.active} onChange={(e) => set({ active: e.target.checked })} />
           Hiện chặng này trên lộ trình
@@ -926,8 +1176,10 @@ function pathNodesFromUnit(unit) {
       icon: node.icon || 'dumbbell',
       sortOrder: node.sortOrder ?? index,
       active: node.active !== false,
+      lockMode: ['sequential', 'unlocked', 'locked'].includes(node.lockMode) ? node.lockMode : 'sequential',
       stepVideos: mapNodeStepVideos(node.stepVideos),
       levelConfigs: node.levelConfigs || null,
+      exercises: normalizeExercises(node.exercises),
     }));
   }
   return defaultPathNodes(unit);
@@ -937,88 +1189,148 @@ function blankBai(title) {
   return { title, active: true, url: '', content: '', fileUrl: '', fileName: '', checks: [], nodeKey: '', levelConfigs: null };
 }
 
-function lessonsFromUnit(unit) {
-  const nodes = unit.pathNodes?.length ? pathNodesFromUnit(unit) : [];
-  if (!nodes.length || isStockTemplate(nodes)) return [];
-  const lessons = [];
-  nodes.forEach((node) => {
-    if (node.icon !== 'book') return;
-    const learn = node.stepVideos?.learn || [];
-    if (!learn.length) {
-      lessons.push({
-        ...blankBai(node.label),
-        active: node.active !== false,
-        nodeKey: node.key,
-        levelConfigs: node.levelConfigs || null,
-      });
-      return;
-    }
-    learn.forEach((item, idx) => {
-      lessons.push({
-        id: item.id,
-        title: item.title || node.label,
-        active: node.active !== false,
-        url: item.url || '',
-        content: item.content || '',
-        fileUrl: item.fileUrl || '',
-        fileName: item.fileName || '',
-        checks: item.checks || [],
-        nodeKey: learn.length === 1 ? node.key : '',
-        levelConfigs: idx === 0 ? (node.levelConfigs || null) : null,
-      });
-    });
+function dropletsFromUnit(unit) {
+  const nodes = pathNodesFromUnit(unit).slice(0, MAX_DROPLETS_PER_UNIT);
+  return nodes.map((node, idx) => {
+    const legacyLearn = node.stepVideos?.learn?.[0];
+    return {
+      id: legacyLearn?.id,
+      title: node.label || `Hạt nước ${idx + 1}`,
+      icon: node.icon || 'dumbbell',
+      active: node.active !== false,
+      lockMode: ['sequential', 'unlocked', 'locked'].includes(node.lockMode) ? node.lockMode : 'sequential',
+      url: legacyLearn?.url || '',
+      content: legacyLearn?.content || '',
+      fileUrl: legacyLearn?.fileUrl || '',
+      fileName: legacyLearn?.fileName || '',
+      checks: legacyLearn?.checks || [],
+      nodeKey: node.key,
+      stepVideos: node.stepVideos || emptyNodeStepVideos(),
+      levelConfigs: node.levelConfigs || null,
+      exercises: normalizeExercises(node.exercises),
+    };
   });
-  return lessons;
-}
-
-function isStockTemplate(nodes) {
-  if (nodes.length !== PATH_NODE_PRESETS.length) return false;
-  return nodes.every((node, index) => {
-    const preset = PATH_NODE_PRESETS[index];
-    const levels = ['learn', 'practice', 'challenge'];
-    const empty = levels.every((key) => (node.stepVideos?.[key] || []).every((row) => !String(row.url || '').trim() && !String(row.content || '').trim()));
-    return node.key === preset.key && node.label === preset.label && node.icon === preset.icon && empty;
-  });
-}
-
-function _uniqueNodeKey(nodes, base) {
-  const keys = new Set(nodes.map((node) => node.key));
-  if (!keys.has(base)) return base;
-  let index = 2;
-  while (keys.has(`${base}-${index}`)) index += 1;
-  return `${base}-${index}`;
 }
 
 function stageItemSummary(unit) {
-  const count = lessonsFromUnit(unit).length;
-  if (!count) return 'Chưa có bài';
-  return `${count} bài · mỗi bài có nội dung, file, video, luyện tập`;
+  const droplets = dropletsFromUnit(unit);
+  if (!droplets.length) return 'Chưa có hạt nước';
+  const exCount = droplets.reduce((sum, d) => sum + (d.exercises?.length || 0), 0);
+  return `${droplets.length}/${MAX_DROPLETS_PER_UNIT} hạt nước${exCount ? ` · ${exCount} đề bài tập` : ''}`;
 }
 
-function milestoneLevelSummary(lesson) {
-  const cfg = normalizeLevelConfigs(lesson);
-  const ready = ['easy', 'medium', 'hard'].filter((k) => {
-    const c = cfg[k];
-    return Boolean(c.content?.body || c.files?.length || c.video?.url);
+function dropletModuleStats(droplet, unitNodeCounts = {}) {
+  const cfg = normalizeLevelConfigs(droplet);
+  const diffs = ['easy', 'medium', 'hard'];
+  const videoChecks = diffs.reduce((s, d) => s + (cfg[d].video?.checks?.length || 0), 0);
+  const hasVideo = diffs.some((d) => Boolean(String(cfg[d].video?.url || '').trim()));
+  const hasContent = diffs.some((d) => Boolean(String(cfg[d].content?.body || '').trim()));
+  const filesCount = diffs.reduce((s, d) => s + (cfg[d].files?.length || 0), 0);
+  const exercisesCount = (droplet.exercises || []).length;
+  const qStats = unitNodeCounts?.[droplet.nodeKey] || null;
+  const quizTotal = qStats ? (qStats.easy + qStats.medium + qStats.hard) : 0;
+  return { hasVideo, videoChecks, hasContent, filesCount, exercisesCount, qStats, quizTotal };
+}
+
+const QUICK_ADD_TEMPLATES = [
+  { label: 'Học bài (Video · Nội dung · File)', title: 'Học bài', icon: 'book' },
+  { label: 'Luyện tập (Trắc nghiệm 3 cấp)', title: 'Luyện tập', icon: 'dumbbell' },
+  { label: 'Bài tập tự nhập (Tự khớp / AI)', title: 'Bài tập tự nhập', icon: 'clipboard' },
+  { label: 'Thử thách (Trắc nghiệm nâng cao)', title: 'Thử thách', icon: 'flame' },
+  { label: 'Vượt chặng (Kiểm tra tổng hợp)', title: 'Vượt chặng', icon: 'crown' },
+];
+
+function unitHasConfiguredContent(unit) {
+  if ((unit?.videos || []).length > 0) return true;
+  const nodes = unit?.pathNodes || [];
+  return nodes.some((node) => {
+    if ((node.exercises || []).length > 0) return true;
+    if ((node.stepVideos?.learn || []).length > 0) return true;
+    return ['easy', 'medium', 'hard'].some((d) => {
+      const cfg = node?.levelConfigs?.[d];
+      if (!cfg) return false;
+      return Boolean(
+        String(cfg.video?.url || '').trim()
+        || String(cfg.content?.body || '').trim()
+        || String(cfg.content?.title || '').trim()
+        || String(cfg.content?.description || '').trim()
+        || (Array.isArray(cfg.files) && cfg.files.length > 0)
+        || String(cfg.practice?.video?.url || '').trim(),
+      );
+    });
   });
-  if (!ready.length) return 'Chưa có nội dung · Bấm Quản lý để soạn 3 mức';
-  const labels = { easy: 'Dễ', medium: 'Vừa', hard: 'Khó' };
-  return `Đã soạn: ${ready.map((k) => labels[k]).join(', ')} · 4 phần độc lập`;
 }
 
-/** Danh sách mốc bài học trong một chặng. Bấm Quản lý để mở trang chỉnh sửa 3 mức Dễ/Vừa/Khó. */
-function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEditQuestion, questionsVersion = 0 }) {
+function dropletStatusItems(droplet, unit) {
+  const stats = dropletModuleStats(droplet, unit.nodeCounts);
+  if (droplet.icon === 'crown') {
+    const testOutCount = Number(unit.counts?.testOut) || 0;
+    if (testOutCount > 0) {
+      return {
+        ctaLabel: 'Soạn đề',
+        items: [{ tone: 'ok', text: `${testOutCount} câu vượt chặng riêng` }],
+      };
+    }
+    return {
+      ctaLabel: 'Soạn đề',
+      items: [{ tone: 'auto', text: 'Tự lấy tối đa 10 câu trong chặng' }],
+    };
+  }
+
+  const items = [];
+  if (stats.hasVideo) {
+    items.push({ tone: 'ok', text: `Video${stats.videoChecks ? ` (${stats.videoChecks} mốc)` : ''}` });
+  }
+  if (stats.hasContent) {
+    items.push({ tone: 'ok', text: 'Nội dung' });
+  }
+  if (stats.filesCount > 0) {
+    items.push({ tone: 'ok', text: `${stats.filesCount} File` });
+  }
+  if (stats.quizTotal > 0) {
+    items.push({ tone: 'ok', text: `Trắc nghiệm (D:${stats.qStats.easy} · V:${stats.qStats.medium} · K:${stats.qStats.hard})` });
+  }
+  if (stats.exercisesCount > 0) {
+    items.push({ tone: 'ok', text: `${stats.exercisesCount} đề bài tập` });
+  }
+
+  if (!items.length) {
+    const unitQuizTotal = Number(unit.counts?.total) || 0;
+    if ((droplet.icon === 'dumbbell' || droplet.icon === 'flame') && unitQuizTotal > 0) {
+      items.push({ tone: 'auto', text: `Dùng chung ${unitQuizTotal} câu chặng` });
+    } else {
+      items.push({ tone: 'warn', text: 'Chưa có nội dung' });
+    }
+  }
+
+  return { ctaLabel: 'Soạn hạt', items };
+}
+
+/** Bảng lộ trình ngang 1–6 Hạt nước trong mỗi chặng. Bấm "Soạn hạt" để mở studio sạch sẽ theo đúng loại hạt. */
+function UnitPathNodesPanel({
+  unit,
+  onSaved,
+  onComposeQuestion,
+  onAiDraft,
+  onEditQuestion,
+  onComposeTestOut,
+  onAiTestOut,
+  onToggleStatus,
+  onDeleteQuestion,
+  questionsVersion = 0,
+}) {
   const toast = useToast();
-  const initial = lessonsFromUnit(unit);
+  const initial = useMemo(() => dropletsFromUnit(unit), [unit]);
   const [lessons, setLessons] = useState(initial);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const dirty = JSON.stringify(lessons) !== JSON.stringify(initial);
 
   const buildNodesPayload = (list) => {
     const used = new Set();
-    const nodes = list.map((lesson, index) => {
-      const base = String(lesson.nodeKey || `bai-${index + 1}`).replace(/[^a-z0-9-_]/gi, '').slice(0, 40) || `bai-${index + 1}`;
+    return list.slice(0, MAX_DROPLETS_PER_UNIT).map((lesson, index) => {
+      const base = String(lesson.nodeKey || `hat-${index + 1}`).replace(/[^a-z0-9-_]/gi, '').slice(0, 40) || `hat-${index + 1}`;
       let key = base;
       let n = 2;
       while (used.has(key)) {
@@ -1029,46 +1341,34 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEdi
       const levelConfigs = normalizeLevelConfigs(lesson);
       const easy = levelConfigs.easy;
       const hasEasy = Boolean(easy.content?.body || easy.files?.length || easy.video?.url);
+      const icon = lesson.icon || 'book';
+      const stepVideos = lesson.stepVideos ? mapNodeStepVideos(lesson.stepVideos) : emptyNodeStepVideos();
+      if (icon === 'book' || icon === 'clipboard') {
+        stepVideos.learn = hasEasy ? [{
+          id: lesson.id,
+          title: String(lesson.title || '').trim() || `Hạt nước ${index + 1}`,
+          url: String(easy.video?.url || '').trim(),
+          content: String(easy.content?.body || '').trim(),
+          fileUrl: String(easy.files?.[0]?.url || '').trim(),
+          fileName: String(easy.files?.[0]?.name || '').trim(),
+          checks: (easy.video?.checks || []).filter((check) => String(check.prompt || '').trim()),
+        }] : [];
+      }
       return {
         key,
-        label: String(lesson.title || '').trim().slice(0, 40) || `Bài ${index + 1}`,
-        icon: 'book',
+        label: String(lesson.title || '').trim().slice(0, 40) || `Hạt ${index + 1}`,
+        icon,
         sortOrder: index,
         active: lesson.active !== false,
+        lockMode: ['sequential', 'unlocked', 'locked'].includes(lesson.lockMode) ? lesson.lockMode : 'sequential',
         levelConfigs,
-        stepVideos: {
-          learn: hasEasy ? [{
-            id: lesson.id,
-            title: String(lesson.title || '').trim() || `Bài ${index + 1}`,
-            url: String(easy.video?.url || '').trim(),
-            content: String(easy.content?.body || '').trim(),
-            fileUrl: String(easy.files?.[0]?.url || '').trim(),
-            fileName: String(easy.files?.[0]?.name || '').trim(),
-            checks: (easy.video?.checks || []).filter((check) => String(check.prompt || '').trim()),
-          }] : [],
-          practice: [],
-          challenge: [],
-        },
+        exercises: normalizeExercises(lesson.exercises),
+        stepVideos,
       };
     });
-    let practiceKey = 'practice';
-    let practiceN = 2;
-    while (used.has(practiceKey)) {
-      practiceKey = `practice-${practiceN}`;
-      practiceN += 1;
-    }
-    nodes.push({
-      key: practiceKey,
-      label: 'Luyện tập',
-      icon: 'dumbbell',
-      sortOrder: nodes.length,
-      active: true,
-      stepVideos: emptyNodeStepVideos(),
-    });
-    return nodes;
   };
 
-  const persistList = async (nextList, message = 'Đã lưu bài học') => {
+  const persistList = async (nextList, message = 'Đã lưu cấu hình hạt nước') => {
     setSaving(true);
     try {
       await dailyPracticeApi.admin.updateUnit(unit.id, {
@@ -1100,81 +1400,213 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEdi
     });
   };
 
-  const addLesson = () => {
-    if (lessons.length >= 12) return;
+  const addLesson = async (preset = QUICK_ADD_TEMPLATES[0]) => {
+    if (lessons.length >= MAX_DROPLETS_PER_UNIT) {
+      toast.error(`Mỗi chặng tối đa ${MAX_DROPLETS_PER_UNIT} hạt nước`);
+      return;
+    }
+    setAddMenuOpen(false);
     const nextIndex = lessons.length;
-    setLessons((list) => [...list, blankBai(`Bài ${list.length + 1}`)]);
+    const usedKeys = new Set(lessons.map((l) => l.nodeKey));
+    let key = preset.icon === 'clipboard' ? `exercise-${nextIndex + 1}` : `hat-${nextIndex + 1}`;
+    let suffix = 2;
+    while (usedKeys.has(key)) {
+      key = `${preset.icon === 'clipboard' ? 'exercise' : 'hat'}-${nextIndex + suffix}`;
+      suffix += 1;
+    }
+    const titleInUse = lessons.some((l) => String(l.title || '').trim().toLowerCase() === preset.title.toLowerCase());
+    const cleanTitle = titleInUse ? `${preset.title} ${nextIndex + 1}` : preset.title;
+    const created = {
+      ...blankBai(cleanTitle),
+      icon: preset.icon,
+      nodeKey: key,
+      lockMode: 'sequential',
+      exercises: [],
+    };
+    const nextList = [...lessons, created];
+    setLessons(nextList);
     setEditingIndex(nextIndex);
   };
 
   const removeLesson = async (index) => {
-    if (!(await cmsConfirmAction(`Xóa mốc "${lessons[index]?.title || `Bài ${index + 1}`}"?`))) return;
+    if (lessons.length <= 1) {
+      toast.error('Mỗi chặng cần ít nhất 1 hạt nước');
+      return;
+    }
+    if (!(await cmsConfirmAction(`Xóa hạt nước "${lessons[index]?.title || `Hạt ${index + 1}`}"?`))) return;
     setLessons((list) => list.filter((_, i) => i !== index));
-    setEditingIndex((current) => (current === index ? null : current > index ? current - 1 : current));
+    setEditingIndex((cur) => {
+      if (cur === null) return null;
+      if (cur === index) return null;
+      if (cur > index) return cur - 1;
+      return cur;
+    });
   };
 
   const editingLesson = editingIndex !== null ? lessons[editingIndex] : null;
 
   return (
-    <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+    <div className="space-y-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-sky-50/50 via-white to-emerald-50/50 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-slate-500">
-          Mỗi mốc tương ứng một bài học gồm 3 mức (Dễ – Vừa – Khó) với 4 phần độc lập. Bấm <b>Quản lý</b> để chỉnh sửa.
-        </p>
-      </div>
-      {lessons.length === 0 ? (
-        <p className="rounded-xl bg-white px-3 py-4 text-center text-xs font-semibold text-slate-500">
-          Chưa có bài học nào. Bấm <b>Thêm bài</b> để tạo mốc mới.
-        </p>
-      ) : (
-        <ol className="space-y-2">
-          {lessons.map((lesson, index) => {
-            const isActive = lesson.active !== false;
-            return (
-              <li key={lesson.id || lesson.nodeKey || index} className={`rounded-xl bg-white p-2.5 ring-1 ring-slate-200 ${isActive ? '' : 'opacity-65'}`}>
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-black text-white">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <BookOpen size={15} className="shrink-0 text-sky-700" aria-hidden="true" />
-                  <button
-                    type="button"
-                    onClick={() => setEditingIndex(index)}
-                    className="min-w-0 flex-1 text-left !shadow-none"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-black text-slate-900">{lesson.title || `Bài ${index + 1}`}</span>
-                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {isActive ? 'Đang hiển thị' : 'Đang ẩn'}
-                      </span>
-                    </div>
-                    <p className="truncate text-[11px] font-medium text-slate-500">{milestoneLevelSummary(lesson)}</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingIndex(index)}
-                    className="shrink-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-slate-800 !shadow-none"
-                  >
-                    Quản lý
-                  </button>
-                  <span className="flex shrink-0 flex-col">
-                    <button type="button" disabled={index === 0} onClick={() => moveLesson(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
-                    <button type="button" disabled={index === lessons.length - 1} onClick={() => moveLesson(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
-                  </span>
-                  <button type="button" onClick={() => removeLesson(index)} aria-label="Xóa bài" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" onClick={addLesson} disabled={lessons.length >= 12} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm bài</button>
-        {dirty && (
-          <button type="button" onClick={() => persistList(lessons, 'Đã lưu thứ tự và danh sách bài')} disabled={saving || !lessons.length} className="cms-btn cms-btn-primary ml-auto !py-1.5 text-xs">
-            {saving && <Loader2 size={13} className="animate-spin" />} Lưu thay đổi thứ tự
+        <div>
+          <p className="text-xs font-black text-slate-900">
+            Lộ trình Hạt nước trong chặng ({lessons.length}/{MAX_DROPLETS_PER_UNIT} hạt)
+          </p>
+          <p className="text-[11px] text-slate-500">
+            Bấm <b>Soạn hạt</b> ở từng hạt nước để thêm Video (có mốc trả lời), Nội dung, File, Trắc nghiệm 3 cấp hoặc Đề bài tập tự nhập.
+          </p>
+        </div>
+        <div className="relative flex items-center gap-2">
+          {dirty && (
+            <button
+              type="button"
+              onClick={() => persistList(lessons, 'Đã lưu danh sách & thứ tự hạt nước')}
+              disabled={saving || !lessons.length}
+              className="cms-btn cms-btn-primary !py-1.5 text-xs"
+            >
+              {saving && <Loader2 size={13} className="animate-spin" />} Lưu thay đổi ({lessons.length} hạt)
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={lessons.length >= MAX_DROPLETS_PER_UNIT}
+            onClick={() => setAddMenuOpen((v) => !v)}
+            className="cms-btn cms-btn-outline !py-1.5 text-xs disabled:opacity-50"
+          >
+            <Plus size={14} /> {lessons.length >= MAX_DROPLETS_PER_UNIT ? `Đã đủ ${MAX_DROPLETS_PER_UNIT}/${MAX_DROPLETS_PER_UNIT} hạt` : `Thêm hạt nước (${lessons.length}/${MAX_DROPLETS_PER_UNIT})`}
           </button>
-        )}
+          {addMenuOpen && lessons.length < MAX_DROPLETS_PER_UNIT && (
+            <div className="absolute right-0 top-full z-30 mt-1.5 w-68 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+              <p className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Chọn mẫu hạt nước</p>
+              {QUICK_ADD_TEMPLATES.map((tpl) => {
+                const role = DROPLET_ROLE_META[tpl.icon] || DROPLET_ROLE_META.book;
+                const RoleIcon = role.icon;
+                return (
+                  <button
+                    key={tpl.icon + tpl.title}
+                    type="button"
+                    onClick={() => addLesson(tpl)}
+                    className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-bold text-slate-800 hover:bg-slate-50 !shadow-none"
+                  >
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${role.badge}`}>
+                      <RoleIcon size={13} />
+                    </span>
+                    <span className="truncate">{tpl.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Dải 1–6 hạt nước gọn gàng, chỉ hiện trạng thái thực tế */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        {lessons.map((lesson, index) => {
+          const isActive = lesson.active !== false;
+          const role = DROPLET_ROLE_META[lesson.icon] || DROPLET_ROLE_META.dumbbell;
+          const RoleIcon = role.icon;
+          const summary = dropletStatusItems(lesson, unit);
+
+          return (
+            <div
+              key={lesson.id || lesson.nodeKey || index}
+              className={`relative flex flex-col justify-between rounded-2xl border bg-white p-3.5 shadow-2xs transition hover:shadow-md ${role.ring} ${isActive ? '' : 'opacity-60'}`}
+            >
+              <div>
+                <div className="flex items-start gap-2.5">
+                  <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b ${role.dropGrad} text-white shadow-sm`}>
+                    <RoleIcon size={18} />
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-black text-white ring-2 ring-white">
+                      {index + 1}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-black ${role.badge}`}>
+                        {role.label}
+                      </span>
+                      {!isActive && (
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">Ẩn</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingIndex(index)}
+                      className="mt-1 block w-full truncate text-left text-sm font-black text-slate-900 hover:text-emerald-700 !shadow-none"
+                      title={lesson.title}
+                    >
+                      {lesson.title || `Hạt nước ${index + 1}`}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Trạng thái nội dung thực tế */}
+                <ul className="mt-3 space-y-1">
+                  {summary.items.map((item, sIdx) => (
+                    <li
+                      key={sIdx}
+                      className={`flex items-center gap-1.5 text-[11.5px] font-bold ${
+                        item.tone === 'ok'
+                          ? 'text-emerald-700'
+                          : item.tone === 'auto'
+                            ? 'text-sky-700'
+                            : 'text-amber-700'
+                      }`}
+                    >
+                      {item.tone === 'ok' && <CheckCircle2 size={13} className="shrink-0" />}
+                      {item.tone === 'auto' && <Sparkles size={13} className="shrink-0" />}
+                      {item.tone === 'warn' && <AlertTriangle size={13} className="shrink-0" />}
+                      <span className="truncate">{item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-3.5 flex items-center justify-between gap-1 border-t border-slate-100 pt-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingIndex(index)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white hover:bg-slate-800 !shadow-none"
+                >
+                  <Pencil size={12} /> {summary.ctaLabel}
+                </button>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => moveLesson(index, -1)}
+                    aria-label="Đưa sang trái"
+                    title="Đưa sang trái"
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-25 !shadow-none"
+                  >
+                    <ArrowLeft size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === lessons.length - 1}
+                    onClick={() => moveLesson(index, 1)}
+                    aria-label="Đưa sang phải"
+                    title="Đưa sang phải"
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-25 !shadow-none"
+                  >
+                    <ArrowRight size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={lessons.length <= 1}
+                    onClick={() => removeLesson(index)}
+                    aria-label="Xóa hạt nước"
+                    title={lessons.length <= 1 ? 'Cần giữ ít nhất 1 hạt nước' : 'Xóa hạt nước'}
+                    className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-25 !shadow-none"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {editingLesson && (
@@ -1182,11 +1614,16 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft, onEdi
           unit={unit}
           lesson={editingLesson}
           lessonIndex={editingIndex}
+          totalDroplets={lessons.length}
           questionsVersion={questionsVersion}
           onClose={() => setEditingIndex(null)}
-          onComposeQuestion={(uId, diff) => onComposeQuestion?.(uId, diff)}
-          onAiDraft={(uId, diff) => onAiDraft?.(uId, diff)}
+          onComposeQuestion={(uId, diff, nKey) => onComposeQuestion?.(uId, diff, nKey)}
+          onAiDraft={(uId, diff, nKey) => onAiDraft?.(uId, diff, nKey)}
           onEditQuestion={(q) => onEditQuestion?.(q)}
+          onComposeTestOut={onComposeTestOut}
+          onAiTestOut={onAiTestOut}
+          onToggleStatus={onToggleStatus}
+          onDeleteQuestion={onDeleteQuestion}
           onSaveLesson={async (updatedLesson) => {
             const nextList = lessons.map((item, i) => (i === editingIndex ? updatedLesson : item));
             const ok = await persistList(nextList, `Đã lưu "${updatedLesson.title}"`);
@@ -1605,6 +2042,7 @@ function UnitsManager({
   unassigned,
   filterUnitId,
   onFilterUnit,
+  onOpenUnassigned,
   onChanged,
   onComposeQuestion,
   onAiDraft,
@@ -1620,6 +2058,13 @@ function UnitsManager({
   const [targetUnitId, setTargetUnitId] = useState('');
   const [openVideosId, setOpenVideosId] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setOpenVideosId((prev) => {
+      if (prev && units.some((u) => u.id === prev)) return prev;
+      return units[0]?.id || '';
+    });
+  }, [topic.id, units]);
 
   const move = async (index, delta) => {
     const target = index + delta;
@@ -1660,46 +2105,59 @@ function UnitsManager({
   };
 
   return (
-    <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+    <div className="space-y-2.5 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="mr-auto flex items-center gap-1.5 text-sm font-black text-slate-800"><Route size={16} className="text-emerald-600" /> Các chặng</p>
         <button type="button" onClick={() => setModal({})} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm chặng</button>
       </div>
       <p className="text-[11px] text-slate-500">
-        Mỗi chặng là một đoạn trên lộ trình. Mở chặng để thêm video, nội dung hoặc luyện tập. Học viên xong chặng này mới sang chặng sau.
+        Mỗi chặng gồm <b>1 đến 6 hạt nước</b> trên lộ trình. Mở chặng rồi bấm <b>Soạn hạt</b> để thêm Video, Nội dung, File, Trắc nghiệm 3 cấp hoặc Đề bài tập.
       </p>
       {!units.length ? (
-        <p className="rounded-xl bg-white p-4 text-center text-xs text-slate-500">Chưa có chặng nào. Thêm chặng rồi xếp câu hỏi vào chặng.</p>
+        <p className="rounded-xl bg-white p-4 text-center text-xs text-slate-500">Chưa có chặng nào. Bấm <b>Thêm chặng</b> để tạo chặng đầu tiên.</p>
       ) : (
-        <ol className="space-y-1.5">
+        <ol className="space-y-2">
           {units.map((unit, index) => {
-            const short = unit.counts.total < MIN_UNIT_QUESTIONS;
+            const hasContent = unitHasConfiguredContent(unit);
+            const ready = unit.counts.total >= MIN_UNIT_QUESTIONS || hasContent;
             const active = filterUnitId === unit.id;
             const videosOpen = openVideosId === unit.id;
+            const hasCrownNode = (unit.pathNodes || []).some((n) => n.icon === 'crown');
             return (
-              <li key={unit.id} className={`space-y-2 rounded-xl bg-white p-2.5 ring-1 ${active || videosOpen ? 'ring-emerald-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
+              <li key={unit.id} className={`space-y-2.5 rounded-xl bg-white p-3 ring-1 ${active || videosOpen ? 'ring-emerald-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
                 <div className="flex items-center gap-2">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 text-xs font-black text-white">{index + 1}</span>
-                  <button type="button" onClick={() => onFilterUnit(active ? '' : unit.id)} className="min-w-0 flex-1 text-left !shadow-none" title="Lọc câu hỏi của chặng">
-                    <p className="truncate text-sm font-black text-slate-900">
-                      {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-black text-slate-900">
+                        {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
+                      </p>
+                      {ready && unit.active !== false && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10.5px] font-black text-emerald-700 ring-1 ring-emerald-200">
+                          <CheckCircle2 size={11} /> Sẵn sàng hiển thị
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-500">
                       {stageItemSummary(unit)}
                       {unit.counts.total ? ` · ${unit.counts.total} câu` : ''}
                       {unit.counts.testOut ? ` · ${unit.counts.testOut} vượt chặng` : ''}
                       {unit.counts.draft ? <span className="font-bold text-amber-600"> · {unit.counts.draft} nháp</span> : null}
                     </p>
-                    {short && <p className="text-[11px] font-bold text-amber-600">Chưa hiện trên lộ trình: cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản</p>}
-                  </button>
+                    {!ready && (
+                      <p className="mt-0.5 text-[11px] font-bold text-amber-600">
+                        Chưa hiện trên lộ trình · Bấm vào 1 hạt nước để thêm Video/Nội dung/Bài tập hoặc ≥ {MIN_UNIT_QUESTIONS} câu trắc nghiệm
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setOpenVideosId(videosOpen ? '' : unit.id)}
                     aria-expanded={videosOpen}
-                    title="Video, nội dung và luyện tập của chặng"
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}
+                    title="Mở / thu gọn danh sách hạt nước của chặng"
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}
                   >
-                    {videosOpen ? 'Đóng' : 'Soạn'}
+                    {videosOpen ? 'Thu gọn' : 'Mở hạt nước'}
                   </button>
                   <span className="flex shrink-0 flex-col">
                     <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
@@ -1709,7 +2167,7 @@ function UnitsManager({
                   <button type="button" onClick={() => remove(unit)} aria-label="Xóa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
                 </div>
                 {videosOpen && (
-                  <div className="space-y-2 border-t border-slate-100 pt-2">
+                  <div className="space-y-2.5 border-t border-slate-100 pt-2.5">
                     <UnitPathNodesPanel
                       key={`${unit.id}-nodes-${JSON.stringify(unit.pathNodes || [])}`}
                       unit={unit}
@@ -1718,19 +2176,27 @@ function UnitsManager({
                       onComposeQuestion={onComposeQuestion}
                       onAiDraft={onAiDraft}
                       onEditQuestion={onEditQuestion}
-                    />
-                    <UnitTestOutPanel
-                      unit={unit}
-                      questionsVersion={questionsVersion}
                       onComposeTestOut={onComposeTestOut}
                       onAiTestOut={onAiTestOut}
-                      onEditQuestion={onEditQuestion}
                       onToggleStatus={onToggleStatus}
                       onDeleteQuestion={onDeleteQuestion}
                     />
-                    <details className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs">
-                      <summary className="cursor-pointer font-bold text-slate-600">Ảnh chặng và video danh sách (tuỳ chọn)</summary>
-                      <div className="mt-2 space-y-2">
+                    <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                      <summary className="cursor-pointer font-bold text-slate-600">
+                        ⚙ Cài đặt nâng cao của chặng (Ảnh minh họa, Video danh sách cũ{(unit.videos || []).length ? ` · ${unit.videos.length}` : ''})
+                      </summary>
+                      <div className="mt-2.5 space-y-2.5">
+                        {!hasCrownNode && (
+                          <UnitTestOutPanel
+                            unit={unit}
+                            questionsVersion={questionsVersion}
+                            onComposeTestOut={onComposeTestOut}
+                            onAiTestOut={onAiTestOut}
+                            onEditQuestion={onEditQuestion}
+                            onToggleStatus={onToggleStatus}
+                            onDeleteQuestion={onDeleteQuestion}
+                          />
+                        )}
                         <UnitImagePanel key={`${unit.id}-image-${unit.imageUrl || ''}`} unit={unit} onSaved={onChanged} />
                         <UnitVideosPanel key={`${unit.id}-all-${JSON.stringify(unit.videos || [])}`} unit={unit} onSaved={onChanged} />
                       </div>
@@ -1744,8 +2210,15 @@ function UnitsManager({
       )}
       {unassigned > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-2.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-          <button type="button" onClick={() => onFilterUnit('none')} className="mr-auto text-left underline-offset-2 hover:underline !shadow-none">
-            {unassigned} câu Luyện tự do (chưa xếp chặng lộ trình)
+          <button
+            type="button"
+            onClick={() => {
+              onFilterUnit('none');
+              onOpenUnassigned?.();
+            }}
+            className="mr-auto text-left underline-offset-2 hover:underline !shadow-none"
+          >
+            {unassigned} câu chưa xếp chặng lộ trình
           </button>
           <select className={`${INPUT} !w-auto !py-1.5 text-xs`} value={targetUnitId} onChange={(e) => setTargetUnitId(e.target.value)} aria-label="Chặng đích">
             <option value="">Tạo chặng mới “Tổng hợp”</option>
@@ -1771,7 +2244,7 @@ function UnitsManager({
 function UnitSelect({ units, value, onChange, id }) {
   return (
     <select id={id} className={INPUT} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Chưa xếp chặng (chỉ Luyện tự do)</option>
+      <option value="">Chưa xếp chặng</option>
       {units.map((unit, index) => <option key={unit.id} value={unit.id}>Chặng {index + 1}: {unit.title}</option>)}
     </select>
   );
@@ -1802,8 +2275,15 @@ export default function AdminDailyPracticeTab() {
   const [questionModal, setQuestionModal] = useState(null);
   const [aiOpen, setAiOpen] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [questionBankOpen, setQuestionBankOpen] = useState(false);
   const [sectionTab, setSectionTab] = useState('practice'); // practice | free-materials
   const topic = topics.find((t) => t.id === topicId) || null;
+  const hasActiveQuestionFilter = Boolean(
+    filters.difficulty || filters.type || filters.status || filters.forTestOut || filters.unitId === 'none' || filters.unitId,
+  );
+  const showQuestionBank = questionBankOpen || Boolean(
+    filters.difficulty || filters.type || filters.status || filters.forTestOut || filters.unitId === 'none',
+  );
 
   const loadTopics = useCallback(async () => {
     try {
@@ -2040,14 +2520,27 @@ export default function AdminDailyPracticeTab() {
                 filterUnitId={filters.unitId}
                 questionsVersion={questionsVersion}
                 onFilterUnit={(unitId) => setFilters((f) => ({ ...f, unitId }))}
+                onOpenUnassigned={() => setQuestionBankOpen(true)}
                 onChanged={refreshAll}
-                onComposeQuestion={(unitId, difficulty) => {
+                onComposeQuestion={(unitId, difficulty, nodeKey = '') => {
                   setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
-                  setQuestionModal({ defaultUnitId: unitId || '', defaultDifficulty: difficulty || '', lockUnit: Boolean(unitId) });
+                  setQuestionModal({
+                    defaultUnitId: unitId || '',
+                    defaultDifficulty: difficulty || '',
+                    lockUnit: Boolean(unitId),
+                    defaultNodeKey: nodeKey || '',
+                    lockNodeKey: Boolean(nodeKey),
+                  });
                 }}
-                onAiDraft={(unitId, difficulty) => {
+                onAiDraft={(unitId, difficulty, nodeKey = '') => {
                   setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
-                  setAiOpen({ defaultUnitId: unitId || '', defaultDifficulty: difficulty || '', lockUnit: Boolean(unitId) });
+                  setAiOpen({
+                    defaultUnitId: unitId || '',
+                    defaultDifficulty: difficulty || '',
+                    lockUnit: Boolean(unitId),
+                    defaultNodeKey: nodeKey || '',
+                    lockNodeKey: Boolean(nodeKey),
+                  });
                 }}
                 onComposeTestOut={(unitId) => {
                   setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
@@ -2061,106 +2554,107 @@ export default function AdminDailyPracticeTab() {
                 onToggleStatus={toggleStatus}
                 onDeleteQuestion={removeQuestion}
               />
-              <div className="space-y-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="mr-auto text-sm font-black text-slate-800">Luyện tự do · chỉ trắc nghiệm</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilters((f) => ({ ...f, unitId: 'none' }));
-                      setAiOpen({ defaultUnitId: '', lockUnit: true });
-                    }}
-                    className="cms-btn cms-btn-outline !py-1.5 text-xs"
-                  >
-                    <Bot size={14} /> AI tạo nháp
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilters((f) => ({ ...f, unitId: 'none' }));
-                      setQuestionModal({ defaultUnitId: '', lockUnit: true });
-                    }}
-                    className="cms-btn cms-btn-primary !py-1.5 text-xs"
-                  >
-                    <Plus size={14} /> Soạn câu hỏi
-                  </button>
-                </div>
-                <p className="text-[11px] font-semibold text-slate-600">
-                  Ngân hàng riêng cho chế độ <span className="font-black text-slate-800">Luyện tự do</span> của học viên.
-                  Không dùng câu đã xếp vào lộ trình chặng · không gắn video · chỉ làm trắc nghiệm theo độ khó.
-                  {(unitData.topicId === topicId ? unitData.unassigned : 0) > 0
-                    ? ` Đang có ${unitData.unassigned} câu chưa xếp chặng (dùng cho Luyện tự do).`
-                    : ' Chưa có câu Luyện tự do. Hãy soạn hoặc dùng AI.'}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <select className={`${INPUT} !w-auto`} value={filters.unitId} onChange={(e) => setFilters((f) => ({ ...f, unitId: e.target.value }))} aria-label="Lọc chặng">
-                  <option value="">Mọi phạm vi</option>
-                  <option value="none">Chỉ Luyện tự do</option>
-                  {units.map((unit, index) => <option key={unit.id} value={unit.id}>Chặng {index + 1}: {unit.title}</option>)}
-                </select>
-                <select className={`${INPUT} !w-auto`} value={filters.difficulty} onChange={(e) => setFilters((f) => ({ ...f, difficulty: e.target.value }))} aria-label="Lọc độ khó">
-                  <option value="">Mọi độ khó</option>
-                  {DIFFICULTIES.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-                </select>
-                <select className={`${INPUT} !w-auto`} value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} aria-label="Lọc dạng câu">
-                  <option value="">Mọi dạng câu</option>
-                  {TYPE_IDS.map((t) => <option key={t} value={t}>{QUESTION_TYPES[t].label}</option>)}
-                </select>
-                <select className={`${INPUT} !w-auto`} value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} aria-label="Lọc trạng thái">
-                  <option value="">Mọi trạng thái</option>
-                  <option value="published">Đã xuất bản</option>
-                  <option value="draft">Nháp</option>
-                </select>
-                <select className={`${INPUT} !w-auto`} value={filters.forTestOut} onChange={(e) => setFilters((f) => ({ ...f, forTestOut: e.target.value }))} aria-label="Lọc mục đích">
-                  <option value="">Mọi mục đích</option>
-                  <option value="false">Luyện bài học</option>
-                  <option value="true">Kiểm tra vượt chặng</option>
-                </select>
-              </div>
 
-              {loadingQuestions ? (
-                <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang tải câu hỏi…</p>
-              ) : !questions.length ? (
-                <p className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">Chưa có câu hỏi phù hợp bộ lọc.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {questions.map((q) => {
-                    const level = difficultyMeta(q.difficulty);
-                    return (
-                      <li key={q.id} className={`rounded-xl border p-3 ${q.status === 'draft' ? 'border-amber-200 bg-amber-50/40' : 'border-slate-100'}`}>
-                        <div className="flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex flex-wrap gap-1.5 text-[10px] font-black">
-                              <span className="rounded-full bg-slate-900 px-2 py-0.5 text-white">{QUESTION_TYPES[q.type]?.label}</span>
-                              <span className="rounded-full px-2 py-0.5" style={{ background: level.soft, color: level.color }}>{level.label}</span>
-                              {q.unitId
-                                ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">{unitTitle.get(q.unitId) || 'Chặng'}</span>
-                                : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Chưa xếp chặng</span>}
-                              {q.forTestOut ? (
-                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Vượt chặng</span>
-                              ) : null}
-                              {q.status === 'draft'
-                                ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Nháp{q.source === 'ai' ? ' · AI' : ''}</span>
-                                : <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700"><CheckCircle2 size={10} /> Đã xuất bản</span>}
-                              {!String(q.explanation || '').trim() ? (
-                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">Thiếu giải thích</span>
-                              ) : null}
-                            </div>
-                            <p className="text-sm font-bold text-slate-800">{q.prompt}</p>
-                            <p className="mt-0.5 truncate text-xs text-slate-500">{answerSummary(q)}</p>
-                          </div>
-                          <button type="button" onClick={() => toggleStatus(q)} title={q.status === 'published' ? 'Chuyển về nháp' : 'Xuất bản'} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none">
-                            {q.status === 'published' ? <EyeOff size={15} /> : <Eye size={15} />}
-                          </button>
-                          <button type="button" onClick={() => setQuestionModal(q)} aria-label="Sửa" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><Pencil size={15} /></button>
-                          <button type="button" onClick={() => removeQuestion(q)} aria-label="Xóa" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={15} /></button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              {/* Kho câu hỏi toàn chủ đề — thu gọn mặc định để không làm rối phần Chặng & Hạt nước */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionBankOpen((v) => !v)}
+                    aria-expanded={showQuestionBank}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs font-black text-slate-700 hover:text-slate-900 !shadow-none"
+                  >
+                    {showQuestionBank ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                    <span>Kho câu hỏi toàn chủ đề ({questions.length} câu) — Bấm để lọc, duyệt nháp hoặc sửa hàng loạt</span>
+                  </button>
+                  {hasActiveQuestionFilter && showQuestionBank && (
+                    <button
+                      type="button"
+                      onClick={() => setFilters({ difficulty: '', type: '', status: '', unitId: '', forTestOut: '' })}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 !shadow-none"
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  )}
+                </div>
+
+                {showQuestionBank && (
+                  <div className="space-y-3 border-t border-slate-200 bg-white p-3.5 rounded-b-2xl">
+                    <div className="flex flex-wrap gap-2">
+                      <select className={`${INPUT} !w-auto`} value={filters.unitId} onChange={(e) => setFilters((f) => ({ ...f, unitId: e.target.value }))} aria-label="Lọc chặng">
+                        <option value="">Tất cả chặng</option>
+                        {units.map((unit, index) => <option key={unit.id} value={unit.id}>Chặng {index + 1}: {unit.title}</option>)}
+                      </select>
+                      <select className={`${INPUT} !w-auto`} value={filters.difficulty} onChange={(e) => setFilters((f) => ({ ...f, difficulty: e.target.value }))} aria-label="Lọc độ khó">
+                        <option value="">Mọi độ khó</option>
+                        {DIFFICULTIES.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                      </select>
+                      <select className={`${INPUT} !w-auto`} value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} aria-label="Lọc dạng câu">
+                        <option value="">Mọi dạng câu</option>
+                        {TYPE_IDS.map((t) => <option key={t} value={t}>{QUESTION_TYPES[t].label}</option>)}
+                      </select>
+                      <select className={`${INPUT} !w-auto`} value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} aria-label="Lọc trạng thái">
+                        <option value="">Mọi trạng thái</option>
+                        <option value="published">Đã xuất bản</option>
+                        <option value="draft">Nháp</option>
+                      </select>
+                      <select className={`${INPUT} !w-auto`} value={filters.forTestOut} onChange={(e) => setFilters((f) => ({ ...f, forTestOut: e.target.value }))} aria-label="Lọc mục đích">
+                        <option value="">Mọi mục đích</option>
+                        <option value="false">Luyện bài học</option>
+                        <option value="true">Kiểm tra vượt chặng</option>
+                      </select>
+                    </div>
+
+                    {loadingQuestions ? (
+                      <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang tải câu hỏi…</p>
+                    ) : !questions.length ? (
+                      <p className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">Chưa có câu hỏi phù hợp bộ lọc.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {questions.map((q) => {
+                          const level = difficultyMeta(q.difficulty);
+                          return (
+                            <li key={q.id} className={`rounded-xl border p-3 ${q.status === 'draft' ? 'border-amber-200 bg-amber-50/40' : 'border-slate-100'}`}>
+                              <div className="flex items-start gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="mb-1 flex flex-wrap gap-1.5 text-[10px] font-black">
+                                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-white">{QUESTION_TYPES[q.type]?.label}</span>
+                                    <span className="rounded-full px-2 py-0.5" style={{ background: level.soft, color: level.color }}>{level.label}</span>
+                                    {q.unitId
+                                      ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">{unitTitle.get(q.unitId) || 'Chặng'}</span>
+                                      : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Chưa xếp chặng</span>}
+                                    {q.nodeKey ? (
+                                      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">
+                                        Hạt: {(units.find((u) => u.id === q.unitId)?.pathNodes || []).find((n) => n.key === q.nodeKey)?.label || q.nodeKey}
+                                      </span>
+                                    ) : null}
+                                    {q.forTestOut ? (
+                                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Vượt chặng</span>
+                                    ) : null}
+                                    {q.status === 'draft'
+                                      ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Nháp{q.source === 'ai' ? ' · AI' : ''}</span>
+                                      : <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700"><CheckCircle2 size={10} /> Đã xuất bản</span>}
+                                    {!String(q.explanation || '').trim() ? (
+                                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">Thiếu giải thích</span>
+                                    ) : null}
+                                  </div>
+                                  <p className="text-sm font-bold text-slate-800">{q.prompt}</p>
+                                  <p className="mt-0.5 truncate text-xs text-slate-500">{answerSummary(q)}</p>
+                                </div>
+                                <button type="button" onClick={() => toggleStatus(q)} title={q.status === 'published' ? 'Chuyển về nháp' : 'Xuất bản'} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none">
+                                  {q.status === 'published' ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                                <button type="button" onClick={() => setQuestionModal(q)} aria-label="Sửa" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><Pencil size={15} /></button>
+                                <button type="button" onClick={() => removeQuestion(q)} aria-label="Xóa" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={15} /></button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </section>
           )}
         </div>
@@ -2183,6 +2677,8 @@ export default function AdminDailyPracticeTab() {
           units={units}
           defaultUnitId={questionModal.defaultUnitId ?? defaultUnitId}
           lockUnit={Boolean(questionModal.lockUnit)}
+          defaultNodeKey={questionModal.defaultNodeKey || ''}
+          lockNodeKey={Boolean(questionModal.lockNodeKey)}
           defaultForTestOut={Boolean(questionModal.defaultForTestOut ?? filters.forTestOut === 'true')}
           lockTestOut={Boolean(questionModal.lockTestOut)}
           onClose={() => setQuestionModal(null)}
@@ -2196,6 +2692,8 @@ export default function AdminDailyPracticeTab() {
           units={units}
           defaultUnitId={aiOpen.defaultUnitId ?? defaultUnitId}
           lockUnit={Boolean(aiOpen.lockUnit)}
+          defaultNodeKey={aiOpen.defaultNodeKey || ''}
+          lockNodeKey={Boolean(aiOpen.lockNodeKey)}
           defaultForTestOut={Boolean(aiOpen.defaultForTestOut ?? filters.forTestOut === 'true')}
           lockTestOut={Boolean(aiOpen.lockTestOut)}
           onClose={() => setAiOpen(null)}

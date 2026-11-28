@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Calculator, Check, CheckSquare, Copy, FileText, Loader2, MessageSquare, Send, Sparkles } from 'lucide-react';
 import dailyPracticeApi from '../../services/dailyPracticeApi';
-import { aiSupportAPI } from '../../services/api';
-import AiUsageIndicator, { AI_QUOTA_UPDATED_EVENT, emitAiQuotaUpdated } from '../ui/AiUsageIndicator';
+import { emitAiQuotaUpdated } from '../ui/AiUsageIndicator';
+import useAIQuota, { dispatchOpenAiPackagesModal } from '../../hooks/useAIQuota';
+import AIQuotaMeter from '../ai/AIQuotaMeter';
+import AIOutOfQuotaModal from '../ai/AIOutOfQuotaModal';
 
 const DEFAULT_CHECKLIST_ITEMS = [
   'Không còn ô hiển thị lỗi #N/A, #VALUE!, #REF!, #NAME?',
@@ -350,7 +352,7 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState(-1);
-  const [aiDailyQuota, setAiDailyQuota] = useState(null);
+  const [outOfQuotaModalOpen, setOutOfQuotaModalOpen] = useState(false);
   const chatScrollRef = useRef(null);
   const [messages, setMessages] = useState(() => ([
     {
@@ -366,45 +368,17 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
     courseTitle,
   }), [lessonTitle, unitTitle, courseTitle]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await aiSupportAPI.status();
-        if (!cancelled && res?.success && res?.data?.dailyQuota) {
-          setAiDailyQuota(res.data.dailyQuota);
-        }
-      } catch { /* quota display optional */ }
-    })();
-    const onQuotaUpdated = (event) => {
-      const detail = event?.detail;
-      if (!detail || typeof detail !== 'object') return;
-      if (!detail.questionQuota && !detail.imageQuota) return;
-      setAiDailyQuota((prev) => ({
-        ...(prev || {}),
-        ...(detail.questionQuota ? { questionQuota: detail.questionQuota } : {}),
-        ...(detail.imageQuota ? { imageQuota: detail.imageQuota } : {}),
-      }));
-    };
-    window.addEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(AI_QUOTA_UPDATED_EVENT, onQuotaUpdated);
-    };
-  }, []);
-
-  const questionQuotaApplies = Boolean(aiDailyQuota?.questionQuota?.applies ?? true);
-  const rawPercentLeft = aiDailyQuota?.questionQuota?.percentLeft ?? aiDailyQuota?.questionQuota?.remaining;
-  const questionQuotaLeft = rawPercentLeft != null
-    ? Math.max(0, Math.min(100, Number(rawPercentLeft)))
-    : 100;
-  const questionQuotaBlocked = questionQuotaApplies && !(questionQuotaLeft > 0);
-  const rawImageLimit = aiDailyQuota?.imageQuota?.limit;
-  const imageDisallowed = Boolean(
-    aiDailyQuota?.imageQuota
-    && (aiDailyQuota.imageQuota.allowed === false
-      || (rawImageLimit !== null && rawImageLimit !== undefined && rawImageLimit !== '' && Number(rawImageLimit) === 0)),
-  );
+  const {
+    aiQuotaPercent: questionQuotaLeft,
+    aiPlan,
+    isUnlimited: aiIsUnlimited,
+    isAdminUnlimited: aiIsAdminUnlimited,
+    applies: questionQuotaApplies,
+    isOutOfQuota: questionQuotaBlocked,
+    resetInMs: aiResetInMs,
+    resetsAt: aiResetsAt,
+    applyQuotaUpdate: applyAiQuotaUpdate,
+  } = useAIQuota();
 
   useEffect(() => {
     if (tab !== 'chat' || !chatScrollRef.current) return;
@@ -424,7 +398,11 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
   const ask = async (e) => {
     e.preventDefault();
     const cleaned = question.trim();
-    if (!cleaned || asking || questionQuotaBlocked) return;
+    if (!cleaned || asking) return;
+    if (questionQuotaBlocked) {
+      setOutOfQuotaModalOpen(true);
+      return;
+    }
 
     const historySnapshot = messages.slice(1).slice(-6).map((m) => ({
       role: m.role === 'user' ? 'user' : 'assistant',
@@ -444,12 +422,14 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
         courseTitle: contextSummary.courseTitle,
         history: historySnapshot,
       });
-      if (res?.questionQuota || res?.imageQuota) {
-        setAiDailyQuota((prev) => ({
-          ...(prev || {}),
+      if (res?.questionQuota || res?.imageQuota || res?.aiPlan) {
+        const nextDaily = {
           ...(res.questionQuota ? { questionQuota: res.questionQuota } : {}),
           ...(res.imageQuota ? { imageQuota: res.imageQuota } : {}),
-        }));
+          ...(res.aiPlan ? { aiPlan: res.aiPlan } : {}),
+        };
+        applyAiQuotaUpdate(nextDaily);
+        emitAiQuotaUpdated(nextDaily);
       }
       const answer = String(res?.answer || '').trim();
       setMessages((prev) => [
@@ -461,12 +441,12 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
         },
       ]);
     } catch (err) {
-      if (err?.code === 'AI_QUESTION_QUOTA' || err?.status === 403) {
+      if (err?.code === 'AI_XP_INSUFFICIENT' || err?.code === 'AI_QUESTION_QUOTA' || err?.status === 402 || err?.status === 403) {
         const exhaustedQuota = {
-          ...(aiDailyQuota?.questionQuota || {}),
           ...(err?.questionQuota || {}),
           applies: true,
           mode: 'percent',
+          isUnlimited: false,
           limit: 100,
           remaining: 0,
           percentLeft: 0,
@@ -474,20 +454,21 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
           percentUsed: 100,
         };
         const nextDaily = {
-          ...(aiDailyQuota || {}),
           questionQuota: exhaustedQuota,
           ...(err?.imageQuota ? { imageQuota: err.imageQuota } : {}),
         };
-        setAiDailyQuota(nextDaily);
+        applyAiQuotaUpdate(nextDaily);
         emitAiQuotaUpdated(nextDaily);
         setMessages((prev) => [
           ...prev,
           {
             role: 'ai',
-            title: 'Đã hết hạn mức AI hôm nay',
-            body: err?.message || 'Bạn đã dùng hết 100% hạn mức AI hôm nay. Hạn mức sẽ tự động làm mới vào 00:00.',
+            title: 'Đã hết dung lượng hỏi AI hôm nay',
+            body: err?.message || 'Dung lượng miễn phí đã chạm 0%. Nâng cấp gói để hỏi AI không giới hạn.',
+            action: 'open_ai_packages',
           },
         ]);
+        setOutOfQuotaModalOpen(true);
         return;
       }
       const fallback = buildContextualReply(cleaned, contextSummary);
@@ -637,6 +618,15 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
                   {msg.formula}
                 </code>
               )}
+              {msg.action && (
+                <button
+                  type="button"
+                  onClick={() => dispatchOpenAiPackagesModal()}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#34D399] to-[#059669] px-3.5 py-1.5 text-[11px] font-extrabold text-white shadow-xs hover:brightness-105 cursor-pointer"
+                >
+                  Nâng cấp gói Không giới hạn →
+                </button>
+              )}
             </div>
           ))}
           {asking && (
@@ -647,40 +637,52 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
         </div>
       )}
 
-      <form onSubmit={ask} className="space-y-1.5">
+      <form onSubmit={ask} className="space-y-2">
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={question}
-            disabled={asking || questionQuotaBlocked}
+            disabled={asking}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder={
               questionQuotaBlocked
-                ? 'Đã hết hạn mức AI hôm nay — chờ reset để tiếp tục hỏi'
+                ? 'Đã hết 0% dung lượng — bấm Hỏi để xem gói không giới hạn'
                 : 'Hỏi AI (VD: lỗi #N/A vlookup, hàm IF, căn lề Word...)'
             }
             className="min-w-0 flex-1 rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-emerald-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-55"
           />
           <button
             type="submit"
-            disabled={!question.trim() || asking || questionQuotaBlocked}
+            disabled={!question.trim() || asking}
             className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-white hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 !shadow-none"
           >
             {asking ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             {asking ? 'Đang hỏi' : 'Hỏi'}
           </button>
         </div>
-        <AiUsageIndicator
+        <AIQuotaMeter
+          compact
           dark
-          applies={questionQuotaApplies}
-          percentLeft={questionQuotaLeft}
-          resetInMs={aiDailyQuota?.questionQuota?.resetInMs}
-          resetsAt={aiDailyQuota?.questionQuota?.resetsAt}
-          imageDisallowed={imageDisallowed}
-          isFreeTier={imageDisallowed}
+          percent={questionQuotaLeft}
+          isUnlimited={aiIsUnlimited}
+          isAdminUnlimited={aiIsAdminUnlimited}
+          expiresAt={aiPlan?.expiresAt}
+          resetInMs={aiResetInMs}
+          resetsAt={aiResetsAt}
+          onUpgrade={() => dispatchOpenAiPackagesModal()}
           className="px-0.5"
         />
       </form>
+      <AIOutOfQuotaModal
+        open={outOfQuotaModalOpen}
+        resetInMs={aiResetInMs}
+        resetsAt={aiResetsAt}
+        onClose={() => setOutOfQuotaModalOpen(false)}
+        onViewPackages={(group) => {
+          setOutOfQuotaModalOpen(false);
+          dispatchOpenAiPackagesModal(group);
+        }}
+      />
     </div>
   );
 }

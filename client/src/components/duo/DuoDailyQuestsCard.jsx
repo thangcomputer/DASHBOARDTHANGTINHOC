@@ -14,7 +14,9 @@ export function DuoDailyQuestsCard({
   todayVideos = 0,
   todayXp = 0,
   onOpenPractice,
+  dewdropStyle,
 }) {
+  const isDewdrop = dewdropStyle ?? (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-free-portal-student'));
   const resolvedQuests = useMemo(() => quests || [
     {
       id: 'quiz',
@@ -46,6 +48,76 @@ export function DuoDailyQuestsCard({
   ], [quests, todayAnswers, todayVideos, todayXp]);
 
   const completedCount = resolvedQuests.filter((q) => q.current >= q.target).length;
+
+  if (isDewdrop) {
+    return (
+      <section className="dew-app-card dew-app-card--emerald flex min-w-0 flex-col gap-3 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Target size={18} className="shrink-0 text-emerald-600" aria-hidden="true" />
+            <h3 className="text-[15px] font-extrabold text-slate-900">Nhiệm vụ hôm nay</h3>
+          </div>
+          <span className="rounded-full bg-slate-100/90 border border-white px-3 py-1 text-xs font-extrabold text-slate-700 shadow-2xs">
+            {completedCount}/{resolvedQuests.length} xong
+          </span>
+        </div>
+        <ul className="space-y-2.5">
+          {resolvedQuests.map((quest) => {
+            const isDone = quest.current >= quest.target;
+            const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
+            return (
+              <li key={quest.id}>
+                <button
+                  type="button"
+                  onClick={onOpenPractice}
+                  className={`w-full rounded-2xl backdrop-blur-md border px-4 py-2.5 flex items-center justify-between gap-3 text-left shadow-[0_4px_12px_-6px_rgba(15,23,42,0.08),inset_0_1px_0_#fff] transition hover:border-emerald-200 cursor-pointer ${
+                    isDone ? 'bg-emerald-50/85 border-emerald-200/80' : 'bg-white/80 border-slate-100 hover:bg-white'
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                        isDone ? 'bg-emerald-500 shadow-xs' : 'bg-slate-100/90 border border-white shadow-2xs'
+                      }`}
+                    >
+                      <QuestIcon quest={quest} isDone={isDone} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className={`block truncate text-[13px] font-bold ${isDone ? 'text-emerald-800' : 'text-slate-800'}`}>
+                        {quest.title}
+                      </span>
+                      {quest.current > 0 && !isDone ? (
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/80">
+                            <span className="block h-full rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
+                          </span>
+                          <span className="shrink-0 text-[10px] font-extrabold text-slate-500 tabular-nums">
+                            {Math.min(quest.current, quest.target)}/{quest.target}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  {quest.rewardXp ? (
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black border ${
+                        isDone
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : 'bg-gradient-to-b from-[#FEF08A] via-[#FBBF24] to-[#F59E0B] text-amber-950 border-amber-200/80 shadow-[0_4px_10px_-3px_rgba(217,119,6,0.35),inset_0_1.5px_1px_rgba(255,255,255,0.75)]'
+                      }`}
+                    >
+                      <Gift size={12} aria-hidden="true" />
+                      +{quest.rewardXp}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    );
+  }
 
   return (
     <section className="duo-card flex flex-col gap-3 p-4">

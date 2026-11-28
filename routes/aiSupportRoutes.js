@@ -40,9 +40,20 @@ const {
   sessionToClient,
   peekQuestionQuota,
   peekImageQuota,
+  peekPlanModelQuota,
+  resolveStudentQuotaUser,
   AI_PEER_ID,
   AI_PEER_NAME,
 } = require('../services/aiSupportService');
+const {
+  ALLOWED_MODELS,
+  DEFAULT_AI_PLAN_MODEL_POLICY,
+  getAiPlanModelPolicy,
+  saveAiPlanModelPolicy,
+  resetAiPlanModelPolicy,
+} = require('../services/ai/aiPlanPolicyService');
+const aiPackageService = require('../services/aiPackageService');
+const logger = require('../config/logger');
 const { buildConversationId } = require('../utils/chatConversationId');
 
 const quickAskLimiter = rateLimit({
@@ -74,15 +85,25 @@ function denyUnlessSupport(req, res) {
 router.get('/status', authMiddleware, async (req, res) => {
   const allowed = isAiChatUser(req.user);
   let dailyQuota = null;
+  let aiPlan = null;
   if (allowed) {
     const role = getMessagingRole(req.user);
     const userId = String(req.user.id);
     const conversationId = buildConversationId(role, userId, 'system', AI_PEER_ID);
     const session = await getSession(conversationId);
     const roleKey = session?.userRole || role;
+    const quotaUser = role === 'student' ? await resolveStudentQuotaUser(req.user) : req.user;
+    aiPlan = role === 'student' ? aiPackageService.formatAiPlanStatus(quotaUser) : null;
+    let planModelQuota = null;
+    if (role === 'student') {
+      const policy = await getAiPlanModelPolicy().catch(() => null);
+      planModelQuota = peekPlanModelQuota(session || { userRole: roleKey }, quotaUser, policy);
+    }
     dailyQuota = {
-      questionQuota: peekQuestionQuota(session || { userRole: roleKey }, req.user),
-      imageQuota: peekImageQuota(session || { userRole: roleKey }, req.user),
+      questionQuota: peekQuestionQuota(session || { userRole: roleKey }, quotaUser),
+      imageQuota: peekImageQuota(session || { userRole: roleKey }, quotaUser),
+      ...(aiPlan ? { aiPlan } : {}),
+      ...(planModelQuota ? { planModelQuota } : {}),
     };
   }
   res.json({
@@ -92,8 +113,85 @@ router.get('/status', authMiddleware, async (req, res) => {
       configured: aiSupportConfigured(),
       peer: { id: AI_PEER_ID, name: AI_PEER_NAME, role: 'system' },
       ...(dailyQuota ? { dailyQuota } : {}),
+      ...(aiPlan ? { aiPlan } : {}),
     },
   });
+});
+
+// ── Gói Hỏi AI Không Giới Hạn (áp dụng chung cho Học viên DewSkill & Học viên Trung tâm) ──
+router.get('/packages', authMiddleware, async (req, res) => {
+  try {
+    const role = getMessagingRole(req.user);
+    const quotaUser = role === 'student' ? await resolveStudentQuotaUser(req.user) : req.user;
+    const aiPlan = role === 'student' ? aiPackageService.formatAiPlanStatus(quotaUser) : { isUnlimited: true, plan: '' };
+    const session = isAiChatUser(req.user)
+      ? await getSession(buildConversationId(role, String(req.user.id), 'system', AI_PEER_ID))
+      : null;
+    const questionQuota = peekQuestionQuota(session || { userRole: role }, quotaUser);
+    const policy = await getAiPlanModelPolicy().catch(() => null);
+    const planModelQuota = role === 'student' ? peekPlanModelQuota(session || { userRole: role }, quotaUser, policy) : null;
+    return res.json({
+      success: true,
+      data: {
+        packages: aiPackageService.AI_PACKAGE_PLANS,
+        aiPlan,
+        questionQuota,
+        aiQuotaPercent: Number(questionQuota?.percentLeft ?? 100),
+        ...(policy?.tiers ? { planModelPolicy: policy.tiers } : {}),
+        ...(planModelQuota ? { planModelQuota } : {}),
+      },
+    });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message || 'Không tải được gói Hỏi AI' });
+  }
+});
+
+router.post('/packages/checkout', authMiddleware, async (req, res) => {
+  try {
+    const planId = String(req.body?.planId || '').trim().toLowerCase();
+    const data = await aiPackageService.checkoutAiPackage({ user: req.user, planId });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message || 'Không tạo được mã chuyển khoản gói Hỏi AI',
+      ...(err.code ? { code: err.code } : {}),
+    });
+  }
+});
+
+router.get('/packages/session/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    const data = await aiPackageService.getAiPackageSession({
+      user: req.user,
+      sessionId: req.params.sessionId,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message || 'Không kiểm tra được trạng thái thanh toán gói Hỏi AI',
+    });
+  }
+});
+
+router.post('/packages/simulate-paid', authMiddleware, async (req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_PAYMENT_SIMULATE !== 'true') {
+    return res.status(403).json({ success: false, message: 'Chức năng giả lập chỉ dành cho môi trường phát triển.' });
+  }
+  try {
+    const data = await aiPackageService.simulateAiPackagePurchase({
+      studentId: req.user?.id || req.user?._id,
+      sessionId: req.body?.sessionId,
+      io: req.app.get('io'),
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message || 'Không giả lập được thanh toán gói Hỏi AI',
+    });
+  }
 });
 
 router.post('/message', authMiddleware, policyShadowMessage('send'), messagesCutoverGate('send'), async (req, res) => {
@@ -152,6 +250,9 @@ router.post('/message', authMiddleware, policyShadowMessage('send'), messagesCut
     return res.status(201).json({ success: true, data: result.clientMessage });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -261,6 +362,9 @@ router.post('/escalate', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -285,6 +389,9 @@ router.post('/reset', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -309,6 +416,9 @@ router.post('/end', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -366,6 +476,9 @@ router.get('/thread/:conversationId', authMiddleware, async (req, res) => {
     return res.json({ success: true, data: result });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -385,6 +498,9 @@ router.post('/claim', authMiddleware, async (req, res) => {
     return res.json({ success: true, data: result, message: 'Đã tiếp nhận yêu cầu' });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -404,6 +520,9 @@ router.post('/resolve', authMiddleware, async (req, res) => {
     return res.json({ success: true, data: result, message: 'Đã đánh dấu xử lý xong' });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -428,6 +547,9 @@ router.post('/reply', authMiddleware, async (req, res) => {
     return res.json({ success: true, data: result });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
@@ -463,10 +585,18 @@ router.post('/quick-ask', authMiddleware, quickAskLimiter, async (req, res) => {
     return res.json({ success: true, data });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({
       success: false,
       message: err.message || 'Lỗi server',
       ...(err.code ? { code: err.code } : {}),
+      ...(typeof err.needXp === 'number' ? { needXp: err.needXp } : {}),
+      ...(typeof err.currentXp === 'number' ? { currentXp: err.currentXp } : {}),
+      ...(typeof err.isFreeTier === 'boolean' ? { isFreeTier: err.isFreeTier } : {}),
+      ...(err.suggestedAction ? { suggestedAction: err.suggestedAction } : {}),
+      ...(err.xpWallet ? { xpWallet: err.xpWallet } : {}),
       ...(err.questionQuota ? { questionQuota: err.questionQuota } : {}),
       ...(err.imageQuota ? { imageQuota: err.imageQuota } : {}),
     });
@@ -597,6 +727,9 @@ router.post('/quick-ask/feedback', authMiddleware, quickAskLimiter, async (req, 
     });
   } catch (err) {
     const status = err.status || 500;
+    if (status >= 500) {
+      logger.error({ err: err?.message, stack: err?.stack, userId: req.user?.id }, '[AI Support] unhandled error');
+    }
     return res.status(status).json({ success: false, message: err.message || 'Không lưu được phản hồi' });
   }
 });
@@ -720,6 +853,71 @@ router.patch('/admin/rag-feedback/:id', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+// Admin-only: Cấu hình phân tầng Model AI & giới hạn Fair-Use theo từng gói
+router.get('/admin/model-policy', authMiddleware, async (req, res) => {
+  if (!isRagAdminUser(req.user)) {
+    return res.status(403).json({ success: false, message: 'Chỉ Quản trị viên mới được xem cấu hình Model AI' });
+  }
+  try {
+    const policy = await getAiPlanModelPolicy({ forceRefresh: true });
+    return res.json({
+      success: true,
+      data: {
+        policy,
+        defaults: DEFAULT_AI_PLAN_MODEL_POLICY,
+        allowedModels: ALLOWED_MODELS,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Không tải được cấu hình Model AI' });
+  }
+});
+
+router.put('/admin/model-policy', authMiddleware, async (req, res) => {
+  if (!isRagAdminUser(req.user)) {
+    return res.status(403).json({ success: false, message: 'Chỉ Quản trị viên mới được chỉnh cấu hình Model AI' });
+  }
+  try {
+    const input = req.body?.tiers ? { tiers: req.body.tiers } : (req.body || {});
+    const policy = await saveAiPlanModelPolicy(input, {
+      id: req.user?.id || req.user?._id,
+      name: req.user?.name || req.user?.email || 'Admin',
+    });
+    return res.json({
+      success: true,
+      data: {
+        policy,
+        defaults: DEFAULT_AI_PLAN_MODEL_POLICY,
+        allowedModels: ALLOWED_MODELS,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Không lưu được cấu hình Model AI' });
+  }
+});
+
+router.post('/admin/model-policy/reset', authMiddleware, async (req, res) => {
+  if (!isRagAdminUser(req.user)) {
+    return res.status(403).json({ success: false, message: 'Chỉ Quản trị viên mới được khôi phục cấu hình Model AI' });
+  }
+  try {
+    const policy = await resetAiPlanModelPolicy({
+      id: req.user?.id || req.user?._id,
+      name: req.user?.name || req.user?.email || 'Admin',
+    });
+    return res.json({
+      success: true,
+      data: {
+        policy,
+        defaults: DEFAULT_AI_PLAN_MODEL_POLICY,
+        allowedModels: ALLOWED_MODELS,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Không khôi phục được cấu hình Model AI' });
   }
 });
 

@@ -17,6 +17,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AppStackParamList } from '../navigation/types';
 import { StatusBar } from 'expo-status-bar';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import {
@@ -53,8 +56,6 @@ import type { UserRole } from '../types';
 
 const ADMIN_ZALO_PHONE = String(process.env.EXPO_PUBLIC_SUPPORT_PHONE || '0935758462').replace(/\D/g, '');
 const SUPPORT_HOTLINE_LABEL = '093 5758 462';
-const PRIVACY_POLICY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || 'https://thangtinhoc.vn/privacy-policy';
-const TERMS_OF_SERVICE_URL = process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL || 'https://thangtinhoc.vn/terms-of-service';
 
 const DEWSKILL_LOGO = require('../../assets/logo.webp');
 const MASCOT_OFFICE = require('../../assets/mascot/wor-excel-powerpoint-mascot.gif');
@@ -118,6 +119,7 @@ function openAdminZalo(message = '') {
  * Giữ nguyên toàn bộ luồng Đăng nhập (HV/GV), Đăng ký dùng thử Free Portal, Sinh trắc học và Quên mật khẩu.
  */
 export function LoginScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { signIn, signInWithBiometrics, isSigningIn, authError } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [role, setRole] = useState<UserRole>('student');
@@ -974,11 +976,21 @@ export function LoginScreen() {
               </Pressable>
 
               <View style={styles.legalRow}>
-                <Pressable onPress={() => { void Linking.openURL(PRIVACY_POLICY_URL); }} hitSlop={8} accessibilityRole="link">
+                <Pressable
+                  onPress={() => navigation.navigate('LegalDocument', { tab: 'privacy' })}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xem Chính sách bảo mật"
+                >
                   <Text style={styles.legalLink}>Chính sách bảo mật</Text>
                 </Pressable>
                 <Text style={styles.legalDot}>·</Text>
-                <Pressable onPress={() => { void Linking.openURL(TERMS_OF_SERVICE_URL); }} hitSlop={8} accessibilityRole="link">
+                <Pressable
+                  onPress={() => navigation.navigate('LegalDocument', { tab: 'terms' })}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xem Điều khoản sử dụng"
+                >
                   <Text style={styles.legalLink}>Điều khoản sử dụng</Text>
                 </Pressable>
               </View>

@@ -5,6 +5,7 @@ import subscriptionApi from '../../../services/subscriptionApi';
 import api from '../../../services/api';
 import { formatVnd } from '../../../utils/subscription';
 import { generateVietQRUrl } from '../../bankSelectUtils';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
 import {
   MEET_MODAL_SHELL_CLASS,
@@ -38,6 +39,7 @@ export function isFreePortalAccount() {
       return true;
     }
     const u = JSON.parse(localStorage.getItem('student_user') || '{}');
+    if (u?.accountType === 'dewskill') return true;
     if (u?.freePortal === true) return true;
     const course = String(u?.course || '').toLowerCase();
     return course === 'tài khoản miễn phí' || course.includes('miễn phí');
@@ -208,16 +210,17 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
       ? `Thanh toán gói ${order.planLabel || selected?.label || ''}`
       : 'Học tin học cùng giảng viên qua Google Meet';
   const headerSubtitle = paid || order
-    ? 'Hệ thống tự động mở khóa lớp học và cập nhật ví XP ngay sau khi xác nhận'
-    : 'Học trực tiếp Word · Excel · PowerPoint bài bản — Thực hành dễ hiểu từng bước';
+    ? 'Hệ thống tự động kích hoạt gói hỗ trợ AI ngay sau khi xác nhận'
+    : 'Nâng cấp gói hỗ trợ AI — Học tập & hỏi đáp AI không giới hạn';
 
   return createPortal(
     <div
+      data-theme={getDewSkillThemeAttr()}
       className="fixed inset-0 z-[9700] flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-950/55 p-3 sm:p-5 backdrop-blur-xs"
       onClick={handleClose}
     >
       <div
-        className={MEET_MODAL_SHELL_CLASS}
+        className={`dew-modal ${MEET_MODAL_SHELL_CLASS}`}
         role="dialog"
         aria-modal="true"
         aria-label={headerTitle}
@@ -291,7 +294,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
               </p>
 
               <TransferPaymentDetails
-                courseName={`Gói Meet ${order.planLabel || selected?.label || ''}`}
+                courseName={`Gói hỗ trợ AI ${order.planLabel || selected?.label || ''}`}
                 amount={order.amount}
                 qrUrl={qrUrl}
                 loading={!bank}
@@ -361,7 +364,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                   setError('');
                 }}
                 xpSummary={xpSummary}
-                heading="Chọn gói học Meet"
+                heading="Chọn gói hỗ trợ AI"
               />
 
               {error ? <p className="text-center text-xs font-semibold text-red-600">{error}</p> : null}

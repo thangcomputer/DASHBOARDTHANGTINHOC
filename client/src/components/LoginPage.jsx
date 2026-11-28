@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Eye, EyeOff, CheckCircle2, AlertCircle, BookOpen, Lock, User, KeyRound, MonitorX, UserPlus,
   GraduationCap, Award, Headphones, LogIn, Monitor, Clock,
@@ -389,10 +389,25 @@ const LoginPage = ({ onLogin }) => {
               ))}
             </div>
 
-            <div className="text-center animate-in fade-in duration-1000 delay-500 pt-0.5">
+            <div className="text-center animate-in fade-in duration-1000 delay-500 pt-0.5 space-y-1.5">
               <div className="flex items-center justify-center gap-2 text-slate-400 text-[11px]">
                 <span className="font-black text-slate-500 tracking-wider">Hỗ trợ kỹ thuật:</span>
                 <span className="font-bold">Hotline 093 5758 462</span>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
+                <Link
+                  to="/dieu-khoan"
+                  className="font-semibold text-slate-500 hover:text-emerald-600 hover:underline transition-colors"
+                >
+                  Điều khoản sử dụng
+                </Link>
+                <span aria-hidden="true">·</span>
+                <Link
+                  to="/bao-mat"
+                  className="font-semibold text-slate-500 hover:text-emerald-600 hover:underline transition-colors"
+                >
+                  Chính sách bảo mật
+                </Link>
               </div>
             </div>
           </div>

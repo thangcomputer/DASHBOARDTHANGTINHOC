@@ -49,7 +49,7 @@ export default function StudentMaterialsTab({
       };
 
   return (
-          <div className="cms-sd cms-sd-page bg-slate-50 min-h-full">
+          <div className={`cms-sd cms-sd-page min-h-full ${isFreePortalOnly ? 'bg-transparent' : 'bg-slate-50'}`}>
             {!isFreePortalOnly && (
               <CourseSwitcher
                 courses={initialMainTab === 'courses' ? [] : enrollments}

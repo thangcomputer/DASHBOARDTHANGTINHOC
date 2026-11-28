@@ -164,13 +164,6 @@ function sortMeetClasses(rows: MeetClassRow[] = []): MeetCardItem[] {
     .sort((a, b) => a.nextStart - b.nextStart);
 }
 
-type LmsSubjectProgress = {
-  id: string;
-  name: string;
-  completedLessons: number;
-  totalLessons: number;
-};
-
 async function openDashboardLink(url: string) {
   try {
     await Linking.openURL(url);
@@ -193,7 +186,6 @@ export function HomeScreen() {
   const [practice, setPractice] = useState<Awaited<ReturnType<typeof dailyPracticeApi.overview>> | null>(null);
   const [pathData, setPathData] = useState<Awaited<ReturnType<typeof dailyPracticeApi.path>> | null>(null);
   const [meetClasses, setMeetClasses] = useState<MeetClassRow[]>([]);
-  const [lmsSubjects, setLmsSubjects] = useState<LmsSubjectProgress[]>([]);
   const [savedPathTopicId, setSavedPathTopicId] = useState('');
   const [lastStudy, setLastStudy] = useState<LastStudySession | null>(null);
   const [goalData, setGoalData] = useState<LearningGoalData | null>(null);
@@ -220,56 +212,6 @@ export function HomeScreen() {
     mobileApiRequest<{ data?: MeetClassRow[] }>('/meet-classes/mine')
       .then((res) => setMeetClasses(Array.isArray(res?.data) ? res.data : []))
       .catch(() => setMeetClasses([]));
-    mobileApiRequest<{ data?: { courses?: Array<Record<string, unknown>>; subjects?: Array<Record<string, unknown>> } }>('/lesson-practice/my/subjects')
-      .then((res) => {
-        const courses = Array.isArray(res?.data?.courses) ? res.data.courses : [];
-        if (courses.length > 0) {
-          const enrolledVideoCourses = courses.filter((c) => c.enrolled && c.deliveryMode === 'video');
-          const mapped: LmsSubjectProgress[] = [];
-          enrolledVideoCourses.forEach((course) => {
-            const subs = Array.isArray(course.subjects) ? (course.subjects as Array<Record<string, unknown>>) : [];
-            if (subs.length > 0) {
-              subs.forEach((s) => {
-                const units = Array.isArray(s.units) ? (s.units as Array<Record<string, unknown>>) : [];
-                let totalLessons = Number(s.totalLessons) || 0;
-                let completedLessons = Number(s.completedLessons) || 0;
-                if (!totalLessons && units.length > 0) {
-                  units.forEach((u) => {
-                    const secs = Array.isArray(u.sections) ? (u.sections as Array<Record<string, unknown>>) : [];
-                    totalLessons += secs.length || 1;
-                    completedLessons += secs.filter((sec) => Boolean(sec.completed)).length;
-                  });
-                }
-                mapped.push({
-                  id: String(s.id || s._id || course.courseId || ''),
-                  name: String(s.name || course.title || ''),
-                  completedLessons,
-                  totalLessons,
-                });
-              });
-            } else {
-              mapped.push({
-                id: String(course.courseId || course.id || ''),
-                name: String(course.title || course.name || ''),
-                completedLessons: Number(course.completedLessons) || 0,
-                totalLessons: Number(course.totalLessons) || 0,
-              });
-            }
-          });
-          setLmsSubjects(mapped);
-          return;
-        }
-        const list = Array.isArray(res?.data?.subjects) ? res.data.subjects : [];
-        setLmsSubjects(
-          list.map((s) => ({
-            id: String(s.id || s._id || ''),
-            name: String(s.name || ''),
-            completedLessons: Number(s.completedLessons) || 0,
-            totalLessons: Number(s.totalLessons) || 0,
-          })),
-        );
-      })
-      .catch(() => { });
   }, [isTeacher, user]);
 
   const didInitialStudentFocusRef = useRef(false);
@@ -427,25 +369,6 @@ export function HomeScreen() {
     || courseOptions[0];
   const currentCourse = currentEnrollment?.courseName || user?.course || '';
   const freePortalCourse = currentCourse.trim().toLocaleLowerCase('vi') === 'tài khoản miễn phí' || freeMenu;
-
-  const subjectIdsOfEnrollment = useMemo(() => {
-    const ids = Array.isArray(currentEnrollment?.subjectIds)
-      ? currentEnrollment.subjectIds.map(String)
-      : [];
-    return new Set(ids);
-  }, [currentEnrollment]);
-
-  const matchedSubjects = useMemo(() => {
-    if (!lmsSubjects.length || subjectIdsOfEnrollment.size === 0) return [];
-    return lmsSubjects.filter((s) => subjectIdsOfEnrollment.has(s.id));
-  }, [lmsSubjects, subjectIdsOfEnrollment]);
-
-  const isVideoCourse = matchedSubjects.length > 0 && (currentEnrollment?.totalSessions ?? 0) === 0;
-  const videoDone = matchedSubjects.reduce((sum, s) => sum + s.completedLessons, 0);
-  const videoTotal = matchedSubjects.reduce((sum, s) => sum + s.totalLessons, 0);
-  const videoNextSubject = matchedSubjects.find((s) => s.totalLessons > 0 && s.completedLessons < s.totalLessons)
-    || matchedSubjects[0]
-    || null;
 
   const coursePickerItems = useMemo<CoursePickerItem[]>(() => courseOptions.map((enrollment) => {
     const total = enrollment.totalSessions ?? 12;
@@ -1168,7 +1091,7 @@ export function HomeScreen() {
                         });
                         return;
                       }
-                      tabNavigation.navigate('CourseVideos', {
+                      tabNavigation.navigate('DailyPractice', {
                         resumeKey: Date.now(),
                         resumeCourseId: effectiveLastStudy.courseId,
                         resumeSubjectId: effectiveLastStudy.subjectId,
@@ -1218,8 +1141,8 @@ export function HomeScreen() {
                         : nextLesson[0]
                           ? nextLesson[0].meta
                           : meetAccess
-                            ? 'Chưa có lịch Meet hôm nay · Tự học video & giữ chuỗi XP'
-                            : 'Tự học video & giữ chuỗi XP'}
+                            ? 'Chưa có lịch Meet hôm nay · Luyện tập & giữ chuỗi XP'
+                            : 'Luyện tập & giữ chuỗi XP'}
                   </Text>
                   <View style={styles.bMiniActionWrap}>
                     {primaryTodayClass ? (
@@ -1386,7 +1309,7 @@ export function HomeScreen() {
                   <View style={styles.ovHeadRow}>
                     <BookOpen size={18} color="#059669" />
                     <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
-                    <Pressable onPress={() => tabNavigation.navigate('CourseVideos')} accessibilityRole="button">
+                    <Pressable onPress={() => tabNavigation.navigate('DailyPractice')} accessibilityRole="button">
                       <Text style={styles.ovLink}>Xem tất cả ›</Text>
                     </Pressable>
                   </View>
@@ -1396,60 +1319,32 @@ export function HomeScreen() {
                     onChange={setSelectedCourse}
                     showProgress={false}
                   />
-                  {coursePickerItems.length <= 1 ? (
-                    <Text numberOfLines={2} style={styles.ovCourseName}>{currentCourse || 'Chưa có khóa học'}</Text>
-                  ) : null}
-                  <ProgressBar
-                    value={
-                      isVideoCourse
-                        ? (videoTotal > 0 ? Math.round((videoDone / videoTotal) * 100) : 0)
-                        : (studentProgress ?? 0)
-                    }
-                  />
+                  <View style={styles.ovProgressBlock}>
+                    <View style={styles.ovProgressHeaderRow}>
+                      {coursePickerItems.length <= 1 ? (
+                        <Text numberOfLines={2} style={[styles.ovCourseName, styles.flex]}>{currentCourse || 'Chưa có khóa học'}</Text>
+                      ) : (
+                        <View style={styles.flex} />
+                      )}
+                      <Text style={styles.ovCoursePct}>{`${studentProgress ?? 0}%`}</Text>
+                    </View>
+                    <ProgressBar value={studentProgress ?? 0} />
+                  </View>
                   <Text style={styles.ovCourseMeta}>
-                    {(isVideoCourse
-                      ? [
-                        videoTotal > 0 ? `${videoDone}/${videoTotal} bài · ${Math.round((videoDone / videoTotal) * 100)}%` : 'Khóa video tự học',
-                        videoTotal > 0 ? `Còn ${Math.max(0, videoTotal - videoDone)} bài` : '',
-                      ]
-                      : [
-                        sessionCountsAvailable ? `${completedSessions}/${totalSessions} buổi · ${studentProgress ?? 0}%` : '',
-                        sessionCountsAvailable ? `Còn ${Math.max(0, (totalSessions || 0) - (completedSessions || 0))} buổi` : '',
-                        (currentEnrollment?.avgGrade ?? user?.avgGrade) != null ? `Điểm TB ${currentEnrollment?.avgGrade ?? user?.avgGrade}/10` : '',
-                        currentEnrollment?.teacherName ? `GV: ${currentEnrollment.teacherName}` : '',
-                      ]
-                    ).filter(Boolean).join('  ·  ') || 'Tiến độ sẽ cập nhật sau buổi học đầu tiên.'}
+                    {[
+                      sessionCountsAvailable ? `Đã học ${completedSessions}/${totalSessions} buổi` : '',
+                      currentEnrollment?.teacherName ? `GV: ${currentEnrollment.teacherName}` : '',
+                    ].filter(Boolean).join('  ·  ') || 'Tiến độ sẽ cập nhật sau buổi học đầu tiên.'}
                   </Text>
-                  <View style={styles.ovButtonRow}>
-                    {isVideoCourse ? (
-                      <DuoButton
-                        variant="blue"
-                        size="md"
-                        icon={<Video size={16} color="#FFFFFF" />}
-                        label={videoNextSubject ? `Học tiếp: ${videoNextSubject.name}` : 'Vào học video'}
-                        onPress={() => tabNavigation.navigate('CourseVideos')}
-                        style={{ flex: 1 }}
-                      />
-                    ) : (
-                      <>
-                        <DuoButton
-                          variant="primary"
-                          size="md"
-                          icon={<Video size={16} color="#FFFFFF" />}
-                          label="Vào bài học"
-                          onPress={() => tabNavigation.navigate('CourseVideos')}
-                          style={{ flex: 1 }}
-                        />
-                        <DuoButton
-                          variant="secondary"
-                          size="md"
-                          icon={<Calendar size={16} color="#475569" />}
-                          label="Lịch học"
-                          onPress={() => tabNavigation.navigate('Schedule')}
-                          style={{ flex: 1 }}
-                        />
-                      </>
-                    )}
+                  <View style={[styles.ovButtonRow, styles.ovButtonRowEnd]}>
+                    <DuoButton
+                      variant="primary"
+                      size="md"
+                      icon={<Video size={16} color="#FFFFFF" />}
+                      label="Vào bài học"
+                      onPress={() => tabNavigation.navigate('DailyPractice')}
+                      style={styles.ovCourseActionBtn}
+                    />
                   </View>
                 </View>
               ) : null}
@@ -1470,7 +1365,7 @@ export function HomeScreen() {
                   />
                 ) : null}
                 <LearningLeaderboardCard isBrandStudent={isBrandStudent} />
-                {(practice?.referral || practiceStats?.referral) ? (
+                {freeMenu && (practice?.referral || practiceStats?.referral) ? (
                   <ReferralRewardCard
                     referral={(practice?.referral || practiceStats?.referral)!}
                     onRedeemed={() => {
@@ -1670,8 +1565,13 @@ const styles = StyleSheet.create({
   ovStatValue: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   ovStatLabel: { color: colors.muted, fontSize: 11.5, lineHeight: 15, fontWeight: '700' },
   ovCourseName: { color: colors.ink, fontSize: 16, fontWeight: '900' },
+  ovProgressBlock: { gap: 6 },
+  ovProgressHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  ovCoursePct: { color: '#059669', fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   ovCourseMeta: { color: colors.muted, fontSize: 12, fontWeight: '700', lineHeight: 18 },
   ovButtonRow: { flexDirection: 'row', gap: spacing.sm },
+  ovButtonRowEnd: { justifyContent: 'flex-end' },
+  ovCourseActionBtn: { width: '48.5%', minWidth: 160 },
   ovPrimary: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
     backgroundColor: colors.brand,

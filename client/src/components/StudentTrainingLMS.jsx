@@ -3,10 +3,11 @@ import {
   Play, CheckCircle, Lock, ChevronRight, Clock, Award, BookOpen,
   ArrowLeft, Shield, Users, BarChart2, RefreshCw, GraduationCap,
   PlayCircle, ChevronDown, ChevronUp, Star, AlertCircle, CheckCircle2,
-  FileBox, Video, Download, FileText, Timer, FileUp, UploadCloud, Link as LinkIcon, X, Crown, Gift, ExternalLink,
+  FileBox, Video, Download, FileText, Timer, FileUp, UploadCloud, Link as LinkIcon, X, Crown, Gift, ExternalLink, PenLine, Plus,
 } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
+import { useActiveCourse } from '../context/ActiveCourseContext';
 import { getClientEnrollments, isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
 import {
   buildExamSubjectsFromProgress,
@@ -365,6 +366,29 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const [fpTopicFilter, setFpTopicFilter] = useState('all');
   const [fpDifficultyFilter, setFpDifficultyFilter] = useState('all'); // all | easy | medium | hard
   const isFreePortalOnly = Boolean(trainingData?.isFreePortalOnly);
+  const {
+    enrolledCourses: enrolledPortalCourses,
+    activeCourseId: activePortalCourseId,
+    setActiveCourseId: setActivePortalCourseId,
+    openAddCourse,
+  } = useActiveCourse();
+  const [fpCourseFilter, setFpCourseFilter] = useState(() => activePortalCourseId || 'all');
+
+  useEffect(() => {
+    if (activePortalCourseId) setFpCourseFilter(activePortalCourseId);
+  }, [activePortalCourseId]);
+
+  const selectedFilterCourse = useMemo(
+    () => (fpCourseFilter === 'all' ? null : enrolledPortalCourses.find((c) => c.id === fpCourseFilter) || null),
+    [enrolledPortalCourses, fpCourseFilter],
+  );
+
+  const matchesCourseFilter = useCallback((item) => {
+    if (fpCourseFilter === 'all' || !selectedFilterCourse) return true;
+    const ids = selectedFilterCourse.topicIds || [];
+    if (ids.length === 0) return true;
+    return ids.includes(String(item?.topicId || '').trim());
+  }, [fpCourseFilter, selectedFilterCourse]);
 
   const fpTopicOptions = useMemo(() => {
     if (!isFreePortalOnly) return [];
@@ -373,38 +397,45 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       ...(trainingData?.files || []),
       ...(trainingData?.softwareLinks || []),
       ...(trainingData?.assignments || []),
-    ].forEach((item) => {
-      const tid = String(item?.topicId || '').trim();
-      const tname = String(item?.topicName || '').trim();
-      if (tid && !seen.has(tid)) seen.set(tid, tname || 'Môn học');
-    });
+    ]
+      .filter(matchesCourseFilter)
+      .forEach((item) => {
+        const tid = String(item?.topicId || '').trim();
+        const tname = String(item?.topicName || '').trim();
+        if (tid && !seen.has(tid)) seen.set(tid, tname || 'Môn học');
+      });
     return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  }, [isFreePortalOnly, trainingData?.files, trainingData?.softwareLinks, trainingData?.assignments]);
+  }, [isFreePortalOnly, trainingData?.files, trainingData?.softwareLinks, trainingData?.assignments, matchesCourseFilter]);
 
   const visibleFiles = useMemo(() => {
     const list = trainingData?.files || [];
     if (!isFreePortalOnly) return list;
-    const filtered = fpTopicFilter === 'all' ? list : list.filter((f) => String(f?.topicId || '') === fpTopicFilter);
+    const filtered = list.filter((f) =>
+      matchesCourseFilter(f) && (fpTopicFilter === 'all' || String(f?.topicId || '') === fpTopicFilter),
+    );
     return sortFreePortalItems(filtered);
-  }, [trainingData?.files, isFreePortalOnly, fpTopicFilter]);
+  }, [trainingData?.files, isFreePortalOnly, fpTopicFilter, matchesCourseFilter]);
 
   const visibleSoftwareLinks = useMemo(() => {
     const list = trainingData?.softwareLinks || [];
     if (!isFreePortalOnly) return list;
-    const filtered = fpTopicFilter === 'all' ? list : list.filter((s) => String(s?.topicId || '') === fpTopicFilter);
+    const filtered = list.filter((s) =>
+      matchesCourseFilter(s) && (fpTopicFilter === 'all' || String(s?.topicId || '') === fpTopicFilter),
+    );
     return sortFreePortalItems(filtered);
-  }, [trainingData?.softwareLinks, isFreePortalOnly, fpTopicFilter]);
+  }, [trainingData?.softwareLinks, isFreePortalOnly, fpTopicFilter, matchesCourseFilter]);
 
   const visibleAssignments = useMemo(() => {
     const list = trainingData?.assignments || [];
     if (!isFreePortalOnly) return list;
     const filtered = list.filter((a) => {
+      if (!matchesCourseFilter(a)) return false;
       if (fpTopicFilter !== 'all' && String(a?.topicId || '') !== fpTopicFilter) return false;
       if (fpDifficultyFilter !== 'all' && String(a?.difficulty || 'easy') !== fpDifficultyFilter) return false;
       return true;
     });
     return sortFreePortalItems(filtered);
-  }, [trainingData?.assignments, isFreePortalOnly, fpTopicFilter, fpDifficultyFilter]);
+  }, [trainingData?.assignments, isFreePortalOnly, fpTopicFilter, fpDifficultyFilter, matchesCourseFilter]);
 
   // Mở thẳng một bài tập từ trang Tổng quan (#materials-assignments?assignmentId=…).
   useEffect(() => {
@@ -1399,27 +1430,109 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             </div>
           )}
           {hideTabBar && ['files', 'software', 'assignments'].includes(mainTab) && (
-            <div className="mb-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
-              {[
-                { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
-                { key: 'software', icon: LinkIcon, label: 'Phần mềm', count: trainingData?.softwareLinks?.length || 0 },
-                { key: 'assignments', icon: BookOpen, label: 'Bài tập', count: pendingAssignmentCount },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={mainTab === t.key}
-                  onClick={() => setMainTab(t.key)}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? (isFreeStudent ? 'bg-white text-emerald-600 shadow-sm' : 'bg-white text-emerald-600 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
+            isFreePortalOnly ? (
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div
+                  className="inline-flex max-w-full flex-wrap gap-1.5 rounded-full bg-white/85 backdrop-blur-xl border border-white p-1.5 shadow-[0_8px_24px_-10px_rgba(16,185,129,0.18)]"
+                  role="tablist"
                 >
-                  <t.icon size={15} /> {t.label}
-                  {t.count > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-black text-slate-600">{t.count}</span>}
-                </button>
-              ))}
-            </div>
+                  {[
+                    { key: 'files', icon: FileBox, label: 'Tài liệu', count: visibleFiles.length },
+                    { key: 'software', icon: LinkIcon, label: 'Phần mềm', count: visibleSoftwareLinks.length },
+                    { key: 'assignments', icon: BookOpen, label: 'Bài tập', count: visibleAssignments.length },
+                  ].map((t) => {
+                    const active = mainTab === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setMainTab(t.key)}
+                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                          active
+                            ? 'dew-btn-primary text-white shadow-sm'
+                            : 'text-slate-600 hover:bg-white/80 hover:text-emerald-700'
+                        }`}
+                      >
+                        <t.icon size={15} /> {t.label}
+                        {t.count > 0 && (
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
+                              active ? 'bg-white/25 text-white' : 'bg-emerald-50 text-emerald-700'
+                            }`}
+                          >
+                            {t.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {enrolledPortalCourses.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-full bg-white/80 backdrop-blur-xl border border-white px-2.5 py-1.5 shadow-[0_6px_20px_-10px_rgba(15,23,42,0.12)]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFpCourseFilter('all');
+                        setFpTopicFilter('all');
+                      }}
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
+                        fpCourseFilter === 'all'
+                          ? 'dew-btn-primary text-white'
+                          : 'dew-btn-white text-slate-600'
+                      }`}
+                    >
+                      Tất cả khóa
+                    </button>
+                    {enrolledPortalCourses.map((c) => {
+                      const active = fpCourseFilter === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setFpCourseFilter(c.id);
+                            setActivePortalCourseId(c.id);
+                            setFpTopicFilter('all');
+                          }}
+                          className={`rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
+                            active
+                              ? 'dew-btn-primary text-white'
+                              : 'dew-btn-white text-slate-700'
+                          }`}
+                        >
+                          {c.shortTitle || c.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mb-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
+                {[
+                  { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
+                  { key: 'software', icon: LinkIcon, label: 'Phần mềm', count: trainingData?.softwareLinks?.length || 0 },
+                  { key: 'assignments', icon: BookOpen, label: 'Bài tập', count: pendingAssignmentCount },
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={mainTab === t.key}
+                    onClick={() => setMainTab(t.key)}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? (isFreeStudent ? 'bg-white text-emerald-600 shadow-sm' : 'bg-white text-emerald-600 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    <t.icon size={15} /> {t.label}
+                    {t.count > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-black text-slate-600">{t.count}</span>}
+                  </button>
+                ))}
+              </div>
+            )
           )}
-          {hideTabBar && <div className="mb-5 border-b border-slate-200" />}
+          {hideTabBar && !isFreePortalOnly && <div className="mb-5 border-b border-slate-200" />}
 
           {mainTab === 'courses' && (
             <>
@@ -1527,16 +1640,28 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           {/* FILES TAB */}
           {mainTab === 'files' && (
-            <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-3">
-                <Download className="text-green-600" /> {isFreePortalOnly ? 'Tài liệu luyện tập miễn phí' : 'Tài liệu Khóa học'}
-              </h2>
+            <div className={`${isFreePortalOnly ? 'dew-app-card p-5 sm:p-6' : 'bg-white rounded-[24px] p-6 shadow-sm border border-gray-100'} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2.5">
+                  <Download className="text-emerald-600" />
+                  <span>
+                    {isFreePortalOnly
+                      ? `Tài liệu luyện tập${selectedFilterCourse ? ` — ${selectedFilterCourse.shortTitle || selectedFilterCourse.title}` : ''}`
+                      : 'Tài liệu Khóa học'}
+                  </span>
+                </h2>
+                {isFreePortalOnly && visibleFiles.length > 0 && (
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-extrabold text-emerald-700">
+                    {visibleFiles.length} tài liệu
+                  </span>
+                )}
+              </div>
               {isFreePortalOnly && fpTopicOptions.length > 0 && (
-                <div className="mb-4 flex flex-wrap gap-1.5">
+                <div className="mb-5 flex flex-wrap gap-1.5">
                   <button
                     type="button"
                     onClick={() => setFpTopicFilter('all')}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${fpTopicFilter === 'all' ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-600'}`}
                   >
                     Tất cả môn
                   </button>
@@ -1545,7 +1670,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                       key={tp.id}
                       type="button"
                       onClick={() => setFpTopicFilter(tp.id)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${fpTopicFilter === tp.id ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-600'}`}
                     >
                       {tp.name}
                     </button>
@@ -1556,82 +1681,95 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 visibleFiles.length === 0 ? (
                   <div className="py-12 text-center text-slate-400">
                     <FileBox size={40} className="mx-auto mb-3 opacity-40" />
-                    <p className="font-bold">Chưa có tài liệu</p>
-                    <p className="text-xs mt-1">Chưa có tài liệu cho môn này.</p>
+                    <p className="font-bold text-slate-700">Chưa có tài liệu</p>
+                    <p className="text-xs mt-1">Chưa có tài liệu cho lớp hoặc môn học đang chọn.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                    <table className="w-full min-w-[680px] text-left text-sm">
-                      <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600 border-b border-slate-200">
-                        <tr>
-                          <th className="px-4 py-3 w-12 text-center">STT</th>
-                          <th className="px-4 py-3">Môn học</th>
-                          <th className="px-4 py-3">Chủ đề / Chặng</th>
-                          <th className="px-4 py-3">Tài liệu</th>
-                          <th className="px-4 py-3 text-right">Tải xuống</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {visibleFiles.map((file, idx) => {
-                          const fKey = file.id ?? `f-${idx}`;
-                          const rawUrl = file.fileUrl || file.url || file.link || '';
-                          const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
-                            || /^https?:\/\//i.test(String(rawUrl));
-                          return (
-                            <tr key={fKey} className="hover:bg-emerald-50/40 transition-colors">
-                              <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
-                              <td className="px-4 py-3">
-                                <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                                  {file.topicName || 'Chung'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className="inline-block rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
-                                  {file.unitTitle || 'Cả môn'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="font-bold text-slate-800">{file.title}</div>
-                                {file.desc ? (
-                                  <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{htmlToPlainText(file.desc)}</div>
-                                ) : null}
-                                <div className="mt-1 text-[11px] font-semibold text-slate-400">
-                                  {isLink ? 'Liên kết ngoài' : `${file.fileType || 'FILE'}${file.fileSize ? ` · ${file.fileSize}` : ''}`}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right whitespace-nowrap">
-                                {!rawUrl ? (
-                                  <span className="text-xs text-slate-400">Chưa có file</span>
-                                ) : isLink ? (
-                                  <a
-                                    href={resolveMediaUrl(rawUrl)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-sky-700 no-underline"
-                                  >
-                                    <ExternalLink size={14} /> Mở link
-                                  </a>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                                    onClick={async () => {
-                                      try {
-                                        await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
-                                      } catch (err) {
-                                        toast.error(err?.message || 'Không tải được tài liệu');
-                                      }
-                                    }}
-                                  >
-                                    <Download size={14} /> Tải xuống
-                                  </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {visibleFiles.map((file, idx) => {
+                      const fKey = file.id ?? `f-${idx}`;
+                      const rawUrl = file.fileUrl || file.url || file.link || '';
+                      const fileTypeStr = String(file.fileType || file.type || 'FILE').toUpperCase();
+                      const isLink = fileTypeStr === 'LINK' || /^https?:\/\//i.test(String(rawUrl));
+                      const isPdf = fileTypeStr.includes('PDF') || /\.pdf$/i.test(String(file.fileOriginalName || rawUrl));
+                      const isExcel = fileTypeStr.includes('XLS') || /\.(xlsx?|csv)$/i.test(String(file.fileOriginalName || rawUrl));
+                      const badgeBg = isLink
+                        ? 'from-indigo-400 via-indigo-500 to-violet-600'
+                        : isPdf
+                          ? 'from-rose-400 via-red-500 to-rose-600'
+                          : isExcel
+                            ? 'from-emerald-400 via-emerald-500 to-teal-600'
+                            : 'from-sky-400 via-blue-500 to-indigo-600';
+                      const badgeLabel = isLink ? 'LINK' : isPdf ? 'PDF' : isExcel ? 'XLSX' : fileTypeStr.slice(0, 4) || 'DOC';
+                      return (
+                        <div
+                          key={fKey}
+                          className="rounded-[24px] bg-white/90 backdrop-blur-xl border border-white p-5 shadow-[0_14px_30px_-14px_rgba(16,185,129,0.22),inset_0_2px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-4 hover:-translate-y-0.5 transition-all"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-b ${badgeBg} text-white font-black text-[11px] flex items-center justify-center shrink-0 shadow-[0_10px_20px_-6px_rgba(15,23,42,0.28),inset_0_2px_0_rgba(255,255,255,0.65)] ring-2 ring-white/80`}>
+                                {badgeLabel}
+                              </div>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {file.topicName && (
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                                    {file.topicName}
+                                  </span>
                                 )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                {file.unitTitle && (
+                                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                    {file.unitTitle}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <h3 className="mt-3.5 text-[15px] font-extrabold text-slate-900 leading-snug line-clamp-2">
+                              {file.title}
+                            </h3>
+                            {file.desc ? (
+                              <p className="mt-1.5 text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                {htmlToPlainText(file.desc)}
+                              </p>
+                            ) : null}
+                            <p className="mt-2 text-[11px] font-semibold text-slate-400">
+                              {isLink ? 'Liên kết học liệu trực tuyến' : `${fileTypeStr}${file.fileSize ? ` · ${file.fileSize}` : ''}`}
+                            </p>
+                          </div>
+
+                          <div>
+                            {!rawUrl ? (
+                              <span className="inline-flex w-full items-center justify-center rounded-full bg-slate-100 py-2.5 text-xs font-bold text-slate-400">
+                                Chưa có file đính kèm
+                              </span>
+                            ) : isLink ? (
+                              <a
+                                href={resolveMediaUrl(rawUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="dew-btn-primary w-full inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-extrabold text-white no-underline cursor-pointer"
+                              >
+                                <ExternalLink size={14} /> Mở link tài liệu
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                className="dew-btn-primary w-full inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-extrabold text-white cursor-pointer"
+                                onClick={async () => {
+                                  try {
+                                    await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
+                                  } catch (err) {
+                                    toast.error(err?.message || 'Không tải được tài liệu');
+                                  }
+                                }}
+                              >
+                                <Download size={14} /> Tải xuống
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )
               ) : (
@@ -1840,18 +1978,30 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           {/* ASSIGNMENTS TAB */}
           {mainTab === 'assignments' && (
-            <div className="cms-card !p-4 sm:!p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
-                <BookOpen className="text-green-600" /> {isFreePortalOnly ? 'Bài tập luyện tập (3 mức độ)' : 'Bài tập được giao'}
-              </h2>
+            <div className={`${isFreePortalOnly ? 'dew-app-card p-5 sm:p-6' : 'cms-card !p-4 sm:!p-6'} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2.5">
+                  <BookOpen className="text-emerald-600" />
+                  <span>
+                    {isFreePortalOnly
+                      ? `Bài tập thực hành${selectedFilterCourse ? ` — ${selectedFilterCourse.shortTitle || selectedFilterCourse.title}` : ''}`
+                      : 'Bài tập được giao'}
+                  </span>
+                </h2>
+                {isFreePortalOnly && visibleAssignments.length > 0 && (
+                  <span className="rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-xs font-extrabold text-sky-700">
+                    {visibleAssignments.length} bài tập
+                  </span>
+                )}
+              </div>
               {isFreePortalOnly && (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
                   {fpTopicOptions.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
                         onClick={() => setFpTopicFilter('all')}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${fpTopicFilter === 'all' ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-600'}`}
                       >
                         Tất cả môn
                       </button>
@@ -1860,7 +2010,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                           key={tp.id}
                           type="button"
                           onClick={() => setFpTopicFilter(tp.id)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpTopicFilter === tp.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                          className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${fpTopicFilter === tp.id ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-600'}`}
                         >
                           {tp.name}
                         </button>
@@ -1878,7 +2028,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                         key={d.id}
                         type="button"
                         onClick={() => setFpDifficultyFilter(d.id)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${fpDifficultyFilter === d.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        className={`rounded-full px-3 py-1.5 text-xs font-bold transition cursor-pointer ${fpDifficultyFilter === d.id ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-600'}`}
                       >
                         {d.label}
                       </button>
@@ -1890,114 +2040,112 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 visibleAssignments.length === 0 ? (
                   <div className="py-12 text-center text-slate-400">
                     <CheckCircle2 size={32} className="mx-auto mb-2 text-slate-200" />
-                    <p className="text-sm">Chưa có bài tập phù hợp với bộ lọc hiện tại.</p>
+                    <p className="text-sm font-bold text-slate-700">Chưa có bài tập phù hợp với bộ lọc hiện tại.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                    <table className="w-full min-w-[780px] text-left text-sm">
-                      <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600 border-b border-slate-200">
-                        <tr>
-                          <th className="px-4 py-3 w-12 text-center">STT</th>
-                          <th className="px-4 py-3">Môn học</th>
-                          <th className="px-4 py-3">Chủ đề / Chặng</th>
-                          <th className="px-4 py-3">Mức độ</th>
-                          <th className="px-4 py-3">Bài tập &amp; Yêu cầu</th>
-                          <th className="px-4 py-3 text-right">Tải xuống &amp; Nộp bài</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {visibleAssignments.map((a, idx) => {
-                          const submission = a.mySubmission || localSubmissions[idx];
-                          const d = String(a.difficulty || 'easy').toLowerCase();
-                          const meta = d === 'hard'
-                            ? { label: 'Khó', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
-                            : d === 'medium'
-                              ? { label: 'Vừa', cls: 'bg-amber-100 text-amber-700 border-amber-200' }
-                              : { label: 'Dễ', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
-                          const aKey = a._id || a.id || `a-${idx}`;
-                          const aDesc = htmlToPlainText(a.description || '');
-                          const isExternal = /^https?:\/\//i.test(String(a.fileUrl || ''));
-                          return (
-                            <tr key={aKey} id={`lms-assignment-${aKey}`} className="hover:bg-emerald-50/40 transition-colors">
-                              <td className="px-4 py-3 text-center font-bold text-slate-500">{idx + 1}</td>
-                              <td className="px-4 py-3">
-                                <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                                  {a.topicName || 'Chung'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className="inline-block rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
-                                  {a.unitTitle || 'Cả môn'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`inline-block rounded-lg border px-2.5 py-1 text-xs font-black ${meta.cls}`}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {visibleAssignments.map((a, idx) => {
+                      const submission = a.mySubmission || localSubmissions[idx];
+                      const d = String(a.difficulty || 'easy').toLowerCase();
+                      const meta = d === 'hard'
+                        ? { label: 'Khó', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
+                        : d === 'medium'
+                          ? { label: 'Vừa', cls: 'bg-amber-100 text-amber-700 border-amber-200' }
+                          : { label: 'Dễ', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+                      const aKey = a._id || a.id || `a-${idx}`;
+                      const aDesc = htmlToPlainText(a.description || '');
+                      const isExternal = /^https?:\/\//i.test(String(a.fileUrl || ''));
+                      return (
+                        <div
+                          key={aKey}
+                          id={`lms-assignment-${aKey}`}
+                          className="rounded-[24px] bg-white/90 backdrop-blur-xl border border-white p-5 shadow-[0_14px_30px_-14px_rgba(2,132,199,0.2),inset_0_2px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-4 hover:-translate-y-0.5 transition-all"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-sky-400 via-sky-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-[0_10px_20px_-6px_rgba(2,132,199,0.4),inset_0_2px_0_rgba(255,255,255,0.65)] ring-2 ring-white/80">
+                                <PenLine size={20} />
+                              </div>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black ${meta.cls}`}>
                                   {meta.label}
                                 </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="font-bold text-slate-800">{a.title}</div>
-                                <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                                  {aDesc || 'Tải đề bài về thực hành và nộp lại file bài làm (.zip, .rar, .pdf, .docx, .xlsx).'}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right whitespace-nowrap">
-                                <div className="inline-flex items-center justify-end gap-2">
-                                  {a.fileUrl ? (
-                                    isExternal ? (
-                                      <a
-                                        href={resolveMediaUrl(a.fileUrl)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 no-underline"
-                                      >
-                                        <ExternalLink size={13} /> Tải đề
-                                      </a>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          try {
-                                            await downloadMediaFile(a.fileUrl, a.fileOriginalName || a.title);
-                                          } catch (err) {
-                                            toast.error(err?.message || 'Không tải được đề bài');
-                                          }
-                                        }}
-                                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                                      >
-                                        <Download size={13} /> Tải đề
-                                      </button>
-                                    )
-                                  ) : null}
-                                  <label className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold text-white cursor-pointer transition ${uploadingAssignId === idx
-                                      ? 'bg-emerald-400 cursor-not-allowed'
-                                      : submission
-                                        ? 'bg-amber-500 hover:bg-amber-600'
-                                        : 'bg-emerald-600 hover:bg-emerald-700'
-                                    }`}>
-                                    {uploadingAssignId === idx ? (
-                                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    ) : submission ? (
-                                      <CheckCircle2 size={14} />
-                                    ) : (
-                                      <UploadCloud size={14} />
-                                    )}
-                                    <span>{uploadingAssignId === idx ? 'Đang tải...' : submission ? 'Đã nộp · Nộp lại' : 'Nộp bài'}</span>
-                                    <input
-                                      type="file"
-                                      className="hidden"
-                                      accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx"
-                                      onChange={(e) => handleFileChange(a, idx, e.target.files[0])}
-                                      disabled={uploadingAssignId === idx}
-                                    />
-                                  </label>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                {a.topicName && (
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                                    {a.topicName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <h3 className="mt-3.5 text-[15px] font-extrabold text-slate-900 leading-snug line-clamp-2">
+                              {a.title}
+                            </h3>
+                            <p className="mt-1.5 text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                              {aDesc || 'Tải đề bài về thực hành và nộp lại file bài làm (.zip, .rar, .pdf, .docx, .xlsx).'}
+                            </p>
+                            {a.unitTitle && (
+                              <span className="mt-2 inline-block rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                {a.unitTitle}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            {a.fileUrl ? (
+                              isExternal ? (
+                                <a
+                                  href={resolveMediaUrl(a.fileUrl)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="dew-btn-white inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-xs font-extrabold text-slate-700 no-underline shrink-0 cursor-pointer"
+                                >
+                                  <ExternalLink size={13} /> Đề
+                                </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await downloadMediaFile(a.fileUrl, a.fileOriginalName || a.title);
+                                    } catch (err) {
+                                      toast.error(err?.message || 'Không tải được đề bài');
+                                    }
+                                  }}
+                                  className="dew-btn-white inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-xs font-extrabold text-slate-700 shrink-0 cursor-pointer"
+                                >
+                                  <Download size={13} /> Đề
+                                </button>
+                              )
+                            ) : null}
+                            <label
+                              className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-extrabold text-white cursor-pointer transition ${
+                                uploadingAssignId === idx
+                                  ? 'bg-sky-400 cursor-not-allowed'
+                                  : submission
+                                    ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_10px_20px_-6px_rgba(16,185,129,0.4),inset_0_2px_0_rgba(255,255,255,0.65)]'
+                                    : 'bg-gradient-to-b from-sky-400 via-sky-500 to-blue-600 shadow-[0_10px_20px_-6px_rgba(2,132,199,0.45),inset_0_2px_0_rgba(255,255,255,0.65)] hover:brightness-105'
+                              }`}
+                            >
+                              {uploadingAssignId === idx ? (
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : submission ? (
+                                <CheckCircle2 size={14} />
+                              ) : (
+                                <PenLine size={14} />
+                              )}
+                              <span>{uploadingAssignId === idx ? 'Đang tải...' : submission ? 'Đã nộp · Nộp lại' : 'Làm bài ngay'}</span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx"
+                                onChange={(e) => handleFileChange(a, idx, e.target.files[0])}
+                                disabled={uploadingAssignId === idx}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )
               ) : (
@@ -2276,6 +2424,40 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               </div>
             );
           })()}
+
+          {isFreePortalOnly && ['files', 'software', 'assignments'].includes(mainTab) && (
+            <div className="dew-app-card rounded-[24px] px-5 py-3.5 mt-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm font-bold text-slate-700">
+                Cần tài liệu cho lớp khác?
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {enrolledPortalCourses
+                  .filter((c) => c.id !== fpCourseFilter)
+                  .slice(0, 2)
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setFpCourseFilter(c.id);
+                        setActivePortalCourseId(c.id);
+                        setFpTopicFilter('all');
+                      }}
+                      className="dew-btn-white inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-extrabold text-emerald-700 cursor-pointer"
+                    >
+                      Chuyển sang {c.shortTitle || c.title}
+                    </button>
+                  ))}
+                <button
+                  type="button"
+                  onClick={() => openAddCourse()}
+                  className="dew-btn-primary inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-extrabold text-white cursor-pointer"
+                >
+                  <Plus size={13} /> Khám phá thêm khóa học
+                </button>
+              </div>
+            </div>
+          )}
 
         </div>
         {videoPayModal}

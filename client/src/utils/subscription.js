@@ -14,9 +14,11 @@ export function formatVnd(value) {
 }
 
 export {
+  LOW_XP_BUY_THRESHOLD,
   formatDailyXpProgressLine,
   formatDailyXpWalletLine,
   isDailyXpExhausted,
+  isLowXpForBuyPrompt,
   resolveTodayXpSidebar,
 } from '../../../shared/subscription/xpDailyLine.mjs';
 
@@ -31,9 +33,14 @@ export function subscriptionShortLabel(subscription, options = {}) {
   if (options.isCourseStudent === true) {
     return options.xpLine ? `Gói Khóa học · ${options.xpLine}` : 'Gói Khóa học';
   }
+  const hasOwnedClass = Boolean(subscription.hasOwnedClass || subscription.state === 'course');
+  if (hasOwnedClass && !subscription.meetLifetime && subscription.state === 'course') {
+    const label = subscription.ownedClassName || subscription.planLabel || 'Khóa học theo môn';
+    return options.xpLine ? `${label} · ${options.xpLine}` : label;
+  }
   const freePortal = options.freePortal === true;
   const hasActivePaid = subscription.state === 'active' || subscription.state === 'expiring' || Boolean(subscription.meetLifetime);
-  if (!hasActivePaid && (subscription.freeTier || subscription.state === 'free' || (freePortal && !subscription.meetLifetime))) {
+  if (!hasActivePaid && !hasOwnedClass && (subscription.freeTier || subscription.state === 'free' || (freePortal && !subscription.meetLifetime))) {
     return 'Gói miễn phí';
   }
   if (subscription.state === 'lifetime') return 'Gói Vĩnh viễn';
@@ -64,9 +71,12 @@ export function reminderMilestoneKey(subscription) {
   return `${subscription.expiresAt}:${milestone}`;
 }
 
-/** Khớp server `hasMeetAccess`: cổng miễn phí đã mua gói Meet còn hạn. */
+/** Khớp server `hasMeetAccess`: cổng miễn phí đã mua gói Meet còn hạn hoặc sở hữu khóa học còn hạn có Meet. */
 export function hasMeetAccessClient(subscription) {
   if (!subscription) return false;
+  if (subscription.state === 'course' || subscription.hasOwnedClass) {
+    return subscription.hasCourseMeetAccess !== false;
+  }
   if (subscription.state === 'expired' || subscription.freeTier || subscription.state === 'free') return false;
   return Boolean(subscription.meetLifetime || subscription.state === 'active' || subscription.state === 'expiring');
 }
@@ -83,6 +93,7 @@ export function hasFeedPostAccess({ role, session, subscription }) {
     if (session?.freePortal === true) return false;
     return false;
   }
+  if (sub.state === 'course' || Boolean(sub.hasOwnedClass)) return true;
   const state = sub.state;
   if (state === 'expired' || state === 'free' || sub.freeTier) return false;
   if (state === 'active' || state === 'expiring') return true;

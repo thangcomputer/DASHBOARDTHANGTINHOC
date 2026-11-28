@@ -34,6 +34,25 @@ const videoGuideSchema = new mongoose.Schema({
   checklist: { type: [String], default: [] },
 }, { _id: false });
 
+const dropletExerciseSchema = new mongoose.Schema({
+  title: { type: String, default: '', trim: true, maxlength: 180 },
+  prompt: { type: String, required: true, trim: true, maxlength: 5000 },
+  attachmentUrl: { type: String, default: '', trim: true, maxlength: 500 },
+  attachmentName: { type: String, default: '', trim: true, maxlength: 180 },
+  expectedAnswers: { type: [String], default: [] },
+  gradingMode: { type: String, enum: ['auto', 'ai', 'hybrid'], default: 'hybrid' },
+  matchOptions: {
+    ignoreCase: { type: Boolean, default: true },
+    trimSpaces: { type: Boolean, default: true },
+    ignoreAccents: { type: Boolean, default: false },
+    numericTolerance: { type: Number, default: 0 },
+  },
+  aiCriteria: { type: String, default: '', trim: true, maxlength: 1000 },
+  hint: { type: String, default: '', trim: true, maxlength: 300 },
+  explanation: { type: String, default: '', trim: true, maxlength: 1000 },
+  xpReward: { type: Number, default: 10 },
+}, { _id: true });
+
 const levelSectionConfigSchema = new mongoose.Schema({
   sectionOrder: {
     type: [String],
@@ -63,6 +82,7 @@ const levelSectionConfigSchema = new mongoose.Schema({
   practice: {
     title: { type: String, default: '', trim: true, maxlength: 160 },
     description: { type: String, default: '', trim: true, maxlength: 320 },
+    questionIds: { type: [String], default: [] },
     itemOrder: { type: [String], default: [] },
     video: {
       title: { type: String, default: '', trim: true, maxlength: 160 },
@@ -208,6 +228,8 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
         medium: { type: levelSectionConfigSchema, default: undefined },
         hard: { type: levelSectionConfigSchema, default: undefined },
       },
+      /** Đề bài tập tự nhập đáp án (Tự khớp / AI chấm) của hạt nước. */
+      exercises: { type: [dropletExerciseSchema], default: [] },
     }],
     default: undefined,
   },

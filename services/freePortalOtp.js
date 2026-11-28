@@ -380,6 +380,7 @@ async function verifyOtpAndRegister({ identifier, email, phone, otp, deviceFinge
     paidAmount: 0,
     status: 'Đang học',
     learningMode: 'ONLINE',
+    accountType: 'dewskill',
     freePortal: true,
     freeUnlocked: false,
     isFirstLogin: false,

@@ -703,7 +703,7 @@ export default function AdminStudentsTab() {
   };
 
   const selectFilterClass =
-    'w-full h-11 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 outline-none cursor-pointer transition-all';
+    'w-full h-10 px-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-[13px] font-medium text-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 outline-none cursor-pointer transition-all';
 
   const teacherSelectClass =
     'w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-sky-400 cursor-pointer';
@@ -826,140 +826,144 @@ export default function AdminStudentsTab() {
 
   return (
     <div className="cms-students-module cms-viewport-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* Title + actions */}
-      <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3 shrink-0">
-        <div className="flex items-start justify-between gap-3 min-w-0">
-          <h2 className="text-base font-semibold text-slate-900 flex items-start gap-2 min-w-0">
-            <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
-              <BookOpen size={18} aria-hidden="true" />
-            </span>
-            <span className="min-w-0 break-words leading-snug">Quản lý Học Viên</span>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0 self-center">
-              {studentsPagination.totalRecords}
-            </span>
-          </h2>
-        </div>
-
-        {/* Sticky search */}
-        <div className="cms-students-search-sticky -mx-3 px-3 py-2 sm:-mx-4 sm:px-4 lg:mx-0 lg:px-0 lg:static lg:bg-transparent lg:backdrop-blur-none lg:border-0 lg:py-0">
-          <div className="relative w-full">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
-            <input
-              value={draftSearch}
-              onChange={(e) => setDraftSearch(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => {
-                window.setTimeout(() => setSearchFocused(false), 180);
-              }}
-              className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 outline-none w-full transition-all"
-              placeholder="Tìm tên, SĐT, Email, mã HV..."
-              aria-label="Tìm học viên"
-              autoComplete="off"
-              aria-autocomplete="list"
-              aria-expanded={searchFocused && searchSuggestions.length > 0}
-            />
-            {searchFocused && String(draftSearch || '').trim() && searchSuggestions.length > 0 && (
-              <ul
-                className="absolute left-0 right-0 top-full mt-1 z-30 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1"
-                role="listbox"
-              >
-                {searchSuggestions.map((s) => (
-                  <li key={s.id || s._id} role="option">
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        const name = String(s.name || '').trim();
-                        setDraftSearch(name);
-                        setSearch(name);
-                        setSearchFocused(false);
-                      }}
-                    >
-                      <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
-                      {s.phone ? (
-                        <span className="block text-[11px] text-slate-400">{s.phone}</span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+      {/* Title + search + filters + actions */}
+      <div className="px-3 pt-3 pb-2.5 sm:px-4 lg:px-5 lg:py-3.5 shrink-0 border-b border-slate-100/80">
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:flex-wrap xl:flex-nowrap lg:items-center lg:gap-1.5 2xl:gap-2 min-w-0">
+          <div className="flex items-center justify-between gap-2 min-w-0 lg:shrink-0">
+            <h2 className="text-sm 2xl:text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                <BookOpen size={17} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 truncate leading-snug">Quản lý Học Viên TT</span>
+              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
+                {studentsPagination.totalRecords}
+              </span>
+            </h2>
           </div>
-        </div>
 
-        {/* Branch + Status (+ Course) - one wrapping row */}
-        <div className="cms-students-filters">
-          <div className="lg:hidden">
-            <BranchFilterDropdown fullWidth />
+          {/* Sticky search */}
+          <div className="cms-students-search-sticky -mx-3 px-3 py-1.5 sm:-mx-4 sm:px-4 lg:mx-0 lg:px-0 lg:static lg:bg-transparent lg:backdrop-blur-none lg:border-0 lg:py-0 lg:flex-1 lg:min-w-[180px] 2xl:min-w-[220px]">
+            <div className="relative w-full">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+              <input
+                value={draftSearch}
+                onChange={(e) => setDraftSearch(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setSearchFocused(false), 180);
+                }}
+                className="pl-9 pr-3 h-10 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 outline-none w-full transition-all"
+                placeholder="Tìm tên, SĐT, Email, mã HV..."
+                aria-label="Tìm học viên"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-expanded={searchFocused && searchSuggestions.length > 0}
+              />
+              {searchFocused && String(draftSearch || '').trim() && searchSuggestions.length > 0 && (
+                <ul
+                  className="absolute left-0 right-0 top-full mt-1 z-30 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1"
+                  role="listbox"
+                >
+                  {searchSuggestions.map((s) => (
+                    <li key={s.id || s._id} role="option">
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          const name = String(s.name || '').trim();
+                          setDraftSearch(name);
+                          setSearch(name);
+                          setSearchFocused(false);
+                        }}
+                      >
+                        <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
+                        {s.phone ? (
+                          <span className="block text-[11px] text-slate-400">{s.phone}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-          <CmsSelect
-            value={filterCourse}
-            onChange={(e) => setFilterCourse(e.target.value)}
-            className={selectFilterClass}
-          >
-            <option value="all">Tất cả khóa học</option>
-            {courseFilterOptions.map((c) => (
-              <option key={c._id} value={c.name}>{c.name}</option>
-            ))}
-          </CmsSelect>
-          <CmsSelect
-            value={filterPaid}
-            onChange={(e) => setFilterPaid(e.target.value)}
-            className={selectFilterClass}
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="paid">Đã đóng phí</option>
-            <option value="unpaid">Chưa nộp phí</option>
-            <option value="refunded">Hoàn học phí</option>
-          </CmsSelect>
-        </div>
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-2 min-w-0 sm:flex sm:flex-wrap sm:items-stretch">
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="cms-students-btn-primary col-span-2 sm:col-auto sm:order-last sm:ml-auto !px-3"
-          >
-            <Plus size={15} className="shrink-0" />
-            Thêm học viên
-          </button>
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            disabled={isExportingExcel}
-            className="cms-students-btn-outline !px-2.5 min-w-0"
-            title="Xuất Excel"
-          >
-            {isExportingExcel
-              ? <Loader2 size={15} className="animate-spin shrink-0" />
-              : <Download size={15} className="shrink-0" />}
-            <span>Xuất</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowImportModal(true)}
-            className="cms-students-btn-outline !px-2.5 min-w-0"
-            title="Import Excel"
-          >
-            <FileSpreadsheet size={15} className="shrink-0" />
-            <span>Excel</span>
-          </button>
-          <button
-            type="button"
-            onClick={handlePurgeCancelledStudents}
-            disabled={purgingCancelled}
-            className="cms-students-btn-outline col-span-2 sm:col-auto !px-2.5 min-w-0 text-rose-700 border-rose-200 hover:bg-rose-50"
-            title="Xóa vĩnh viễn HV chỉ còn khóa đã hủy/hoàn (ghost)"
-          >
-            {purgingCancelled
-              ? <Loader2 size={15} className="animate-spin shrink-0" />
-              : <Trash2 size={15} className="shrink-0" />}
-            <span>
-              Dọn HV hủy khóa{ghostCancelledCount > 0 ? ` (${ghostCancelledCount})` : ''}
-            </span>
-          </button>
+          {/* Branch + Status (+ Course) */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:items-center lg:gap-1.5 2xl:gap-2 lg:shrink-0 min-w-0">
+            <div className="sm:col-span-2 lg:hidden">
+              <BranchFilterDropdown fullWidth />
+            </div>
+            <CmsSelect
+              value={filterCourse}
+              onChange={(e) => setFilterCourse(e.target.value)}
+              wrapperClassName="w-full lg:w-[150px] 2xl:w-[175px]"
+              className={selectFilterClass}
+            >
+              <option value="all">Tất cả khóa học</option>
+              {courseFilterOptions.map((c) => (
+                <option key={c._id} value={c.name}>{c.name}</option>
+              ))}
+            </CmsSelect>
+            <CmsSelect
+              value={filterPaid}
+              onChange={(e) => setFilterPaid(e.target.value)}
+              wrapperClassName="w-full lg:w-[140px] 2xl:w-[160px]"
+              className={selectFilterClass}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="paid">Đã đóng phí</option>
+              <option value="unpaid">Chưa nộp phí</option>
+              <option value="refunded">Hoàn học phí</option>
+            </CmsSelect>
+          </div>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-2 min-w-0 sm:flex sm:flex-wrap sm:items-center lg:flex-nowrap lg:gap-1.5 2xl:gap-2 lg:shrink-0">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={isExportingExcel}
+              className="cms-students-btn-outline !h-10 !px-2.5 !text-xs whitespace-nowrap min-w-0"
+              title="Xuất Excel"
+            >
+              {isExportingExcel
+                ? <Loader2 size={14} className="animate-spin shrink-0" />
+                : <Download size={14} className="shrink-0" />}
+              <span>Xuất</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="cms-students-btn-outline !h-10 !px-2.5 !text-xs whitespace-nowrap min-w-0"
+              title="Import Excel"
+            >
+              <FileSpreadsheet size={14} className="shrink-0" />
+              <span>Excel</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePurgeCancelledStudents}
+              disabled={purgingCancelled}
+              className="cms-students-btn-outline col-span-2 sm:col-auto !h-10 !px-2.5 !text-xs whitespace-nowrap min-w-0 text-rose-700 border-rose-200 hover:bg-rose-50"
+              title="Xóa vĩnh viễn HV chỉ còn khóa đã hủy/hoàn (ghost)"
+            >
+              {purgingCancelled
+                ? <Loader2 size={14} className="animate-spin shrink-0" />
+                : <Trash2 size={14} className="shrink-0" />}
+              <span>
+                Dọn HV hủy khóa{ghostCancelledCount > 0 ? ` (${ghostCancelledCount})` : ''}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="cms-students-btn-primary col-span-2 sm:col-auto sm:ml-auto lg:ml-0 !h-10 !px-3 !text-xs whitespace-nowrap shrink-0"
+            >
+              <Plus size={14} className="shrink-0" />
+              Thêm học viên
+            </button>
+          </div>
         </div>
       </div>
 

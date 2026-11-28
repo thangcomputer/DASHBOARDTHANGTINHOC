@@ -13,6 +13,7 @@ import BuyXpModal from './BuyXpModal';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { setStudyMediaPlaying } from '../../../utils/learningGoal';
 import { gameSounds } from '../../../utils/sound';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import { VIDEO_CHECK_ANSWER_XP, VIDEO_CHECK_SKIP_XP } from '../../../utils/dailyPractice';
 import { AnswerCheer, CRY_MASCOT, readScreenshot, UploadProgress } from './VideoAnswerFx';
 import {
@@ -243,6 +244,7 @@ export default function PathVideoModal({
   const syncXpStats = (res, spendXp = 0) => {
     const patch = {
       ...(typeof res?.profileXp === 'number' ? { xpTotal: res.profileXp } : {}),
+      ...(typeof res?.studyXpTotal === 'number' ? { studyXpTotal: res.studyXpTotal } : {}),
       ...(typeof res?.purchasedXp === 'number' ? { purchasedXp: res.purchasedXp } : {}),
       ...(typeof res?.dailyXp === 'number' ? { dailyXp: res.dailyXp } : {}),
       ...(spendXp > 0 ? { spendXp } : {}),
@@ -549,7 +551,7 @@ export default function PathVideoModal({
       }
     } catch (err) {
       setMissed(false);
-      if (err.status === 402) openBuyXp();
+      if (err.status === 402) openBuyXp(err);
       else setCheckError(err.message || 'Chưa gửi được câu trả lời');
     } finally {
       setCheckBusy(false);
@@ -574,7 +576,11 @@ export default function PathVideoModal({
     }
   };
 
-  const openBuyXp = () => {
+  const openBuyXp = (err = null) => {
+    if (err?.suggestedAction === 'upgrade_plan' || err?.isFreeTier) {
+      window.dispatchEvent(new CustomEvent('cms:open-upgrade-plan'));
+      return;
+    }
     setBuyXpOpen(true);
     dailyPracticeApi.student.overview()
       .then((data) => setXpPacks(data?.stats?.xpPacks || []))
@@ -591,8 +597,12 @@ export default function PathVideoModal({
         const data = await dailyPracticeApi.student.overview();
         const xp = Number(data?.stats?.xpTotal) || 0;
         if (xp < cost) {
-          setXpPacks(data?.stats?.xpPacks || []);
-          setBuyXpOpen(true);
+          if (data?.stats?.suggestedAction === 'upgrade_plan' || data?.stats?.isFreeTier) {
+            window.dispatchEvent(new CustomEvent('cms:open-upgrade-plan'));
+          } else {
+            setXpPacks(data?.stats?.xpPacks || []);
+            setBuyXpOpen(true);
+          }
           setCheckBusy(false);
           return;
         }
@@ -603,7 +613,7 @@ export default function PathVideoModal({
       syncXpStats(res, Number(res?.charged ?? res?.cost ?? 0));
       setPaidHint(res.hint || '');
     } catch (err) {
-      if (err.status === 402) openBuyXp();
+      if (err.status === 402) openBuyXp(err);
       else setCheckError(err.message || 'Chưa đổi được gợi ý');
     } finally {
       setCheckBusy(false);
@@ -630,7 +640,7 @@ export default function PathVideoModal({
       setConfirmingSkip(false);
       finishCheck(gate.id);
     } catch (err) {
-      if (err.status === 402) openBuyXp();
+      if (err.status === 402) openBuyXp(err);
       else setCheckError(err.message || 'Chưa bỏ qua được câu hỏi');
     } finally {
       setCheckBusy(false);
@@ -1157,7 +1167,7 @@ export default function PathVideoModal({
   }
 
   return createPortal(
-    <div className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation">
+    <div data-theme={getDewSkillThemeAttr()} className="dp-video-backdrop fixed inset-0 z-[9600] flex items-center justify-center p-2 sm:p-4 md:p-6" role="presentation">
       <div
         className="dp-pop flex max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-[22px] bg-[#1C1F26] shadow-[0_30px_80px_rgba(69,10,10,0.55)] ring-1 ring-white/10"
         role="dialog"

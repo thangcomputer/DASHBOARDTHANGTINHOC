@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Sparkles } from 'lucide-react';
 import { vnTodayKey } from '../../../utils/dailyPractice';
 import { gameSounds } from '../../../utils/sound';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import Mascot from './Mascot';
 
 const SHOW_MS = 3000;
@@ -50,10 +51,10 @@ export default function WelcomeBackModal({
   ].filter(Boolean).join(' · ');
 
   return createPortal(
-    <div className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
+    <div data-theme={getDewSkillThemeAttr()} className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="presentation">
       <style>{`@keyframes dp-welcome-bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}`}</style>
       <div
-        className="cms-goal-in relative flex aspect-square w-[min(92vw,420px)] flex-col items-center justify-center overflow-hidden rounded-[32px] bg-gradient-to-br from-amber-50 via-white to-orange-50 px-6 text-center shadow-2xl"
+        className="dew-modal cms-goal-in relative flex aspect-square w-[min(92vw,420px)] flex-col items-center justify-center overflow-hidden rounded-[32px] bg-gradient-to-br from-amber-50 via-white to-orange-50 px-6 text-center shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dp-welcome-title"

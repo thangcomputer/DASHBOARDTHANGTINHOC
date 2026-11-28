@@ -12,7 +12,7 @@ const DEFAULT_AMOUNTS = {
   subject: 50,
   course: 200,
   streak3: 20,
-  streak7: 50,
+  streak7: 100,
   streak14: 100,
   streak30: 300,
   referral: 50,

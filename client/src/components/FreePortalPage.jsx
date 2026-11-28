@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Eye,
   EyeOff,
@@ -968,6 +968,16 @@ export default function FreePortalPage({ onLogin }) {
               <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400">
                 <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
                 <span>Bảo mật an toàn 100% • Không yêu cầu thẻ ngân hàng</span>
+              </div>
+              <div className="mt-1.5 text-center text-[11px] text-slate-400">
+                <span>Khi tiếp tục, bạn đồng ý với </span>
+                <Link to="/dieu-khoan" className="font-semibold text-emerald-600 hover:underline">
+                  Điều khoản sử dụng
+                </Link>
+                <span> &amp; </span>
+                <Link to="/bao-mat" className="font-semibold text-emerald-600 hover:underline">
+                  Chính sách bảo mật
+                </Link>
               </div>
             </div>
 

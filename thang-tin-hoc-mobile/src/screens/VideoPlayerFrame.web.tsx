@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { MobileLmsPlayerChrome } from '../components/dailyPractice/MobileLmsPlayerChrome';
+import { MobileLmsPlayerChrome, type VideoCheckpointPin } from '../components/dailyPractice/MobileLmsPlayerChrome';
 import { typography } from '../theme/tokens';
 import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
@@ -103,6 +103,10 @@ export function VideoPlayerFrame({
   initialAtSec = 0,
   pausedCheckpointSec = null,
   onFullscreenChange,
+  checkpoints = [],
+  onSelectCheckpoint = null,
+  maxCheckpointSec = null,
+  checkpointGateModal = null,
 }: {
   videoUrl: string;
   embeddedUrl: string;
@@ -121,6 +125,10 @@ export function VideoPlayerFrame({
   initialAtSec?: number;
   pausedCheckpointSec?: number | null;
   onFullscreenChange?: (fullscreen: boolean) => void;
+  checkpoints?: VideoCheckpointPin[];
+  onSelectCheckpoint?: ((cp: VideoCheckpointPin) => void) | null;
+  maxCheckpointSec?: number | null;
+  checkpointGateModal?: React.ReactNode | ((state: { isFullscreen: boolean }) => React.ReactNode);
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -138,6 +146,8 @@ export function VideoPlayerFrame({
   const watchedCallbackRef = useRef(onWatched);
   const doneRef = useRef(done);
   const antiSeekRef = useRef(antiSeekEnabled);
+  const maxCpRef = useRef<number | null>(maxCheckpointSec);
+  maxCpRef.current = maxCheckpointSec;
   const guardRef = useRef<ReturnType<typeof createVideoWatchGuard> | null>(null);
   const pendingSeekRef = useRef<{ target: number; expiresAt: number } | null>(null);
   const watchStorageKeyRef = useRef(`student_lms_pos_${lessonId}`);
@@ -263,7 +273,10 @@ export function VideoPlayerFrame({
         const allowAdvance = Boolean(options?.allowAdvance);
         const guard = guardRef.current;
         const duration = Number(progressRef.current.duration) || 0;
-        let target = requested;
+        const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+          ? Math.max(0, maxCpRef.current)
+          : Number.POSITIVE_INFINITY;
+        let target = Math.min(requested, cpCap);
         if (duration > 0) target = Math.min(target, duration);
         if (antiSeekRef.current && !doneRef.current && !allowAdvance && guard) {
           const cap = Math.max(progressRef.current.currentTime, guard.getMaxPosition());
@@ -278,6 +291,10 @@ export function VideoPlayerFrame({
         pendingSeekRef.current = allowAdvance
           ? { target, expiresAt: Date.now() + 2000 }
           : null;
+        if (target >= cpCap - 0.15) {
+          if (videoRef.current) videoRef.current.pause();
+          else if (youtubePlayerRef.current) youtubePlayerRef.current.pauseVideo?.();
+        }
         if (videoRef.current) {
           const cur = Number(videoRef.current.currentTime) || 0;
           const appliedTarget = (target <= cur || canMediaSeekTo(videoRef.current, target)) ? target : cur;
@@ -288,6 +305,9 @@ export function VideoPlayerFrame({
           }
           progressRef.current = { ...progressRef.current, currentTime: appliedTarget };
           setUiProgress((prev) => ({ ...prev, currentTime: appliedTarget }));
+          if (appliedTarget >= cpCap - 0.15) {
+            callbackRef.current({ ...progressRef.current, currentTime: appliedTarget, playing: false });
+          }
           return;
         }
         if (youtubePlayerRef.current) youtubePlayerRef.current.seekTo(target, true);
@@ -296,6 +316,9 @@ export function VideoPlayerFrame({
         }
         progressRef.current = { ...progressRef.current, currentTime: target };
         setUiProgress((prev) => ({ ...prev, currentTime: target }));
+        if (target >= cpCap - 0.15) {
+          callbackRef.current({ ...progressRef.current, currentTime: target, playing: false });
+        }
       },
     };
     if (playerApiRef) playerApiRef.current = currentPlayerApi;
@@ -356,10 +379,36 @@ export function VideoPlayerFrame({
         }
         pendingSeekRef.current = null;
       }
+      const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+        ? Math.max(0, maxCpRef.current)
+        : Number.POSITIVE_INFINITY;
       const tick = guard.tick(currentTime, duration, playing, antiSeekRef.current, doneRef.current || thresholdReached);
       if (tick.seekTo !== null) {
         seekTo(tick.seekTo);
         triggerAntiSeekNotice();
+        return;
+      }
+      if (currentTime >= cpCap - 0.15) {
+        const clampedT = Math.min(currentTime, cpCap);
+        if (playing) {
+          if (videoRef.current) videoRef.current.pause();
+          else if (youtubePlayerRef.current) youtubePlayerRef.current.pauseVideo?.();
+          else if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage(JSON.stringify({ method: 'pause' }), 'https://player.vimeo.com');
+          }
+        }
+        if (currentTime > cpCap + 0.35) seekTo(cpCap);
+        const cpSnap: VideoPlayerProgress = {
+          currentTime: clampedT,
+          duration,
+          watchedSeconds: tick.watchedSeconds,
+          completed: doneRef.current,
+          playing: false,
+        };
+        progressRef.current = cpSnap;
+        callbackRef.current(cpSnap);
+        setUiProgress(cpSnap);
+        noteStudyMediaProgress(false);
         return;
       }
       const now = Date.now();
@@ -381,7 +430,7 @@ export function VideoPlayerFrame({
       };
       progressRef.current = snapshot;
       noteStudyMediaProgress(playing);
-      if (now - lastProgressSentAt >= 500) {
+      if (now - lastProgressSentAt >= 350) {
         lastProgressSentAt = now;
         callbackRef.current(snapshot);
         setUiProgress(snapshot);
@@ -635,13 +684,28 @@ export function VideoPlayerFrame({
 
   const togglePlay = () => {
     setAwaitingStart(false);
-    if (uiProgress.playing) playerApiRef?.current?.pause?.();
-    else playerApiRef?.current?.play?.();
+    if (uiProgress.playing) {
+      playerApiRef?.current?.pause?.();
+      return;
+    }
+    const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+      ? Math.max(0, maxCpRef.current)
+      : Number.POSITIVE_INFINITY;
+    if (progressRef.current.currentTime >= cpCap - 0.15) {
+      playerApiRef?.current?.pause?.();
+      callbackRef.current({ ...progressRef.current, playing: false });
+      return;
+    }
+    playerApiRef?.current?.play?.();
   };
 
   const seekTo = (position: number) => {
-    playerApiRef?.current?.seekTo?.(position);
-    setUiProgress((prev) => ({ ...prev, currentTime: position }));
+    const cpCap = typeof maxCpRef.current === 'number' && maxCpRef.current > 0
+      ? Math.max(0, maxCpRef.current)
+      : Number.POSITIVE_INFINITY;
+    const clamped = Math.min(position, cpCap);
+    playerApiRef?.current?.seekTo?.(clamped);
+    setUiProgress((prev) => ({ ...prev, currentTime: clamped }));
   };
 
   const refreshQualities = useCallback(() => {
@@ -715,6 +779,8 @@ export function VideoPlayerFrame({
           overlayVariant={appearance === 'window' ? 'window' : 'default'}
           startOverlayVisible={appearance === 'window' && awaitingStart && !uiProgress.playing}
           pausedCheckpointSec={pausedCheckpointSec}
+          checkpoints={checkpoints}
+          onSelectCheckpoint={onSelectCheckpoint}
           isPlaying={uiProgress.playing}
           currentTime={uiProgress.currentTime}
           duration={uiProgress.duration}
@@ -738,6 +804,9 @@ export function VideoPlayerFrame({
           rightSlot={chromeRightSlot}
         />
       ) : null}
+      {typeof checkpointGateModal === 'function'
+        ? checkpointGateModal({ isFullscreen })
+        : checkpointGateModal}
       {playerError ? (
         <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(8,13,25,0.82)' }}>
           <Text style={{ color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700', textAlign: 'center' }}>{playerError}</Text>

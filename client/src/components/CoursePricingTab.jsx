@@ -9,7 +9,7 @@ import { loadXlsx } from '../utils/loadXlsx';
 import CmsSelect from './ui/CmsSelect';
 import {
   Plus, Edit2, Trash2, Save, X, Loader2, AlertCircle,
-  DollarSign, Percent, Tag, BookOpen, CheckCircle2, Clapperboard, GraduationCap,
+  DollarSign, Percent, Tag, BookOpen, CheckCircle2,
   Download, Upload, FileSpreadsheet, RefreshCw
 } from 'lucide-react';
 import { useToast } from '../utils/useToast';
@@ -35,7 +35,6 @@ const COURSE_IMPORT_COLUMNS = [
   { header: 'Bắt đầu giảm giá (ISO)', key: 'discountStartsAt' },
   { header: 'Kết thúc giảm giá (ISO)', key: 'discountEndsAt' },
   { header: 'Số buổi', key: 'totalSessions' },
-  { header: 'Hình thức (instructor/video)', key: 'deliveryMode' },
   { header: 'Danh mục', key: 'category' },
   { header: 'Mã môn (phân cách bằng ;)', key: 'examSubjects' },
   { header: 'Mô tả', key: 'description' },
@@ -86,12 +85,6 @@ function parseCourseImportRow(row, rowNumber) {
     .map((id) => id.trim())
     .filter(Boolean);
   const examSubjects = rawExamSubjects.map((id) => slugifyExamSubjectId(id));
-  const deliveryInput = normalizeSpreadsheetHeader(get('deliveryMode'));
-  const deliveryMode = ['video', 'tuhocquavideo'].includes(deliveryInput)
-    ? 'video'
-    : ['instructor', 'hoccunggiangvien'].includes(deliveryInput)
-      ? 'instructor'
-      : '';
   const category = String(get('category') || 'van-phong').trim().toLowerCase();
   const allowedCategories = new Set(['van-phong', 'do-hoa', 'lap-trinh', 'ai', 'chung-chi', 'khac']);
   const status = String(get('status') || 'published').trim().toLowerCase();
@@ -106,7 +99,6 @@ function parseCourseImportRow(row, rowNumber) {
   if (!Number.isInteger(totalSessions) || totalSessions < 1) errors.push('số buổi phải là số nguyên dương');
   if (!examSubjects.length) errors.push('thiếu mã môn');
   if (examSubjects.some((id) => !id || id.length < 2)) errors.push('có mã môn không hợp lệ');
-  if (!deliveryMode) errors.push('hình thức học phải là instructor hoặc video');
   if (!allowedCategories.has(category)) errors.push(`danh mục "${category}" không hợp lệ`);
   if (!allowedStatuses.has(status)) errors.push(`trạng thái "${status}" không hợp lệ`);
   if (Boolean(discountStartsAt) !== Boolean(discountEndsAt)) errors.push('cần nhập đủ thời gian bắt đầu và kết thúc giảm giá');
@@ -128,7 +120,7 @@ function parseCourseImportRow(row, rowNumber) {
     discountStartsAt: discountStartsAt || null,
     discountEndsAt: discountEndsAt || null,
     totalSessions,
-    deliveryMode,
+    deliveryMode: 'instructor',
     category,
     examSubjects,
     description: String(get('description') || '').trim(),
@@ -209,7 +201,6 @@ function CourseModal({
     discountStartsAt: toLocalDateTimeInput(course?.discountStartsAt),
     discountEndsAt: toLocalDateTimeInput(course?.discountEndsAt),
     totalSessions: course?.totalSessions || 12,
-    deliveryMode: course?.deliveryMode || 'instructor',
     category: course?.category || 'van-phong',
     examSubjects: Array.isArray(course?.examSubjects) && course.examSubjects.length
       ? [...course.examSubjects]
@@ -416,7 +407,7 @@ function CourseModal({
         discountStartsAt: fromLocalDateTimeInput(form.discountStartsAt),
         discountEndsAt: fromLocalDateTimeInput(form.discountEndsAt),
         totalSessions: Number(form.totalSessions),
-        deliveryMode: form.deliveryMode,
+        deliveryMode: 'instructor',
         category: form.category,
         examSubjects: form.examSubjects,
         description: form.description,
@@ -489,46 +480,6 @@ function CourseModal({
                   placeholder="VD: THVP Nâng Cao (12 Buổi)"
                 />
               </div>
-
-              <fieldset>
-                <legend className="mb-2 block text-xs font-black  tracking-widest text-gray-500">
-                  Hình thức học
-                </legend>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {[
-                    { id: 'instructor', label: 'Học cùng giảng viên', description: 'Học theo lịch với giảng viên', Icon: GraduationCap },
-                    { id: 'video', label: 'Tự học qua video', description: 'Chủ động học theo lộ trình video', Icon: Clapperboard },
-                  ].map((option) => {
-                    const selected = form.deliveryMode === option.id;
-                    return (
-                      <label
-                        key={option.id}
-                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-blue-300 ${selected
-                            ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                            : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200'
-                          }`}
-                      >
-                        <input
-                          type="radio"
-                          name="course-delivery-mode"
-                          value={option.id}
-                          checked={selected}
-                          onChange={() => setForm((current) => ({ ...current, deliveryMode: option.id }))}
-                          className="sr-only"
-                        />
-                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-gray-500'
-                          }`}>
-                          <option.Icon size={20} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-xs font-extrabold">{option.label}</span>
-                          <span className="mt-0.5 block text-[11px] text-gray-500">{option.description}</span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1130,7 +1081,6 @@ export default function CoursePricingTab() {
       discountStartsAt: course.discountStartsAt ? new Date(course.discountStartsAt).toISOString() : '',
       discountEndsAt: course.discountEndsAt ? new Date(course.discountEndsAt).toISOString() : '',
       totalSessions: Number(course.totalSessions) || 12,
-      deliveryMode: course.deliveryMode || 'instructor',
       category: course.category || 'van-phong',
       examSubjects: Array.isArray(course.examSubjects) ? course.examSubjects.join(';') : '',
       description: course.description || '',
@@ -1158,7 +1108,7 @@ export default function CoursePricingTab() {
       ['HƯỚNG DẪN NHẬP KHÓA HỌC'],
       ['Mỗi dòng trong sheet KhoaHoc là một khóa học mới. Tên trùng với khóa hiện có sẽ được bỏ qua, không ghi đè.'],
       ['Giá gốc: số tiền VND; Giảm giá: phần trăm từ 0 đến 100; Số buổi: số nguyên dương.'],
-      ['Hình thức: instructor hoặc video. Danh mục: van-phong, do-hoa, lap-trinh, ai, chung-chi hoặc khac.'],
+      ['Danh mục: van-phong, do-hoa, lap-trinh, ai, chung-chi hoặc khac.'],
       ['Mã môn: nhập mã môn, nhiều môn phân cách bằng dấu chấm phẩy (;). Mã chưa có trong danh mục sẽ được thêm tự động từ file.'],
       ['Tên môn mới được tạo từ mã môn nếu danh mục chưa có mã đó (ví dụ: word-co-ban → Word Co Ban).'],
       ['Thời gian giảm giá: định dạng ISO, ví dụ 2026-10-10T09:00:00.000Z; để trống nếu không đặt lịch.'],

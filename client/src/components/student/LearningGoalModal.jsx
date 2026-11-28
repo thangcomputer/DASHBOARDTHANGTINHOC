@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { CalendarCheck, CalendarDays, Check, Clock3, Flame, Loader2, PlayCircle, Sparkles, Sprout, Target, Trophy, X } from 'lucide-react';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { useToast } from '../../utils/useToast';
+import { getDewSkillThemeAttr } from '../../utils/dewskillTheme';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
   LEARNING_GOAL_HOURS,
@@ -97,9 +98,9 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-2.5 sm:p-4 backdrop-blur-[2px]" role="presentation">
+    <div data-theme={getDewSkillThemeAttr()} className="fixed inset-0 z-[9400] flex items-center justify-center bg-slate-950/55 p-2.5 sm:p-4 backdrop-blur-[2px]" role="presentation">
       <div
-        className="cms-goal-in relative flex max-h-[94dvh] w-full max-w-sm sm:max-w-md flex-col overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white shadow-2xl"
+        className="dew-modal cms-goal-in relative flex max-h-[94dvh] w-full max-w-sm sm:max-w-md flex-col overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="learning-goal-title"

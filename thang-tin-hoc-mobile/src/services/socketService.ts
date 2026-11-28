@@ -59,6 +59,7 @@ export const SOCKET_EVENTS = {
   FREE_PORTAL_UNLOCKED: 'socket:free-portal:unlocked',
   FREE_PORTAL_LOCKED: 'socket:free-portal:locked',
   SUBSCRIPTION_UPDATED: 'socket:subscription:updated',
+  STREAK_HONOR: 'socket:streak:honor',
 } as const;
 
 let socket: Socket | null = null;
@@ -228,6 +229,7 @@ function bindSocketEvents(instance: Socket, token: string) {
   instance.on('free-portal-unlocked', (data) => emitDeviceEvent(SOCKET_EVENTS.FREE_PORTAL_UNLOCKED, data));
   instance.on('free-portal-locked', (data) => emitDeviceEvent(SOCKET_EVENTS.FREE_PORTAL_LOCKED, data));
   instance.on('subscription:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.SUBSCRIPTION_UPDATED, data));
+  instance.on('streak:honor', (data) => emitDeviceEvent(SOCKET_EVENTS.STREAK_HONOR, data));
   instance.on('notification:read-sync', (data) => {
     emitDeviceEvent(SOCKET_EVENTS.NOTIFICATION_READ_SYNC, data);
     queueNotificationSignal(data);

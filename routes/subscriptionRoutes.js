@@ -2,12 +2,16 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, checkPermission, branchFilter } = require('../middleware/auth');
+const { authMiddleware, checkPermission, checkAnyPermission, branchFilter } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const service = require('../services/subscriptionService');
+const referralConfigService = require('../services/referralConfigService');
 
-const requireStudentAdmin = [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS)];
+const requireStudentAdmin = [
+  authMiddleware,
+  checkAnyPermission(PERMISSIONS.MANAGE_DEWSKILL_SUBSCRIPTIONS, PERMISSIONS.MANAGE_STUDENTS),
+];
 const requireFinanceAdmin = [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE)];
 
 function requireStudentRole(req, res, next) {
@@ -62,6 +66,26 @@ router.get('/xp-config', ...requireStudentAdmin, handle(() => service.getXpConfi
 router.put('/xp-config', ...requireStudentAdmin, handle(async (req) => service.setXpConfig(req.body || {})));
 router.post('/xp-config/reset-all', ...requireStudentAdmin, handle(() => service.resetAllStudentsXp()));
 
+router.get('/referral-config', ...requireStudentAdmin, handle(async () => {
+  const [config, stats] = await Promise.all([
+    referralConfigService.getReferralConfig({ forceRefresh: true }),
+    referralConfigService.getReferralStats(),
+  ]);
+  return { config, stats };
+}));
+
+router.put('/referral-config', ...requireStudentAdmin, handle(async (req) => {
+  const config = await referralConfigService.saveReferralConfig(req.body || {}, actorOf(req));
+  const stats = await referralConfigService.getReferralStats();
+  return { config, stats };
+}));
+
+router.post('/referral-config/reset', ...requireStudentAdmin, handle(async (req) => {
+  const config = await referralConfigService.resetReferralConfig(actorOf(req));
+  const stats = await referralConfigService.getReferralStats();
+  return { config, stats };
+}));
+
 router.get('/codes', ...requireStudentAdmin, handle((req) => service.listCodes({
   status: String(req.query.status || ''),
   plan: String(req.query.plan || ''),
@@ -104,7 +128,7 @@ router.get('/codes/export.csv', ...requireStudentAdmin, async (req, res) => {
   }
 });
 
-router.get('/students', authMiddleware, branchFilter, checkPermission(PERMISSIONS.MANAGE_STUDENTS), handle((req) => service.searchStudents(
+router.get('/students', authMiddleware, branchFilter, checkAnyPermission(PERMISSIONS.MANAGE_DEWSKILL_SUBSCRIPTIONS, PERMISSIONS.MANAGE_STUDENTS), handle((req) => service.searchStudents(
   String(req.query.q || ''),
   req.branchFilter || {},
 )));

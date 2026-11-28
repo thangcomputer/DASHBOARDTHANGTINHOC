@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const activationCodeSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true, trim: true },
   plan: { type: String, enum: ['1m', '3m', '6m', '12m', 'lifetime'], required: true },
+  classId: { type: mongoose.Schema.Types.ObjectId, ref: 'DewskillClass', default: null },
   status: { type: String, enum: ['unused', 'used', 'revoked'], default: 'unused', index: true },
   batchId: { type: String, default: '', index: true },
   note: { type: String, default: '', trim: true, maxlength: 200 },

@@ -14,11 +14,11 @@ const MEDALS = {
 };
 
 const LEAGUE_TIERS = [
-  { key: 'bronze', name: 'Đồng', Icon: Medal, iconClass: 'text-amber-700', minMinutes: 0, frame: 'ring-2 ring-amber-700/60', badge: 'bg-amber-100 text-amber-800' },
-  { key: 'silver', name: 'Bạc', Icon: Medal, iconClass: 'text-slate-500', minMinutes: 60, frame: 'ring-2 ring-slate-400', badge: 'bg-slate-200 text-slate-700' },
-  { key: 'gold', name: 'Vàng', Icon: Award, iconClass: 'text-amber-500', minMinutes: 120, frame: 'ring-2 ring-amber-400 shadow-xs', badge: 'bg-yellow-100 text-amber-800' },
-  { key: 'platinum', name: 'Bạch Kim', Icon: Shield, iconClass: 'text-cyan-600', minMinutes: 210, frame: 'ring-2 ring-cyan-400 shadow-sm', badge: 'bg-cyan-100 text-cyan-800' },
-  { key: 'diamond', name: 'Kim Cương', Icon: Gem, iconClass: 'text-fuchsia-600', minMinutes: 300, frame: 'ring-[3px] ring-fuchsia-400 shadow-md', badge: 'bg-fuchsia-100 text-fuchsia-800' },
+  { key: 'bronze', name: 'Đồng', Icon: Medal, iconClass: 'text-amber-800', minMinutes: 0, frame: 'ring-2 ring-amber-700/60', badge: 'bg-amber-100 text-amber-800', pillGlow: 'bg-gradient-to-b from-[#FDE68A] via-[#F59E0B]/70 to-[#D97706]/80 text-amber-950' },
+  { key: 'silver', name: 'Bạc', Icon: Medal, iconClass: 'text-slate-600', minMinutes: 60, frame: 'ring-2 ring-slate-400', badge: 'bg-slate-200 text-slate-700', pillGlow: 'bg-gradient-to-b from-white via-slate-200 to-slate-300 text-slate-800' },
+  { key: 'gold', name: 'Vàng', Icon: Award, iconClass: 'text-amber-700', minMinutes: 120, frame: 'ring-2 ring-amber-400 shadow-xs', badge: 'bg-yellow-100 text-amber-800', pillGlow: 'bg-gradient-to-b from-[#FEF08A] via-[#FACC15] to-[#EAB308] text-amber-950' },
+  { key: 'platinum', name: 'Bạch Kim', Icon: Shield, iconClass: 'text-cyan-700', minMinutes: 210, frame: 'ring-2 ring-cyan-400 shadow-sm', badge: 'bg-cyan-100 text-cyan-800', pillGlow: 'bg-gradient-to-b from-[#CFFAFE] via-[#67E8F9] to-[#22D3EE] text-cyan-950' },
+  { key: 'diamond', name: 'Kim Cương', Icon: Gem, iconClass: 'text-fuchsia-700', minMinutes: 300, frame: 'ring-[3px] ring-fuchsia-400 shadow-md', badge: 'bg-fuchsia-100 text-fuchsia-800', pillGlow: 'bg-gradient-to-b from-[#FAE8FF] via-[#F0ABFC] to-[#E879F9] text-fuchsia-950' },
 ];
 
 function TierIcon({ tier, size = 11 }) {
@@ -122,6 +122,116 @@ export default function LearningLeaderboardCard() {
   const myLeague = leagueForRow(me);
   const nextTierIdx = Math.min(LEAGUE_TIERS.length - 1, LEAGUE_TIERS.findIndex((t) => t.key === myLeague.key) + 1);
   const nextLeague = LEAGUE_TIERS[nextTierIdx];
+
+  if (freePortal) {
+    return (
+      <section className="dew-app-card dew-app-card--amber flex min-w-0 flex-col gap-3 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <Trophy size={18} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-extrabold text-slate-900">Bảng xếp hạng tuần</h3>
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                {data
+                  ? `${formatWeekDay(data.weekStart)} – ${formatWeekDay(data.weekEnd)}${data.participants > 0 ? ` · ${data.participants} học viên tham gia` : ''}`
+                  : 'Đang tải…'}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-extrabold border border-white/80 shadow-[0_4px_10px_-3px_rgba(180,83,9,0.28),inset_0_1.5px_1px_rgba(255,255,255,0.7)] ${myLeague.pillGlow}`}>
+              <TierIcon tier={myLeague} size={13} />
+              <span>{myLeague.name}</span>
+            </span>
+            {me && myLeague.key !== 'diamond' ? (
+              <span className="text-xs font-bold text-slate-700 tabular-nums">
+                Lên {nextLeague.name}: {Math.max(0, nextLeague.minMinutes - (Number(me.minutes) || 0))}p
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {error ? (
+          <p className="rounded-xl bg-amber-50/90 px-3 py-2 text-xs font-semibold text-amber-800">{error}</p>
+        ) : null}
+
+        {data && !top.length ? (
+          <p className="text-xs font-semibold text-slate-600">
+            Tuần này chưa có ai – hãy là người đầu tiên!
+          </p>
+        ) : (
+          <ol className="space-y-1.5">
+            {top.map((row) => {
+              const tier = leagueForRow(row);
+              return (
+                <li
+                  key={`${row.rank}-${row.name}`}
+                  className={`flex items-center gap-2.5 rounded-2xl border px-3 py-2 shadow-[inset_0_1px_0_#fff] ${
+                    row.isMe
+                      ? 'border-emerald-200 bg-emerald-50/90'
+                      : row.rank <= 3
+                        ? 'border-amber-100 bg-amber-50/50'
+                        : 'border-white bg-white/80'
+                  }`}
+                >
+                  <RankBadge rank={row.rank} />
+                  <Avatar name={row.name} avatar={row.avatar} freePortal={freePortal} frameClass={tier.frame} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-extrabold text-slate-800">
+                      {row.name}
+                      {row.isMe ? (
+                        <span className="ml-1.5 align-middle text-[9px] font-black uppercase tracking-wide rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">
+                          Bạn
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="flex items-center gap-1 truncate text-[10px] font-semibold text-slate-500">
+                      <TierIcon tier={tier} size={13} />
+                      <span>Hạng {tier.name}{row.hoursPerDay ? ` · Mục tiêu ${row.hoursPerDay}g/ngày` : ''}</span>
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right leading-tight">
+                    <p className="flex items-center justify-end gap-0.5 text-[11px] font-black text-emerald-600">
+                      <CheckCircle2 size={11} aria-hidden="true" />
+                      {row.goalDays}/{data.daysSoFar} ngày
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-500">
+                      {formatStudyMinutes(row.minutes)}
+                      {row.xp > 0 ? ` · ${row.xp} XP` : null}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        {data && me && (top.length > 0 || !me.hasGoal) ? (
+          <footer className="border-t border-slate-200/70 pt-2">
+            {!me.hasGoal ? (
+              <p className="text-xs font-medium text-slate-500">Đặt mục tiêu ở tab Mục tiêu để lên bảng.</p>
+            ) : !me.rank ? (
+              <p className="text-xs font-medium text-slate-500">Chưa có phút học tuần này — vào bài học để lên bảng.</p>
+            ) : meInTop ? (
+              gapMessage(me) ? (
+                <p className="text-xs leading-snug text-slate-500">{gapMessage(me)}</p>
+              ) : null
+            ) : (
+              <div className="flex items-start gap-2 rounded-2xl bg-white/80 border border-white px-3 py-2">
+                <span className="text-base font-black tabular-nums text-emerald-600">#{me.rank}</span>
+                <p className="min-w-0 flex-1 text-xs leading-snug text-slate-600">
+                  <span className="font-bold text-slate-800">
+                    {me.goalDays} ngày đạt · {formatStudyMinutes(me.minutes)}
+                  </span>
+                  {gapMessage(me) ? ` — ${gapMessage(me)}` : null}
+                </p>
+              </div>
+            )}
+          </footer>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section className="duo-card flex min-w-0 flex-col p-3.5">

@@ -18,6 +18,8 @@ const LazyStudentTrainingTab = lazy(() => import('./tabs/AdminStudentTrainingTab
 const LazyCertPrepTab = lazy(() => import('./tabs/AdminCertPrepTab'));
 const LazyLessonPracticeTab = lazy(() => import('./tabs/AdminLessonPracticeTab'));
 const LazyDailyPracticeTab = lazy(() => import('./tabs/AdminDailyPracticeTab'));
+const LazyDewskillStudentsTab = lazy(() => import('./tabs/AdminDewskillStudentsTab'));
+const LazyDewskillClassesTab = lazy(() => import('./tabs/AdminDewskillClassesTab'));
 const LazyLmsXpSettingsTab = lazy(() => import('./tabs/AdminLmsXpSettings'));
 const LazySubscriptionTab = lazy(() => import('./tabs/AdminSubscriptionTab'));
 const LazyMeetClassTab = lazy(() => import('./tabs/AdminMeetClassTab'));
@@ -110,6 +112,14 @@ export function AdminLazyLessonPracticeTab() {
 
 export function AdminLazyDailyPracticeTab() {
   return <LazyAdminTab Component={LazyDailyPracticeTab} />;
+}
+
+export function AdminLazyDewskillStudentsTab() {
+  return <LazyAdminTab Component={LazyDewskillStudentsTab} />;
+}
+
+export function AdminLazyDewskillClassesTab() {
+  return <LazyAdminTab Component={LazyDewskillClassesTab} />;
 }
 
 export function AdminLazyLmsXpSettingsTab() {

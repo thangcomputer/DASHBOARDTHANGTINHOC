@@ -127,6 +127,9 @@ export default function LmsBrandedPlayerChrome({
   overlayVariant = 'default',
   /** Slot hiển thị ngang hàng trên thanh điều khiển (vd: Đánh dấu đã xem). */
   rightSlot = null,
+  /** Mốc câu hỏi gắn trên thanh tiến độ: [{ id, atSec, label, unlocked, completed, active }] */
+  checkpoints = [],
+  onSelectCheckpoint = null,
 }) {
   const windowLook = overlayVariant === 'window';
   const [dragging, setDragging] = useState(false);
@@ -381,8 +384,34 @@ export default function LmsBrandedPlayerChrome({
                 className="absolute inset-y-0 left-0 rounded-full bg-emerald-500"
                 style={{ width: `${progressPct}%` }}
               />
+              {safeDur > 0 && Array.isArray(checkpoints) && checkpoints.map((cp, idx) => {
+                const leftPct = Math.min(96, Math.max(4, ((Number(cp.atSec) || 0) / safeDur) * 100));
+                const clickable = Boolean(cp.unlocked && onSelectCheckpoint);
+                return (
+                  <button
+                    key={cp.id || idx}
+                    type="button"
+                    title={`Mốc ${idx + 1} (${formatClock(cp.atSec)})`}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (clickable) onSelectCheckpoint(cp);
+                    }}
+                    className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 px-1 text-[10px] font-black transition ${cp.completed
+                      ? 'border-white bg-emerald-500 text-white shadow'
+                      : cp.unlocked
+                        ? (cp.active ? 'scale-110 border-white bg-emerald-400 text-slate-950 shadow-md ring-2 ring-emerald-300/80' : 'border-white bg-emerald-600 text-white shadow hover:scale-110')
+                        : 'cursor-default border-white/60 bg-slate-600 text-white/80'
+                    }`}
+                    style={{ left: `${leftPct}%` }}
+                  >
+                    {cp.completed ? '✓' : (cp.label || idx + 1)}
+                  </button>
+                );
+              })}
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow border border-emerald-200"
+                className="pointer-events-none absolute top-1/2 -translate-y-1/2 z-20 w-4 h-4 rounded-full bg-white shadow border border-emerald-200"
                 style={{ left: `calc(${progressPct}% - 8px)` }}
               />
             </div>

@@ -16,7 +16,14 @@ type ReferralRewardCardProps = {
   onRedeemed?: () => void;
 };
 
-/** Thẻ giới thiệu bạn bè nhận thưởng XP trên Tổng quan học viên — đồng bộ Web StudentOverviewTab. */
+function formatShortVnd(amount: number) {
+  const val = Math.max(0, Math.round(Number(amount) || 0));
+  if (val === 0) return '0đ';
+  if (val >= 1000 && val % 1000 === 0) return `${val / 1000}K`;
+  return `${val.toLocaleString('vi-VN')}đ`;
+}
+
+/** Thẻ giới thiệu bạn bè giảm học phí trên Tổng quan học viên — đồng bộ Web StudentOverviewTab. */
 export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardProps) {
   const [referralInput, setReferralInput] = useState('');
   const [referralBusy, setReferralBusy] = useState(false);
@@ -30,6 +37,16 @@ export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardP
   useEffect(() => () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
   }, []);
+
+  if (referral.enabled === false) {
+    return null;
+  }
+
+  const discountVnd = Math.max(0, Math.round(Number(referral.discountAmountVnd ?? 50000)));
+  const referrerVnd = Math.max(0, Math.round(Number(referral.referrerRewardVnd ?? 50000)));
+  const availableVnd = Math.max(0, Math.round(Number(referral.availableDiscountVnd || 0)));
+  const shortDiscount = formatShortVnd(discountVnd);
+  const shortReferrer = formatShortVnd(referrerVnd);
 
   const markCopied = () => {
     setReferralCopied(true);
@@ -52,7 +69,9 @@ export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardP
     try {
       await Share.share({
         title: 'Mã giới thiệu DewSkill',
-        message: `Nhập mã giới thiệu ${referral.code} trên DewSkill để nhận ngay +${referral.rewardXp} XP!`,
+        message: discountVnd > 0
+          ? `Nhập mã giới thiệu ${referral.code} trên DewSkill để được giảm ${discountVnd.toLocaleString('vi-VN')}đ khi đăng ký khóa học!`
+          : `Nhập mã giới thiệu ${referral.code} trên DewSkill để cùng học nhé!`,
       });
       markCopied();
     } catch {
@@ -68,9 +87,12 @@ export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardP
     try {
       const data = await dailyPracticeApi.redeemReferral(cleaned);
       setReferralInput('');
+      const gained = Math.max(0, Math.round(Number(data.discountAmountVnd ?? discountVnd)));
       setFeedback({
         type: 'success',
-        text: `Đã nhận +${data.rewardXp} XP cho cả bạn và ${data.referrerName}!`,
+        text: gained > 0
+          ? `Đã áp mã từ ${data.referrerName}! Bạn nhận ngay ưu đãi giảm ${gained.toLocaleString('vi-VN')}đ khi đăng ký khóa học.`
+          : `Đã áp dụng mã giới thiệu từ ${data.referrerName}!`,
       });
       onRedeemed?.();
     } catch (err) {
@@ -89,18 +111,35 @@ export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardP
         <View style={styles.headerLeft}>
           <View style={styles.titleRow}>
             <Gift size={17} color="#F59E0B" />
-            <Text style={styles.title}>Giới thiệu bạn bè · Nhận thưởng XP</Text>
+            <Text style={styles.title}>
+              {discountVnd > 0 ? `Giới thiệu bạn bè · Giảm ${shortDiscount}` : 'Giới thiệu bạn bè'}
+            </Text>
           </View>
           <Text style={styles.subtitle}>
-            Gửi mã cho bạn bè cùng học — cả 2 nhận ngay{' '}
-            <Text style={styles.rewardStrong}>{`+${referral.rewardXp} XP`}</Text>!
+            {discountVnd > 0 ? (
+              <>
+                Giảm ngay{' '}
+                <Text style={styles.rewardStrong}>{`${discountVnd.toLocaleString('vi-VN')}đ`}</Text>
+                {' khi được giới thiệu'}
+                {referrerVnd > 0 ? ` · Người giới thiệu nhận giảm ${shortReferrer}` : ''}
+                {Number(referral.minOrderAmountVnd) > 0
+                  ? ` (khóa từ ${formatShortVnd(Number(referral.minOrderAmountVnd))})`
+                  : ''}.
+              </>
+            ) : (
+              'Chia sẻ mã để giới thiệu bạn bè cùng học tại DewSkill.'
+            )}
           </Text>
         </View>
-        <View style={styles.statsPill}>
-          <Text style={styles.statsPillText}>
-            {`${referral.referralCount || 0} bạn · +${referral.referralXpEarned || 0} XP`}
-          </Text>
-        </View>
+        {(availableVnd > 0 || (referral.referralCount || 0) > 0) ? (
+          <View style={styles.statsPill}>
+            <Text style={styles.statsPillText}>
+              {availableVnd > 0
+                ? `Đang có -${availableVnd.toLocaleString('vi-VN')}đ`
+                : `${referral.referralCount || 0} bạn`}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.codeBox}>
@@ -124,7 +163,9 @@ export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardP
       {referral.redeemed ? (
         <View style={styles.redeemedBox}>
           <Text style={styles.redeemedText}>
-            {`✓ Đã áp dụng mã giới thiệu ${referral.referredByCode || ''}.`}
+            {availableVnd > 0
+              ? `✓ Đã áp dụng mã giới thiệu ${referral.referredByCode || ''} · Còn ưu đãi giảm ${availableVnd.toLocaleString('vi-VN')}đ (tự động trừ khi đăng ký khóa học).`
+              : `✓ Đã áp dụng mã giới thiệu ${referral.referredByCode || ''}.`}
           </Text>
         </View>
       ) : (
@@ -151,9 +192,11 @@ export function ReferralRewardCard({ referral, onRedeemed }: ReferralRewardCardP
               pressed && !(referralBusy || !referralInput.trim()) && styles.submitBtnPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Nhận thưởng XP từ mã giới thiệu"
+            accessibilityLabel={discountVnd > 0 ? `Nhận giảm ${shortDiscount} từ mã giới thiệu` : 'Áp dụng mã giới thiệu'}
           >
-            <Text style={styles.submitBtnText}>{referralBusy ? 'Đang gửi...' : 'Nhận XP'}</Text>
+            <Text style={styles.submitBtnText}>
+              {referralBusy ? 'Đang gửi...' : discountVnd > 0 ? `Nhận giảm ${shortDiscount}` : 'Áp dụng'}
+            </Text>
           </Pressable>
         </View>
       )}

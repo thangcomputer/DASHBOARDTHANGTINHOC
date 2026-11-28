@@ -10,7 +10,6 @@ const MeetStartAlert = lazy(() => import('./student/MeetStartAlert'));
 const StudentAttendanceConfirmModal = lazy(() => import('./student/StudentAttendanceConfirmModal'));
 const WelcomeCelebrationOverlay = lazy(() => import('./WelcomeCelebrationOverlay'));
 const FreeSurveyModal = lazy(() => import('./student/FreeSurveyModal'));
-const PlacementTestModal = lazy(() => import('./student/dailyPractice/PlacementTestModal'));
 const LoginInboxAlertPopup = lazy(() => import('./LoginInboxAlertPopup'));
 const ClassRoomHost = lazy(() => import('./classRoom/ClassRoom'));
 const LearningGoalModal = lazy(() => import('./student/LearningGoalModal'));
@@ -60,6 +59,7 @@ import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT } from '../utils/learningGoal';
 import { isFreePortalSelfRegistrationStudent } from '../utils/enrollments';
+import { getDewSkillThemeAttr } from '../utils/dewskillTheme';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/teacherQuizKeys';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -68,16 +68,23 @@ import { hasPermission, PERMISSIONS } from '../constants/permissions';
 import PinLockGate from './pinLock/PinLockGate';
 import PinLockSettingsModal from './pinLock/PinLockSettingsModal';
 import { clearLastActive, setLockedFlag } from '../utils/pinLock';
+import {
+  isLongNotificationText,
+  isPurchaseNotification,
+  PurchaseNotificationReceipt,
+} from './notifications/PurchaseNotificationReceipt';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
-  students: 'Học viên',
+  students: 'Học viên TT',
   teachers: 'Giảng viên',
   evaluations: 'Đánh giá',
   finance: 'Tài chính',
   training: 'Đào tạo GV',
   'student-training': 'Đào tạo HV',
-  'lesson-practice': 'Bài giảng',
+  'lesson-practice': 'Luyện tập tự do',
+  'dewskill-students': 'Học viên DewSkill',
+  'dewskill-classes': 'Quản lý lớp học',
   'daily-practice': 'Luyện tập hằng ngày',
   'lms-xp-settings': 'Điểm XP học bài',
   'subscription-codes': 'Mã kích hoạt & gói',
@@ -98,8 +105,9 @@ const PAGE_TITLES = {
 const ROLE_PAGE_TITLES = {
   student: {
     dashboard: 'Tổng quan',
+    'courses-catalog': 'Danh mục khóa học',
     schedule: 'Lịch học',
-    'lesson-practice': 'Bài giảng',
+    'lesson-practice': 'Luyện tập tự do',
     'daily-practice': 'Luyện tập',
     'materials-files': 'Bài tập và tài nguyên',
     'materials-software': 'Bài tập và tài nguyên',
@@ -232,6 +240,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (pathname.includes('/tenants')) return 'Multi-tenant';
   if (pathname.includes('/exam')) return 'Phòng thi';
   if (pathname.includes('/cert-prep')) return 'Ôn thi MOS/IC3';
+  if (pathname.includes('/courses')) return 'Danh mục khóa học';
   if (pathname.includes('/lesson-practice')) return 'Bài học';
   if (pathname.includes('/daily-practice')) return 'Luyện tập hằng ngày';
   if (pathname.includes('/test')) return 'Bài test';
@@ -593,19 +602,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   }, [session?.mustChangePassword, mustResetPwDone, readStoredSessionFlags]);
 
   const [showWelcomeCelebration, setShowWelcomeCelebration] = useState(false);
-  const [showPlacementPrompt, setShowPlacementPrompt] = useState(false);
   const [freeSurveyClosed, setFreeSurveyClosed] = useState(false);
   const [freeUnlockShow, setFreeUnlockShow] = useState(null);
   const finishFreeFireworks = useCallback(() => {
     setFreeUnlockShow((current) => (current === 'fireworks' ? 'guide' : current));
   }, []);
   const welcomeMarkedRef = React.useRef(false);
-
-  useEffect(() => {
-    const handleOpenPlacement = () => setShowPlacementPrompt(true);
-    window.addEventListener('open-placement-test', handleOpenPlacement);
-    return () => window.removeEventListener('open-placement-test', handleOpenPlacement);
-  }, []);
   const [courseCelebration, setCourseCelebration] = useState(null);
   const courseCelebrationTimerRef = React.useRef(null);
   const [starBonusCelebration, setStarBonusCelebration] = useState(null);
@@ -1436,17 +1438,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   const dismissWelcomeCelebration = React.useCallback(async () => {
     setShowWelcomeCelebration(false);
-    if (role === 'student') {
-      try {
-        const studentId = session?.id || session?._id || myId;
-        const existing = localStorage.getItem(`dewskill_placement_v1:${studentId || 'guest'}`);
-        if (!existing) {
-          setShowPlacementPrompt(true);
-        }
-      } catch {
-        setShowPlacementPrompt(true);
-      }
-    }
     if (welcomeMarkedRef.current) return;
     welcomeMarkedRef.current = true;
     try {
@@ -1517,6 +1508,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   }, [practiceSessionActive]);
   const [notifLimit, setNotifLimit] = React.useState(5);
   const [notifPos, setNotifPos] = React.useState({ top: 72, right: 16 });
+  const [expandedNotifIds, setExpandedNotifIds] = React.useState({});
+  const [notifDetailModal, setNotifDetailModal] = React.useState(null);
   const [assignedTeacherModal, setAssignedTeacherModal] = React.useState({
     open: false,
     loading: false,
@@ -1527,9 +1520,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   useEffect(() => {
     setLoginOverlay('welcome-celebration', Boolean(showWelcomeCelebration));
   }, [showWelcomeCelebration]);
-  useEffect(() => {
-    setLoginOverlay('placement-prompt', Boolean(showPlacementPrompt));
-  }, [showPlacementPrompt]);
   useEffect(() => {
     setLoginOverlay('course-celebration', Boolean(courseCelebration));
   }, [courseCelebration]);
@@ -1952,7 +1942,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       currentUserRole={getMessagingRole(session) || role}
       getConversations={getConversations}
     >
-      <div className={`flex h-[100dvh] max-h-[100dvh] ${isFreePortalStudent ? 'bg-[#f4fbf8]' : 'bg-[#f8fafc]'} dark:bg-[#0b1018] relative font-sans overflow-hidden`}>
+      <div
+        data-theme={isFreePortalStudent ? 'dewskill' : 'center'}
+        className={`flex h-[100dvh] max-h-[100dvh] ${isFreePortalStudent ? 'lms-canvas bg-gradient-to-br from-[#E0F2FE] via-[#ECFEFF] to-[#ECFDF5]' : 'bg-[#f8fafc]'} dark:bg-[#0b1018] relative font-sans overflow-hidden`}
+      >
+        {isFreePortalStudent ? (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden z-0 dark:hidden" aria-hidden="true">
+            <span className="dew-water-orb absolute -top-10 left-[220px] h-28 w-28 opacity-55" />
+            <span className="dew-water-orb absolute top-14 right-10 h-20 w-20 opacity-45" />
+            <span className="dew-water-orb absolute bottom-20 left-8 h-32 w-32 opacity-40" />
+            <span className="dew-water-orb absolute -bottom-10 right-[18%] h-28 w-28 opacity-50" />
+          </div>
+        ) : null}
         {isRefetching ? (
           <div className="sr-only" role="status" aria-live="polite">
             Đang đồng bộ dữ liệu
@@ -1976,8 +1977,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           onBrandLogoChange={setBrandLogo}
         />
 
-        <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
-          <header className={`cms-topbar flex flex-col ${!isImmersivePage ? 'cms-shell-gutter' : ''
+        <main id="main-content" className="relative z-10 flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
+          <header className={`cms-topbar flex flex-col ${isFreePortalStudent ? 'dew-topbar ' : ''}${!isImmersivePage ? 'cms-shell-gutter' : ''
             } ${(role === 'teacher' && location.pathname === '/teacher/test') || practiceSessionActive ? 'hidden' : ''
             } ${mobileScrollChromeHidden ? 'cms-topbar--scroll-away' : ''
             }`}>
@@ -2039,7 +2040,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-amber-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shrink-0"
+                  className={isFreePortalStudent
+                    ? 'inline-flex items-center justify-center w-9 h-9 rounded-full border border-white bg-white/85 dark:border-slate-700/80 dark:bg-slate-800/80 text-slate-600 dark:text-amber-300 shadow-[0_6px_16px_-6px_rgba(15,23,42,0.12),inset_0_1.5px_0_#fff] hover:bg-white dark:hover:bg-slate-800 transition shrink-0'
+                    : 'inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-amber-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shrink-0'}
                   title={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
                   aria-label={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
                 >
@@ -2054,7 +2057,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                     aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
                     aria-expanded={showNotif}
                     aria-haspopup="dialog"
-                    className={`cms-topbar__action relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'is-open' : ''}`}
+                    className={`cms-topbar__action relative ${isFreePortalStudent ? 'w-10 h-10 rounded-full' : 'w-10 h-10 sm:w-11 sm:h-11 rounded-xl'} flex items-center justify-center transition-colors duration-200 ${showNotif ? 'is-open' : ''}`}
                   >
                     <Bell size={18} aria-hidden="true" />
                     {unreadCount > 0 && (
@@ -2126,7 +2129,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             blocked={
               showFreeSurvey
               || showWelcomeCelebration
-              || showPlacementPrompt
               || !!courseCelebration
               || !!starBonusCelebration
               || (role === 'teacher' && !!teacherPaymentCelebration)
@@ -2145,15 +2147,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             onDone={() => {
               setFreeSurveyClosed(true);
               window.dispatchEvent(new Event('free-survey-done'));
-              if (!showWelcomeCelebration && role === 'student') {
-                try {
-                  const studentId = session?.id || session?._id || myId;
-                  const existing = localStorage.getItem(`dewskill_placement_v1:${studentId || 'guest'}`);
-                  if (!existing) setShowPlacementPrompt(true);
-                } catch {
-                  setShowPlacementPrompt(true);
-                }
-              }
             }}
           />
         </DeferredMount>
@@ -2172,18 +2165,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             name={displayName || session?.name || ''}
             variant="welcome"
             onClose={dismissWelcomeCelebration}
-          />
-        </DeferredMount>
-        <DeferredMount when={showPlacementPrompt && !showWelcomeCelebration && !showFreeSurvey}>
-          <PlacementTestModal
-            open={showPlacementPrompt && !showWelcomeCelebration && !showFreeSurvey}
-            intro={true}
-            onClose={() => setShowPlacementPrompt(false)}
-            studentId={session?.id || session?._id || myId}
-            onApplied={() => {
-              setShowPlacementPrompt(false);
-              navigate('/student/daily-practice');
-            }}
           />
         </DeferredMount>
         <DeferredMount when={!showWelcomeCelebration && !!courseCelebration}>
@@ -2276,7 +2257,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         />
 
         {showNotif && typeof document !== 'undefined' && createPortal(
-          <>
+          <div data-theme={isFreePortalStudent ? 'dewskill' : 'center'}>
             <div
               className="cms-notif-backdrop md:hidden"
               aria-hidden="true"
@@ -2287,7 +2268,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               role="dialog"
               aria-modal="true"
               aria-label="Danh sách thông báo"
-              className="cms-notif-sheet"
+              className={`cms-notif-sheet${isFreePortalStudent ? ' dew-popover' : ''}`}
               style={{
                 '--notif-top': `${notifPos.top}px`,
                 '--notif-right': `${notifPos.right}px`,
@@ -2320,11 +2301,21 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                     {myNotifications.slice(0, notifLimit).map((n, idx) => {
                       const style = getNotifStyle(n.type);
                       const Icon = style.icon;
+                      const nid = String(n.id || n._id || idx);
+                      const rawNotifText = formatNotificationStudentMask(n.text || n.message || n.content, students, role === 'admin' || role === 'staff' || role === 'teacher');
+                      const isPurchase = isPurchaseNotification(n);
+                      const isLong = isPurchase || isLongNotificationText(rawNotifText);
+                      const isExpanded = Boolean(expandedNotifIds[nid]);
                       return (
                         <div
                           key={`${n.id || n._id}-${idx}`}
                           onClick={() => {
                             markNotificationRead(n.id || n._id);
+                            if (isPurchase) {
+                              setShowNotif(false);
+                              setNotifDetailModal(n);
+                              return;
+                            }
                             if (n.payload?.action === 'RESET_PASSWORD') {
                               window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
                             } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
@@ -2668,9 +2659,43 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
                             </div>
                             {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
-                            <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
-                              {formatNotificationStudentMask(n.text || n.message || n.content, students, role === 'admin' || role === 'staff' || role === 'teacher')}
-                            </p>
+                            {isPurchase && isExpanded ? (
+                              <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                                <PurchaseNotificationReceipt notif={n} compact />
+                              </div>
+                            ) : (
+                              <p className={`text-[13px] leading-snug whitespace-pre-line break-anywhere ${isExpanded ? '' : 'line-clamp-2'} ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
+                                {rawNotifText}
+                              </p>
+                            )}
+                            {isLong ? (
+                              <div className="mt-1 flex flex-wrap items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedNotifIds((prev) => ({ ...prev, [nid]: !prev[nid] }));
+                                  }}
+                                  className="text-[11.5px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                                >
+                                  {isExpanded ? 'Thu gọn' : 'Xem thêm'}
+                                </button>
+                                {isPurchase ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      markNotificationRead(n.id || n._id);
+                                      setShowNotif(false);
+                                      setNotifDetailModal(n);
+                                    }}
+                                    className="text-[11.5px] font-bold text-sky-600 hover:text-sky-700 hover:underline cursor-pointer"
+                                  >
+                                    Chi tiết giao dịch ›
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -2694,7 +2719,77 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 </button>
               </div>
             </div>
-          </>,
+          </div>,
+          document.body
+        )}
+
+        {notifDetailModal && createPortal(
+          <div
+            data-theme={isFreePortalStudent ? 'dewskill' : 'center'}
+            className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={notifDetailModal.title || 'Chi tiết thông báo'}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setNotifDetailModal(null);
+            }}
+          >
+            <div className="dew-modal w-full max-w-md rounded-3xl border border-slate-100 bg-white p-5 shadow-2xl space-y-4">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700">
+                    Chi tiết thông báo thanh toán
+                  </p>
+                  <h3 className="mt-0.5 text-base font-black text-slate-900 leading-snug">
+                    {notifDetailModal.title || 'Thông báo giao dịch'}
+                  </h3>
+                  <p className="mt-0.5 text-[11px] font-medium text-slate-400">
+                    {formatTime(notifDetailModal.time || notifDetailModal.createdAt || notifDetailModal.timestamp)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotifDetailModal(null)}
+                  aria-label="Đóng chi tiết thông báo"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {isPurchaseNotification(notifDetailModal) ? (
+                <PurchaseNotificationReceipt notif={notifDetailModal} />
+              ) : (
+                <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+                  {notifDetailModal.message || notifDetailModal.content || notifDetailModal.text}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotifDetailModal(null);
+                    navigate('/student#profile');
+                  }}
+                  className={isFreePortalStudent
+                    ? 'dew-btn-primary px-4 py-2 text-xs font-extrabold text-white cursor-pointer'
+                    : 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition cursor-pointer'}
+                >
+                  Xem lịch sử trong Hồ sơ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotifDetailModal(null)}
+                  className={isFreePortalStudent
+                    ? 'dew-btn-white px-4 py-2 text-xs font-bold cursor-pointer'
+                    : 'px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition cursor-pointer'}
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>,
           document.body
         )}
 
@@ -2975,22 +3070,38 @@ const ChangePasswordModal = ({ session, role, onLogout }) => {
     }
   };
 
+  const pwThemeAttr = role === 'student' ? getDewSkillThemeAttr(session) : 'center';
+  const isDewPw = pwThemeAttr === 'dewskill';
+
   return createPortal(
     <div
+      data-theme={pwThemeAttr}
       className="fixed inset-0 z-[10050] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-[2px]"
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="change-password-title"
     >
-      <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-sm max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden shadow-xl">
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 flex items-center justify-between">
+      <div className={`bg-white rounded-2xl sm:rounded-3xl w-full max-w-sm max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden shadow-xl${isDewPw ? ' dew-modal' : ''}`}>
+        <div className={isDewPw
+          ? 'bg-gradient-to-r from-[#047857] via-[#0D9488] to-[#0284C7] px-6 py-5 flex items-center justify-between'
+          : 'bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 flex items-center justify-between'}
+        >
           <h3 id="change-password-title" className="text-white font-black text-lg flex items-center gap-2">
             <Lock size={20} aria-hidden="true" />
             {isOtpReset ? 'Đặt lại mật khẩu mới' : session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
           </h3>
           {!isOtpReset ? (
-            <button type="button" onClick={() => setIsOpen(false)} aria-label="Đóng" className="text-white/80 hover:text-white transition cursor-pointer"><X size={20} aria-hidden="true" /></button>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              aria-label="Đóng"
+              className={isDewPw
+                ? 'flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition cursor-pointer'
+                : 'text-white/80 hover:text-white transition cursor-pointer'}
+            >
+              <X size={isDewPw ? 17 : 20} aria-hidden="true" />
+            </button>
           ) : null}
         </div>
         <div className="p-6">
@@ -3042,8 +3153,13 @@ const ChangePasswordModal = ({ session, role, onLogout }) => {
                   </button>
                 </div>
               </div>
-              <button type="submit" disabled={loading}
-                className="w-full btn-primary-blue py-3 cursor-pointer">
+              <button
+                type="submit"
+                disabled={loading}
+                className={isDewPw
+                  ? 'dew-btn-primary w-full py-3 text-sm font-extrabold cursor-pointer disabled:opacity-60'
+                  : 'w-full btn-primary-blue py-3 cursor-pointer'}
+              >
                 {loading ? 'Đang xử lý...' : isOtpReset ? 'Lưu mật khẩu mới' : 'Xác nhận đổi'}
               </button>
               {isOtpReset && typeof onLogout === 'function' ? (
@@ -3051,7 +3167,9 @@ const ChangePasswordModal = ({ session, role, onLogout }) => {
                   type="button"
                   onClick={onLogout}
                   disabled={loading}
-                  className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  className={isDewPw
+                    ? 'dew-btn-white w-full py-2.5 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer'
+                    : 'w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition inline-flex items-center justify-center gap-1.5 cursor-pointer'}
                 >
                   <LogOut size={13} aria-hidden="true" />
                   Đăng xuất về trang đăng nhập

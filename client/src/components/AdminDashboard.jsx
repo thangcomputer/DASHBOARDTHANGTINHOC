@@ -14,6 +14,8 @@ import {
   AdminLazyCertPrepTab,
   AdminLazyLessonPracticeTab,
   AdminLazyDailyPracticeTab,
+  AdminLazyDewskillStudentsTab,
+  AdminLazyDewskillClassesTab,
   AdminLazyLmsXpSettingsTab,
   AdminLazySubscriptionTab,
   AdminLazyMeetClassTab,
@@ -88,6 +90,8 @@ const AdminDashboard = () => {
               </AdminTrainingProvider>
             )}
             {activeTab === 'daily-practice' && <AdminLazyDailyPracticeTab />}
+            {activeTab === 'dewskill-students' && <AdminLazyDewskillStudentsTab />}
+            {activeTab === 'dewskill-classes' && <AdminLazyDewskillClassesTab />}
             {activeTab === 'lms-xp-settings' && <AdminLazyLmsXpSettingsTab />}
             {activeTab === 'subscription-codes' && <AdminLazySubscriptionTab />}
             {activeTab === 'meet-classes' && <AdminLazyMeetClassTab />}

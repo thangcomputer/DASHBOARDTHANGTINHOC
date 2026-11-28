@@ -4,6 +4,7 @@ import { Check, Gift, Loader2, Lock, Sparkles, X, Zap } from 'lucide-react';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { buildChestShareData } from '../../../../../shared/dailyPractice/shareAchievement.mjs';
+import { getDewSkillThemeAttr } from '../../../utils/dewskillTheme';
 import ShareAchievementModal, { ShareTriggerButton } from '../ShareAchievementModal';
 
 export const UNIT_CHEST_REWARD_XP = 50;
@@ -149,7 +150,7 @@ export function UnitStageChest({
         </p>
         <p className="mt-0.5 text-xs text-slate-400">
           {toneClaimed
-            ? 'Phần thưởng đã vào ví XP của bạn'
+            ? 'Phần thưởng đã cộng vào XP Học tập của bạn'
             : toneDone
               ? 'Chúc mừng bạn đã chinh phục toàn bộ chặng!'
               : 'Hoàn thành các bài tập để nhận quà'}
@@ -260,6 +261,7 @@ export function UnitStageChest({
       {/* Modal chúc mừng mở rương chặng nhận XP qua portal lên document.body để không bị stacking context chặng khác che */}
       {showCelebration && typeof document !== 'undefined' && createPortal(
         <div
+          data-theme={getDewSkillThemeAttr()}
           role="dialog"
           aria-modal="true"
           aria-label={`Chúc mừng nhận ${claimedXp} XP rương chặng`}

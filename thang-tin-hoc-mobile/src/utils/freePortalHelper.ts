@@ -37,6 +37,7 @@ export function isFreePortalMenu(
   }
   return (
     user.freePortal === true
+    || (user as { accountType?: string }).accountType === 'dewskill'
     || String(user.course || '').trim().toLocaleLowerCase('vi') === FREE_PORTAL_COURSE_NAME.toLocaleLowerCase('vi')
     || String(user.course || '').trim().toLocaleLowerCase('vi').includes('miễn phí')
   );

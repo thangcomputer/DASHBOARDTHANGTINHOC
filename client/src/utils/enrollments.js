@@ -74,7 +74,6 @@ export function getClientEnrollments(student) {
       name: e.courseName, courseName: e.courseName,
       courseId: e.courseId ? String(e.courseId) : '',
       format: e.format || e.courseFormat || '',
-      deliveryMode: e.deliveryMode === 'video' || e.deliveryMode === 'instructor' ? e.deliveryMode : '',
       examSubjects: Array.isArray(e.examSubjects) ? e.examSubjects : [],
       teacherId: teacherIdStr(e.teacherId),
       teacherName: teacherNameFromRef(e.teacherId, e.teacherName),
@@ -99,7 +98,6 @@ export function getClientEnrollments(student) {
     return [{
       id: 'main', enrollmentId: 'main', name: student.course, courseName: student.course,
       courseId: '', examSubjects: [], teacherId: tid,
-      deliveryMode: student.deliveryMode === 'video' || student.deliveryMode === 'instructor' ? student.deliveryMode : '',
       teacherName: teacherNameFromRef(student.teacherId, student.teacherName),
       completedSessions: completed, totalSessions: student.totalSessions || 12, remainingSessions: student.remainingSessions,
       avgGrade: student.avgGrade || 0, grades: student.grades || [], linkHoc: student.linkHoc || '',
@@ -330,7 +328,6 @@ export function scopeStudentToEnrollment(student, enrollment) {
   return {
     ...student, course: enrollment.courseName || enrollment.name, teacherId: enrollment.teacherId || '',
     courseId: enrollment.courseId ? String(enrollment.courseId) : '',
-    deliveryMode: enrollment.deliveryMode || '',
     teacher: teacherLabel, teacherName: name,
     completedSessions: enrollment.completedSessions ?? 0,
     totalSessions: enrollment.totalSessions ?? 12,

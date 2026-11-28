@@ -18,6 +18,7 @@ import SupportMascot from './SupportMascot';
 import { extractYouTubeId } from '../utils/youtubeDuration';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
 import { isFeedPostLocked } from '../utils/subscription';
+import { useActiveCourse } from '../context/ActiveCourseContext';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -266,7 +267,27 @@ export default function FeedBoard({ session, role }) {
   }, [isSuperAdminViewerUser, isHighAdminViewerUser, meRole]);
 
   const [posts, setPosts] = useState([]);
-  const visiblePosts = useMemo(() => posts.filter(canViewPost), [posts, canViewPost]);
+  const { enrolledCourses } = useActiveCourse();
+  const [feedCourseFilter, setFeedCourseFilter] = useState('all');
+  const activeFeedCourse = useMemo(
+    () => enrolledCourses.find((c) => c.id === feedCourseFilter) || null,
+    [enrolledCourses, feedCourseFilter],
+  );
+  const visiblePosts = useMemo(() => {
+    const base = posts.filter(canViewPost);
+    if (!isFreePortalStudent || !activeFeedCourse) return base;
+    const cid = String(activeFeedCourse.id || '');
+    const tIds = new Set((activeFeedCourse.topicIds || []).map(String));
+    const keywords = [activeFeedCourse.shortTitle, activeFeedCourse.title, ...(activeFeedCourse.topicNames || [])]
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase());
+    return base.filter((post) => {
+      if (cid && (String(post.courseId || '') === cid || String(post.classId || '') === cid)) return true;
+      if (post.topicId && tIds.has(String(post.topicId))) return true;
+      const hay = `${post.content || ''} ${post.title || ''} ${post.courseName || ''}`.toLowerCase();
+      return keywords.some((kw) => kw.length >= 3 && hay.includes(kw));
+    });
+  }, [posts, canViewPost, isFreePortalStudent, activeFeedCourse]);
   const personalPinsStorageKey = `feed-personal-pins:${meId || 'preview'}`;
   const [personalPinsState, setPersonalPinsState] = useState(() => ({
     storageKey: personalPinsStorageKey,
@@ -1074,7 +1095,14 @@ export default function FeedBoard({ session, role }) {
                 <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
                   {previews.map((src, i) => (
                     <div key={src} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 group shadow-xs">
-                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={src}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                       <button
                         type="button"
                         onClick={() => removePending(i)}
@@ -1123,6 +1151,32 @@ export default function FeedBoard({ session, role }) {
             </span>
           </div>
         )}
+        {isFreePortalStudent && enrolledCourses.length > 0 && (
+          <div className="dew-app-card flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2.5">
+            <span className="text-xs font-extrabold text-slate-600 mr-1">Lọc theo khóa:</span>
+            <button
+              type="button"
+              onClick={() => setFeedCourseFilter('all')}
+              className={`px-3 py-1 text-xs font-bold cursor-pointer ${
+                feedCourseFilter === 'all' ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-700'
+              }`}
+            >
+              Tất cả khóa
+            </button>
+            {enrolledCourses.map((course) => (
+              <button
+                key={course.id}
+                type="button"
+                onClick={() => setFeedCourseFilter(course.id)}
+                className={`px-3 py-1 text-xs font-bold cursor-pointer ${
+                  feedCourseFilter === course.id ? 'dew-btn-primary text-white' : 'dew-btn-white text-slate-700'
+                }`}
+              >
+                {course.shortTitle}
+              </button>
+            ))}
+          </div>
+        )}
         {loading ? (
           <div className="cms-feed-skeleton-list space-y-4" aria-busy="true">
             {[0, 1, 2].map((i) => (
@@ -1142,7 +1196,20 @@ export default function FeedBoard({ session, role }) {
           <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200">
             <Newspaper className="mx-auto text-slate-300 mb-2" size={36} />
             <p className="text-sm font-semibold text-slate-500">Chưa có bài nào</p>
-            <p className="cms-feed-page-desc mt-1">Hãy là người đầu tiên đặt câu hỏi!</p>
+            <p className="cms-feed-page-desc mt-1">
+              {feedCourseFilter !== 'all'
+                ? 'Chưa có bài viết gắn với khóa học đang lọc.'
+                : 'Hãy là người đầu tiên đặt câu hỏi!'}
+            </p>
+            {feedCourseFilter !== 'all' ? (
+              <button
+                type="button"
+                onClick={() => setFeedCourseFilter('all')}
+                className="dew-btn-primary mt-3 px-4 py-1.5 text-xs font-bold cursor-pointer"
+              >
+                Xem tất cả bài viết
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="cms-feed-list space-y-4">
@@ -1279,7 +1346,16 @@ export default function FeedBoard({ session, role }) {
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }}
                             className="relative w-full aspect-video rounded-xl overflow-hidden border border-slate-100 cursor-zoom-in group"
                           >
-                            <img src={src} alt="" className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-200" />
+                            <img
+                              src={src}
+                              alt=""
+                              className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-200"
+                              onError={(e) => {
+                                const btn = e.currentTarget.closest('button');
+                                if (btn) btn.style.display = 'none';
+                                else e.currentTarget.style.display = 'none';
+                              }}
+                            />
                           </button>
                         );
                       })}
@@ -1455,7 +1531,14 @@ export default function FeedBoard({ session, role }) {
                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }}
                                             className={(isReplyNode ? 'w-14 h-14 ' : 'w-16 h-16 ') + 'block rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in'}
                                           >
-                                            <img src={src} alt="" className="w-full h-full object-cover" />
+                                            <img
+                        src={src}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                                           </button>
                                         );
                                       })}
@@ -1484,7 +1567,14 @@ export default function FeedBoard({ session, role }) {
                                     <div className="flex flex-wrap gap-2">
                                       {(commentPreviews[post.id] || []).map((src) => (
                                         <div key={src} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200">
-                                          <img src={src} alt="" className="w-full h-full object-cover" />
+                                          <img
+                        src={src}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -1539,7 +1629,14 @@ export default function FeedBoard({ session, role }) {
                             <div className="flex flex-wrap gap-2 mb-2">
                               {(commentPreviews[post.id] || []).map((src) => (
                                 <div key={src} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200">
-                                  <img src={src} alt="" className="w-full h-full object-cover" />
+                                  <img
+                        src={src}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1676,7 +1773,14 @@ export default function FeedBoard({ session, role }) {
                   const src = resolveMediaUrl(url) || url;
                   return (
                     <div key={url} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 group">
-                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={src}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                       <button
                         type="button"
                         onClick={() => setEditExistingImages((prev) => prev.filter((_, idx) => idx !== i))}

@@ -50,9 +50,11 @@ function getModelProfile(task, opts = {}) {
   const envScope = String(process.env.AI_SCOPE_CLASSIFIER_MODEL || '').trim();
   const envLesson = String(process.env.AI_LESSON_MODEL || '').trim();
   const envGlobal = String(process.env.AI_MODEL || '').trim();
+  const envFileSolve = String(process.env.AI_FILE_SOLVE_MODEL || '').trim();
 
   const nonLiteFlash = envFlash && !isLiteModelName(envFlash) ? envFlash : '';
   const nonLiteGlobal = envGlobal && !isLiteModelName(envGlobal) ? envGlobal : '';
+  const nonLiteFileSolve = envFileSolve && !isLiteModelName(envFileSolve) ? envFileSolve : '';
 
   const profiles = {
     classify: {
@@ -98,6 +100,20 @@ function getModelProfile(task, opts = {}) {
       maxTokens: 1500,
       temperature: 0.3,
       timeoutMs: 20000,
+    },
+    qa_file_solve: {
+      models: uniqueList([
+        nonLiteFileSolve,
+        'gemini-3.1-pro-preview',
+        'gemini-3.8-flash',
+        'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-2.0-flash-lite',
+      ]),
+      thinkingBudget: 2048,
+      maxTokens: 4096,
+      temperature: 0.1,
+      timeoutMs: 45000,
     },
     support_simple: {
       models: uniqueList([envLite, 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite']),
@@ -183,6 +199,21 @@ function getSupportFallbackChain() {
   ]);
 }
 
+function resolveTaskProfileForPlan(task, { planTier = '', usage = {}, hasImage = false, hasFile = false, policy = null } = {}) {
+  if (planTier) {
+    const { resolvePlanRouting } = require('./aiPlanPolicyService');
+    return resolvePlanRouting({
+      tier: planTier,
+      task,
+      hasImage,
+      hasFile,
+      usage,
+      policy,
+    });
+  }
+  return getModelProfile(task);
+}
+
 async function chatWithProfile(task, opts = {}) {
   const { chatCompletion } = require('./llmClient');
   const profile = getModelProfile(task, opts);
@@ -230,6 +261,7 @@ async function chatWithProfile(task, opts = {}) {
 
 module.exports = {
   getModelProfile,
+  resolveTaskProfileForPlan,
   isComplexQuery,
   getSupportFallbackChain,
   chatWithProfile,
