@@ -47,9 +47,10 @@ test('AppSidebar hiển thị XP/XP thay cho Khóa chính thức và hiện nút
   const root = path.resolve(import.meta.dirname, '../..');
   const sidebar = fs.readFileSync(path.join(root, 'client/src/components/AppSidebar.jsx'), 'utf8');
   const subUtil = fs.readFileSync(path.join(root, 'client/src/utils/subscription.js'), 'utf8');
+  const planCard = fs.readFileSync(path.join(root, 'client/src/components/ai/SidebarAIPlanCard.jsx'), 'utf8');
   assert.equal(sidebar.includes("'Khóa chính thức'"), false);
   assert.equal(subUtil.includes("'Gói Khóa học · Khóa chính thức'"), false);
-  assert.ok(sidebar.includes('isDailyXpExhausted(dpSidebarStats)'));
-  assert.ok(sidebar.includes('Mua XP'));
-  assert.ok(sidebar.includes('<BuyXpModal'));
+  assert.ok(sidebar.includes('deriveSidebarAiPlan'));
+  assert.ok(sidebar.includes('<SidebarAIPlanCard'));
+  assert.ok(planCard.includes('aiPlan'));
 });

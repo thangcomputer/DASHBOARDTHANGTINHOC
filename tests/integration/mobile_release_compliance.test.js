@@ -35,8 +35,14 @@ test('Giai doan 1: self-service account deletion and public legal URLs are prope
   assert.ok(policyRoutes.includes('Content-Security-Policy'));
 
   assert.ok(mobileService.includes("mobileApiRequest<{ success?: boolean; message?: string }>('/auth/delete-account'"));
-  assert.ok(featureScreens.includes('https://thangtinhoc.vn/privacy-policy'));
-  assert.ok(featureScreens.includes('https://thangtinhoc.vn/terms-of-service'));
+  assert.ok(
+    featureScreens.includes("navigation.navigate('LegalDocument', { tab: 'privacy' })")
+      || featureScreens.includes('https://thangtinhoc.vn/privacy-policy'),
+  );
+  assert.ok(
+    featureScreens.includes("navigation.navigate('LegalDocument', { tab: 'terms' })")
+      || featureScreens.includes('https://thangtinhoc.vn/terms-of-service'),
+  );
   assert.ok(featureScreens.includes('https://thangtinhoc.vn/delete-account'));
   assert.ok(featureScreens.includes('Xóa tài khoản vĩnh viễn'));
   assert.ok(featureScreens.includes('DeleteAccountModal'));

@@ -52,13 +52,6 @@ function createWatchGuard() {
   };
 }
 
-function formatCheckpointClock(secs) {
-  const s = Math.max(0, Math.floor(Number(secs) || 0));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, '0')}`;
-}
-
 function FallbackVideoPane({
   unit, done, onWatched, onXpWatched, playerApiRef,
   maxCheckpointSec = null,

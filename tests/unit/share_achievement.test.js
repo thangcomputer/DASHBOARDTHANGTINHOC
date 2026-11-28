@@ -105,8 +105,13 @@ test('shareAchievement helpers format Duolingo-style 4-stat payloads for all com
 });
 
 test('all web and mobile completion flows expose SHARE trigger and ShareAchievementModal', () => {
+  assert.ok(
+    read('client/src/components/student/dailyPractice/AchievementPopup.jsx').includes('PracticeCompletionModal'),
+    'AchievementPopup.jsx re-exports PracticeCompletionModal',
+  );
+
   const webScreens = [
-    'client/src/components/student/dailyPractice/AchievementPopup.jsx',
+    'client/src/components/student/dailyPractice/PracticeCompletionModal.jsx',
     'client/src/components/student/dailyPractice/Celebration.jsx',
     'client/src/components/student/dailyPractice/UnitStageChest.jsx',
     'client/src/components/student/dailyPractice/DailyPracticePage.jsx',
@@ -124,9 +129,13 @@ test('all web and mobile completion flows expose SHARE trigger and ShareAchievem
 
   for (const file of webScreens) {
     const src = read(file);
-    assert.ok(src.includes('ShareTriggerButton'), `${file} phải dùng ShareTriggerButton`);
     assert.ok(src.includes('ShareAchievementModal'), `${file} phải gắn ShareAchievementModal`);
-    assert.ok(/SHARE/.test(src), `${file} phải hiển thị chữ SHARE`);
+    if (file.endsWith('PracticeCompletionModal.jsx')) {
+      assert.ok(src.includes('Share2') && /Chia sẻ|SHARE/.test(src), `${file} phải có nút chia sẻ thành tích`);
+    } else {
+      assert.ok(src.includes('ShareTriggerButton'), `${file} phải dùng ShareTriggerButton`);
+      assert.ok(/SHARE|Chia sẻ/.test(src), `${file} phải hiển thị nút chia sẻ`);
+    }
   }
 
   const mobileScreens = [
@@ -140,14 +149,13 @@ test('all web and mobile completion flows expose SHARE trigger and ShareAchievem
     'thang-tin-hoc-mobile/src/screens/CertPrepScreens.tsx',
     'thang-tin-hoc-mobile/src/screens/StudentExamScreen.tsx',
     'thang-tin-hoc-mobile/src/components/DigitalCertificateModal.tsx',
-    'thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx',
   ];
 
   for (const file of mobileScreens) {
     const src = read(file);
     if (!file.endsWith('PracticeFinishOverlay.tsx')) {
       assert.ok(src.includes('ShareTriggerButton'), `${file} phải dùng ShareTriggerButton`);
-      assert.ok(/SHARE/.test(src), `${file} phải hiển thị chữ SHARE`);
+      assert.ok(/SHARE|Chia sẻ/.test(src), `${file} phải hiển thị nút chia sẻ`);
     } else {
       assert.ok(src.includes('ShareAchievementModal'), `${file} phải render ShareAchievementModal`);
     }

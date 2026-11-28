@@ -43,8 +43,9 @@ test('mobile video courses can be purchased with the same checkout API as web', 
   assert.ok(api.includes('/checkout'));
   assert.ok(api.includes('/lesson-practice/my/course-purchase-sessions/'));
   assert.ok(api.includes("'/settings/payment'"));
+  const modal = mobile('components/CoursePaymentModal.tsx');
+  assert.ok(modal.includes('export function CoursePaymentModal'));
   const screen = mobile('screens/CourseVideosScreen.tsx');
-  assert.ok(screen.includes('CoursePaymentModal'));
   assert.ok(!screen.includes('thanh toán khóa học trên Web app'));
 });
 

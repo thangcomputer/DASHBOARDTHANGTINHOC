@@ -13,7 +13,7 @@ test('Tổng quan học viên (web): mỗi thông tin một chỗ, việc cần 
     assert.ok(!overview.includes(removed), `bỏ khối trùng: ${removed}`);
   }
   assert.ok(overview.includes('Khóa học của tôi') && overview.includes('Lịch học hôm nay') && overview.includes('<WelcomeHero'));
-  assert.ok(overview.includes('Học tiếp: ${nextSubject.name}'), 'nút học tiếp phần đang dở');
+  assert.ok(overview.includes('Học tiếp ngay') && overview.includes('Học tiếp 1 chạm'), 'nút học tiếp phần đang dở');
   assert.ok(overview.includes('Việc cần làm hôm nay') && overview.includes('LearningLeaderboardCard'), 'bảng xếp hạng tuần ở cột phải');
   assert.ok(!overview.includes('LmsGoalMergedCard'), 'ẩn thẻ Học bài gộp trên Tổng quan');
   assert.ok(overview.includes("label: `Buổi tới: Ca ${sessionRange}"), 'buổi học tới ở thẻ chào mừng');
@@ -53,8 +53,8 @@ test('Trang chủ mobile: cùng bố cục, bỏ khối trùng (thẻ lớp, KPI
   assert.ok(leaderboard.includes('LEAGUE_TIERS') && leaderboard.includes('Hạng tuần:'), 'bảng xếp hạng tuần mobile có cấp hạng như web');
 
   const courses = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
-  assert.ok(courses.includes('blockUnregisteredInstructorPreview') && courses.includes('Zalo tư vấn'), 'thẻ khóa giảng viên mobile khóa preview và dùng nút Zalo tư vấn như web');
-  assert.ok(courses.includes('resumeVideoAt'), 'hỗ trợ vào thẳng mốc video khóa học khi bấm Học tiếp ngay');
+  assert.ok(courses.includes('CenterFreePracticePanel') && courses.includes('VideoPlayerFrame') && courses.includes('resumeSubjectId'), 'màn bài học mobile phát video trong khung và hỗ trợ học tiếp theo môn');
+  assert.ok(courses.includes('openUnitDetail'), 'hỗ trợ mở thẳng bài học khi bấm Học tiếp ngay');
 
   const dp = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
   assert.ok(dp.includes('pendingResume') && dp.includes('initialAtSec'), 'bấm Học tiếp 1 chạm mở thẳng bài/video/quiz và seek tới mốc đang học');

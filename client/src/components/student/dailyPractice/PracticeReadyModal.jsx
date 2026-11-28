@@ -17,7 +17,7 @@ export default function PracticeReadyModal({
   testOut = false,
   testOutLocked = false,
   review = false,
-  isFreeTier = false,
+  isFreeTier: _isFreeTier = false,
   questionStakeXp = QUESTION_STAKE_XP,
   countdownSeconds = 3,
   onStay,

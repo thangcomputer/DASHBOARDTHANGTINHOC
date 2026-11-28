@@ -124,11 +124,11 @@ export function collectUnitVideos(unit) {
 export function UnitStageHeader({
   unit,
   color,
-  onTestOut,
+  onTestOut: _onTestOut,
   onUpgrade,
   highlight: isNextUnit = false,
   hasVideo: _hasVideo,
-  testOutButtonRef,
+  testOutButtonRef: _testOutButtonRef,
   isStarted = false,
   onStartUnit,
   onStageAction,

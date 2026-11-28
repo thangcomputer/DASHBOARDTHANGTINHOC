@@ -100,13 +100,12 @@ function readStudentCertificateMeta() {
 }
 
 function HomeScreen({
-  overview, loading, error, onStart, onStartSpacedReview, starting, initialTopicId = '',
-  mode, onModeChange, path, pathLoading, pathError, onStartStep, onPathChanged, onBuyXpPaid,
+  overview, loading: _loading, error: _error, onStart: _onStart, onStartSpacedReview, starting, initialTopicId = '',
+  mode, onModeChange: _onModeChange, path, pathLoading, pathError, onStartStep, onPathChanged, onBuyXpPaid,
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const [topicId, setTopicId] = useState('');
   const [activePathTopicId, setActivePathTopicId] = useState(initialTopicId);
-  const [difficulty, setDifficulty] = useState('easy');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const certStudent = useMemo(() => readStudentCertificateMeta(), []);
@@ -123,7 +122,6 @@ function HomeScreen({
   const topics = useMemo(() => overview?.topics || [], [overview]);
   const stats = overview?.stats || {};
   const aiQuota = useAIQuota({ autoFetch: true });
-  const xpEmpty = Boolean(stats.xpEmpty || (stats.xpTotal || 0) <= 0);
   const showLowAiBanner = Boolean(aiQuota.applies && !aiQuota.isUnlimited && aiQuota.aiQuotaPercent <= 20);
   const xpPacks = stats.xpPacks || [];
   const openHomeXpOrUpgrade = () => {
@@ -163,10 +161,6 @@ function HomeScreen({
       step: pathTopic.next.step,
     }
     : null;
-
-  const topicPathDone = Boolean(
-    pathTopic?.totalUnits && (pathTopic.completedUnits || 0) >= pathTopic.totalUnits,
-  );
 
   const freePortal = isFreePortalAccount();
   const effectiveMode = freePortal ? 'path' : 'free';
@@ -629,7 +623,6 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const perQuestionStake = session.perQuestionStakeXp || QUESTION_STAKE_XP;
   const isTestOutStake = Boolean(session.path?.testOut) && stakeXp > 0;
   const isPerQuestion = !xpDisabled && !session.recovery && !isTestOutStake && isPathSession;
-  const stakeLabel = xpDisabled ? 0 : (session.sessionStakeXp || total * perQuestionStake || SESSION_STAKE_XP);
   const mandatory = !xpDisabled && Boolean(session.mandatory ?? (stakeXp > 0 || isPerQuestion));
   const walletXp = inPlayWalletXp(profileXp, isTestOutStake ? stakeXp : 0);
   const hintShareXp = !xpDisabled

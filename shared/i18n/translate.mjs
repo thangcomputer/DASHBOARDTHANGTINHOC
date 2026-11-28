@@ -14,6 +14,7 @@ const VI_EN_EXTENDED = {
   // Khảo sát / Đánh giá / Popup
   'Cài đặt và hỗ trợ': 'Settings & Support',
   'Cài đặt & hỗ trợ': 'Settings & Support',
+  'Xem lịch sử trong Hồ sơ': 'View history in Profile',
   'Bật thông báo trên thiết bị': 'Enable Device Notifications',
   'Bật quyền thông báo cho trình duyệt này': 'Enable notifications for this browser',
   'Chỉ hỏi quyền khi bạn chọn bật': 'Only asks permission when you choose to enable',

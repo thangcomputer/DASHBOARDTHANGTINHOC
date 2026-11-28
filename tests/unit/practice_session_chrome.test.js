@@ -59,12 +59,14 @@ test('practiceSessionMode toggles document dataset attribute and dispatches cust
 
 test('Web App hides topbar header, sidebar menu, Ctrl+K palette, and floating support button during active Daily Practice session', () => {
   const dailyPractice = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
+  const exitModal = read('client/src/components/student/dailyPractice/ExitPracticeWarningModal.jsx');
   assert.match(dailyPractice, /setPracticeSessionActive\(true\)/);
   assert.match(dailyPractice, /return \(\) => setPracticeSessionActive\(false\)/);
   assert.match(dailyPractice, /writeReloadAbandonNotice/);
   assert.match(dailyPractice, /ReloadAbandonNoticeModal/);
-  assert.match(dailyPractice, /mode = 'quit'/);
-  assert.match(dailyPractice, /Tải lại trang sẽ mất XP!/);
+  assert.match(dailyPractice, /<ExitPracticeWarningModal/);
+  assert.match(exitModal, /mode = 'quit'/);
+  assert.match(exitModal, /Tải lại trang sẽ mất XP!/);
   assert.match(dailyPractice, /window\.addEventListener\('keydown', handleReloadShortcut, true\)/);
   assert.doesNotMatch(dailyPractice, /window\.addEventListener\('beforeunload'/);
   assert.match(dailyPractice, /window\.addEventListener\('pagehide', handlePageHide\)/);

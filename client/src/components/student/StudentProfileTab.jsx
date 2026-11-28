@@ -55,7 +55,7 @@ export default function StudentProfileTab({
   studentData,
   progressPct: _progressPct = 0,
   setShowUpdateProfileModal,
-  setShowTuitionModal,
+  setShowTuitionModal: _setShowTuitionModal,
   sessionGender = '',
 }) {
   const navigate = useNavigate();
@@ -492,118 +492,118 @@ export default function StudentProfileTab({
                   ) : (
                     <>
                       {(showAllCourses ? courses : courses.slice(0, 1)).map((c) => {
-                      const title = c.courseName || c.name || 'Khóa học';
-                      const freeCourse = isFreePortalCourseName(title);
-                      const catalogCourse = catalogForCourse(c);
-                      const total = freeCourse ? 0 : (Number(c.totalSessions) || 12);
-                      const done = freeCourse ? 0 : (Number(c.completedSessions) || 0);
-                      const sessionsDone = !freeCourse && ((total > 0 && done >= total) || c.status === 'completed');
-                      const examEval = evaluateCourseCertificateStatus(c, {
-                        examProgress: effectiveExamProgress,
-                        examSubjectsCatalog,
-                        fallbackExamSubjectIds: catalogCourse?.examSubjectIds || [],
-                      });
-                      const requiresExamPass = !freeCourse && examEval.totalExams > 0;
-                      const isCompleted = !freeCourse && sessionsDone && (!requiresExamPass || examEval.allExamsPassed);
-                      const awaitingExams = !freeCourse && sessionsDone && requiresExamPass && !examEval.allExamsPassed;
-                      const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100) || 0) : 0;
+                        const title = c.courseName || c.name || 'Khóa học';
+                        const freeCourse = isFreePortalCourseName(title);
+                        const catalogCourse = catalogForCourse(c);
+                        const total = freeCourse ? 0 : (Number(c.totalSessions) || 12);
+                        const done = freeCourse ? 0 : (Number(c.completedSessions) || 0);
+                        const sessionsDone = !freeCourse && ((total > 0 && done >= total) || c.status === 'completed');
+                        const examEval = evaluateCourseCertificateStatus(c, {
+                          examProgress: effectiveExamProgress,
+                          examSubjectsCatalog,
+                          fallbackExamSubjectIds: catalogCourse?.examSubjectIds || [],
+                        });
+                        const requiresExamPass = !freeCourse && examEval.totalExams > 0;
+                        const isCompleted = !freeCourse && sessionsDone && (!requiresExamPass || examEval.allExamsPassed);
+                        const awaitingExams = !freeCourse && sessionsDone && requiresExamPass && !examEval.allExamsPassed;
+                        const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100) || 0) : 0;
 
-                      return (
-                        <div key={c.id || c.enrollmentId || title} className="px-4 py-3.5 space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{title}</h4>
-                            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${isCompleted
+                        return (
+                          <div key={c.id || c.enrollmentId || title} className="px-4 py-3.5 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{title}</h4>
+                              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${isCompleted
                                 ? 'bg-[#EFF6FF] text-[#2563EB]'
                                 : awaitingExams
                                   ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                   : 'bg-[#ECFDF5] text-[#16A34A]'
-                              }`}>
-                              {isCompleted ? 'Hoàn thành' : (awaitingExams ? `Chờ thi (${examEval.passedExams}/${examEval.totalExams} môn)` : 'Đang học')}
-                            </span>
-                          </div>
-                          <p className="text-[12px] text-[#64748B]">
-                            GV: {c.teacherName || teacherValue || 'Chưa phân công'}{c.registeredAt ? ` · ${formatDateDisplay(c.registeredAt)}` : ''}
-                          </p>
-                          <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all bg-[#10B981]" style={{ width: `${pct}%` }} />
-                          </div>
-                          <div className="flex items-center justify-between text-[12px]">
-                            <span className="text-[#64748B]">
-                              {done}/{total} buổi · Tiến độ {pct}%
-                            </span>
-                            <span className="font-extrabold text-[#0F172A]">{c.avgGrade ?? 0} TB</span>
-                          </div>
-                          {requiresExamPass ? (
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 space-y-1.5">
-                              <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-600">
-                                <span>Thi chứng nhận môn học</span>
-                                <span className={examEval.allExamsPassed ? 'text-emerald-700' : 'text-amber-700'}>
-                                  Đạt {examEval.passedExams}/{examEval.totalExams} môn
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {examEval.subjects.map((sub) => (
-                                  <span
-                                    key={sub.id}
-                                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10.5px] font-bold ${sub.passed
+                                }`}>
+                                {isCompleted ? 'Hoàn thành' : (awaitingExams ? `Chờ thi (${examEval.passedExams}/${examEval.totalExams} môn)` : 'Đang học')}
+                              </span>
+                            </div>
+                            <p className="text-[12px] text-[#64748B]">
+                              GV: {c.teacherName || teacherValue || 'Chưa phân công'}{c.registeredAt ? ` · ${formatDateDisplay(c.registeredAt)}` : ''}
+                            </p>
+                            <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all bg-[#10B981]" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                              <span className="text-[#64748B]">
+                                {done}/{total} buổi · Tiến độ {pct}%
+                              </span>
+                              <span className="font-extrabold text-[#0F172A]">{c.avgGrade ?? 0} TB</span>
+                            </div>
+                            {requiresExamPass ? (
+                              <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-600">
+                                  <span>Thi chứng nhận môn học</span>
+                                  <span className={examEval.allExamsPassed ? 'text-emerald-700' : 'text-amber-700'}>
+                                    Đạt {examEval.passedExams}/{examEval.totalExams} môn
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {examEval.subjects.map((sub) => (
+                                    <span
+                                      key={sub.id}
+                                      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10.5px] font-bold ${sub.passed
                                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                         : 'border-slate-200 bg-white text-slate-600'
-                                      }`}
-                                  >
-                                    {sub.passed ? <CheckCircle2 size={11} /> : <Clock size={11} className="text-amber-500" />}
-                                    {sub.label}
-                                  </span>
-                                ))}
+                                        }`}
+                                    >
+                                      {sub.passed ? <CheckCircle2 size={11} /> : <Clock size={11} className="text-amber-500" />}
+                                      {sub.label}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          ) : null}
-                          {isCompleted ? (
-                            <div className="pt-1 flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setCertificateCourse({
-                                  courseId: String(c.courseId || c.id || ''),
-                                  courseTitle: title,
-                                  instructorName: c.teacherName || (teacherValue && teacherValue !== 'Chưa phân công' ? teacherValue : '') || 'Trung tâm Thắng Tin Học',
-                                  completionRate: 100,
-                                  avgGrade: examEval.averageExamScore ?? (Number(c.avgGrade) > 0 ? Number(c.avgGrade) : null),
-                                  examsPassed: true,
-                                  scope: 'course',
-                                })}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
-                              >
-                                <QrCode size={13} /> Xem chứng nhận QR
-                              </button>
-                              <ShareTriggerButton
-                                onClick={() => setShareAchievementData(buildCourseOrCertShareData({
-                                  title,
-                                  scope: 'course',
-                                  studentName: studentData?.name || '',
-                                  completionRate: 100,
-                                  avgGrade: examEval.averageExamScore ?? (Number(c.avgGrade) > 0 ? Number(c.avgGrade) : null),
-                                }))}
-                                label="SHARE"
-                                size="sm"
-                              />
-                            </div>
-                          ) : awaitingExams ? (
-                            <div className="pt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[11px] font-semibold text-amber-800">
-                              <span className="inline-flex items-center gap-1.5 min-w-0">
-                                <Lock size={12} className="shrink-0 text-amber-600" />
-                                <span>Hoàn thành số buổi chưa đủ — cần thi đạt tất cả {examEval.totalExams} môn để nhận chứng nhận.</span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => navigate('/student/exam')}
-                                className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 text-[10.5px] font-extrabold transition cursor-pointer"
-                              >
-                                Vào phòng thi
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                            ) : null}
+                            {isCompleted ? (
+                              <div className="pt-1 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setCertificateCourse({
+                                    courseId: String(c.courseId || c.id || ''),
+                                    courseTitle: title,
+                                    instructorName: c.teacherName || (teacherValue && teacherValue !== 'Chưa phân công' ? teacherValue : '') || 'Trung tâm Thắng Tin Học',
+                                    completionRate: 100,
+                                    avgGrade: examEval.averageExamScore ?? (Number(c.avgGrade) > 0 ? Number(c.avgGrade) : null),
+                                    examsPassed: true,
+                                    scope: 'course',
+                                  })}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                                >
+                                  <QrCode size={13} /> Xem chứng nhận QR
+                                </button>
+                                <ShareTriggerButton
+                                  onClick={() => setShareAchievementData(buildCourseOrCertShareData({
+                                    title,
+                                    scope: 'course',
+                                    studentName: studentData?.name || '',
+                                    completionRate: 100,
+                                    avgGrade: examEval.averageExamScore ?? (Number(c.avgGrade) > 0 ? Number(c.avgGrade) : null),
+                                  }))}
+                                  label="SHARE"
+                                  size="sm"
+                                />
+                              </div>
+                            ) : awaitingExams ? (
+                              <div className="pt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                                <span className="inline-flex items-center gap-1.5 min-w-0">
+                                  <Lock size={12} className="shrink-0 text-amber-600" />
+                                  <span>Hoàn thành số buổi chưa đủ — cần thi đạt tất cả {examEval.totalExams} môn để nhận chứng nhận.</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate('/student/exam')}
+                                  className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 text-[10.5px] font-extrabold transition cursor-pointer"
+                                >
+                                  Vào phòng thi
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                       {courses.length > 1 && (
                         <div className="px-4 py-2.5 bg-white">
                           <button
@@ -662,76 +662,75 @@ export default function StudentProfileTab({
                     ) : (
                       <>
                         {(showAllCourses ? enrolledCourses : enrolledCourses.slice(0, 1)).map((c) => {
-                        const isCurrent = c.id === activeCourseId;
-                        const isOwned = c.status === 'owned';
-                        const pct = Math.max(0, Math.min(100, Number(c.progress) || 0));
-                        const timeInfo = getCourseTimeRemaining(c.accessExpiresAt);
-                        const durationMonths = Math.max(1, Number(c.durationMonths) || 12);
-                        return (
-                          <div
-                            key={c.id}
-                            className={`rounded-2xl border p-3.5 transition-all ${isCurrent
+                          const isCurrent = c.id === activeCourseId;
+                          const isOwned = c.status === 'owned';
+                          const pct = Math.max(0, Math.min(100, Number(c.progress) || 0));
+                          const timeInfo = getCourseTimeRemaining(c.accessExpiresAt);
+                          const durationMonths = Math.max(1, Number(c.durationMonths) || 12);
+                          return (
+                            <div
+                              key={c.id}
+                              className={`rounded-2xl border p-3.5 transition-all ${isCurrent
                                 ? 'bg-emerald-50/75 border-emerald-200 shadow-sm'
                                 : 'bg-white/80 border-white shadow-xs'
-                              }`}
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <h4 className="text-[14px] font-extrabold text-[#0F172A] truncate">
-                                    {c.title}
-                                  </h4>
-                                  <span
-                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isOwned
+                                }`}
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <h4 className="text-[14px] font-extrabold text-[#0F172A] truncate">
+                                      {c.title}
+                                    </h4>
+                                    <span
+                                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isOwned
                                         ? 'bg-emerald-100 text-emerald-700'
                                         : 'bg-sky-100 text-sky-700'
-                                      }`}
-                                  >
-                                    {isOwned ? 'Đã kích hoạt ✓' : 'Đang học thử'}
-                                  </span>
-                                  {isOwned && c.includesMeet !== false ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[10px] font-bold text-teal-700">
-                                      <Video size={10} /> Có học Meet GV
+                                        }`}
+                                    >
+                                      {isOwned ? 'Đã kích hoạt ✓' : 'Đang học thử'}
                                     </span>
+                                    {isOwned && c.includesMeet !== false ? (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[10px] font-bold text-teal-700">
+                                        <Video size={10} /> Có học Meet GV
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                    {c.level || c.badge || 'Lộ trình DewSkill'} · {c.currentStage || 'Chặng 1'} · {pct}%
+                                  </p>
+                                  {isOwned ? (
+                                    <div
+                                      className={`mt-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-bold ${timeInfo.isExpiringSoon
+                                          ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                          : 'border-emerald-200/80 bg-emerald-50/80 text-emerald-800'
+                                        }`}
+                                    >
+                                      <Clock size={11} className="shrink-0" />
+                                      <span>Gói {durationMonths} tháng · {timeInfo.detailNote}</span>
+                                      <span className="font-medium text-slate-500">· Hết hạn sẽ khóa &amp; đặt lại về ban đầu</span>
+                                    </div>
                                   ) : null}
                                 </div>
-                                <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                                  {c.level || c.badge || 'Lộ trình DewSkill'} · {c.currentStage || 'Chặng 1'} · {pct}%
-                                </p>
-                                {isOwned ? (
-                                  <div
-                                    className={`mt-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-bold ${
-                                      timeInfo.isExpiringSoon
-                                        ? 'border-amber-200 bg-amber-50 text-amber-800'
-                                        : 'border-emerald-200/80 bg-emerald-50/80 text-emerald-800'
-                                    }`}
-                                  >
-                                    <Clock size={11} className="shrink-0" />
-                                    <span>Gói {durationMonths} tháng · {timeInfo.detailNote}</span>
-                                    <span className="font-medium text-slate-500">· Hết hạn sẽ khóa &amp; đặt lại về ban đầu</span>
-                                  </div>
-                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveCourseId(c.id);
+                                    navigate('/student/daily-practice');
+                                  }}
+                                  className="dew-btn-primary inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[11px] font-extrabold text-white shrink-0 cursor-pointer"
+                                >
+                                  Vào học <ArrowRight size={12} />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveCourseId(c.id);
-                                  navigate('/student/daily-practice');
-                                }}
-                                className="dew-btn-primary inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[11px] font-extrabold text-white shrink-0 cursor-pointer"
-                              >
-                                Vào học <ArrowRight size={12} />
-                              </button>
+                              <div className="mt-2.5 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-[#34D399] via-[#10B981] to-[#059669] transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
                             </div>
-                            <div className="mt-2.5 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-[#34D399] via-[#10B981] to-[#059669] transition-all"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                         {enrolledCourses.length > 1 && (
                           <button
                             type="button"
@@ -779,66 +778,66 @@ export default function StudentProfileTab({
                     ) : (
                       <>
                         {(showAllFreeSubjects ? freeSubjectItems : freeSubjectItems.slice(0, 1)).map((sub) => (
-                        <div key={sub.key} className="px-4 py-3.5 space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{sub.name}</h4>
-                            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${sub.completed
+                          <div key={sub.key} className="px-4 py-3.5 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-[14px] font-bold text-[#0F172A] truncate">{sub.name}</h4>
+                              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${sub.completed
                                 ? 'bg-[#ECFDF5] text-[#059669]'
                                 : 'bg-slate-100 text-slate-600'
-                              }`}>
-                              {sub.completed ? 'Đã học xong' : (sub.done > 0 ? 'Đang học' : 'Chưa học')}
-                            </span>
-                          </div>
-                          <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${sub.completed ? 'bg-[#059669]' : 'bg-[#10B981]'}`}
-                              style={{ width: `${sub.pct}%` }}
-                            />
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
-                            <span className="text-[#64748B]">
-                              {sub.done}/{sub.total} {sub.unitLabel} · Tiến độ {sub.pct}%
-                            </span>
-                            {sub.completed ? (
-                              <div className="flex items-center gap-1.5">
+                                }`}>
+                                {sub.completed ? 'Đã học xong' : (sub.done > 0 ? 'Đang học' : 'Chưa học')}
+                              </span>
+                            </div>
+                            <div className="w-full bg-[#E9EFF0] h-2 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${sub.completed ? 'bg-[#059669]' : 'bg-[#10B981]'}`}
+                                style={{ width: `${sub.pct}%` }}
+                              />
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
+                              <span className="text-[#64748B]">
+                                {sub.done}/{sub.total} {sub.unitLabel} · Tiến độ {sub.pct}%
+                              </span>
+                              {sub.completed ? (
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCertificateCourse({
+                                      courseId: sub.id,
+                                      courseTitle: sub.name,
+                                      instructorName: 'Trung tâm Thắng Tin Học',
+                                      completionRate: 100,
+                                      avgGrade: null,
+                                      examsPassed: true,
+                                      scope: 'subject',
+                                    })}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                                  >
+                                    <QrCode size={13} /> Xem &amp; tải chứng nhận
+                                  </button>
+                                  <ShareTriggerButton
+                                    onClick={() => setShareAchievementData(buildCourseOrCertShareData({
+                                      title: sub.name,
+                                      scope: 'subject',
+                                      studentName: studentData?.name || '',
+                                      completionRate: 100,
+                                    }))}
+                                    label="SHARE"
+                                    size="sm"
+                                  />
+                                </div>
+                              ) : (
                                 <button
                                   type="button"
-                                  onClick={() => setCertificateCourse({
-                                    courseId: sub.id,
-                                    courseTitle: sub.name,
-                                    instructorName: 'Trung tâm Thắng Tin Học',
-                                    completionRate: 100,
-                                    avgGrade: null,
-                                    examsPassed: true,
-                                    scope: 'subject',
-                                  })}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                                  onClick={() => navigate(sub.href)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                                 >
-                                  <QrCode size={13} /> Xem &amp; tải chứng nhận
+                                  <Lock size={11} className="text-slate-400" /> Học xong để tải
                                 </button>
-                                <ShareTriggerButton
-                                  onClick={() => setShareAchievementData(buildCourseOrCertShareData({
-                                    title: sub.name,
-                                    scope: 'subject',
-                                    studentName: studentData?.name || '',
-                                    completionRate: 100,
-                                  }))}
-                                  label="SHARE"
-                                  size="sm"
-                                />
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => navigate(sub.href)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-                              >
-                                <Lock size={11} className="text-slate-400" /> Học xong để tải
-                              </button>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                         {freeSubjectItems.length > 1 && (
                           <div className="px-4 py-2.5 bg-white">
                             <button
@@ -894,21 +893,19 @@ export default function StudentProfileTab({
                           <div className="min-w-0 flex-1 space-y-0.5">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${
-                                  isAi
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${isAi
                                     ? 'bg-amber-50 text-amber-800 border-amber-200'
                                     : 'bg-sky-50 text-sky-700 border-sky-200'
-                                }`}
+                                  }`}
                               >
                                 {isAi ? 'Gói AI' : 'Khóa học'}
                               </span>
                               <p className="font-extrabold text-[#0F172A] truncate">{item.courseName}</p>
                               <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                                  isExpired
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isExpired
                                     ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                     : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                }`}
+                                  }`}
                               >
                                 {isExpired ? (isAi ? 'Đã hết hạn' : 'Đã hết hạn · Đã đặt lại') : timeLeft.shortNote}
                               </span>

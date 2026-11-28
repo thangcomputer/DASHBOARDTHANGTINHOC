@@ -407,10 +407,10 @@ export default function ShareAchievementModal({ open, onClose, data }) {
               >
                 <StatCardIcon name={item.icon} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold leading-tight text-slate-900">
+                  <p className="break-words text-sm font-extrabold leading-tight text-slate-900">
                     {item.value}
                   </p>
-                  <p className="mt-0.5 truncate text-[11px] font-medium leading-tight text-slate-500">
+                  <p className="mt-0.5 break-words text-[11px] font-medium leading-tight text-slate-500">
                     {item.label}
                   </p>
                 </div>

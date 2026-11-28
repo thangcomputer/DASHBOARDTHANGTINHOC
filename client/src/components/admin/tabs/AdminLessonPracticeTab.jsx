@@ -156,12 +156,6 @@ function unitContentOrder(unit, items) {
   return result;
 }
 
-function practiceGroupTimeLimit(unit, groupId) {
-  const configured = (unit?.practiceTimeLimits || [])
-    .find((entry) => String(entry.groupId) === String(groupId));
-  return configured ? configured.timeLimitSec : (unit?.timeLimitSec ?? 0);
-}
-
 function RegionDraw({ imageUrl, region, onChange }) {
   const ref = useRef(null);
   const drag = useRef(null);

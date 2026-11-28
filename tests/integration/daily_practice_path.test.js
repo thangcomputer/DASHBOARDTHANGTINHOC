@@ -21,7 +21,7 @@ test('computeUnits: chặng sau mở khi chặng trước xong; bước sau mở
   assert.equal(computed[0].pathNodes[0].state, 'completed', 'Học bài trống bài → bỏ qua');
   const firstQuiz = computed[0].pathNodes.find((node) => node.kind === 'quiz');
   assert.deepEqual(firstQuiz.levels.map((s) => s.state), ['active', 'locked', 'locked']);
-  assert.equal(computed[1].canTestOut, true);
+  assert.equal(computed[1].canTestOut, false);
 
   computed = pathService.computeUnits(units, new Map([
     ['a', { completedSteps: ['learn', 'practice', 'challenge'], completedAt: new Date() }],
@@ -51,12 +51,12 @@ test('quyền kiểm tra vượt lấy theo trạng thái gói đang hiệu lự
   }, now), false);
 
   const pathView = read('client/src/components/student/dailyPractice/PathView.jsx');
-  assert.ok(pathView.includes('canTestOut={path?.canTestOut === true}'));
+  assert.ok(pathView.includes('canTestOut={Boolean(current?.canTestOut ?? path?.canTestOut)}'));
   assert.ok(pathView.includes('onClick={onUpgrade}'));
   assert.ok(!pathView.includes('isFreePortalAccount'));
 
   const practicePage = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
-  assert.ok(practicePage.includes('testOutLocked={stakeConfirm.testOut && path?.canTestOut !== true}'));
+  assert.ok(practicePage.includes('testOutLocked={stakeConfirm.testOut && !isTestOutUnlocked(path, stakeConfirm.pick?.unitId)}'));
   assert.ok(!practicePage.includes('isFreePortal={isFreePortalAccount()}'));
 });
 
@@ -88,10 +88,22 @@ test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần t
   };
   try {
     await Student.collection.insertMany([
-      { _id: studentId, name: 'HV Lộ trình' },
+      {
+        _id: studentId,
+        name: 'HV Lộ trình',
+        accountType: 'dewskill',
+        freePortal: true,
+        subscription: {
+          plan: '3m',
+          activatedAt: new Date(Date.now() - 86400000),
+          expiresAt: new Date(Date.now() + 30 * 86400000),
+        },
+      },
       {
         _id: otherStudentId,
         name: 'HV Vượt',
+        accountType: 'dewskill',
+        freePortal: true,
         subscription: {
           plan: '3m',
           activatedAt: new Date(Date.now() - 86400000),
@@ -172,6 +184,12 @@ test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần t
       'bước chưa mở thì không vào được',
     );
 
+    await Promise.all([service.getProfile(studentId), service.getProfile(otherStudentId)]);
+    await DailyPracticeProfile.updateMany(
+      { studentId: { $in: [studentId, otherStudentId] } },
+      { $inc: { purchasedXp: 500, xpTotal: 500 } },
+    );
+
     // Luyện tập: đúng 2/4 (<60%) → chưa qua; đúng hết → qua, mở nấc Vừa.
     let session = await service.startSession(studentId, { mode: 'path', unitId: unit1.id, step: 'learn', nodeKey: 'practice-1' });
     assert.equal(session.path.step, 'learn');
@@ -239,19 +257,28 @@ test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần t
     assert.equal(playlist.lesson.locked, true, 'chưa mua khóa thì không lộ link video bài giảng');
     assert.deepEqual(playlist.lesson.videos, []);
 
-    // HV khác kiểm tra vượt chặng 2 → xong cả chặng 1 và 2.
+    // HV khác: chặng khóa chưa thể vào/vượt tắt; xong các nút tiền điều kiện của chặng 1 rồi vượt chặng 1 → mở chặng 2.
     await assert.rejects(
       service.startSession(otherStudentId, { mode: 'path', unitId: unit2.id, step: 'learn' }),
       { status: 403 },
     );
-    session = await service.startSession(otherStudentId, { mode: 'path', unitId: unit2.id, step: 'challenge', testOut: true });
+    await assert.rejects(
+      service.startSession(otherStudentId, { mode: 'path', unitId: unit2.id, step: 'challenge', testOut: true }),
+      { status: 403 },
+    );
+    for (const nodeKey of ['practice-1', 'challenge', 'practice-2']) {
+      for (const step of ['learn', 'practice', 'challenge']) {
+        const s = await service.startSession(otherStudentId, { mode: 'path', unitId: unit1.id, step, nodeKey });
+        const r = await playAll(otherStudentId, s, s.questions.length);
+        assert.equal(r.path.passed, true);
+      }
+    }
+    session = await service.startSession(otherStudentId, { mode: 'path', unitId: unit1.id, step: 'challenge', testOut: true });
     result = await playAll(otherStudentId, session, session.questions.length);
     assert.equal(result.path.passed, true);
-    assert.equal(result.path.topicCompleted, true);
     const otherPath = (await pathService.getPath(otherStudentId)).topics.find((t) => t.topic.id === topic.id);
-    assert.deepEqual(otherPath.units.map((u) => u.state), ['completed', 'completed']);
-    assert.ok(otherPath.units.every((u) => u.testedOut));
-    assert.equal(otherPath.next, null);
+    assert.deepEqual(otherPath.units.map((u) => u.state), ['completed', 'active']);
+    assert.equal(otherPath.units[0].testedOut, true);
 
     // Xóa chặng: câu về "chưa xếp chặng", tiến độ chặng đó bị xóa.
     const removed = await pathService.deleteUnit(unit2.id);
@@ -287,8 +314,12 @@ test('giao diện lộ trình: web + mobile có màn lộ trình, luyện tự d
   assert.ok(mobile.includes('PathView'), 'mobile có màn lộ trình');
   assert.ok(mobile.includes('Luyện tự do'));
   assert.ok(web.includes('PracticeFinishOverlay') || web.includes('<Celebration'), 'web có chuỗi màn ăn mừng');
-  assert.ok(web.includes('Combo x{combo}'), 'web hiện combo khi đúng liên tiếp');
-  const webCelebration = read('client/src/components/student/dailyPractice/Celebration.jsx');
+  assert.ok(
+    web.includes('<PracticeTopBar') && read('client/src/components/student/dailyPractice/PracticeTopBar.jsx').includes('Combo x{combo}'),
+    'web hiện combo khi đúng liên tiếp',
+  );
+  const webCelebration = read('client/src/components/student/dailyPractice/Celebration.jsx')
+    + read('client/src/components/student/dailyPractice/PracticeCompletionModal.jsx');
   for (const text of ['Đã luyện tập xong!', 'ngày liên tiếp', 'Hoàn thành nhiệm vụ hằng ngày!']) assert.ok(webCelebration.includes(text), text);
   assert.ok(read('client/src/components/student/dailyPractice/PathView.jsx').includes('<StepPopover'), 'web: bảng bắt đầu bật dưới nút');
   assert.ok(mobile.includes('PracticeFinishOverlay') || mobile.includes('<Celebration'), 'mobile có chuỗi màn ăn mừng');
@@ -345,8 +376,11 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   assert.ok(gameBtn.includes('dp-game-btn'), 'nút 3D GameButton');
 
   const answerFeedback = read('client/src/components/student/dailyPractice/AnswerFeedback.jsx');
-  assert.ok(answerFeedback.includes("'Chính xác!'"), 'thông báo Chính xác! khi trả lời đúng');
-  assert.ok(answerFeedback.includes('<XPRewardAnimation'), 'kích hoạt XPRewardAnimation khi xác nhận XP');
+  const answerFeedbackBanner = read('client/src/components/student/dailyPractice/AnswerFeedbackBanner.jsx');
+  const answerFeedbackAll = `${answerFeedback}\n${answerFeedbackBanner}`;
+  assert.ok(answerFeedbackAll.includes("'Chính xác!'"), 'thông báo Chính xác! khi trả lời đúng');
+  const topBarCode = read('client/src/components/student/dailyPractice/PracticeTopBar.jsx');
+  assert.ok(topBarCode.includes('<AnimatedXpCounter') || answerFeedbackAll.includes('<XPRewardAnimation'), 'kích hoạt XP animation khi xác nhận XP');
 
   const xpReward = read('client/src/components/student/dailyPractice/XPRewardAnimation.jsx');
   assert.ok(xpReward.includes('hasClaimedRewardKey'), 'chống cộng/hiển thị XP trùng lặp');
@@ -370,7 +404,8 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
     assert.ok(mascot.includes(`${state}: '/mascot/`), `Mascot hỗ trợ trạng thái ${state}`);
   }
 
-  const achievement = read('client/src/components/student/dailyPractice/AchievementPopup.jsx');
+  const achievement = read('client/src/components/student/dailyPractice/AchievementPopup.jsx')
+    + read('client/src/components/student/dailyPractice/PracticeCompletionModal.jsx');
   assert.ok(achievement.includes('Tiếp tục học'), 'nút Tiếp tục học');
   assert.ok(achievement.includes('Xem lại kết quả'), 'nút Xem lại kết quả');
   assert.ok(achievement.includes('Làm lại'), 'nút Làm lại');
@@ -393,10 +428,10 @@ test('hệ thống Game Hóa DewSkill: đủ 10 nhóm hiệu ứng, mascot giọ
   const webQuestions = read('client/src/components/student/dailyPractice/Questions.jsx');
   assert.ok(webQuestions.includes('export function QuizAnswerOption'), 'Web có component QuizAnswerOption');
   assert.ok(answerFeedback.includes('export function QuizActionButtons'), 'Web có component QuizActionButtons');
-  assert.ok(answerFeedback.includes("'Chưa chính xác'"), 'Web hiển thị Chưa chính xác khi sai');
-  assert.ok(answerFeedback.includes("'Giải thích'"), 'Web có nút Giải thích');
-  assert.ok(answerFeedback.includes("'Tiếp tục'"), 'Web có nút Tiếp tục');
-  assert.ok(!answerFeedback.includes('retryCooldownSec'), 'Web không khóa đếm ngược Thử lại khi sai câu thường');
+  assert.ok(answerFeedbackAll.includes("'Chưa đúng!'") || answerFeedbackAll.includes("'Chưa chính xác'"), 'Web hiển thị Chưa đúng khi sai');
+  assert.ok(answerFeedbackAll.includes("'Giải thích'"), 'Web có nút Giải thích');
+  assert.ok(answerFeedbackAll.includes('Tiếp tục'), 'Web có nút Tiếp tục');
+  assert.ok(!answerFeedbackAll.includes('retryCooldownSec'), 'Web không khóa đếm ngược Thử lại khi sai câu thường');
   assert.ok(!web.includes('retryCooldownSec'), 'Web cho phép qua câu tiếp ngay khi sai câu thường');
   assert.ok(web.includes('disabled={!videoCompleted || busy}'), 'Web chỉ khóa Tiếp tục với câu video chưa hoàn thành');
   assert.ok(progressBar.includes('export function QuizProgressBar'), 'Web có component QuizProgressBar');

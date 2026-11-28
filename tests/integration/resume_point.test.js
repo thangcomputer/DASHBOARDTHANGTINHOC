@@ -22,10 +22,13 @@ test('vị trí học dở: lưu, đọc, bỏ mục không còn, nhảy sang bu
   await mongoose.connect(TEST_DB);
   const studentId = new mongoose.Types.ObjectId();
   const slug = `resume-test-${Date.now()}`;
+  const otherSlug = `resume-other-${Date.now()}`;
   let subject;
+  let otherSubject;
   try {
-    await Student.collection.insertOne({ _id: studentId, name: 'HV Resume', course: slug });
-    subject = await LessonSubject.create({ name: slug, slug, examSubjectId: slug, unlockMode: 'sequential' });
+    await Student.collection.insertOne({ _id: studentId, name: 'HV Resume', course: slug, accountType: 'center', freePortal: false });
+    subject = await LessonSubject.create({ name: slug, slug, examSubjectId: slug, unlockMode: 'open' });
+    otherSubject = await LessonSubject.create({ name: otherSlug, slug: otherSlug, examSubjectId: otherSlug, unlockMode: 'open' });
     const unit1 = await LessonUnit.create({
       subjectId: subject._id,
       title: 'Buổi 1',
@@ -37,6 +40,12 @@ test('vị trí học dở: lưu, đọc, bỏ mục không còn, nhảy sang bu
       title: 'Buổi 2',
       sortOrder: 2,
       videos: [{ id: 'v3', title: 'Bảng', url: 'https://youtu.be/c' }],
+    });
+    const otherUnit = await LessonUnit.create({
+      subjectId: otherSubject._id,
+      title: 'Buổi môn chưa đăng ký',
+      sortOrder: 1,
+      videos: [{ id: 'v-other', title: 'Khóa', url: 'https://youtu.be/x' }],
     });
 
     assert.equal(await service.getResumePoint(studentId), null, 'chưa học gì thì không có điểm học dở');
@@ -51,9 +60,9 @@ test('vị trí học dở: lưu, đọc, bỏ mục không còn, nhảy sang bu
     assert.equal(point.itemTitle, 'Định dạng');
 
     await assert.rejects(
-      service.saveResumePoint(studentId, { unitId: String(unit2._id), sectionId: 'video:v3' }),
+      service.saveResumePoint(studentId, { unitId: String(otherUnit._id), sectionId: 'video:v-other' }),
       { status: 403 },
-      'buổi còn khóa thì không lưu',
+      'môn chưa đăng ký thì không lưu',
     );
 
     await service.saveResumePoint(studentId, { unitId: String(unit1._id), sectionId: 'video:da-xoa' });
@@ -80,9 +89,9 @@ test('vị trí học dở: lưu, đọc, bỏ mục không còn, nhảy sang bu
   } finally {
     await StudyResumePoint.deleteMany({ studentId });
     await LessonUnitProgress.deleteMany({ studentId });
-    if (subject) {
-      await LessonUnit.deleteMany({ subjectId: subject._id });
-      await LessonSubject.deleteOne({ _id: subject._id });
+    for (const doc of [subject, otherSubject].filter(Boolean)) {
+      await LessonUnit.deleteMany({ subjectId: doc._id });
+      await LessonSubject.deleteOne({ _id: doc._id });
     }
     await Student.collection.deleteOne({ _id: studentId });
     await mongoose.disconnect();
@@ -94,19 +103,20 @@ test('API học tiếp: route + web/mobile lưu vị trí và popup mục tiêu 
   assert.ok(routes.includes("router.get('/my/resume-point'"));
   assert.ok(routes.includes("router.put('/my/resume-point'"));
 
-  const webPage = read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx');
-  assert.ok(webPage.includes('lessonPracticeApi.student.saveResumePoint({'), 'web lưu vị trí lên server');
-  assert.ok(webPage.includes("searchParams.get('unitId')"), 'web mở đúng buổi từ link');
-  assert.ok(webPage.includes("searchParams.get('section')"), 'web mở đúng mục từ link');
+  const webRedirect = read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx');
+  assert.ok(webRedirect.includes("searchParams.get('unitId')") && webRedirect.includes('/student/daily-practice'), 'web nhận unitId từ link mục tiêu');
+  const webCatalog = read('client/src/components/student/lessonPractice/LessonPracticeCatalogPage.jsx');
+  assert.ok(webCatalog.includes("searchParams.get('lesson') || searchParams.get('unitId')"), 'web mở đúng bài từ query');
   const webModal = read('client/src/components/student/LearningGoalModal.jsx');
   assert.ok(webModal.includes('lessonPracticeApi.student.resumePoint()'));
   assert.ok(webModal.includes("'Tiếp tục xem video'"));
 
   const mobileScreen = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
-  assert.ok(mobileScreen.includes('saveStudyResumePoint({ unitId: displayedUnit.id, sectionId: displayedSectionId, courseId })'));
-  assert.ok(mobileScreen.includes('void openSubject(course, subject, {'));
+  assert.ok(mobileScreen.includes('resumeSubjectId={route.params?.resumeSubjectId}'));
+  assert.ok(mobileScreen.includes('openUnitDetail'));
   const mobileModal = read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx');
   assert.ok(mobileModal.includes('getStudyResumePoint()'));
-  assert.ok(mobileModal.includes("screen: 'CourseVideos'"));
+  assert.ok(mobileModal.includes("screen: 'DailyPractice'"));
+  assert.ok(mobileModal.includes('resumeSubjectId: resume.subjectId'));
   assert.ok(mobileModal.includes("'Tiếp tục xem video'"));
 });

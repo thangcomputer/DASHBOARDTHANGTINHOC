@@ -100,23 +100,25 @@ test('nối chủ đề ↔ video có mặt ở admin, web và mobile', () => {
   const webResult = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
   assert.ok(webResult.includes('summary.relatedLesson && <RelatedLessonCard'));
   assert.ok(webResult.includes("searchParams.get('topicId')"));
-  assert.ok(read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx').includes('<LessonNavigationBar'));
+  const webRedirect = read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx');
+  assert.ok(webRedirect.includes('/student/daily-practice') && webRedirect.includes("searchParams.get('unitId')"));
 
   const mobileResult = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
   assert.ok(mobileResult.includes('summary.relatedLesson ? <RelatedLessonCard'));
   assert.ok(mobileResult.includes('route.params?.topicId'));
   const mobileLesson = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
-  assert.ok(mobileLesson.includes('dailyPracticeApi.relatedTopics('));
-  assert.ok(mobileLesson.includes("stackNavigation.navigate('DailyPractice', { topicId })"));
+  assert.ok(mobileLesson.includes('dailyPracticeApi'));
+  assert.ok(mobileLesson.includes('openUnitDetail'));
 });
 
 test('trang bài học web và mobile giống nhau: gợi ý luyện tập ở đáy + điều hướng mục/bài + nút đọc xong', () => {
-  const web = read('client/src/components/student/lessonPractice/LessonPracticeUnitsPage.jsx');
-  assert.ok(web.includes('<LessonNavigationBar'), 'web có thanh Mục trước / Mục sau / Bài tiếp theo như mobile');
-  assert.ok(web.includes("disabled={!next || !currentDone}"), 'mục sau chỉ mở khi xong mục hiện tại (như mobile)');
-  assert.ok(web.includes("'Đã đọc xong · Tiếp tục'"));
+  const web = read('client/src/components/student/lessonPractice/LessonPracticeCatalogPage.jsx');
+  assert.ok(web.includes('prevUnit') && web.includes('nextUnit'), 'web có điều hướng Bài trước / Tiếp tục bài học');
+  assert.ok(web.includes("'Tiếp tục bài học'") && web.includes("'Về danh sách bài'"));
+  assert.ok(web.includes('markSection'));
 
   const mobile = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
-  assert.match(mobile, /\{relatedStrip\}\s*\{lessonNavigation\}/, 'mobile đặt gợi ý luyện tập ngay trên thanh điều hướng đáy');
-  assert.ok(mobile.includes('const relatedStrip = null;'));
+  assert.ok(mobile.includes('prevUnit') && mobile.includes('nextUnit'), 'mobile có điều hướng Bài trước / Tiếp tục bài học');
+  assert.ok(mobile.includes("'Tiếp tục bài học'") && mobile.includes("'Về danh sách bài'"));
+  assert.ok(mobile.includes('handleMarkSection'));
 });

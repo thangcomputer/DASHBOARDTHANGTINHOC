@@ -9,10 +9,10 @@ const read = (file) => fs.readFileSync(path.join(__dirname, '../..', file), 'utf
 
 test('mobile: video bài giảng luôn phát trong khung, link không hợp lệ báo tại chỗ', () => {
   const screen = read('thang-tin-hoc-mobile/src/screens/CourseVideosScreen.tsx');
-  assert.ok(screen.includes('const url = playableVideoUrl(rawUrl);'));
-  assert.ok(screen.includes('if (url) setStarted(true);'));
-  assert.ok(!/startVideo = \(\) => \{[\s\S]{0,200}onOpenVideo\(/.test(screen), 'không mở link ra tab/ứng dụng khác');
-  assert.ok(screen.includes('Liên kết video chưa đúng'));
+  assert.ok(screen.includes('const playableUrl = playableVideoUrl(rawVideoUrl);'));
+  assert.ok(screen.includes('if (playableUrl) setVideoStarted(true);'));
+  assert.ok(!screen.includes('Linking.openURL('), 'không mở link video ra trình duyệt/ứng dụng khác');
+  assert.ok(screen.includes('Link video chưa hợp lệ'));
 
   const source = read('thang-tin-hoc-mobile/src/utils/videoSource.ts');
   assert.ok(source.includes("if (/^[\\w-]{11}$/.test(raw)) return raw;"), 'nhận mã YouTube đứng riêng như web');

@@ -373,7 +373,6 @@ export default function LessonAiAssistantPanel({ lessonTitle = '', unitTitle = '
     aiPlan,
     isUnlimited: aiIsUnlimited,
     isAdminUnlimited: aiIsAdminUnlimited,
-    applies: questionQuotaApplies,
     isOutOfQuota: questionQuotaBlocked,
     resetInMs: aiResetInMs,
     resetsAt: aiResetsAt,

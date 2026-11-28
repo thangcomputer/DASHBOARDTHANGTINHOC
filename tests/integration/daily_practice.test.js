@@ -216,11 +216,13 @@ test('lượt chơi đầy đủ: bắt đầu → trả lời → gợi ý → 
   const DailyPracticeSession = require('../../models/DailyPracticeSession');
   const DailyPracticeProfile = require('../../models/DailyPracticeProfile');
   const StudyTimeLog = require('../../models/StudyTimeLog');
+  const Student = require('../../models/Student');
   const service = require('../../services/dailyPracticeService');
   const studentId = new mongoose.Types.ObjectId();
   await mongoose.connect(TEST_DB);
   let topicId;
   try {
+    await Student.collection.insertOne({ _id: studentId, name: 'HV Tự do', accountType: 'center', freePortal: false });
     const topic = await service.createTopic({ name: `Test ${Date.now()}`, icon: 'keyboard', color: 'purple' });
     topicId = topic.id;
     for (const type of rules.TYPES) await service.createQuestion({ ...SAMPLES[type], topicId, difficulty: 'easy' });
@@ -291,6 +293,7 @@ test('lượt chơi đầy đủ: bắt đầu → trả lời → gợi ý → 
     await DailyPracticeSession.deleteMany({ studentId });
     await DailyPracticeProfile.deleteMany({ studentId });
     await StudyTimeLog.deleteMany({ studentId });
+    await Student.collection.deleteOne({ _id: studentId });
     await mongoose.disconnect();
   }
 });
@@ -316,7 +319,7 @@ test('popup nhắc luyện tập: một lần mỗi ngày, sau popup mục tiêu
 test('lối vào 1 từ Tổng quan (web + mobile)', () => {
   const web = read('client/src/components/student/StudentOverviewTab.jsx');
   assert.ok(web.includes("navigate('/student/daily-practice')"));
-  assert.ok(web.includes('<DuoHeroCard') && web.includes('<DuoDailyQuestsCard'));
+  assert.ok((web.includes('<DuoHeroCard') || web.includes('<WelcomeHero')) && web.includes('<DuoDailyQuestsCard'));
   assert.ok(web.includes('Luyện tập hằng ngày') || web.includes('Làm ngay'));
   assert.ok(!read('client/src/components/student/LearningGoalCard.jsx').includes('DailyStreakCta'), 'không lặp ở thẻ Mục tiêu');
 
@@ -329,10 +332,13 @@ test('lối vào 1 từ Tổng quan (web + mobile)', () => {
 
 test('nút Thoát có popup xác nhận "sẽ mất chuỗi hôm nay" thay cho hộp thoại trình duyệt', () => {
   const web = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
+  const exitModal = read('client/src/components/student/dailyPractice/ExitPracticeWarningModal.jsx');
+  const topBar = read('client/src/components/student/dailyPractice/PracticeTopBar.jsx');
   assert.ok(!web.includes('window.confirm('), 'không dùng confirm mặc định');
-  assert.ok(web.includes("'Bạn sẽ mất chuỗi hôm nay!'"));
-  assert.ok(web.includes('Ở lại luyện tiếp'));
-  assert.ok(web.includes('<LogOut size={16} aria-hidden="true" /> Thoát'));
+  assert.ok(web.includes('<ExitPracticeWarningModal') && web.includes('<PracticeTopBar'));
+  assert.ok(exitModal.includes("'Bạn sẽ mất chuỗi hôm nay!'"));
+  assert.ok(exitModal.includes('Ở lại luyện tiếp'));
+  assert.ok(topBar.includes('<span>Thoát</span>'));
   const mobile = read('thang-tin-hoc-mobile/src/screens/DailyPracticeScreen.tsx');
   assert.ok(!mobile.includes('Alert.alert('));
   assert.ok(mobile.includes("'Bạn sẽ mất chuỗi hôm nay!'"));
@@ -352,7 +358,7 @@ test('gắn đủ: route server, menu + trang web, admin, màn mobile, đếm gi
     sidebar.includes("{ key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice'")
     || sidebar.includes("{ key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập', path: '/student/daily-practice'"),
   );
-  assert.ok(sidebar.includes("hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING"));
+  assert.ok(sidebar.includes("hash: 'daily-practice'") && sidebar.includes('PERMISSIONS.MANAGE_STUDENT_TRAINING'));
   assert.ok(read('client/src/App.jsx').includes('<Route path="/student/daily-practice"'));
   assert.ok(read('client/src/components/AdminDashboard.jsx').includes("activeTab === 'daily-practice' && <AdminLazyDailyPracticeTab />"));
   assert.ok(read('client/src/utils/learningGoal.js').includes('lesson-practice|daily-practice'));

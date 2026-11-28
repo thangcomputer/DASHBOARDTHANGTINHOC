@@ -161,7 +161,13 @@ const DEFAULT_CATALOG_UI = {
 
 function sanitizeText(value, fallback = '', maxLen = 180) {
   if (value === undefined || value === null) return fallback;
-  const trimmed = String(value).replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  const trimmed = Array.from(String(value))
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code > 0x1f && code !== 0x7f;
+    })
+    .join('')
+    .trim();
   return trimmed.slice(0, maxLen);
 }
 

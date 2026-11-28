@@ -174,8 +174,6 @@ export function practiceFinishXpDisplay(summary) {
   const gained = Number(summary.gainedXp) || 0;
   const reward = Math.max(0, Number(summary.xp) || 0);
   const studyXp = Math.max(0, Number(summary.studyXpGained ?? reward) || 0);
-  const stake = Math.max(0, Number(summary.stakeXp) || 0);
-  const walletLoss = Math.max(0, Number(summary.walletXpSpent ?? (summary.passed ? Math.max(0, reward - gained) : Math.abs(gained))) || 0);
   const hintNote = summary.hintPenaltyXp ? ` (−${summary.hintPenaltyXp} gợi ý)` : '';
 
   if (!summary.passed) {

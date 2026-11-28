@@ -495,7 +495,6 @@ export default function CourseEnrollmentModal({
     : BENEFITS;
   const aiPlanExpiryFormatted = formatAiPlanExpiry(activatedAiPlan?.expiresAt);
   const courseDurationMonths = Math.max(1, Number(course?.durationMonths) || 12);
-  const courseIncludesMeet = course?.includesMeet !== false;
   const activatedCourseTime = getCourseTimeRemaining(activatedCourseMeta?.expiresAt);
 
   const modal = (

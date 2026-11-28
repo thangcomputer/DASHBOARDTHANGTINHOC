@@ -44,13 +44,13 @@ export default function StageNodePopover({
   anchorRef,
   anchorKey = '',
   starting = false,
-  canTestOut = true,
+  canTestOut: _canTestOut = true,
   onClose,
   onSelectStage,
   onOpenLesson,
   onStartPractice,
   onStartMilestone,
-  onUpgrade,
+  onUpgrade: _onUpgrade,
 }) {
   const popRef = useRef(null);
   const onCloseRef = useRef(onClose);

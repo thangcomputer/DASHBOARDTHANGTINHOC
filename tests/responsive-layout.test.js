@@ -94,6 +94,7 @@ test('Responsive footer navigation spaces items evenly and aligns icons and labe
     src.includes("['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile']")
     || src.includes("['schedule', 'inbox', 'daily-practice', 'dashboard', 'feed', 'lesson-practice', 'profile']")
     || src.includes("['schedule', 'inbox', 'feed', 'dashboard', 'daily-practice', 'lesson-practice', 'profile']")
+    || src.includes("['schedule', 'inbox', 'feed', 'dashboard', 'daily-practice', 'profile']")
   );
   assert.ok(src.includes('cms-mobile-bottom-nav__label') || src.includes('flex h-6 w-full items-center justify-center text-center leading-3'));
 });
@@ -174,7 +175,10 @@ test('Removes duplicated page headings and aligns top spacing on student pages',
   assert.ok(news.includes('className="w-full space-y-4 pt-4 pb-8"'));
   assert.ok(support.includes('max-w-5xl pt-4'));
   assert.ok(feed.includes('cms-feed-column pt-4 pb-8 space-y-4'));
-  assert.ok(practice.includes('px-1 pb-8 pt-4 md:px-2 md:pt-4'));
+  assert.ok(
+    practice.includes('px-1 pb-8 pt-4 md:px-2 md:pt-4')
+    || practice.includes('dp-dew-page min-h-full w-full px-2 pb-10 pt-3 sm:px-4')
+  );
   assert.ok(dashboardLayout.includes("isInboxPage ? 'pt-4' : ''"));
   assert.match(styles, /\.cms-sd-page\s*\{[^}]*padding-block: 0 16px;/);
   assert.match(styles, /@media \(min-width: 768px\)\s*\{\s*\.cms-sd-page\s*\{[^}]*padding-block: 0 20px;/);

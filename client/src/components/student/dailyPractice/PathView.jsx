@@ -11,8 +11,6 @@ import {
   PATH_HUB_PROGRESS_RING,
   pathHubLevelStates,
 } from '../../../../../shared/dailyPractice/pathHubProgressRing.mjs';
-import { pathNodeColor } from '../../../../../shared/dailyPractice/pathNodeColors.mjs';
-import { pathPlainStageMinHeightPx } from '../../../../../shared/dailyPractice/pathPlainJourney.mjs';
 import { PATH_HUB_DUO } from '../../../../../shared/dailyPractice/pathHubDuoVisual.mjs';
 import VietnamJourneyStage from './VietnamJourneyStage';
 import DewdropHorizontalJourney from './DewdropHorizontalJourney';
@@ -26,7 +24,7 @@ import {
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import PathLessonModal from './PathLessonModal';
 import VideoLessonWorkspace, { readVideoLessonProgress } from './VideoLessonWorkspace';
-import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
+import WelcomeBackModal from './WelcomeBackModal';
 import PathVideoModal from './PathVideoModal';
 import PathUnitRoadmapModal from './PathUnitRoadmapModal';
 import { gameSounds } from '../../../utils/sound';
@@ -999,7 +997,7 @@ export function resolveUpgradeCourse(allVisibleClasses = [], activeCourse = null
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
   path, practiceStats, loading, error, starting, initialTopicId = '', activeTopicId = '',
-  onTopicChange, onStartStep, onPathChanged, layout = 'default', showSubjectBar = true,
+  onTopicChange, onStartStep, onPathChanged, layout: _layout = 'default', showSubjectBar = true,
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const { activeCourse, allVisibleClasses, loading: coursesLoading, refreshCourses } = useActiveCourse();
@@ -1317,8 +1315,6 @@ export default function PathView({
     }
     setPopover({ unitId: unit.id, nodeKey, testOut: false });
   };
-  const wide = layout === 'wide';
-  const laneWidthPx = wide ? 520 : 420;
 
   return (
     <div className="space-y-4">
