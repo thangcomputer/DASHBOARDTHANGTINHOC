@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { loadXlsx } from '../utils/loadXlsx';
 import CmsSelect from './ui/CmsSelect';
 import {
@@ -19,6 +20,7 @@ import { useData } from '../context/DataContext';
 import { apiFetch, resolveMediaUrl } from '../services/api';
 import lessonPracticeApi from '../services/lessonPracticeApi';
 import { calculateDiscountPrice, isCourseDiscountActive } from '../utils/coursePricing';
+import { publishedWithoutOutline } from './admin/courseReadiness';
 import {
   getExamSubjectOptions,
   formatExamSubjectsSummary,
@@ -1036,6 +1038,7 @@ function CourseModal({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function CoursePricingTab() {
+  const navigate = useNavigate();
   const toast = useToast();
   const { showModal } = useModal();
   const {
@@ -1427,6 +1430,19 @@ export default function CoursePricingTab() {
         </div>
       </div>
 
+      {courses.some(publishedWithoutOutline) ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3 text-[13px] text-amber-900 leading-relaxed">
+          {courses.filter(publishedWithoutOutline).length} khóa đang xuất bản nhưng chưa có dàn ý chương. Học viên vẫn thấy khóa. Việc này không chặn lưu.
+          <button
+            type="button"
+            onClick={() => navigate({ pathname: '/admin', hash: 'course-catalog' })}
+            className="ml-2 font-semibold underline"
+          >
+            Xem bảng khóa học
+          </button>
+        </div>
+      ) : null}
+
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3 text-[13px] text-amber-900 flex items-start gap-2.5 leading-relaxed">
         <AlertCircle size={15} className="flex-shrink-0 mt-0.5 text-amber-600" />
         <span>
@@ -1532,6 +1548,9 @@ export default function CoursePricingTab() {
                     <span className="text-slate-300">·</span>
                     <span>{course.totalSessions} buổi</span>
                   </div>
+                  {publishedWithoutOutline(course) ? (
+                    <p className="text-[12px] text-amber-700">Đã xuất bản, chưa có dàn ý chương.</p>
+                  ) : null}
                 </article>
               );
             })}
@@ -1568,6 +1587,9 @@ export default function CoursePricingTab() {
                         {course.description && (
                           <p className="text-[12px] text-slate-500 mt-0.5 line-clamp-1">{course.description}</p>
                         )}
+                        {publishedWithoutOutline(course) ? (
+                          <p className="text-[12px] text-amber-700 mt-1">Đã xuất bản, chưa có dàn ý chương.</p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <span className={`font-mono text-sm tabular-nums ${hasDiscount ? 'line-through text-slate-400' : 'font-semibold text-slate-800'}`}>

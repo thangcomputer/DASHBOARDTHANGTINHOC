@@ -1,1 +1,0 @@
-# Regression Check\n100% tests passing. Zero business logic changed.

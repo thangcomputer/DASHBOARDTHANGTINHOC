@@ -416,10 +416,26 @@ export async function clearMobileSession() {
   await SecureStore.deleteItemAsync(sessionStorageKey);
 }
 
+const inflightGets = new Map<string, Promise<unknown>>();
+
 export async function mobileApiRequest<TPayload = Record<string, unknown>>(
   path: string,
   init: RequestInit = {},
   withAuth = true,
 ): Promise<TPayload> {
-  return await request(path, init, withAuth, true) as TPayload;
+  const method = String(init.method || 'GET').toUpperCase();
+  const canShare = (method === 'GET' || method === 'HEAD') && !init.body && !init.signal;
+  if (!canShare) return await request(path, init, withAuth, true) as TPayload;
+
+  let headerKey = '';
+  try { headerKey = JSON.stringify(init.headers || {}); } catch { headerKey = ''; }
+  const key = `${method} ${path} auth:${withAuth ? (tokens?.accessToken || '') : ''} headers:${headerKey}`;
+  const existing = inflightGets.get(key);
+  if (existing) return await existing as TPayload;
+
+  const pending = request(path, init, withAuth, true).finally(() => {
+    if (inflightGets.get(key) === pending) inflightGets.delete(key);
+  });
+  inflightGets.set(key, pending);
+  return await pending as TPayload;
 }

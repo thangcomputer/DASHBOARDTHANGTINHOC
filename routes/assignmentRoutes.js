@@ -7,7 +7,6 @@ const mongoose = require('mongoose');
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Student = require('../models/Student');
-const Teacher = require('../models/Teacher');
 const { authMiddleware, branchFilter, userHasPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');

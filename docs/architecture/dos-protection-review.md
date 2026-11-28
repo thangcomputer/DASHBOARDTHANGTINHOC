@@ -1,1 +1,0 @@
-# DoS Protection Review\nRequest Timeout, JSON Flooding protection, and HPP protection active.

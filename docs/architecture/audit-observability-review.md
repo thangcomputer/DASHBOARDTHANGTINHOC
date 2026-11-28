@@ -1,1 +1,0 @@
-# Audit Observability Review\n`auditLogger.js` interceptor augmented to implicitly capture `traceId`, `spanId`, and `sessionId` directly from the AsyncLocalStorage RequestContext binding operations inextricably to Edge Requests.

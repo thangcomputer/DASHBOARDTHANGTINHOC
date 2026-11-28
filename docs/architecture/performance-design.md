@@ -1,1 +1,0 @@
-# Performance Design\nAnalysis of Repository Cache, Memory Cache, Compression, Pagination, Connection Pools, Mongo Indexes, and Lazy Loading.

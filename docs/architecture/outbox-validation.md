@@ -1,1 +1,0 @@
-# Outbox Validation\nDuplicate messages, lost messages, replay, ordering, DLQ readiness, and poison message handling mocked and validated.

@@ -970,7 +970,6 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
     const mongoose = require('mongoose');
     const { conversationId } = req.params;
     const readerId = req.user.id;
-    const isStaffOrAdmin = req.user.role === 'admin' || isStaffAccount(req.user);
     const isGroupConv = String(conversationId || '').startsWith('group_');
     let allowed = false;
     if (isGroupConv) {
@@ -1317,8 +1316,6 @@ router.post('/groups', messagesGuard('group_create'), async (req, res) => {
     if (!Array.isArray(participants) || participants.length === 0) {
       return res.status(400).json({ success: false, message: 'Danh sách thành viên không hợp lệ' });
     }
-    const validRoles = ['admin', 'teacher', 'student', 'staff'];
-
     const sanitizedParticipants = participants
       .map(p => ({ ...p, normRole: normalizeGroupRole(p?.role) }))
       .filter(p => p && typeof p === 'object' && p.userId && p.name && p.normRole)

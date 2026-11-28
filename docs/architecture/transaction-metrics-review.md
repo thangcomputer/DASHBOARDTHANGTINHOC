@@ -1,1 +1,0 @@
-# Transaction Metrics Review\nTransaction status, execution_duration, and rollback_reason natively collected via CommandBus wrapper.

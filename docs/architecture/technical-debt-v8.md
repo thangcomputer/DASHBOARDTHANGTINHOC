@@ -1,1 +1,0 @@
-# Technical Debt v8\nLack of isolated Secret Manager, manual runbooks, incomplete automated horizontal scaling strategies.

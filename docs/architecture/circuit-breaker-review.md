@@ -1,1 +1,0 @@
-# Circuit Breaker Review\nEnsures third-party degradation (Zalo/SePay) does not spiral into complete threadpool starvation.

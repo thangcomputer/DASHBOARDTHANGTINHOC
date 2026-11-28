@@ -1,9 +1,0 @@
-{
-  "title": "System Performance Dashboard",
-  "panels": [
-    {
-      "type": "graph",
-      "title": "Total System Performance"
-    }
-  ]
-}

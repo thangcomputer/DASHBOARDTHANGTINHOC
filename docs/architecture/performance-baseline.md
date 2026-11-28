@@ -1,1 +1,0 @@
-# Performance Baseline\nNative MetricsRegistry is active. Baselines will populate as traffic flows through `/metrics` endpoint.

@@ -3,6 +3,8 @@
 Full-stack CMS cho trung tâm đào tạo: **Express 5 + MongoDB + Socket.io**, frontend **React (Vite) + Tailwind**.
 
 > **Đội kỹ thuật:** [docs/TECHNICAL.md](docs/TECHNICAL.md) · [ERD](docs/ERD.md) · [OpenAPI](docs/openapi.yaml) · [Final review](docs/ROADMAP_REVIEW.md)
+>
+> **Bàn giao:** [docs/README.md](docs/README.md) — kiến trúc, cấu trúc thư mục, API, nghiệp vụ, cách chạy và chỗ không được sửa.
 
 ## Cấu trúc thư mục
 

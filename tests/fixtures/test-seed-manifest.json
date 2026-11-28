@@ -1,0 +1,112 @@
+{
+  "database": "thang_tin_hoc_test",
+  "host": "127.0.0.1",
+  "runtimeDatabaseUntouched": "dashboardthangtinhoc",
+  "runtimeStudentCountUnchanged": true,
+  "cleared": [
+    {
+      "name": "paymentsessions",
+      "deleted": 0
+    },
+    {
+      "name": "userdevicesessions",
+      "deleted": 0
+    },
+    {
+      "name": "dailypracticeprofiles",
+      "deleted": 0
+    },
+    {
+      "name": "authsessions",
+      "deleted": 0
+    },
+    {
+      "name": "teachers",
+      "deleted": 4
+    },
+    {
+      "name": "schedules",
+      "deleted": 0
+    },
+    {
+      "name": "courses",
+      "deleted": 2
+    },
+    {
+      "name": "lessonsubjects",
+      "deleted": 1
+    },
+    {
+      "name": "registereddevices",
+      "deleted": 0
+    },
+    {
+      "name": "lessonunits",
+      "deleted": 1
+    },
+    {
+      "name": "notifications",
+      "deleted": 0
+    },
+    {
+      "name": "messages",
+      "deleted": 0
+    },
+    {
+      "name": "students",
+      "deleted": 0
+    },
+    {
+      "name": "assignments",
+      "deleted": 0
+    },
+    {
+      "name": "mobilepushtokens",
+      "deleted": 0
+    }
+  ],
+  "counts": {
+    "teachers": 4,
+    "students": 10,
+    "courses": 2,
+    "schedules": 2,
+    "messages": 2
+  },
+  "seeded": {
+    "adminId": "6b0b05595ead987ee2d94fb1",
+    "teacherIds": [
+      "6b0b05595ead987ee2d94fb2",
+      "6b0b05595ead987ee2d94fb3",
+      "6b0b05595ead987ee2d94fb4"
+    ],
+    "studentIds": [
+      "6b0b05595ead987ee2d94fb9",
+      "6b0b05595ead987ee2d94fbe",
+      "6b0b05595ead987ee2d94fc3",
+      "6b0b05595ead987ee2d94fc8",
+      "6b0b05595ead987ee2d94fcd",
+      "6b0b05595ead987ee2d94fd2",
+      "6b0b05595ead987ee2d94fd7",
+      "6b0b05595ead987ee2d94fdc",
+      "6b0b055a5ead987ee2d94fe1",
+      "6b0b055a5ead987ee2d94fe6"
+    ],
+    "courseIds": [
+      "6b0b05595ead987ee2d94fb5",
+      "6b0b05595ead987ee2d94fb6"
+    ],
+    "lessonSubjectId": "6b0b05595ead987ee2d94fb7",
+    "lessonUnitId": "6b0b05595ead987ee2d94fb8",
+    "assignmentId": "6b0b055a5ead987ee2d94fed",
+    "linksOk": true,
+    "device": {
+      "firstSlot": 1,
+      "secondSlot": 2,
+      "thirdCode": "DEVICE_NOT_REGISTERED_LIMIT_REACHED",
+      "reloginSlot": 1,
+      "activeDevicesAfterRelogin": 2
+    },
+    "xpRule": 60
+  },
+  "password": "Test@12345"
+}

@@ -1,1 +1,0 @@
-# Transaction Boundary Review v3\nAll designated Domains inherit the reliability infrastructure seamlessly via CQRS interception logic without polluting business rules.

@@ -16,7 +16,6 @@ const {
   getMergedExamCatalog,
   normalizeCustomList,
   resolveExamSubjectsForCourse,
-  isExcludedExamSubjectId,
 } = require('./examSubjectCatalog');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
 const logger = require('../config/logger');

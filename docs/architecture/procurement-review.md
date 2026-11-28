@@ -1,1 +1,0 @@
-# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.5 Batch 3 ERP Financial Settlement & Procurement Business Logic Implementation.

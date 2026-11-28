@@ -1,4 +1,5 @@
 // ─── API Service - Hệ thống CMS Thắng Tin Học ───────────────────────────────
+import { shareInflight } from './inflightGet.js';
 
 export const SOCKET_BASE = import.meta.env.VITE_API_URL || '';
 export const BASE_URL = SOCKET_BASE;
@@ -619,8 +620,22 @@ export function clearSelectedTenantId() {
 /**
  * CORE FETCH HELPER: Tự động đính kèm Auth Header và xử lý lỗi hệ thống.
  * Tự động refresh token khi nhận 401/TOKEN_EXPIRED và retry 1 lần.
+ * GET/HEAD giống nhau và đang bay được gộp; request ghi dữ liệu không gộp.
  */
-export const apiFetch = async (endpoint, options = {}) => {
+function apiFetchCoalesceKey(endpoint, options) {
+  const method = String(options.method || 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') return null;
+  if (options.dedupe === false || options.body || options.signal) return null;
+  if (options._retried || options._csrfRetried || options._rateRetryCount || options._serverRetryCount) return null;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  let tenant = '';
+  try { tenant = localStorage.getItem('selected_tenant_id') || ''; } catch { /* ignore */ }
+  let extraHeaders = '';
+  try { extraHeaders = JSON.stringify(options.headers || {}); } catch { extraHeaders = ''; }
+  return `${method} ${url} auth:${options.skipAuth ? '' : (getAccessToken() || '')} tenant:${tenant} headers:${extraHeaders}`;
+}
+
+async function apiFetchCore(endpoint, options = {}) {
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
   const method = options.method || 'GET';
   const buildHeaders = async (token) => {
@@ -749,6 +764,12 @@ export const apiFetch = async (endpoint, options = {}) => {
   }
 
   return apiFetch(endpoint, { ...options, _retried: true });
+}
+
+export const apiFetch = async (endpoint, options = {}) => {
+  const key = apiFetchCoalesceKey(endpoint, options);
+  if (!key) return apiFetchCore(endpoint, options);
+  return shareInflight(key, () => apiFetchCore(endpoint, options));
 };
 
 export const callHistoryAPI = {

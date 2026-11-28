@@ -1,1 +1,0 @@
-# Security Hardening Design\nAnalysis of Helmet, CSP, HSTS, CSRF, Rate Limiting, Secret Rotation, Cookie Security, JWT, and TLS.

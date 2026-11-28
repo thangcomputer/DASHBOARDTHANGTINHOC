@@ -1,1 +1,0 @@
-# Transaction Hook Review\nCommandBus successfully wraps all commands with `TransactionManager.execute()`.

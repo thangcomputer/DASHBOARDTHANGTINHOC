@@ -1,1 +1,0 @@
-# Circuit Breaker Hook Review\n`ExternalCircuitBreaker` provided for Email/AI calls skipping Mongo.

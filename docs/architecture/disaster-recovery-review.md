@@ -1,1 +1,0 @@
-# Disaster Recovery Review\nSLA RTO/RPO defined in organizational runbook.

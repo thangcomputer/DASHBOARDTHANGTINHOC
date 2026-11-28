@@ -1,1 +1,0 @@
-'use strict'; class ${ModelName}Controller {} module.exports = ${ModelName}Controller;

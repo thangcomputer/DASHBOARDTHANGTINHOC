@@ -1,1 +1,0 @@
-# Performance Validation\nTransaction overhead minimal (< 2ms), Retry overhead negligible, Idempotency lookup latency < 1ms.

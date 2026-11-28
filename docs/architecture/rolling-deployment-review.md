@@ -1,1 +1,0 @@
-# Rolling Deployment Review\nHealthchecks ensure smooth traffic draining during rolling updates.

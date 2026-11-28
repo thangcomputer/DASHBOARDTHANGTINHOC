@@ -13,8 +13,6 @@ const logger = require('../config/logger');
 // ─── CQRS Strangler: import modular CQRS controller ─────────────────────────
 // Activated via ENABLE_CQRS_INVOICE=true env flag
 const cqrsInvoiceController = require('../modules/invoice/controllers/InvoiceController');
-const NEW_PERMISSIONS = require('../shared/constants/permissions');
-const { authorize } = require('../shared/middleware/authorize');
 
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)

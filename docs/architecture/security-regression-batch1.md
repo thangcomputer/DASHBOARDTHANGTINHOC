@@ -1,1 +1,0 @@
-# Security Regression Report\n0 authentication and authorization regressions detected.

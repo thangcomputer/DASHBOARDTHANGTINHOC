@@ -1,1 +1,0 @@
-# Rollback Review\nDatabase schema strict backward compatibility ensures instant rollback via container revert.

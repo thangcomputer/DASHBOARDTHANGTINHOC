@@ -1,1 +1,0 @@
-# Production Performance Review\nCaching, Gzip, and Mongo pooling validated.

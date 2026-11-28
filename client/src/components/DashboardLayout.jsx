@@ -77,6 +77,7 @@ import {
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
   students: 'Học viên TT',
+  'course-catalog': 'Khóa học',
   teachers: 'Giảng viên',
   evaluations: 'Đánh giá',
   finance: 'Tài chính',

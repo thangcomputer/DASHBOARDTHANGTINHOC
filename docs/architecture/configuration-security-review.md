@@ -1,1 +1,0 @@
-# Configuration Security Review\nPasswords, JWT, API Keys excluded from diagnostics endpoints and logging.

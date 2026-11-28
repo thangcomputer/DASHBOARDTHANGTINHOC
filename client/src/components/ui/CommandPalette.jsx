@@ -81,6 +81,7 @@ const ROLE_COMMANDS = {
   admin: [
     { id: 'adm-dash', label: 'Tổng quan hệ thống', hint: 'Trang chủ quản trị', path: '/admin', icon: LayoutDashboard, keywords: 'tong quan dashboard home' },
     { id: 'adm-stu', label: 'Quản lý Học viên', hint: 'Danh sách & hồ sơ HV', path: '/admin#students', icon: GraduationCap, keywords: 'hoc vien students' },
+    { id: 'adm-course', label: 'Khóa học', hint: 'Thiếu video, dàn ý, giá', path: '/admin#course-catalog', icon: BookOpen, keywords: 'khoa hoc course video' },
     { id: 'adm-tea', label: 'Quản lý Giảng viên', hint: 'Danh sách & duyệt GV', path: '/admin#teachers', icon: Users, keywords: 'giang vien teachers' },
     { id: 'adm-meet', label: 'Lịch học Meet', hint: 'Lịch dạy & ca học', path: '/admin#meet-classes', icon: Calendar, keywords: 'lich meet schedule' },
     { id: 'adm-fin', label: 'Tài chính & Chi trả', hint: 'Thu chi & lương GV', path: '/admin#finance', icon: DollarSign, keywords: 'tai chinh finance luong' },

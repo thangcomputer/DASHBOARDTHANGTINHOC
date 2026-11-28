@@ -1,1 +1,0 @@
-# Sprint 4.6 Batch 2 Complete\nEnterprise Observability integrated. Next steps involve spinning up the infrastructure (Grafana/Prometheus/Jaeger containers) outside the monolith codebase.

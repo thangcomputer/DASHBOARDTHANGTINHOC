@@ -1,1 +1,0 @@
-# Restore Review\nrestore-mongo.sh documented for rapid recovery.

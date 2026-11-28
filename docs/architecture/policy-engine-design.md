@@ -1,1 +1,0 @@
-# Policy Engine Design\nPolicyContext established for ABAC future.

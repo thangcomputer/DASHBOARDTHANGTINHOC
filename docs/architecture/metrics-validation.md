@@ -1,1 +1,0 @@
-# Metrics Validation\nCounters and Summary metrics exported cleanly over HTTP text format.

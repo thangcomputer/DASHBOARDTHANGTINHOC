@@ -1,9 +1,0 @@
-{
-  "title": "HTTP Traffic Dashboard",
-  "panels": [
-    {
-      "type": "graph",
-      "title": "Total HTTP Traffic"
-    }
-  ]
-}

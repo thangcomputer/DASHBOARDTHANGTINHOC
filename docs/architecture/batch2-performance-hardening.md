@@ -1,1 +1,0 @@
-# Batch 2 Performance Hardening\nSprint 4.8 Batch 2 completed with zero regressions.

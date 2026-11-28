@@ -1,1 +1,0 @@
-# Regression Check\nZero behavioral drift. 100% automated regression success.

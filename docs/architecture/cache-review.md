@@ -1,1 +1,0 @@
-# Cache Review\nMemoryCache and RedisCache providers configured.

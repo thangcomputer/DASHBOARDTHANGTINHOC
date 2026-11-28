@@ -22,6 +22,7 @@ import {
   AdminLazyDeviceSecurityTab,
 } from './admin/AdminLazyTabShell';
 
+import AdminCourseHub from './admin/tabs/AdminCourseHub';
 import AdminModalManager from './admin/shared/AdminModalManager';
 import { useAdminDashboardState } from './admin/hooks/useAdminDashboardState';
 import { AdminFinanceProvider } from './admin/hooks/AdminFinanceContext';
@@ -52,6 +53,7 @@ const AdminDashboard = () => {
             )}
 
             {activeTab === 'students' && <AdminLazyStudentsTab />}
+            {activeTab === 'course-catalog' && <AdminCourseHub />}
             {activeTab === 'teachers' && <AdminLazyTeachersTab />}
             {(activeTab === 'training' || activeTab.startsWith('training-')) && activeTab !== 'training-guides-evaluations' && (
               <AdminTrainingProvider activeTab={activeTab}>

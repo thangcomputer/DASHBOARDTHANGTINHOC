@@ -1,1 +1,0 @@
-# Runtime Profiler Review\nLightweight `Profiler` deployed. Measures block execution time natively capturing P50/P99 latency buckets via `MetricsRegistry`.

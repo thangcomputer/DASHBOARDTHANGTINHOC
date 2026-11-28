@@ -1411,7 +1411,6 @@ const Group = require('../models/Group');
 const ConversationVisibility = require('../models/ConversationVisibility');
 const PayrollLog = require('../models/PayrollLog');
 const Employee = require('../models/Employee');
-const mongoose = require('mongoose');
 
 router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGuard('reset'), async (req, res) => {
   const { phrase, password, options = { all: true } } = req.body;

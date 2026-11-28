@@ -1,1 +1,0 @@
-# Regression Report Batch 3\n0 integrations or unit tests failed.

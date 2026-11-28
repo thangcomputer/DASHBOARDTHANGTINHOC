@@ -1,1 +1,0 @@
-# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.1 Batch 1 CRM Foundation.

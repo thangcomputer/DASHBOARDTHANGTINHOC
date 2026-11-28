@@ -1,9 +1,0 @@
-{
-  "title": "Database Performance Dashboard",
-  "panels": [
-    {
-      "type": "graph",
-      "title": "Total Database Performance"
-    }
-  ]
-}

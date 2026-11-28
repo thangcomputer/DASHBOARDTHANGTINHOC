@@ -7,7 +7,6 @@ const cache = require('../utils/cache');
 const { getCachedSettings } = require('../services/settingsCache');
 const {
   sanitizeExamSubjects,
-  resolveExamSubjectsForCourse,
   inferExamSubjectsFromCourseName,
 } = require('../services/examSubjectCatalog');
 const { policyShadowCourse } = require('../middleware/policyShadowCourse');

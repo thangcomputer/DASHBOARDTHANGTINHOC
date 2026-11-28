@@ -1,1 +1,0 @@
-# Technical Debt v9\nRemaining debt: external Vault integration not yet instantiated. Redis cluster scaling deferred.

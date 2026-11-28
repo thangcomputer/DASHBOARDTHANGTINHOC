@@ -1,1 +1,0 @@
-# Configuration Observability Review\nMetrics bound to secret access, configuration loads, and validation failures.

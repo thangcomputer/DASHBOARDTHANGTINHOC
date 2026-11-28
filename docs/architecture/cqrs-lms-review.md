@@ -1,1 +1,0 @@
-# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.0 Batch 3 LMS Advanced Features.

@@ -1,1 +1,0 @@
-# Transaction Infrastructure\nProvides global boundary contexts using `TransactionContext` wrapped with AsyncLocalStorage.

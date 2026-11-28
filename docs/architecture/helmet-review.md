@@ -1,1 +1,0 @@
-# Helmet Review\nHSTS, FrameGuard, NoSniff, CSP centralized via configuration.

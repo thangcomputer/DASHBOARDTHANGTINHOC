@@ -1,1 +1,0 @@
-# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.3 Batch 4 Enterprise Workflow Orchestration, Saga, State Machine & AI Automation.

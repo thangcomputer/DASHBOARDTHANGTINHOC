@@ -1,1 +1,0 @@
-# Alert Rules Review\nPrometheus alert definitions generated in `docs/architecture/alerts/`.

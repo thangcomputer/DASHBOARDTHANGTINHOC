@@ -8,6 +8,7 @@
 
 
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Settings, CreditCard, Bell, Save, Loader2, Eye,
   Upload, Users, GraduationCap, ToggleLeft,
@@ -58,6 +59,7 @@ function TuitionQRPreview({ settings, compact = false }) {
 }
 
 export default function SystemSettingsTab() {
+  const location = useLocation();
   const [activeSubTab, setActiveSubTab] = useState('bank');
   const [loading, setLoading] = useState(true);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -350,6 +352,14 @@ export default function SystemSettingsTab() {
       setAdminSaving(false);
     }
   };
+
+  useEffect(() => {
+    const raw = (location.hash || '').replace(/^#/, '');
+    const query = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+    const section = new URLSearchParams(query).get('section');
+    const allowed = ['bank', 'pricing', 'branches', 'popup', 'invoice', 'web', 'ai-auto-reply', 'account'];
+    if (section && allowed.includes(section)) setActiveSubTab(section);
+  }, [location.hash]);
 
   const TABS = [
     { key: 'bank', label: 'Tài khoản Thu học phí', icon: CreditCard },

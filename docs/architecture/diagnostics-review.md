@@ -1,1 +1,0 @@
-# Operational Diagnostics Review\nExposed `/diagnostics` encompassing Event Loop Lag, Memory Heaps, and raw CPU Usage.

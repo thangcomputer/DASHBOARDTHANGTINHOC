@@ -1,1 +1,0 @@
-# Release Management Review\nSemantic versioning enforced across Git tags.

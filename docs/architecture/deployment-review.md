@@ -1,1 +1,0 @@
-# Deployment Review\nEvaluated deployment pipeline and validated readiness.

@@ -125,6 +125,7 @@ const MENU_CONFIG = {
       { key: 'inbox', section: 'KHÔNG GIAN LÀM VIỆC', icon: MessageSquare, label: 'Hộp thư', path: '/admin/inbox', permission: PERMISSIONS.MANAGE_MESSAGES },
 
       { key: 'students', section: 'HỌC VIÊN TT', icon: Users, label: 'Học viên TT', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'course-catalog', section: 'HỌC VIÊN TT', icon: BookOpen, label: 'Khóa học', path: '/admin', hash: 'course-catalog', permission: [PERMISSIONS.MANAGE_STUDENTS, PERMISSIONS.SYSTEM_SETTINGS, PERMISSIONS.MANAGE_TRAINING] },
       { key: 'lesson-practice', section: 'HỌC VIÊN TT', icon: BookOpen, label: 'Luyện tập tự do', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'student-resources', section: 'HỌC VIÊN TT', icon: FileText, label: 'Tài liệu & Phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'student-training', section: 'HỌC VIÊN TT', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
@@ -688,9 +689,12 @@ const AppSidebar = ({
       return;
     }
     if (onNavigateItem) { onNavigateItem(item); setMobileOpen(false); return; }
-    // Navigate with hash if present (e.g. /teacher#students)
-    const target = item.hash ? `${item.path}#${item.hash}` : item.path;
-    navigate(target);
+    // Hash trên cùng pathname: navigate('/admin#tab') bị React Router bỏ qua.
+    if (item.hash) {
+      navigate({ pathname: item.path, hash: item.hash });
+    } else {
+      navigate(item.path);
+    }
     setMobileOpen(false);
   };
 
@@ -777,7 +781,7 @@ const AppSidebar = ({
 
   // Trả về element (không khai báo component con) - tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
   const renderSidebarContent = () => (
-    <div className={`cms-sidebar-glass__content relative flex flex-col h-full overflow-x-hidden ${isFreeStudent ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
+    <div className={`cms-sidebar-glass__content relative flex flex-col h-full min-h-0 overflow-x-hidden ${isFreeStudent ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
       {isFreeStudent ? (
         <div className="pointer-events-none absolute inset-0 overflow-hidden z-0 dark:hidden" aria-hidden="true">
           <span className="dew-water-orb absolute -top-6 right-4 h-16 w-16 opacity-45" />
@@ -840,7 +844,7 @@ const AppSidebar = ({
         )}
       </div>
 
-      <nav className="flex-1 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
+      <nav className="flex-1 min-h-0 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
         {filterItems(effectiveSourceItems)
           .filter(item => {
             // Ẩn mục 'Bài Test' khi GV đã được kích hoạt giảng dạy
@@ -921,8 +925,14 @@ const AppSidebar = ({
                       <Lock size={isStudentNav ? 14 : 13} className={`ml-auto flex-shrink-0 ${isFreeStudent ? 'text-amber-600' : isStudentNav ? 'text-[#FBBF24]' : 'text-amber-200'}`} aria-label="Đang khóa" />
                     )}
                     {!isLocked && getBadgeCount(navItem.key) > 0 && (
-                      <span className={`ml-auto px-1.5 py-0.5 rounded-full text-white text-xs font-black leading-none drop-shadow-md ${isCourseStudent ? 'bg-[#10B981] shadow-emerald-500/50' : (isFreeStudent || isTeacherNav) ? 'bg-[#059669] shadow-emerald-500/50' : 'bg-emerald-500 shadow-emerald-500/50'}`} aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
-                        {getBadgeCount(navItem.key) > 99 ? '99+' : getBadgeCount(navItem.key)}
+                      <span
+                        className={`ml-auto px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold leading-none drop-shadow-md ${isCourseStudent ? 'bg-[#10B981] shadow-emerald-500/50' : (isFreeStudent || isTeacherNav) ? 'bg-[#059669] shadow-emerald-500/50' : 'bg-emerald-500 shadow-emerald-500/50'}`}
+                        title={role === 'admin' && navItem.key === 'students' ? `${getBadgeCount(navItem.key)} học viên chưa thu` : undefined}
+                        aria-label={role === 'admin' && navItem.key === 'students' ? `${getBadgeCount(navItem.key)} chưa thu` : `${getBadgeCount(navItem.key)} thông báo`}
+                      >
+                        {role === 'admin' && navItem.key === 'students'
+                          ? `${getBadgeCount(navItem.key)} chưa thu`
+                          : (getBadgeCount(navItem.key) > 99 ? '99+' : getBadgeCount(navItem.key))}
                       </span>
                     )}
                     {isStudentNav && !isFreeStudent && active && !isLocked && !showFreeLock && getBadgeCount(navItem.key) === 0 && (

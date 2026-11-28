@@ -7,7 +7,7 @@ const FileAsset = require('../models/FileAsset');
 const Invoice = require('../models/Invoice');
 const Schedule = require('../models/Schedule');
 const learningGoalService = require('../services/learningGoalService');
-const { authMiddleware, checkPermission, isTeacher, branchFilter, userHasPermission } = require('../middleware/auth');
+const { authMiddleware, checkPermission, branchFilter, userHasPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const { assertStudentBranchAccess } = require('../middleware/studentBranchGuard');
 const { policyShadowStudentRead } = require('../middleware/policyShadowStudentRead');
@@ -78,7 +78,7 @@ const {
   generateStudentCode,
   isCanonical,
 } = require('../services/businessCodeService');
-const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../services/ledgerService');
+const { settlePayment, postRefund } = require('../services/ledgerService');
 const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
 const { notifyTeacherPaymentReceived } = require('../services/teacherPaymentNotice');
 const cache = require('../utils/cache');

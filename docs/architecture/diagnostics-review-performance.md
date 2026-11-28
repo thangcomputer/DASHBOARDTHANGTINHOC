@@ -1,1 +1,0 @@
-# Diagnostics Review\n/diagnostics endpoint exposed with cache, memory, mongo metrics.

@@ -19,7 +19,15 @@ async function getCachedSettings() {
       .select(SETTINGS_PUBLIC_SELECT)
       .lean();
     if (!settings) {
-      await SystemSettings.create({ _key: 'main' });
+      try {
+        await SystemSettings.updateOne(
+          { _key: 'main' },
+          { $setOnInsert: { _key: 'main' } },
+          { upsert: true },
+        );
+      } catch (err) {
+        if (err?.code !== 11000) throw err;
+      }
       settings = await SystemSettings.findOne({ _key: 'main' })
         .select(SETTINGS_PUBLIC_SELECT)
         .lean();

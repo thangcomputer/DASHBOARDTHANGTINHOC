@@ -1,1 +1,0 @@
-# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.4 Batch 4 Enterprise Platform Hardening Production Readiness Finalization.

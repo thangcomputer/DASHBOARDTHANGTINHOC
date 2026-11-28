@@ -1,1 +1,0 @@
-# CI/CD Review\nGitHub actions structured for test, lint, and security scan stages.

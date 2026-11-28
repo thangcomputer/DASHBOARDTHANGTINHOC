@@ -1,1 +1,0 @@
-# Nginx Review\nnginx.conf scaffolded for production caching and security headers.

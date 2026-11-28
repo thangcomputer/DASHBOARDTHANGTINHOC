@@ -1,1 +1,0 @@
-# Security Hardening Review\nCentralized enterprise security middleware implemented.

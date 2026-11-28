@@ -1,1 +1,0 @@
-# Invoice Reliability Review\nInvoice generation transactions now emit metrics correctly to MetricsRegistry.

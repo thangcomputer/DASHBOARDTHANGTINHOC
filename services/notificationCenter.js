@@ -2,7 +2,6 @@
  * Notification Center - list / count / mark-read / dismiss / broadcast.
  */
 const Notification = require('../models/Notification');
-const logger = require('../config/logger');
 
 const VALID_TYPES = ['SYSTEM', 'COURSE', 'FINANCE', 'EVALUATION', 'MESSAGE', 'EXAM', 'SCHEDULE'];
 
